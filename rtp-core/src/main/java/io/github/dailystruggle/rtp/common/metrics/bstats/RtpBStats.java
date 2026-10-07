@@ -69,6 +69,7 @@ public final class RtpBStats {
         BStatsService s = service;
         service = null;
         if (s != null) s.shutdown();
+        RtpBStatsCatalogue.stopRtpCostSampler();
     }
 
     /** The running service, or {@code null}. */

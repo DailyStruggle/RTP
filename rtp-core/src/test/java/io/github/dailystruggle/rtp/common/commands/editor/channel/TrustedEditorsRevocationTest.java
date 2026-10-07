@@ -131,6 +131,47 @@ class TrustedEditorsRevocationTest {
         assertTrue(reloaded.isTrusted(B), "B from t2 must be retained");
     }
 
+    @Test
+    @DisplayName("In-memory revocation is authoritative: isTrusted does not re-import from disk on miss")
+    void inMemoryRevocationAuthoritative() throws IOException {
+        Path f = file("{\"version\":1,\"trusted\":[{\"fingerprint\":\"" + A + "\",\"added\":1},"
+                + "{\"fingerprint\":\"" + B + "\",\"added\":2}]}");
+        TrustedEditors t = TrustedEditors.load(f);
+        assertTrue(t.isTrusted(A));
+        assertTrue(t.isTrusted(B));
+
+        // forget in memory only (simulating arrival before file write or file write failure)
+        assertEquals(Set.of(A), t.forget("abcd"));
+        assertFalse(t.isTrusted(A), "in-memory revocation must stick even if file still contains key");
+        assertTrue(t.isTrusted(B));
+
+        // Unknown fingerprint must return false without consulting disk
+        String unknown = "1234" + "0".repeat(60);
+        assertFalse(t.isTrusted(unknown));
+    }
+
+    @Test
+    @DisplayName("Tombstones prevent resurrecting revoked keys when a later add merges from disk")
+    void tombstonesPreventResurrectionOnMerge() throws IOException {
+        Path f = file("{\"version\":1,\"trusted\":[{\"fingerprint\":\"" + A + "\",\"added\":1}]}");
+        TrustedEditors t = TrustedEditors.load(f);
+        assertTrue(t.isTrusted(A));
+
+        // Forget A in memory
+        t.forget("abcd");
+        assertFalse(t.isTrusted(A));
+
+        // Later add B on this channel: merges from disk where A was still present
+        t.add(B, 2000L);
+        assertFalse(t.isTrusted(A), "A must not be re-imported into memory via add merge");
+        assertTrue(t.isTrusted(B));
+
+        // On disk, A must have been replaced/excluded because t had revoked A
+        TrustedEditors reloaded = TrustedEditors.load(f);
+        assertFalse(reloaded.isTrusted(A), "A must not be re-persisted to disk");
+        assertTrue(reloaded.isTrusted(B));
+    }
+
     /** POSIX {@code rw-------}, or every ACL entry granted to the owner. */
     public static void assertOwnerOnly(Path f) throws IOException {
         PosixFileAttributeView posix = Files.getFileAttributeView(f, PosixFileAttributeView.class);

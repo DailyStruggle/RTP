@@ -935,6 +935,21 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       sender = Bukkit.getPlayer(senderId);
       if (sender == null) return false;
     }
+    if (!Bukkit.isPrimaryThread() && plugin instanceof Plugin bp && bp.isEnabled()) {
+      java.util.concurrent.CompletableFuture<Boolean> f = new java.util.concurrent.CompletableFuture<>();
+      Bukkit.getScheduler().runTask(bp, () -> {
+        try {
+          f.complete(Bukkit.dispatchCommand(sender, commandLine));
+        } catch (Throwable t) {
+          f.completeExceptionally(t);
+        }
+      });
+      try {
+        return f.get(5, java.util.concurrent.TimeUnit.SECONDS);
+      } catch (Exception e) {
+        return false;
+      }
+    }
     try {
       return Bukkit.dispatchCommand(sender, commandLine);
     } catch (Throwable t) {

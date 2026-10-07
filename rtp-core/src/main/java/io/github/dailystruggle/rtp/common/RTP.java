@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
@@ -326,7 +327,7 @@ public class RTP {
           if (apiTargetPermissionDenied(player, target, null)) {
             future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
                 io.github.dailystruggle.rtp.api.RTPResult.Reason.NO_PERMISSION,
-                "Missing permission for " + target));
+                getNoPermissionMessage(target)));
             return future;
           }
           io.github.dailystruggle.rtp.api.network.NetworkCommandHook hook = networkCommandHook;
@@ -387,7 +388,7 @@ public class RTP {
           if (apiTargetPermissionDenied(player, target, null)) {
             future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
                 io.github.dailystruggle.rtp.api.RTPResult.Reason.NO_PERMISSION,
-                "Missing permission for " + target));
+                getNoPermissionMessage(target)));
             return future;
           }
           String destServer = target.serverId();
@@ -462,7 +463,7 @@ public class RTP {
         if (apiTargetPermissionDenied(player, target, null)) {
           future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
               io.github.dailystruggle.rtp.api.RTPResult.Reason.NO_PERMISSION,
-              "Missing permission for " + target));
+              getNoPermissionMessage(target)));
           return future;
         }
 
@@ -486,7 +487,7 @@ public class RTP {
         if (apiTargetPermissionDenied(player, target, region)) {
           future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
               io.github.dailystruggle.rtp.api.RTPResult.Reason.NO_PERMISSION,
-              "Missing permission for " + target));
+              getNoPermissionMessage(target)));
           return future;
         }
 
@@ -1037,6 +1038,16 @@ public class RTP {
     getInstance().processingPlayers.add(uuid);
     targetRegion.inFlightCalculations.incrementAndGet();
     scheduler.runTaskAsynchronously(task);
+  }
+
+  private static String getNoPermissionMessage(io.github.dailystruggle.rtp.api.RtpTarget target) {
+    if (configs != null) {
+      Object val = configs.getConfigValue(PlayerMessages.noPerms, null);
+      if (val instanceof String msg && !msg.isBlank()) {
+        return msg;
+      }
+    }
+    return "Missing permission for " + target;
   }
 
   /**

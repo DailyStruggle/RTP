@@ -41,6 +41,7 @@ public final class TrustedEditors {
     private final long maxAgeMillis;
     private final LongSupplier clock;
     private final Map<String, Long> trusted = new LinkedHashMap<>();
+    private final Set<String> revoked = new LinkedHashSet<>();
 
     private TrustedEditors(Path file, long maxAgeMillis, LongSupplier clock) {
         this.file = file;
@@ -105,15 +106,9 @@ public final class TrustedEditors {
 
     /** Trusted and, with a max age, still inside it (an expired entry is dropped from memory). */
     public synchronized boolean isTrusted(String fingerprint) {
-        Long added = fingerprint == null ? null : trusted.get(fingerprint);
-        if (added == null && file != null && Files.isRegularFile(file)) {
-            TrustedEditors disk = load(file, maxAgeMillis, clock);
-            for (Map.Entry<String, Long> entry : disk.trusted.entrySet()) {
-                trusted.putIfAbsent(entry.getKey(), entry.getValue());
-            }
-            added = fingerprint == null ? null : trusted.get(fingerprint);
-        }
-        if (added == null) return false;
+        if (fingerprint == null) return false;
+        Long added = trusted.get(fingerprint);
+        if (added == null) return false; // in-memory revocation is authoritative for this instance
         if (expired(added, clock.getAsLong())) {
             trusted.remove(fingerprint);
             return false;
@@ -139,7 +134,9 @@ public final class TrustedEditors {
                 if (file != null && Files.isRegularFile(file)) {
                     TrustedEditors disk = load(file, maxAgeMillis, clock);
                     for (Map.Entry<String, Long> entry : disk.trusted.entrySet()) {
-                        trusted.putIfAbsent(entry.getKey(), entry.getValue());
+                        if (!revoked.contains(entry.getKey())) {
+                            trusted.putIfAbsent(entry.getKey(), entry.getValue());
+                        }
                     }
                 }
                 Set<String> removed = forget(selector);
@@ -160,6 +157,7 @@ public final class TrustedEditors {
                 it.remove();
             }
         }
+        revoked.addAll(removed);
         return removed;
     }
 
@@ -175,10 +173,13 @@ public final class TrustedEditors {
         }
         synchronized (FILE_LOCK) {
             synchronized (this) {
+                revoked.remove(fingerprint);
                 if (file != null && Files.isRegularFile(file)) {
                     TrustedEditors disk = load(file, maxAgeMillis, clock);
                     for (Map.Entry<String, Long> entry : disk.trusted.entrySet()) {
-                        trusted.putIfAbsent(entry.getKey(), entry.getValue());
+                        if (!revoked.contains(entry.getKey())) {
+                            trusted.putIfAbsent(entry.getKey(), entry.getValue());
+                        }
                     }
                 }
                 trusted.remove(fingerprint);
@@ -193,7 +194,9 @@ public final class TrustedEditors {
         if (file != null && Files.isRegularFile(file)) {
             TrustedEditors disk = load(file, maxAgeMillis, clock);
             for (Map.Entry<String, Long> entry : disk.trusted.entrySet()) {
-                trusted.putIfAbsent(entry.getKey(), entry.getValue());
+                if (!revoked.contains(entry.getKey())) {
+                    trusted.putIfAbsent(entry.getKey(), entry.getValue());
+                }
             }
         }
         return Set.copyOf(trusted.keySet());

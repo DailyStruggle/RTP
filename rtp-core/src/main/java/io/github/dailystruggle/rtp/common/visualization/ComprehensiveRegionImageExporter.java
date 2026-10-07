@@ -112,7 +112,10 @@ public final class ComprehensiveRegionImageExporter {
     String timestamp = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss", Locale.ROOT)
         .withZone(java.time.ZoneId.systemDefault())
         .format(java.time.Instant.now());
-    String baseName = region.name + "_all_" + timestamp;
+    String sanitizedName = (region.name == null || region.name.isBlank())
+        ? "region"
+        : region.name.replaceAll("[^A-Za-z0-9._-]", "_");
+    String baseName = sanitizedName + "_all_" + timestamp;
     File imageFile = new File(outputDirectory, baseName + ".png");
     File jsonFile = new File(outputDirectory, baseName + ".json");
 
