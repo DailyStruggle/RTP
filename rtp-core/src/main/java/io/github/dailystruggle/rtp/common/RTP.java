@@ -374,18 +374,31 @@ public class RTP {
           return future;
         }
 
+        // ACTION target is a UI navigation descriptor, not a teleport destination:
+        if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.ACTION) {
+          future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+              io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET,
+              "ACTION targets cannot be teleported to"));
+          return future;
+        }
+
         // Coordinate target (e.g. /rtp back to exact coordinate on local or remote server):
         if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.COORDINATE) {
+          if (apiTargetPermissionDenied(player, target, null)) {
+            future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                io.github.dailystruggle.rtp.api.RTPResult.Reason.NO_PERMISSION,
+                "Missing permission for " + target));
+            return future;
+          }
           String destServer = target.serverId();
           String localServer = (io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE != null)
               ? io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE.serverId() : null;
           boolean isLocal = (destServer == null || destServer.isEmpty() || destServer.equalsIgnoreCase(localServer));
           if (isLocal) {
             String worldName = target.worldName();
-            RTPWorld<?> world = serverAccessor.getRTPWorld(worldName);
-            if (world == null && !serverAccessor.getRTPWorlds().isEmpty()) {
-              world = serverAccessor.getRTPWorlds().get(0);
-            }
+            RTPWorld<?> world = (worldName != null && !worldName.isBlank())
+                ? serverAccessor.getRTPWorld(worldName)
+                : null;
             if (world == null) {
               future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
                   io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET,
@@ -830,6 +843,21 @@ public class RTP {
               0L, 0.0, iconBlock, environment, label);
         }
 
+        if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.ACTION) {
+          return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
+              io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.READY,
+              0L, 0.0, null, null, target.name());
+        }
+
+        if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.COORDINATE) {
+          boolean noPerm = apiTargetPermissionDenied(player, target, null);
+          return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
+              noPerm
+                  ? io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.NO_PERMISSION
+                  : io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.READY,
+              0L, 0.0, null, null, target.name());
+        }
+
         // Check target permission first; REGION is gated after resolution below.
         boolean noPerm = apiTargetPermissionDenied(player, target, null);
 
@@ -1063,6 +1091,22 @@ public class RTP {
         return region != null
             && region.getSettings().requirePermission()
             && !player.hasPermission("rtp.regions." + target.name());
+      case COORDINATE: {
+        String worldName = target.worldName();
+        if (worldName != null && !worldName.isBlank() && configs != null) {
+          ConfigParser<WorldKeys> worldParser = configs.getWorldParser(worldName);
+          boolean requirePerm = worldParser != null
+              && Boolean.parseBoolean(
+                  worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
+          if (requirePerm
+              && !player.hasPermission("rtp.worlds." + worldName)
+              && !player.hasPermission("rtp.worlds.*")) {
+            return true;
+          }
+        }
+        return false;
+      }
+      case ACTION:
       case DEFAULT:
       default:
         return false;
@@ -1103,6 +1147,9 @@ public class RTP {
         }
         return selectionAPI.getRegionOrDefault("default");
       }
+      case ACTION:
+      case COORDINATE:
+        throw new IllegalArgumentException(target.kind() + " targets cannot be resolved to a region");
       case DEFAULT:
       default:
         if (player == null) {
@@ -1359,6 +1406,9 @@ public class RTP {
                 pendingDeathTeleports.remove(uuid);
             if (pending != null) {
               pending.completeDeathTeleport(false);
+            }
+            if (actionManager != null) {
+              actionManager.handlePlayerQuit(uuid);
             }
           });
         } catch (Throwable t) {
@@ -1743,6 +1793,11 @@ public class RTP {
       scheduler.cancelTask(task);
     }
     trackedTasks.clear();
+
+    // Delayed arrival releases never run once the plugin is disabled (S-002).
+    int arrivalHolds =
+        io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask.flushArrivalReservations();
+    log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop flushArrivalReservations released=" + arrivalHolds);
 
     log(Level.FINE,
         "[SHUTDOWN_TRACE] RTP.stop permRegionLookup shutDown count="

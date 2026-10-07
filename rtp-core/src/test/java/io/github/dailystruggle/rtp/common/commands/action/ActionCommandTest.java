@@ -642,9 +642,13 @@ class ActionCommandTest {
     targetLoc.setReservation(reservation);
 
     io.github.dailystruggle.rtp.api.group.GroupPlacementService orig = io.github.dailystruggle.rtp.common.RTP.groupPlacementService;
-    io.github.dailystruggle.rtp.common.RTP.groupPlacementService = request ->
-        java.util.concurrent.CompletableFuture.completedFuture(
-            io.github.dailystruggle.rtp.api.group.GroupPlacementResult.success(Map.of(aliceId, targetLoc)));
+    io.github.dailystruggle.rtp.common.RTP.groupPlacementService = request -> {
+      alice.setLocation(targetLoc).whenComplete((ok, ex) -> {
+        if (targetLoc.getReservation() != null) targetLoc.getReservation().close();
+      });
+      return java.util.concurrent.CompletableFuture.completedFuture(
+          io.github.dailystruggle.rtp.api.group.GroupPlacementResult.success(Map.of(aliceId, targetLoc)));
+    };
 
     try {
       ActionDefinition.PlacementSpec pSpec = new ActionDefinition.PlacementSpec(

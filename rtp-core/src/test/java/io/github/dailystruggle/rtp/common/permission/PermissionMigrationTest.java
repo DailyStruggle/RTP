@@ -492,6 +492,30 @@ public class PermissionMigrationTest {
         assertTrue(mixedPlan.getGeneratedCommands().contains("lp group member permission set rtp.noCooldown true"));
     }
 
+    @Test
+    @DisplayName("5.6 - Sanitizes parsed group names to [A-Za-z0-9_-]+ and rejects malicious tokens")
+    void testSanitizesGroupNames() {
+        List<String> rawOutput = List.of(
+                "Groups: default, admin-1, vip_plus, malformed group name, evil;inject",
+                "- valid_group (weight: 10)",
+                "- drop table users;",
+                "> good-group"
+        );
+        List<String> parsed = service.parseGroupListOutput(rawOutput);
+        assertTrue(parsed.contains("default"));
+        assertTrue(parsed.contains("admin-1"));
+        assertTrue(parsed.contains("vip_plus"));
+        assertTrue(parsed.contains("valid_group"));
+        assertTrue(parsed.contains("good-group"));
+
+        assertFalse(parsed.contains("malformed group name"));
+        assertFalse(parsed.contains("evil;inject"));
+        assertFalse(parsed.contains("drop table users;"));
+
+        assertThrows(IllegalArgumentException.class, () -> service.formatGroupGet("evil;command"));
+        assertThrows(IllegalArgumentException.class, () -> service.formatGroupSet("bad name", "rtp.use", true, ""));
+    }
+
     private static final class StubRoot extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
         StubRoot() {
             super(null);

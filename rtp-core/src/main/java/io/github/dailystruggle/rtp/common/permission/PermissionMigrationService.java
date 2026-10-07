@@ -33,6 +33,14 @@ public class PermissionMigrationService {
     public static final String DEFAULT_USER_SET_TEMPLATE = "lp user [user] permission set [permission] [value] [contexts]";
     public static final String DEFAULT_USER_UNSET_TEMPLATE = "lp user [user] permission unset [permission] [contexts]";
 
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+    private static final Pattern GROUP_TOKEN_SEPARATORS = Pattern.compile("[,;\\s]+");
+    private static final Pattern CONTEXT_SEPARATORS = Pattern.compile("[,;]+");
+    private static final Pattern TOKEN_PUNCTUATION = Pattern.compile("[()\\[\\]{}:,\"]");
+    private static final Pattern COLOR_CODES = Pattern.compile("[§&][0-9a-fk-orA-FK-OR]");
+    private static final Pattern ANSI_ESCAPES = Pattern.compile("\u001B\\[[;?0-9]*[a-zA-Z]");
+    private static final Pattern SHORTHAND_FLAG = Pattern.compile("^[a-z]\\s++.*+");
+
     private String groupListTemplate = DEFAULT_GROUP_LIST_TEMPLATE;
     private String groupGetTemplate = DEFAULT_GROUP_GET_TEMPLATE;
     private String groupSetTemplate = DEFAULT_GROUP_SET_TEMPLATE;
@@ -348,7 +356,7 @@ public class PermissionMigrationService {
                 if (rest.startsWith("(") && rest.contains("weight")) {
                     continue;
                 }
-                for (String token : rest.split("[,;\\s]+")) {
+                for (String token : GROUP_TOKEN_SEPARATORS.split(rest)) {
                     token = cleanToken(token);
                     if (!token.isEmpty()) groups.add(token);
                 }
@@ -359,8 +367,8 @@ public class PermissionMigrationService {
                     token = token.substring(0, token.indexOf('(')).trim();
                 }
                 // If token contains hyphen-separated metadata like "-  default - 0", split and take first non-empty word
-                if (token.contains("-")) {
-                    String[] parts = token.split("-");
+                if (token.contains(" - ")) {
+                    String[] parts = token.split(" - ");
                     for (String part : parts) {
                         String clean = cleanToken(part);
                         if (!clean.isEmpty()) {
@@ -377,14 +385,19 @@ public class PermissionMigrationService {
         return new ArrayList<>(groups);
     }
 
+    private static final Pattern GROUP_NAME_PATTERN = Pattern.compile("^[A-Za-z0-9_-]+$");
+
     private static String cleanToken(String token) {
         if (token == null) return "";
         // Remove trailing or leading parenthesis, brackets, quotes
-        token = token.replaceAll("[()\\[\\]{}:,\"]", "").trim();
+        token = TOKEN_PUNCTUATION.matcher(token).replaceAll("").trim();
         // Skip metadata phrases
         if (token.equalsIgnoreCase("weight") || token.equalsIgnoreCase("inherited")
                 || token.equalsIgnoreCase("group") || token.equalsIgnoreCase("name")
                 || token.equalsIgnoreCase("tracks") || token.equalsIgnoreCase("displayname")) {
+            return "";
+        }
+        if (!GROUP_NAME_PATTERN.matcher(token).matches()) {
             return "";
         }
         return token;
@@ -393,9 +406,9 @@ public class PermissionMigrationService {
     private static String cleanAnsiAndColors(String s) {
         if (s == null) return "";
         // Strip Minecraft color codes (§x or &x)
-        String c = s.replaceAll("[§&][0-9a-fk-orA-FK-OR]", "");
+        String c = COLOR_CODES.matcher(s).replaceAll("");
         // Strip ANSI escapes
-        return c.replaceAll("\u001B\\[[;?0-9]*[a-zA-Z]", "");
+        return ANSI_ESCAPES.matcher(c).replaceAll("");
     }
 
     /**
@@ -456,7 +469,7 @@ public class PermissionMigrationService {
             }
 
             // Remove LuckPerms shorthand flags like "d " or "g " if present
-            if (line.matches("^[a-z]\\s++.*+")) {
+            if (SHORTHAND_FLAG.matcher(line).matches()) {
                 line = line.substring(2).trim();
             }
 
@@ -478,7 +491,7 @@ public class PermissionMigrationService {
                 if (contextsRaw != null && !contextsRaw.isBlank()) {
                     // Turn "world=nether, server=survival" or "world=nether server=survival" into "world=nether server=survival"
                     StringBuilder ctxBuilder = new StringBuilder();
-                    for (String part : contextsRaw.split("[,;]+")) {
+                    for (String part : CONTEXT_SEPARATORS.split(contextsRaw)) {
                         part = part.trim();
                         if (!part.isEmpty() && part.contains("=")) {
                             if (ctxBuilder.length() > 0) ctxBuilder.append(" ");
@@ -500,13 +513,11 @@ public class PermissionMigrationService {
      */
     public String formatUserSet(String user, String permission, boolean value, String contexts) {
         String ctx = (contexts != null && !contexts.isBlank()) ? " " + contexts.trim() : "";
-        return userSetTemplate
+        return collapseWhitespace(userSetTemplate
                 .replace("[user]", user)
                 .replace("[permission]", permission)
                 .replace("[value]", String.valueOf(value))
-                .replace("[contexts]", ctx)
-                .replaceAll("\\s+", " ")
-                .trim();
+                .replace("[contexts]", ctx));
     }
 
     /**
@@ -514,42 +525,49 @@ public class PermissionMigrationService {
      */
     public String formatUserUnset(String user, String permission, String contexts) {
         String ctx = (contexts != null && !contexts.isBlank()) ? " " + contexts.trim() : "";
-        return userUnsetTemplate
+        return collapseWhitespace(userUnsetTemplate
                 .replace("[user]", user)
                 .replace("[permission]", permission)
-                .replace("[contexts]", ctx)
-                .replaceAll("\\s+", " ")
-                .trim();
+                .replace("[contexts]", ctx));
     }
 
     /**
      * Build command for setting a group permission.
      */
     public String formatGroupSet(String group, String permission, boolean value, String contexts) {
+        if (group == null || !GROUP_NAME_PATTERN.matcher(group).matches()) {
+            throw new IllegalArgumentException("Invalid group name: " + group);
+        }
         String ctx = (contexts != null && !contexts.isBlank()) ? " " + contexts.trim() : "";
-        return groupSetTemplate
+        return collapseWhitespace(groupSetTemplate
                 .replace("[group]", group)
                 .replace("[permission]", permission)
                 .replace("[value]", String.valueOf(value))
-                .replace("[contexts]", ctx)
-                .replaceAll("\\s+", " ")
-                .trim();
+                .replace("[contexts]", ctx));
     }
 
     /**
      * Build command for unsetting a group permission.
      */
     public String formatGroupUnset(String group, String permission, String contexts) {
+        if (group == null || !GROUP_NAME_PATTERN.matcher(group).matches()) {
+            throw new IllegalArgumentException("Invalid group name: " + group);
+        }
         String ctx = (contexts != null && !contexts.isBlank()) ? " " + contexts.trim() : "";
-        return groupUnsetTemplate
+        return collapseWhitespace(groupUnsetTemplate
                 .replace("[group]", group)
                 .replace("[permission]", permission)
-                .replace("[contexts]", ctx)
-                .replaceAll("\\s+", " ")
-                .trim();
+                .replace("[contexts]", ctx));
+    }
+
+    private static String collapseWhitespace(String s) {
+        return WHITESPACE.matcher(s).replaceAll(" ").trim();
     }
 
     public String formatGroupGet(String group) {
+        if (group == null || !GROUP_NAME_PATTERN.matcher(group).matches()) {
+            throw new IllegalArgumentException("Invalid group name: " + group);
+        }
         return groupGetTemplate.replace("[group]", group).trim();
     }
 

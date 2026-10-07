@@ -150,11 +150,18 @@ public class FactionsBoundaryProvider implements ClaimBoundaryProvider {
 
       return Optional.of(buildBoundary(facId, worldName, chunkKeys, centroidX, centroidZ, finalMinX, finalMinZ, finalMaxX, finalMaxZ));
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.WARNING,
-          "[RTP] Factions integration encountered an error resolving claim boundary. Disabling Factions boundary lookup.",
-          t);
+      if (ClaimCheckFailure.isIncompatibility(t)) {
+        exists = false;
+        RTP.log(
+            Level.SEVERE,
+            "[RTP] Factions API is missing or incompatible. Disabling Factions boundary lookup.",
+            t);
+      } else {
+        RTP.log(
+            Level.WARNING,
+            "[RTP] Factions integration encountered an error resolving claim boundary for player " + playerId + ".",
+            t);
+      }
       return Optional.empty();
     }
   }
@@ -194,6 +201,21 @@ public class FactionsBoundaryProvider implements ClaimBoundaryProvider {
         return Optional.empty();
       }
 
+      try {
+        Method isSafeZone = faction.getClass().getMethod("isSafeZone");
+        if (Boolean.TRUE.equals(isSafeZone.invoke(faction))) {
+          return Optional.empty();
+        }
+      } catch (NoSuchMethodException ignored) {
+      }
+      try {
+        Method isWarZone = faction.getClass().getMethod("isWarZone");
+        if (Boolean.TRUE.equals(isWarZone.invoke(faction))) {
+          return Optional.empty();
+        }
+      } catch (NoSuchMethodException ignored) {
+      }
+
       Method getAllClaims = null;
       try {
         getAllClaims = faction.getClass().getMethod("getAllClaims");
@@ -225,6 +247,7 @@ public class FactionsBoundaryProvider implements ClaimBoundaryProvider {
 
       for (Object fLoc : claimsCollection) {
         if (fLoc == null) continue;
+        if (count >= 1024) break;
         Method getWorldNameMethod = fLoc.getClass().getMethod("getWorldName");
         Object wNameObj = getWorldNameMethod.invoke(fLoc);
         if (wNameObj == null || !worldName.equalsIgnoreCase(wNameObj.toString())) {
@@ -267,10 +290,18 @@ public class FactionsBoundaryProvider implements ClaimBoundaryProvider {
 
       return Optional.of(buildBoundary(resolvedFacId, worldName, chunkKeys, centroidX, centroidZ, minChunkX, minChunkZ, maxChunkX, maxChunkZ));
     } catch (Throwable t) {
-      RTP.log(
-          Level.WARNING,
-          "[RTP] Factions integration encountered an error resolving claim boundary at (" + x + "," + z + ").",
-          t);
+      if (ClaimCheckFailure.isIncompatibility(t)) {
+        exists = false;
+        RTP.log(
+            Level.SEVERE,
+            "[RTP] Factions API is missing or incompatible. Disabling Factions boundary lookup.",
+            t);
+      } else {
+        RTP.log(
+            Level.WARNING,
+            "[RTP] Factions integration encountered an error resolving claim boundary at (" + x + "," + z + ").",
+            t);
+      }
       return Optional.empty();
     }
   }

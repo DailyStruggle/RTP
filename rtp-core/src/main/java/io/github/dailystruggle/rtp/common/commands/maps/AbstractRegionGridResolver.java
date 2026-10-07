@@ -48,7 +48,10 @@ public abstract class AbstractRegionGridResolver implements ChartSpecResolver {
 
     @Override
     public String toString() {
-      return "GridDomain[width=" + width + ", height=" + height + "]";
+      return "GridDomain[width=" + width + ", height=" + height
+          + ", insideDomain=" + Arrays.toString(insideDomain)
+          + ", biomeRgb=" + Arrays.toString(biomeRgb)
+          + ", hazardMask=" + Arrays.toString(hazardMask) + "]";
     }
   }
 

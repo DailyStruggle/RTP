@@ -76,6 +76,7 @@ public final class EditorLoopbackChannel implements AutoCloseable {
     private static final int INBOUND_CAP = MAX_MESSAGE_BYTES + 1024;
     private static final int READ_CHUNK = 64 * 1024;
     private static final String WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+    private static final Pattern CRLF = Pattern.compile("\r\n");
     private static final Pattern LOOPBACK_AUTHORITY =
             Pattern.compile("(localhost|127\\.0\\.0\\.1|\\[::1\\])(:\\d{1,5})?", Pattern.CASE_INSENSITIVE);
     private static final Pattern ALLOWED_ORIGIN =
@@ -470,7 +471,7 @@ public final class EditorLoopbackChannel implements AutoCloseable {
         }
         String head = new String(c.in, 0, end, StandardCharsets.ISO_8859_1);
         consume(c, end + HEADER_END.length);
-        String[] lines = head.split("\r\n", -1);
+        String[] lines = CRLF.split(head, -1);
         String[] request = lines[0].split(" ", -1);
         if (request.length != 3 || !"HTTP/1.1".equals(request[2])) {
             reject(c, 400, "Bad Request", "malformed request line", "", now);
@@ -564,6 +565,7 @@ public final class EditorLoopbackChannel implements AutoCloseable {
         return ByteBuffer.wrap(r.getBytes(StandardCharsets.ISO_8859_1));
     }
 
+    @SuppressWarnings("java:S4790") // RFC 6455 Section 4.2.2 mandates SHA-1 for Sec-WebSocket-Accept handshake
     static String acceptKey(String key) {
         try {
             byte[] sha = MessageDigest.getInstance("SHA-1").digest((key + WS_GUID).getBytes(StandardCharsets.ISO_8859_1));

@@ -8,12 +8,15 @@ import java.util.Deque;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 
 /**
  * {@link MenuConsumerProfile} for the {@code /rtp config} menu consumer (ADR-044).
  * Generates {@code /rtp config <file> <key>=} suggestion prefixes and resolves YAML comments.
  */
 public final class ConfigMenuConsumerProfile implements MenuConsumerProfile {
+
+    private static final Pattern LINE_BREAK = Pattern.compile("\\R");
 
     private final Function<String, RtpYamlSection> sectionResolver;
     private final YamlCommentLookup commentLookup;
@@ -86,7 +89,7 @@ public final class ConfigMenuConsumerProfile implements MenuConsumerProfile {
      * multi-line comments with {@code \n} per {@code RtpYamlSection#getComment}.
      */
     private static String stripCommentMarkers(String raw) {
-        String[] lines = raw.split("\\R", -1);
+        String[] lines = LINE_BREAK.split(raw, -1);
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i];

@@ -128,8 +128,10 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
     int minY = getNumber(GenericVerticalAdjustorKeys.minY, 0L).intValue();
     int dir = getNumber(GenericVerticalAdjustorKeys.direction, 0).intValue();
 
-    int worldMin = chunk.getWorld().getMinHeight();
-    int worldMax = chunk.getWorld().getMaxHeight();
+    io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = chunk.getWorld();
+    if (world == null) return false;
+    int worldMin = world.getMinHeight();
+    int worldMax = world.getMaxHeight();
     maxY = Math.min(maxY, worldMax - 1);
     minY = Math.max(minY, worldMin + 1);
     if (minY > maxY) return false;
@@ -272,8 +274,10 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
       Set<String> unsafeBlocks,
       int platformDepth) {
     if (chunk == null) return false;
-    int worldMin = chunk.getWorld().getMinHeight();
-    int worldMax = chunk.getWorld().getMaxHeight();
+    io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = chunk.getWorld();
+    if (world == null) return false;
+    int worldMin = world.getMinHeight();
+    int worldMax = world.getMaxHeight();
     if (y - 1 < worldMin || y + 1 >= worldMax) return false;
     int skylight = (!requireSkyLight || (y + 1) > columnSkyFloor) ? 15 : 0;
     return !chunk.isAir(x, y - 1, z)
@@ -300,8 +304,10 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
     int minY = getNumber(GenericVerticalAdjustorKeys.minY, 0L).intValue();
     int dir = getNumber(GenericVerticalAdjustorKeys.direction, 0).intValue();
 
-    int worldMin = chunk.getWorld().getMinHeight();
-    int worldMax = chunk.getWorld().getMaxHeight();
+    io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = chunk.getWorld();
+    if (world == null) return null;
+    int worldMin = world.getMinHeight();
+    int worldMax = world.getMaxHeight();
     maxY = Math.min(maxY, worldMax - 1);
     minY = Math.max(minY, worldMin + 1);
     if (minY > maxY) return null;

@@ -641,6 +641,33 @@ class PlaceholderProviderTest {
     }
 
     @Test
+    void fillPlaceholders_keyWithRegexMetacharacters_matchedLiterally() {
+        String key = "a.b$(c";
+        PlaceholderProvider.placeholders.put(key, uuid -> "V");
+        try {
+            String result = PlaceholderProvider.fillPlaceholders("[a.b$(c] %A.B$(C% <a.b$(c> [axb$(c]", DUMMY_UUID);
+            assertEquals("V V V [axb$(c]", result);
+        } finally {
+            PlaceholderProvider.placeholders.remove(key);
+        }
+    }
+
+    @Test
+    void replaceDelimited_adjacentAndPartialTokens() {
+        assertEquals("XX", PlaceholderProvider.replaceDelimited("[k][K]", '[', "k", ']', "X"));
+        assertEquals("%X", PlaceholderProvider.replaceDelimited("%%k%", '%', "k", '%', "X"));
+        assertEquals("[k", PlaceholderProvider.replaceDelimited("[k", '[', "k", ']', "X"));
+        assertEquals("$1\\", PlaceholderProvider.replaceDelimited("<k>", '<', "k", '>', "$1\\"));
+    }
+
+    @Test
+    void fillNumericPlaceholders_emptyIndexBeforeValidToken_onlyValidTokenReplaced() {
+        assertEquals("[p] [invalid]", PlaceholderProvider.fillNumericPlaceholders("[p] [p999]"));
+        assertEquals("%p%p999%", PlaceholderProvider.fillNumericPlaceholders("%p%p999%"));
+        assertEquals("[p99999999999]", PlaceholderProvider.fillNumericPlaceholders("[p99999999999]"));
+    }
+
+    @Test
     void fillNumericPlaceholders_coverage() {
         String template = "Value: [p0] and %p1%";
         String res = PlaceholderProvider.fillNumericPlaceholders(template);

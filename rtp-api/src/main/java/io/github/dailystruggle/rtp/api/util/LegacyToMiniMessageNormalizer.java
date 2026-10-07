@@ -58,6 +58,7 @@ public final class LegacyToMiniMessageNormalizer {
   // Single legacy color/format code: &c or section c.
   private static final Pattern LEGACY_CODE_PATTERN =
       Pattern.compile("[&\u00a7]([0-9a-fk-orK-OR])");
+  private static final Pattern LEGACY_PREFIX = Pattern.compile("[&\u00a7]");
 
   // A MiniMessage tag span: <name...> or </name>.
   private static final Pattern MINIMESSAGE_TAG_SPAN =
@@ -96,7 +97,7 @@ public final class LegacyToMiniMessageNormalizer {
     Matcher hexMatcher = LEGACY_HEX_PATTERN.matcher(text);
     StringBuffer hexBuf = new StringBuffer();
     while (hexMatcher.find()) {
-      String hex = hexMatcher.group(1).replaceAll("[&\u00a7]", "");
+      String hex = LEGACY_PREFIX.matcher(hexMatcher.group(1)).replaceAll("");
       hexMatcher.appendReplacement(hexBuf, Matcher.quoteReplacement("<#" + hex.toLowerCase(Locale.ROOT) + ">"));
     }
     hexMatcher.appendTail(hexBuf);

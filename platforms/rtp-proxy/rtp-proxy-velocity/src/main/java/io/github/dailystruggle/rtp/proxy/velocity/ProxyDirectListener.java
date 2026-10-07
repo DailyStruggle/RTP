@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 /**
  * Proxy-side TCP listener for the {@code proxy-direct} transport tier
@@ -72,6 +73,8 @@ public final class ProxyDirectListener {
 
     /** Minimum gap between allowlist-rejection WARNINGs (scanner flood guard). */
     private static final long REJECT_LOG_INTERVAL_MS = 10_000L;
+
+    private static final Pattern LINE_BREAK = Pattern.compile("\\R");
 
     /**
      * Concurrent RPC connections across all clients. Each holds one worker for at
@@ -406,7 +409,7 @@ public final class ProxyDirectListener {
                               java.net.SocketAddress remote) throws Exception {
         String payload = ProxyDirectWire.readSignedPayload(in, verifier);
         if (payload != null && requestQueue != null) {
-            String[] f = payload.split(String.valueOf(ProxyDirectWire.FS), -1);
+            String[] f = ProxyDirectWire.splitFields(payload);
             try {
                 UUID id = UUID.fromString(f[0]);
                 NetworkRequestQueue.CancelReason reason = NetworkRequestQueue.CancelReason.EXPLICIT_REQUEST;
@@ -456,7 +459,7 @@ public final class ProxyDirectListener {
         String payload = ProxyDirectWire.readSignedPayload(in, verifier);
         RedeemOutcome outcome = RedeemOutcome.NOT_FOUND;
         if (payload != null && transport != null) {
-            String[] f = payload.split(String.valueOf(ProxyDirectWire.FS), -1);
+            String[] f = ProxyDirectWire.splitFields(payload);
             if (f.length >= 3) {
                 try {
                     UUID id = UUID.fromString(f[1]);
@@ -505,7 +508,7 @@ public final class ProxyDirectListener {
      */
     private static String summarisePayload(String payload) {
         if (payload == null || payload.isBlank()) return "empty payload";
-        String firstLine = payload.split("\\R", 2)[0];
+        String firstLine = LINE_BREAK.split(payload, 2)[0];
         if (firstLine.length() > 200) firstLine = firstLine.substring(0, 200) + "...";
         return "payload=" + firstLine;
     }

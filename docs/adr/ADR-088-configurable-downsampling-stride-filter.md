@@ -1,7 +1,7 @@
 # ADR-088 - Configurable Downsampling Stride Filter for Spatial Candidate Selection
 
-**Status:** Accepted (amended 2026-09-08)  
-**Date:** 2026-09-08 (amended; originally proposed 2026-09-08)
+**Status:** Accepted (amended 2026-10-06)
+**Date:** 2026-09-08 (amended 2026-10-06: full-bin stride bound replaces the half-bin bound; REROLL cell-slot spacing, section 10)
 
 ## Context
 
@@ -87,22 +87,27 @@ In `SquareOptimizedDualLayer`, every virtual good index maps bijectively to a va
 - Latency drops from $12.6\,\mu\text{s} \to 1.56\,\mu\text{s}$ per selection ($> 600{,}000$ coordinates/second).
 - 100% loop-free and retry-free.
 
-### 6. Adaptive Stride Scaling (`deriveAdaptiveStride`) & Nyquist Bin Sampling Limit
+### 6. Adaptive Stride Scaling (`deriveAdaptiveStride`) & Full-Bin Stride Limit
 
 A static stride $S = 256$ on small shapes ($R = 16$, $1{,}024$ chunks) causes subset starvation (only 4 candidates per subset). Stride $S$ scales adaptively based on domain size:
 $$S = \begin{cases} 1 & \text{for } \text{domain} < 64 \\ 4 & \text{for } \text{domain} < 256 \quad (R \le 8) \\ 16 & \text{for } \text{domain} < 1024 \quad (R \le 16) \\ 64 & \text{for } \text{domain} < 8192 \quad (R \le 64) \\ 256 & \text{for } \text{domain} \ge 8192 \quad (R \ge 128) \end{cases}$$
 This guarantees that every subset maintains $\ge 64$ candidates while keeping inter-player physical spacing proportional across all world sizes.
 
-#### Signal Processing Hard Limit: Nyquist Bin Sampling Rule ($S \le \frac{\text{binArea}}{2}$)
-To prevent spatial aliasing, pattern degradation, and cross-phase boundary overlap across macro-tile / bin boundaries, stride $S$ is subject to a strict signal processing upper bound:
-$$S \le \max\left(1, \left\lfloor \frac{\text{binArea}}{2} \right\rfloor \right) \quad \text{where } \text{binArea} = P^2 = \text{pointEdgeChunks}^2$$
+#### Hard Limit: Full-Bin Stride Rule ($S \le \text{binArea}$)
+Stride $S$ is bounded by one key per bin:
+$$S \le \max\left(1, \text{binArea} \right) \quad \text{where } \text{binArea} = P^2 = \text{pointEdgeChunks}^2$$
 
-- **Rule Rationale:** In digital signal processing and spatial sampling, sampling frequency must be at least twice the maximum spatial frequency ($f_s \ge 2 f_{\max}$). If stride step $S$ exceeds half the number of chunks in a macro-tile / bin ($S > \frac{\text{binArea}}{2}$), the sampling interval falls below the Nyquist rate for the bin partition. Under sub-Nyquist sampling, points alias across bin boundaries and cause adjacent-tile coordinate overlap without falling back on the presumption of the next phase (interstitial points).
+- **Rule Rationale:** At $S = P^2$ a phase lane holds the same intra-bin Hilbert offset in every bin. Bins of equal orientation translate that offset by multiples of $P$, so same-lane keys sit at least $P$ chunks apart. The floor breaks only where the spiral re-orients a bin at a ring corner; that share is about $1/\text{rings}$, and derived $P \le 2R/64$ keeps $\text{rings} \ge 32$, so at least ~95% of keys keep the floor (measured 5.1% / 2.6% / 1.35% seam keys at 32 / 64 / 128 rings; on the shipped 16,384-block circle no same-lane pair is closer than 22.6 chunks). Below $P^2$ a lane takes several keys per bin, and the Hilbert sub-quadrants they land in are transposed or reflected relative to each other, so no spacing floor holds: $S = P^2/2$ leaves 78-92% and $S = P^2/4$ leaves 97-99% of keys within $\sqrt{S}$ of a same-lane key inside a bin, independent of radius (`ConsecutiveLandingSpacingSimTest`). Being a power of four is not sufficient; the stride must cover the whole bin.
+- **Predictability:** A lane narrows the next window of 16-64 landings to $N / S$ keys sharing one intra-bin offset (about 3,200 chunks on the shipped circle). The order within the lane, the next lane and the window length stay keyed (C7), so this does not let a player trap a landing.
 - **Enforced Caps:**
-  - For $P = 32$ ($\text{binArea} = 1{,}024\text{ chunks}$): $S \le 512$.
-  - For $P = 16$ ($\text{binArea} = 256\text{ chunks}$): $S \le 128$.
+  - For $P = 32$ ($\text{binArea} = 1{,}024\text{ chunks}$): $S \le 1{,}024$.
+  - For $P = 16$ ($\text{binArea} = 256\text{ chunks}$): $S \le 256$.
   - Stride is additionally bounded by $S \le \frac{\text{domainSize}}{4}$.
 - **Resolution of Domain Saturation:** When benchmarking or operating at large strides ($S = 256$), the world radius must provide sufficient domain capacity ($R \ge 1{,}024\text{ chunks}$ for concurrent bursts $N \ge 500$) so that macro-tile occupancy remains below the packing threshold ($\le 10\%$), preventing seam boundary overlap between adjacent occupied bins.
+
+#### Superseded: Half-Bin "Nyquist" Rule ($S \le \frac{\text{binArea}}{2}$)
+
+The original rule capped $S$ at half the bin, citing the sampling theorem ($f_s \ge 2 f_{\max}$) against aliasing across bin boundaries. The key space is a bijection rather than a sampled signal, so no aliasing applies. The cap clamped the resolution-derived $S = P^2$ to $P^2/2$, which put two keys of each lane in mirrored halves of every bin, as close as 1.4 chunks.
 
 ### 7. Strict Separation of Ground Truth vs. Candidate Sampling
 
@@ -146,19 +151,34 @@ regions:
 
 - Supported in command overrides: `/rtp shape:square_optimized_duallayer selectionstride:256`.
 
+### 10. REROLL Cell-Slot Spacing (Cross-Lane Floor)
+
+Section 6 gives a floor only among keys of one lane. Lanes are permuted under independent keys, so keys of two lanes fall at random relative to each other: a 4,096-landing REROLL stress run on the 16,384-block circle had 98 pairs within 48 blocks (3 chunks), about the uniform rate.
+
+In `MODE_REROLL` the key domain is fixed, so the stride keys are regrouped by aligned 8x8-chunk cells:
+1. **Cells:** for $P \ge 8$, every aligned 64-key block of a bin's Hilbert index is an aligned $8 \times 8$-chunk cell, and its 64 offsets are an isometric copy of the base order-3 curve under all eight bin orientations. A stride $S$ that is a multiple of 64 splits into $S/64$ cell **slots**; key $= b \cdot S + 64 \cdot \text{slot} + \ell$.
+2. **Inset offsets:** $\ell$ is restricted to the 16 offsets whose chunk sits $\ge 2$ chunks from every cell edge (local coordinates $[2, 5]^2$). Any two picks in distinct cells are then $\ge 5$ chunks apart on some axis (more than 64 blocks), whichever window drew them.
+3. **Shared slot order:** all windows on a slot advance one counter through one keyed permutation of the $\text{range}/S$ stride blocks ($K = \text{secretServerSeed} \oplus (\text{epoch} + \text{cycle}) \cdot \ldots \oplus \text{slot} \cdot \gamma$). No cell repeats within a **pass** of $\text{range}/64$ picks (65,472 on the shipped 16,384-block circle; a 20,000-entry backlog plus 4,096 landings at 40% rejection draws about 34,000).
+4. **Windows unchanged:** a window holds one (slot, offset) pair for a Gaussian 16-64 picks, so picks inside it keep the section 6 lattice. Every $S/64$ windows visit each slot once in a keyed order, so slot passes advance evenly; the offset is keyed per window. `BINNED_AMORTIZED` uses the pure-in-$t$ form: slot $= \text{reverse}(t \bmod S/64)$, block counter $t / (S/64)$, offset keyed per draw.
+
+**Bounds:** the floor holds within a pass; a later pass revisits cells at a fresh keyed offset, so cross-pass pairs fall back toward the uniform rate. `MODE_ACCUMULATE` keeps the per-lane path, because renumbered good indices do not stay on cells. Predictability (C7): the next pick is one of $\text{range}/S$ blocks under a keyed permutation; an observer learns at most the current slot and offset of a window.
+
+**Coverage trade-off:** only the $4 \times 4$ core of each cell is selectable, 25% of chunks, on a lattice with an 8-chunk period. The spread by area stays even, because every cell offers the same subset (`CellSlotSpacingTest`), but land patches narrower than about 4 chunks that fall entirely in cell borders are never picked. A 16x16 cell with the same 2-chunk inset keeps the 5-chunk floor and reaches 56% of chunks, but its pass is 4x shorter (16,368 picks on the shipped circle), below the draws of a 20,000-entry backlog.
+
 ## Criteria
 
 | # | Criterion | Status |
 |---|---|---|
 | C1 | **Exact Coordinate Bijection:** Strided index maps bijectively to valid chunk coordinates without collisions or out-of-bounds leakage | **MET** |
 | C2 | **Full Safety Ground Truth:** Run tables retain 1-chunk resolution without loss of hazard identification | **MET** |
-| C3 | **Deterministic Spacing & Nyquist Bound:** Distance between consecutive indices satisfies $d \ge \sqrt{S}$ chunks within Nyquist limit $S \le \text{binArea}/2$ | **MET** |
+| C3 | **Deterministic Spacing & Full-Bin Bound:** At $S = P^2$ same-lane keys satisfy $d \ge P$ chunks except at spiral ring-corner seams (share ~$1/\text{rings} \le$ ~5%); sub-bin strides carry no spacing floor; $S \le \text{binArea}$ | **MET** (raw draw order: 0 back-to-back pairs under 256 blocks per 4,096 draws. With ~40% terrain rejection under ACCUMULATE, and with backlog and live searches interleaved, back-to-back pairs stay ~95% below uniform, because the remap offset between nearby picks is only the rejections learned between them. Dense learned bad areas push that offset toward a full bin and loosen in-bin spacing) |
 | C4 | **Zero Dynamic Distance Queries:** Selection operates in $O(1)$ without runtime distance re-roll loops | **MET** |
-| C5 | **Full Ergodicity:** Rotating dyadic phase over $S$ offsets covers 100% of addressable chunk coordinates without coordinate starvation | **MET** |
-| C6 | **Zero Duplicate Selections:** Keyed Feistel permutation guarantees 0 duplicate chunk landings ($0.0\%$) across the domain | **MET** |
+| C5 | **Full Ergodicity:** Rotating dyadic phase over $S$ offsets covers 100% of addressable chunk coordinates without coordinate starvation | **PARTIAL** (ACCUMULATE: met. REROLL with cell-slot spacing: 25% of chunks, the core of each 8x8 cell, section 10) |
+| C6 | **Zero Duplicate Selections:** Keyed Feistel permutation guarantees 0 duplicate chunk landings ($0.0\%$) across the domain | **PARTIAL** (holds while the permuted domain is fixed, as in REROLL mode. Under ACCUMULATE each merged rejection renumbers good indices, and with `expand: false` landings are not marked, so used chunks repeat at about the uniform rate) |
 | C7 | **Cryptographic Unpredictability:** Non-linear avalanche bit-mixing prevents players/bots from anticipating landing coordinates | **MET** |
 | C8 | **Range Contraction Immunity:** Permutations operate on virtual good space, remaining valid when bad locations contract domain | **MET** |
 | C9 | **Scale-Invariant Density:** Adaptive stride scaling prevents subset starvation on small arenas ($R \le 16$) | **MET** |
+| C10 | **Cross-Lane Floor (REROLL):** any two picks within a pass are $\ge 5$ chunks apart on some axis, with no area marked | **MET** (section 10; 0 pairs within 48 blocks over 4,096 landings after a 20,000-draw backlog, `CellSlotSpacingTest`) |
 
 ## Alternatives Considered
 

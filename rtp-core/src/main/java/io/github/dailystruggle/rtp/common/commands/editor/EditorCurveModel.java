@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser;
 
 import java.io.ByteArrayOutputStream;
 import java.util.*;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -28,6 +29,7 @@ final class EditorCurveModel {
 
     private static final int UNIQUE_PLACEMENT = LocationGenerator.FailTypes.uniquePlacement.ordinal();
     private static final int MISC = LocationGenerator.FailTypes.misc.ordinal();
+    private static final Pattern WORD_BOUNDARY = Pattern.compile("\\b");
 
     private EditorCurveModel() {
     }
@@ -53,9 +55,24 @@ final class EditorCurveModel {
         return out;
     }
 
+    /** Literal-key equivalent of {@code ['"]key['"]|\.key\b}; transparent bounds keep {@code \b} exact. */
     private static boolean mentions(String js, String key) {
-        String q = Pattern.quote(key);
-        return Pattern.compile("['\"]" + q + "['\"]|\\." + q + "\\b").matcher(js).find();
+        int len = js.length();
+        Matcher boundary = null;
+        for (int i = js.indexOf(key, 1); i >= 1; i = i < len ? js.indexOf(key, i + 1) : -1) {
+            char before = js.charAt(i - 1);
+            int end = i + key.length();
+            if (isQuote(before) && end < len && isQuote(js.charAt(end))) return true;
+            if (before == '.') {
+                if (boundary == null) boundary = WORD_BOUNDARY.matcher(js).useTransparentBounds(true);
+                if (boundary.region(end, len).lookingAt()) return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isQuote(char c) {
+        return c == '\'' || c == '"';
     }
 
     /** The settings in {@code keys}, normalised as {@link #normalise(Object)} does. */

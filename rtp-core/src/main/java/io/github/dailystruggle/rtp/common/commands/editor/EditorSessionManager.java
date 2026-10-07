@@ -22,6 +22,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 import java.util.logging.Level;
+import java.util.regex.Pattern;
 
 /**
  * Manages ephemeral web editor sessions and local HTML editor bundle exports (ADR-104).
@@ -33,6 +34,7 @@ public final class EditorSessionManager {
 
     private static final EditorSessionManager INSTANCE = new EditorSessionManager();
     private static final SecureRandom RANDOM = new SecureRandom();
+    private static final Pattern PATH_SEPARATOR = Pattern.compile("[/\\\\]");
 
     /** Local session lifetime: the hosted relay's TTL. */
     static final long SESSION_TTL_MILLIS = 30L * 60L * 1000L;
@@ -546,7 +548,7 @@ public final class EditorSessionManager {
 
     private static boolean isPathHidden(String path) {
         if (path == null || path.isEmpty()) return false;
-        String[] segments = path.split("[/\\\\]");
+        String[] segments = PATH_SEPARATOR.split(path);
         for (String seg : segments) {
             if (seg.startsWith(".")) return true;
         }
@@ -1211,6 +1213,8 @@ public final class EditorSessionManager {
 
     /** A remotely fetched payload without the {@code sha256} it must carry (ADR-104 §4.2). */
     public static final class MissingDigestException extends IllegalArgumentException {
+        private static final long serialVersionUID = 1L;
+
         public MissingDigestException() {
             super("Payload has no sha256 digest; payloads fetched from the byte store must carry one");
         }

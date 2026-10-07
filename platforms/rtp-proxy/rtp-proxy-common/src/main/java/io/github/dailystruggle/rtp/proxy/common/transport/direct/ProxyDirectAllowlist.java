@@ -16,6 +16,22 @@ import java.util.List;
 public final class ProxyDirectAllowlist {
 
     private record Block(byte[] network, int prefix) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof Block other)) return false;
+            return prefix == other.prefix && java.util.Arrays.equals(network, other.network);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * java.util.Arrays.hashCode(network) + Integer.hashCode(prefix);
+        }
+
+        @Override
+        public String toString() {
+            return "Block[network=" + java.util.Arrays.toString(network) + ", prefix=" + prefix + "]";
+        }
     }
 
     private static final ProxyDirectAllowlist ALLOW_ALL = new ProxyDirectAllowlist(List.of());
@@ -97,7 +113,7 @@ public final class ProxyDirectAllowlist {
     }
 
     private static byte[] literal(String addr, String entry) {
-        if (addr.isEmpty() || !addr.matches("[0-9A-Fa-f:.]+") || (addr.indexOf(':') < 0 && !addr.matches("[0-9.]+"))) {
+        if (addr.isEmpty() || !literalChars(addr, true) || (addr.indexOf(':') < 0 && !literalChars(addr, false))) {
             throw new IllegalArgumentException("allowedClients: '" + entry
                     + "' is not an IP literal or CIDR (hostnames are not accepted)");
         }
@@ -107,5 +123,16 @@ public final class ProxyDirectAllowlist {
         } catch (UnknownHostException ex) {
             throw new IllegalArgumentException("allowedClients: bad address '" + entry + "'");
         }
+    }
+
+    /** Every char in {@code [0-9.]}, or {@code [0-9A-Fa-f:.]} when {@code ipv6}. */
+    private static boolean literalChars(String s, boolean ipv6) {
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            boolean ok = (c >= '0' && c <= '9') || c == '.'
+                    || (ipv6 && (c == ':' || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')));
+            if (!ok) return false;
+        }
+        return true;
     }
 }

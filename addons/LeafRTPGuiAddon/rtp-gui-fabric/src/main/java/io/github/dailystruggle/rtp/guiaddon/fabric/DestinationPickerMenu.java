@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Server-side container menu that renders the RTP destination picker as a chest GUI
@@ -41,6 +42,9 @@ import java.util.Map;
  * picker.
  */
 final class DestinationPickerMenu extends ChestMenu {
+
+  private static final Pattern COLOR_CODE = Pattern.compile("(?i)[&\u00a7](#[0-9a-f]{6}|x([&\u00a7][0-9a-f]){6}|[0-9a-fk-or])");
+  private static final Pattern LEFTOVER_TAGS = Pattern.compile("<[^>]+>");
 
   private final Map<Integer, MenuEntry> slotEntries;
   private final int topSlots;
@@ -130,12 +134,14 @@ final class DestinationPickerMenu extends ChestMenu {
     return BuiltInRegistries.ITEM.getOptional(id).orElse(Items.COMPASS);
   }
 
-  /** Strips RTP/legacy {@code &x} and {@code §x} color codes for a plain label. */
+  /** Strips RTP/legacy {@code &x}, {@code §x}, hex, and MiniMessage color codes for a plain label. */
   private static String strip(String text) {
     if (text == null || text.isEmpty()) {
       return "";
     }
-    return text.replaceAll("(?i)[&\u00a7][0-9a-fk-or]", "");
+    String expanded = io.github.dailystruggle.rtp.common.tools.MiniMessageColorExpander.expand(text);
+    String noColor = COLOR_CODE.matcher(expanded).replaceAll("");
+    return LEFTOVER_TAGS.matcher(noColor).replaceAll("");
   }
 
   @Override

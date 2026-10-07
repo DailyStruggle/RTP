@@ -59,7 +59,7 @@ You can explicitly specify distance units in config files or command parameters:
   - `c`, `chunk`, `chunks`: Chunks (1 chunk = 16 blocks). E.g. `radius: 256c` (4,096 blocks).
   - `b`, `block`, `blocks`: Minecraft blocks (1 block = 1 meter). E.g. `radius: 4096b` (256 chunks).
   - `nb`, `netherblock`, `netherblocks`: Nether coordinate blocks (8 Overworld blocks). E.g. `radius: 500nb` (4,000 blocks).
-  - `r`, `region`, `regions`: Anvil / Linear region files (1 region = 32 chunks = 512 blocks). E.g. `radius: 4r` (128 chunks = 2,048 blocks).
+  - `r`, `region`, `regions`: Region files (1 region = 32 chunks = 512 blocks). E.g. `radius: 4r` (128 chunks = 2,048 blocks).
 - **Metric Units (1 block = 1 meter):**
   - `m`, `meter`, `meters`, `metre`, `metres`: Meters (1 meter = 1 block). E.g. `radius: 5000m`.
   - `km`, `k`, `kilo`, `kilos`, `kilometer`, `kilometers`, `kilometre`, `kilometres`: Kilometers. E.g. `radius: 5km` (5,000 blocks = 312.5 chunks).
@@ -144,12 +144,40 @@ Changing a radius invalidates cached locations for that region, so the first few
 ### Common Shape Keys
 - `name`: The shape engine to use.
 - `mode`: The selection logic.
-  - `ACCUMULATE`: (Recommended) Even distribution, pre-calculated sectors. Best for most cases.
+  - `ACCUMULATE`: (Recommended) Draws only from chunks not known to be bad, so learned bad ground costs nothing. Best for most cases. With `expand: false` a spot can occasionally come up again; see [Spacing, repeats and worst case by mode](#spacing-repeats-and-worst-case-by-mode).
   - `NEAREST`: Finds the closest non-blocked spot. Fast but may cause clustering.
-  - `REROLL`: Simple random selection with retries. Even but unbounded.
+  - `REROLL`: Skips known-bad chunks and draws again. On `CIRCLE` and `SQUARE` no spot comes up twice until the shuffle has cycled, and spacing stays exact; each known-bad chunk costs one in-memory check. See [Spacing, repeats and worst case by mode](#spacing-repeats-and-worst-case-by-mode).
   - `NONE`: No pre-check. Fastest but ignores pre-computed safety data.
 - `centerX` / `centerZ`: The center of the region in **chunks**.
-- `uniquePlacements`: Chunk radius cleared around a spot once a player lands there so it is never reused. `0` = off, `1` = the landing chunk only, `N` = an `(2N-1)x(2N-1)` chunk square. (Legacy `true`/`false` still work and map to `1`/`0`.) Setting `auto` automatically derives the radius from the server's effective view distance (lowest power of 2 at or under view distance, e.g. 10 -> 8 chunks). When paired with `expand: true` in dual-layer shapes, it enables zero-memory dyadic stride downsampling ($S = (2R_u-1)^2$), keeping concurrent players isolated by view distance while driving rapid outward frontier expansion.
+- `uniquePlacements`: Chunk radius cleared around a spot once a player lands there so it is never reused. `0` = off, `1` = the landing chunk only, `N` = an `(2N-1)x(2N-1)` chunk square. (Legacy `true`/`false` still work and map to `1`/`0`.) It only takes effect with `expand: true`, where the region grows to replace the cleared area; with `expand: false` it is ignored so the region cannot run out of destinations. Setting `auto` automatically derives the radius from the server's effective view distance (lowest power of 2 at or under view distance, e.g. 10 -> 8 chunks). When paired with `expand: true` in dual-layer shapes, it enables zero-memory dyadic stride downsampling ($S = (2R_u-1)^2$), keeping concurrent players isolated by view distance while driving rapid outward frontier expansion.
+
+### Spacing, repeats and worst case by mode
+
+This applies to `CIRCLE` and `SQUARE` (the dual-layer shapes). The other shapes don't use the keyed shuffle described here.
+
+Candidates come from a keyed shuffle of the region, drawn in lanes that take the same spot in each bin. On the default 16,384-block circle, spots drawn back to back sit one bin apart (512 blocks). Where the spiral turns at its corners, bins change orientation and spots can come closer: about 5% of spots on the smallest regions, fewer on larger ones. On the default circle the closest pair is 362 blocks. A new lane starts every 16 to 64 draws, and spots from different lanes fall at random relative to each other. RTP keeps no list of past destinations and doesn't check where players are.
+
+The two modes handle known-bad ground differently:
+
+| | `ACCUMULATE` (default) | `REROLL` |
+|---|---|---|
+| What it draws from | Only chunks not known to be bad | Every chunk; a known-bad chunk is skipped and the next one drawn |
+| Back-to-back spacing | In a simulation with 40% bad ground, pairs under 256 blocks were about 95% rarer than with random picks. Loosens toward random where the region has learned large bad areas (from `/rtp scan` or pregen) | Exact. A bad chunk removes one spot from the lane and moves no other |
+| Repeat landings, `expand: false` | Possible, about as often as random picks (around 0.1% of landings in the simulation) | None until the shuffle has cycled |
+| Cost of known-bad ground | None | One in-memory check per known-bad chunk, roughly a microsecond |
+| Worst case | Bounded | Bounded: each known-bad chunk is drawn at most once per pass, and progress carries over between requests |
+
+The ready cache is filled from the same draw order as live searches, so mixing cached and live answers adds no repeats and keeps back-to-back spacing.
+
+**Why `ACCUMULATE` can repeat.** It numbers only the good chunks. Every newly learned rejection renumbers them, so a chunk a player already used can land on a number that hasn't been drawn yet. Landings are marked as used only with `uniquePlacements` and `expand: true`. Marking them with `expand: false` isn't an option: the region never grows back, so the marks would use it up until searches stop finding locations.
+
+**`REROLL` limits.**
+
+- One request skips at most 10,000 known-bad chunks and then fails. The next request carries on where it stopped. On a region that is nearly all bad, a player can see a failed attempt even though good ground is left.
+- With `expand: true`, every new bad mark grows the range and restarts the shuffle with a new key. The pass starts over, so the once-per-pass ceiling no longer holds.
+- Unexplored chunks cost a region-file read or a chunk load in either mode. Each one is checked once, and the result is remembered.
+
+For comparison, picking a random spot and retrying has no ceiling. Each retry fails with the same odds as the last, and the same bad chunk can be loaded again on a later request.
 
 ### Shape Engines and Parameters
 
@@ -255,7 +283,7 @@ The backlog cache (controlled by `backlogCacheCap`) is an optional **unverified*
 ### How it works
 
 - The spiral selector drops unverified candidates straight into the backlog — **no chunk load, no database write**.
-- Each region tick pulses the backlog: the oldest unverified entry is picked, the region file (32×32 chunk bin: `.mca` Anvil or `.linear` Linear) it falls in is identified, and *every* unverified entry that shares that bin is classified in one pass via the region pre-filter. This amortises the per-bin cost over many candidates.
+- Each region tick pulses the backlog: the oldest unverified entry is picked, the region file (32×32 chunk bin: `.mca` Anvil, or another format registered by an addon) it falls in is identified, and *every* unverified entry that shares that bin is classified in one pass via the region pre-filter. This amortises the per-bin cost over many candidates.
 - Entries are promoted into the verified queue **in insertion order**. An unverified head blocks promotion; an invalidated head is dropped silently and the next entry is considered. This preserves spiral order without stalling on failed candidates.
 - The backlog is **not** persisted across restarts by design — entries are re-selected fresh on startup, so the cost of dropping them is bounded.
 

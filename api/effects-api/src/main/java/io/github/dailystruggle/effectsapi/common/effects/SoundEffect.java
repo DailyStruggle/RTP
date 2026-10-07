@@ -52,12 +52,12 @@ public class SoundEffect extends Effect<SoundEffect.SoundKeys> {
 
     @Override
     public String toPermission() {
-        return data.get(SoundKeys.TYPE).toString().replaceAll("\\.*", "") +
-               data.get(SoundKeys.VOLUME).toString().replaceAll("\\.*", "") +
-               data.get(SoundKeys.PITCH).toString().replaceAll("\\.*", "") +
-               data.get(SoundKeys.DX).toString().replaceAll("\\.*", "") +
-               data.get(SoundKeys.DY).toString().replaceAll("\\.*", "") +
-               data.get(SoundKeys.DZ).toString().replaceAll("\\.*", "");
+        return data.get(SoundKeys.TYPE).toString().replace(".", "") +
+               data.get(SoundKeys.VOLUME).toString().replace(".", "") +
+               data.get(SoundKeys.PITCH).toString().replace(".", "") +
+               data.get(SoundKeys.DX).toString().replace(".", "") +
+               data.get(SoundKeys.DY).toString().replace(".", "") +
+               data.get(SoundKeys.DZ).toString().replace(".", "");
     }
 
     @Override

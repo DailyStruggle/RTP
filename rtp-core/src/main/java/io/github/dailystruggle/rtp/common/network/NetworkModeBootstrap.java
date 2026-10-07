@@ -15,6 +15,7 @@ import io.github.dailystruggle.rtp.proxy.common.transport.ReservationTokenReaper
 import io.github.dailystruggle.rtp.proxy.common.transport.memory.InMemoryNetworkRequestQueue;
 import io.github.dailystruggle.rtp.proxy.common.transport.memory.InMemoryNetworkStateBinding;
 import io.github.dailystruggle.rtp.proxy.common.transport.redis.RedisNetworkStateBinding;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespEndpoint;
 import io.github.dailystruggle.rtp.proxy.common.transport.sql.SqlNetworkStateBinding;
 
 import java.io.File;
@@ -859,8 +860,9 @@ public final class NetworkModeBootstrap {
                 // per-status HASHes (mirrors {@code NetworkBindings.openRequestQueue}).
                 RtpYamlSection redis = transportSec == null
                         ? null : transportSec.getConfigurationSection("redis");
-                String host = redis == null ? "localhost" : redis.getString("host", "localhost");
-                int port = redis == null ? 6379 : redis.getInt("port", 6379);
+                RespEndpoint ep = parseRedisEndpoint(redis);
+                String host = (ep.tls() || ep.username() != null) ? ep.toUri() : ep.host();
+                int port = ep.port();
                 String password = redisPassword(redis);
                 return new io.github.dailystruggle.rtp.proxy.common.transport.redis.RedisNetworkRequestQueue(
                         host, port, password, 0, verifier, schemaVersion);
@@ -1132,8 +1134,9 @@ public final class NetworkModeBootstrap {
                 // verify. Passing null here silently disables signing and
                 // causes the proxy to reject every snapshot read.
                 RtpYamlSection redis = transportSec == null ? null : transportSec.getConfigurationSection("redis");
-                String host = redis == null ? "localhost" : redis.getString("host", "localhost");
-                int port = redis == null ? 6379 : redis.getInt("port", 6379);
+                RespEndpoint ep = parseRedisEndpoint(redis);
+                String host = (ep.tls() || ep.username() != null) ? ep.toUri() : ep.host();
+                int port = ep.port();
                 String password = redisPassword(redis);
                 if (verifier == null) {
                     // Fall back to the legacy 4-arg ctor only when verifier
@@ -1168,6 +1171,37 @@ public final class NetworkModeBootstrap {
 
     private static final java.util.concurrent.atomic.AtomicBoolean YAML_REDIS_PASSWORD_WARNED =
             new java.util.concurrent.atomic.AtomicBoolean();
+
+    /**
+     * Parse Redis endpoint settings from {@code transport.redis.*}.
+     * Respects {@code host}, {@code port}, {@code tls}, and {@code username},
+     * defaulting the port to 6380 when TLS is active without an explicit port,
+     * and 6379 otherwise.
+     */
+    static RespEndpoint parseRedisEndpoint(RtpYamlSection redis) {
+        String hostRaw = redis == null ? "localhost" : redis.getString("host", "localhost");
+        boolean tlsFlag = redis != null && redis.getBoolean("tls", false);
+        boolean tlsDetected = tlsFlag || hostRaw.trim().toLowerCase(java.util.Locale.ROOT).startsWith("rediss://");
+        int defaultPort = tlsDetected ? 6380 : 6379;
+        int port = (redis != null && redis.contains("port"))
+                ? (int) redis.getLong("port", defaultPort)
+                : defaultPort;
+        String username = redis == null ? null : redis.getString("username", null);
+        if (username != null && username.isEmpty()) {
+            username = null;
+        }
+
+        RespEndpoint ep;
+        try {
+            ep = RespEndpoint.parse(hostRaw, port);
+            boolean tls = ep.tls() || tlsFlag;
+            String user = ep.username() != null ? ep.username() : username;
+            return new RespEndpoint(ep.host(), ep.port(), tls, user);
+        } catch (IllegalArgumentException e) {
+            RTP.log(Level.WARNING, "[RTP] transport.redis.host: " + e.getMessage() + "; falling back to defaults.");
+            return new RespEndpoint("localhost", defaultPort, tlsFlag, username);
+        }
+    }
 
     /**
      * Redis password: env var named by {@code transport.redis.passwordEnv}

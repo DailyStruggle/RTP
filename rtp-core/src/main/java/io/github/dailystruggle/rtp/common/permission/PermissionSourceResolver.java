@@ -1,22 +1,21 @@
 package io.github.dailystruggle.rtp.common.permission;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.editor.EditorLoopbackJson;
 import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporter;
 import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporterRegistry;
 import io.github.dailystruggle.rtp.common.importer.UniversalConfigImporter;
+import io.github.dailystruggle.rtp.common.search.FuzzySearchEngine;
+import io.github.dailystruggle.rtp.common.search.ThesaurusIndex;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -42,13 +41,13 @@ public final class PermissionSourceResolver {
     /** Normalized folder names / node prefixes of general teleport suites; only {@code source=} maps them. */
     static final Set<String> NON_RTP_SUITES = Set.of("essentials", "essentialsx", "cmi", "huskhomes");
     /** Maximum edit distance for a fuzzy key or prefix match. */
-    static final int MAX_EDIT_DISTANCE = 2;
+    static final int MAX_EDIT_DISTANCE = FuzzySearchEngine.MAX_EDIT_DISTANCE;
     /** Terms shorter than this only match exactly (containment / edit distance are too noisy). */
     static final int MIN_FUZZY_LENGTH = 5;
     /** Shortest name allowed to match by containment ({@code rtp} itself never does). */
-    static final int MIN_CONTAINMENT_LENGTH = 4;
+    static final int MIN_CONTAINMENT_LENGTH = FuzzySearchEngine.MIN_CONTAINMENT_LENGTH;
 
-    static final String THESAURUS_RESOURCE = "/editor/editor-data.json";
+    static final String THESAURUS_RESOURCE = ThesaurusIndex.THESAURUS_RESOURCE;
 
     private static final int MAX_FILES_PER_FOLDER = 32;
     private static final long MAX_FILE_BYTES = 512L * 1024L;
@@ -61,8 +60,6 @@ public final class PermissionSourceResolver {
             "cooldown", Set.of("cooldown", "teleportcooldown"),
             "delay", Set.of("delay", "teleportdelay", "warmup"),
             "worlds", Set.of("worlds", "customworlds", "enabledworlds"));
-
-    private static volatile Map<String, Set<String>> conceptTerms;
 
     private PermissionSourceResolver() {}
 
@@ -150,49 +147,20 @@ public final class PermissionSourceResolver {
     }
 
     static boolean keyMatches(String key, String term) {
-        if (key.isEmpty() || term.isEmpty()) return false;
-        if (key.equals(term)) return true;
-        if (term.length() < MIN_FUZZY_LENGTH) return false;
-        if (key.contains(term)) return true;
-        return key.length() >= MIN_FUZZY_LENGTH && levenshtein(key, term) <= MAX_EDIT_DISTANCE;
+        return FuzzySearchEngine.keyMatches(key, term);
     }
 
     static boolean nameMatches(String a, String b) {
-        if (a.isEmpty() || b.isEmpty()) return false;
-        if (a.equals(b)) return true;
-        if (Math.min(a.length(), b.length()) >= MIN_CONTAINMENT_LENGTH && (a.contains(b) || b.contains(a))) {
-            return true;
-        }
-        return a.length() >= MIN_FUZZY_LENGTH && b.length() >= MIN_FUZZY_LENGTH
-                && levenshtein(a, b) <= MAX_EDIT_DISTANCE;
+        return FuzzySearchEngine.nameMatches(a, b);
     }
 
     /** Lower-case ASCII letters and digits only. */
     static String normalize(@Nullable String s) {
-        if (s == null) return "";
-        StringBuilder sb = new StringBuilder(s.length());
-        for (int k = 0; k < s.length(); k++) {
-            char c = Character.toLowerCase(s.charAt(k));
-            if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) sb.append(c);
-        }
-        return sb.toString();
+        return FuzzySearchEngine.normalize(s);
     }
 
     static int levenshtein(String a, String b) {
-        int[] prev = new int[b.length() + 1];
-        int[] cur = new int[b.length() + 1];
-        for (int j = 0; j <= b.length(); j++) prev[j] = j;
-        for (int i = 1; i <= a.length(); i++) {
-            cur[0] = i;
-            for (int j = 1; j <= b.length(); j++) {
-                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
-                cur[j] = Math.min(Math.min(cur[j - 1] + 1, prev[j] + 1), prev[j - 1] + cost);
-            }
-            int[] t = prev;
-            prev = cur;
-            cur = t;
-        }
-        return prev[b.length()];
+        return FuzzySearchEngine.levenshtein(a, b);
     }
 
     /** Normalized YAML keys (whole and per dotted segment) from the folder root and one subdirectory level. */
@@ -239,48 +207,6 @@ public final class PermissionSourceResolver {
 
     /** Canonical spellings plus every thesaurus word whose key list names one of them. */
     static Map<String, Set<String>> conceptTerms() {
-        Map<String, Set<String>> cached = conceptTerms;
-        if (cached != null) return cached;
-        Map<String, Set<String>> terms = new LinkedHashMap<>();
-        for (Map.Entry<String, Set<String>> e : CANONICAL.entrySet()) {
-            terms.put(e.getKey(), new HashSet<>(e.getValue()));
-        }
-        for (Map.Entry<String, List<String>> syn : loadThesaurus().entrySet()) {
-            String word = normalize(syn.getKey());
-            if (word.isEmpty()) continue;
-            for (Map.Entry<String, Set<String>> c : CANONICAL.entrySet()) {
-                for (String key : syn.getValue()) {
-                    if (c.getValue().contains(normalize(key))) {
-                        terms.get(c.getKey()).add(word);
-                        break;
-                    }
-                }
-            }
-        }
-        Map<String, Set<String>> frozen = new LinkedHashMap<>();
-        terms.forEach((k, v) -> frozen.put(k, Set.copyOf(v)));
-        conceptTerms = Collections.unmodifiableMap(frozen);
-        return conceptTerms;
-    }
-
-    private static Map<String, List<String>> loadThesaurus() {
-        Map<String, List<String>> out = new LinkedHashMap<>();
-        try (InputStream in = PermissionSourceResolver.class.getResourceAsStream(THESAURUS_RESOURCE)) {
-            if (in == null) {
-                RTP.log(Level.FINE, "[RTP] permission source thesaurus missing: " + THESAURUS_RESOURCE);
-                return out;
-            }
-            Object root = EditorLoopbackJson.parse(new String(in.readAllBytes(), StandardCharsets.UTF_8));
-            if (!(root instanceof Map<?, ?> m) || !(m.get("synonyms") instanceof Map<?, ?> syn)) return out;
-            for (Map.Entry<?, ?> e : syn.entrySet()) {
-                if (!(e.getKey() instanceof String word) || !(e.getValue() instanceof List<?> list)) continue;
-                List<String> keys = new ArrayList<>();
-                for (Object o : list) if (o instanceof String s) keys.add(s);
-                out.put(word, keys);
-            }
-        } catch (IOException | RuntimeException e) {
-            RTP.log(Level.FINE, "[RTP] permission source thesaurus unreadable; using canonical keys only: " + e);
-        }
-        return out;
+        return ThesaurusIndex.getInstance().getConceptTerms(CANONICAL);
     }
 }

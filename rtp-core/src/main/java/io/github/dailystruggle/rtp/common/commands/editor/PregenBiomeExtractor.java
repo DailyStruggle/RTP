@@ -14,17 +14,15 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.regex.Pattern;
 
 /**
  * Off-tick extractor for chunk-resolution pregenerated land and biome mapping (ADR-104 §4.3, ADR-084).
  *
- * <p>Rule S-005 compliant: Zero chunk loads on the main thread. Scans region files (.mca / .linear)
- * within the bounding box of a region and samples chunk existence and representative surface biomes.</p>
+ * <p>Rule S-005 compliant: Zero chunk loads on the main thread. Scans region files ({@code .mca}, or
+ * any format with a reader registered in {@link RegionFormatRegistry}) within the bounding box of a
+ * region and samples chunk existence and representative surface biomes.</p>
  */
 public final class PregenBiomeExtractor {
-
-    private static final Pattern REGION_FILE = Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.(mca|linear)");
 
     public record ChunkBiomeSample(int cx, int cz, int biomeIndex) {}
 
@@ -212,26 +210,41 @@ public final class PregenBiomeExtractor {
 
         for (int rz = minRz; rz <= maxRz; rz++) {
             for (int rx = minRx; rx <= maxRx; rx++) {
-                String baseName = "r." + rx + "." + rz;
-                Path mca = regionDir.resolve(baseName + ".mca");
-                Path linear = regionDir.resolve(baseName + ".linear");
-                Path target = Files.isRegularFile(mca) ? mca : (Files.isRegularFile(linear) ? linear : null);
+                Path target = regionFileIn(regionDir, "r." + rx + "." + rz);
                 if (target == null) continue;
 
                 filesScanned++;
-                byte[] bytes = AnvilRegionByteCache.get(target);
-                if (bytes == null) continue;
-
-                generatedCount += sampleRegionFile(bytes, extensionOf(target), rx, rz,
-                        minCx, minCz, maxCx, maxCz, fallback, sink);
+                // Leased pooled buffer: valid bytes are [0, length()).
+                try (AnvilRegionByteCache.Lease lease = AnvilRegionByteCache.acquire(target)) {
+                    if (lease == null) continue;
+                    generatedCount += sampleRegionFile(lease.buffer(), lease.length(), extensionOf(target),
+                            rx, rz, minCx, minCz, maxCx, maxCz, fallback, sink);
+                }
             }
         }
 
         return new ExtractionResult(palette, samples, generatedCount, filesScanned);
     }
 
+    /**
+     * Region file for {@code baseName}: a registered non-Anvil format first (a converted world may
+     * keep stale {@code .mca} files), then {@code .mca}. Unregistered formats are ignored so their
+     * bytes never reach the Anvil decoder. {@code null} when none exists.
+     */
+    static Path regionFileIn(Path regionDir, String baseName) {
+        for (String ext : RegionFormatRegistry.getRegisteredExtensions()) {
+            if (".mca".equals(ext)) continue;
+            Path p = regionDir.resolve(baseName + ext);
+            if (Files.isRegularFile(p)) return p;
+        }
+        Path mca = regionDir.resolve(baseName + ".mca");
+        return Files.isRegularFile(mca) ? mca : null;
+    }
+
     static String extensionOf(Path regionFile) {
-        return regionFile.getFileName().toString().endsWith(".linear") ? ".linear" : ".mca";
+        String name = regionFile.getFileName().toString();
+        int dot = name.lastIndexOf('.');
+        return dot >= 0 ? name.substring(dot) : ".mca";
     }
 
     /**
@@ -243,8 +256,16 @@ public final class PregenBiomeExtractor {
     static int sampleRegionFile(byte[] bytes, String ext, int rx, int rz,
                                 int minCx, int minCz, int maxCx, int maxCz,
                                 MemoryShape<?> fallback, ChunkSink sink) {
+        return sampleRegionFile(bytes, bytes == null ? 0 : bytes.length, ext, rx, rz,
+                minCx, minCz, maxCx, maxCz, fallback, sink);
+    }
+
+    /** As above over {@code bytes[0, length)}; a pooled buffer's stale tail is never read. */
+    static int sampleRegionFile(byte[] bytes, int length, String ext, int rx, int rz,
+                                int minCx, int minCz, int maxCx, int maxCz,
+                                MemoryShape<?> fallback, ChunkSink sink) {
         RegionFileReader reader = RegionFormatRegistry.getReader(ext);
-        if (reader == null) reader = AnvilReader.INSTANCE;
+        if (reader == null) return 0; // unregistered format: never decode as Anvil
 
         int baseChunkX = rx << 5;
         int baseChunkZ = rz << 5;
@@ -260,7 +281,7 @@ public final class PregenBiomeExtractor {
 
                 boolean isGen;
                 try {
-                    isGen = reader.isChunkGenerated(bytes, lx, lz);
+                    isGen = reader.isChunkGenerated(bytes, length, lx, lz);
                 } catch (Exception e) {
                     isGen = false;
                 }
@@ -270,7 +291,7 @@ public final class PregenBiomeExtractor {
                 String biomeName = null;
                 // Attempt fast column probe for surface biome
                 try {
-                    ColumnProbe probe = AnvilReader.readColumnProbe(bytes, lx, lz, 32, 255);
+                    ColumnProbe probe = AnvilReader.readColumnProbe(bytes, length, lx, lz, 32, 255);
                     if (probe != null && probe.hasHeightmap()) {
                         biomeName = probe.biomeAt(probe.heightmapTopY());
                     }

@@ -14,25 +14,27 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Pregen-scan utility (ADR-016 biome section 6.1, ADR-077) that walks every {@code r.X.Z.mca}
- * and {@code r.X.Z.linear} under a dimension's {@code region/} folder and returns the union of every
- * decodable namespaced biome id. Consumed by the platform's {@code setBiomesGetter}
- * tab-completion hook.
+ * Pregen-scan utility (ADR-016 biome section 6.1, ADR-077) that walks every {@code r.X.Z.<ext>}
+ * whose extension has a reader in {@link RegionFormatRegistry} ({@code .mca} built in) under a
+ * dimension's {@code region/} folder and returns the union of every decodable namespaced biome id.
+ * Consumed by the platform's {@code setBiomesGetter} tab-completion hook.
  *
  * <p>Threading: {@link #scanBiomesAsync(Path, String)} dispatches on
  * {@link ForkJoinPool#commonPool()} and is the intended entry point;
  * {@link #scanBiomes(Path, String)} runs inline and must already be off-tick.
  *
  * <p>Cache key is {@code (regionFolder, mtimeSignature)} where the signature is
- * the max {@code lastModified} across {@code r.*.*.mca} and {@code r.*.*.linear}; any change re-runs.
+ * the max {@code lastModified} across those region files; any change re-runs. Files in
+ * unregistered formats are never read (their bytes are not Anvil and must not reach
+ * {@link AnvilReader}).
  *
  * <p>Per ADR-016 section 8 "malformed → UNKNOWN, never crash": individual decode
  * failures are skipped; missing region folder → empty set, never an exception.
  */
 public final class AnvilRegionScanner {
 
-    /** Matches {@code r.<X>.<Z>.mca} or {@code r.<X>.<Z>.linear} with optionally-signed integer X/Z coordinates. */
-    private static final Pattern REGION_FILE = Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.(mca|linear)");
+    /** Matches {@code r.<X>.<Z>.<ext>} with optionally-signed integer X/Z coordinates. */
+    private static final Pattern REGION_FILE = Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.([A-Za-z0-9]+)");
 
     /**
      * Process-wide cache. Keyed by absolute region-folder path; value holds the
@@ -122,8 +124,7 @@ public final class AnvilRegionScanner {
         long max = 0L;
         try (DirectoryStream<Path> ds = Files.newDirectoryStream(regionFolder)) {
             for (Path p : ds) {
-                Matcher m = REGION_FILE.matcher(p.getFileName().toString());
-                if (!m.matches()) continue;
+                if (readerFor(p) == null) continue;
                 try {
                     long t = Files.getLastModifiedTime(p).toMillis();
                     if (t > max) max = t;
@@ -142,9 +143,9 @@ public final class AnvilRegionScanner {
         LinkedHashSet<String> out = new LinkedHashSet<>();
         try (DirectoryStream<Path> ds = Files.newDirectoryStream(regionFolder)) {
             for (Path p : ds) {
-                Matcher m = REGION_FILE.matcher(p.getFileName().toString());
-                if (!m.matches()) continue;
-                scanRegionFile(p, out);
+                RegionFileReader reader = readerFor(p);
+                if (reader == null) continue;
+                scanRegionFile(p, reader, out);
             }
         } catch (IOException ignored) {
             // Directory unreadable - return what we have (possibly empty). Matches
@@ -154,7 +155,14 @@ public final class AnvilRegionScanner {
         return out.isEmpty() ? Collections.emptySet() : Collections.unmodifiableSet(out);
     }
 
-    private static void scanRegionFile(Path regionFile, Set<String> out) {
+    /** Registered reader for a {@code r.X.Z.<ext>} file, or {@code null} for other names and unregistered formats. */
+    private static RegionFileReader readerFor(Path file) {
+        Matcher m = REGION_FILE.matcher(file.getFileName().toString());
+        if (!m.matches()) return null;
+        return RegionFormatRegistry.getReader(m.group(3));
+    }
+
+    private static void scanRegionFile(Path regionFile, RegionFileReader reader, Set<String> out) {
         byte[] bytes;
         // Bypasses AnvilRegionByteCache deliberately: a full-folder biome scan would evict the
         // whole LRU for a one-shot walk. It is still a cold device read, so it is still a valid
@@ -167,13 +175,6 @@ public final class AnvilRegionScanner {
             return;
         }
         StorageLatencyProbe.record(System.nanoTime() - readStart, bytes.length);
-        String fileName = regionFile.getFileName().toString();
-        int dotIdx = fileName.lastIndexOf('.');
-        String ext = dotIdx >= 0 ? fileName.substring(dotIdx) : "";
-        RegionFileReader reader = RegionFormatRegistry.getReader(ext);
-        if (reader == null) {
-            reader = AnvilReader.INSTANCE;
-        }
 
         // Walk all 1024 chunk slots; absent chunks return null from readChunk.
         for (int cz = 0; cz < 32; cz++) {

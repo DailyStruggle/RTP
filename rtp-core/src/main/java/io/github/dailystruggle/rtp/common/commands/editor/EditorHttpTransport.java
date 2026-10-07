@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -45,6 +46,9 @@ public class EditorHttpTransport {
     public static final String DEFAULT_RELAY_URL = "https://usersockets.luckperms.net";
     /** Largest decompressed byte-store body accepted (gzip bomb guard). */
     public static final int MAX_DECOMPRESSED_BYTES = 4 * 1024 * 1024;
+
+    private static final Pattern TRAILING_SLASHES = Pattern.compile("/+$");
+    private static final Pattern KEY_DECORATION = Pattern.compile("[\"'{}\r\n ]");
 
     private static volatile EditorHttpTransport configured;
 
@@ -77,9 +81,9 @@ public class EditorHttpTransport {
         this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
         String bytebin = url(bytebinUrl, "bytebinUrl");
         String relay = url(relayUrl, "relayUrl");
-        this.bytebinUrl = bytebin != null ? bytebin.replaceAll("/+$", "") : DEFAULT_BYTEBIN_URL;
-        this.editorBaseUrl = (editorBaseUrl != null && !editorBaseUrl.isBlank()) ? editorBaseUrl.replaceAll("/+$", "") : DEFAULT_EDITOR_URL;
-        this.relayUrl = relay != null ? relay.replaceAll("/+$", "") : DEFAULT_RELAY_URL;
+        this.bytebinUrl = bytebin != null ? stripTrailingSlashes(bytebin) : DEFAULT_BYTEBIN_URL;
+        this.editorBaseUrl = (editorBaseUrl != null && !editorBaseUrl.isBlank()) ? stripTrailingSlashes(editorBaseUrl) : DEFAULT_EDITOR_URL;
+        this.relayUrl = relay != null ? stripTrailingSlashes(relay) : DEFAULT_RELAY_URL;
     }
 
     /**
@@ -137,8 +141,12 @@ public class EditorHttpTransport {
             relay = url(m.get("relayUrl"), "relayUrl");
         }
         return new String[]{
-                bytebin != null ? bytebin.replaceAll("/+$", "") : DEFAULT_BYTEBIN_URL,
-                relay != null ? relay.replaceAll("/+$", "") : DEFAULT_RELAY_URL};
+                bytebin != null ? stripTrailingSlashes(bytebin) : DEFAULT_BYTEBIN_URL,
+                relay != null ? stripTrailingSlashes(relay) : DEFAULT_RELAY_URL};
+    }
+
+    private static String stripTrailingSlashes(String s) {
+        return TRAILING_SLASHES.matcher(s).replaceAll("");
     }
 
     /**
@@ -367,6 +375,6 @@ public class EditorHttpTransport {
             // it is an error or invalid response and must not be treated as a token.
             throw new RuntimeException("Byte-store response is JSON but does not contain a 'key' field: " + body);
         }
-        return body.replaceAll("[\"'{}\r\n ]", "");
+        return KEY_DECORATION.matcher(body).replaceAll("");
     }
 }

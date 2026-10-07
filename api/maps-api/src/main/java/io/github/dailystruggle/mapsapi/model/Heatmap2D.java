@@ -48,6 +48,9 @@ public record Heatmap2D(int width, int height, double[] values,
 
     /** Returns the sample at row {@code y}, column {@code x}. No defensive copy. */
     public double valueAt(int x, int y) {
+        if (x < 0 || x >= width || y < 0 || y >= height) {
+            throw new IndexOutOfBoundsException("Coordinates (" + x + ", " + y + ") out of bounds for " + width + "x" + height);
+        }
         return values[y * width + x];
     }
 

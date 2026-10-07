@@ -31,6 +31,8 @@ import java.util.regex.Pattern;
  */
 public final class GateEvaluator {
 
+  private static final Pattern COORD_SEPARATORS = Pattern.compile("[,\\s]+");
+
   private GateEvaluator() {}
 
   /**
@@ -177,6 +179,15 @@ public final class GateEvaluator {
             } else {
               scoreValue = 1.0;
             }
+          } else {
+            RTPServerAccessor accessor = RTP.serverAccessor;
+            UUID pid = context.participantId();
+            Integer realScore = (accessor != null && pid != null)
+                ? accessor.getScoreboardScore(pid, objStr)
+                : null;
+            if (realScore != null) {
+              scoreValue = realScore.doubleValue();
+            }
           }
           if (!GateExpressionParser.matches(matches.toString(), scoreValue)) {
             return false;
@@ -193,7 +204,7 @@ public final class GateEvaluator {
             Object targetObj = map.get("target");
             if (targetObj != null && !targetObj.toString().equalsIgnoreCase("anchor")) {
               // Custom coordinate target: "x,y,z" or "x,z"
-              String[] parts = targetObj.toString().split("[,\\s]+");
+              String[] parts = COORD_SEPARATORS.split(targetObj.toString());
               if (parts.length >= 2 && context.currentX() != null && context.currentZ() != null) {
                 try {
                   double tx = Double.parseDouble(parts[0]);

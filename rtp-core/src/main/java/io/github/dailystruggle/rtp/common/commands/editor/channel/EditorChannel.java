@@ -434,9 +434,13 @@ public final class EditorChannel {
     }
 
     private void hello(String from, Map<String, Object> msg, byte[] signed, byte[] signature, long now) {
+        if (!(msg.get("publicKey") instanceof String k)) {
+            drop(from, "hello with a bad key: missing or not a string");
+            return;
+        }
         PublicKey key;
         try {
-            key = EditorKeys.decodePublicKey(msg.get("publicKey") instanceof String k ? k : null);
+            key = EditorKeys.decodePublicKey(k);
         } catch (IllegalArgumentException e) {
             drop(from, "hello with a bad key: " + e.getMessage());
             return;

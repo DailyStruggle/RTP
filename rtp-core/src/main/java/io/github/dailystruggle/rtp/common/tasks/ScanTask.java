@@ -1131,7 +1131,7 @@ public class ScanTask extends RTPRunnable {
 
       // Chunk-by-chunk decision:
       // 1. Check if chunk is generated on disk.
-      // 2. If generated, attempt off-tick MCA / .linear column probe first.
+      // 2. If generated, attempt off-tick region-file column probe first.
       // 3. If ungenerated or probe UNKNOWN / unreadable, route to full-load path.
       boolean generated = true;
       try {

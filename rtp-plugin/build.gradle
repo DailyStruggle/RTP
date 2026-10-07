@@ -574,24 +574,9 @@ shadowJar {
     exclude 'META-INF/services/javax.annotation.processing.Processor'
     exclude 'folia-thread-stubs.astub'
 
-    // Airlift aircompressor: only io.airlift.compress.zstd is used for Linear region format.
-    // Unused codecs (Snappy, Bzip2, LZO, LZ4, Hadoop, Gzip, Deflate) are dropped (~135 KB comp / ~245 KB raw).
-    exclude 'io/airlift/compress/snappy/**'
-    exclude 'io/airlift/compress/bzip2/**'
-    exclude 'io/airlift/compress/lzo/**'
-    exclude 'io/airlift/compress/lz4/**'
-    exclude 'io/airlift/compress/hadoop/**'
-    exclude 'io/airlift/compress/gzip/**'
-    exclude 'io/airlift/compress/deflate/**'
-
     // Multi-release module descriptors (e.g. SnakeYAML 2.x) name pre-relocation packages
     // and are meaningless inside a shaded plugin jar.
     exclude 'META-INF/versions/*/module-info.class'
-
-    // aircompressor (zstd for .linear regions). Relocated to avoid clashing with other
-    // plugins shading the same lib; the Class.forName probe in LinearRegionReader is a
-    // string constant and is rewritten too.
-    relocate 'io.airlift.compress', 'io.github.dailystruggle.rtp.aircompressor'
 
     // The JDK-25 v26_1_R1 adapter bytecode is INTENTIONALLY NOT merged here.
     //
@@ -609,9 +594,8 @@ shadowJar {
     // Solution: merge v26_1_R1 bytecode AFTER remapJar via the `mergeV26`
     // task below, so its classes survive intact.
     //
-    // NOTE: shadowJar's `minimize()` is deliberately NOT used here. The shaded
-    // libs are relocated into our own namespace (aircompressor), and
-    // every published RTP module exposes an addon-facing API plus
+    // NOTE: shadowJar's `minimize()` is deliberately NOT used here. Every
+    // published RTP module exposes an addon-facing API plus
     // descriptor-loaded platform entry points (RTPFabricMod, the Velocity main,
     // plugin.yml main) that static reachability analysis cannot see. Under
     // those constraints minimize() would trim only a few KB of genuinely-unused
@@ -1328,16 +1312,6 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     exclude 'org/intellij/lang/annotations/**'
     exclude 'META-INF/maven/**'
 
-    // Airlift aircompressor: only io.airlift.compress.zstd is used for Linear region format.
-    // Unused codecs (Snappy, Bzip2, LZO, LZ4, Hadoop, Gzip, Deflate) are dropped (~135 KB comp / ~245 KB raw).
-    exclude 'io/airlift/compress/snappy/**'
-    exclude 'io/airlift/compress/bzip2/**'
-    exclude 'io/airlift/compress/lzo/**'
-    exclude 'io/airlift/compress/lz4/**'
-    exclude 'io/airlift/compress/hadoop/**'
-    exclude 'io/airlift/compress/gzip/**'
-    exclude 'io/airlift/compress/deflate/**'
-
     // Multi-release module descriptors -- see the matching note in the Pro shadowJar.
     exclude 'META-INF/versions/*/module-info.class'
     // Concrete SQL database options, LoginCacheTask, and Redis transport are INTENTIONALLY KEPT in lite
@@ -1391,11 +1365,9 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     // (plugin.yml, performance.yml, config.yml, ...).
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
-    // Same relocations as full, minus H2 (not shaded).
-    // commands-api and effects-api are RTP's public addon SPIs and ship
-    // unrelocated so addons (compileOnly against them) link at runtime. See the
-    // matching note in the Pro shadowJar relocate block above.
-    relocate 'io.airlift.compress', 'io.github.dailystruggle.rtp.aircompressor'
+    // No relocations: no third-party library is shaded. commands-api and
+    // effects-api are RTP's public addon SPIs and ship unrelocated so addons
+    // (compileOnly against them) link at runtime.
 
     // Lite ships the same operator docs as Pro; copyDocs (a processResources
     // dependency) stages them into the main resources output that this jar

@@ -35,6 +35,26 @@ public abstract class AbstractDualLayerShape extends MemoryShape<GenericMemorySh
   protected final java.util.concurrent.ConcurrentHashMap<Integer, java.util.concurrent.atomic.AtomicLong> phaseProgress =
       new java.util.concurrent.ConcurrentHashMap<>();
 
+  /**
+   * REROLL cell-slot spacing (ADR-088 section 10). Every aligned 64-key Hilbert block is an aligned
+   * 8x8-chunk cell, and its 64 offsets are an isometric copy of the base 8x8 curve under every
+   * bin orientation. Restricting the in-cell offset to the 16 whose chunk sits >= 2 chunks from
+   * each cell edge puts any two picks in distinct cells >= 5 chunks apart on some axis (> 64
+   * blocks), whichever lanes drew them. Cells are distinct within a pass because all lanes that
+   * share a slot share one counter and one permutation.
+   */
+  static final int SPACING_CELL_EDGE = 8;
+  static final int SPACING_CELL_KEYS = SPACING_CELL_EDGE * SPACING_CELL_EDGE;
+  static final int SPACING_CELL_SHIFT = Integer.numberOfTrailingZeros(SPACING_CELL_KEYS);
+  static final int SPACING_CELL_INSET = 2;
+  static final int[] SPACING_INSET_LANES = insetLanes(SPACING_CELL_EDGE, SPACING_CELL_INSET);
+
+  protected final java.util.concurrent.atomic.AtomicInteger cellPhase = new java.util.concurrent.atomic.AtomicInteger(0);
+  protected final java.util.concurrent.atomic.AtomicInteger cellWindowRemaining = new java.util.concurrent.atomic.AtomicInteger(0);
+  protected final java.util.concurrent.atomic.AtomicInteger cellStepCounter = new java.util.concurrent.atomic.AtomicInteger(0);
+  protected final java.util.concurrent.ConcurrentHashMap<Integer, java.util.concurrent.atomic.AtomicLong> cellSlotProgress =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
   protected AbstractDualLayerShape(String name, EnumMap<GenericMemoryShapeParams, Object> defaults) {
     super(GenericMemoryShapeParams.class, name, defaults);
     this.derived = true;
@@ -124,6 +144,8 @@ public abstract class AbstractDualLayerShape extends MemoryShape<GenericMemorySh
     backlogCounter.set(0);
     activeWindowRemaining.set(0);
     phaseProgress.clear();
+    cellWindowRemaining.set(0);
+    cellSlotProgress.clear();
   }
 
   @Override
@@ -145,6 +167,8 @@ public abstract class AbstractDualLayerShape extends MemoryShape<GenericMemorySh
       this.backlogCounter.set(0);
       this.activeWindowRemaining.set(0);
       this.phaseProgress.clear();
+      this.cellWindowRemaining.set(0);
+      this.cellSlotProgress.clear();
     }
   }
 
@@ -163,6 +187,10 @@ public abstract class AbstractDualLayerShape extends MemoryShape<GenericMemorySh
       long t = selectionCounter.getAndIncrement();
       long permuted = feistelPermute(t, total, getEpochKey(curEpoch, 0L));
       return Math.min(total - 1, Math.max(0L, permuted));
+    }
+
+    if (cellSpacingApplies(stride, total)) {
+      return sampleCellSpaced(total, stride, curEpoch);
     }
 
     int bits = Integer.numberOfTrailingZeros(stride);
@@ -212,11 +240,112 @@ public abstract class AbstractDualLayerShape extends MemoryShape<GenericMemorySh
     }
   }
 
+  /**
+   * Cell-slot spacing needs a fixed key domain (REROLL; ACCUMULATE renumbers good indices), whole
+   * 8x8 cells per bin, and a stride that is a whole number of cells dividing the range.
+   */
+  protected boolean cellSpacingApplies(int stride, long total) {
+    return MODE_REROLL.equals(mode())
+        && getPointEdgeChunks() >= SPACING_CELL_EDGE
+        && stride >= SPACING_CELL_KEYS
+        && stride % SPACING_CELL_KEYS == 0
+        && total >= stride
+        && total % stride == 0;
+  }
+
+  /**
+   * Window lane = (cell slot, inset offset). The slot's counter walks one permutation of the
+   * stride blocks shared by every window on that slot, so no cell repeats until the slot's pass
+   * of {@code total / stride} blocks ends; a pass over all slots is {@code total / 64} cells.
+   * Picks inside one window keep the full-bin P-chunk lattice.
+   */
+  protected double sampleCellSpaced(long total, int stride, long curEpoch) {
+    int slots = stride >>> SPACING_CELL_SHIFT;
+    long blocks = total / stride;
+    int phase = getOrRotateCellPhase(slots, curEpoch);
+    int slot = phase >>> SPACING_CELL_SHIFT;
+    long k = cellSlotProgress.computeIfAbsent(slot, s -> new java.util.concurrent.atomic.AtomicLong(0))
+        .getAndIncrement();
+    long cycle = k / blocks;
+    long block = feistelPermute(k % blocks, blocks, getEpochKey(curEpoch + cycle, slot));
+    return Math.min(total - 1, block * stride + phase);
+  }
+
+  /**
+   * Every {@code slots} windows visit each slot once in a keyed order, so slot passes advance
+   * evenly; the inset offset is keyed per window.
+   */
+  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: CAS-guarded window rotation with synchronized single-winner reseed
+  protected int getOrRotateCellPhase(int slots, long curEpoch) {
+    while (true) {
+      int remaining = cellWindowRemaining.get();
+      if (remaining > 0) {
+        if (cellWindowRemaining.compareAndSet(remaining, remaining - 1)) {
+          return cellPhase.get();
+        }
+        continue;
+      }
+
+      synchronized (this) {
+        if (cellWindowRemaining.get() <= 0) {
+          int step = cellStepCounter.getAndIncrement();
+          long roundKey = feistelSalt ^ (curEpoch * 0x3C6EF372FE94F82AL) ^ ((step / slots) * 0xA54FF53A5F1D36F1L);
+          int slot = (int) feistelPermute(step % slots, slots, roundKey);
+          int lane = insetLaneFor(roundKey ^ step);
+          cellPhase.set((slot << SPACING_CELL_SHIFT) | lane);
+
+          // Gaussian batch window centered at 32 (std dev ~6, bounds [16, 64])
+          int w = (int) Math.round(32.0 + rng().nextGaussian() * 6.0);
+          cellWindowRemaining.set(Math.max(16, Math.min(64, w)));
+        }
+      }
+      return cellPhase.get();
+    }
+  }
+
+  /** BINNED_AMORTIZED form: pure in {@code t}; the slot rotates every draw, bit-reversed. */
+  protected long cellSpacedKeyForCounter(long t, long range, int stride, long curEpoch) {
+    int slots = stride >>> SPACING_CELL_SHIFT;
+    int slotBits = Integer.numberOfTrailingZeros(slots);
+    int slotIdx = (int) (t % slots);
+    int slot = slotBits == 0 ? 0 : Integer.reverse(slotIdx) >>> (32 - slotBits);
+    long blocks = range / stride;
+    long k = t / slots;
+    long cycle = k / blocks;
+    long block = feistelPermute(k % blocks, blocks, getEpochKey(curEpoch + cycle, slot));
+    int lane = insetLaneFor(feistelSalt ^ (curEpoch * 0x3C6EF372FE94F82AL) ^ (t * 0xA54FF53A5F1D36F1L));
+    return block * stride + ((long) slot << SPACING_CELL_SHIFT) + lane;
+  }
+
+  private static int insetLaneFor(long seed) {
+    long z = seed + 0x9E3779B97F4A7C15L;
+    z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
+    z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
+    z ^= z >>> 31;
+    return SPACING_INSET_LANES[(int) Long.remainderUnsigned(z, SPACING_INSET_LANES.length)];
+  }
+
+  /** Offsets along the base {@code edge x edge} Hilbert curve whose cell sits >= {@code inset} from every edge. */
+  static int[] insetLanes(int edge, int inset) {
+    int[] out = new int[edge * edge];
+    int n = 0;
+    for (int d = 0; d < edge * edge; d++) {
+      int[] xy = hilbertToXY(d, edge, 0);
+      int margin = Math.min(Math.min(xy[0], edge - 1 - xy[0]), Math.min(xy[1], edge - 1 - xy[1]));
+      if (margin >= inset) out[n++] = d;
+    }
+    return java.util.Arrays.copyOf(out, n);
+  }
+
   public int deriveEffectiveStride(long domainSize) {
     long res = spatialResolution();
     int p = getPointEdgeChunks();
     long binArea = (long) p * p;
-    long maxStrideByBin = Math.max(1L, binArea / 2L);
+    // ADR-088: S = P^2 puts one key per bin, so same-orientation bins hold a lane P chunks apart
+    // (floor breaks only at spiral ring-corner re-orientations, share ~1/rings; derived P keeps
+    // rings >= 32, so <= ~5%).
+    // Sub-bin strides land keys in mirrored Hilbert quadrants and keep no spacing floor.
+    long maxStrideByBin = Math.max(1L, binArea);
 
     if (res > 1L) {
       long cellDim = 1L << (64 - Long.numberOfLeadingZeros(res - 1L));
@@ -291,6 +420,9 @@ public abstract class AbstractDualLayerShape extends MemoryShape<GenericMemorySh
     }
 
     int stride = deriveAdaptiveStride(range);
+    if (cellSpacingApplies(stride, range)) {
+      return cellSpacedKeyForCounter(t, range, stride, curEpoch);
+    }
     int bits = Integer.numberOfTrailingZeros(stride);
     int subsetIdx = (int) (t % stride);
     int phaseOffset = Integer.reverse(subsetIdx) >>> (32 - bits);

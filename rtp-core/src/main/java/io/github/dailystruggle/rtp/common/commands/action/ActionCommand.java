@@ -9,7 +9,6 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.action.ActionManager;
 import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
-import io.github.dailystruggle.rtp.common.commands.ServerAccessorCommandParameters;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -34,7 +33,38 @@ public class ActionCommand extends BaseRTPCmdImpl {
   public ActionCommand(@Nullable CommandsAPICommand parent, ActionDefinition definition) {
     super(parent);
     this.definition = Objects.requireNonNull(definition, "definition must not be null");
-    addParameter("player", new ServerAccessorCommandParameters().playerParameter());
+
+    io.github.dailystruggle.rtp.api.action.ParameterSpec targetParam =
+        definition.command().firstParameterOfType(io.github.dailystruggle.rtp.api.action.ParameterType.PLAYER);
+    String paramPerm = (targetParam != null && targetParam.hasPermission())
+        ? targetParam.permission()
+        : (targetParam != null ? "" : "rtp.other");
+
+    addParameter(
+        "player",
+        new io.github.dailystruggle.commandsapi.common.CommandParameter(
+            paramPerm,
+            "target player",
+            (uuid, s) -> {
+              RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
+              if (sender == null) return false;
+              if (paramPerm != null && !paramPerm.isBlank() && !sender.hasPermission(paramPerm) && !sender.isRtpAdmin()) {
+                return false;
+              }
+              RTPPlayer target = RTP.serverAccessor.getPlayer(s);
+              if (target == null || !target.name().equalsIgnoreCase(s)) return false;
+              RTPCommandSender targetSender = RTP.serverAccessor.getSender(target.uuid());
+              if (targetSender == null) return true;
+              if (!(sender instanceof RTPPlayer)) return true;
+              if (!targetSender.hasPermission("rtp.notme")) return true;
+              return sender.hasPermission("rtp.*") || sender.hasPermission("rtp.notme.bypass") || sender.isRtpAdmin();
+            }) {
+          @Override
+          public java.util.Set<String> values() {
+            return RTP.serverAccessor != null ? RTP.serverAccessor.getOnlinePlayerNames() : java.util.Collections.emptySet();
+          }
+        });
+
     commandLookup.put("CANCEL", new ActionCancelCmd(this, definition.id()));
     registerDeclaredSubcommands();
   }

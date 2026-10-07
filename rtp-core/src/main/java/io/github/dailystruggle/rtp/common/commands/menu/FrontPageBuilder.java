@@ -17,11 +17,16 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 /**
  * Curated front-page builder for {@code /rtp menu} (no args).
  * Produces permission-gated landing page with entry points for players and admins.
  */
 public final class FrontPageBuilder {
+
+    /** {@code :} + optional color codes + {@code ...}: the "command:&7..." placeholder echo. */
+    private static final Pattern PLACEHOLDER_ECHO =
+            Pattern.compile(":(?:&[0-9A-Fa-fK-Ok-or]|#[0-9A-Fa-f]{6})*+\\.\\.\\.");
 
     /** Admin-view gate permission. {@code rtp.admin} should imply this in {@code plugin.yml}. */
     public static final String ADMIN_PERMISSION = "rtp.menu.admin";
@@ -193,7 +198,7 @@ public final class FrontPageBuilder {
             }
         }
         // Drop the "command:&7..." placeholder echo from the picker labels.
-        label = label.replaceAll(":(?:&[0-9A-Fa-fK-Ok-or]|#[0-9A-Fa-f]{6})*+\\.\\.\\.", "");
+        label = PLACEHOLDER_ECHO.matcher(label).replaceAll("");
         // Strip any color code / whitespace left dangling at the end by the split.
         label = stripTrailingFormatting(label);
         if (label.isEmpty()) label = raw;

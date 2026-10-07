@@ -245,6 +245,22 @@ public final class ProxyDirectWire {
         return readList(in, verifier);
     }
 
+    /**
+     * Split a multi-field payload on {@link #FS}, keeping trailing empty fields:
+     * identical to {@code payload.split(String.valueOf(FS), -1)} without the regex dispatch.
+     */
+    public static String[] splitFields(String payload) {
+        List<String> out = new ArrayList<>();
+        int from = 0;
+        int at;
+        while ((at = payload.indexOf(FS, from)) >= 0) {
+            out.add(payload.substring(from, at));
+            from = at + 1;
+        }
+        out.add(payload.substring(from));
+        return out.toArray(new String[0]);
+    }
+
     // ---- structured record codecs ----------------------------------------
 
     /**
@@ -263,7 +279,7 @@ public final class ProxyDirectWire {
     /** Decode a token payload; {@code null}/empty -> {@code null} (no reservation). */
     public static ReservationToken decodeToken(String payload) {
         if (payload == null || payload.isEmpty()) return null;
-        String[] f = payload.split(String.valueOf(FS), -1);
+        String[] f = splitFields(payload);
         if (f.length < 6) return null;
         try {
             String regionKey = f[5].isEmpty() ? null : f[5];
@@ -292,7 +308,7 @@ public final class ProxyDirectWire {
     /** Decode an enrolment envelope; returns {@code null} when malformed. */
     public static NetworkRequestQueue.EnrolmentEnvelope decodeEnvelope(String payload) {
         if (payload == null || payload.isEmpty()) return null;
-        String[] f = payload.split(String.valueOf(FS), -1);
+        String[] f = splitFields(payload);
         if (f.length < 5) return null;
         try {
             Optional<String> regionKey = f[2].isEmpty() ? Optional.empty() : Optional.of(f[2]);
@@ -321,7 +337,7 @@ public final class ProxyDirectWire {
     /** Decode a queue-status payload; returns {@code null} when malformed. */
     public static NetworkRequestQueue.QueueStatus decodeStatus(String payload) {
         if (payload == null || payload.isEmpty()) return null;
-        String[] f = payload.split(String.valueOf(FS), -1);
+        String[] f = splitFields(payload);
         if (f.length < 6) return null;
         try {
             Optional<String> serverId = f[3].isEmpty() ? Optional.empty() : Optional.of(f[3]);

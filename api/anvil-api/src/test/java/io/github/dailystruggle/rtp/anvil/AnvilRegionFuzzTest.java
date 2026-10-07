@@ -4,7 +4,7 @@ import com.code_intelligence.jazzer.junit.FuzzTest;
 import java.io.IOException;
 import org.junit.jupiter.api.DisplayName;
 
-@DisplayName("Anvil & Linear Region Coverage-Guided Fuzz Tests")
+@DisplayName("Anvil Region Coverage-Guided Fuzz Tests")
 class AnvilRegionFuzzTest {
 
     @FuzzTest(maxDuration = "2s")
@@ -65,20 +65,6 @@ class AnvilRegionFuzzTest {
             Nbt.readRootCompoundSelective(data, (path, name, type) -> Nbt.SelectiveFilter.Decision.RECURSE);
         } catch (IOException expected) {
             // Expected safe fail-closed behavior for malformed NBT
-        }
-    }
-
-    @FuzzTest(maxDuration = "2s")
-    @DisplayName("Fuzz LinearRegionReader.readChunk with arbitrary byte mutations")
-    void fuzzReadLinearChunk(byte[] data) {
-        if (data == null) {
-            return;
-        }
-
-        try {
-            LinearRegionReader.INSTANCE.readChunk(data, 0, 0);
-        } catch (IOException | IllegalArgumentException expected) {
-            // Expected safe fail-closed behavior for malformed region data
         }
     }
 }

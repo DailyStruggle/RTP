@@ -58,6 +58,7 @@ public class SubspaceShape {
   private final int chunkRadius;
   private final Region parentRegion;
   private final MemoryShape<?> parentShape;
+  private boolean floatingAnchorY = false;
   private java.util.Random rng = null;
 
   public void setRng(java.util.Random rng) {
@@ -66,6 +67,14 @@ public class SubspaceShape {
 
   protected java.util.Random rng() {
     return rng != null ? rng : ThreadLocalRandom.current();
+  }
+
+  public boolean isFloatingAnchorY() {
+    return floatingAnchorY;
+  }
+
+  public void setFloatingAnchorY(boolean floatingAnchorY) {
+    this.floatingAnchorY = floatingAnchorY;
   }
 
   /**
@@ -88,6 +97,25 @@ public class SubspaceShape {
    * @param parentRegion the owning parent Region (optional, may be {@code null})
    */
   public SubspaceShape(RTPLocation anchor, int blockRadius, int centerRadius, Region parentRegion) {
+    this(anchor, blockRadius, centerRadius, parentRegion, false);
+  }
+
+  /**
+   * Constructs a new SubspaceShape bounded to a block-radius footprint around an anchor with inner exclusion radius
+   * and floating elevation baseline option.
+   *
+   * @param anchor the central anchor location (never {@code null})
+   * @param blockRadius footprint half-width in blocks
+   * @param centerRadius inner exclusion radius in blocks
+   * @param parentRegion the owning parent Region (optional, may be {@code null})
+   * @param floatingAnchorY whether elevation tolerance floats relative to the first validated slot
+   */
+  public SubspaceShape(
+      RTPLocation anchor,
+      int blockRadius,
+      int centerRadius,
+      Region parentRegion,
+      boolean floatingAnchorY) {
     this.anchor = Objects.requireNonNull(anchor, "anchor cannot be null");
     if (blockRadius < 0) {
       throw new IllegalArgumentException("Subspace blockRadius must be >= 0, got: " + blockRadius);
@@ -106,6 +134,7 @@ public class SubspaceShape {
     } else {
       this.parentShape = null;
     }
+    this.floatingAnchorY = floatingAnchorY;
   }
 
   public RTPLocation getAnchor() {
@@ -292,11 +321,21 @@ public class SubspaceShape {
     // count by minimum separation over the validated set - the final layout depends on which
     // candidates actually validate, so separation cannot be baked into enumeration.
     List<RTPLocation> validatedPool = new ArrayList<>();
+    Integer baseElevation = null;
     for (int[] cell : cells) {
       RTPLocation validated = validator.validate(cell[0], cell[1]);
       if (validated == null || validated.coords() == null) continue;
-      if (elevationTolerance >= 0
-          && Math.abs(validated.coords().y() - anchorY) > elevationTolerance) continue;
+      if (elevationTolerance >= 0) {
+        if (floatingAnchorY) {
+          if (baseElevation == null) {
+            baseElevation = validated.coords().y();
+          } else if (Math.abs(validated.coords().y() - baseElevation) > elevationTolerance) {
+            continue;
+          }
+        } else if (Math.abs(validated.coords().y() - anchorY) > elevationTolerance) {
+          continue;
+        }
+      }
       validatedPool.add(validated);
     }
 
@@ -411,7 +450,7 @@ public class SubspaceShape {
    * only a pending future resumes the loop from its callback, so stack depth stays O(1) regardless
    * of footprint size.
    */
-  private static void drainSlots(
+  private void drainSlots(
       List<int[]> candidates,
       int startIndex,
       int required,
@@ -455,10 +494,20 @@ public class SubspaceShape {
     }
   }
 
-  private static void acceptSlot(RTPLocation loc, int elevationTolerance, int anchorY, List<RTPLocation> acc) {
-    if (loc != null && loc.coords() != null
-        && (elevationTolerance < 0 || Math.abs(loc.coords().y() - anchorY) <= elevationTolerance)) {
-      acc.add(loc);
+  private void acceptSlot(RTPLocation loc, int elevationTolerance, int anchorY, List<RTPLocation> acc) {
+    if (loc != null && loc.coords() != null) {
+      if (elevationTolerance < 0) {
+        acc.add(loc);
+      } else if (floatingAnchorY) {
+        int baseY = acc.isEmpty() ? loc.coords().y() : acc.get(0).coords().y();
+        if (Math.abs(loc.coords().y() - baseY) <= elevationTolerance) {
+          acc.add(loc);
+        }
+      } else {
+        if (Math.abs(loc.coords().y() - anchorY) <= elevationTolerance) {
+          acc.add(loc);
+        }
+      }
     }
   }
 
@@ -652,7 +701,7 @@ public class SubspaceShape {
 
               int vy = validated.coords().y();
               if (clusterAnchorY == null) {
-                if (elevationTolerance >= 0 && Math.abs(vy - anchorY) > elevationTolerance * 2) continue;
+                if (elevationTolerance >= 0 && !floatingAnchorY && Math.abs(vy - anchorY) > elevationTolerance * 2) continue;
                 clusterAnchorY = vy;
               } else {
                 if (elevationTolerance >= 0 && Math.abs(vy - clusterAnchorY) > elevationTolerance) continue;

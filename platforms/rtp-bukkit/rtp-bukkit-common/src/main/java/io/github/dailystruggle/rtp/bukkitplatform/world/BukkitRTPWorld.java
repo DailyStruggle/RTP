@@ -296,17 +296,10 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     // daemons with no region-thread affinity.
     return CompletableFuture.supplyAsync(() -> {
       try {
-        java.nio.file.Path regionFile =
-            io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(worldFolder, dim, cx, cz);
-        // Share raw region bytes across sibling-chunk probes in the same
-        // r.X.Z.mca via a 4-entry LRU, with mtime invalidation.
-        byte[] regionBytes = io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
-        if (regionBytes == null) return null;
-        int rx = Math.floorMod(cx, 32);
-        int rz = Math.floorMod(cz, 32);
+        // Reads only this chunk's sectors (location table cached per region file).
         io.github.dailystruggle.rtp.anvil.ColumnProbe probe =
-            io.github.dailystruggle.rtp.anvil.AnvilReader.readColumnProbe(
-                regionBytes, rx, rz, finalMinY, finalMaxY);
+            io.github.dailystruggle.rtp.anvil.AnvilPrefilter.probeColumn(
+                worldFolder, dim, cx, cz, finalMinY, finalMaxY);
         if (probe == null) return null;
         return io.github.dailystruggle.rtp.api.world.ChunkColumnProbe.of(
             new io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter(probe, cx, cz,
@@ -326,11 +319,9 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   /**
    * {@inheritDoc}
    *
-   * <p>Reads {@code r.<rcx>.<rcz>.mca} once via {@link
-   * io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache}, decodes each of the
-   * up-to-1024 chunks via {@link io.github.dailystruggle.rtp.anvil.AnvilReader#readChunkView},
-   * and samples the biome at chunk-local {@code (8, y, 8)} via
-   * {@link io.github.dailystruggle.rtp.anvil.AnvilChunkView#getBiomeAt}.
+   * <p>Reads {@code r.<rcx>.<rcz>.mca} once under a pooled-buffer lease via {@link
+   * io.github.dailystruggle.rtp.anvil.AnvilRegionSampler#readAllBiomes} and samples each
+   * chunk's biome at chunk-local {@code (8, y, 8)}.
    *
    * <p>Biome names are canonicalised to the same uppercase, {@code minecraft:}
    * -stripped form used by {@code MemoryShape.addBiomeLocation} so that
@@ -352,31 +343,8 @@ public class BukkitRTPWorld extends RTPWorld<World> {
           io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(
               worldFolder, dim, rcx << 5, rcz << 5);
       if (regionFile == null) return java.util.Collections.emptyMap();
-      byte[] regionBytes =
-          io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
-      if (regionBytes == null) return java.util.Collections.emptyMap();
-      java.util.HashMap<Long, String> out = new java.util.HashMap<>(1024);
-      for (int rx = 0; rx < 32; rx++) {
-        for (int rz = 0; rz < 32; rz++) {
-          try {
-            io.github.dailystruggle.rtp.anvil.AnvilChunkView view =
-                io.github.dailystruggle.rtp.anvil.AnvilReader.readChunkView(
-                    regionBytes, rx, rz);
-            if (view == null) continue;
-            String raw = view.getBiomeAt(8, y, 8);
-            if (raw == null) continue;
-            String canonical = canonicaliseBiome(raw);
-            if (canonical == null || canonical.isEmpty()) continue;
-            int cx = (rcx << 5) | rx;
-            int cz = (rcz << 5) | rz;
-            long key = ((long) cx << 32) | (cz & 0xFFFF_FFFFL);
-            out.put(key, canonical);
-          } catch (Throwable ignored) {
-            // chunk not present in region file or unreadable; skip silently.
-          }
-        }
-      }
-      return out;
+      return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.readAllBiomes(
+          regionFile, rcx, rcz, y, BukkitRTPWorld::canonicaliseBiome);
     } catch (Throwable t) {
       RTP.log(java.util.logging.Level.FINE,
           "[RTP] readBiomesInRegionFile failed for world=" + name
@@ -772,21 +740,74 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     }
   }
 
+  /**
+   * In-flight ticket adds deferred behind an async load, keyed by packed chunk key. A release
+   * removes the entry, so the deferred add sees its token gone and skips (S-002). Holds only
+   * pending adds; entries are removed when the add applies or is cancelled.
+   */
+  private final java.util.concurrent.ConcurrentHashMap<Long, Object> deferredTicketAdds =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
   @Override
   protected java.util.concurrent.CompletableFuture<Void> setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
     org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
     if (plugin == null || !plugin.isEnabled()) {
       return java.util.concurrent.CompletableFuture.completedFuture(null);
     }
-    if (org.bukkit.Bukkit.isPrimaryThread()) {
-      if (forceLoad) {
-        if (!world.getPluginChunkTickets(cx, cz).contains(plugin)) {
-          world.addPluginChunkTicket(cx, cz, plugin);
+    final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
+    if (!forceLoad) {
+      deferredTicketAdds.remove(key);
+    }
+    if (forceLoad && CHUNK_AT_ASYNC_FUTURE != null && !isChunkLoaded(cx, cz)) {
+      // S-005: addPluginChunkTicket loads an absent chunk synchronously on the tick thread.
+      // Load it through the async chunk API first, then apply the ticket to the now-resident
+      // chunk. The returned future still completes only once the ticket is applied (ADR-015).
+      try {
+        @SuppressWarnings("unchecked")
+        CompletableFuture<org.bukkit.Chunk> load =
+            (CompletableFuture<org.bukkit.Chunk>) CHUNK_AT_ASYNC_FUTURE.invoke(world, cx, cz);
+        if (load != null) {
+          final Object token = new Object();
+          deferredTicketAdds.put(key, token);
+          return load.handle((chunk, ex) -> null)
+              .thenCompose(ignored -> applyTicketOnOwner(plugin, cx, cz, true, token));
         }
-      } else {
-        world.removePluginChunkTicket(cx, cz, plugin);
+      } catch (Throwable t) {
+        RTP.log(java.util.logging.Level.FINE,
+            "[RTP] async pre-load before chunk ticket failed for world=" + name + " chunk=("
+                + cx + "," + cz + "): " + t.getClass().getSimpleName() + ": " + t.getMessage());
       }
-      return java.util.concurrent.CompletableFuture.completedFuture(null);
+    }
+    return applyTicketOnOwner(plugin, cx, cz, forceLoad, null);
+  }
+
+  /**
+   * Apply or drop the plugin chunk ticket on the thread that owns {@code (cx, cz)}.
+   *
+   * @param deferredToken non-null when the add was postponed behind an async load; the add is
+   *     then skipped unless the token is still registered, so a release that ran first cannot
+   *     leave an orphaned ticket (S-002)
+   * @return future completed after the native ticket call has executed
+   */
+  private java.util.concurrent.CompletableFuture<Void> applyTicketOnOwner(
+      org.bukkit.plugin.Plugin plugin, int cx, int cz, boolean forceLoad, Object deferredToken) {
+    final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
+    if (org.bukkit.Bukkit.isPrimaryThread()) {
+      try {
+        if (forceLoad) {
+          if (deferredToken != null && !deferredTicketAdds.remove(key, deferredToken)) {
+            return java.util.concurrent.CompletableFuture.completedFuture(null);
+          }
+          if (!world.getPluginChunkTickets(cx, cz).contains(plugin)) {
+            world.addPluginChunkTicket(cx, cz, plugin);
+          }
+        } else {
+          world.removePluginChunkTicket(cx, cz, plugin);
+        }
+        return java.util.concurrent.CompletableFuture.completedFuture(null);
+      } catch (Throwable t) {
+        return java.util.concurrent.CompletableFuture.failedFuture(t);
+      }
     }
     // ADR-015 Paper chunk-system-v2 follow-up (ticket-application race):
     // the raw addPluginChunkTicket call is main-thread-only on Bukkit/Paper and
@@ -804,6 +825,10 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     Runnable applyTicket = () -> {
       try {
         if (forceLoad) {
+          if (deferredToken != null && !deferredTicketAdds.remove(key, deferredToken)) {
+            future.complete(null);
+            return;
+          }
           if (!world.getPluginChunkTickets(cx, cz).contains(plugin)) {
             world.addPluginChunkTicket(cx, cz, plugin);
           }

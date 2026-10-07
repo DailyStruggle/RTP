@@ -23,7 +23,7 @@ Three operational challenges arise when subspace candidate evaluation encounters
 
 ### 1. Two-Stage Subspace Candidate Pipeline (Anvil Region Pre-Screening Binned with L3)
 
-Subspace placement adopts a decoupled two-stage pipeline operating alongside the L3 Backlog cache (ADR-028) and the Anvil/Linear pre-filter (ADR-016, ADR-077):
+Subspace placement adopts a decoupled two-stage pipeline operating alongside the L3 Backlog cache (ADR-028) and the Anvil/Linear pre-filter (ADR-016, ADR-077). (2026-10-06: Linear reader withdrawn from core, see ADR-077; core pre-screens only `.mca`, and the Linear references below apply only when an addon registers a reader.)
 
 ```
 [Stage 1: Off-Tick Anvil Region Pre-Screening]

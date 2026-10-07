@@ -5,7 +5,9 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -14,8 +16,8 @@ import java.util.regex.Pattern;
  * Resolves region file paths and determines the appropriate {@link RegionFileReader}
  * format for a given coordinate (ADR-077).
  *
- * <p>Supports registered format extensions from {@link RegionFormatRegistry}, including the
- * built-in Linear ({@code .linear} / ZSTD) format as well as standard Anvil ({@code .mca}).</p>
+ * <p>Supports standard Anvil ({@code .mca}) plus any format extension registered with
+ * {@link RegionFormatRegistry}. Files in unregistered formats are ignored.</p>
  */
 public final class RegionFileResolver {
 
@@ -24,11 +26,11 @@ public final class RegionFileResolver {
     /**
      * Target region file description holding its on-disk path, matching reader, and format metadata.
      */
-    public record ResolvedRegion(Path path, RegionFileReader reader, boolean isLinear) {}
+    public record ResolvedRegion(Path path, RegionFileReader reader) {}
 
     /**
      * Resolves the on-disk region file and matching reader for chunk {@code (cx, cz)}.
-     * Probes registered non-Anvil formats (e.g. {@code .linear}) first, then {@code .mca}.
+     * Probes registered non-Anvil formats first, then {@code .mca}.
      *
      * @param worldFolder      the root world directory
      * @param dimensionSubpath dimension subdirectory (e.g., {@code "DIM-1"}, {@code "DIM1"}, or {@code ""})
@@ -37,12 +39,65 @@ public final class RegionFileResolver {
      * @return {@link ResolvedRegion} with the existing file path, or the default {@code .mca} path if neither exists on disk
      */
     public static ResolvedRegion resolve(Path worldFolder, String dimensionSubpath, int cx, int cz) {
-        int regionX = cx >> 5;
-        int regionZ = cz >> 5;
         Path dir = regionDirectoryFor(worldFolder, dimensionSubpath);
-        String baseName = "r." + regionX + "." + regionZ;
+        String baseName = "r." + (cx >> 5) + "." + (cz >> 5);
+        ResolvedRegion found = resolveOnDisk(dir, baseName);
+        // Neither exists on disk - default to .mca path and Anvil reader
+        return found != null ? found : new ResolvedRegion(dir.resolve(baseName + ".mca"), AnvilReader.INSTANCE);
+    }
 
-        // Check registered non-default formats first (e.g. .linear)
+    /** Memo entry; {@code region == null} records that no region file existed. */
+    private record Memo(ResolvedRegion region, long checkedNanos) {}
+
+    private static final int MEMO_CAPACITY = 4096;
+
+    private static final LinkedHashMap<Path, Memo> MEMO =
+            new LinkedHashMap<>(MEMO_CAPACITY * 2, 0.75f, /* accessOrder = */ true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<Path, Memo> eldest) {
+                    return size() > MEMO_CAPACITY;
+                }
+            };
+
+    /**
+     * As {@link #resolve} but returns {@code null} when no region file exists, memoizing the answer
+     * (present or absent) for {@link AnvilRegionByteCache#revalidateIntervalMillis()}. Inside the
+     * window a probe pays no existence syscalls; a file created or converted by a save is observed
+     * within one window, well under the chunk-save cadence. Blocking stat: off the tick thread (S-005).
+     */
+    public static ResolvedRegion resolveExisting(Path worldFolder, String dimensionSubpath, int cx, int cz) {
+        Path dir = regionDirectoryFor(worldFolder, dimensionSubpath);
+        String baseName = "r." + (cx >> 5) + "." + (cz >> 5);
+        Path key = dir.resolve(baseName + ".mca");
+        long window = AnvilRegionByteCache.revalidateIntervalNanos();
+        if (window > 0L) {
+            Memo memo;
+            synchronized (MEMO) {
+                memo = MEMO.get(key);
+            }
+            if (memo != null && System.nanoTime() - memo.checkedNanos() < window) {
+                return memo.region();
+            }
+        }
+        ResolvedRegion found = resolveOnDisk(dir, baseName);
+        if (window > 0L) {
+            synchronized (MEMO) {
+                MEMO.put(key, new Memo(found, System.nanoTime()));
+            }
+        }
+        return found;
+    }
+
+    /** Clears the {@link #resolveExisting} memo. Test hook. */
+    public static void invalidateMemo() {
+        synchronized (MEMO) {
+            MEMO.clear();
+        }
+    }
+
+    /** Existing region file for {@code baseName} in {@code dir}, or {@code null}. */
+    private static ResolvedRegion resolveOnDisk(Path dir, String baseName) {
+        // Registered non-Anvil formats first: a server that converted its world keeps stale .mca files.
         Set<String> extensions = RegionFormatRegistry.getRegisteredExtensions();
         for (String ext : extensions) {
             if (".mca".equalsIgnoreCase(ext)) continue;
@@ -50,26 +105,16 @@ public final class RegionFileResolver {
             if (Files.isRegularFile(customPath)) {
                 RegionFileReader reader = RegionFormatRegistry.getReader(ext);
                 if (reader != null) {
-                    boolean isLinear = ".linear".equalsIgnoreCase(ext);
-                    return new ResolvedRegion(customPath, reader, isLinear);
+                    return new ResolvedRegion(customPath, reader);
                 }
             }
         }
 
-        // Check standard .mca
         Path mcaPath = dir.resolve(baseName + ".mca");
         if (Files.isRegularFile(mcaPath)) {
-            return new ResolvedRegion(mcaPath, AnvilReader.INSTANCE, false);
+            return new ResolvedRegion(mcaPath, AnvilReader.INSTANCE);
         }
-
-        // Check any remaining registered formats on disk in case .linear exists even if not registered yet
-        Path linearFallback = dir.resolve(baseName + ".linear");
-        if (Files.isRegularFile(linearFallback) && RegionFormatRegistry.isRegistered(".linear")) {
-            return new ResolvedRegion(linearFallback, RegionFormatRegistry.getReader(".linear"), true);
-        }
-
-        // Neither exists on disk - default to .mca path and Anvil reader
-        return new ResolvedRegion(mcaPath, AnvilReader.INSTANCE, false);
+        return null;
     }
 
     /**

@@ -41,7 +41,7 @@ lifecycle:
   onEnqueue:
     - CONSOLE: "tag [sender_name] add rtp_qchal_[target_name]"
     - MESSAGE: "<gray>Quick challenge sent to <yellow>[target_name]</yellow>! Waiting for response...</gray>"
-    - MESSAGE: "<gold>[sender_name] has challenged you to an instant duel! </gold><green><bold><click:run_command:'/rtp action quickchallenge player=[sender_name]'><hover:show_text:'<gray>Click to accept instant duel with [sender_name]</gray>'>[CLICK TO ACCEPT]</hover></click></bold></green>"
+    - MESSAGE_TARGET: "<gold>[sender_name] has challenged you to an instant duel! </gold><green><bold><click:run_command:'/rtp action quickchallenge player=[sender_name]'><hover:show_text:'<gray>Click to accept instant duel with [sender_name]</gray>'>[CLICK TO ACCEPT]</hover></click></bold></green>"
 
   onStart:
     - CONSOLE: "tag [sender_name_1] remove rtp_qchal_[sender_name_2]"
@@ -52,6 +52,6 @@ lifecycle:
   onCancel:
     - CONSOLE: "tag [sender_name] remove rtp_qchal_[target_name]"
     - MESSAGE: "<gray>Quick challenge to <yellow>[target_name]</yellow> was cancelled.</gray>"
-    - MESSAGE: "<gray>Quick challenge from <yellow>[sender_name]</yellow> was cancelled.</gray>"
+    - MESSAGE_TARGET: "<gray>Quick challenge from <yellow>[sender_name]</yellow> was cancelled.</gray>"
 
 version: "1.0"

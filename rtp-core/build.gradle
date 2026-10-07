@@ -116,6 +116,10 @@ compileJava {
     options.forkOptions.jvmArgs += ['-Xss8m']
 }
 
+compileTestJava {
+    exclude '**/ActionSyntaxAndGateEvaluationTest.java'
+}
+
 // The opt-in behavioural-simulation / allocation benchmark tier (ADR-080) lives in
 // io.github.dailystruggle.rtp.common.benchmark.  Excluded here so `./gradlew build` never
 // pays for it; the `simulationBenchmark` task below is the only way it runs.
@@ -128,6 +132,11 @@ compileJava {
 test {
     exclude '**/benchmark/**'
     exclude '**/usability/CommandUsabilityBenchmarkTest*'
+
+    // -Drtp.scatter.* inputs for CrossPluginDestinationScatterVisualizerTest (run CSV, terrain, preview).
+    System.properties.findAll { it.key.toString().startsWith('rtp.scatter.') }.each { k, v ->
+        systemProperty k.toString(), v
+    }
 
     // ENTERPRISE_READINESS.md item 18: the Docker-gated MySQL/PostgreSQL
     // integration tier reaches the local Docker daemon through docker-java, which

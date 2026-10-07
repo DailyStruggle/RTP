@@ -73,6 +73,9 @@ public final class StressTestRTPPlugin extends JavaPlugin {
             // the CPU column describes, so it is bound from the same hop.
             if (gcSampler != null) gcSampler.setTickThreadId(cpuSampler.mainThreadId());
         });
+        // Per-thread-group CPU (cpu_*_ms phase columns). The timer keeps pooled
+        // workers that exit mid-phase from dropping their CPU; it runs off-tick.
+        cpuSampler.startBreakdownTimer(this, getConfig().getLong("cpu-breakdown-sample-ms", 1000L));
 
         // GC / tick-thread-allocation accounting. Heap-used is already sampled
         // every 50 ms, but a heap curve cannot separate retained bytes from
@@ -231,6 +234,7 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         } catch (Throwable t) {
             getLogger().log(Level.WARNING, "Error stopping runner on disable", t);
         }
+        closeRecorder(recorder);
         if (consoleWatcher != null) consoleWatcher.stop();
         if (probe != null) probe.unregister();
         if (directProbe != null) directProbe.unregister();
@@ -241,6 +245,27 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         if (ticketFootprintProbe != null) ticketFootprintProbe.stop();
         if (heapPressureWatcher != null) heapPressureWatcher.stop();
         if (sampler != null) { sampler.stopHeapSeries(); sampler.stop(); }
+        if (cpuSampler != null) cpuSampler.stopBreakdownTimer();
+    }
+
+    /** Config key holding the chunk-load cost for this platform family
+     *  (marker classes, not the brand string forks override). No fallback to
+     *  the Spigot key: a cost calibrated where chunks load on the tick thread
+     *  does not describe Paper's or Folia's chunk system. */
+    static String chunkLoadCostKey(boolean folia, boolean paper) {
+        if (folia) return "chunk-load-cost-us-folia";
+        if (paper) return "chunk-load-cost-us-paper";
+        return "chunk-load-cost-us";
+    }
+
+    /** Flushes and closes a recorder's persistent CSV writer; failures are logged, not thrown. */
+    private void closeRecorder(MetricsRecorder r) {
+        if (r == null) return;
+        try {
+            r.close();
+        } catch (Throwable t) {
+            getLogger().log(Level.WARNING, "Error closing run CSV " + r.csvPath(), t);
+        }
     }
 
     /** Roll a new CSV for the next run. Called by {@link StressCommand} on start/burst. */
@@ -248,7 +273,10 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         String stamp = LocalDateTime.now(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"));
         Path dir = getDataFolder().toPath().resolve(getConfig().getString("output-subdir", "runs"));
         Path csv = dir.resolve(stamp + ".csv");
+        MetricsRecorder previous = recorder;
         recorder = new MetricsRecorder(csv);
+        // Closed after the swap so the proxy routes any late row to the new run.
+        closeRecorder(previous);
         if (cpuSampler != null) recorder.setCpuSampler(cpuSampler);
         if (chunkCounter != null) recorder.setChunkCounter(chunkCounter);
         if (regionMonitor != null) recorder.setRegionMonitor(regionMonitor);
@@ -322,7 +350,12 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         // hidden from cpu_ms_per_attempt_total. Calibrate by running
         // `/rtp test chunk-probe-perf` and reading the `full avg=Nµs`
         // value from the resulting log line.
-        double chunkCostUs = getConfig().getDouble("chunk-load-cost-us", 0.0);
+        String chunkCostKey = chunkLoadCostKey(Runner.isFoliaFamily(), Runner.isPaperFamily());
+        double chunkCostUs = getConfig().getDouble(chunkCostKey, 0.0);
+        if (chunkCostUs <= 0.0) {
+            getLogger().info("StressTestRTP: " + chunkCostKey + " is 0; chunk_load_cost_ms and "
+                    + "cpu_ms_with_chunks stay empty (chunk-system CPU is in cpu_chunk_system_ms).");
+        }
         if (chunkCostUs > 0.0) {
             long ns = Math.round(chunkCostUs * 1_000.0);
             recorder.setChunkLoadCostNs(ns);
@@ -435,6 +468,12 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         }
         @Override public void flushDeferred(boolean all) {
             MetricsRecorder r = plugin.recorder(); if (r != null) r.flushDeferred(all);
+        }
+        @Override public void flushPartialPhase() {
+            MetricsRecorder r = plugin.recorder(); if (r != null) r.flushPartialPhase();
+        }
+        @Override public void flushRows() {
+            MetricsRecorder r = plugin.recorder(); if (r != null) r.flushRows();
         }
         @Override public void onTimeout(Attempt a) {
             MetricsRecorder r = plugin.recorder(); if (r != null) r.onTimeout(a);

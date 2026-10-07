@@ -119,6 +119,12 @@ public final class EditorLiveFeed {
     private static final Pattern OWN_FILE = Pattern.compile("(feed|(land|path|hazard|heat)-[0-9_\\-]+)\\.js(\\.tmp)?");
     private static final Pattern FOCUS_TYPE = Pattern.compile("\"type\"\\s*:\\s*\"focus\"");
     private static final Pattern WORLD_FIELD = Pattern.compile("\"world\"\\s*:\\s*\"([^\"\\\\]{1,128})\"");
+    private static final String INT_VALUE = "\"\\s*:\\s*(-?\\d{1,9})(?![\\d.])";
+    private static final Pattern MIN_RX_FIELD = Pattern.compile("\"minRx" + INT_VALUE);
+    private static final Pattern MIN_RZ_FIELD = Pattern.compile("\"minRz" + INT_VALUE);
+    private static final Pattern MAX_RX_FIELD = Pattern.compile("\"maxRx" + INT_VALUE);
+    private static final Pattern MAX_RZ_FIELD = Pattern.compile("\"maxRz" + INT_VALUE);
+    private static final Pattern Y_FIELD = Pattern.compile("\"y" + INT_VALUE);
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final Object LOCK = new Object();
     /** Volatile: read lock-free by channel handlers on the socket's poll thread (no lock-order cycle). */
@@ -728,13 +734,13 @@ public final class EditorLiveFeed {
         lastPushed = null;
         pageState(latestFocus);
         Matcher wm = WORLD_FIELD.matcher(latestFocus);
-        Integer minRx = intField(latestFocus, "minRx");
-        Integer minRz = intField(latestFocus, "minRz");
-        Integer maxRx = intField(latestFocus, "maxRx");
-        Integer maxRz = intField(latestFocus, "maxRz");
+        Integer minRx = intField(latestFocus, MIN_RX_FIELD);
+        Integer minRz = intField(latestFocus, MIN_RZ_FIELD);
+        Integer maxRx = intField(latestFocus, MAX_RX_FIELD);
+        Integer maxRz = intField(latestFocus, MAX_RZ_FIELD);
         if (!wm.find() || minRx == null || minRz == null || maxRx == null || maxRz == null) return;
         String world = wm.group(1);
-        Integer yField = intField(latestFocus, "y");
+        Integer yField = intField(latestFocus, Y_FIELD);
         int y = (yField == null) ? WorldBiomeStore.DEFAULT_Y : yField;
         WorldLandSurvey target = surveyFor(world, y);
         if (target == null) return;
@@ -1127,8 +1133,8 @@ public final class EditorLiveFeed {
         return created;
     }
 
-    private static Integer intField(String json, String name) {
-        Matcher m = Pattern.compile("\"" + name + "\"\\s*:\\s*(-?\\d{1,9})(?![\\d.])").matcher(json);
+    private static Integer intField(String json, Pattern field) {
+        Matcher m = field.matcher(json);
         return m.find() ? Integer.valueOf(m.group(1)) : null;
     }
 

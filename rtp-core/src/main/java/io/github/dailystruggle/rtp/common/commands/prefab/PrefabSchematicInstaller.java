@@ -127,6 +127,9 @@ public final class PrefabSchematicInstaller {
                 installed.add(resource);
             }
         }
+        if (!installed.isEmpty()) {
+            io.github.dailystruggle.rtp.common.tasks.teleport.RegionSchematicService.invalidateCache();
+        }
         return new Result(installed, skipped, missing);
     }
 

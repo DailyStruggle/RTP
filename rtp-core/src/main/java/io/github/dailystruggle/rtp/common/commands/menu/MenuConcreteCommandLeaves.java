@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 
 import org.jetbrains.annotations.Nullable;
 
@@ -569,6 +570,13 @@ final class MenuConcreteCommandLeaves {
         private static final String PARAM_HEIGHT = "height";
         private static final String PARAM_ZOOM = "zoom";
         private static final int DEFAULT_SIZE = 512;
+        // Heap guard: export rasters share the server heap, so cap each side and the
+        // total area (8192^2 ARGB = 256 MiB) before any canvas is allocated.
+        private static final int MIN_SIDE = 16;
+        private static final int MAX_SIDE = 8192;
+        private static final long MAX_PIXELS = (long) MAX_SIDE * MAX_SIDE;
+        private static final Pattern NON_NUMERIC = Pattern.compile("[^0-9.]");
+        private static final Pattern NON_SIGNED_NUMERIC = Pattern.compile("[^0-9.-]");
 
         VisualizationExportCmd() {
             super(null);
@@ -596,37 +604,58 @@ final class MenuConcreteCommandLeaves {
                 // kib / mib / gib -> binary 1024 / 1048576 / 1073741824
                 // px / pix / pixels -> 1
                 if (s.endsWith("giga") || s.endsWith("gp") || s.endsWith("gpx") || s.endsWith("gpix") || s.endsWith("gpixels") || (s.endsWith("g") && !s.endsWith("deg"))) {
-                    String numPart = s.replaceAll("[^0-9.]", "").trim();
+                    String numPart = NON_NUMERIC.matcher(s).replaceAll("").trim();
                     double num = numPart.isEmpty() ? 1.0 : Double.parseDouble(numPart);
-                    return (int) Math.round(num * 1_000_000_000.0);
+                    return clampSide(num * 1_000_000_000.0);
                 } else if (s.endsWith("mega") || s.endsWith("mp") || s.endsWith("mpx") || s.endsWith("mpix") || s.endsWith("mpixels") || s.endsWith("m")) {
-                    String numPart = s.replaceAll("[^0-9.]", "").trim();
+                    String numPart = NON_NUMERIC.matcher(s).replaceAll("").trim();
                     double num = numPart.isEmpty() ? 1.0 : Double.parseDouble(numPart);
-                    return (int) Math.round(num * 1_000_000.0);
+                    return clampSide(num * 1_000_000.0);
                 } else if (s.endsWith("kilo") || s.endsWith("kilos") || s.endsWith("kp") || s.endsWith("kpx") || s.endsWith("kpix") || s.endsWith("kpixels") || s.endsWith("k")) {
-                    String numPart = s.replaceAll("[^0-9.]", "").trim();
+                    String numPart = NON_NUMERIC.matcher(s).replaceAll("").trim();
                     double num = numPart.isEmpty() ? 1.0 : Double.parseDouble(numPart);
-                    return (int) Math.round(num * 1000.0);
+                    return clampSide(num * 1000.0);
                 } else if (s.endsWith("kib")) {
-                    String numPart = s.replaceAll("[^0-9.]", "").trim();
+                    String numPart = NON_NUMERIC.matcher(s).replaceAll("").trim();
                     double num = numPart.isEmpty() ? 1.0 : Double.parseDouble(numPart);
-                    return (int) Math.round(num * 1024.0);
+                    return clampSide(num * 1024.0);
                 } else if (s.endsWith("mib")) {
-                    String numPart = s.replaceAll("[^0-9.]", "").trim();
+                    String numPart = NON_NUMERIC.matcher(s).replaceAll("").trim();
                     double num = numPart.isEmpty() ? 1.0 : Double.parseDouble(numPart);
-                    return (int) Math.round(num * 1024.0 * 1024.0);
+                    return clampSide(num * 1024.0 * 1024.0);
                 } else if (s.endsWith("px") || s.endsWith("pix") || s.endsWith("pixels")) {
-                    String numPart = s.replaceAll("[^0-9.]", "").trim();
+                    String numPart = NON_NUMERIC.matcher(s).replaceAll("").trim();
                     double num = numPart.isEmpty() ? 1.0 : Double.parseDouble(numPart);
-                    return (int) Math.round(num);
+                    return clampSide(num);
                 } else {
-                    String numPart = s.replaceAll("[^0-9.-]", "").trim();
+                    String numPart = NON_SIGNED_NUMERIC.matcher(s).replaceAll("").trim();
                     if (numPart.isEmpty()) return defaultValue;
-                    return (int) Math.round(Double.parseDouble(numPart));
+                    return clampSide(Double.parseDouble(numPart));
                 }
             } catch (Exception e) {
                 return defaultValue;
             }
+        }
+
+        /** Clamps in the double domain so suffixes like {@code 5g} cannot overflow the int cast. */
+        private static int clampSide(double value) {
+            if (Double.isNaN(value)) return MIN_SIDE;
+            return (int) Math.max(MIN_SIDE, Math.min(MAX_SIDE, Math.round(value)));
+        }
+
+        /** Bounds a resolved canvas to {@link #MAX_SIDE} per side and {@link #MAX_PIXELS}, keeping aspect ratio. */
+        static int[] clampCanvas(long w, long h) {
+            w = Math.max(MIN_SIDE, w);
+            h = Math.max(MIN_SIDE, h);
+            double scale = Math.min(1.0, Math.min((double) MAX_SIDE / w, (double) MAX_SIDE / h));
+            scale = Math.min(scale, Math.sqrt((double) MAX_PIXELS / ((double) w * h)));
+            if (scale < 1.0) {
+                w = Math.round(w * scale);
+                h = Math.round(h * scale);
+            }
+            return new int[]{
+                    (int) Math.max(MIN_SIDE, Math.min(MAX_SIDE, w)),
+                    (int) Math.max(MIN_SIDE, Math.min(MAX_SIDE, h))};
         }
 
         private static Integer[] parseDimensions(Map<String, List<String>> parameterValues) {
@@ -653,12 +682,21 @@ final class MenuConcreteCommandLeaves {
                     h = parsePixelDimension(heightVals.get(0), h != null ? h : DEFAULT_SIZE);
                 }
             }
-            if (w != null) w = Math.max(16, w);
-            if (h != null) h = Math.max(16, h);
+            if (w != null) w = Math.max(MIN_SIDE, Math.min(MAX_SIDE, w));
+            if (h != null) h = Math.max(MIN_SIDE, Math.min(MAX_SIDE, h));
             return new Integer[]{w, h};
         }
 
-        private static int[] resolveCanvasDimensions(
+        static int[] resolveCanvasDimensions(
+                @Nullable io.github.dailystruggle.rtp.common.selection.region.Region region,
+                Integer customWidth,
+                Integer customHeight,
+                boolean isSpatial) {
+            int[] dims = resolveUnclampedCanvasDimensions(region, customWidth, customHeight, isSpatial);
+            return clampCanvas(dims[0], dims[1]);
+        }
+
+        private static int[] resolveUnclampedCanvasDimensions(
                 @Nullable io.github.dailystruggle.rtp.common.selection.region.Region region,
                 Integer customWidth,
                 Integer customHeight,
@@ -748,7 +786,7 @@ final class MenuConcreteCommandLeaves {
                     (uuid, value) -> value != null && !value.isEmpty()) {
                 @Override
                 public Set<String> values() {
-                    return new HashSet<>(Arrays.asList("512", "1024", "2048", "4k", "8k", "16k", "k", "kpx", "m", "mpx"));
+                    return new HashSet<>(Arrays.asList("512", "1024", "2048", "4k", "8k", "k", "kpx"));
                 }
             });
             cmd.addParameter(PARAM_WIDTH, new CommandParameter(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,

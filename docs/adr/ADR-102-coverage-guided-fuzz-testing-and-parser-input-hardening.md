@@ -10,7 +10,7 @@
 ## 1. Context
 
 RTP processes external, untrusted, or semi-trusted data across multiple performance-critical surfaces:
-1. **World chunk data (`.mca` Anvil and `.linear` ZSTD region files):** Parsed off-tick by `anvil-api` (`AnvilReader`, `LinearRegionReader`, and `Nbt`). In Minecraft, players can manipulate chunk state or exploit vanilla glitches to create corrupted chunks, oversized NBT structures, or invalid heightmaps.
+1. **World chunk data (`.mca` Anvil and `.linear` ZSTD region files):** Parsed off-tick by `anvil-api` (`AnvilReader`, `LinearRegionReader`, and `Nbt`). In Minecraft, players can manipulate chunk state or exploit vanilla glitches to create corrupted chunks, oversized NBT structures, or invalid heightmaps. (2026-10-06: Linear reader withdrawn from core, see ADR-077; core parses only `.mca`.)
 2. **Redis network frames (`RespProtocol`):** Used in proxy/network mode (`rtp-proxy-common`). In shared hosting or multi-plugin Redis networks, malformed frames or rogue plugins can inject malicious payloads.
 3. **Player command arguments and gate expressions (`commands-api`, `GateExpressionParser`):** Executed on live threads during gameplay.
 
@@ -26,7 +26,7 @@ Traditional static unit testing and random property-based generators (`jqwik`) c
 
 2. **Adopt Coverage-Guided In-Process Fuzz Testing (Jazzer) & Two-Tier CI Model:**
    - Introduce `com.code-intelligence:jazzer-junit` into the test toolchain (`gradle/libs.versions.toml`).
-   - Write `@FuzzTest` suites targeting `AnvilReader` (for `.mca` and `.linear` chunk decoding) and `RespProtocol` (for RESP2 wire parsing).
+   - Write `@FuzzTest` suites targeting `AnvilReader` (for `.mca` and `.linear` chunk decoding) and `RespProtocol` (for RESP2 wire parsing). (2026-10-06: Linear reader withdrawn from core, see ADR-077; the Linear fuzz target is deleted.)
    - **Tier 1 (Fast Regression on PR/Push):** In standard CI and test execution (`./gradlew test`), fuzz tests execute deterministic regression seeds in milliseconds without launching the genetic mutation loop, ensuring zero slowdown or non-deterministic test times on PRs.
    - **Tier 2 (Scheduled & Dispatch Exploratory Fuzzing in CI):** A dedicated CI workflow (`.github/workflows/fuzzing.yml`) executes extended in-process coverage-guided mutation loops weekly and on manual dispatch. It executes `./gradlew test` with `JAZZER_FUZZ=1` enabled, tests the fuzz targets for extended durations, and captures crash artifacts/reproducers if violations or hangs are uncovered.
 

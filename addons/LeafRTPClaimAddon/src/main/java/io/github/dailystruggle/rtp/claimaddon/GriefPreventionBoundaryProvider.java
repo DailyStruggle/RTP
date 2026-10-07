@@ -11,6 +11,7 @@ import me.ryanhamshire.GriefPrevention.DataStore;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 /**
@@ -54,13 +55,38 @@ public class GriefPreventionBoundaryProvider implements ClaimBoundaryProvider {
         return Optional.empty();
       }
 
+      Player player = Bukkit.getPlayer(playerId);
+      Location playerLoc = (player != null && player.isOnline() && player.getWorld() != null
+          && worldName.equalsIgnoreCase(player.getWorld().getName()))
+          ? player.getLocation() : null;
+
       Claim targetClaim = null;
+      double minDistanceSq = Double.MAX_VALUE;
+
       for (Claim claim : playerData.getClaims()) {
         if (claim == null) continue;
         Location lesser = claim.getLesserBoundaryCorner();
-        if (lesser != null && lesser.getWorld() != null && worldName.equalsIgnoreCase(lesser.getWorld().getName())) {
+        if (lesser == null || lesser.getWorld() == null || !worldName.equalsIgnoreCase(lesser.getWorld().getName())) {
+          continue;
+        }
+
+        if (playerLoc != null) {
+          if (claim.contains(playerLoc, true, false)) {
+            targetClaim = claim;
+            break;
+          }
+          Location greater = claim.getGreaterBoundaryCorner();
+          if (greater != null) {
+            double cx = (lesser.getX() + greater.getX()) / 2.0;
+            double cz = (lesser.getZ() + greater.getZ()) / 2.0;
+            double distSq = (playerLoc.getX() - cx) * (playerLoc.getX() - cx) + (playerLoc.getZ() - cz) * (playerLoc.getZ() - cz);
+            if (distSq < minDistanceSq) {
+              minDistanceSq = distSq;
+              targetClaim = claim;
+            }
+          }
+        } else if (targetClaim == null) {
           targetClaim = claim;
-          break;
         }
       }
 
@@ -89,11 +115,18 @@ public class GriefPreventionBoundaryProvider implements ClaimBoundaryProvider {
 
       return Optional.of(buildBoundary(claimId, worldName, minX, minZ, maxX, maxZ, minChunkX, minChunkZ, maxChunkX, maxChunkZ, centroidX, centroidZ));
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.WARNING,
-          "[RTP] GriefPrevention integration encountered an error resolving claim boundary. Disabling GP boundary lookup.",
-          t);
+      if (ClaimCheckFailure.isIncompatibility(t)) {
+        exists = false;
+        RTP.log(
+            Level.SEVERE,
+            "[RTP] GriefPrevention API is missing or incompatible. Disabling GP boundary lookup.",
+            t);
+      } else {
+        RTP.log(
+            Level.WARNING,
+            "[RTP] GriefPrevention integration encountered an error resolving claim boundary for player " + playerId + ".",
+            t);
+      }
       return Optional.empty();
     }
   }
@@ -142,10 +175,18 @@ public class GriefPreventionBoundaryProvider implements ClaimBoundaryProvider {
 
       return Optional.of(buildBoundary(claimId, worldName, minX, minZ, maxX, maxZ, minChunkX, minChunkZ, maxChunkX, maxChunkZ, centroidX, centroidZ));
     } catch (Throwable t) {
-      RTP.log(
-          Level.WARNING,
-          "[RTP] GriefPrevention integration encountered an error resolving claim boundary at (" + x + "," + z + ").",
-          t);
+      if (ClaimCheckFailure.isIncompatibility(t)) {
+        exists = false;
+        RTP.log(
+            Level.SEVERE,
+            "[RTP] GriefPrevention API is missing or incompatible. Disabling GP boundary lookup.",
+            t);
+      } else {
+        RTP.log(
+            Level.WARNING,
+            "[RTP] GriefPrevention integration encountered an error resolving claim boundary at (" + x + "," + z + ").",
+            t);
+      }
       return Optional.empty();
     }
   }

@@ -57,7 +57,7 @@ As detailed in [ADR-100](../adr/ADR-100-superseding-adr-024-sla-and-support-tier
 | **PlaceholderAPI (PAPI) Integration** | Yes | Yes | Supported in both editions when PlaceholderAPI is present. |
 | **Multilingual Support (`/rtp lang`)** | Yes | Yes | Complete `lang/**` locale trees and ADR-020 runtime switching included in both. |
 | **Interactive Book & Map Menus** | Yes | Yes | Maps API and book rendering available across both editions. |
-| **Anvil / Linear Prefilter (ADR-016, ADR-077)** | Yes | Yes | Off-tick chunk prefiltering enabled in both editions (`rtp-anvil` retained in Lite). |
+| **Anvil Prefilter (ADR-016, ADR-077)** | Yes | Yes | Off-tick chunk prefiltering enabled in both editions (`rtp-anvil` retained in Lite). Other region formats require an addon reader. |
 | **Operator Documentation Extraction** | Yes | Yes | Both extract identical version-stamped `docs/**` via `JarUtils.extractDocs`. |
 | **Configuration Files Parity** | Yes | Yes | Lite inherits Pro `config.yml`, `advanced/*`, and definitions verbatim (ADR-024 amendment). |
 | **bStats Anonymous Telemetry** | Plugin ID 12277 | Plugin ID 30865 | Distinct metrics tracking IDs preserve separate install base analytics. |
@@ -68,4 +68,4 @@ As detailed in [ADR-100](../adr/ADR-100-superseding-adr-024-sla-and-support-tier
 
 - **Build-Time License Auditing:** The Gradle task `:rtp-plugin:liteJarStructureCheck` inspects the built Lite jar to verify that `LICENSE` contains the MIT terms (and no PolyForm text), while Folia, `LoginCacheTask`, SQL and Redis are retained per ADR-100.
 - **Network Transport Integrity:** The build audit verifies that the tier-1 `PluginMessageNetworkBinding` and proxy auto-detection classes, as well as the native `RespRedisClient` transport bindings, are preserved in Lite per ADR-100.
-- **Third-Party Dependency Compliance:** Shaded third-party libraries (e.g. SnakeYAML, aircompressor) are compatible with Apache 2.0, MIT, or BSD licenses and audited via CycloneDX SBOM generation (`bom.json`) on every release. LZ4 region decode is in-house code (ADR-016 section 15); lz4-java is a test-scope dependency only and is not shipped.
+- **Third-Party Dependency Compliance:** The plugin jars shade no third-party library (ADR-077); dependencies are audited via CycloneDX SBOM generation (`bom.json`) on every release. LZ4 region decode is in-house code (ADR-016 section 15); lz4-java is a test-scope dependency only and is not shipped.

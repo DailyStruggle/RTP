@@ -32,8 +32,6 @@ import org.jetbrains.annotations.Nullable;
 public class SendMessage {
   public static final Map<String, Function<UUID, String>> placeholders = PlaceholderProvider.placeholders;
   private static final Pattern hexColorPattern1 = Pattern.compile("(&?#[0-9a-fA-F]{6})");
-  private static final Pattern hexColorPattern2 =
-      Pattern.compile("(&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F]&[0-9a-fA-F])");
   private static final List<Consumer<String>> interceptors = new CopyOnWriteArrayList<>();
   /**
    * Detects MiniMessage {@code <tag>} markup (named colours, {@code <#rrggbb>}
@@ -317,30 +315,26 @@ public class SendMessage {
     return legacyFinisher.apply(format(player, GradientExpander.expand(resolved)));
   }
 
-  private static String Hex2Color(String text) {
-    // reduce patterns
+  /**
+   * Package-private for tests. Rewrites every {@code #hhhhhh} / {@code &#hhhhhh} to
+   * {@code §x§h§h§h§h§h§h} in one pass. Runs after {@code translateAlternateColorCodes},
+   * which leaves {@code &#} intact because {@code #} is not a legacy code char.
+   */
+  static String Hex2Color(String text) {
     if (text == null) return "";
-    Matcher matcher2 = hexColorPattern2.matcher(text);
-    while (matcher2.find()) {
-      String hexColor = text.substring(matcher2.start(), matcher2.end());
-      String shortColor = "#" + hexColor.replace("&", "");
-      text = text.replaceAll(hexColor, shortColor);
-    }
-
-    // colorize
-    Matcher matcher1 = hexColorPattern1.matcher(text);
-    while (matcher1.find()) {
-      String hexColor = text.substring(matcher1.start(), matcher1.end());
-      String bukkitColor;
-      StringBuilder bukkitColorCode = new StringBuilder("§x");
-      for (int i = hexColor.indexOf('#') + 1; i < hexColor.length(); i++) {
-        bukkitColorCode.append("§").append(hexColor.charAt(i));
+    Matcher matcher = hexColorPattern1.matcher(text);
+    if (!matcher.find()) return text;
+    StringBuilder out = new StringBuilder(text.length() + 32);
+    int last = 0;
+    do {
+      int end = matcher.end();
+      out.append(text, last, matcher.start()).append("§x");
+      for (int i = end - 6; i < end; i++) {
+        out.append('§').append(Character.toLowerCase(text.charAt(i)));
       }
-      bukkitColor = bukkitColorCode.toString().toLowerCase();
-      text = text.replaceAll(hexColor, bukkitColor);
-      matcher1.reset(text);
-    }
-    return text;
+      last = end;
+    } while (matcher.find());
+    return out.append(text, last, text.length()).toString();
   }
 
   /**

@@ -711,6 +711,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
    * unknown-player path fires (loudly) if the lookup fails.
    */
   private String resolveName(UUID callerId) {
+    if (callerId == null) return "CONSOLE";
     try {
       var player = RTP.serverAccessor.getPlayer(callerId);
       if (player != null) return player.name();

@@ -74,13 +74,67 @@ public final class BukkitHandles implements HandleProvider {
      * evaluate from {@code effects-api} (which has no compile-time dependency
      * on Folia API).
      */
-    static boolean isFolia() {
+    public static boolean isFolia() {
         try {
             Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
             return true;
         } catch (ClassNotFoundException e) {
             return false;
         }
+    }
+
+    /**
+     * Schedules a delayed task across Bukkit or Folia schedulers. Returns a
+     * canceller runnable.
+     */
+    public static Runnable scheduleDelayed(org.bukkit.plugin.Plugin caller, @Nullable Player player, long delayTicks, Runnable task) {
+        if (isFolia()) {
+            if (player != null) {
+                try {
+                    Object entityScheduler = player.getClass().getMethod("getScheduler").invoke(player);
+                    Object scheduledTask = entityScheduler.getClass()
+                            .getMethod("runDelayed", org.bukkit.plugin.Plugin.class, java.util.function.Consumer.class, Runnable.class, long.class)
+                            .invoke(entityScheduler, caller, (java.util.function.Consumer<Object>) t -> task.run(), null, delayTicks);
+                    if (scheduledTask != null) {
+                        return () -> {
+                            try {
+                                scheduledTask.getClass().getMethod("cancel").invoke(scheduledTask);
+                            } catch (Throwable ignored) {}
+                        };
+                    }
+                } catch (Throwable ignored) {}
+            }
+            try {
+                Object globalRegionScheduler = org.bukkit.Bukkit.class
+                        .getMethod("getGlobalRegionScheduler").invoke(null);
+                Object scheduledTask = globalRegionScheduler.getClass()
+                        .getMethod("runDelayed", org.bukkit.plugin.Plugin.class, java.util.function.Consumer.class, long.class)
+                        .invoke(globalRegionScheduler, caller, (java.util.function.Consumer<Object>) t -> task.run(), delayTicks);
+                if (scheduledTask != null) {
+                    return () -> {
+                        try {
+                            scheduledTask.getClass().getMethod("cancel").invoke(scheduledTask);
+                        } catch (Throwable ignored) {}
+                    };
+                }
+            } catch (Throwable t) {
+                task.run();
+                return () -> {};
+            }
+        }
+        org.bukkit.scheduler.BukkitTask bTask = org.bukkit.Bukkit.getScheduler().runTaskLater(caller, task, delayTicks);
+        return () -> {
+            try {
+                bTask.cancel();
+            } catch (Throwable ignored) {}
+        };
+    }
+
+    /**
+     * Runs a delayed task across Bukkit or Folia schedulers.
+     */
+    public static void runDelayed(org.bukkit.plugin.Plugin caller, long delayTicks, Runnable task) {
+        scheduleDelayed(caller, null, delayTicks, task);
     }
 
     @Override
@@ -188,7 +242,8 @@ public final class BukkitHandles implements HandleProvider {
 
         @Override
         public void spawnParticle(Object type, int count, double dx, double dy, double dz, double speed) {
-            player.spawnParticle((Particle) type, player.getLocation().add(dx, dy, dz), count, 0, 0, 0, speed);
+            int clampedCount = Math.max(1, Math.min(256, count));
+            player.spawnParticle((Particle) type, player.getLocation().add(dx, dy, dz), clampedCount, 0, 0, 0, speed);
         }
 
         @Override
@@ -366,14 +421,14 @@ public final class BukkitHandles implements HandleProvider {
                 org.bukkit.plugin.Plugin caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();
                 if (caller != null) {
                     try {
-                        org.bukkit.scheduler.BukkitTask task = org.bukkit.Bukkit.getScheduler().runTaskLater(caller, () -> {
+                        Runnable timeoutTask = () -> {
                             Player p = org.bukkit.Bukkit.getPlayer(state.playerId);
                             if (p != null && io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.GlideSafetyListener.isGliding(state.playerId)) {
                                 io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.GlideSafetyListener.endGlide(
                                         p, io.github.dailystruggle.effectsapi.bukkit.events.PlayerLandEvent.Reason.TIMEOUT);
                             }
-                        }, landingTimeoutTicks);
-                        state.watchdogTaskId = task.getTaskId();
+                        };
+                        state.watchdogCanceller = scheduleDelayed(caller, player, landingTimeoutTicks, timeoutTask);
                     } catch (Throwable t) {
                         caller.getLogger().warning(
                                 "GlideEffect could not schedule timeout watchdog: " + t.getMessage());
@@ -446,8 +501,9 @@ public final class BukkitHandles implements HandleProvider {
 
         @Override
         public void spawnParticle(Object type, int count, double dx, double dy, double dz, double speed) {
+            int clampedCount = Math.max(1, Math.min(256, count));
             World world = location.getWorld();
-            if (world != null) world.spawnParticle((Particle) type, location.add(dx, dy, dz), count, 0, 0, 0, speed);
+            if (world != null) world.spawnParticle((Particle) type, location.add(dx, dy, dz), clampedCount, 0, 0, 0, speed);
         }
 
         @Override
@@ -505,7 +561,7 @@ public final class BukkitHandles implements HandleProvider {
         boolean flicker = false, trail = false, safe = true;
 
         Object o = data.get("NUMBER");
-        if (o instanceof Number) numFireworks = ((Number) o).intValue();
+        if (o instanceof Number) numFireworks = Math.max(1, Math.min(8, ((Number) o).intValue()));
 
         o = data.get("DX");
         if (o instanceof Number) dx = ((Number) o).doubleValue();

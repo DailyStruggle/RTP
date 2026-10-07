@@ -168,14 +168,23 @@ public final class ProxyDirectTlsConfig {
     public SSLSocket wrapClient(Socket connected, String host, int port) throws IOException, GeneralSecurityException {
         if (!enabled()) throw new IllegalStateException("proxy-direct TLS not enabled");
         SSLSocket ssl = (SSLSocket) context().getSocketFactory().createSocket(connected, host, port, true);
-        ssl.setEnabledProtocols(filterProtocols(ssl.getSupportedProtocols()));
-        if (verifyHostname) {
-            SSLParameters p = ssl.getSSLParameters();
-            p.setEndpointIdentificationAlgorithm("HTTPS");
-            ssl.setSSLParameters(p);
+        try {
+            ssl.setEnabledProtocols(filterProtocols(ssl.getSupportedProtocols()));
+            if (verifyHostname) {
+                SSLParameters p = ssl.getSSLParameters();
+                p.setEndpointIdentificationAlgorithm("HTTPS");
+                ssl.setSSLParameters(p);
+            }
+            ssl.startHandshake();
+            return ssl;
+        } catch (Throwable t) {
+            try {
+                ssl.close();
+            } catch (Throwable suppressed) {
+                t.addSuppressed(suppressed);
+            }
+            throw t;
         }
-        ssl.startHandshake();
-        return ssl;
     }
 
     private SSLContext context() throws IOException, GeneralSecurityException {

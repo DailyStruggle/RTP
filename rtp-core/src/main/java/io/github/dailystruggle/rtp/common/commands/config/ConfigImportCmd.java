@@ -15,12 +15,15 @@ import java.io.File;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.logging.Level;
+import java.util.regex.Pattern;
 
 /**
  * Subcommand {@code /rtp config import [source] [--overwrite]}.
  * Implements the foreign config importer seam (ADR-066).
  */
 public class ConfigImportCmd extends BaseRTPCmdImpl {
+
+    private static final Pattern COLOR_CODE = Pattern.compile("&[0-9a-fk-or]");
 
     public static final String PARAM_SOURCE = "source";
     public static final String PARAM_OVERWRITE = "overwrite";
@@ -266,65 +269,79 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
             importer = ForeignConfigImporterRegistry.getImporter("universal");
         }
 
-        sendMessage(callerId, "&7[RTP] Importing from &f" + sourceDir.getFileName() + "&7 (overwrite=" + overwrite + ")...");
-        ImportResult result = importer.importConfiguration(sourceDir, destinationDir, overwrite);
+        final ForeignConfigImporter finalImporter = importer;
+        final Path finalSourceDir = sourceDir;
+        final boolean finalOverwrite = overwrite;
+        final boolean finalMigratePermissions = migratePermissions;
+        final String finalRequestedSource = requestedSource;
 
-        for (String warn : result.getWarnings()) {
-            sendMessage(callerId, "&e[WARN] " + warn);
-        }
+        Runnable importTask = () -> {
+            sendMessage(callerId, "&7[RTP] Importing from &f" + finalSourceDir.getFileName() + "&7 (overwrite=" + finalOverwrite + ")...");
+            ImportResult result = finalImporter.importConfiguration(finalSourceDir, destinationDir, finalOverwrite);
 
-        if (!result.isSuccess()) {
-            sendMessage(callerId, "&c[RTP] Import failed!");
-            for (String err : result.getErrors()) {
-                sendMessage(callerId, "&c[ERROR] " + err);
+            for (String warn : result.getWarnings()) {
+                sendMessage(callerId, "&e[WARN] " + warn);
             }
-            if (!overwrite) {
-                sendMessage(callerId, "&7Tip: pass &foverwrite=true&7 or &f--overwrite&7 to replace existing files.");
-            }
-            return false;
-        }
 
-        sendMessage(callerId, "&a[RTP] Successfully imported configuration from &f" + result.getSourceName() + "&a:");
-        for (String entity : result.getMappedEntities()) {
-            sendMessage(callerId, "  &2✔ &f" + entity);
-        }
-
-        boolean reloaded = false;
-        Throwable reloadFailure = null;
-        try {
-            CommandsAPICommand reload = (RTP.baseCommand != null)
-                    ? RTP.baseCommand.getCommandLookup().get("reload")
-                    : null;
-            if (reload != null) {
-                reloaded = reload.onCommand(callerId, Collections.emptyMap(), null);
-            } else if (RTP.configs != null) {
-                RTP.reloading.set(true);
-                try {
-                    reloaded = RTP.configs.reload();
-                } finally {
-                    RTP.reloading.set(false);
+            if (!result.isSuccess()) {
+                sendMessage(callerId, "&c[RTP] Import failed!");
+                for (String err : result.getErrors()) {
+                    sendMessage(callerId, "&c[ERROR] " + err);
                 }
+                if (!finalOverwrite) {
+                    sendMessage(callerId, "&7Tip: pass &foverwrite=true&7 or &f--overwrite&7 to replace existing files.");
+                }
+                return;
             }
-        } catch (RuntimeException re) {
-            reloadFailure = re;
-            RTP.reloading.set(false);
-        }
 
-        if (reloaded) {
-            sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
-                    + "&a file(s). Configuration reload completed!");
-        } else if (reloadFailure != null) {
-            sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
-                    + "&a file(s). &eReload failed: " + reloadFailure.getMessage() + " - run &f/rtp reload&e.");
+            sendMessage(callerId, "&a[RTP] Successfully imported configuration from &f" + result.getSourceName() + "&a:");
+            for (String entity : result.getMappedEntities()) {
+                sendMessage(callerId, "  &2✔ &f" + entity);
+            }
+
+            boolean reloaded = false;
+            Throwable reloadFailure = null;
+            try {
+                CommandsAPICommand reload = (RTP.baseCommand != null)
+                        ? RTP.baseCommand.getCommandLookup().get("reload")
+                        : null;
+                if (reload != null) {
+                    reloaded = reload.onCommand(callerId, Collections.emptyMap(), null);
+                } else if (RTP.configs != null) {
+                    RTP.reloading.set(true);
+                    try {
+                        reloaded = RTP.configs.reload();
+                    } finally {
+                        RTP.reloading.set(false);
+                    }
+                }
+            } catch (RuntimeException re) {
+                reloadFailure = re;
+                RTP.reloading.set(false);
+            }
+
+            if (reloaded) {
+                sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
+                        + "&a file(s). Configuration reload completed!");
+            } else if (reloadFailure != null) {
+                sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
+                        + "&a file(s). &eReload failed: " + reloadFailure.getMessage() + " - run &f/rtp reload&e.");
+            } else {
+                sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
+                        + "&a file(s). Run &f/rtp reload&a to apply.");
+            }
+
+            // Unified permission migration step
+            if (finalMigratePermissions) {
+                String sourceFilter = finalRequestedSource != null ? finalRequestedSource.toLowerCase(Locale.ROOT) : null;
+                executePermissionMigration(callerId, sourceFilter, finalOverwrite);
+            }
+        };
+
+        if (RTP.scheduler != null) {
+            RTP.scheduler.runTaskAsynchronously(importTask);
         } else {
-            sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
-                    + "&a file(s). Run &f/rtp reload&a to apply.");
-        }
-
-        // Unified permission migration step
-        if (migratePermissions) {
-            String sourceFilter = requestedSource != null ? requestedSource.toLowerCase(Locale.ROOT) : null;
-            executePermissionMigration(callerId, sourceFilter, overwrite);
+            importTask.run();
         }
 
         return true;
@@ -411,7 +428,7 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
         if (callerId != null && RTP.serverAccessor != null) {
             RTP.serverAccessor.sendMessage(callerId, msg);
         } else {
-            RTP.log(Level.INFO, msg.replaceAll("&[0-9a-fk-or]", ""));
+            RTP.log(Level.INFO, COLOR_CODE.matcher(msg).replaceAll(""));
         }
     }
 }

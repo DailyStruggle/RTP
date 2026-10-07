@@ -3720,14 +3720,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @param def returned when {@code key} is {@code null} or holds no value
    * @return the configured value, or {@code def}
    */
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: synchronized read of configuration EnumMap
   private Object paramByKey(E key, Object def) {
     if (key == null) return def;
-    EnumMap<E, Object> snapshot = data;
-    synchronized (snapshot) {
-      Object value = snapshot.get(key);
-      return value != null ? value : def;
-    }
+    // Lock-free: FactoryValue publishes {@code data} copy-on-write, so the map is immutable.
+    Object value = data.get(key);
+    return value != null ? value : def;
   }
 
   /**
@@ -3759,7 +3756,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   protected final boolean expand() {
     Object raw = paramByKey(knobs().expand, Boolean.FALSE);
     if (raw instanceof Boolean b) return b;
-    return Boolean.parseBoolean(raw.toString());
+    return Boolean.parseBoolean(String.valueOf(raw));
   }
 
   /**
@@ -4050,8 +4047,13 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       return -1;
     }
 
-    Object rawUnique = paramByKey(knobs().uniquePlacements, 0);
-    int uniqueRadius = uniquePlacementsRadius(rawUnique);
+    // uniquePlacements consumes area permanently. Without expand the range never grows back, so
+    // marking would exhaust the region (ACCUMULATE subtracts the marks from the range); it is
+    // therefore active only when expand is on and supported.
+    int uniqueRadius =
+        (supportsExpand() && expand())
+            ? uniquePlacementsRadius(paramByKey(knobs().uniquePlacements, 0))
+            : 0;
     if (uniqueRadius > 0) {
       // addBadChunkRadius: chunk-uniform (uniqueplacements knob) - within a chunk the per-column
       // selection order is deterministic, so re-rolling onto the same chunk produces the

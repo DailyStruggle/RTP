@@ -10,6 +10,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 
@@ -19,6 +21,16 @@ public final class AsyncTaskProcessing extends RTPRunnable {
   private static final AtomicLong betweenStep = new AtomicLong();
   private static final Semaphore stepSemaphore = new Semaphore(1);
   private static final Semaphore futuresSemaphore = new Semaphore(1);
+
+  /** Pulse runs longer than this are reported once as a stall (REQ-RTP-S-004 visibility). */
+  static final long STALL_WARN_NANOS = TimeUnit.SECONDS.toNanos(5);
+
+  // Non-overlap guard: the platform fires this pulse every tick regardless of whether the
+  // previous one finished, so a slow pulse would otherwise stack one worker per tick.
+  private static final AtomicBoolean pulseActive = new AtomicBoolean();
+  private static final AtomicLong pulseStartNanos = new AtomicLong();
+  private static final AtomicBoolean stallReported = new AtomicBoolean();
+
   private final long availableTime;
 
   /**
@@ -36,8 +48,31 @@ public final class AsyncTaskProcessing extends RTPRunnable {
 
   @Override
   public void run() {
-//    System.out.println("[RTP-DEBUG] AsyncTaskProcessing: Tick started.");
+    if (!pulseActive.compareAndSet(false, true)) {
+      long started = pulseStartNanos.get();
+      long elapsed = System.nanoTime() - started;
+      // started == 0: the owner won the CAS but has not stamped its start yet.
+      if (started != 0L && elapsed > STALL_WARN_NANOS && stallReported.compareAndSet(false, true)) {
+        RTP.log(Level.WARNING, "[RTP] async pulse has not completed after "
+            + TimeUnit.NANOSECONDS.toMillis(elapsed) + "ms; skipping ticks until it finishes");
+      }
+      return;
+    }
+    pulseStartNanos.set(System.nanoTime());
+    stallReported.set(false);
+    try {
+      runPulse();
+    } finally {
+      pulseActive.set(false);
+    }
+  }
 
+  /** @return true while a pulse is executing; visible for tests. */
+  static boolean isPulseActive() {
+    return pulseActive.get();
+  }
+
+  private void runPulse() {
     if (trackingId != null) {
       io.github.dailystruggle.rtp.common.tools.MemoryTracker.updateTracking(trackingId);
     }

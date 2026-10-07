@@ -42,6 +42,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate required release secrets
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          HANGAR_TOKEN: ${{ secrets.HANGAR_TOKEN }}
+        run: |
+          if [ -z "$MODRINTH_TOKEN" ]; then
+            echo "::error::Missing required secret MODRINTH_TOKEN"
+            exit 1
+          fi
+          if [ -z "$HANGAR_TOKEN" ]; then
+            echo "::error::Missing required secret HANGAR_TOKEN"
+            exit 1
+          fi
+
       # The Modrinth / Hangar descriptions below are built here from the single
       # source docs/publishing/FRONT_PAGE.md into the gitignored
       # scripts/release/generated/. Fail before building, tagging, or uploading
@@ -68,6 +82,10 @@ jobs:
           fi
           if [ -z "$VERSION" ]; then
             echo "::error::Could not determine release version."
+            exit 1
+          fi
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9]+)*$ ]]; then
+            echo "::error::Invalid release version format: ${VERSION}"
             exit 1
           fi
           echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
@@ -125,7 +143,8 @@ jobs:
             echo "lite_asc=${LITE_JAR}.asc" >> "$GITHUB_OUTPUT"
             echo "Found PGP signature: ${LITE_JAR}.asc"
           else
-            echo "No PGP signature found (signing credentials may not have been provided)."
+            echo "::error::Missing PGP signature ${LITE_JAR}.asc. Release cannot proceed unsigned."
+            exit 1
           fi
 
       - name: Retrieve acceptance evidence log
@@ -173,8 +192,9 @@ jobs:
 
       - name: Extract release notes from CHANGELOG.md
         id: notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
           # Extract the section for this version from the shared CHANGELOG.md.
           # Heading shape:
           #   ## [1.0.0] - YYYY-MM-DD
@@ -229,8 +249,8 @@ jobs:
       - name: Create and push Git tag
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
         run: |
-          TAG="${{ steps.version.outputs.tag }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           if git rev-parse "$TAG" >/dev/null 2>&1; then
@@ -325,12 +345,15 @@ jobs:
       - name: Publish version to Hangar
         env:
           HANGAR_TOKEN: ${{ secrets.HANGAR_TOKEN }}
+          FILE: ${{ steps.artifact.outputs.lite_jar }}
+          VERSION: ${{ steps.version.outputs.version }}
+          VERSION_TYPE: ${{ contains(steps.version.outputs.version, 'beta') && 'beta' || contains(steps.version.outputs.version, 'alpha') && 'alpha' || 'release' }}
         run: |
           python3 scripts/release/publish_hangar_version.py \
             --project LeafRTP \
-            --file "${{ steps.artifact.outputs.lite_jar }}" \
-            --version "${{ steps.version.outputs.version }}" \
-            --version-type "${{ contains(steps.version.outputs.version, 'beta') && 'beta' || contains(steps.version.outputs.version, 'alpha') && 'alpha' || 'release' }}" \
+            --file "$FILE" \
+            --version "$VERSION" \
+            --version-type "$VERSION_TYPE" \
             --changelog-file release-notes.md
 
       - name: Update Hangar project description

@@ -73,6 +73,10 @@ public class FireworkEffect extends Effect<FireworkEffect.FireworkKeys> {
         for (Map.Entry<FireworkKeys, Object> entry : data.entrySet()) {
             dataMap.put(entry.getKey().name(), entry.getValue());
         }
+        Object num = dataMap.get(FireworkKeys.NUMBER.name());
+        if (num instanceof Number) {
+            dataMap.put(FireworkKeys.NUMBER.name(), Math.max(1, Math.min(8, ((Number) num).intValue())));
+        }
 
         if (ph != null) {
             ph.spawnFirework(dataMap);
@@ -104,20 +108,24 @@ public class FireworkEffect extends Effect<FireworkEffect.FireworkKeys> {
     @Override
     public void setData(String... data) {
         applyByType(KEY_ORDER, data);
+        Object n = this.data.get(FireworkKeys.NUMBER);
+        if (n instanceof Number) {
+            this.data.put(FireworkKeys.NUMBER, Math.max(1, Math.min(8, ((Number) n).intValue())));
+        }
     }
 
     @Override
     public String toPermission() {
-        return this.data.get(FireworkKeys.TYPE).toString().replaceAll("\\.*", "") +
-                this.data.get(FireworkKeys.NUMBER).toString().replaceAll("\\.*", "") +
-                this.data.get(FireworkKeys.POWER).toString().replaceAll("\\.*", "") +
-                this.data.get(FireworkKeys.COLOR).toString().replaceAll("\\.*", "") +
-                this.data.get(FireworkKeys.FADE).toString().replaceAll("\\.*", "") +
-                this.data.get(FireworkKeys.FLICKER).toString().replaceAll("\\.*", "") +
-                this.data.get(FireworkKeys.TRAIL).toString().replaceAll("\\.*", "") +
-                this.data.get(FireworkKeys.SAFE).toString().replaceAll("\\.*", "") +
-                this.data.get(FireworkKeys.DX).toString().replaceAll("\\.*", "") +
-                this.data.get(FireworkKeys.DY).toString().replaceAll("\\.*", "") +
-                this.data.get(FireworkKeys.DZ).toString().replaceAll("\\.*", "");
+        return this.data.get(FireworkKeys.TYPE).toString().replace(".", "") +
+                this.data.get(FireworkKeys.NUMBER).toString().replace(".", "") +
+                this.data.get(FireworkKeys.POWER).toString().replace(".", "") +
+                this.data.get(FireworkKeys.COLOR).toString().replace(".", "") +
+                this.data.get(FireworkKeys.FADE).toString().replace(".", "") +
+                this.data.get(FireworkKeys.FLICKER).toString().replace(".", "") +
+                this.data.get(FireworkKeys.TRAIL).toString().replace(".", "") +
+                this.data.get(FireworkKeys.SAFE).toString().replace(".", "") +
+                this.data.get(FireworkKeys.DX).toString().replace(".", "") +
+                this.data.get(FireworkKeys.DY).toString().replace(".", "") +
+                this.data.get(FireworkKeys.DZ).toString().replace(".", "");
     }
 }

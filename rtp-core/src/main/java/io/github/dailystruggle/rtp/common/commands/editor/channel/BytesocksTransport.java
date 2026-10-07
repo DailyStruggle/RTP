@@ -59,6 +59,9 @@ public final class BytesocksTransport implements ChannelTransport {
     static final long PING_MILLIS = 20_000L;
     private static final Pattern KEY = Pattern.compile("[A-Za-z0-9_\\-]{4,64}");
     private static final Pattern JSON_KEY = Pattern.compile("\"key\"\\s*:\\s*\"([^\"]{1,64})\"");
+    private static final Pattern TRAILING_SLASHES = Pattern.compile("/+$");
+    private static final Pattern QUERY_OR_FRAGMENT = Pattern.compile("[?#].*$");
+    private static final Pattern NOT_FOUND_STATUS = Pattern.compile("(?s).*status code 40[04]\\b.*");
     private static final String USER_AGENT = "RTP-Plugin-Editor/1.0";
 
     /** Periodic async timer; production uses {@link #schedulerTimer()}. */
@@ -105,7 +108,7 @@ public final class BytesocksTransport implements ChannelTransport {
 
     /** {@code https://h[:p]} to {@code wss://h[:p]/<id>}, {@code http} to {@code ws}. */
     static URI socketUri(String relayUrl, String id) {
-        URI base = URI.create(Objects.requireNonNull(relayUrl, "relayUrl").replaceAll("/+$", ""));
+        URI base = URI.create(TRAILING_SLASHES.matcher(Objects.requireNonNull(relayUrl, "relayUrl")).replaceAll(""));
         String scheme = base.getScheme() == null ? "" : base.getScheme().toLowerCase(java.util.Locale.ROOT);
         String ws = switch (scheme) {
             case "https", "wss" -> "wss";
@@ -124,7 +127,7 @@ public final class BytesocksTransport implements ChannelTransport {
         HttpRequest req;
         try {
             req = HttpRequest.newBuilder()
-                    .uri(URI.create(relayUrl.replaceAll("/+$", "") + "/create"))
+                    .uri(URI.create(TRAILING_SLASHES.matcher(relayUrl).replaceAll("") + "/create"))
                     .header("User-Agent", USER_AGENT)
                     .timeout(Duration.ofMillis(CREATE_TIMEOUT_MILLIS))
                     .GET()
@@ -154,7 +157,7 @@ public final class BytesocksTransport implements ChannelTransport {
     }
 
     private static String lastSegment(String location) {
-        String s = location.trim().replaceAll("[?#].*$", "").replaceAll("/+$", "");
+        String s = TRAILING_SLASHES.matcher(QUERY_OR_FRAGMENT.matcher(location.trim()).replaceAll("")).replaceAll("");
         int i = s.lastIndexOf('/');
         return i >= 0 ? s.substring(i + 1) : s;
     }
@@ -409,7 +412,7 @@ public final class BytesocksTransport implements ChannelTransport {
                 if (code == 400 || code == 404) return true;
             }
             String m = c.getMessage();
-            if (m != null && m.matches("(?s).*status code 40[04]\\b.*")) return true;
+            if (m != null && NOT_FOUND_STATUS.matcher(m).matches()) return true;
         }
         return false;
     }

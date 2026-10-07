@@ -56,6 +56,8 @@ public class GlideSafetyListener implements Listener {
         public final Material shutdownPlatformMaterial;
         /** BukkitTask id of the timeout watchdog, or {@code -1} if none. */
         public volatile int watchdogTaskId;
+        /** Optional watchdog cancellation handle. */
+        public volatile Runnable watchdogCanceller;
 
         public GlideState(UUID playerId, boolean allowFireworks, boolean placeOnShutdown,
                           Material shutdownPlatformMaterial) {
@@ -64,6 +66,7 @@ public class GlideSafetyListener implements Listener {
             this.placeOnShutdown = placeOnShutdown;
             this.shutdownPlatformMaterial = shutdownPlatformMaterial;
             this.watchdogTaskId = -1;
+            this.watchdogCanceller = null;
         }
     }
 
@@ -97,6 +100,12 @@ public class GlideSafetyListener implements Listener {
         if (player == null) return;
         GlideState s = gliders.remove(player.getUniqueId());
         if (s == null) return;
+        if (s.watchdogCanceller != null) {
+            try {
+                s.watchdogCanceller.run();
+            } catch (Throwable ignored) {
+            }
+        }
         if (s.watchdogTaskId != -1) {
             try {
                 Bukkit.getScheduler().cancelTask(s.watchdogTaskId);

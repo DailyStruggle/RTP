@@ -56,7 +56,9 @@ public abstract class AbstractVerticalAdjustor<T extends Enum<T>> extends Vertic
   protected static boolean isGroundSafe(
       RTPChunk chunk, int x, int y, int z, Set<String> unsafeBlocks, int platformDepth) {
     if (chunk == null) return false;
-    int worldMin = chunk.getWorld().getMinHeight();
+    io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = chunk.getWorld();
+    if (world == null) return false;
+    int worldMin = world.getMinHeight();
     int depth = Math.max(1, platformDepth);
     for (int d = 1; d <= depth; d++) {
       int checkY = y - d;
@@ -72,8 +74,11 @@ public abstract class AbstractVerticalAdjustor<T extends Enum<T>> extends Vertic
    * Returns {@link Integer#MIN_VALUE} if column is entirely air.
    */
   protected static int computeColumnSkyFloor(RTPChunk chunk, int x, int z) {
-    int top = chunk.getWorld().getMaxHeight() - 1;
-    int bottom = chunk.getWorld().getMinHeight();
+    if (chunk == null) return Integer.MIN_VALUE;
+    io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = chunk.getWorld();
+    if (world == null) return Integer.MIN_VALUE;
+    int top = world.getMaxHeight() - 1;
+    int bottom = world.getMinHeight();
     for (int y = top; y >= bottom; y--) {
       if (!chunk.isAir(x, y, z)) return y;
     }

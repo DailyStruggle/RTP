@@ -270,7 +270,7 @@ public class ClaimAnchoredRegionTracker {
     RTPLocation anchor = new RTPLocation(
         new io.github.dailystruggle.rtp.api.world.RTPCoords(worldName, anchorXZ[0], 64, anchorXZ[1]), 1);
 
-    SubspaceShape subspace = new SubspaceShape(anchor, blockRadius, parentRegion);
+    SubspaceShape subspace = new SubspaceShape(anchor, blockRadius, 0, parentRegion, true);
 
     if (parentRegion.getShape() instanceof MemoryShape<?> memShape) {
       // Ingest known hazard memory from parent region directly into memory shape if applicable
@@ -420,7 +420,7 @@ public class ClaimAnchoredRegionTracker {
     List<String> victims = anchorCache.values().stream()
         .filter(s -> !s.getClaimId().equals(keepId))
         .sorted(Comparator.comparingLong(ClaimAnchorState::getLastAccessEpochMillis))
-        .limit(excess + maxEntries / 10)
+        .limit((long) excess + maxEntries / 10)
         .map(ClaimAnchorState::getClaimId)
         .toList();
     for (String victim : victims) {

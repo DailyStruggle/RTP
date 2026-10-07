@@ -76,4 +76,48 @@ class AdaptiveClaimProberTest {
     assertEquals(-512, boundary.minZ());
     assertEquals(512, boundary.maxZ());
   }
+
+  @Test
+  @DisplayName("AdaptiveClaimProber discovers non-convex L-shaped claims via bounded chunk flood fill")
+  void testLShapedClaimFloodFillDiscovery() {
+    String world = "world";
+
+    // L-shaped claim consisting of:
+    // Vertical arm: X: 0..32, Z: 0..160
+    // Horizontal arm: X: 0..256, Z: 0..32
+    java.util.function.Predicate<io.github.dailystruggle.rtp.api.world.RTPCoords> inLClaim = coords -> {
+      int x = coords.x();
+      int z = coords.z();
+      boolean inVerticalArm = (x >= 0 && x <= 32 && z >= 0 && z <= 160);
+      boolean inHorizontalArm = (x >= 0 && x <= 256 && z >= 0 && z <= 32);
+      return inVerticalArm || inHorizontalArm;
+    };
+
+    // Probe starting at (16, 120) on the vertical arm
+    // Notice: at Z=120, the horizontal arm does NOT intersect the X-axis through the origin!
+    // Pure 4-axis ray probing would falsely truncate maxX at 32.
+    Optional<ClaimBoundary> boundaryOpt = AdaptiveClaimProber.probeBoundary(world, 16, 120, inLClaim);
+    assertTrue(boundaryOpt.isPresent(), "L-shaped claim boundary must be discovered");
+    ClaimBoundary boundary = boundaryOpt.get();
+
+    // Verify boundary encompasses both arms
+    assertTrue(boundary.maxX() >= 256, "maxX must reach the horizontal arm (>= 256) via flood fill, got " + boundary.maxX());
+    assertTrue(boundary.maxZ() >= 160, "maxZ must reach the top of the vertical arm (>= 160), got " + boundary.maxZ());
+    assertTrue(boundary.minX() <= 0, "minX must reach 0");
+    assertTrue(boundary.minZ() <= 0, "minZ must reach 0");
+
+    // Coordinates in the vertical arm must be inside
+    assertTrue(boundary.contains(16, 120), "Origin should be inside");
+    assertTrue(boundary.contains(10, 10), "Base corner should be inside");
+    assertTrue(boundary.contains(16, 150), "Top of vertical arm should be inside");
+
+    // Coordinates in the horizontal arm must be inside
+    assertTrue(boundary.contains(200, 16), "Point in horizontal arm should be inside");
+    assertTrue(boundary.contains(250, 20), "Point near end of horizontal arm should be inside");
+
+    // Point in the empty quadrant of the L-shape (X=200, Z=120) must NOT be inside!
+    assertFalse(boundary.contains(200, 120), "Empty quadrant of L-shape must not be included");
+    assertFalse(boundary.contains(-10, 50), "Outside to the west must not be included");
+    assertFalse(boundary.contains(50, 180), "Outside to the north must not be included");
+  }
 }

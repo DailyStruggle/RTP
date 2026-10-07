@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.anvil;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -20,9 +19,10 @@ import java.util.Map;
  * (one {@code long[16]} per region file, derived once at first touch and reused
  * until the {@code .mca} mtime advances).</p>
  *
- * <p>Thread-safety: same synchronisation discipline as {@link AnvilRegionByteCache}
- * (LinkedHashMap LRU with {@code synchronized} access). Stale-mtime detection is
- * cheap (single stat) and only invalidates the bitmap for the touched region file.</p>
+ * <p>Source: {@link AnvilRegionHeaderCache} (4 KiB location table), never the whole file.
+ * Staleness follows its revalidation window: at most one stat per window per file.</p>
+ *
+ * <p>Thread-safety: LinkedHashMap LRU with {@code synchronized} access.</p>
  */
 public final class AnvilRegionOccupancyCache {
 
@@ -68,27 +68,22 @@ public final class AnvilRegionOccupancyCache {
    */
   public static boolean isOccupied(Path regionFile, int cx, int cz) {
     if (regionFile == null) return false;
-    long mtime;
+    AnvilRegionHeaderCache.Header header;
     try {
-      if (!Files.isRegularFile(regionFile)) return false;
-      mtime = Files.getLastModifiedTime(regionFile).toMillis();
+      header = AnvilRegionHeaderCache.get(regionFile);
     } catch (IOException e) {
       return false;
     }
+    if (header == null) return false;
     long[] bitmap;
     synchronized (CACHE) {
       Entry hit = CACHE.get(regionFile);
-      if (hit != null && hit.mtime == mtime) {
-        bitmap = hit.bitmap;
-      } else {
-        bitmap = null;
-      }
+      bitmap = (hit != null && hit.mtime == header.mtime()) ? hit.bitmap : null;
     }
     if (bitmap == null) {
-      bitmap = buildBitmap(regionFile);
-      if (bitmap == null) return false;
+      bitmap = buildBitmap(header);
       synchronized (CACHE) {
-        CACHE.put(regionFile, new Entry(bitmap, mtime));
+        CACHE.put(regionFile, new Entry(bitmap, header.mtime()));
       }
     }
     int rx = Math.floorMod(cx, 32);
@@ -114,18 +109,10 @@ public final class AnvilRegionOccupancyCache {
     }
   }
 
-  private static long[] buildBitmap(Path regionFile) {
-    byte[] bytes = AnvilRegionByteCache.get(regionFile);
-    if (bytes == null || bytes.length < 4096) return null;
+  private static long[] buildBitmap(AnvilRegionHeaderCache.Header header) {
     long[] bitmap = new long[16]; // 1024 bits
     for (int index = 0; index < 1024; index++) {
-      int off = index * 4;
-      int sectorOffset =
-          ((bytes[off]     & 0xFF) << 16) |
-          ((bytes[off + 1] & 0xFF) << 8)  |
-           (bytes[off + 2] & 0xFF);
-      int sectorCount = bytes[off + 3] & 0xFF;
-      if (sectorOffset != 0 && sectorCount != 0) {
+      if (header.isOccupied(index)) {
         bitmap[index >>> 6] |= (1L << (index & 63));
       }
     }

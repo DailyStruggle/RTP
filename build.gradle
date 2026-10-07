@@ -310,7 +310,12 @@ subprojects {
     // violation - this is the local + CI static-analysis gate.
     //   Local / CI gate : .\gradlew.bat check -PstaticAnalysis
     //   Whole build      : .\gradlew.bat build -PstaticAnalysis
-    if (project.hasProperty('staticAnalysis')) {
+    // `pmdRegexMain` is a separate ADVISORY scan (config/pmd/regex.xml, never
+    // fails the build) that flags avoidable regex use. It runs under either
+    // flag; `-PregexAnalysis` alone runs only it, skipping the gating tasks.
+    //   Regex advisory  : .\gradlew.bat pmdRegexMain -PregexAnalysis
+    def pmdGate = project.hasProperty('staticAnalysis')
+    if (pmdGate || project.hasProperty('regexAnalysis')) {
         apply plugin: 'pmd'
         pmd {
             toolVersion = libs.versions.pmd.get()
@@ -323,6 +328,30 @@ subprojects {
             ignoreFailures = false
             // Analyse production + test sources; skip generated/remapped output.
             incrementalAnalysis = true
+        }
+        def pmdRegexMain = tasks.register('pmdRegexMain', Pmd) {
+            group = 'verification'
+            description = 'Advisory PMD scan for avoidable regex use (config/pmd/regex.xml); never fails the build.'
+            ruleSetFiles = rootProject.files('config/pmd/regex.xml')
+            ruleSets = []
+            source = sourceSets.main.allJava
+            // Type resolution for pmd-java:matchesSig (String / Pattern receivers).
+            classpath = sourceSets.main.output + sourceSets.main.compileClasspath
+            ignoreFailures = true
+            consoleOutput = true
+            reports {
+                xml.required = true
+                xml.outputLocation = layout.buildDirectory.file('reports/pmd/regexMain.xml')
+                html.required = true
+                html.outputLocation = layout.buildDirectory.file('reports/pmd/regexMain.html')
+            }
+        }
+        tasks.named('check').configure { dependsOn pmdRegexMain }
+        tasks.withType(Pmd).configureEach {
+            // AuxClasspathLoader treats every non-directory file as a JAR/ZIP archive. Filter out non-archives
+            // (such as POM artifacts resolved by pom-packaging dependencies) to prevent ZipException crashes.
+            classpath = files(classpath.filter { it.isDirectory() || it.name.endsWith('.jar') || it.name.endsWith('.zip') })
+            if (!pmdGate && name != 'pmdRegexMain') enabled = false
         }
     }
 
@@ -971,11 +1000,25 @@ subprojects {
                 property 'sonar.cpd.exclusions', '**/*'
             }
 
+            if (project.path == ':effects-api') {
+                property 'sonar.coverage.exclusions', '**/effectsapi/bukkit/**,**/effectsapi/fabric/**'
+            }
+
             def isVersionAdapterOrCarrier = project.name.matches('v[0-9]+.*') ||
                     project.name.contains('unobf') ||
                     project.path.matches('.*:(v[0-9]+.*|.*unobf.*)')
             if (isVersionAdapterOrCarrier) {
                 property 'sonar.cpd.exclusions', '**/*'
+            }
+
+            // External PMD issues for SonarCloud: custom Java rule plugins cannot be
+            // installed on SonarCloud, so project-specific PMD rules surface this way.
+            if (project.hasProperty('staticAnalysis') || project.hasProperty('regexAnalysis')) {
+                def pmdReports = [layout.buildDirectory.file('reports/pmd/regexMain.xml').get().asFile]
+                if (project.hasProperty('staticAnalysis')) {
+                    pmdReports << layout.buildDirectory.file('reports/pmd/main.xml').get().asFile
+                }
+                property 'sonar.java.pmd.reportPaths', pmdReports*.absolutePath.join(',')
             }
 
             if (!isPlatformOrAddon) {

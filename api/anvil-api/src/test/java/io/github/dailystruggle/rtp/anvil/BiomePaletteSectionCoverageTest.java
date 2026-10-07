@@ -52,22 +52,22 @@ class BiomePaletteSectionCoverageTest {
         assertThrows(IndexOutOfBoundsException.class, () -> single.biomeIdAt(0, 16, 0));
         assertThrows(IndexOutOfBoundsException.class, () -> single.biomeIdAt(0, 0, 20));
 
-        // Multi-entry with empty or null data falls back to palette[0]
+        // Multi-entry with empty or null data returns null (UNKNOWN)
         BiomePaletteSection multiEmptyData = new BiomePaletteSection(0, List.of("minecraft:plains", "minecraft:desert"), new long[0]);
-        assertEquals("minecraft:plains", multiEmptyData.biomeIdAt(4, 4, 4));
+        assertNull(multiEmptyData.biomeIdAt(4, 4, 4));
+        assertTrue(multiEmptyData.hasMalformedData());
 
-        // Multi-entry with short data array falls back to palette[0] when index out of range
-        BiomePaletteSection shortData = new BiomePaletteSection(0, List.of("minecraft:plains", "minecraft:desert"), new long[]{1L});
-        // cell at (3, 3, 3) has index 63, entriesPerLong = 64, longIdx = 0, slot = 63
-        assertEquals("minecraft:plains", shortData.biomeIdAt(12, 12, 12));
+        // Multi-entry with short data array falls back to null when index out of range
+        BiomePaletteSection shortData = new BiomePaletteSection(0, List.of("minecraft:plains", "minecraft:desert"), new long[0]);
+        assertNull(shortData.biomeIdAt(12, 12, 12));
 
-        // When unpacked palette index is out of palette bounds, falls back to palette[0]
+        // When unpacked palette index is out of palette bounds, returns null
         // 2-bit palette: size 3, index 3 is invalid (only 0, 1, 2 exist)
         long wordWith3 = 0b11L; // slot 0 has value 3
         BiomePaletteSection outOfBoundsPaletteIdx = new BiomePaletteSection(0,
                 List.of("minecraft:plains", "minecraft:desert", "minecraft:forest"),
                 new long[]{wordWith3, 0L});
-        assertEquals("minecraft:plains", outOfBoundsPaletteIdx.biomeIdAt(0, 0, 0));
+        assertNull(outOfBoundsPaletteIdx.biomeIdAt(0, 0, 0));
     }
 
     @Test

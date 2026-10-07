@@ -44,6 +44,14 @@ public final class OnPlayerQuit implements Listener {
 
     new RTPTeleportCancel(uuid).run();
 
+    try {
+      if (RTP.actionManager != null) {
+        RTP.actionManager.handlePlayerQuit(uuid);
+      }
+    } catch (Throwable ignored) {
+      // never let the quit listener throw
+    }
+
     // CHECKLIST-maps-api.md Stage 2.2 / REQ-RTP-MAP-003 - bridge the
     // PlayerQuitEvent into the MapDispatch lifecycle bus so any registered
     // MapBindingLifecycle (e.g. BukkitMapBinding) can release per-viewer

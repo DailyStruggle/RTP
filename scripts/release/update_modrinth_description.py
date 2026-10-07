@@ -77,8 +77,8 @@ def main() -> None:
 
     token = os.environ.get("MODRINTH_TOKEN")
     if not token and not args.dry_run:
-        print("::warning::MODRINTH_TOKEN environment variable not set; skipping Modrinth description update.")
-        sys.exit(0)
+        print("::error::MODRINTH_TOKEN environment variable not set.", file=sys.stderr)
+        sys.exit(1)
 
     try:
         body = read_description(args.source_file)

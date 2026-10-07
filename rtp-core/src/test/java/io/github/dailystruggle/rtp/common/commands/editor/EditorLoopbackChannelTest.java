@@ -184,11 +184,7 @@ class EditorLoopbackChannelTest {
         assertEquals(0, channel.clientCount());
         assertEquals(1, closes.get());
         pollUntil(client.closed::isDone, "client observed close");
-        assertThrows(IOException.class, () -> {
-            try (Socket s = new Socket(InetAddress.getLoopbackAddress(), channel.port())) {
-                s.getOutputStream().write(1);
-            }
-        });
+        assertThrows(IOException.class, () -> new Socket(InetAddress.getLoopbackAddress(), channel.port()));
     }
 
     // ---- raw-socket protocol violations ----

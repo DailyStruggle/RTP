@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="RTP regex hygiene (advisory)"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+  <description>
+    Advisory detectors for avoidable regex use: per-call Pattern compilation,
+    String regex helpers on literal input, regex-path String#split, and
+    regex text concatenated without Pattern.quote (injection / wrong-match risk).
+
+    Report-only: run by the `pmdRegexMain` task with ignoreFailures = true, so
+    findings are listed but never fail the build. Reports land in
+    `build/reports/pmd/regexMain.{xml,html}` per module and are imported into
+    SonarCloud as external PMD issues (sonar.java.pmd.reportPaths).
+
+      .\gradlew.bat pmdRegexMain -PregexAnalysis              (all modules)
+      .\gradlew.bat :rtp-core:pmdRegexMain -PregexAnalysis    (one module)
+
+    `-PstaticAnalysis` also runs this scan (still advisory). Production sources
+    only; tests are not scanned.
+
+    Suppress a justified site (e.g. a user-supplied pattern that must compile at
+    runtime) with @SuppressWarnings("PMD.RuleName") plus a short reason.
+
+    Not flagged on purpose: static final Pattern fields and static initializers
+    (compiled once), and String#split on a single literal char or an escaped
+    non-alphanumeric char (the JDK fast path never touches java.util.regex).
+  </description>
+
+  <!--
+    String#replaceAll whose regex argument is a constant with no regex
+    metacharacters: String#replace is the literal equivalent with no Pattern
+    compile. Note: replace() also treats the replacement literally, so check
+    that the replacement has no `$` / `\` escapes. Mirrors Sonar java:S5361.
+  -->
+  <rule name="UseStringReplaceForLiteralRegex"
+        language="java"
+        message="replaceAll with a literal regex: use String.replace (no Pattern compile, no regex semantics)."
+        class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+    <priority>2</priority>
+    <properties>
+      <property name="xpath">
+        <value><![CDATA[
+//MethodCall[pmd-java:matchesSig('java.lang.String#replaceAll(java.lang.String,java.lang.String)')]
+  [let $a := ArgumentList/*[1],
+       $v := if ($a/self::StringLiteral) then string($a/@ConstValue)
+             else if ($a/self::InfixExpression[not(*[not(self::StringLiteral)])]) then string-join($a/StringLiteral/@ConstValue, '')
+             else if ($a/self::VariableAccess) then string((ancestor::CompilationUnit//FieldDeclaration[pmd-java:modifiers() = 'static' and pmd-java:modifiers() = 'final']/VariableDeclarator[VariableId/@Name = $a/@Name]/StringLiteral/@ConstValue)[1])
+             else ''
+   return string-length($v) > 0 and not(matches($v, '[\\\^$.|?*+()\[\]{}]'))]
+        ]]></value>
+      </property>
+    </properties>
+    <example>
+      <![CDATA[
+s.replaceAll("&", "");   // flagged
+s.replace("&", "");      // preferred
+      ]]>
+    </example>
+  </rule>
+
+  <!--
+    String#replaceAll / replaceFirst / matches with a real regex compile a new
+    Pattern on every call. Hoist to a static final Pattern, or use a char scan
+    (e.g. common/text/LegacyColorStrip) on hot paths.
+  -->
+  <rule name="AvoidStringRegexHelpers"
+        language="java"
+        message="String.replaceAll/replaceFirst/matches compiles a new Pattern on every call: use a static final Pattern or a char scan."
+        class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+    <priority>3</priority>
+    <properties>
+      <property name="xpath">
+        <value><![CDATA[
+//MethodCall[pmd-java:matchesSig('java.lang.String#replaceFirst(java.lang.String,java.lang.String)')
+           or pmd-java:matchesSig('java.lang.String#matches(java.lang.String)')
+           or (pmd-java:matchesSig('java.lang.String#replaceAll(java.lang.String,java.lang.String)')
+               and not(let $a := ArgumentList/*[1],
+                           $v := if ($a/self::StringLiteral) then string($a/@ConstValue)
+                                 else if ($a/self::InfixExpression[not(*[not(self::StringLiteral)])]) then string-join($a/StringLiteral/@ConstValue, '')
+                                 else if ($a/self::VariableAccess) then string((ancestor::CompilationUnit//FieldDeclaration[pmd-java:modifiers() = 'static' and pmd-java:modifiers() = 'final']/VariableDeclarator[VariableId/@Name = $a/@Name]/StringLiteral/@ConstValue)[1])
+                                 else ''
+                       return string-length($v) > 0 and not(matches($v, '[\\\^$.|?*+()\[\]{}]'))))]
+        ]]></value>
+      </property>
+    </properties>
+    <example>
+      <![CDATA[
+if (addr.matches("[0-9.]+")) { ... }          // flagged
+
+private static final Pattern IPV4 = Pattern.compile("[0-9.]+");
+if (IPV4.matcher(addr).matches()) { ... }     // preferred
+      ]]>
+    </example>
+  </rule>
+
+  <!--
+    String#split takes a non-regex fast path only for a single char that is
+    not one of .$|()[{^?*+\ or a backslash-escaped non-alphanumeric char
+    (e.g. "\\."). Anything else compiles a Pattern per call.
+  -->
+  <rule name="AvoidRegexSplit"
+        language="java"
+        message="String.split argument misses the JDK single-char fast path and compiles a Pattern per call: use a static final Pattern or a char split."
+        class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+    <priority>3</priority>
+    <properties>
+      <property name="xpath">
+        <value><![CDATA[
+//MethodCall[pmd-java:matchesSig('java.lang.String#split(java.lang.String)')
+           or pmd-java:matchesSig('java.lang.String#split(java.lang.String,int)')]
+  [let $a := ArgumentList/*[1],
+       $v := if ($a/self::StringLiteral) then string($a/@ConstValue)
+             else if ($a/self::VariableAccess) then string((ancestor::CompilationUnit//FieldDeclaration[pmd-java:modifiers() = 'static' and pmd-java:modifiers() = 'final']/VariableDeclarator[VariableId/@Name = $a/@Name]/StringLiteral/@ConstValue)[1])
+             else ''
+   return not(
+       (string-length($v) = 1 and not(contains('.$|()[{^?*+\', $v)))
+    or (string-length($v) = 2 and starts-with($v, '\')
+        and not(matches(substring($v, 2), '[0-9A-Za-z]'))))]
+        ]]></value>
+      </property>
+    </properties>
+    <example>
+      <![CDATA[
+s.split(":");          // not flagged (fast path)
+s.split("\\.");        // not flagged (fast path)
+s.split("\\s+");       // flagged
+WS.split(s);           // preferred: private static final Pattern WS = Pattern.compile("\\s+");
+      ]]>
+    </example>
+  </rule>
+
+  <!--
+    Pattern.compile outside a static final field / static initializer runs
+    on every invocation; Pattern.matches(regex, input) always compiles.
+    Runtime-supplied patterns (admin/user input) are a legitimate exception:
+    suppress them with a reason and keep their input length capped (ReDoS).
+  -->
+  <rule name="RegexCompiledPerCall"
+        language="java"
+        message="Pattern compiled per call: hoist to a static final Pattern (suppress with a reason if the pattern is runtime-supplied)."
+        class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+    <priority>3</priority>
+    <properties>
+      <property name="xpath">
+        <value><![CDATA[
+//MethodCall[pmd-java:matchesSig('java.util.regex.Pattern#compile(java.lang.String)')
+           or pmd-java:matchesSig('java.util.regex.Pattern#compile(java.lang.String,int)')]
+  [not(ancestor::FieldDeclaration[pmd-java:modifiers() = 'static' and pmd-java:modifiers() = 'final'])]
+  [not(ancestor::Initializer[@Static = true()])]
+|
+//MethodCall[pmd-java:matchesSig('java.util.regex.Pattern#matches(java.lang.String,java.lang.CharSequence)')]
+        ]]></value>
+      </property>
+    </properties>
+    <example>
+      <![CDATA[
+String clean(String s) {
+    return Pattern.compile("\\s+").matcher(s).replaceAll(" ");   // flagged
+}
+
+private static final Pattern WS = Pattern.compile("\\s+");       // preferred
+      ]]>
+    </example>
+  </rule>
+
+  <!--
+    Security: a regex built by concatenating non-constant text without
+    Pattern.quote treats that text as regex syntax. Keys or values containing
+    . $ ( [ \ etc. then match the wrong input or throw PatternSyntaxException.
+    Covers Pattern.compile / Pattern.matches and the String regex helpers.
+  -->
+  <rule name="UnquotedRegexConcatenation"
+        language="java"
+        message="Regex built by concatenating non-constant text without Pattern.quote: quote the dynamic part or avoid regex."
+        class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+    <priority>2</priority>
+    <properties>
+      <property name="xpath">
+        <value><![CDATA[
+//MethodCall[pmd-java:matchesSig('java.util.regex.Pattern#compile(java.lang.String)')
+           or pmd-java:matchesSig('java.util.regex.Pattern#compile(java.lang.String,int)')
+           or pmd-java:matchesSig('java.util.regex.Pattern#matches(java.lang.String,java.lang.CharSequence)')
+           or pmd-java:matchesSig('java.lang.String#replaceAll(java.lang.String,java.lang.String)')
+           or pmd-java:matchesSig('java.lang.String#replaceFirst(java.lang.String,java.lang.String)')
+           or pmd-java:matchesSig('java.lang.String#matches(java.lang.String)')
+           or pmd-java:matchesSig('java.lang.String#split(java.lang.String)')
+           or pmd-java:matchesSig('java.lang.String#split(java.lang.String,int)')]
+  [ArgumentList/*[1][self::InfixExpression]
+                    [not(@CompileTimeConstant = true())]
+                    [not(.//MethodCall[pmd-java:matchesSig('java.util.regex.Pattern#quote(java.lang.String)')])]]
+        ]]></value>
+      </property>
+    </properties>
+    <example>
+      <![CDATA[
+Pattern.compile("\\[" + key + "]", Pattern.CASE_INSENSITIVE);                 // flagged
+Pattern.compile("\\[" + Pattern.quote(key) + "]", Pattern.CASE_INSENSITIVE);  // compliant
+      ]]>
+    </example>
+  </rule>
+
+</ruleset>

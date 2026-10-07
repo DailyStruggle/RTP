@@ -225,12 +225,14 @@ class ProxyDirectListenerTest {
             s.setSoTimeout(3000);
             DataOutputStream out = new DataOutputStream(s.getOutputStream());
             DataInputStream in = new DataInputStream(s.getInputStream());
-            assertThrows(IOException.class, () -> {
+            try {
                 ProxyDirectWire.writeOpcode(out, ProxyDirectWire.OP_HEARTBEAT);
                 ProxyDirectWire.writeSignedPayload(out, "x", V, 1);
                 out.flush();
-                ProxyDirectWire.readList(in, V);
-            });
+                assertThrows(IOException.class, () -> ProxyDirectWire.readList(in, V));
+            } catch (IOException expected) {
+                // Connection was closed by listener
+            }
         } finally {
             listener.stop();
         }
@@ -344,12 +346,15 @@ class ProxyDirectListenerTest {
                 raw.connect(new InetSocketAddress("127.0.0.1", listener.boundPort()), 1000);
                 raw.setSoTimeout(3000);
                 DataOutputStream out = new DataOutputStream(raw.getOutputStream());
-                assertThrows(IOException.class, () -> {
+                try {
                     ProxyDirectWire.writeOpcode(out, ProxyDirectWire.OP_HEARTBEAT);
                     ProxyDirectWire.writeSignedPayload(out, "x", V, 1);
                     out.flush();
-                    ProxyDirectWire.readList(new DataInputStream(raw.getInputStream()), V);
-                });
+                    DataInputStream rawIn = new DataInputStream(raw.getInputStream());
+                    assertThrows(IOException.class, () -> ProxyDirectWire.readList(rawIn, V));
+                } catch (IOException expected) {
+                    // Connection was closed by listener
+                }
             }
         } finally {
             listener.stop();

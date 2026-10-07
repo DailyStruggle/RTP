@@ -11,6 +11,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * NeoForge implementation of the platform-neutral {@link MenuRenderer} seam.
@@ -32,6 +33,9 @@ import java.util.UUID;
 public final class NeoForgeMenuRenderer implements MenuRenderer {
 
   public static final String STYLE = "chest";
+
+  private static final Pattern COLOR_CODE = Pattern.compile("(?i)[&\u00a7](#[0-9a-f]{6}|x([&\u00a7][0-9a-f]){6}|[0-9a-fk-or])");
+  private static final Pattern LEFTOVER_TAGS = Pattern.compile("<[^>]+>");
 
   @Override
   public String key() {
@@ -148,9 +152,10 @@ public final class NeoForgeMenuRenderer implements MenuRenderer {
       if (player == null) {
         RTP.log(java.util.logging.Level.INFO,
             "[RTP-GUI] NeoForge renderer: could not resolve player at open time for " + playerId
-                + " (offline, or neither the player registry nor a bound server was available);"
-                + " falling back to a classic teleport so the command never silently no-ops");
-        fallbackTeleport(playerId);
+                + " (offline, or neither the player registry nor a bound server was available)");
+        if (model.isRoot()) {
+          fallbackTeleport(playerId);
+        }
         return;
       }
       try {
@@ -176,14 +181,14 @@ public final class NeoForgeMenuRenderer implements MenuRenderer {
               }
             });
       } catch (Throwable cannotOpen) {
-        // The menu could not be displayed (e.g. a screen/menu-type linkage
-        // failure on this runtime). Honour the MenuRenderer contract and fall
-        // back to the classic teleport rather than leaving the player with
-        // neither a menu nor a teleport.
         RTP.log(java.util.logging.Level.WARNING,
             "[RTP-GUI] NeoForge renderer: opening the chest menu for " + playerId
-                + " threw; falling back to a classic teleport", cannotOpen);
-        fallbackTeleport(playerId);
+                + " threw" + (model.isRoot() ? "; falling back to a classic teleport" : ""), cannotOpen);
+        if (model.isRoot()) {
+          fallbackTeleport(playerId);
+        } else if (RTP.serverAccessor != null) {
+          RTP.serverAccessor.sendMessage(playerId, "&c[RTP] Could not open menu.");
+        }
       }
     }, 1L);
   }
@@ -197,7 +202,21 @@ public final class NeoForgeMenuRenderer implements MenuRenderer {
    */
   private static void fallbackTeleport(UUID playerId) {
     try {
-      RTPAPI.teleport(playerId, RtpTarget.defaultRegion());
+      RTPAPI.teleport(playerId, RtpTarget.defaultRegion())
+          .whenComplete((result, error) -> {
+            if (error != null) {
+              RTP.log(java.util.logging.Level.WARNING,
+                  "[RTP-GUI] NeoForge renderer: fallback teleport for " + playerId + " failed", error);
+              if (RTP.serverAccessor != null) {
+                RTP.serverAccessor.sendMessage(playerId, "&c[RTP] Teleport failed: " + error.getMessage());
+              }
+            } else if (result != null && !result.isSuccess()) {
+              String msg = result.message() != null ? result.message() : (result.reason() != null ? result.reason().name() : "unknown");
+              if (RTP.serverAccessor != null) {
+                RTP.serverAccessor.sendMessage(playerId, "&c[RTP] Teleport failed: " + msg);
+              }
+            }
+          });
     } catch (Throwable noTeleport) {
       RTP.log(java.util.logging.Level.WARNING,
           "[RTP-GUI] NeoForge renderer: classic-teleport fallback for " + playerId
@@ -209,6 +228,8 @@ public final class NeoForgeMenuRenderer implements MenuRenderer {
     if (title == null || title.isEmpty()) {
       return "Random Teleport";
     }
-    return title.replaceAll("(?i)[&\u00a7][0-9a-fk-or]", "");
+    String expanded = io.github.dailystruggle.rtp.common.tools.MiniMessageColorExpander.expand(title);
+    String noColor = COLOR_CODE.matcher(expanded).replaceAll("");
+    return LEFTOVER_TAGS.matcher(noColor).replaceAll("");
   }
 }

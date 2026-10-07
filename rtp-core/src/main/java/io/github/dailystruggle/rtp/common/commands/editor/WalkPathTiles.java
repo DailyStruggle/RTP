@@ -24,7 +24,25 @@ public final class WalkPathTiles {
     static final int BOUNDS_MARGIN_CHUNKS = 2;
 
     /** One tile: {@code locs[lz * 32 + lx]} is the curve location of chunk (tx*32+lx, tz*32+lz). */
-    public record Tile(int tx, int tz, int cells, long[] locs) {}
+    public record Tile(int tx, int tz, int cells, long[] locs) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof Tile other)) return false;
+            return tx == other.tx && tz == other.tz && cells == other.cells && Arrays.equals(locs, other.locs);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Objects.hash(tx, tz, cells);
+            return 31 * result + Arrays.hashCode(locs);
+        }
+
+        @Override
+        public String toString() {
+            return "Tile[tx=" + tx + ", tz=" + tz + ", cells=" + cells + ", locs=" + Arrays.toString(locs) + "]";
+        }
+    }
 
     /** Tiles computed by one {@link #nextBatch} call plus progress counters. */
     public record Batch(String region, List<Tile> tiles, int tilesDone, int tilesTotal, boolean done) {}

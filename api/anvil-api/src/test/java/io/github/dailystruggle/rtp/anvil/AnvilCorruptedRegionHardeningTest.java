@@ -23,15 +23,16 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * Hardening and fail-closed regression tests for malformed, corrupted, or oversized
- * region files (both Anvil .mca and Linear .linear ZSTD formats).
+ * region files.
  *
  * Covers:
  * 1. Truncated .mca headers (< 8192 bytes).
  * 2. Sector pointers indexing beyond EOF or into overlapping sector ranges (offset < 2).
- * 3. Corrupted or invalid Zlib / ZSTD compression streams and oversized payload bombs.
+ * 3. Corrupted or invalid Zlib compression streams, oversized payload bombs, and
+ *    region files in a format with no registered reader.
  * 4. Empty or malformed nibble arrays and heightmaps.
  */
-@DisplayName("Anvil & Linear Corrupted Region File Hardening Tests")
+@DisplayName("Anvil Corrupted Region File Hardening Tests")
 class AnvilCorruptedRegionHardeningTest {
 
     // =========================================================================
@@ -138,7 +139,7 @@ class AnvilCorruptedRegionHardeningTest {
     }
 
     // =========================================================================
-    // 3. Corrupted or invalid Zlib / ZSTD compression streams & oversized data
+    // 3. Corrupted or invalid Zlib compression streams & oversized data
     // =========================================================================
 
     @Test
@@ -174,47 +175,20 @@ class AnvilCorruptedRegionHardeningTest {
     }
 
     @Test
-    @DisplayName("Scenario 3: Corrupted or invalid Linear ZSTD stream fails closed")
-    void testCorruptedLinearZstdStream(@TempDir Path tempDir) throws IOException {
-        // Linear region file header:
-        // Magic (8 bytes) + version (1 byte) + timestamp (8 bytes) + compressionLevel (1 byte) + dataPayloadLength (4 bytes) = 22 bytes
-        // Followed by 1024 ints chunk lengths (4096 bytes) + 1024 ints timestamps (4096 bytes) = 8214 bytes header
-        int totalHeader = 22 + 4096 + 4096;
-        byte[] linearBytes = new byte[totalHeader + 100];
-        ByteBuffer buf = ByteBuffer.wrap(linearBytes);
-        buf.putLong(LinearRegionReader.LINEAR_MAGIC_V1);
-        buf.put((byte) 1); // version 1
-        buf.putLong(123456789L); // timestamp
-        buf.put((byte) 6); // compression level
-        buf.putInt(100); // data payload length
-
-        // Set chunk (0, 0) uncompressed length = 500 bytes
-        buf.position(22);
-        buf.putInt(500);
-
-        // Put invalid non-zstd bytes at the payload offset
-        buf.position(totalHeader);
-        byte[] garbage = new byte[100];
-        java.util.Arrays.fill(garbage, (byte) 0xAA);
-        buf.put(garbage);
-
-        assertTrue(LinearRegionReader.INSTANCE.isChunkGenerated(linearBytes, 0, 0));
-        assertThrows(CorruptRegionEntryException.class, () -> LinearRegionReader.INSTANCE.readChunk(linearBytes, 0, 0));
-
-        // Test oversized declared Linear chunk length (> 32 MiB)
-        byte[] linearOversized = linearBytes.clone();
-        ByteBuffer bufOver = ByteBuffer.wrap(linearOversized);
-        bufOver.position(22);
-        bufOver.putInt(100 * 1024 * 1024); // 100 MiB declared length
-        assertThrows(CorruptRegionEntryException.class, () -> LinearRegionReader.INSTANCE.readChunk(linearOversized, 0, 0));
-
-        // Check probeSyncDetailed on corrupted .linear file
+    @DisplayName("Scenario 3: Region file in an unregistered format fails closed without Anvil decoding")
+    void testUnregisteredFormatFailsClosed(@TempDir Path tempDir) throws IOException {
+        RegionFormatRegistry.reset();
         Path regionDir = tempDir.resolve("region");
         Files.createDirectories(regionDir);
-        Files.write(regionDir.resolve("r.0.0.linear"), linearBytes);
+        byte[] garbage = new byte[8192 + 4096];
+        java.util.Arrays.fill(garbage, (byte) 0x02);
+        Files.write(regionDir.resolve("r.0.0.linear"), garbage);
+        RegionFileResolver.invalidateMemo();
 
+        assertNull(RegionFileResolver.resolveExisting(tempDir, "", 0, 0),
+                "No reader is registered for .linear, so no region file may resolve");
         AnvilPrefilter.ProbeResult res = AnvilPrefilter.probeSyncDetailed(tempDir, "", 0, 0, Set.of("LAVA"));
-        assertEquals(Verdict.UNKNOWN, res.verdict(), "Corrupt Linear ZSTD must fail closed to UNKNOWN");
+        assertEquals(Verdict.UNKNOWN, res.verdict(), "Unregistered format must fail closed to UNKNOWN");
         assertNull(res.view());
     }
 
@@ -286,7 +260,7 @@ class AnvilCorruptedRegionHardeningTest {
     }
 
     @Test
-    @DisplayName("Scenario 4: Truncated or empty block_states data array fails closed to palette[0]")
+    @DisplayName("Scenario 4: Truncated or empty block_states data array fails closed to null (UNKNOWN)")
     void testPaletteSectionTruncatedDataArray() {
         List<String> palette = List.of("minecraft:stone", "minecraft:lava");
         // data array length 1 is far shorter than needed for 4096 4-bit entries (needs 256 longs)
@@ -297,8 +271,8 @@ class AnvilCorruptedRegionHardeningTest {
         assertEquals("minecraft:stone", sec.blockIdAt(0, 0, 0));
 
         // entryIndex(15, 15, 15) maps to long 255 which is >= shortData.length!
-        // Must NOT throw IndexOutOfBoundsException; must fail closed to palette[0]
-        assertEquals("minecraft:stone", sec.blockIdAt(15, 15, 15));
+        // Must NOT throw IndexOutOfBoundsException; must fail closed to null (UNKNOWN)
+        assertNull(sec.blockIdAt(15, 15, 15));
     }
 
     @Test
@@ -362,5 +336,71 @@ class AnvilCorruptedRegionHardeningTest {
 
         IOException ex = assertThrows(IOException.class, () -> Nbt.readRootCompound(badNbt));
         assertTrue(ex.getMessage().contains("Malformed TAG_Int_Array length"), ex.getMessage());
+    }
+
+    // =========================================================================
+    // 5. Region byte cache bounds & malformed palette prefilter safety (RTP-14)
+    // =========================================================================
+
+    @Test
+    @DisplayName("Scenario 5: Region byte cache enforces 64 MiB ceiling and malformed palette yields UNKNOWN")
+    void testRegionByteCacheCeilingAndMalformedPalettePrefilter(@TempDir Path tempDir) throws IOException {
+        // File exceeding 64 MiB is refused by acquire
+        Path bigFile = tempDir.resolve("big_region.mca");
+        try (var fc = java.nio.channels.FileChannel.open(bigFile,
+                java.nio.file.StandardOpenOption.CREATE,
+                java.nio.file.StandardOpenOption.WRITE)) {
+            fc.position(AnvilRegionByteCache.MAX_REGION_FILE_BYTES + 1024L);
+            fc.write(ByteBuffer.wrap(new byte[]{1}));
+        }
+        try (AnvilRegionByteCache.Lease lease = AnvilRegionByteCache.acquire(bigFile)) {
+            assertNull(lease, "Files exceeding MAX_REGION_FILE_BYTES must not be cached");
+        }
+
+        // Prefilter fails closed to UNKNOWN when section has malformed palette data
+        LinkedHashMap<String, Object> root = new LinkedHashMap<>();
+        root.put("DataVersion", 3465); // 1.20.2
+        long[] heightmap = new long[37];
+        // Height 10 for (0, 0)
+        heightmap[0] = 10L;
+        LinkedHashMap<String, Object> heightmaps = new LinkedHashMap<>();
+        heightmaps.put("MOTION_BLOCKING_NO_LEAVES", heightmap);
+        root.put("Heightmaps", heightmaps);
+
+        Nbt.NbtList secList = new Nbt.NbtList(Nbt.TAG_COMPOUND, new java.util.ArrayList<>());
+        LinkedHashMap<String, Object> sec = new LinkedHashMap<>();
+        sec.put("Y", (byte) 0);
+        // Multi-entry palette with truncated data
+        sec.put("block_states", java.util.Map.of(
+                "palette", new Nbt.NbtList(Nbt.TAG_COMPOUND, List.of(
+                        java.util.Map.of("Name", "minecraft:stone"),
+                        java.util.Map.of("Name", "minecraft:air")
+                )),
+                "data", new long[1] // severely truncated: needs 256 longs
+        ));
+        secList.items.add(sec);
+        root.put("sections", secList);
+
+        byte[] nbtBytes = Nbt.writeNamedRoot("", root);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (GZIPOutputStream gzos = new GZIPOutputStream(baos)) {
+            gzos.write(nbtBytes);
+        }
+        byte[] compressed = baos.toByteArray();
+
+        byte[] region = new byte[8192 + 4096];
+        region[0] = 0; region[1] = 0; region[2] = 2; region[3] = 1;
+        ByteBuffer bb = ByteBuffer.wrap(region, 8192, 4096);
+        bb.putInt(compressed.length + 1);
+        bb.put((byte) 1); // gzip
+        bb.put(compressed);
+
+        Path regionDir = tempDir.resolve("region");
+        Files.createDirectories(regionDir);
+        Files.write(regionDir.resolve("r.0.0.mca"), region);
+
+        AnvilPrefilter.ProbeResult res = AnvilPrefilter.probeSyncDetailed(tempDir, "", 0, 0, Set.of("minecraft:lava"));
+        assertEquals(Verdict.UNKNOWN, res.verdict(), "Malformed palette data must fail closed to UNKNOWN");
+        assertNull(res.view());
     }
 }

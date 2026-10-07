@@ -33,7 +33,9 @@ class MeasurementChannelTest {
                 System.currentTimeMillis(), 0, 0, 20.0, 50.0, 512);
     }
 
-    private static List<String> rows(Path csv) throws Exception {
+    /** Rows on disk after forcing the recorder's buffered writer out. */
+    private static List<String> rows(MetricsRecorder rec, Path csv) throws Exception {
+        rec.flushRows();
         List<String> lines = Files.readAllLines(csv);
         return lines.subList(1, lines.size()); // drop header
     }
@@ -92,7 +94,7 @@ class MeasurementChannelTest {
         assertTrue(probe.attributeDirect(player, 1000, -2000, true, "", null));
         assertEquals(1, rec.successCount());
         assertTrue(rec.isDeferred(a));
-        assertEquals(0, rows(csv).size());
+        assertEquals(0, rows(rec, csv).size());
 
         // A sighting somewhere else belongs to another teleport.
         assertFalse(probe.noteExternal(player, new Location(null, 50, 64, 50)));
@@ -101,7 +103,7 @@ class MeasurementChannelTest {
         assertTrue(probe.noteExternal(player, new Location(null, 1000.5, 64, -1999.5)));
         assertFalse(rec.isDeferred(a));
         assertTrue(a.externalSeenEpochMs > 0);
-        List<String> written = rows(csv);
+        List<String> written = rows(rec, csv);
         assertEquals(1, written.size());
         assertTrue(written.get(0).contains("PLUGIN_EVENT"));
     }
@@ -121,7 +123,7 @@ class MeasurementChannelTest {
         probe.attributeDirect(p1, 10, 10, false, "NOT_AT_DESTINATION", null);
         assertFalse(rec.isDeferred(failed));
         assertEquals(0, rec.successCount());
-        assertTrue(rows(csv).get(0).contains("NOT_AT_DESTINATION"));
+        assertTrue(rows(rec, csv).get(0).contains("NOT_AT_DESTINATION"));
 
         UUID p2 = UUID.randomUUID();
         MetricsRecorder.Attempt competitor = attempt("betterrtp");
@@ -145,7 +147,7 @@ class MeasurementChannelTest {
         assertTrue(rec.isDeferred(a)); // still inside the wait
         rec.flushDeferred(true);
         assertFalse(rec.isDeferred(a));
-        String row = rows(csv).get(0);
+        String row = rows(rec, csv).get(0);
         // external_latency_ms is the first column after region_tps_5s_at_dispatch.
         String[] header = MetricsRecorder.CSV_HEADER.split(",");
         int col = List.of(header).indexOf("external_latency_ms");

@@ -34,7 +34,7 @@ These files shall be committed in standard compressed format with an aggregate d
 ### 2. Symmetrical Synthetic Region Generator (`SyntheticRegionBuilder`)
 
 Provide a zero-dependency, in-memory procedural generator in test scope (`io.github.dailystruggle.rtp.common.test.synthetic.SyntheticRegionBuilder`):
-- **Binary Compliance:** Directly emits binary-accurate MCA (NBT + ZLIB) or Linear (ZSTD) region files.
+- **Binary Compliance:** Directly emits binary-accurate MCA (NBT + ZLIB) or Linear (ZSTD) region files. (2026-10-06: Linear reader withdrawn from core, see ADR-077; core tests need only MCA output.)
 - **Parametric Terrain Synthesis:**
   - `checkerboard(int safeChunkEdge, int hazardChunkEdge)`: Generates alternating safe land and hazard (lava/void) chunks to assert stride coverage and prevent aliasing.
   - `steepStep(int xSplit, int yLow, int yHigh)`: Generates a vertical cliff face to test `LinearAdjustor` raycast bounds and fall-damage prevention.
@@ -69,6 +69,6 @@ Implement a lightweight, headless runtime harness that exercises the `ADR-087` a
 ## References
 
 - [ADR-016: Anvil Read-Only Subsystem](ADR-016-anvil-subsystem.md)
-- [ADR-077: Multi-Format Region Support (Linear ZSTD)](ADR-077-multi-format-region-support.md)
+- [ADR-077: Multi-Format Region Support: Pluggable Region Readers (Linear via Addon)](ADR-077-multi-format-region-support.md)
 - [ADR-087: Adaptive Tick-Budget and Memory Backpressure for Folia](ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia.md)
 - [ADR-088: Configurable Downsampling Stride Filter](ADR-088-configurable-downsampling-stride-filter.md)

@@ -19,26 +19,28 @@ class PaletteSectionTest {
         PaletteSection singleWithData = new PaletteSection(0, List.of("minecraft:stone"), new long[]{1L});
         assertEquals("minecraft:stone", singleWithData.blockIdAt(0, 0, 0));
 
-        // Multi entry without data is tolerated
+        // Multi entry without data is tolerated and returns null (UNKNOWN)
         PaletteSection multiWithoutData = new PaletteSection(0, List.of("minecraft:stone", "minecraft:air"), null);
-        assertEquals("minecraft:stone", multiWithoutData.blockIdAt(0, 0, 0));
+        assertNull(multiWithoutData.blockIdAt(0, 0, 0));
+        assertTrue(multiWithoutData.hasMalformedData());
 
-        // Multi entry with empty data is tolerated
+        // Multi entry with empty data is tolerated and returns null (UNKNOWN)
         PaletteSection multiWithEmptyData = new PaletteSection(0, List.of("minecraft:stone", "minecraft:air"), new long[0]);
-        assertEquals("minecraft:stone", multiWithEmptyData.blockIdAt(0, 0, 0));
+        assertNull(multiWithEmptyData.blockIdAt(0, 0, 0));
+        assertTrue(multiWithEmptyData.hasMalformedData());
     }
 
     @Test
-    void testBlockIdAtCorruptedIndexFallsBackToFirstEntry() {
+    void testBlockIdAtCorruptedIndexReturnsNullUnknown() {
         // 2 entries in palette -> PackedPaletteDecoder uses 4 bits per entry (minimum 4)
-        // If data contains invalid palette index (e.g. 5 >= 2), blockIdAt should fall back to palette.get(0)
+        // If data contains invalid palette index (e.g. 5 >= 2), blockIdAt should return null (UNKNOWN)
         List<String> palette = List.of("minecraft:stone", "minecraft:dirt");
         int[] indices = new int[4096];
         indices[0] = 5; // index out of bounds for palette of size 2
         long[] packed = AnvilTestFixtures.packIndices(4, indices);
 
         PaletteSection section = new PaletteSection(0, palette, packed);
-        assertEquals("minecraft:stone", section.blockIdAt(0, 0, 0));
+        assertNull(section.blockIdAt(0, 0, 0));
     }
 
     @Test

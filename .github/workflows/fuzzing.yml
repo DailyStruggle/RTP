@@ -46,8 +46,13 @@ jobs:
       - name: Run Jazzer Coverage-Guided Fuzzing
         env:
           JAZZER_FUZZ: '1'
+          DURATION_INPUT: ${{ github.event.inputs.duration }}
         run: |
-          DURATION="${{ github.event.inputs.duration || '5m' }}"
+          DURATION="${DURATION_INPUT:-5m}"
+          if [[ ! "$DURATION" =~ ^[0-9]+[smh]$ ]]; then
+            echo "::error::Invalid duration format: ${DURATION}"
+            exit 1
+          fi
           echo "Executing fuzz testing for ${{ matrix.target.name }} with duration ${DURATION}..."
           ./gradlew ${{ matrix.target.project }} \
             --tests "${{ matrix.target.testClass }}" \

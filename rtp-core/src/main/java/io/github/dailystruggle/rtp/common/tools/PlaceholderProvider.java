@@ -24,8 +24,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.function.IntFunction;
 
 public class PlaceholderProvider {
     public static final Map<String, Function<UUID, String>> placeholders = new ConcurrentHashMap<>();
@@ -1306,54 +1305,108 @@ public class PlaceholderProvider {
             Function<UUID, String> function = placeholders.get(s);
             if (function == null) continue;
             String value = function.apply(uuid);
-            String quotedValue = Matcher.quoteReplacement(value);
-            text = Pattern.compile("\\[" + s + "]", Pattern.CASE_INSENSITIVE)
-                    .matcher(text)
-                    .replaceAll(quotedValue);
-            text = Pattern.compile("%" + s + "%", Pattern.CASE_INSENSITIVE)
-                    .matcher(text)
-                    .replaceAll(quotedValue);
-            text = Pattern.compile("<" + s + ">", Pattern.CASE_INSENSITIVE)
-                    .matcher(text)
-                    .replaceAll(quotedValue);
+            text = replaceDelimited(text, '[', s, ']', value);
+            text = replaceDelimited(text, '%', s, '%', value);
+            text = replaceDelimited(text, '<', s, '>', value);
         }
         return text;
+    }
+
+    /**
+     * Replaces every {@code open + key + close} (key matched case-insensitively, literally)
+     * with {@code value}, left to right, non-overlapping. Keys come from the addon-writable
+     * {@link #placeholders} map, so they must never be interpreted as regex syntax.
+     */
+    static String replaceDelimited(String text, char open, String key, char close, String value) {
+        int keyLen = key.length();
+        int tokenLen = keyLen + 2;
+        int from = text.indexOf(open);
+        if (from < 0) return text;
+        StringBuilder sb = null;
+        int copied = 0;
+        int last = text.length() - tokenLen;
+        for (int i = from; i >= 0 && i <= last; ) {
+            if (text.charAt(i + tokenLen - 1) == close && text.regionMatches(true, i + 1, key, 0, keyLen)) {
+                if (sb == null) sb = new StringBuilder(text.length() + Math.max(0, value.length() - tokenLen));
+                sb.append(text, copied, i).append(value);
+                copied = i + tokenLen;
+                i = text.indexOf(open, copied);
+            } else {
+                i = text.indexOf(open, i + 1);
+            }
+        }
+        if (sb == null) return text;
+        return sb.append(text, copied, text.length()).toString();
     }
 
     public static String fillNumericPlaceholders(String text) {
         if (RTP.configs == null) return text;
+        List<?>[] list = new List<?>[1];
+        IntFunction<String> lookup = index -> {
+            if (list[0] == null) {
+                Object o = RTP.configs.getConfigValue(PlaceholderMessages.placeholders, new ArrayList<>());
+                list[0] = o instanceof List<?> pList ? pList : Collections.emptyList();
+            }
+            return list[0].size() > index ? String.valueOf(list[0].get(index)) : "[invalid]";
+        };
         // [p0], [p1]...
-        text = fillNumericPlaceholders(text, Pattern.compile("\\[([Pp])(\\d*)]"), "\\[[Pp]\\d*]");
+        text = fillNumericPlaceholders(text, '[', ']', lookup);
         // %p0%, %p1%...
-        text = fillNumericPlaceholders(text, Pattern.compile("%([Pp])(\\d*)%"), "%[Pp]\\d*%");
+        text = fillNumericPlaceholders(text, '%', '%', lookup);
         return text;
     }
 
-    private static String fillNumericPlaceholders(String text, Pattern pattern, String removeRegex) {
-        Matcher matcher = pattern.matcher(text);
-        while (matcher.find()) {
-            String group = matcher.group(2);
-            int bits;
-            try {
-                bits = Integer.parseInt(group);
-            } catch (NumberFormatException ignored) {
+    /**
+     * Single left-to-right pass over {@code open [Pp] digits close} tokens. Replacement text is
+     * not rescanned, and same-syntax tokens are stripped from it so a configured value cannot
+     * re-introduce a placeholder. Tokens with an empty or unparseable index are kept verbatim.
+     */
+    private static String fillNumericPlaceholders(String text, char open, char close, IntFunction<String> lookup) {
+        return scanNumericTokens(text, open, close, index -> {
+            if (index < 0) return null;
+            return scanNumericTokens(lookup.apply(index), open, close, ignored -> "");
+        });
+    }
+
+    /**
+     * Visits each {@code open [Pp] [0-9]* close} token; {@code replacer} receives the parsed index
+     * ({@code -1} when empty or overflowing) and returns the substitute, or {@code null} to keep it.
+     */
+    private static String scanNumericTokens(String text, char open, char close, IntFunction<String> replacer) {
+        int i = text.indexOf(open);
+        if (i < 0) return text;
+        StringBuilder sb = null;
+        int copied = 0;
+        int n = text.length();
+        while (i >= 0 && i + 2 < n) {
+            char p = text.charAt(i + 1);
+            if (p != 'p' && p != 'P') {
+                i = text.indexOf(open, i + 1);
                 continue;
             }
-            matcher.reset();
-
-            String replacement = "[invalid]";
-            Object o = RTP.configs.getConfigValue(PlaceholderMessages.placeholders, new ArrayList<>());
-            if (o instanceof List<?> pList) {
-                if (pList.size() > bits) {
-                    replacement = pList.get(bits).toString();
+            int j = i + 2;
+            while (j < n && text.charAt(j) >= '0' && text.charAt(j) <= '9') j++;
+            if (j >= n || text.charAt(j) != close) {
+                i = text.indexOf(open, i + 1);
+                continue;
+            }
+            int index = -1;
+            if (j > i + 2) {
+                try {
+                    index = Integer.parseInt(text, i + 2, j, 10);
+                } catch (NumberFormatException ignored) {
+                    index = -1;
                 }
             }
-
-            replacement = Pattern.compile(removeRegex).matcher(replacement).replaceAll("");
-
-            text = matcher.replaceFirst(Matcher.quoteReplacement(replacement));
-            matcher = pattern.matcher(text);
+            String replacement = replacer.apply(index);
+            if (replacement != null) {
+                if (sb == null) sb = new StringBuilder(n);
+                sb.append(text, copied, i).append(replacement);
+                copied = j + 1;
+            }
+            i = text.indexOf(open, j + 1);
         }
-        return text;
+        if (sb == null) return text;
+        return sb.append(text, copied, n).toString();
     }
 }

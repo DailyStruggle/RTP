@@ -30,6 +30,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.TreeSet;
 import java.util.logging.Level;
+import java.util.regex.Pattern;
 
 /**
  * RTP's bStats chart catalogue, shared by every platform.
@@ -44,6 +45,9 @@ import java.util.logging.Level;
  * </ul>
  */
 public final class RtpBStatsCatalogue {
+
+    private static final Pattern VERSION_SUFFIX = Pattern.compile("[-\\s]");
+    private static final Pattern DIGITS = Pattern.compile("\\d+");
 
     private RtpBStatsCatalogue() {}
 
@@ -286,12 +290,12 @@ public final class RtpBStatsCatalogue {
     /** {@code "1.21.4-R0.1-SNAPSHOT"} / {@code "1.21.4"} -> {@code "1.21"}; blank -> {@code "unknown"}. */
     public static String majorMinor(String raw) {
         if (raw == null || raw.isBlank()) return "unknown";
-        String core = raw.trim().split("[-\\s]", 2)[0];
+        String core = VERSION_SUFFIX.split(raw.trim(), 2)[0];
         String[] parts = core.split("\\.");
-        if (parts.length >= 2 && parts[0].matches("\\d+") && parts[1].matches("\\d+")) {
+        if (parts.length >= 2 && DIGITS.matcher(parts[0]).matches() && DIGITS.matcher(parts[1]).matches()) {
             return parts[0] + "." + parts[1];
         }
-        return core.matches("\\d+") ? core : "unknown";
+        return DIGITS.matcher(core).matches() ? core : "unknown";
     }
 
     public static String detectDatabaseBackend() {

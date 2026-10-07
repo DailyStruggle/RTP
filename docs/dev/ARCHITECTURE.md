@@ -15,7 +15,7 @@ The RTP (Random Teleport) plugin is built with a multi-module architecture to en
 ### Core & API Modules
 * **rtp-api**: Contains the interfaces, APIs, and shared models used by the plugin and external integrations. Addon developers should compile against this module.
 * **rtp-core**: Contains the core logic of the plugin. This includes region management, random location selection algorithms (shapes), queue management, database interactions, and memory tracking. It is agnostic of the specific server platform.
-* **anvil-api** (`api/anvil-api`): A standalone, platform-neutral off-tick region decoder and prefilter framework (ADR-016, ADR-077). Implements the `RegionFileReader` SPI to read and decode both Anvil (`.mca` / Zlib / LZ4) and Linear (`.linear` / ZSTD) region formats off the main thread. Linear decoding uses a pure-Java ZStandard reader (`io.airlift:aircompressor`, no native binaries) built directly into this module.
+* **anvil-api** (`api/anvil-api`): A standalone, platform-neutral off-tick region decoder and prefilter framework (ADR-016, ADR-077). Defines the `RegionFileReader` SPI and ships one built-in reader, Anvil (`.mca` / Zlib / LZ4), decoded off the main thread. Addons may register other formats through `RegionFormatRegistry` or a `RegionFileReaderProvider` service; files in an unregistered format (e.g. `.linear`) are ignored and their chunks fall back to the platform's live async chunk load.
 * **commands-api**: A unified command framework (formerly external) now integrated to handle multi-platform command structures, including future support for Brigadier on Fabric.
 * **effects-api**: A unified visual/particle effects framework (formerly external) now integrated for cross-platform visual consistency.
 

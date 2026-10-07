@@ -158,7 +158,7 @@ Region files are untrusted input. `.mca` chunk payloads shall be decompressed on
 - Every malformed stream shall surface as `CorruptRegionEntryException` (section 2 fall-through to `Verdict.UNKNOWN`).
 - lz4-java is a test-scope reference only (differential tests in `Lz4BlockDecoderTest`, Jazzer target in `AnvilRegionFuzzTest`).
 
-Rationale: two memory-safety CVEs in lz4-java's native/`Unsafe` paths within a year (CVE-2025-12183, CVE-2026-59949) against roughly 250 lines of fuzzable code for a fixed, simple container format. `.linear` (ADR-077) retains the pure-Java aircompressor ZStandard decoder until that format is retired.
+Rationale: two memory-safety CVEs in lz4-java's native/`Unsafe` paths within a year (CVE-2025-12183, CVE-2026-59949) against roughly 250 lines of fuzzable code for a fixed, simple container format. `.linear` (ADR-077) retains the pure-Java aircompressor ZStandard decoder until that format is retired. (2026-10-06: Linear reader withdrawn from core, see ADR-077; aircompressor is no longer a dependency and core ships no third-party codec.)
 
 ## Consequences
 

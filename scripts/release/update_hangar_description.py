@@ -116,8 +116,8 @@ def main() -> None:
 
     token = os.environ.get("HANGAR_TOKEN")
     if not token and not args.dry_run:
-        print("::warning::HANGAR_TOKEN environment variable not set; skipping Hangar description update.")
-        sys.exit(0)
+        print("::error::HANGAR_TOKEN environment variable not set.", file=sys.stderr)
+        sys.exit(1)
 
     try:
         body = read_description(args.source_file)

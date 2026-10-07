@@ -206,7 +206,7 @@ reproducible by readers".
   cache locality without disrupting 1D spiral bijections.
 - [x] ~~**Anvil PRESCAN accuracy measurement → conditional FULLSCAN retirement.**~~ Retired:
   the scan path in `ScanTask` has been streamlined into a single hybrid pass. Generated chunks are
-  probed off-tick via Anvil (`.mca` / `.linear`), while ungenerated chunks route to targeted on-demand
+  probed off-tick via Anvil (`.mca`, or an addon-registered format), while ungenerated chunks route to targeted on-demand
   generation without globally switching the scan phase or requiring an unconditional Pass 2 FULLSCAN
   sweep. S-001 safety remains authoritatively enforced at teleport selection time.
 - [ ] **Chunky-driven generation pass for `/rtp scan` (near-term focus, D-005 + ADR gated).** Today
@@ -496,6 +496,7 @@ reproducible by readers".
 
 ## Tier 3 — Polish and long tail
 
+- [ ] **Pre-release runtime verification of `/rtp back`.** Command implementation is landed in `rtp-core` (`BackCmd` with unit coverage in `BackCmdTest`), but requires runtime verification across live platform adapters and multi-server devstack before release (origin coordinate toggling, cross-server network mode target return, permission gating on `rtp.back`, and cooldown tracking).
 - [ ] **Standalone `rtp-anvil` publication.** The module is genuinely reusable outside RTP (any
   plugin wanting off-tick region-file reads could depend on it). If pursued, add a Maven Central
   publish target and write the "why this lives alone" ADR.

@@ -1,11 +1,48 @@
-# ADR-077 - Multi-Format Region Support: Linear (ZSTD) and Pluggable Region Readers
+# ADR-077 - Multi-Format Region Support: Pluggable Region Readers (Linear via Addon)
 
-**Status:** Accepted (revised 2026-09-23 - see Revision)
+**Status:** Accepted (revised 2026-09-23, revised again 2026-10-06 - see Revisions)
 **Date:** 2026-08-26
 **Extends:** [ADR-016](ADR-016-anvil-subsystem.md) (Anvil Read-Only Subsystem)
 **Related:** [ADR-028](ADR-028-l3-backlog-cache.md) (L3 Backlog Cache), [ADR-067](ADR-067-adaptive-scan-rate-and-mca-header-generation-check.md) (Adaptive Scan Rate and Header Generation Check)
 
-## Revision (2026-09-23) - Linear folded into `anvil-api` via a pure-Java decoder
+## Revision (2026-10-06) - Linear withdrawn from core; ships later as a guarded addon
+
+The built-in `LinearRegionReader` did not implement the real Linear format. The
+reference implementation (xymb `LinearRegionFileFormatTools`, `linear.py`, used by
+LinearPaper and Leaves) uses signature `0xc3ff13183cca9d9a` at both the start and the end
+of the file, a 32-byte header, and keeps the 1024-entry `(size, timestamp)` table *inside*
+the compressed blob. The reader expected a different signature, a 22-byte header and
+plain size/timestamp tables before the compressed payload, so every real `.linear` file
+failed its signature check and returned `UNKNOWN` after a whole-file read. Its tests built
+fixtures in the reader's own layout and so passed against it. The reader also summed
+untrusted chunk lengths into an `int` without bounds and let the decompressor skip up to
+~2 GiB.
+
+Decision: Linear is removed from core.
+
+- `LinearRegionReader`, its tests and its fuzz target are deleted.
+- `RegionFormatRegistry` registers only `.mca` by default.
+- `RegionFileResolver` keeps no Linear special case (no `isLinear` flag, no hard-coded
+  `.linear` fallback).
+- `AnvilRegionScanner` and `PregenBiomeExtractor` read only `.mca` and registered
+  extensions. A file in an unregistered format is never handed to `AnvilReader`.
+- `io.airlift:aircompressor` is dropped from `anvil-api` and from both shaded jars, and
+  `zstd-jni` is dropped from the test classpath. The plugin jar shades no third-party
+  library.
+- The `RegionFileReader` / `RegionFileReaderProvider` / `RegionFormatRegistry` SPI stays.
+  A future addon shall provide a Linear reader that is guarded:
+  - validate both signatures and the header;
+  - decompress into a buffer of capped size;
+  - add up chunk sizes as a `long`, with a per-chunk cap;
+  - test against files produced by the reference converter.
+
+On a Linear world, core resolves no region file, so the probe returns `UNKNOWN`
+and the chunk goes to the live async load path (S-004, S-005). That was already the
+effective behaviour, minus the wasted whole-file read. None of the Linear code reached a
+release (3.2.1 shipped Anvil only). This revision supersedes the 2026-09-23 revision
+below, Decision items 2, 3 and 5 for Linear, and Option F.
+
+## Revision (2026-09-23) - Linear folded into `anvil-api` via a pure-Java decoder (superseded 2026-10-06)
 
 The original decision (Option E) packaged the Linear decoder as a standalone
 `LeafRTPLinearAddon` specifically to keep the native `com.github.luben:zstd-jni`
@@ -68,9 +105,14 @@ Under ADR-016, RTP's off-tick region pre-filter subsystem (`api/anvil-api`) hard
 | Option C: Inline Linear parsing into `AnvilReader` | Violates single-responsibility principle; mixing Anvil 4 KiB sector arithmetic with ZSTD stream decoding creates tight coupling and testing complexity. |
 | Option D: Bundle zstd-jni into anvil-api directly | Bundles multi-platform *native* binaries into the core jar, increasing overall jar size by ~6.3 MiB for all users even though 98%+ use standard .mca Anvil. |
 | Option E: Pluggable SPI with dedicated `LeafRTPLinearAddon` (originally selected; superseded 2026-09-23) | Kept the native zstd-jni out of core, but required operators on `.linear` worlds to install a separate addon jar. Superseded once the native dependency was replaced by the tiny pure-Java aircompressor decoder (see Revision). |
-| Option F: Build Linear into `anvil-api` using a pure-Java ZStandard decoder (Selected, 2026-09-23) | RTP only decompresses (read-only, off-tick), so a pure-Java decoder (`io.airlift:aircompressor`, ~0.26 MiB shaded, no native binaries) delivers built-in `.linear` support for both editions with negligible size cost and no per-platform native packaging or linkage-failure risk. |
+| Option F: Build Linear into `anvil-api` using a pure-Java ZStandard decoder (selected 2026-09-23; superseded 2026-10-06) | The shipped reader did not match the real Linear layout and lacked input bounds, and the decoder was the plugin's only shaded third-party library. |
+| Option G: Anvil-only core; Linear as a guarded addon on the existing SPI (Selected, 2026-10-06) | Keeps core free of shaded dependencies and of an unverified parser. Linear worlds fall back to live async loads until the addon ships, which is what already happened in practice. |
 
 ## Consequences
+
+The 2026-10-06 revision supersedes the Linear-specific points below. Core pre-filters
+only `.mca`; `.linear` worlds fall back to live async chunk loads until a Linear addon
+registers a reader.
 
 - **Positive:**
   - Leaves, Gale, and modded servers using `.linear` retain full off-tick biome and safety pre-filtering out of the box, in both the Lite and Pro editions, with no operator action.

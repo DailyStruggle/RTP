@@ -251,6 +251,27 @@ class BukkitServerAccessorTest {
     }
 
     @Test
+    @DisplayName("executeCommandWithCapture filters logger messages by provider")
+    @Timeout(10)
+    void testExecuteCommandWithCaptureFiltersLogger() {
+        org.bukkit.command.Command lpCmd = new org.bukkit.command.Command("lp") {
+            @Override
+            public boolean execute(org.bukkit.command.CommandSender sender, String commandLabel, String[] args) {
+                java.util.logging.Logger.getLogger("me.lucko.luckperms").info("luckperms group output");
+                java.util.logging.Logger.getLogger("unrelated.plugin").info("unrelated noise log");
+                return true;
+            }
+        };
+        server.getCommandMap().register("test", lpCmd);
+
+        List<String> output = new ArrayList<>();
+        boolean executed = accessor.executeCommandWithCapture("lp listgroups", output::add);
+        assertTrue(executed);
+        assertTrue(output.contains("luckperms group output"));
+        assertFalse(output.contains("unrelated noise log"));
+    }
+
+    @Test
     @DisplayName("Action triggers and task registry lifecycle")
     void testActionRegistryTriggers() {
         String trackingId = "test-task-" + UUID.randomUUID().toString();

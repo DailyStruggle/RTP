@@ -58,6 +58,14 @@ import java.util.logging.Level;
  *       caller currently on the main thread that could have triggered a
  *       chunk load. With concurrency-cap = 1 this is exact; with concurrency
  *       &gt; 1 it is best-effort and biased toward the latest dispatcher.</li>
+ *   <li><b>Landing area.</b> Checked before step 2. A load within the
+ *       arrival ring ({@code viewDistance + 1}, Chebyshev) of an account's
+ *       last successful destination is charged to that teleport until the
+ *       same account's next dispatch, which closes the window. Paper loads a
+ *       player's view area after the teleport event, so without this the
+ *       arrival cost lands on whichever attempt happens to be in flight, or in
+ *       background when none is - making the per-attempt figure depend on how
+ *       long a plugin's teleports take.</li>
  *   <li><b>Background bucket.</b> Loads on chunk-system threads with no
  *       plugin-ticket match, or main-thread loads with zero in-flight
  *       attempts, fall here. The phase row records both the attributed sum
@@ -108,6 +116,9 @@ public final class ChunkLoadCounter implements Listener {
     /** Loads observed off every tick thread during the current phase.
      *  Background work: costs wall time but not tick time. */
     private final AtomicLong phaseOffTickLoads = new AtomicLong();
+    /** Loads charged to a finished teleport's landing area during the current
+     *  phase (see {@link Landing}). Disjoint from attributed and background. */
+    private final AtomicLong phaseLandingLoads = new AtomicLong();
 
     /** Snapshots at the start of the current phase, for {@link #phaseTotal()}. */
     private volatile long phaseBaselineTotal = 0L;
@@ -118,6 +129,32 @@ public final class ChunkLoadCounter implements Listener {
     private volatile long phaseBaselineBinCandidates = 0L;
     private volatile long phaseBaselineOnTick = 0L;
     private volatile long phaseBaselineOffTick = 0L;
+    private volatile long phaseBaselineLanding = 0L;
+
+    /** Arrival area of one account's last successful teleport. Open from that
+     *  attempt's completion until the account's next dispatch or the next
+     *  phase reset; never time-based, so back-to-back teleports of one account
+     *  cannot overlap. {@code seq} breaks ties between overlapping areas of
+     *  different accounts in favour of the most recent landing. */
+    private static final class Landing {
+        final String world;
+        final int destX;
+        final int destZ;
+        final int radius;
+        final long seq;
+
+        Landing(String world, int destX, int destZ, int radius, long seq) {
+            this.world = world;
+            this.destX = destX;
+            this.destZ = destZ;
+            this.radius = radius;
+            this.seq = seq;
+        }
+    }
+
+    /** Open landing areas keyed by account name; at most one per account. */
+    private final ConcurrentHashMap<String, Landing> landings = new ConcurrentHashMap<>();
+    private final AtomicLong landingSeq = new AtomicLong();
 
     /** Effective render-distance (in chunks) used to size the post-teleport
      *  arrival ring that {@link #endAttempt} subtracts from the raw attributed
@@ -234,8 +271,6 @@ public final class ChunkLoadCounter implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onChunkLoad(ChunkLoadEvent event) {
-        totalLoads.incrementAndGet();
-
         final int cx = event.getChunk().getX();
         final int cz = event.getChunk().getZ();
 
@@ -247,20 +282,35 @@ public final class ChunkLoadCounter implements Listener {
         // chunk that just loaded" - which TickThreadDetector answers via
         // runtime detection only.
         final boolean onTick = TickThreadDetector.ownsChunk(event.getWorld(), cx, cz);
+        syncAttributor.onLoad(cx, cz, onTick);
+        route(event.getWorld().getName(), cx, cz, onTick, event.getChunk());
+    }
+
+    /** Attribution chain for one load, split from the event handler so it can
+     *  be exercised without a server. {@code chunk} may be null when plugin
+     *  tickets are unsupported. */
+    void route(String worldName, int cx, int cz, boolean onTick, Chunk chunk) {
+        totalLoads.incrementAndGet();
         if (onTick) {
             phaseOnTickLoads.incrementAndGet();
         } else {
             phaseOffTickLoads.incrementAndGet();
         }
-        syncAttributor.onLoad(cx, cz, onTick);
 
         // Plugin-ticket attribution (Paper only).
-        if (pluginTicketsSupported) {
-            MetricsRecorder.Attempt a = attributeByPluginTicket(event.getChunk());
+        if (pluginTicketsSupported && chunk != null) {
+            MetricsRecorder.Attempt a = attributeByPluginTicket(chunk);
             if (a != null) {
                 bump(a, cx, cz, onTick);
                 return;
             }
+        }
+
+        // Landing area of a finished teleport whose account has not
+        // dispatched again.
+        if (!landings.isEmpty() && matchLanding(worldName, cx, cz) != null) {
+            phaseLandingLoads.incrementAndGet();
+            return;
         }
 
         // Main-thread temporal attribution.
@@ -314,6 +364,19 @@ public final class ChunkLoadCounter implements Listener {
             }
         }
         return null;
+    }
+
+    /** Most recent open landing area containing the chunk, or null. Iterates
+     *  at most one entry per roster account. */
+    private Landing matchLanding(String worldName, int cx, int cz) {
+        Landing best = null;
+        for (Landing l : landings.values()) {
+            if (l.world != null && worldName != null && !l.world.equals(worldName)) continue;
+            int cheb = Math.max(Math.abs(cx - l.destX), Math.abs(cz - l.destZ));
+            if (cheb > l.radius) continue;
+            if (best == null || l.seq > best.seq) best = l;
+        }
+        return best;
     }
 
     private void bump(MetricsRecorder.Attempt a, int chunkX, int chunkZ, boolean onTick) {
@@ -475,6 +538,8 @@ public final class ChunkLoadCounter implements Listener {
      *  attempt is a no-op. */
     public void beginAttempt(MetricsRecorder.Attempt a) {
         if (a == null) return;
+        // The account's next teleport closes its previous landing window.
+        if (a.player != null) landings.remove(a.player);
         if (attemptCounts.putIfAbsent(a.attemptId, new Tally()) == null) {
             inFlight.add(a);
         }
@@ -510,6 +575,20 @@ public final class ChunkLoadCounter implements Listener {
             }
         }
         inFlight.remove(a);
+        openLanding(a);
+    }
+
+    /** Opens the account's landing window for a successful attempt with a
+     *  known destination; any other outcome leaves no window open. */
+    private void openLanding(MetricsRecorder.Attempt a) {
+        if (a.player == null) return;
+        if (!a.success || (a.toX == 0.0 && a.toZ == 0.0)) {
+            landings.remove(a.player);
+            return;
+        }
+        landings.put(a.player, new Landing(a.world,
+                (int) Math.floor(a.toX / 16.0), (int) Math.floor(a.toZ / 16.0),
+                viewDistanceChunks() + 1, landingSeq.incrementAndGet()));
     }
 
     /** Monotonically-increasing global total since plugin enable. */
@@ -529,6 +608,9 @@ public final class ChunkLoadCounter implements Listener {
         phaseBaselineSelection = phaseSelectionLoads.get();
         phaseBaselineOnTick = phaseOnTickLoads.get();
         phaseBaselineOffTick = phaseOffTickLoads.get();
+        phaseBaselineLanding = phaseLandingLoads.get();
+        // Landing windows belong to the previous phase's teleports.
+        landings.clear();
         phaseBaselineRegionReads = phaseRegionReads.get();
         phaseBaselineBinCandidates = phaseBinCandidates.get();
         phaseBinOccupancyMax.set(0L);
@@ -546,10 +628,16 @@ public final class ChunkLoadCounter implements Listener {
         return Math.max(0L, phaseBackgroundLoads.get() - phaseBaselineBackground);
     }
 
+    /** Loads charged to a finished teleport's landing area, before that
+     *  account's next dispatch, since the last {@link #resetPhase()}. */
+    public long phaseLanding() {
+        return Math.max(0L, phaseLandingLoads.get() - phaseBaselineLanding);
+    }
+
     /** Loads attributed to one of the in-flight attempts since the last
-     *  {@link #resetPhase()}. {@code phaseAttributed() + phaseBackground()}
-     *  should equal {@link #phaseTotal()} modulo loads counted against
-     *  attempts that began before the phase reset. */
+     *  {@link #resetPhase()}. {@code phaseAttributed() + phaseLanding() +
+     *  phaseBackground()} should equal {@link #phaseTotal()} modulo loads
+     *  counted against attempts that began before the phase reset. */
     public long phaseAttributed() {
         return Math.max(0L, phaseAttributedLoads.get() - phaseBaselineAttributed);
     }

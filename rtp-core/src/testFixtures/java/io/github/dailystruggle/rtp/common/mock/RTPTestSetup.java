@@ -23,6 +23,8 @@ public final class RTPTestSetup {
      * @return the installed accessor so tests can call {@link MockRTPServerAccessor#addPlayer} etc.
      */
     public static MockRTPServerAccessor install(File pluginDir) {
+        // Pending arrival holds belong to the previous test's scheduler and would never fire.
+        io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask.flushArrivalReservations();
         MockRTPServerAccessor accessor = new MockRTPServerAccessor(pluginDir);
 
         // Clear any accessor registered by a previous test so that the write-once

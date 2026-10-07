@@ -61,8 +61,15 @@ public final class MenuActions {
       MenuRenderer renderer = GuiRenderers.resolve(config.menuStyle());
       if (renderer == null || !renderer.isAvailable()) return;
 
-      if ("menu:main".equalsIgnoreCase(action)) {
-        renderer.open(playerId, MenuModel.build(playerId, config));
+      if ("menu:main".equalsIgnoreCase(action) || action.toLowerCase(java.util.Locale.ROOT).startsWith("menu:main:")) {
+        int page = 0;
+        if (action.toLowerCase(java.util.Locale.ROOT).startsWith("menu:main:")) {
+          try {
+            page = Integer.parseInt(action.substring("menu:main:".length()));
+          } catch (NumberFormatException ignored) {
+          }
+        }
+        renderer.open(playerId, MenuModel.build(playerId, config, page));
         return;
       }
       if ("menu:operator".equalsIgnoreCase(action)) {

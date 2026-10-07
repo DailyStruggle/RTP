@@ -289,8 +289,9 @@ public final class V26_2_R1FabricRTPPlayer implements RTPPlayer,
         if (p == null || command == null) return;
         if (p.level() instanceof ServerLevel lvl) {
             MinecraftServer srv = lvl.getServer();
+            if (srv == null) return;
             // Command dispatch touches single-threaded server state; hop when called off-thread.
-            if (srv != null && !srv.isSameThread()) {
+            if (!srv.isSameThread()) {
                 srv.execute(() -> performCommand(player, command));
                 return;
             }
@@ -333,6 +334,7 @@ public final class V26_2_R1FabricRTPPlayer implements RTPPlayer,
         if (srv == null && p.level() instanceof ServerLevel here) {
             srv = here.getServer();
         }
+        if (srv == null) return CompletableFuture.completedFuture(false);
         final double tx = to.getBlockX() + 0.5;
         final double ty = to.getBlockY();
         final double tz = to.getBlockZ() + 0.5;
@@ -363,6 +365,7 @@ public final class V26_2_R1FabricRTPPlayer implements RTPPlayer,
         if (srv == null && p.level() instanceof ServerLevel here) {
             srv = here.getServer();
         }
+        if (srv == null) return;
         final int bx = to.getBlockX();
         final int by = to.getBlockY();
         final int bz = to.getBlockZ();

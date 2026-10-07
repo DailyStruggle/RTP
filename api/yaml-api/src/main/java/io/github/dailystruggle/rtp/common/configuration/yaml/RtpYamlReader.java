@@ -6,6 +6,7 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * Recursive-descent parser for the RTP-supported YAML subset.
@@ -77,6 +78,8 @@ public final class RtpYamlReader {
 
     /** Sentinel value placed in a comment list to mark a blank source line. */
     static final String BLANK_LINE_SENTINEL = "\u0000BLANK";
+
+    private static final Pattern LINE_BREAK = Pattern.compile("\r\n|\r|\n");
 
     private RtpYamlReader(List<RawLine> lines) {
         this.lines = lines;
@@ -178,7 +181,7 @@ public final class RtpYamlReader {
     private static List<RawLine> lex(String source) {
         List<RawLine> out = new ArrayList<>();
         // Normalise line endings, split preserving empties.
-        String[] split = source.split("\r\n|\r|\n", -1);
+        String[] split = LINE_BREAK.split(source, -1);
         // Drop a trailing empty produced by a final newline; keeps line count honest.
         int count = split.length;
         if (count > 0 && split[count - 1].isEmpty()) count--;
