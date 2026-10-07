@@ -136,6 +136,9 @@ public final class WorldBiomeStore {
     public synchronized int paletteIndex(String biome) {
         Integer idx = paletteIndex.get(biome);
         if (idx != null) return idx;
+        if (palette.size() >= BiomeBinCodec.MAX_PALETTE_ENTRIES) {
+            return 0;
+        }
         palette.add(biome);
         int i = palette.size() - 1;
         paletteIndex.put(biome, i);

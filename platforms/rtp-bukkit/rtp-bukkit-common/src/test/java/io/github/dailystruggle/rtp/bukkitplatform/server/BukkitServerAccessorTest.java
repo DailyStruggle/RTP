@@ -11,6 +11,7 @@ import io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask;
 import io.github.dailystruggle.rtp.api.server.PlatformFamily;
 import io.github.dailystruggle.rtp.api.server.ProgressBar;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.permissions.PermissionAttachment;
 import org.junit.jupiter.api.AfterEach;
@@ -28,6 +29,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -226,6 +228,33 @@ class BukkitServerAccessorTest {
         // Unknown UUID defaults safely to console sender
         RTPCommandSender fallbackSender = accessor.getSender(UUID.randomUUID());
         assertNotNull(fallbackSender);
+    }
+
+    @Test
+    @DisplayName("executeCommand dispatched asynchronously hops to primary thread")
+    @Timeout(10)
+    void testExecuteCommandAsynchronousHop() throws Exception {
+        AtomicBoolean dispatchedOnPrimary = new AtomicBoolean(false);
+        org.bukkit.command.Command threadCheckCmd = new org.bukkit.command.Command("threadcheck") {
+            @Override
+            public boolean execute(org.bukkit.command.CommandSender sender, String commandLabel, String[] args) {
+                dispatchedOnPrimary.set(Bukkit.isPrimaryThread());
+                return true;
+            }
+        };
+        server.getCommandMap().register("test", threadCheckCmd);
+
+        CompletableFuture<Boolean> asyncExecution = CompletableFuture.supplyAsync(() ->
+            accessor.executeCommand(null, "threadcheck")
+        );
+
+        while (!asyncExecution.isDone()) {
+            server.getScheduler().performTicks(1);
+            Thread.sleep(10);
+        }
+
+        assertTrue(asyncExecution.get());
+        assertTrue(dispatchedOnPrimary.get(), "Command should be dispatched on the primary server thread");
     }
 
     @Test

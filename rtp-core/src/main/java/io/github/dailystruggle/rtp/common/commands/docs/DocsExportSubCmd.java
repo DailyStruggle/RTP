@@ -59,25 +59,25 @@ public class DocsExportSubCmd extends BaseRTPCmdImpl {
         sendMessage(callerId, "RTP: Asynchronously generating standalone HTML documentation bundle...");
 
         final Path finalTargetPath = targetPath;
-        // Zero sync I/O on main thread (S-005): run asynchronously
-        CompletableFuture.runAsync(() -> {
+        // Zero sync I/O on main thread (S-005): run asynchronously through RTP.scheduler (F-001)
+        Runnable exportTask = () -> {
             try {
                 DocsRegistry.getInstance().exportLocalHtmlBundle(finalTargetPath);
-            } catch (Exception e) {
-                RTP.log(Level.WARNING, "Failed to export documentation bundle to " + finalTargetPath + ": " + e.getMessage(), e);
-                throw new RuntimeException(e);
+                String msg = "RTP: Documentation bundle exported successfully to " + finalTargetPath.toAbsolutePath();
+                sendMessage(callerId, msg);
+            } catch (Throwable e) {
+                // S-004: Never silently swallow failure
+                String err = "RTP: Failed to export documentation bundle: " + e.getMessage();
+                RTP.log(Level.WARNING, err, e);
+                sendMessage(callerId, err);
             }
-        }).thenRun(() -> {
-            String msg = "RTP: Documentation bundle exported successfully to " + finalTargetPath.toAbsolutePath();
-            sendMessage(callerId, msg);
-        }).exceptionally(throwable -> {
-            // S-004: Never silently swallow failure
-            Throwable cause = (throwable.getCause() != null) ? throwable.getCause() : throwable;
-            String err = "RTP: Failed to export documentation bundle: " + cause.getMessage();
-            RTP.log(Level.WARNING, err, cause);
-            sendMessage(callerId, err);
-            return null;
-        });
+        };
+
+        if (RTP.scheduler != null) {
+            RTP.scheduler.runTaskAsynchronously(exportTask);
+        } else {
+            CompletableFuture.runAsync(exportTask);
+        }
 
         return true;
     }

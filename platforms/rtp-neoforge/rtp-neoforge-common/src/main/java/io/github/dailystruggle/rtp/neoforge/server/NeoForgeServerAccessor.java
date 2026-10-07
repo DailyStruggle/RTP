@@ -1020,15 +1020,27 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
         if (s == null) return false;
         if (!isPrimaryThread()) {
             // Callers consume the captured lines synchronously, so block on the server-thread run.
+            java.util.concurrent.atomic.AtomicBoolean timedOut = new java.util.concurrent.atomic.AtomicBoolean(false);
+            java.util.function.Consumer<String> guardedConsumer = sLine -> {
+                if (!timedOut.get() && lineConsumer != null) {
+                    lineConsumer.accept(sLine);
+                }
+            };
             java.util.concurrent.CompletableFuture<Boolean> done = new java.util.concurrent.CompletableFuture<>();
-            s.execute(() -> done.complete(captureCommandNow(s, commandLine, lineConsumer)));
+            s.execute(() -> {
+                if (!timedOut.get()) {
+                    done.complete(captureCommandNow(s, commandLine, guardedConsumer));
+                }
+            });
             try {
                 return done.get(CAPTURE_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS);
             } catch (InterruptedException e) {
+                timedOut.set(true);
                 Thread.currentThread().interrupt();
                 log(Level.WARNING, "[RTP][NeoForge] executeCommandWithCapture interrupted for '" + commandLine + "'", e);
                 return false;
             } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException e) {
+                timedOut.set(true);
                 log(Level.WARNING, "[RTP][NeoForge] executeCommandWithCapture did not complete on the server thread for '"
                         + commandLine + "': " + e, e);
                 return false;

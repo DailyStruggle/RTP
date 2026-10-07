@@ -412,6 +412,51 @@ class ActionManagerTest {
   }
 
   @Test
+  @DisplayName("Offline participant aborts session before any teleport is dispatched")
+  void testOfflineParticipantAbortsBeforeAnyTeleport() {
+    UUID p1Id = UUID.randomUUID();
+    UUID p2Id = UUID.randomUUID();
+
+    RTPLocation p1InitialLoc = new RTPLocation(serverAccessor.getRTPWorld("world"), 10, 64, 10);
+    RTPLocation p2InitialLoc = new RTPLocation(serverAccessor.getRTPWorld("world"), 20, 64, 20);
+
+    io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player1 =
+        new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(p1Id, "Player1", p1InitialLoc);
+    io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player2 =
+        new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(p2Id, "Player2", p2InitialLoc);
+    player2.setOnline(false);
+
+    serverAccessor.addPlayer(player1);
+    serverAccessor.addPlayer(player2);
+
+    ActionDefinition.PlacementSpec pSpec =
+        new ActionDefinition.PlacementSpec("default", "CIRCLE", 64, 16, 8, Map.of(), 3, 2);
+    ActionDefinition def = new ActionDefinition(
+        "offline_test_action", "offline_test_action", "rtp.action.offline", "",
+        pSpec,
+        ActionDefinition.ConfinementSpec.DEFAULT,
+        ActionDefinition.LifecycleSpec.EMPTY);
+    actionManager.registerAction(def);
+
+    RTPLocation cachedLoc1 = new RTPLocation(serverAccessor.getRTPWorld("world"), 200, 32, 200);
+    RTPLocation cachedLoc2 = new RTPLocation(serverAccessor.getRTPWorld("world"), 210, 32, 210);
+    ActionManager.PrevalidatedActionPlacement item =
+        new ActionManager.PrevalidatedActionPlacement(
+            Map.of(UUID.randomUUID(), cachedLoc1, UUID.randomUUID(), cachedLoc2), 200, 200);
+    actionManager.offerCachedPlacement("offline_test_action", item);
+
+    ActionSessionResult res =
+        actionManager.trigger("offline_test_action", List.of(p1Id, p2Id), ActionContext.EMPTY).join();
+    assertFalse(res.success());
+    assertTrue(res.failureReason().contains("Participant offline: " + p2Id));
+
+    // Assert that Player1 was NOT teleported
+    assertEquals(p1InitialLoc, player1.getLocation(), "Player1 must not be teleported when Player2 is offline");
+    assertFalse(actionManager.getSessionForParticipant(p1Id).isPresent());
+    assertFalse(actionManager.getSessionForParticipant(p2Id).isPresent());
+  }
+
+  @Test
   @DisplayName("Per-action cache revalidation fallback to live placement on block column failure (ADR-097)")
   void testCacheRevalidationFallbackOnInvalidBlock() {
     UUID p1 = UUID.randomUUID();

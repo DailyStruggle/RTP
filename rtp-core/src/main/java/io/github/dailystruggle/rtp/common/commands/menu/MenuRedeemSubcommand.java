@@ -3082,7 +3082,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                 ? messageMethod
                 : msg -> RTP.serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg, null);
         Predicate<String> permissionProbe = permissionProbeFactory.apply(senderId);
-        if (permissionProbe == null) permissionProbe = perm -> true;
+        if (permissionProbe == null) permissionProbe = perm -> false;
         try {
             rtpRoot.onCommand(senderId,
                     permissionProbe,

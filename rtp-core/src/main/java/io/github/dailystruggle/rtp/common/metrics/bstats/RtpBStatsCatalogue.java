@@ -503,6 +503,21 @@ public final class RtpBStatsCatalogue {
     }
 
     /**
+     * Cancels and clears the rolling cost sampler task on reload or shutdown.
+     */
+    static void stopRtpCostSampler() {
+        synchronized (RtpBStatsCatalogue.class) {
+            if (rtpCostSamplerTask != null && RTP.scheduler != null) {
+                try {
+                    RTP.scheduler.cancelTask(rtpCostSamplerTask);
+                } catch (Throwable ignored) {
+                }
+            }
+            rtpCostSamplerTask = null;
+        }
+    }
+
+    /**
      * Rolling 1-minute-delta accumulator of a cumulative nanosecond counter against
      * the cumulative RTP-served counter. Summing deltas is exact regardless of
      * cadence; {@link #msPerRtp()} is total ns / total RTP. Thread-safe.

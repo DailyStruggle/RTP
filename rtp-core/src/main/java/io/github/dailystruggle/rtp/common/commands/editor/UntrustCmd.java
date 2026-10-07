@@ -90,14 +90,16 @@ public class UntrustCmd extends BaseRTPCmdImpl {
         return true;
     }
 
-    /** Revokes in open channels first, then the file; the union of both. Disk I/O. */
+    /** Revokes on disk first, then in open channels; the union of both. Disk I/O. */
     static Set<String> untrust(String selector) {
-        Set<String> removed = new LinkedHashSet<>(EditorChannel.untrustAny(selector));
+        Set<String> removed = new LinkedHashSet<>();
         try {
             removed.addAll(TrustedEditors.load(EditorChannelWiring.editorDir().resolve(EditorChannelWiring.TRUSTED_FILE))
                     .remove(selector));
         } catch (IOException e) {
             throw new UncheckedIOException(e.getMessage(), e);
+        } finally {
+            removed.addAll(EditorChannel.untrustAny(selector));
         }
         return removed;
     }

@@ -30,7 +30,7 @@ services:
     image: redis:7-alpine
     container_name: rtp-devstack-redis
     ports:
-      - "${REDIS_HOST_PORT:-6380}:6379"
+      - "127.0.0.1:${REDIS_HOST_PORT:-6380}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "PING"]
       interval: 2s
@@ -54,7 +54,7 @@ services:
       SKIP_CHOWN: "TRUE"
       RTP_NET_SECRET: ${RTP_NET_SECRET:?set RTP_NET_SECRET in .env}
     ports:
-      - "25577:25577"
+      - "127.0.0.1:25577:25577"
     volumes:
       # itzg/mc-proxy chowns every mounted path on boot; :ro single-file mounts
       # reject chown with exit 1 on Windows/Docker-Desktop. SKIP_CHOWN is honored
@@ -75,7 +75,7 @@ services:
       SKIP_CHOWN: "TRUE"
       RTP_NET_SECRET: ${RTP_NET_SECRET:?set RTP_NET_SECRET in .env}
     ports:
-      - "25578:25577"
+      - "127.0.0.1:25578:25577"
     volumes:
       - ./proxy-b/velocity.toml:/server/velocity.toml
       - ./shared/forwarding.secret:/server/forwarding.secret

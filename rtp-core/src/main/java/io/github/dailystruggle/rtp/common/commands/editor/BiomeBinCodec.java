@@ -141,14 +141,19 @@ public final class BiomeBinCodec {
         return cells;
     }
 
+    public static final int MAX_PALETTE_ENTRIES = 4096;
+
     /** {@code counts[v]} = cells holding value {@code v}, computed from runs without expanding. */
     public static int[] histogram(byte[] runs, int valueBound) {
-        int[] counts = new int[Math.max(1, valueBound)];
+        int[] counts = new int[Math.max(1, Math.min(MAX_PALETTE_ENTRIES, valueBound))];
         if (runs == null) return counts;
         int[] pos = {0};
         while (pos[0] < runs.length) {
             int v = readVarint(runs, pos);
             int len = readVarint(runs, pos);
+            if (v < 0 || v >= MAX_PALETTE_ENTRIES) {
+                throw new IllegalArgumentException("cell value out of palette bounds: " + v);
+            }
             if (v >= counts.length) counts = Arrays.copyOf(counts, v + 1);
             counts[v] += len;
         }

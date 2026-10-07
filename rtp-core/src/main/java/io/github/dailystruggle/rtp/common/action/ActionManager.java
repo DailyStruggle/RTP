@@ -977,8 +977,11 @@ public final class ActionManager implements ActionService {
             if (res.success()) {
               return CompletableFuture.completedFuture(res);
             }
-            // If cached placement was invalidated upon recheck, try next cached or fall back to live placement
-            return tryCachedOrLivePlacement(def, participants, effectiveContext, groupService, parentRegion, sessionId);
+            if ("Cached placement slot rejected by revalidation".equals(res.failureReason())) {
+              // If cached placement was invalidated upon recheck, try next cached or fall back to live placement
+              return tryCachedOrLivePlacement(def, participants, effectiveContext, groupService, parentRegion, sessionId);
+            }
+            return CompletableFuture.completedFuture(res);
           });
     }
 
@@ -1089,6 +1092,18 @@ public final class ActionManager implements ActionService {
               Map<UUID, int[]> assignedSlots = new HashMap<>();
               String worldName = locList.get(0).world().name();
 
+              if (RTP.serverAccessor != null) {
+                for (UUID pid : participants) {
+                  var p = RTP.serverAccessor.getPlayer(pid);
+                  if (p != null && !p.isOnline()) {
+                    cached.release();
+                    rollbackReservation(participants, sessionId);
+                    return CompletableFuture.completedFuture(
+                        ActionSessionResult.failure("Participant offline: " + pid));
+                  }
+                }
+              }
+
               List<CompletableFuture<Boolean>> teleports = new ArrayList<>(participants.size());
               for (int i = 0; i < participants.size(); i++) {
                 UUID pid = participants.get(i);
@@ -1096,12 +1111,6 @@ public final class ActionManager implements ActionService {
                 assignedSlots.put(pid, new int[] {loc.x(), loc.y(), loc.z()});
                 if (RTP.serverAccessor != null) {
                   io.github.dailystruggle.rtp.api.entity.RTPPlayer player = RTP.serverAccessor.getPlayer(pid);
-                  if (player != null && !player.isOnline()) {
-                    cached.release();
-                    rollbackReservation(participants, sessionId);
-                    return CompletableFuture.completedFuture(
-                        ActionSessionResult.failure("Participant offline: " + pid));
-                  }
                   if (player != null) {
                     CompletableFuture<Boolean> done = new CompletableFuture<>();
                     teleports.add(done);

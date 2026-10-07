@@ -122,15 +122,4 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Linear:** RTP-28
 
 
-### 2026-10-05 — Small lifecycle and bounds gaps from the v3.3.0 audit
-
-- **Severity:** Low
-- **Status:** Open
-- **Discovered during:** v3.3.0 pre-release audit (bStats, commands, editor, CI)
-- **Location:** `rtp-core/.../metrics/bstats/RtpBStatsCatalogue.java` ~159, ~480-494 and `RtpBStats.shutdown`; `commands/docs/DocsExportSubCmd.java` ~61-69; `commands/menu/MenuRedeemSubcommand.java` ~3074-3075; `commands/editor/BiomeBinCodec.java` ~145-155 / `WorldBiomeStore` palette; `visualization/ComprehensiveRegionImageExporter.java` ~115-117; `.github/workflows/fuzzing.yml` ~59 and `mutation-testing.yml` ~52; `devstack/docker-compose.yml` ports; `FabricServerAccessor` / `NeoForgeServerAccessor` `executeCommandWithCapture` (10 s timeout); `RTP.java` `NO_PERMISSION` results
-- **Symptom / hypothesis:** The bStats cost sampler is never cancelled and its static handle blocks rescheduling after a reload. Docs export runs on `CompletableFuture.runAsync` rather than `RTP.scheduler`. `dispatchRun` treats a null permission probe as allow-all. The biome palette and `histogram` grow with the largest biome index. Export filenames embed the unsanitized `region.name`. Two `upload-artifact@v4` refs are unpinned. Devstack publishes an open Redis and an offline-mode proxy on all interfaces. On Fabric/NeoForge a capture that times out still runs later and appends to the caller's list after the caller has moved on. The API's `NO_PERMISSION` failure text (`Missing permission for <target>`) is hardcoded English and shown verbatim by the GUI addon (S-007-adjacent).
-- **Impact:** Individually minor: reload leaks, a rule violation, latent fail-open paths, admin-only path oddities, and supply-chain/dev-host hygiene.
-- **Suggested next step:** Cancel and null the sampler in shutdown; use `RTP.scheduler`; fail closed on a null probe; cap the palette; sanitize export names to `[A-Za-z0-9._-]`; pin the SHAs; bind devstack ports to `127.0.0.1`; drop late capture output once the caller has timed out; give `NO_PERMISSION` a configurable message key.
-- **Linear:** RTP-29
-
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->

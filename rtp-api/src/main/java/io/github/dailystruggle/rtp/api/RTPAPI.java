@@ -303,10 +303,7 @@ public class RTPAPI {
   public static boolean checkPermission(UUID player, String permission) {
     if (player == null || permission == null || permission.isBlank()) return false;
     RTPServerAccessor sa = serverAccessor;
-    if (sa == null) {
-      throw new IllegalStateException(
-          "[RTP API] Cannot check permission: Core implementation is not loaded.");
-    }
+    if (sa == null) return false; // fail closed: no core, no permission
     try {
       var sender = sa.getSender(player);
       return sender != null && sender.hasPermission(permission);

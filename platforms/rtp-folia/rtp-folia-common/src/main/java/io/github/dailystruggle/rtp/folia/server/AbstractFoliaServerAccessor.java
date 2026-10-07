@@ -685,14 +685,25 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
         return false;
       }
     } else {
+      java.util.concurrent.CompletableFuture<Boolean> dispatchFuture = new java.util.concurrent.CompletableFuture<>();
       Bukkit.getGlobalRegionScheduler().run(bukkitPlugin, task -> {
         try {
-          Bukkit.dispatchCommand(capturingSender, commandLine);
+          dispatchFuture.complete(Bukkit.dispatchCommand(capturingSender, commandLine));
         } catch (Throwable t) {
           log(Level.WARNING, "[RTP] Capturing console command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+          dispatchFuture.completeExceptionally(t);
         }
       });
-      return true;
+      try {
+        return dispatchFuture.get(5, java.util.concurrent.TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        log(Level.WARNING, "[RTP] Async capturing command dispatch interrupted for '" + commandLine + "': " + e.getMessage(), e);
+        return false;
+      } catch (Throwable t) {
+        log(Level.WARNING, "[RTP] Async capturing command dispatch failed for '" + commandLine + "': " + t.getMessage(), t);
+        return false;
+      }
     }
   }
 
