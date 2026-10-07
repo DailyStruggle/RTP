@@ -39,6 +39,9 @@ public final class EditorSessionManager {
     /** Local session lifetime: the hosted relay's TTL. */
     static final long SESSION_TTL_MILLIS = 30L * 60L * 1000L;
     static final int MAX_SESSIONS = 32;
+    public static final int MAX_FILES = 256;
+    public static final long MAX_PAYLOAD_BYTES = 4L * 1024L * 1024L;
+    public static final int MAX_PAYLOAD_CHARS = 4 * 1024 * 1024;
 
     private record Session(String payload, long createdAt) {
     }
@@ -1244,65 +1247,79 @@ public final class EditorSessionManager {
         if (json == null || json.isBlank()) {
             throw new IllegalArgumentException("Payload cannot be null or empty");
         }
-
-        int filesIdx = json.indexOf("\"files\"");
-        if (filesIdx == -1) {
-            throw new IllegalArgumentException("Invalid payload: missing 'files' field");
+        if (json.length() > MAX_PAYLOAD_CHARS) {
+            throw new IllegalArgumentException("Payload too large (max " + MAX_PAYLOAD_CHARS + " characters)");
         }
 
-        int colonIdx = json.indexOf(':', filesIdx);
-        if (colonIdx == -1) {
-            throw new IllegalArgumentException("Invalid payload: malformed 'files' field");
+        Object rootObj;
+        try {
+            rootObj = EditorLoopbackJson.parse(json);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid payload JSON: " + e.getMessage(), e);
+        }
+        if (!(rootObj instanceof Map<?, ?> rootMap)) {
+            throw new IllegalArgumentException("Invalid payload: root must be a JSON object");
         }
 
-        int filesStart = json.indexOf('{', colonIdx);
-        if (filesStart == -1) {
-            throw new IllegalArgumentException("Invalid payload: 'files' must be an object");
-        }
-
-        int filesEnd = findMatchingBrace(json, filesStart);
-        if (filesEnd == -1) {
-            throw new IllegalArgumentException("Invalid payload: unclosed 'files' object");
-        }
-
-        String filesBlock = json.substring(filesStart, filesEnd + 1);
-
-        // Parse files dictionary
-        Map<String, String> files = parseJsonStringMap(filesBlock);
-        if (files.isEmpty()) {
+        Object filesObj = rootMap.get("files");
+        if (!(filesObj instanceof Map<?, ?> filesMap) || filesMap.isEmpty()) {
             throw new IllegalArgumentException("Payload contains no configuration files to apply");
+        }
+        if (filesMap.size() > MAX_FILES) {
+            throw new IllegalArgumentException("Too many configuration files in payload (max " + MAX_FILES + ")");
+        }
+
+        Map<String, String> files = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> e : filesMap.entrySet()) {
+            if (!(e.getKey() instanceof String path) || !(e.getValue() instanceof String text)) {
+                throw new IllegalArgumentException("'files' entries must map a path to string content");
+            }
+            files.put(path, text);
         }
 
         // Extract declared SHA-256 if present
-        String declaredSha = extractStringField(json, "sha256");
+        Object declaredShaObj = rootMap.get("sha256");
+        String declaredSha = declaredShaObj instanceof String s ? s : null;
         if (requireDigest && (declaredSha == null || declaredSha.isBlank())) {
             throw new MissingDigestException();
         }
         if (declaredSha != null && !declaredSha.isBlank()) {
-            String computedRawSha = EditorHttpTransport.computeSha256(filesBlock);
             String computedCanonicalSha = computeCanonicalFilesSha256(files);
-            if (!declaredSha.equalsIgnoreCase(computedRawSha) && !declaredSha.equalsIgnoreCase(computedCanonicalSha)) {
-                throw new IllegalArgumentException("Payload SHA-256 mismatch! Expected: " + declaredSha + ", computed: " + computedRawSha);
+            String computedRawSha = null;
+            int filesIdx = json.indexOf("\"files\"");
+            if (filesIdx != -1) {
+                int colonIdx = json.indexOf(':', filesIdx);
+                if (colonIdx != -1) {
+                    int filesStart = json.indexOf('{', colonIdx);
+                    if (filesStart != -1) {
+                        int filesEnd = findMatchingBrace(json, filesStart);
+                        if (filesEnd != -1) {
+                            computedRawSha = EditorHttpTransport.computeSha256(json.substring(filesStart, filesEnd + 1));
+                        }
+                    }
+                }
+            }
+            if (!declaredSha.equalsIgnoreCase(computedCanonicalSha)
+                    && (computedRawSha == null || !declaredSha.equalsIgnoreCase(computedRawSha))) {
+                throw new IllegalArgumentException("Payload SHA-256 mismatch! Expected: " + declaredSha + ", computed: " + computedCanonicalSha);
             }
         }
 
         int version = 1;
-        String versionStr = extractNumericField(json, "version");
-        if (versionStr != null) {
-            try {
-                version = Integer.parseInt(versionStr);
-            } catch (NumberFormatException ignored) {
-            }
+        Object verObj = rootMap.get("version");
+        if (verObj instanceof Number n) {
+            version = n.intValue();
+        } else if (verObj instanceof String s) {
+            try { version = Integer.parseInt(s); } catch (NumberFormatException ignored) {}
         }
 
-        String pluginVersion = extractStringField(json, "pluginVersion");
+        String pluginVersion = rootMap.get("pluginVersion") instanceof String s ? s : null;
         long timestamp = 0L;
-        String tsStr = extractNumericField(json, "timestamp");
-        if (tsStr != null) {
-            try {
-                timestamp = Long.parseLong(tsStr);
-            } catch (NumberFormatException ignored) {
-            }
+        Object tsObj = rootMap.get("timestamp");
+        if (tsObj instanceof Number n) {
+            timestamp = n.longValue();
+        } else if (tsObj instanceof String s) {
+            try { timestamp = Long.parseLong(s); } catch (NumberFormatException ignored) {}
         }
 
         // Validate each file AST and geometry

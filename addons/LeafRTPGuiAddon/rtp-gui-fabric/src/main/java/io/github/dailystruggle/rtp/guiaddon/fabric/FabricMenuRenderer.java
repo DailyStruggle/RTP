@@ -173,12 +173,12 @@ public final class FabricMenuRenderer implements MenuRenderer {
     // Defer by 1 tick so that if open() was triggered from an active container
     // click (sub-menu navigation / pagination), the current click packet finishes
     // processing completely before the new container screen is opened.
-    RTP.log(java.util.logging.Level.INFO,
+    RTP.log(java.util.logging.Level.FINE,
         "[RTP-GUI] Fabric renderer scheduling chest open for " + playerId);
     RTP.scheduler.runTaskLater(() -> {
       ServerPlayer player = resolvePlayer(playerId);
       if (player == null) {
-        RTP.log(java.util.logging.Level.INFO,
+        RTP.log(java.util.logging.Level.FINE,
             "[RTP-GUI] Fabric renderer: could not resolve player at open time for " + playerId
                 + " (offline, or neither the player registry nor a bound server was available)");
         if (model.isRoot()) {
@@ -186,7 +186,7 @@ public final class FabricMenuRenderer implements MenuRenderer {
         }
         return;
       }
-      RTP.log(java.util.logging.Level.INFO,
+      RTP.log(java.util.logging.Level.FINE,
           "[RTP-GUI] Fabric renderer opening chest menu for " + playerId);
       try {
         MenuLayout layout = MenuLayout.compute(model);

@@ -112,6 +112,16 @@ public class MenuModelTest {
         assertEquals("CLOCK", config.iconOperatorStatus());
         assertEquals("WRITABLE_BOOK", config.iconOperatorAdminBook());
         assertEquals("REDSTONE_TORCH", config.iconOperatorReload());
+        assertEquals("&a&lSetup Wizard", config.titleOperatorSetup());
+        assertEquals("&e&lImport Configs", config.titleOperatorImport());
+        assertEquals("&b&lConfig Editor", config.titleOperatorConfig());
+        assertEquals("&d&lVisualizations", config.titleOperatorVisualizations());
+        assertEquals("&f&lStatus & Metrics", config.titleOperatorStatus());
+        assertEquals("&6&lAdmin Book Panel", config.titleOperatorAdminBook());
+        assertEquals("&c&lQuick Reload", config.titleOperatorReload());
+        assertEquals("&e[Previous Page]", config.textPreviousPage());
+        assertEquals("&e[Next Page]", config.textNextPage());
+        assertEquals("&c[Back to Worlds]", config.textBackToMainMenu());
     }
 
     @Test

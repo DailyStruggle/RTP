@@ -912,6 +912,9 @@ public class RTP {
               (ConfigParser<EconomyKeys>) configs.getParser(EconomyKeys.class);
           if (eco != null) {
             cost += eco.getNumber(EconomyKeys.price, 0.0).doubleValue();
+            if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.BIOME) {
+              cost += eco.getNumber(EconomyKeys.biomePrice, 0.0).doubleValue();
+            }
             floor = eco.getNumber(EconomyKeys.balanceFloor, 0.0).doubleValue();
           }
           if ((economy.bal(uuid) - cost) < floor) {

@@ -77,40 +77,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Linear:** RTP-2
 
 
-### 2026-10-05 — Release workflows interpolate step outputs and inputs into shell scripts
-
-- **Severity:** Medium
-- **Status:** Open
-- **Discovered during:** v3.3.0 pre-release audit (CI/release)
-- **Location:** `.github/workflows/release-bbb.yml` lines ~111, ~168 (`TAG="${{ steps.version.outputs.tag }}"`); `release.yml` lines ~177, ~233, ~329-333; `fuzzing.yml` line ~50 (`inputs.duration`); `gradle.yml` lines ~100-110 (`github.base_ref`)
-- **Symptom / hypothesis:** The version comes from a loosely matched branch name (`^[vV]([0-9]+\.[0-9]+.*)$`) or a dispatch input and is template-substituted into later `run:` blocks, so `$(...)` or quotes in it execute.
-- **Impact:** Runner code execution in jobs that hold publish and signing secrets. Practical exposure is limited: fork PRs get no secrets and a read-only token, and dispatch needs write access. Hardening rather than an open hole.
-- **Suggested next step:** Validate the version against `^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9]+)*$` and fail otherwise; pass outputs and inputs only via `env:` and expand as `"$VAR"`.
-- **Linear:** RTP-11
-
-### 2026-10-05 — Release jobs can publish partial or unsigned releases
-
-- **Severity:** Medium
-- **Status:** Open
-- **Discovered during:** v3.3.0 pre-release audit (CI/release)
-- **Location:** `.github/workflows/release-bbb.yml` lines ~107-120 (tag pushed before the build at ~137); `release.yml` lines ~123-129 (missing `.asc` only logged); `scripts/release/update_modrinth_description.py` ~78-81, `update_hangar_description.py` ~117-120 (missing token exits 0)
-- **Symptom / hypothesis:** A failed Pro build leaves a public `v*` tag behind. A missing signing key still publishes the Lite jar to GitHub, Modrinth and Hangar. A missing marketplace token silently skips that channel.
-- **Impact:** Unverifiable or inconsistent releases across channels; manual cleanup of orphan tags.
-- **Suggested next step:** Push the tag only after build and upload succeed; fail when `${LITE_JAR}.asc` is missing (as `maven-central.yml` does); check required tokens at job start (`: "${HANGAR_TOKEN:?}"`).
-- **Linear:** RTP-7
-
-
-### 2026-10-06 — Claim boundary providers disable on any error and under-cover large or irregular claims
-
-- **Severity:** Medium
-- **Status:** Open
-- **Discovered during:** v3.3.0 pre-release audit (claim addon boundary providers)
-- **Location:** `addons/LeafRTPClaimAddon/.../TownyBoundaryProvider.java` ~149, `FactionsBoundaryProvider.java` ~152 and ~181-250, `GriefPreventionBoundaryProvider.java` ~57-64 and ~91, `AdaptiveClaimProber.java` ~18-49
-- **Symptom / hypothesis:** Any `Throwable` sets `exists = false` for the session (the checker fail-open pattern fixed earlier). The prober samples only the four axes through the hit and stops at 512 blocks, so L-shaped or large claims are truncated. Towny keys town blocks as 16-block chunks and ignores a non-default town block size. Factions `getBoundaryAt` excludes only wilderness, so a SafeZone/WarZone hit enumerates every claim reflectively with no cap. GriefPrevention anchors a player to the first claim in the world. Providers call Towny/GP/Factions/Bukkit APIs from async completion threads (the same pattern as the existing checkers).
-- **Impact:** Availability and placement quality, not S-003: per-location claim checkers still veto every final destination. Effects: claim hazards under-marked (more rerolls), claim anchors silently empty after one error, wrong-claim anchors, and long reflective scans on large system factions.
-- **Suggested next step:** Disable only on linkage errors (reuse `ClaimCheckFailure`); flood-fill claimed chunks with a cap instead of axis probing; read Towny's town block size; skip or locally bound SafeZone/WarZone; prefer the claim containing the player.
-- **Linear:** RTP-15
-
 ### 2026-10-06 — Weekly Jazzer job fuzzes one Anvil target for 2 s and passes
 
 - **Severity:** Medium
@@ -140,31 +106,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Suggested next step:** Probe through the registered reader: `reader.readChunk(...)` then `AnvilReader.toView(entry.root)` for the surface biome, or add a column-probe method to the `RegionFileReader` SPI with an Anvil default.
 - **Linear:** RTP-22
 
-### 2026-10-06 — YAML depth, modded-platform startup noise, API enum additions, devstack leftovers
-
-- **Severity:** Low
-- **Status:** Open
-- **Discovered during:** v3.3.0 pre-release audit (yaml-api, API surface, devstack run)
-- **Location:** `api/yaml-api/.../RtpYamlReader.java` (`parseMappingBody` / `parseChildBlock` / `FlowParser`), `RtpYamlWriter.emitScalar` PLAIN branch; `platforms/rtp-neoforge/.../utils/NeoForgeJarUtils.java` ~78; `addons/LeafRTPGuiAddon/rtp-gui-common/.../RTPGuiCommonAddon.java` ~188; `rtp-api` `RtpTarget.Kind`, `RTPResult.Reason`, `RTPAPI.checkPermission`; `devstack/run-acceptance.ps1` ~837-846 (`Test-Gui`)
-- **Symptom / hypothesis:** The YAML reader has no nesting-depth or size cap (a deeply nested or `[[[[...` document from an import or a trusted editor apply throws `StackOverflowError`), and the writer emits PLAIN scalars verbatim (section setters already force DOUBLE). NeoForge cannot extract the bundled docs ("URI scheme is not file" from the union filesystem). On Fabric 1.21.x the GUI addon's 26.x-only renderer logs a `NoClassDefFoundError` stack trace although it is caught and skipped. New enum constants (`COORDINATE`, `ACTION`, `NO_PERMISSION`) break addons that switch over them without a default; every other 3.2.1 API change is additive (final classes with private constructors and factories, no new abstract methods). `RTPAPI.checkPermission` returns `false` before init instead of throwing (S-006 style). The GUI acceptance step copies the 26.x-only `LeafRTPGuiAddon.jar` into the 1.21.x `backend-c`/`backend-d` `mods/` folders, where Fabric Loader and FML abort the server; the stale copies were renamed `*.disabled-by-audit` on 2026-10-06.
-- **Impact:** Thread death on a pathological config; no offline docs on NeoForge; alarming log line on Fabric 1.21.x; addon compatibility caveat for the release notes; devstack runs fail on the modded backends after any GUI run.
-- **Suggested next step:** Thread a depth counter (max ~128) and a byte cap through the YAML reader; read docs through `Files`/`FileSystem` instead of `new File(uri)`; log the skipped renderer at FINE without a stack trace; mention the enum additions in the CHANGELOG; only stage the GUI jar into `mods/` for 26.x backends.
-- **Linear:** RTP-26
-
-### 2026-10-06 — Action and GUI polish: bundled definitions, hardcoded text, dead settings
-
-- **Severity:** Low
-- **Status:** Open
-- **Discovered during:** v3.3.0 pre-release audit (action and GUI addons)
-- **Location:** bundled `addons/LeafRTPActionAddon/.../actions/*.yml`; `ActionCommand.java` ~202/280/285, `ActionCancelCmd.java` ~101-158, `ActionSubCmd.java` ~59-77; `ActionManager.processWaitQueue` ~462-483; `rtp-gui-common/.../MenuIcons.java` ~116, `MenuModel.java` nav/operator labels, `GuiMenuConfig.rows()` ~107; Fabric/NeoForge `DestinationPickerMenu` filler ~96/130; `FabricMenuRenderer` ~172/184; `RTP.getTargetStatus` ~903-912 and `getAllowedTargets` ~681-723
-- **Symptom / hypothesis:**
-  - Bundled definitions: titles are `PLAYER:` commands, so non-op players never see them (`/title` needs op); `broadcast` is not a vanilla command; teams has no win condition, and the first death sets every participant back to survival.
-  - Action command failures, cancel results and raw internal reasons ("Revalidation error: ...") are hardcoded English (S-007). After a reload, renamed aliases keep pointing at the old definition; `alias: cancel` replaces the built-in subcommand; `/rtp action cancel [session_id]` is documented but not accepted. A single queued entry is never re-evaluated alone, and one player can queue twice.
-  - GUI: `textReady`/`textUnavailable` are never used (lore is hardcoded), status shows raw enum names, nav and operator labels are hardcoded, `menuRows` has no effect, a mistyped filler fills slots with compasses on Fabric/NeoForge, and Fabric logs two INFO lines per open. Buttons show READY for players locked out by `lockAfterUses` or already teleporting, and the biome page offers biomes the blacklist excludes.
-- **Impact:** Cosmetic or confusing behaviour on the features advertised for 3.3.0; no safety or security impact.
-- **Suggested next step:** Use `CONSOLE: title` and `say`/`tellraw` in the bundled files and add a team win check; move strings to `messages.yml`/`guimenu.yml` with locale parity; drop stale aliases and reserve built-in names; report lock-out in `getTargetStatus` and honour `biomeWhitelist` in `getAllowedTargets`.
-- **Linear:** RTP-25
-
 ### 2026-10-06 — Fuzz targets: unreachable paths, exception-only oracles, missing parsers
 
 - **Severity:** Low
@@ -180,28 +121,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Suggested next step:** Let the fuzzer pick the chunk coordinates (`FuzzedDataProvider`); add a prefilter target asserting the verdict is never ACCEPT on malformed data; narrow the tolerated exceptions; add targets for YAML, editor JSON and the network envelope first.
 - **Linear:** RTP-28
 
-
-### 2026-10-05 — Editor apply parser is structure-blind and has no file-count cap
-
-- **Severity:** Low
-- **Status:** Open
-- **Discovered during:** v3.3.0 pre-release audit (web editor)
-- **Location:** `rtp-core/.../commands/editor/EditorSessionManager.java` lines ~1244-1267 (`indexOf("\"files\"")`), `parseJsonStringMap`; `ApplyCmd` offline drop read
-- **Symptom / hypothesis:** The byte-store, session and offline apply paths locate `files` by substring rather than parsing the JSON root. They have no `MAX_FILES` or per-file budget (the channel path caps at 256), and the offline `editor/<token>.json` is read with no size cap. The embedded `sha256` is self-declared, so it guards only against corruption.
-- **Impact:** An admin applying a hostile token can trigger thousands of YAML parses, `.bak` writes and a reload. Path checks still hold, so there's no write outside the allow-list.
-- **Suggested next step:** Parse the root with `EditorLoopbackJson`, take `files` from the root object only, and apply the channel caps (256 files, 4 MiB) to every apply path.
-- **Linear:** RTP-30
-
-### 2026-10-05 — `trusted-editors.json` is not owner-only and concurrent writers drop entries
-
-- **Severity:** Low
-- **Status:** Open
-- **Discovered during:** v3.3.0 pre-release audit (web editor)
-- **Location:** `rtp-core/.../commands/editor/channel/TrustedEditors.java` lines ~154-184; new instance per channel in `EditorChannelWiring.trusted()`
-- **Symptom / hypothesis:** The trust file is written without `EditorKeys.restrictToOwner`, unlike the channel keys. Each open channel holds its own in-memory copy and rewrites the whole file, so the last writer wins.
-- **Impact:** On shared hosts another local account could pre-trust a browser key (defense in depth; write access to the data folder is already strong). Two concurrent sessions can erase each other's trust, which brings back the prompt.
-- **Suggested next step:** Apply `restrictToOwner` to the temp file and the target; use a process-wide instance, or reload and merge under a lock before each write.
-- **Linear:** RTP-27
 
 ### 2026-10-05 — Small lifecycle and bounds gaps from the v3.3.0 audit
 

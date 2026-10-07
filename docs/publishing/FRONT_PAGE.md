@@ -105,7 +105,7 @@ On Paper all candidate checking runs off the tick thread. On Folia, candidates a
 - [**Universal**](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-competitor-plugins-betterrtp-justrtp-ezrtp-jakesrtp): `/rtp config import` uses search-engine-style fuzzy matching and synonyms to translate configs from existing RTP plugins without touching original files.
 - [**Visual**](https://dailystruggle.github.io/RTP/admin/WEB_EDITOR_GUIDE/): Draw polygon and donut regions over real terrain via `/rtp editor`, or use the guided in-game `/rtp admin setup` wizard.
 - [**Unified**](https://dailystruggle.github.io/RTP/admin/QUICK_START/): One jar runs across Paper, Folia, Spigot, Fabric, NeoForge, and Velocity without separate builds or bridge plugins.
-- [**Scriptable**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Built-in YAML actions handle portals (`/rtp trigger`), matchmaking duels, party scatter, shrinking arenas, and claim-relative drops.
+- [**Scriptable**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Built-in YAML actions handle portals (`/rtp trigger`), PvP matchmaking duels (1v1, 2v2, teams), party scatter, shrinking arenas, and claim-relative drops.
 - [**Exploit-safe**](https://dailystruggle.github.io/RTP/admin/CLAIM_PLUGIN_COMPATIBILITY/): Fail-closed claim checks, PvP damage cancel, zero open firewall ports.
 
 Benchmark comparisons and hardware metrics are in [Performance](#performance).
@@ -117,8 +117,8 @@ Most people just want `/rtp` to work without lagging the server. Past that, thes
 - [**Spawn portals & launch pads**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): A cuboid trigger (`/rtp trigger`) over a portal frame or launch pad runs teleports with countdown holograms, sounds, and particle trails.
 - [**Group & party scatter**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): The bundled `scatter.yml` action disperses queued parties to safe spots with guaranteed spacing (`minSeparation` blocks apart).
 - [**First-join random spawn**](https://dailystruggle.github.io/RTP/admin/RECIPES/#rtp-on-first-join-random-spawn-for-new-players): Grant `rtp.onevent.firstjoin` to scatter new players across the wilderness on login; the login reserve cache keeps a destination pre-warmed so entry feels instant.
-- [**1v1 duels & arenas**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Bundled `challenge.yml` and `arena.yml` actions pair players into temporary bounded zones with countdowns, border constraints, and automatic cleanup.
-- [**Town & faction borders**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): The bundled `nearclaim.yml` action lands players safely relative to a town or claim perimeter (`anchor: claimboundary`) instead of a fixed coordinate center.
+- [**1v1 and 2v2 PvP matchmaking**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Bundled `challenge.yml`, `arena.yml`, and `teams.yml` actions queue and pair players for 1v1 duels or 2v2 squad battles into temporary bounded arenas with countdowns, border constraints, and automatic cleanup.
+- [**Near-player & claim hunting**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Bundled `nearplayer.yml` and `nearclaim.yml` actions land players safely near random players or town and claim perimeters (`anchor: entity`, `anchor: claimboundary`) without inline claim-plugin overhead.
 - [**Sky drops**](https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/): A `Fixed` vertical adjustor at Y=250+ pairs with a slow-falling potion effect for aerial parachute drops.
 
 ---
@@ -185,12 +185,25 @@ Every server has different world borders, world routing, and gameplay rules. Siz
 ### Gameplay and worlds
 
 - **Regions**: any number per world with customizable shape (Square, Circle, Rectangle, Polygon), radius, center, curve weighting, vertical bounds, world override, permission gate, and price. Vertical adjustors (Linear, Jump, Fixed) for sky islands, void worlds, aerial parachute drops, and Nether ceilings. A world's `override` key (`definitions/worlds/<name>.yml`) routes Nether or End teleports to designated safe worlds.
-- **Scripted actions and arenas**: multi-player placement and confinement defined in YAML (`definitions/actions/<name>.yml`): minimum player spacing (`minSeparation`), elevation tolerance, moving or static borders, leash radius, damage on breach, and lifecycle triggers (`onStart`, `onBoundaryViolation`, `onExpire`, `onDeath`). Vanilla scoreboards (`rtp_violations`, `rtp_time_left`, `rtp_in_bounds`) update continuously for command blocks and datapacks. Cuboid triggers (`/rtp trigger`) fire actions when players enter a portal frame, walk onto a launch pad, or cross a threshold.
 - **Arrival schematics**: drop a Sponge `.schem` named after a region into `plugins/RTP/advanced/schematics/` and every teleport into that region pastes it centered on the landing spot. Decoded in-house, no WorldEdit needed, and claim-aware.
 - **Auto-RTP on events**: join, first join, respawn, world change, move, and teleport (`rtp.onevent.*`). A login reserve cache keeps destinations ready so join-time teleports feel instantaneous.
 - **Economy**: charge per `/rtp` through Vault, per-region pricing, refund on cancel, and `rtp.free` permission bypass.
 - **PvP / combat-tag gate**: off by default; refuses or delays `/rtp` for players who recently dealt or took PvP damage. Includes built-in tracking or hooks into PvPManager, CombatLogX, or Simple Combat Log if installed.
 - **Command blocks and console**: the same unified command parser handles player, console, and command-block callers.
+
+### Action engine
+
+LeafRTP includes a declarative action engine for multi-entity, confined, and anchor-driven teleports declared in YAML (`definitions/actions/<id>.yml`). It turns random teleportation into an adventure and event system without requiring separate minigame or portal plugins.
+
+- **Physical trigger zones** (`/rtp trigger create|remove|list`): Define cuboid trigger boundaries over portal frames, launch pads, or thresholds. Stepping into the zone fires configured actions with countdown holograms, particle trails, sound stages, and combat verification.
+- **Subspace group placement**: Teleports parties, squads, or rival duelists simultaneously with guaranteed minimum spacing (`minSeparation`) and elevation tolerance (`elevationTolerance`) off-tick, eliminating suffocation, entity stacking, and chunk-generation lag spikes.
+- **Confinement and boundary enforcement**: Restricts participants to an active arena (`SUBSPACE`, `REGION`, `LEASH`, or custom `SHAPE`) with automatic pull-backs on boundary violations, session duration timers, and non-blocking disarm lifecycles.
+- **Dynamic anchor resolution**: Roots teleports dynamically: `regionQueue` (pre-warmed world queue), `entity` (near a target or random player), `nearclaim` (near town or claim perimeters without inline claim-plugin overhead), or `location` (fixed landmark or dungeon coordinates).
+- **PvP matchmaking queues**: Dedicated queueing for 1v1 duels, 2v2 squad matches, and team battles (`/rtp action <challenge|arena|teams|koth>`). Supports open matchmaking (auto-pairing any queued opponents) or targeted reciprocity (dueling a specific rival), match countdowns, and queue cancellation (`/rtp action cancel`).
+- **Lifecycle scripts and scoreboards**: Scripted console, player, and action dispatches trigger on phase events (`onEnqueue`, `onStart`, `onBoundaryViolation`, `onExpire`, `onDeath`, `onCancel`). Isolated dummy scoreboards (`rtp_violations`, `rtp_time_left`, `rtp_in_bounds`, `rtp_alive`) update continuously for vanilla `@a[scores=...]` target selectors, datapacks, and command blocks.
+- **Pre-warmed action queues**: Dedicated background candidate pools (`cacheSize`) keep multi-player placements pre-verified, so duel and event teleports dispatch instantly.
+
+Full configuration reference, schema specifications, and bundled templates: [Actions & arenas](https://dailystruggle.github.io/RTP/admin/ACTIONS/).
 
 ### Claims and safety
 
@@ -441,7 +454,8 @@ Switching between the free download and this one is a jar swap. Config, data fil
 | `/rtp world:<world>` | Teleport within a specific world | `rtp.world` / `rtp.worlds.*` |
 | `/rtp player:<name>` | Teleport another player | `rtp.other` |
 | `/rtp biome:<biome>` | Teleport to a chosen biome | `rtp.biome` / `rtp.biome.*` |
-| `/rtp action:<name> [players]` | Trigger a scripted action or arena | `rtp.action` / `rtp.action.<name>` |
+| `/rtp action <name> [player]` | Trigger a scripted action, arena, or matchmaking duel | `rtp.action` / `rtp.action.<name>` |
+| `/rtp action cancel [action]` | Leave a matchmaking queue or cancel an action entry | `rtp.action.cancel` |
 | `/rtp back` | Return to where you were before the last `/rtp` | `rtp.back` |
 | `/rtp trigger create\|remove\|list` | Cuboid triggers that fire an action on entry | `rtp.trigger` |
 | `/rtp centerx=<x> centerz=<z> radius=<r>` | One-off overrides for this call; units allowed (`radius=10km`) | `rtp.params` |
@@ -546,6 +560,9 @@ A: No, but they work well together. `/rtp scan` walks a region off-tick, verifie
 
 **Q: Iris / Terra / custom datapack generators, or a world upgraded from an older version?**
 A: Yes. Region files are read directly: modded and namespaced IDs are kept, and `/rtp biome:<x>` matches what's on disk. Plugins that use the live noise-map lookup get this wrong after a version migration. Chunks that were never populated fall back to a live load.
+
+**Q: What about the Linear (.linear) region format?**
+A: Region pre-filtering reads standard Anvil (`.mca`) files directly because 4 KiB sectors allow random-access chunk checks without decompressing whole regions or shading third-party libraries. For `.linear` or any other unsupported format, the pre-filter returns `UNKNOWN` and falls back to live chunk loading on the server engine. The reader is pluggable through `RegionFileReader` SPI for addons.
 
 **Q: I'm on NeoForge.**
 A: There's a native NeoForge adapter for 1.21.x / 26.x running the same core as every other platform. I test it less than the Bukkit family and Fabric, and broader testing on the 26.x carrier is still ongoing. If you hit something there, it goes to the front of my list.

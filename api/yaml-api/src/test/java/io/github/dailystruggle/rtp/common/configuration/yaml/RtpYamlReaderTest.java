@@ -353,4 +353,20 @@ class RtpYamlReaderTest {
         assertEquals(0, ex.column());
         assertTrue(ex.getMessage().contains("line 2"));
     }
+
+    @Test
+    @DisplayName("Deeply nested block mappings and flow sequences reject with rtpYaml.syntax.maxDepth")
+    void maxDepthRejects() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 150; i++) {
+            sb.append("  ".repeat(i)).append("k").append(i).append(":\n");
+        }
+        sb.append("  ".repeat(150)).append("v: 1\n");
+        RtpYamlParseException ex1 = assertThrows(RtpYamlParseException.class, () -> RtpYamlReader.parse(sb.toString()));
+        assertEquals("rtpYaml.syntax.maxDepth", ex1.messageKey());
+
+        String flowSeq = "[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]";
+        RtpYamlParseException ex2 = assertThrows(RtpYamlParseException.class, () -> RtpYamlReader.parse("flow: " + flowSeq));
+        assertEquals("rtpYaml.syntax.maxDepth", ex2.messageKey());
+    }
 }

@@ -348,10 +348,16 @@ subprojects {
         }
         tasks.named('check').configure { dependsOn pmdRegexMain }
         tasks.withType(Pmd).configureEach {
-            // AuxClasspathLoader treats every non-directory file as a JAR/ZIP archive. Filter out non-archives
-            // (such as POM artifacts resolved by pom-packaging dependencies) to prevent ZipException crashes.
-            classpath = files(classpath.filter { it.isDirectory() || it.name.endsWith('.jar') || it.name.endsWith('.zip') })
             if (!pmdGate && name != 'pmdRegexMain') enabled = false
+        }
+        afterEvaluate {
+            tasks.withType(Pmd).configureEach {
+                // AuxClasspathLoader treats every non-directory file as a JAR/ZIP archive. Filter out non-archives
+                // (such as POM artifacts resolved by pom-packaging dependencies) to prevent ZipException crashes.
+                if (classpath != null) {
+                    classpath = files(classpath.filter { it.isDirectory() || it.name.endsWith('.jar') || it.name.endsWith('.zip') })
+                }
+            }
         }
     }
 

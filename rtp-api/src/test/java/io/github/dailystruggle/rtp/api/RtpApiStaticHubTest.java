@@ -294,9 +294,9 @@ class RtpApiStaticHubTest {
     assertFalse(RTPAPI.checkPermission(pId, null));
     assertFalse(RTPAPI.checkPermission(pId, "  "));
 
-    // null server accessor
+    // null server accessor throws IllegalStateException per S-006 fail-closed contract
     RTPAPI.serverAccessor = null;
-    assertFalse(RTPAPI.checkPermission(pId, "perm"));
+    assertThrows(IllegalStateException.class, () -> RTPAPI.checkPermission(pId, "perm"));
 
     // with server accessor
     var mockSender = (io.github.dailystruggle.rtp.api.entity.RTPCommandSender) java.lang.reflect.Proxy.newProxyInstance(

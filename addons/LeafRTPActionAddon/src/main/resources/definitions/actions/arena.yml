@@ -64,7 +64,7 @@ lifecycle:
     - FOR_EACH:
         - CONSOLE: "gamemode adventure [player]"
         - CONSOLE: "give [player] iron_sword 1"
-        - PLAYER: "title [player] title {\"text\":\"DUEL START!\",\"color\":\"red\"}"
+        - CONSOLE: "title [player] title {\"text\":\"DUEL START!\",\"color\":\"red\"}"
         - MESSAGE: "<green><bold>Match found! Arena duel started. Fight to the death!</bold></green>"
 
   onBoundaryViolation:
@@ -76,7 +76,7 @@ lifecycle:
       run:
         - ACTION: PULL_BACK
         - FOR_EACH:
-            PLAYER: "title [violator] subtitle {\"text\":\"Stay inside the world border!\",\"color\":\"yellow\"}"
+            CONSOLE: "title [violator] subtitle {\"text\":\"Stay inside the world border!\",\"color\":\"yellow\"}"
 
     # Gate 2: Disqualification if repeatedly attempting to flee
     - gate:
@@ -84,7 +84,7 @@ lifecycle:
           objective: "rtp_violations"
           matches: ">= 2"
       run:
-        - CONSOLE: "broadcast &c[violator] fled the arena and was disqualified!"
+        - CONSOLE: "tellraw @a [{\"text\":\"[violator] fled the arena and was disqualified!\",\"color\":\"red\"}]"
         - CONSOLE: "kill [violator]"
         - ACTION: DISARM
 
@@ -96,7 +96,7 @@ lifecycle:
     - ACTION: DISARM
 
   onDeath:
-    - CONSOLE: "broadcast &6[winner] &ehas defeated &c[victim] &ein the arena!"
+    - CONSOLE: "tellraw @a [{\"text\":\"[winner] \",\"color\":\"gold\"},{\"text\":\"has defeated \",\"color\":\"yellow\"},{\"text\":\"[victim] \",\"color\":\"red\"},{\"text\":\"in the arena!\",\"color\":\"yellow\"}]"
     - CONSOLE: "give [winner] diamond 3"
     - FOR_EACH:
         - CONSOLE: "gamemode survival [player]"

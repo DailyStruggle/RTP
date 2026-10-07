@@ -48,6 +48,9 @@ import java.util.regex.Pattern;
  */
 public final class RtpYamlReader {
 
+    public static final int MAX_DEPTH = 128;
+    public static final int MAX_SOURCE_BYTES = 4 * 1024 * 1024;
+
     /** A pre-lexed source line with its indent + payload classification. */
     private static final class RawLine {
         final int lineNo;       // 1-based
@@ -87,6 +90,10 @@ public final class RtpYamlReader {
     }
 
     public static RtpYamlMapping parse(String source) {
+        if (source != null && source.length() > MAX_SOURCE_BYTES) {
+            throw new RtpYamlParseException("rtpYaml.syntax.maxSize",
+                    "YAML input exceeds maximum allowed size (max " + MAX_SOURCE_BYTES + " bytes)", 1, 0);
+        }
         // Strip a UTF-8 BOM (U+FEFF) if present at position 0. Files written
         // by PowerShell `Add-Content -Encoding utf8` (and several other
         // common Windows tools) prepend a BOM by default; without this
@@ -221,6 +228,15 @@ public final class RtpYamlReader {
      * entry.
      */
     private void parseMappingBody(RtpYamlMapping mapping, int expectedIndent) {
+        parseMappingBody(mapping, expectedIndent, 0);
+    }
+
+    private void parseMappingBody(RtpYamlMapping mapping, int expectedIndent, int depth) {
+        if (depth > MAX_DEPTH) {
+            int lineNo = pos < lines.size() ? lines.get(pos).lineNo : (lines.isEmpty() ? 1 : lines.get(lines.size() - 1).lineNo);
+            throw new RtpYamlParseException("rtpYaml.syntax.maxDepth",
+                    "maximum nesting depth exceeded (max " + MAX_DEPTH + ")", lineNo, expectedIndent);
+        }
         while (pos < lines.size()) {
             RawLine ln = lines.get(pos);
             if (ln.blank) {
@@ -274,7 +290,7 @@ public final class RtpYamlReader {
             if (afterColon.isEmpty()) {
                 // Look ahead for an indented child block; otherwise this is an
                 // empty-scalar value (null).
-                child = parseChildBlock(ln.indent);
+                child = parseChildBlock(ln.indent, depth + 1);
             } else {
                 child = parseInlineValue(afterColon, ln.lineNo, ln.indent + pk.keyLength + 2);
             }
@@ -292,7 +308,12 @@ public final class RtpYamlReader {
      * whether the child is a mapping, a sequence, or an empty scalar
      * (when the next non-blank line is at a shallower indent or EOF).
      */
-    private RtpYamlNode parseChildBlock(int parentIndent) {
+    private RtpYamlNode parseChildBlock(int parentIndent, int depth) {
+        if (depth > MAX_DEPTH) {
+            int lineNo = pos < lines.size() ? lines.get(pos).lineNo : (lines.isEmpty() ? 1 : lines.get(lines.size() - 1).lineNo);
+            throw new RtpYamlParseException("rtpYaml.syntax.maxDepth",
+                    "maximum nesting depth exceeded (max " + MAX_DEPTH + ")", lineNo, parentIndent);
+        }
         // Skip blanks/comments to peek at indent of the next content line.
         int peek = pos;
         List<String> bufferedComments = new ArrayList<>();
@@ -313,17 +334,22 @@ public final class RtpYamlReader {
         if (next.content.startsWith("- ") || next.content.equals("-")) {
             RtpYamlSequence seq = new RtpYamlSequence();
             seq.setSourcePosition(next.lineNo, next.indent);
-            parseSequenceBody(seq, next.indent);
+            parseSequenceBody(seq, next.indent, depth + 1);
             return seq;
         } else {
             RtpYamlMapping map = new RtpYamlMapping();
             map.setSourcePosition(next.lineNo, next.indent);
-            parseMappingBody(map, next.indent);
+            parseMappingBody(map, next.indent, depth + 1);
             return map;
         }
     }
 
-    private void parseSequenceBody(RtpYamlSequence seq, int expectedIndent) {
+    private void parseSequenceBody(RtpYamlSequence seq, int expectedIndent, int depth) {
+        if (depth > MAX_DEPTH) {
+            int lineNo = pos < lines.size() ? lines.get(pos).lineNo : (lines.isEmpty() ? 1 : lines.get(lines.size() - 1).lineNo);
+            throw new RtpYamlParseException("rtpYaml.syntax.maxDepth",
+                    "maximum nesting depth exceeded (max " + MAX_DEPTH + ")", lineNo, expectedIndent);
+        }
         while (pos < lines.size()) {
             RawLine ln = lines.get(pos);
             if (ln.blank) {
@@ -352,7 +378,7 @@ public final class RtpYamlReader {
             String after = ln.content.equals("-") ? "" : ln.content.substring(2);
             RtpYamlNode item;
             if (after.isEmpty()) {
-                item = parseChildBlock(ln.indent);
+                item = parseChildBlock(ln.indent, depth + 1);
             } else if (after.charAt(0) == '[') {
                 // Flow sequence item ("- [x, z]"); checked before looksLikeKey so a
                 // ':' inside the brackets is reported as a flow error, not a key.
@@ -366,14 +392,14 @@ public final class RtpYamlReader {
                 ParsedKey pk = parseKey(new RawLine(ln.lineNo, ln.indent + 2, after, false, false));
                 RtpYamlNode child;
                 if (pk.afterColon.isEmpty()) {
-                    child = parseChildBlock(ln.indent + 2);
+                    child = parseChildBlock(ln.indent + 2, depth + 1);
                 } else {
                     child = parseInlineValue(pk.afterColon, ln.lineNo, ln.indent + 2 + pk.keyLength + 2);
                 }
                 child.setSourcePosition(ln.lineNo, ln.indent + 2);
                 itemMap.put(pk.key, child);
                 // Continued mapping entries at the same indent as this item's content.
-                parseMappingBody(itemMap, ln.indent + 2);
+                parseMappingBody(itemMap, ln.indent + 2, depth + 1);
                 item = itemMap;
             } else {
                 item = parseInlineValue(after, ln.lineNo, ln.indent + 2);
@@ -512,6 +538,7 @@ public final class RtpYamlReader {
         private final int line;
         private final int column;
         private int i;
+        private int depth;
 
         FlowParser(String s, int line, int column) {
             this.s = s;
@@ -531,27 +558,35 @@ public final class RtpYamlReader {
 
         private RtpYamlSequence parseSequence() {
             int open = i++;
-            RtpYamlSequence seq = new RtpYamlSequence();
-            seq.setFlowStyle(true);
-            seq.setSourcePosition(line, column + open);
-            skipWs();
-            if (i < s.length() && s.charAt(i) == ']') { i++; return seq; }
-            while (true) {
+            if (++depth > MAX_DEPTH) {
+                throw error("rtpYaml.syntax.maxDepth",
+                        "maximum nesting depth exceeded (max " + MAX_DEPTH + ")", open);
+            }
+            try {
+                RtpYamlSequence seq = new RtpYamlSequence();
+                seq.setFlowStyle(true);
+                seq.setSourcePosition(line, column + open);
                 skipWs();
-                if (i >= s.length()) throw unterminated(open);
-                seq.add(parseItem());
-                skipWs();
-                if (i >= s.length()) throw unterminated(open);
-                char c = s.charAt(i);
-                if (c == ']') { i++; return seq; }
-                if (c != ',') {
-                    throw error("rtpYaml.syntax.flowSeq",
-                            "expected ',' or ']' in flow sequence", i);
-                }
-                i++;
-                skipWs();
-                // Trailing comma before the close is legal YAML.
                 if (i < s.length() && s.charAt(i) == ']') { i++; return seq; }
+                while (true) {
+                    skipWs();
+                    if (i >= s.length()) throw unterminated(open);
+                    seq.add(parseItem());
+                    skipWs();
+                    if (i >= s.length()) throw unterminated(open);
+                    char c = s.charAt(i);
+                    if (c == ']') { i++; return seq; }
+                    if (c != ',') {
+                        throw error("rtpYaml.syntax.flowSeq",
+                                "expected ',' or ']' in flow sequence", i);
+                    }
+                    i++;
+                    skipWs();
+                    // Trailing comma before the close is legal YAML.
+                    if (i < s.length() && s.charAt(i) == ']') { i++; return seq; }
+                }
+            } finally {
+                depth--;
             }
         }
 

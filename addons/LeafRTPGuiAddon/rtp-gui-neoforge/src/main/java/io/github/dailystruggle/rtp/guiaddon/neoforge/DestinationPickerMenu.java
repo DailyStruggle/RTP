@@ -78,7 +78,7 @@ final class DestinationPickerMenu extends ChestMenu {
     for (Map.Entry<Integer, MenuEntry> placed : layout.slotEntries().entrySet()) {
       MenuEntry entry = placed.getValue();
       container.setItem(placed.getKey(), icon(entry.iconName(), entry.displayName(),
-          MenuIcons.entryLore(entry)));
+          MenuIcons.entryLore(entry, model.readyText(), model.unavailableText())));
     }
 
     if (layout.hasDashboard()) {
@@ -96,7 +96,7 @@ final class DestinationPickerMenu extends ChestMenu {
     if (fillerName == null || fillerName.isBlank()) {
       return;
     }
-    Item fillerItem = resolveItem(fillerName);
+    Item fillerItem = resolveFillerItem(fillerName);
     if (fillerItem == Items.AIR) {
       return;
     }
@@ -107,6 +107,17 @@ final class DestinationPickerMenu extends ChestMenu {
         container.setItem(i, pane);
       }
     }
+  }
+
+  private static Item resolveFillerItem(String materialName) {
+    if (materialName == null || materialName.isBlank() || materialName.equalsIgnoreCase("AIR")) {
+      return Items.AIR;
+    }
+    Identifier id = Identifier.tryParse(materialName.trim().toLowerCase(Locale.ROOT));
+    if (id == null) {
+      return Items.AIR;
+    }
+    return BuiltInRegistries.ITEM.getOptional(id).orElse(Items.AIR);
   }
 
   private static ItemStack icon(String materialName, String displayName, List<String> lore) {
