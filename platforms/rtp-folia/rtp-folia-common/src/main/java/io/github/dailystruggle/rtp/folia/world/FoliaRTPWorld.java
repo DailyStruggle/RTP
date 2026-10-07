@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
+import io.github.dailystruggle.rtp.bukkitplatform.world.BukkitMaterialResolver;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
@@ -926,14 +927,12 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
       int depth = safety.getNumber(SafetyKeys.platformDepth, 0).intValue();
       // ADR-060: optional block-restoration timeout (-1 disables, skips capture).
       final int restoreSeconds = safety.getNumber(SafetyKeys.platformRestoreSeconds, -1).intValue();
-      final Material materialFinal;
-      Material material;
-      try {
-        material = Material.valueOf(safety.getConfigValue(SafetyKeys.platformMaterial, "GLASS").toString().toUpperCase());
-      } catch (IllegalArgumentException e) {
-        material = Material.GLASS;
-      }
-      materialFinal = material;
+      Object rawMat = safety.getConfigValue(SafetyKeys.platformMaterial, "GLASS");
+      final Material materialFinal = BukkitMaterialResolver.resolve(
+          rawMat != null ? rawMat.toString() : "GLASS",
+          Material.GLASS,
+          "Platform material"
+      );
 
       final int lx = location.getBlockX();
       final int ly = location.getBlockY();

@@ -89,6 +89,8 @@
       transition: background 0.15s, border-color 0.15s;
     }
     .btn:hover { border-color: var(--accent); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; border-color: var(--overlay); }
+    .btn:disabled:hover { border-color: var(--overlay); }
     .btn-primary { background: var(--green); color: var(--dark); border: none; }
     .btn-primary:hover { opacity: 0.9; }
     #workspace { flex: 1; display: flex; overflow: hidden; position: relative; }
@@ -435,6 +437,95 @@
       box-sizing: border-box;
       white-space: pre;
     }
+    #cfg-textarea-mirror {
+      position: absolute;
+      top: 0;
+      left: 58px;
+      visibility: hidden;
+      pointer-events: none;
+      white-space: pre;
+      word-wrap: normal;
+      overflow: hidden;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      padding: 18px;
+      box-sizing: border-box;
+      z-index: -9999;
+    }
+    #cfg-autocomplete-popup {
+      position: absolute;
+      z-index: 100;
+      min-width: 220px;
+      max-width: 380px;
+      max-height: 220px;
+      background: #181825;
+      border: 1px solid var(--overlay);
+      border-radius: 6px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+      overflow-y: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.83rem;
+      color: var(--text);
+    }
+    .cfg-ac-item {
+      display: flex;
+      align-items: center;
+      padding: 6px 10px;
+      cursor: pointer;
+      gap: 8px;
+      user-select: none;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+    .cfg-ac-item:last-child {
+      border-bottom: none;
+    }
+    .cfg-ac-item:hover, .cfg-ac-item.active {
+      background: rgba(137, 180, 250, 0.16);
+      color: var(--accent);
+    }
+    .cfg-ac-icon {
+      font-size: 0.8rem;
+      width: 16px;
+      text-align: center;
+      color: var(--subtext);
+      flex-shrink: 0;
+    }
+    .cfg-ac-item.active .cfg-ac-icon {
+      color: var(--accent);
+    }
+    .cfg-ac-label {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .cfg-ac-badge {
+      font-size: 0.68rem;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: var(--overlay);
+      color: var(--subtext);
+      opacity: 0.85;
+      flex-shrink: 0;
+    }
+    .cfg-quick-fix-btn {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 1px 6px;
+      font-size: 0.72rem;
+      border-radius: 4px;
+      background: rgba(166, 227, 161, 0.15);
+      border: 1px solid rgba(166, 227, 161, 0.4);
+      color: var(--green);
+      cursor: pointer;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      transition: background 0.1s ease;
+    }
+    .cfg-quick-fix-btn:hover {
+      background: rgba(166, 227, 161, 0.3);
+      color: #fff;
+    }
     #config-doc-tracker {
       width: 380px;
       background: #14141e;
@@ -728,6 +819,8 @@
   <div class="nav-actions">
     <button class="btn" style="border-color:var(--accent); color:var(--accent);" onclick="openSearchModal()">⌖ Quick Find <kbd style="font-size:0.7rem; background:rgba(255,255,255,0.1); padding:1px 4px; border-radius:3px;">Ctrl+K</kbd></button>
     <button class="btn" onclick="exportPng()">📷 Snapshot</button>
+    <button id="btn-undo" class="btn" onclick="EditorHistoryManager.undo()" disabled title="Undo (Ctrl+Z)">↶ Undo <kbd style="font-size:0.7rem; background:rgba(255,255,255,0.1); padding:1px 4px; border-radius:3px;">Ctrl+Z</kbd></button>
+    <button id="btn-redo" class="btn" onclick="EditorHistoryManager.redo()" disabled title="Redo (Ctrl+Y)">↷ Redo <kbd style="font-size:0.7rem; background:rgba(255,255,255,0.1); padding:1px 4px; border-radius:3px;">Ctrl+Y</kbd></button>
     <button class="btn" onclick="resetStaging()">↺ Revert</button>
     <button class="btn btn-primary" onclick="commitChanges()">⚡ Commit / Apply</button>
   </div>
@@ -1163,6 +1256,8 @@
       <div id="cfg-editor-wrap">
         <div id="cfg-gutter">1</div>
         <textarea id="cfg-editor" class="code-editor" spellcheck="false"></textarea>
+        <div id="cfg-textarea-mirror" aria-hidden="true"></div>
+        <div id="cfg-autocomplete-popup" role="listbox" style="display:none;"></div>
         <div id="cfg-unit-chip" class="cfg-unit-chip" style="display:none;"></div>
       </div>
       <aside id="config-doc-tracker" style="overflow-y:auto; max-height:calc(100vh - 120px);">
@@ -1344,6 +1439,192 @@ function blankRegionProfile(name) {
 
 let regionProfiles = { default: blankRegionProfile('default') };
 let regionState = regionProfiles.default;
+
+const initialRegionSnapshots = {};
+
+function cloneRegionSnapshot(state) {
+  if (!state) return null;
+  return {
+    name: state.name || (typeof regionState !== 'undefined' && regionState ? regionState.name : 'default'),
+    shape: state.shape || '',
+    settings: Object.assign({}, state.settings || {}),
+    vertices: Array.isArray(state.vertices) ? state.vertices.map(v => [Number(v[0]), Number(v[1])]) : []
+  };
+}
+
+function recordInitialRegionSnapshot(profile) {
+  if (!profile || !profile.name) return;
+  if (!initialRegionSnapshots[profile.name]) {
+    initialRegionSnapshots[profile.name] = cloneRegionSnapshot(profile);
+  }
+}
+recordInitialRegionSnapshot(regionProfiles.default);
+
+function updateHistoryToolbarUI() {
+  if (typeof document === 'undefined' || !document || typeof document.getElementById !== 'function') return;
+  const undoBtn = document.getElementById('btn-undo');
+  if (undoBtn) {
+    const can = typeof EditorHistoryManager !== 'undefined' && EditorHistoryManager.canUndo();
+    undoBtn.disabled = !can;
+    const desc = (typeof EditorHistoryManager !== 'undefined' && EditorHistoryManager.getUndoDesc()) || '';
+    undoBtn.title = can ? (desc ? `Undo: ${desc} (Ctrl+Z)` : 'Undo (Ctrl+Z)') : 'Undo (Ctrl+Z)';
+  }
+  const redoBtn = document.getElementById('btn-redo');
+  if (redoBtn) {
+    const can = typeof EditorHistoryManager !== 'undefined' && EditorHistoryManager.canRedo();
+    redoBtn.disabled = !can;
+    const desc = (typeof EditorHistoryManager !== 'undefined' && EditorHistoryManager.getRedoDesc()) || '';
+    redoBtn.title = can ? (desc ? `Redo: ${desc} (Ctrl+Y)` : 'Redo (Ctrl+Y)') : 'Redo (Ctrl+Y)';
+  }
+}
+
+function applyHistorySnapshot(snapshot) {
+  if (!snapshot) return;
+  const regionName = snapshot.name || (typeof regionState !== 'undefined' && regionState ? regionState.name : 'default');
+  let profile = (typeof regionProfiles !== 'undefined' && regionProfiles) ? regionProfiles[regionName] : null;
+  if (!profile && typeof regionState !== 'undefined' && regionState) {
+    profile = regionState;
+  }
+  if (profile) {
+    profile.shape = snapshot.shape;
+    profile.settings = Object.assign({}, snapshot.settings || {});
+    profile.vertices = Array.isArray(snapshot.vertices) ? snapshot.vertices.map(v => [Number(v[0]), Number(v[1])]) : [];
+  }
+  if (typeof regionState !== 'undefined' && regionState && regionState.name !== regionName && typeof changeRegionProfile === 'function' && typeof regionProfiles !== 'undefined' && regionProfiles && regionProfiles[regionName]) {
+    changeRegionProfile(regionName);
+  }
+  if (typeof document !== 'undefined' && document && typeof document.getElementById === 'function') {
+    const hudShape = document.getElementById('hud-shape');
+    if (hudShape && typeof regionState !== 'undefined' && regionState) hudShape.textContent = regionState.shape || '-';
+  }
+  const current = typeof regionState !== 'undefined' && regionState ? regionState : profile;
+  if (typeof populateShapeSelect === 'function' && current) populateShapeSelect(current.shape);
+  if (typeof syncShapeSpecificControls === 'function' && current) syncShapeSpecificControls(current);
+  if (typeof renderShapeSettingsForm === 'function' && current) renderShapeSettingsForm(current);
+  if (typeof renderPolygonVerticesList === 'function') renderPolygonVerticesList();
+  if (typeof syncPolygonAABB === 'function') syncPolygonAABB();
+  if (typeof drawMap === 'function') drawMap();
+  if (typeof stageRegionGeometry === 'function' && current) stageRegionGeometry(current);
+  if (typeof updateStagingDiff === 'function') updateStagingDiff();
+}
+
+const HistoryEntry = class {
+  constructor(desc, regionName, before, after) {
+    this.desc = desc || 'Action';
+    this.regionName = regionName || 'default';
+    this.before = before;
+    this.after = after;
+    this.timestamp = Date.now();
+  }
+};
+
+const EditorHistoryManager = (() => {
+  let maxStack = 50;
+  const undoStack = [];
+  const redoStack = [];
+  let pendingGestureStart = null;
+
+  function beginGesture(desc, state) {
+    const s = state || (typeof regionState !== 'undefined' ? regionState : null);
+    if (!s) return;
+    pendingGestureStart = {
+      desc: desc || 'Edit',
+      regionName: s.name || (typeof regionState !== 'undefined' && regionState ? regionState.name : 'default'),
+      before: cloneRegionSnapshot(s)
+    };
+  }
+
+  function commitGesture(state) {
+    if (!pendingGestureStart) return;
+    const { desc, regionName, before } = pendingGestureStart;
+    pendingGestureStart = null;
+    const s = state || ((typeof regionProfiles !== 'undefined' && regionProfiles && regionProfiles[regionName]) ? regionProfiles[regionName] : (typeof regionState !== 'undefined' ? regionState : null));
+    const after = cloneRegionSnapshot(s);
+    if (!after || JSON.stringify(before) === JSON.stringify(after)) return;
+    push(new HistoryEntry(desc, regionName, before, after));
+  }
+
+  function cancelGesture() {
+    pendingGestureStart = null;
+  }
+
+  function push(entry) {
+    if (!entry || !entry.before || !entry.after) return;
+    if (JSON.stringify(entry.before) === JSON.stringify(entry.after)) return;
+    undoStack.push(entry);
+    while (undoStack.length > maxStack) undoStack.shift();
+    redoStack.length = 0;
+    updateHistoryToolbarUI();
+  }
+
+  function undo() {
+    if (undoStack.length === 0) return false;
+    const entry = undoStack.pop();
+    redoStack.push(entry);
+    applyHistorySnapshot(entry.before);
+    updateHistoryToolbarUI();
+    return true;
+  }
+
+  function redo() {
+    if (redoStack.length === 0) return false;
+    const entry = redoStack.pop();
+    undoStack.push(entry);
+    applyHistorySnapshot(entry.after);
+    updateHistoryToolbarUI();
+    return true;
+  }
+
+  function clear() {
+    undoStack.length = 0;
+    redoStack.length = 0;
+    pendingGestureStart = null;
+    updateHistoryToolbarUI();
+  }
+
+  function setMaxStack(depth) {
+    maxStack = Math.max(1, depth);
+    while (undoStack.length > maxStack) undoStack.shift();
+  }
+
+  function getMaxStack() {
+    return maxStack;
+  }
+
+  function canUndo() {
+    return undoStack.length > 0;
+  }
+
+  function canRedo() {
+    return redoStack.length > 0;
+  }
+
+  function getUndoDesc() {
+    return undoStack.length > 0 ? undoStack[undoStack.length - 1].desc : '';
+  }
+
+  function getRedoDesc() {
+    return redoStack.length > 0 ? redoStack[redoStack.length - 1].desc : '';
+  }
+
+  return {
+    beginGesture,
+    commitGesture,
+    cancelGesture,
+    push,
+    undo,
+    redo,
+    clear,
+    setMaxStack,
+    getMaxStack,
+    canUndo,
+    canRedo,
+    getUndoDesc,
+    getRedoDesc,
+    get undoStack() { return undoStack; },
+    get redoStack() { return redoStack; }
+  };
+})();
 
 let canvasZoom = 1.0;
 let canvasPanX = 0;
@@ -2020,7 +2301,7 @@ function shippedBlockKeys(kind) {
  */
 function diagnoseYaml(file, text) {
   const issues = [];
-  const add = (line, severity, msg) => issues.push({ line, severity, msg });
+  const add = (line, severity, msg, fix = null) => issues.push({ line, severity, msg, ...(fix ? { fix } : {}) });
   const recs = parseYamlLines(text);
   const shipped = shippedConfigs[file];
   const shippedRecs = typeof shipped === 'string' ? parseYamlLines(shipped) : [];
@@ -2072,10 +2353,33 @@ function diagnoseYaml(file, text) {
       const source = (ann.source || '').toLowerCase();
       const regKind = (r.key === 'name' && (parent === 'shape' || parent === 'vert')) ? parent
         : (source === 'shape' || source === 'vert') ? source : null;
-      if (regKind && r.value && !r.value.startsWith('@') && registryNames(regKind).length > 0 && !registryHas(regKind, r.value)) {
-        const names = registryNames(regKind);
-        add(r.line, 'error', `Unknown ${REGISTRY_LABEL[regKind]} '${r.value}' (registered: ${names.slice(0, 14).join(', ')}${names.length > 14 ? ', ...' : ''})`);
-        continue;
+      if (regKind && r.value && !r.value.startsWith('@')) {
+        const names = registryNames(regKind).length > 0
+          ? registryNames(regKind)
+          : (regKind === 'shape' ? getAvailableShapeNames() : getAvailableVertNames());
+        if (names.length > 0 && !names.some(n => n.toUpperCase() === r.value.toUpperCase())) {
+          const valUpper = r.value.toUpperCase();
+          let bestCandidate = null;
+          let bestDist = Infinity;
+          for (const name of names) {
+            const dist = computeLevenshtein(valUpper, name.toUpperCase());
+            if (dist < bestDist) {
+              bestDist = dist;
+              bestCandidate = name;
+            }
+          }
+          if (bestCandidate && bestDist <= 2) {
+            add(r.line, 'warning', `Unrecognized ${REGISTRY_LABEL[regKind] || regKind} '${r.value}'. Did you mean '${bestCandidate}'?`, {
+              label: `Replace with '${bestCandidate}'`,
+              line: r.line,
+              original: r.value,
+              replacement: bestCandidate
+            });
+          } else {
+            add(r.line, 'error', `Unknown ${REGISTRY_LABEL[regKind] || regKind} '${r.value}' (registered: ${names.slice(0, 14).join(', ')}${names.length > 14 ? ', ...' : ''})`);
+          }
+          continue;
+        }
       }
     }
 
@@ -2087,7 +2391,26 @@ function diagnoseYaml(file, text) {
       if (ann.options && (type === 'enum' || type === 'list<enum>')) {
         const opts = parseAnnotationList(ann.options);
         if (opts.length && !opts.some(o => o.toLowerCase() === v.toLowerCase())) {
-          add(r.line, 'error', `'${v}' is not one of: ${opts.join(', ')}`);
+          const valUpper = v.toUpperCase();
+          let bestCandidate = null;
+          let bestDist = Infinity;
+          for (const opt of opts) {
+            const dist = computeLevenshtein(valUpper, opt.toUpperCase());
+            if (dist < bestDist) {
+              bestDist = dist;
+              bestCandidate = opt;
+            }
+          }
+          if (bestCandidate && bestDist <= 2) {
+            add(r.line, 'warning', `Unrecognized option '${v}'. Did you mean '${bestCandidate}'?`, {
+              label: `Replace with '${bestCandidate}'`,
+              line: r.line,
+              original: v,
+              replacement: bestCandidate
+            });
+          } else {
+            add(r.line, 'error', `'${v}' is not one of: ${opts.join(', ')}`);
+          }
           continue;
         }
       }
@@ -2133,6 +2456,34 @@ function collectSchemaIssues() {
   return out;
 }
 
+function applyDiagnosticFix(fix) {
+  if (!fix || !cfgEditor) return;
+  const text = cfgEditor.value || '';
+  const lines = text.split(/\r?\n/);
+  const lineIdx = fix.line - 1;
+  if (lineIdx < 0 || lineIdx >= lines.length) return;
+
+  const line = lines[lineIdx];
+  let replacedLine = line;
+  if (line.includes(fix.original)) {
+    replacedLine = line.replace(fix.original, fix.replacement);
+  } else {
+    const re = new RegExp(fix.original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    replacedLine = line.replace(re, fix.replacement);
+  }
+
+  lines[lineIdx] = replacedLine;
+  cfgEditor.value = lines.join('\n');
+  if (currentConfigFile) configs[currentConfigFile] = cfgEditor.value;
+
+  const editedRegion = regionNameOfFile(currentConfigFile);
+  if (editedRegion) applyYamlGeometry(editedRegion, cfgEditor.value);
+  trackCurrentConfigLine();
+  updateGutterAndDiagnostics();
+  if (currentConfigFile) updateStagingDiff();
+  cfgEditor.focus();
+}
+
 let configIssues = [];
 let gutterSig = '';
 function updateGutterAndDiagnostics() {
@@ -2144,10 +2495,11 @@ function updateGutterAndDiagnostics() {
   const byLine = new Map();
   for (const is of configIssues) {
     const cur = byLine.get(is.line);
-    if (!cur) byLine.set(is.line, { severity: is.severity, msgs: [is.msg] });
+    if (!cur) byLine.set(is.line, { severity: is.severity, msgs: [is.msg], fix: is.fix || null });
     else {
       cur.msgs.push(is.msg);
       if (is.severity === 'error') cur.severity = 'error';
+      if (!cur.fix && is.fix) cur.fix = is.fix;
     }
   }
   // A spacer as tall as the editor's horizontal scrollbar keeps the numbers aligned at the bottom
@@ -2158,17 +2510,24 @@ function updateGutterAndDiagnostics() {
     const parts = new Array(total);
     for (let i = 1; i <= total; i++) {
       const d = byLine.get(i);
+      const fixIcon = (d && d.fix) ? ' ✎' : '';
       parts[i - 1] = d
-        ? `<div class="gutter-${d.severity === 'error' ? 'err' : 'warn'}" title="${escapeHtml(d.msgs.join('\n'))}">${d.severity === 'error' ? '⛔' : '⚠'} ${i}</div>`
+        ? `<div class="gutter-${d.severity === 'error' ? 'err' : 'warn'}" style="cursor:pointer;" data-gutter-line="${i}" title="${escapeHtml(d.msgs.join('\n')) + (d.fix ? '\n[Click to inspect Quick Fix]' : '')}">${d.severity === 'error' ? '⛔' : '⚠'}${fixIcon} ${i}</div>`
         : `<div>${i}</div>`;
     }
     gutter.innerHTML = parts.join('') + `<div style="height:${hbar}px"></div>`;
+    gutter.querySelectorAll('[data-gutter-line]').forEach(el => {
+      el.addEventListener('click', () => {
+        const lineNo = parseInt(el.getAttribute('data-gutter-line'), 10);
+        focusEditorLine(lineNo);
+      });
+    });
   }
   gutter.scrollTop = cfgEditor.scrollTop;
   renderConfigIssueList();
 }
 
-// Issue list in the doc tracker; each entry moves the cursor to its line
+// Issue list in the doc tracker; each entry moves the cursor to its line or applies a quick fix
 function renderConfigIssueList() {
   const box = document.getElementById('cfg-issues-box');
   if (!box) return;
@@ -2180,8 +2539,22 @@ function renderConfigIssueList() {
   const errs = configIssues.filter(x => x.severity === 'error').length;
   box.style.display = 'block';
   box.innerHTML = `<div style="font-weight:600; color:${errs ? 'var(--red)' : 'var(--yellow)'}; margin-bottom:4px;">${errs} error(s), ${configIssues.length - errs} warning(s)</div>`
-    + configIssues.slice(0, 40).map(x => `<div class="cfg-issue" data-line="${x.line}" style="cursor:pointer; color:${x.severity === 'error' ? 'var(--red)' : 'var(--yellow)'};">L${x.line}: ${escapeHtml(x.msg)}</div>`).join('');
-  box.querySelectorAll('.cfg-issue').forEach(el => el.addEventListener('click', () => focusEditorLine(parseInt(el.getAttribute('data-line'), 10))));
+    + configIssues.slice(0, 40).map((x, idx) => {
+        const fixBtn = x.fix ? `<button class="cfg-quick-fix-btn" data-fix-idx="${idx}" title="${escapeHtml(x.fix.label)}">⚡ Fix</button>` : '';
+        return `<div class="cfg-issue" data-line="${x.line}" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:3px; color:${x.severity === 'error' ? 'var(--red)' : 'var(--yellow)'};"><span class="cfg-issue-text" style="cursor:pointer; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">L${x.line}: ${escapeHtml(x.msg)}</span>${fixBtn}</div>`;
+      }).join('');
+  box.querySelectorAll('.cfg-issue-text').forEach(el => {
+    el.addEventListener('click', () => focusEditorLine(parseInt(el.parentElement.getAttribute('data-line'), 10)));
+  });
+  box.querySelectorAll('.cfg-quick-fix-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.getAttribute('data-fix-idx'), 10);
+      if (configIssues[idx] && configIssues[idx].fix) {
+        applyDiagnosticFix(configIssues[idx].fix);
+      }
+    });
+  });
 }
 
 // Number + spatial unit value of a raw YAML line ("  radius: 256c # note"), with its char span.
@@ -2426,6 +2799,7 @@ cfgEditor.addEventListener('scroll', () => {
 let cfgInputTimer = null;
 cfgEditor.addEventListener('input', () => {
   if (currentConfigFile) configs[currentConfigFile] = cfgEditor.value;
+  checkAndTriggerAutocomplete(false);
   clearTimeout(cfgInputTimer);
   cfgInputTimer = setTimeout(() => {
     cfgInputTimer = null;
@@ -2442,6 +2816,455 @@ cfgEditor.addEventListener('keyup', () => {
   if (!cfgInputTimer) trackCurrentConfigLine();
 });
 cfgEditor.addEventListener('click', trackCurrentConfigLine);
+
+// ---------------------------------------------------------------------------
+// Web IDE Autocomplete & Caret Tracking Subsystem (ADR-104 / Tri-State Model)
+// ---------------------------------------------------------------------------
+let acVisible = false;
+let acItems = [];
+let acSelectedIndex = 0;
+let currentAcContext = null;
+
+function getAvailableShapeNames() {
+  const reg = registryNames('shape');
+  if (reg && reg.length > 0) return reg;
+  return ['CIRCLE', 'SQUARE', 'RECTANGLE', 'POLYGON'];
+}
+
+function getAvailableVertNames() {
+  const reg = registryNames('vert');
+  if (reg && reg.length > 0) return reg;
+  return ['LINEAR', 'JUMP'];
+}
+
+function hideAutocomplete() {
+  const popup = document.getElementById('cfg-autocomplete-popup');
+  if (popup) popup.style.display = 'none';
+  acVisible = false;
+  acItems = [];
+  acSelectedIndex = 0;
+  currentAcContext = null;
+}
+
+function calculateCaretPixelPosition() {
+  const mirror = document.getElementById('cfg-textarea-mirror');
+  if (!mirror || !cfgEditor) return { x: 0, y: 0 };
+
+  const text = cfgEditor.value || '';
+  const cursorPos = cfgEditor.selectionStart || 0;
+  const textBefore = text.substring(0, cursorPos);
+
+  const style = window.getComputedStyle(cfgEditor);
+  mirror.style.width = cfgEditor.clientWidth + 'px';
+  mirror.style.fontFamily = style.fontFamily;
+  mirror.style.fontSize = style.fontSize;
+  mirror.style.lineHeight = style.lineHeight;
+  mirror.style.padding = style.padding;
+  mirror.style.boxSizing = style.boxSizing;
+
+  mirror.textContent = textBefore;
+  const marker = document.createElement('span');
+  marker.textContent = '|';
+  mirror.appendChild(marker);
+
+  const rect = cfgEditor.getBoundingClientRect();
+  const wrap = document.getElementById('cfg-editor-wrap');
+  const wrapRect = wrap ? wrap.getBoundingClientRect() : { left: 0, top: 0, width: 800, height: 600 };
+
+  const editorOffsetLeft = rect.left - wrapRect.left;
+  const editorOffsetTop = rect.top - wrapRect.top;
+
+  const x = editorOffsetLeft + marker.offsetLeft - cfgEditor.scrollLeft;
+  const y = editorOffsetTop + marker.offsetTop - cfgEditor.scrollTop;
+
+  return { x, y };
+}
+
+function getAutocompleteContext() {
+  if (!cfgEditor) return null;
+  const text = cfgEditor.value || '';
+  const pos = cfgEditor.selectionStart || 0;
+  const lineStart = text.lastIndexOf('\n', pos - 1) + 1;
+  const lineText = text.substring(lineStart, pos);
+
+  // Skip comment lines
+  if (lineText.trim().startsWith('#')) return null;
+
+  const colonIdx = lineText.indexOf(':');
+  const indent = lineText.length - lineText.trimStart().length;
+
+  // Determine parent hierarchy by parsing previous non-comment lines
+  const lines = text.substring(0, pos).split('\n');
+  const currentLineIdx = lines.length - 1;
+  const parentStack = [];
+  for (let i = 0; i < currentLineIdx; i++) {
+    const l = lines[i];
+    const lt = l.trim();
+    if (!lt || lt.startsWith('#')) continue;
+    const lIndent = l.length - l.trimStart().length;
+    const m = lt.match(/^([a-zA-Z0-9_.-]+)\s*:/);
+    if (m) {
+      while (parentStack.length > 0 && parentStack[parentStack.length - 1].indent >= lIndent) {
+        parentStack.pop();
+      }
+      parentStack.push({ indent: lIndent, key: m[1] });
+    }
+  }
+  while (parentStack.length > 0 && parentStack[parentStack.length - 1].indent >= indent) {
+    parentStack.pop();
+  }
+  const parentPath = parentStack.map(p => p.key);
+  const immediateParent = parentPath.length > 0 ? parentPath[parentPath.length - 1] : null;
+
+  if (colonIdx === -1 || pos <= lineStart + colonIdx) {
+    // Mode: KEY completion
+    const keyMatch = lineText.match(/([a-zA-Z0-9_.-]*)$/);
+    const token = keyMatch ? keyMatch[1] : '';
+    const replaceStart = pos - token.length;
+    const replaceEnd = pos;
+
+    return {
+      mode: 'key',
+      token,
+      replaceStart,
+      replaceEnd,
+      indent,
+      immediateParent,
+      parentPath
+    };
+  } else {
+    // Mode: VALUE completion
+    const keyPart = lineText.substring(0, colonIdx).trim();
+    const valPart = lineText.substring(colonIdx + 1);
+    const valMatch = valPart.match(/([a-zA-Z0-9_.-@]*)$/);
+    const token = valMatch ? valMatch[1] : '';
+    const replaceStart = pos - token.length;
+    const replaceEnd = pos;
+
+    return {
+      mode: 'value',
+      key: keyPart,
+      token,
+      replaceStart,
+      replaceEnd,
+      indent,
+      immediateParent,
+      parentPath
+    };
+  }
+}
+
+function collectAutocompleteCandidates(ctx) {
+  if (!ctx) return [];
+  const candidates = [];
+
+  if (ctx.mode === 'key') {
+    if (ctx.immediateParent === 'shape') {
+      let activeShape = null;
+      const text = cfgEditor.value || '';
+      const lines = text.split('\n');
+      const curLineIdx = text.substring(0, ctx.replaceStart).split('\n').length - 1;
+      for (let i = curLineIdx; i >= 0; i--) {
+        const l = lines[i];
+        if (l.trim().startsWith('shape:')) break;
+        const m = l.match(/^\s*name:\s*([a-zA-Z0-9_.-]+)/i);
+        if (m) { activeShape = m[1].toUpperCase(); break; }
+      }
+      if (!activeShape) {
+        for (let i = curLineIdx; i < Math.min(lines.length, curLineIdx + 10); i++) {
+          const l = lines[i];
+          const m = l.match(/^\s*name:\s*([a-zA-Z0-9_.-]+)/i);
+          if (m) { activeShape = m[1].toUpperCase(); break; }
+        }
+      }
+
+      const pKeys = activeShape ? registryKeys('shape', activeShape) : null;
+      const knownKeys = new Set(['name']);
+      if (pKeys) pKeys.forEach(k => knownKeys.add(k));
+      else {
+        ['name', 'radius', 'centerRadius', 'center_radius', 'minRadius', 'min_radius', 'weight', 'expand'].forEach(k => knownKeys.add(k));
+        const shippedKeys = shippedBlockKeys('shape');
+        if (shippedKeys) shippedKeys.forEach(k => knownKeys.add(k));
+      }
+
+      knownKeys.forEach(k => {
+        candidates.push({ label: k + ':', insertText: k + ': ', type: 'property', icon: '⚙', badge: 'shape' });
+      });
+    } else if (ctx.immediateParent === 'vert') {
+      const knownKeys = new Set(['name']);
+      const shippedKeys = shippedBlockKeys('vert');
+      if (shippedKeys) shippedKeys.forEach(k => knownKeys.add(k));
+      else ['name', 'step', 'requireSkyLight'].forEach(k => knownKeys.add(k));
+      knownKeys.forEach(k => {
+        candidates.push({ label: k + ':', insertText: k + ': ', type: 'property', icon: '⚙', badge: 'vert' });
+      });
+    } else {
+      const shipped = shippedConfigs[currentConfigFile];
+      if (shipped) {
+        const shippedRecs = parseYamlLines(shipped);
+        const set = new Set();
+        shippedRecs.forEach(r => {
+          if (ctx.indent === 0 && r.indent === 0 && r.key) set.add(r.key);
+          else if (ctx.immediateParent && r.path[r.path.length - 1] === ctx.immediateParent && r.key) set.add(r.key);
+        });
+        set.forEach(k => {
+          candidates.push({ label: k + ':', insertText: k + ': ', type: 'property', icon: '⌖', badge: 'config' });
+        });
+      }
+      if (candidates.length === 0 && ctx.indent === 0) {
+        ['region', 'regions', 'defaults', 'safety', 'teleportDelay', 'cancelOnMove', 'price', 'logging'].forEach(k => {
+          candidates.push({ label: k + ':', insertText: k + ': ', type: 'property', icon: '⌖', badge: 'config' });
+        });
+      }
+    }
+  } else if (ctx.mode === 'value') {
+    const k = ctx.key.toLowerCase();
+
+    if (k === 'name' && ctx.immediateParent === 'shape') {
+      getAvailableShapeNames().forEach(s => {
+        candidates.push({ label: s, insertText: s, type: 'shape', icon: '⬡', badge: 'shape' });
+      });
+    } else if (k === 'name' && ctx.immediateParent === 'vert') {
+      getAvailableVertNames().forEach(v => {
+        candidates.push({ label: v, insertText: v, type: 'adjustor', icon: '⇅', badge: 'adjustor' });
+      });
+    } else if (k === 'boundary') {
+      ['SUBSPACE', 'REGION', 'LEASH', 'SHAPE', 'NONE'].forEach(b => {
+        candidates.push({ label: b, insertText: b, type: 'enum', icon: '◈', badge: 'boundary' });
+      });
+    } else if (k === 'type') {
+      ['STRING', 'NUMBER', 'PLAYER', 'COORDINATE', 'BOOLEAN'].forEach(t => {
+        candidates.push({ label: t, insertText: t, type: 'enum', icon: '◈', badge: 'type' });
+      });
+    } else if (k.includes('icon') || k.includes('material') || k.includes('filler')) {
+      const commonMaterials = [
+        'COMPASS', 'GLASS', 'STONE', 'DIAMOND', 'DIAMOND_SWORD', 'EMERALD',
+        'BOOK', 'CLOCK', 'BARRIER', 'NETHER_STAR', 'CHEST', 'ENDER_PEARL',
+        'GRASS_BLOCK', 'OBSIDIAN', 'BEACON', 'GOLD_INGOT', 'IRON_INGOT', 'AIR'
+      ];
+      commonMaterials.forEach(m => {
+        candidates.push({ label: m, insertText: m, type: 'material', icon: '❖', badge: 'material' });
+      });
+    } else if (k.includes('enabled') || k.includes('permission') || k.includes('override') || k.includes('cancel') || k.includes('require')) {
+      candidates.push({ label: 'true', insertText: 'true', type: 'boolean', icon: '✓', badge: 'bool' });
+      candidates.push({ label: 'false', insertText: 'false', type: 'boolean', icon: '✗', badge: 'bool' });
+    } else if (k.includes('radius') || k.includes('distance') || k.includes('height')) {
+      ['b', 'c', 'r', 'km'].forEach(u => {
+        candidates.push({ label: u, insertText: u, type: 'unit', icon: '📏', badge: 'unit' });
+      });
+    }
+
+    if (ctx.token.startsWith('@') || ctx.token === '') {
+      ['@config', '@default'].forEach(ref => {
+        candidates.push({ label: ref, insertText: ref, type: 'reference', icon: '🔗', badge: 'reference' });
+      });
+    }
+
+    const shipped = shippedConfigs[currentConfigFile];
+    if (shipped) {
+      const shippedRecs = parseYamlLines(shipped);
+      for (const r of shippedRecs) {
+        if (r.key && r.key.toLowerCase() === k && r.ann && r.ann.options) {
+          const opts = parseAnnotationList(r.ann.options);
+          opts.forEach(opt => {
+            if (!candidates.some(c => c.label === opt)) {
+              candidates.push({ label: opt, insertText: opt, type: 'enum', icon: '◈', badge: 'option' });
+            }
+          });
+        }
+      }
+    }
+  }
+
+  const token = ctx.token.toLowerCase().trim();
+  if (!token) {
+    return candidates.slice(0, 15);
+  }
+
+  const prefixHits = [];
+  const fuzzyHits = [];
+
+  for (const c of candidates) {
+    const rawLabel = c.label.replace(/:$/, '').toLowerCase();
+    if (rawLabel === token) {
+      prefixHits.unshift(c);
+    } else if (rawLabel.startsWith(token)) {
+      prefixHits.push(c);
+    } else if (token.length >= 2) {
+      const dist = computeLevenshtein(token, rawLabel);
+      if (dist <= 2) {
+        fuzzyHits.push({ cand: c, dist });
+      }
+    }
+  }
+
+  fuzzyHits.sort((a, b) => a.dist - b.dist);
+  const result = [...prefixHits, ...fuzzyHits.map(h => h.cand)];
+
+  const seen = new Set();
+  const deduped = [];
+  for (const item of result) {
+    if (!seen.has(item.label)) {
+      seen.add(item.label);
+      deduped.push(item);
+    }
+  }
+  return deduped.slice(0, 15);
+}
+
+function updateActiveAcItem() {
+  const popup = document.getElementById('cfg-autocomplete-popup');
+  if (!popup) return;
+  const items = popup.querySelectorAll('.cfg-ac-item');
+  items.forEach((item, idx) => {
+    const isAct = idx === acSelectedIndex;
+    item.classList.toggle('active', isAct);
+    if (isAct) {
+      item.scrollIntoView({ block: 'nearest' });
+    }
+  });
+}
+
+function renderAutocomplete(items, ctx) {
+  const popup = document.getElementById('cfg-autocomplete-popup');
+  if (!popup || !items || items.length === 0) {
+    hideAutocomplete();
+    return;
+  }
+
+  acItems = items;
+  acSelectedIndex = 0;
+  popup.textContent = '';
+
+  items.forEach((item, index) => {
+    const el = document.createElement('div');
+    el.className = 'cfg-ac-item' + (index === 0 ? ' active' : '');
+    el.setAttribute('role', 'option');
+
+    const iconEl = document.createElement('span');
+    iconEl.className = 'cfg-ac-icon';
+    iconEl.textContent = item.icon || '⌖';
+
+    const labelEl = document.createElement('span');
+    labelEl.className = 'cfg-ac-label';
+    labelEl.textContent = item.label;
+
+    const badgeEl = document.createElement('span');
+    badgeEl.className = 'cfg-ac-badge';
+    badgeEl.textContent = item.badge || item.type;
+
+    el.appendChild(iconEl);
+    el.appendChild(labelEl);
+    el.appendChild(badgeEl);
+
+    el.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      applyAutocompleteChoice(item, ctx);
+    });
+
+    popup.appendChild(el);
+  });
+
+  const pos = calculateCaretPixelPosition();
+  const wrap = document.getElementById('cfg-editor-wrap');
+  const wrapRect = wrap ? wrap.getBoundingClientRect() : { width: 800, height: 600 };
+
+  let left = pos.x;
+  let top = pos.y + 24;
+
+  popup.style.display = 'block';
+  const popupRect = popup.getBoundingClientRect();
+
+  if (top + popupRect.height > wrapRect.height) {
+    top = Math.max(10, pos.y - popupRect.height - 4);
+  }
+  if (left + popupRect.width > wrapRect.width) {
+    left = Math.max(10, wrapRect.width - popupRect.width - 20);
+  }
+
+  popup.style.left = Math.max(10, left) + 'px';
+  popup.style.top = Math.max(10, top) + 'px';
+  acVisible = true;
+}
+
+function applyAutocompleteChoice(item, ctx) {
+  if (!item || !ctx || !cfgEditor) return;
+  const insertText = item.insertText || item.label;
+  const text = cfgEditor.value || '';
+  const before = text.substring(0, ctx.replaceStart);
+  const after = text.substring(ctx.replaceEnd);
+
+  cfgEditor.value = before + insertText + after;
+  const newPos = before.length + insertText.length;
+  cfgEditor.selectionStart = newPos;
+  cfgEditor.selectionEnd = newPos;
+
+  if (currentConfigFile) configs[currentConfigFile] = cfgEditor.value;
+  hideAutocomplete();
+  cfgEditor.focus();
+
+  cfgEditor.dispatchEvent(new Event('input'));
+}
+
+function checkAndTriggerAutocomplete(explicitTrigger = false) {
+  const ctx = getAutocompleteContext();
+  currentAcContext = ctx;
+  if (!ctx) {
+    hideAutocomplete();
+    return false;
+  }
+  if (explicitTrigger || ctx.token.length >= 1 || (ctx.mode === 'value' && ctx.token.length >= 0)) {
+    const candidates = collectAutocompleteCandidates(ctx);
+    if (candidates.length > 0) {
+      renderAutocomplete(candidates, ctx);
+      return true;
+    }
+  }
+  hideAutocomplete();
+  return false;
+}
+
+cfgEditor.addEventListener('keydown', (e) => {
+  if (acVisible && acItems.length > 0) {
+    if (e.key === 'Tab' || e.key === 'Enter') {
+      e.preventDefault();
+      applyAutocompleteChoice(acItems[acSelectedIndex], currentAcContext);
+      return;
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      acSelectedIndex = (acSelectedIndex + 1) % acItems.length;
+      updateActiveAcItem();
+      return;
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      acSelectedIndex = (acSelectedIndex - 1 + acItems.length) % acItems.length;
+      updateActiveAcItem();
+      return;
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      hideAutocomplete();
+      return;
+    }
+  }
+
+  if (e.key === 'Tab') {
+    const triggered = checkAndTriggerAutocomplete(true);
+    if (triggered) {
+      e.preventDefault();
+    }
+  } else if ((e.ctrlKey || e.metaKey) && e.key === ' ') {
+    e.preventDefault();
+    checkAndTriggerAutocomplete(true);
+  }
+});
+
+// Hide autocomplete on scroll or click outside
+window.addEventListener('click', (e) => {
+  if (acVisible && !e.target.closest('#cfg-autocomplete-popup') && e.target !== cfgEditor) {
+    hideAutocomplete();
+  }
+});
 
 // Shipped and live YAML document every key in the comment block directly above it
 // (prose + @type/@default/@range/@options annotations). Used when docTrackerDb has no entry.
@@ -5896,6 +6719,8 @@ function startRegionHandleDrag(h, mx, my, t) {
   const worldX = (mx - t.wox) / t.scale, worldZ = (my - t.woy) / t.scale;
   const polygon = regionShapeFamily(regionState.shape) === 'polygon';
   const setCh = k => settingValue(regionState, k) !== undefined ? settingChunks(regionState, k, 0) : null;
+  const desc = h.role === 'scale' ? 'Scale Region' : (h.kind === 'move' ? 'Move Region' : 'Adjust Region Handle');
+  if (typeof EditorHistoryManager !== 'undefined') EditorHistoryManager.beginGesture(desc, regionState);
   regionHandleDrag = {
     id: h.id, handle: h, polygon, applied: new Map(), scale: 0,
     startX: worldX, startZ: worldZ, dx: 0, dz: 0,
@@ -5957,6 +6782,9 @@ function endRegionHandleDrag() {
   }
   drawMap();
   updateStagingDiff();
+  if (typeof clearTimeout === 'function' && typeof shapeSettingTimer !== 'undefined' && shapeSettingTimer) { clearTimeout(shapeSettingTimer); shapeSettingTimer = null; }
+  if (typeof shapeSettingStartSnapshot !== 'undefined') shapeSettingStartSnapshot = null;
+  if (typeof EditorHistoryManager !== 'undefined') EditorHistoryManager.commitGesture(regionState);
   return true;
 }
 
@@ -6045,6 +6873,7 @@ canvas.addEventListener('mousedown', (e) => {
     dragGrabDX = (v[0] * 16 + 8) - (mx - wox) / scale;
     dragGrabDZ = (v[1] * 16 + 8) - (my - woy) / scale;
     canvas.style.cursor = 'grabbing';
+    EditorHistoryManager.beginGesture('Drag Vertex', regionState);
     updateJumpToYamlButton();
     drawMap();
     return;
@@ -6089,6 +6918,7 @@ window.addEventListener('mouseup', () => {
     syncPolygonAABB();
     drawMap();
     updateStagingDiff();
+    EditorHistoryManager.commitGesture(regionState);
   }
   endRegionHandleDrag();
 });
@@ -6114,11 +6944,11 @@ function renderPolygonVerticesList() {
       <span style="font-size:0.75rem; font-weight:600; color:var(--accent); min-width:24px;">P${i + 1}</span>
       <div style="display:flex; align-items:center; gap:4px; flex:1;">
         <span style="font-size:0.7rem; color:var(--subtext);">X:</span>
-        <input type="text" id="poly-vx-${i}" class="control-input" style="padding:2px 4px; font-size:0.75rem; height:24px;" value="${v[0] !== undefined ? v[0] : 0}c" placeholder="chunks (c) or units (e.g. 125c, 2000b)" title="Chunks (c); b, r and km suffixes convert" oninput="updateVertexCoord(${i}, 0, this.value)" onchange="updateVertexCoord(${i}, 0, this.value); renderPolygonVerticesList();">
+        <input type="text" id="poly-vx-${i}" class="control-input" style="padding:2px 4px; font-size:0.75rem; height:24px;" value="${v[0] !== undefined ? v[0] : 0}c" placeholder="chunks (c) or units (e.g. 125c, 2000b)" title="Chunks (c); b, r and km suffixes convert" oninput="updateVertexCoord(${i}, 0, this.value)" onchange="updateVertexCoord(${i}, 0, this.value); commitVertexCoordEdit(); renderPolygonVerticesList();" onblur="commitVertexCoordEdit()">
       </div>
       <div style="display:flex; align-items:center; gap:4px; flex:1;">
         <span style="font-size:0.7rem; color:var(--subtext);">Z:</span>
-        <input type="text" id="poly-vz-${i}" class="control-input" style="padding:2px 4px; font-size:0.75rem; height:24px;" value="${v[1] !== undefined ? v[1] : 0}c" placeholder="chunks (c) or units (e.g. 187c, 3000b)" title="Chunks (c); b, r and km suffixes convert" oninput="updateVertexCoord(${i}, 1, this.value)" onchange="updateVertexCoord(${i}, 1, this.value); renderPolygonVerticesList();">
+        <input type="text" id="poly-vz-${i}" class="control-input" style="padding:2px 4px; font-size:0.75rem; height:24px;" value="${v[1] !== undefined ? v[1] : 0}c" placeholder="chunks (c) or units (e.g. 187c, 3000b)" title="Chunks (c); b, r and km suffixes convert" oninput="updateVertexCoord(${i}, 1, this.value)" onchange="updateVertexCoord(${i}, 1, this.value); commitVertexCoordEdit(); renderPolygonVerticesList();" onblur="commitVertexCoordEdit()">
       </div>
       <button type="button" style="background:${canDelete ? 'rgba(243,139,168,0.2)' : 'rgba(255,255,255,0.05)'}; color:${canDelete ? 'var(--red)' : 'var(--subtext)'}; border:none; border-radius:3px; padding:2px 6px; font-size:0.75rem; cursor:${canDelete ? 'pointer' : 'not-allowed'};" title="${canDelete ? 'Delete Point' : 'At least 3 vertices required'}" ${canDelete ? '' : 'disabled'} onclick="removePolygonVertex(${i})">✕</button>
     </div>
@@ -6136,17 +6966,42 @@ function parseVertexCoord(value) {
   return isNaN(num) ? 0 : num;
 }
 
+let vertexCoordTimer = null;
+let vertexCoordStartSnapshot = null;
+
+function commitVertexCoordEdit() {
+  if (typeof clearTimeout === 'function' && vertexCoordTimer) {
+    clearTimeout(vertexCoordTimer);
+    vertexCoordTimer = null;
+  }
+  if (!vertexCoordStartSnapshot) return;
+  const before = vertexCoordStartSnapshot;
+  vertexCoordStartSnapshot = null;
+  const after = cloneRegionSnapshot(regionState);
+  if (after && JSON.stringify(before) !== JSON.stringify(after)) {
+    EditorHistoryManager.push(new HistoryEntry('Edit Vertex Coordinate', regionState.name, before, after));
+  }
+}
+
 function updateVertexCoord(index, axis, value) {
   if (!regionState.vertices || !regionState.vertices[index]) return;
+  if (typeof vertexCoordStartSnapshot !== 'undefined' && !vertexCoordStartSnapshot) {
+    vertexCoordStartSnapshot = cloneRegionSnapshot(regionState);
+  }
   const num = parseVertexCoord(value);
   regionState.vertices[index][axis] = num;
   syncPolygonAABB();
   drawMap();
   updateStagingDiff();
+  if (typeof vertexCoordTimer !== 'undefined') {
+    if (typeof clearTimeout === 'function' && vertexCoordTimer) clearTimeout(vertexCoordTimer);
+    if (typeof setTimeout === 'function') vertexCoordTimer = setTimeout(commitVertexCoordEdit, 500);
+  }
 }
 
 function addPolygonVertex() {
   if (!regionState.vertices) regionState.vertices = [];
+  const before = cloneRegionSnapshot(regionState);
   const n = regionState.vertices.length;
   let newX = 0, newZ = 0;
   if (n >= 2) {
@@ -6164,10 +7019,13 @@ function addPolygonVertex() {
   syncPolygonAABB();
   drawMap();
   updateStagingDiff();
+  const after = cloneRegionSnapshot(regionState);
+  EditorHistoryManager.push(new HistoryEntry('Add Vertex', regionState.name, before, after));
 }
 
 function removePolygonVertex(index) {
   if (!regionState.vertices || regionState.vertices.length <= 3) return;
+  const before = cloneRegionSnapshot(regionState);
   regionState.vertices.splice(index, 1);
   if (selectedVertex >= regionState.vertices.length || selectedVertex === index) selectedVertex = -1;
   updateJumpToYamlButton();
@@ -6175,9 +7033,14 @@ function removePolygonVertex(index) {
   syncPolygonAABB();
   drawMap();
   updateStagingDiff();
+  const after = cloneRegionSnapshot(regionState);
+  EditorHistoryManager.push(new HistoryEntry('Remove Vertex', regionState.name, before, after));
 }
 
 function handleRegionSelectChange(val) {
+  if (typeof commitShapeSettingEdit === 'function') commitShapeSettingEdit();
+  commitVertexCoordEdit();
+  EditorHistoryManager.cancelGesture();
   if (val === '__add_region__') {
     const selectEl = document.getElementById('reg-profile-select');
     if (selectEl) selectEl.value = regionState.name;
@@ -6216,6 +7079,7 @@ function promptAddNewRegion() {
     settings: { radius: '256c', centerRadius: '64c', centerX: '0', centerZ: '0' },
     vertices: []
   };
+  recordInitialRegionSnapshot(regionProfiles[cleanName]);
 
   syncRegionProfiles();
   populateConfigSidebar();
@@ -6233,6 +7097,7 @@ function removeCurrentRegion() {
   if (!confirmDel) return;
 
   delete regionProfiles[currentName];
+  delete initialRegionSnapshots[currentName];
   delete configs[`definitions/regions/${currentName}.yml`];
   delete configs[`regions/${currentName}.yml`];
 
@@ -6262,6 +7127,7 @@ function syncRegionProfiles() {
       delete g.local;
       if (prof) Object.assign(prof, g);
       else regionProfiles[regionName] = Object.assign({ name: regionName }, g);
+      recordInitialRegionSnapshot(regionProfiles[regionName]);
     }
   }
 
@@ -6424,12 +7290,18 @@ function syncShapeSpecificControls(region) {
 // Settings the new shape does not take stay in the model (switching back restores them); the
 // writer leaves them out
 function updateRegionShape(val) {
+  const before = cloneRegionSnapshot(regionState);
   regionState.shape = val;
-  document.getElementById('hud-shape').textContent = val;
+  const hudShape = document.getElementById('hud-shape');
+  if (hudShape) hudShape.textContent = val;
   syncShapeSpecificControls(regionState);
   renderShapeSettingsForm(regionState);
   drawMap();
   updateStagingDiff();
+  const after = cloneRegionSnapshot(regionState);
+  if (after && JSON.stringify(before) !== JSON.stringify(after)) {
+    EditorHistoryManager.push(new HistoryEntry(`Switch Shape to ${val}`, regionState.name, before, after));
+  }
 }
 
 /**
@@ -6527,6 +7399,8 @@ function buildShapeSettingRow(region, shape, key, p, curveInput) {
       input.setAttribute('list', list.id);
     }
     input.addEventListener('input', () => applyShapeSetting(key, input.value.trim(), row));
+    input.addEventListener('change', () => commitShapeSettingEdit(key));
+    input.addEventListener('blur', () => commitShapeSettingEdit(key));
   }
   input.dataset.settingKey = key;
   if (typeof p.description === 'string' && p.description) input.title = p.description;
@@ -6577,6 +7451,23 @@ function refreshShapeSettingHint(row, value, p) {
     : '';
 }
 
+let shapeSettingTimer = null;
+let shapeSettingStartSnapshot = null;
+
+function commitShapeSettingEdit(descKey) {
+  if (typeof clearTimeout === 'function' && shapeSettingTimer) {
+    clearTimeout(shapeSettingTimer);
+    shapeSettingTimer = null;
+  }
+  if (!shapeSettingStartSnapshot) return;
+  const before = shapeSettingStartSnapshot;
+  shapeSettingStartSnapshot = null;
+  const after = cloneRegionSnapshot(regionState);
+  if (after && JSON.stringify(before) !== JSON.stringify(after)) {
+    EditorHistoryManager.push(new HistoryEntry(`Change ${descKey || 'Setting'}`, regionState.name, before, after));
+  }
+}
+
 // A form edit: stored as the YAML scalar, staged into the region file, path redrawn from the helper
 function applyShapeSetting(key, value, row) {
   const region = regionState;
@@ -6584,10 +7475,32 @@ function applyShapeSetting(key, value, row) {
   if (row) refreshShapeSettingHint(row, value, p);
   // Half-typed or invalid input keeps the last valid value (and the YAML) untouched
   if (value === '' || shapeSettingError(value, p)) return;
+  const isDiscrete = p.kind === 'boolean' || p.kind === 'enum';
+  const trackHistory = typeof regionHandleDrag === 'undefined' || regionHandleDrag === null;
+  let before = null;
+  if (trackHistory) {
+    if (isDiscrete) {
+      before = cloneRegionSnapshot(region);
+    } else if (typeof shapeSettingStartSnapshot !== 'undefined' && !shapeSettingStartSnapshot) {
+      shapeSettingStartSnapshot = cloneRegionSnapshot(region);
+    }
+  }
   if (!region.settings) region.settings = {};
-  region.settings[settingKeyOf(region, key)] = value;
+  const sk = typeof settingKeyOf === 'function' ? settingKeyOf(region, key) : key;
+  region.settings[sk] = value;
   drawMap();
   updateStagingDiff();
+  if (trackHistory) {
+    if (isDiscrete) {
+      const after = cloneRegionSnapshot(region);
+      if (after && JSON.stringify(before) !== JSON.stringify(after)) {
+        if (typeof EditorHistoryManager !== 'undefined') EditorHistoryManager.push(new HistoryEntry(`Change ${key}`, region.name, before, after));
+      }
+    } else if (typeof shapeSettingTimer !== 'undefined') {
+      if (typeof clearTimeout === 'function' && shapeSettingTimer) clearTimeout(shapeSettingTimer);
+      if (typeof setTimeout === 'function') shapeSettingTimer = setTimeout(() => commitShapeSettingEdit(key), 500);
+    }
+  }
 }
 
 // ADR-034 Mathematical Validation & Polygon Non-Self-Intersection
@@ -7111,16 +8024,21 @@ function copyApplyCmd() {
 }
 
 function resetStaging() {
-  regionState.shape = 'CIRCLE';
-  regionState.settings = { radius: '256c', centerRadius: '64c', centerX: '0', centerZ: '0' };
-  regionState.vertices = [[-125, 187], [125, 187], [125, -187], [-125, -187]];
-  const hudShape = document.getElementById('hud-shape');
-  if (hudShape) hudShape.textContent = 'CIRCLE';
-  populateShapeSelect('CIRCLE');
-  syncShapeSpecificControls(regionState);
-  renderShapeSettingsForm(regionState);
-  drawMap();
-  updateStagingDiff();
+  if (!regionState) return;
+  const name = regionState.name || 'default';
+  let baseline = initialRegionSnapshots[name];
+  if (!baseline) {
+    baseline = {
+      name: name,
+      shape: 'CIRCLE',
+      settings: { radius: '256c', centerRadius: '64c', centerX: '0', centerZ: '0' },
+      vertices: [[-125, 187], [125, 187], [125, -187], [-125, -187]]
+    };
+  }
+  const current = cloneRegionSnapshot(regionState);
+  if (JSON.stringify(current) === JSON.stringify(baseline)) return;
+  EditorHistoryManager.push(new HistoryEntry('Revert to baseline', name, current, cloneRegionSnapshot(baseline)));
+  applyHistorySnapshot(baseline);
 }
 
 function exportPng() {
@@ -8624,7 +9542,43 @@ async function triggerRemoteSynonymExpansion(query) {
   }, 250);
 }
 
-// Global Keyboard Navigation (Ctrl+K, Up/Down, Enter, Esc)
+function isNativeTextEditingTarget(target) {
+  if (!target) return false;
+  const tag = (target.tagName || '').toUpperCase();
+  if (tag === 'TEXTAREA') return true;
+  if (tag === 'INPUT') {
+    const type = (target.type || 'text').toLowerCase();
+    return type === 'text' || type === 'search' || type === 'number' || type === 'password' || type === 'email' || type === 'url';
+  }
+  if (target.isContentEditable) return true;
+  return false;
+}
+
+function handleEditorHistoryHotkeys(e) {
+  if (!e) return false;
+  const isCtrlOrMeta = !!(e.ctrlKey || e.metaKey);
+  if (!isCtrlOrMeta) return false;
+
+  const target = e.target || (typeof document !== 'undefined' ? document.activeElement : null);
+  if (isNativeTextEditingTarget(target) || (typeof document !== 'undefined' && document && isNativeTextEditingTarget(document.activeElement))) {
+    return false;
+  }
+
+  const key = String(e.key || '').toLowerCase();
+  if (!e.shiftKey && key === 'z') {
+    if (typeof e.preventDefault === 'function') e.preventDefault();
+    if (typeof EditorHistoryManager !== 'undefined') EditorHistoryManager.undo();
+    return true;
+  }
+  if (key === 'y' || (e.shiftKey && key === 'z')) {
+    if (typeof e.preventDefault === 'function') e.preventDefault();
+    if (typeof EditorHistoryManager !== 'undefined') EditorHistoryManager.redo();
+    return true;
+  }
+  return false;
+}
+
+// Global Keyboard Navigation (Ctrl+K, Up/Down, Enter, Esc, Undo/Redo)
 window.addEventListener('keydown', (e) => {
   const overlay = document.getElementById('search-modal-overlay');
   const isSearchOpen = overlay && overlay.style.display === 'flex';
@@ -8633,6 +9587,10 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     if (isSearchOpen) closeSearchModal();
     else openSearchModal();
+    return;
+  }
+
+  if (handleEditorHistoryHotkeys(e)) {
     return;
   }
 
@@ -8790,6 +9748,7 @@ function ingestSessionPayload(payload) {
       if (prof.walkPathData) prof.walkPathData._sig = sig;
       // Server geometry is the new baseline, not a canvas edit to write back
       delete regionProfiles[rName]._baseSig;
+      recordInitialRegionSnapshot(prof);
     }
     syncRegionProfiles();
   }

@@ -154,7 +154,9 @@ public final class MenuModel {
                 label,
                 config.iconName(target, status),
                 (status == null) ? 0L : status.remainingCooldownMillis(),
-                (status == null) ? 0.0 : status.cost()));
+                (status == null) ? 0.0 : status.cost(),
+                (status == null) ? 0L : status.delayMillis(),
+                (status == null) ? 0L : status.combatRemainingMillis()));
       }
     }
 
@@ -323,7 +325,9 @@ public final class MenuModel {
                 displayName(target, status),
                 config.iconName(target, status),
                 (status == null) ? 0L : status.remainingCooldownMillis(),
-                (status == null) ? 0.0 : status.cost()));
+                (status == null) ? 0.0 : status.cost(),
+                (status == null) ? 0L : status.delayMillis(),
+                (status == null) ? 0L : status.combatRemainingMillis()));
       }
     }
 

@@ -96,6 +96,8 @@ nav:
       - Web Workspace & Editor: admin/WEB_EDITOR_GUIDE.md
       - Hazard register: dev/HAZARDS.md
       - Addons: admin/ADDONS.md
+      - Custom items & menus: admin/CUSTOM_ITEMS.md
+      - Claim compatibility: admin/CLAIM_PLUGIN_COMPATIBILITY.md
   - Configuration:
       - Overview: admin/configuration/CONFIGURATION.md
       - Config lifecycle: admin/configuration/CONFIG_LIFECYCLE.md

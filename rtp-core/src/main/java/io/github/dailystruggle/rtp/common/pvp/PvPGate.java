@@ -74,6 +74,33 @@ public final class PvPGate {
   }
 
   /**
+   * Returns remaining combat tag milliseconds for {@code player}, or 0 if not in combat or disabled.
+   *
+   * @param player player UUID
+   * @return remaining combat time in milliseconds
+   */
+  public static long combatRemainingMillis(UUID player) {
+    if (player == null || !isEnabled()) return 0L;
+    Source source = Source.fromConfig(stringValue(safety(), SafetyKeys.pvpSource, "AUTO"));
+    PvPCombatStateRegistry.Provider provider = boundProvider();
+
+    boolean useExternal = (source == Source.EXTERNAL)
+        || (source == Source.AUTO && provider != null);
+    if (useExternal) {
+      if (provider == null) return 0L;
+      try {
+        if (!provider.isInCombat(player)) return 0L;
+        return 1000L;
+      } catch (Throwable t) {
+        return 0L;
+      }
+    }
+
+    long tagMillis = combatTagMillis();
+    return NATIVE.remainingMillis(player, System.currentTimeMillis(), tagMillis);
+  }
+
+  /**
    * Evaluate the configured response for {@code player} at a gate checkpoint.
    *
    * @param player the requesting player's UUID

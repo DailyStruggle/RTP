@@ -830,4 +830,76 @@ class ActionCommandTest {
     boolean statusHandled = statusCmd.onCommand(callerId, Map.of(), null);
     assertTrue(statusHandled);
   }
+
+  @Test
+  @DisplayName("Positional parameter parsing: /duel Bob correctly maps to player parameter")
+  void testPositionalArgumentMapsToPlayerParameter() {
+    ActionDefinition.CommandSpec cmdSpec = new ActionDefinition.CommandSpec(
+        "duel", "rtp.command.duel", "Challenge a duel", List.of(),
+        List.of(new io.github.dailystruggle.rtp.api.action.ParameterSpec(
+            "player", io.github.dailystruggle.rtp.api.action.ParameterType.PLAYER, false, "", "any"
+        )),
+        Map.of("leave", new ActionDefinition.SubcommandSpec("leave", "rtp.command.duel.leave", "Leave", List.of(), List.of()))
+    );
+
+    ActionDefinition def = new ActionDefinition(
+        "duel", "duel", "rtp.action.duel", "Duel Action",
+        ActionDefinition.PlacementSpec.DEFAULT,
+        ActionDefinition.ConfinementSpec.DEFAULT,
+        ActionDefinition.LifecycleSpec.EMPTY,
+        cmdSpec);
+
+    actionManager.registerAction(def);
+
+    RTPWorld<?> world = serverAccessor.getRTPWorld("world");
+    UUID p1Id = UUID.randomUUID();
+    UUID p2Id = UUID.randomUUID();
+
+    MockRTPPlayer p1 = new MockRTPPlayer(p1Id, "PlayerOne", new RTPLocation(world, 100, 64, 100));
+    MockRTPPlayer p2 = new MockRTPPlayer(p2Id, "PlayerTwo", new RTPLocation(world, 105, 64, 105));
+    p1.setPermission("rtp.command.duel", true);
+    serverAccessor.addPlayer(p1);
+    serverAccessor.addPlayer(p2);
+
+    ActionCommand cmd = new ActionCommand(def);
+
+    // 1. Natural positional invocation: /duel PlayerTwo
+    java.util.concurrent.atomic.AtomicBoolean badParamCalled = new java.util.concurrent.atomic.AtomicBoolean(false);
+    java.util.concurrent.CompletableFuture<Boolean> future = cmd.onCommand(
+        p1Id,
+        perm -> true,
+        msg -> {
+          if (msg.contains("bad parameter") || msg.contains("invalid command")) {
+            badParamCalled.set(true);
+          }
+        },
+        new String[]{"PlayerTwo"},
+        0,
+        new java.util.HashMap<>()
+    );
+
+    io.github.dailystruggle.commandsapi.common.CommandsAPI.execute();
+    Boolean result = future.join();
+    assertTrue(result, "Positional /duel PlayerTwo must complete successfully");
+    assertFalse(badParamCalled.get(), "Positional /duel PlayerTwo must not trigger bad parameter or invalid command");
+
+    // 2. Subcommand invocation: /duel leave must NOT map to player=leave
+    java.util.concurrent.CompletableFuture<Boolean> leaveFuture = cmd.onCommand(
+        p1Id,
+        perm -> true,
+        msg -> {},
+        new String[]{"leave"},
+        0,
+        new java.util.HashMap<>()
+    );
+    io.github.dailystruggle.commandsapi.common.CommandsAPI.execute();
+    Boolean leaveResult = leaveFuture.join();
+    assertTrue(leaveResult, "Subcommand /duel leave must execute as subcommand");
+
+    // 3. Tab completion suggests online players for positional target
+    List<String> completions = cmd.onTabComplete(p1Id, perm -> true, new String[]{"Play"});
+    assertNotNull(completions);
+    assertTrue(completions.contains("PlayerTwo") || completions.contains("PlayerOne"),
+        "Tab completion must suggest online player names matching prefix");
+  }
 }

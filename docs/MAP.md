@@ -188,6 +188,7 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - [`admin/MIGRATION.md`](admin/MIGRATION.md) — upgrading guides and migration procedures across versions.
 - [`admin/WEB_EDITOR_GUIDE.md`](admin/WEB_EDITOR_GUIDE.md) — ephemeral web config editor and browser interface guide.
 - [`admin/CLAIM_PLUGIN_COMPATIBILITY.md`](admin/CLAIM_PLUGIN_COMPATIBILITY.md) — claim integrations matrix and compatibility notes.
+- [`admin/CUSTOM_ITEMS.md`](admin/CUSTOM_ITEMS.md) — custom item resolution (ItemsAdder, Oraxen, Nexo, CustomModelData) and menu icon compatibility.
 - [`admin/configuration/CONFIGURATION.md`](admin/configuration/CONFIGURATION.md) — configuration architecture, defaults, and multi-file layout.
 - [`admin/configuration/CONFIG_LIFECYCLE.md`](admin/configuration/CONFIG_LIFECYCLE.md) — load, reload, schema evolution, and serialization lifecycle.
 - [`admin/configuration/CORE_CONFIG.md`](admin/configuration/CORE_CONFIG.md) — root `config.yml` reference.

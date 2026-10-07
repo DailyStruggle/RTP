@@ -1,0 +1,73 @@
+plugins {
+    id 'java'
+}
+
+group = 'io.github.dailystruggle'
+version = '1.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+}
+
+dependencies {
+    compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
+    testImplementation 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testImplementation 'org.mockito:mockito-core:5.11.0'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+tasks.register('mockItemsAdderJar', Jar) {
+    archiveFileName = 'MockItemsAdder.jar'
+    from sourceSets.main.output
+    include 'dev/lone/itemsadder/**'
+    include 'io/github/dailystruggle/helpers/mockitems/MockItemsAdderPlugin*'
+    from('src/main/resources/itemsadder') {
+        include 'plugin.yml'
+    }
+}
+
+tasks.register('mockOraxenJar', Jar) {
+    archiveFileName = 'MockOraxen.jar'
+    from sourceSets.main.output
+    include 'io/th0rgal/oraxen/**'
+    include 'io/github/dailystruggle/helpers/mockitems/MockOraxenPlugin*'
+    from('src/main/resources/oraxen') {
+        include 'plugin.yml'
+    }
+}
+
+tasks.register('mockNexoJar', Jar) {
+    archiveFileName = 'MockNexo.jar'
+    from sourceSets.main.output
+    include 'com/nexomc/nexo/**'
+    include 'io/github/dailystruggle/helpers/mockitems/MockNexoPlugin*'
+    from('src/main/resources/nexo') {
+        include 'plugin.yml'
+    }
+}
+
+tasks.register('mockHeadDatabaseJar', Jar) {
+    archiveFileName = 'MockHeadDatabase.jar'
+    from sourceSets.main.output
+    include 'me/arcaniax/hdb/**'
+    include 'io/github/dailystruggle/helpers/mockitems/MockHeadDatabasePlugin*'
+    from('src/main/resources/headdatabase') {
+        include 'plugin.yml'
+    }
+}
+
+tasks.register('buildAllStubs') {
+    dependsOn mockItemsAdderJar, mockOraxenJar, mockNexoJar, mockHeadDatabaseJar
+}
+
+assemble.dependsOn buildAllStubs

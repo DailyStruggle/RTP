@@ -93,6 +93,11 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
         playersByName.put(player.name(), player);
     }
 
+    @Override
+    public Set<String> getOnlinePlayerNames() {
+        return Collections.unmodifiableSet(new HashSet<>(playersByName.keySet()));
+    }
+
     /**
      * Replaces the location generator used by this accessor.
      *

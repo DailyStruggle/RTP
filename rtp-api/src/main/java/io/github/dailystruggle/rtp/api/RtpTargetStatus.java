@@ -26,6 +26,8 @@ public final class RtpTargetStatus {
     READY,
     /** The player is within their teleport cooldown window. */
     ON_COOLDOWN,
+    /** The player is tagged in active PvP combat. */
+    IN_COMBAT,
     /** The player lacks the permission required for this target. */
     NO_PERMISSION,
     /** An economy is configured and the player cannot afford {@link #cost()}. */
@@ -42,6 +44,8 @@ public final class RtpTargetStatus {
   private final String iconBlock;
   private final String environment;
   private final String label;
+  private final long delayMillis;
+  private final long combatRemainingMillis;
 
   /**
    * Creates a status snapshot with default null display hints.
@@ -80,6 +84,23 @@ public final class RtpTargetStatus {
    */
   public RtpTargetStatus(Availability availability, long remainingCooldownMillis, double cost,
       String iconBlock, String environment, String label) {
+    this(availability, remainingCooldownMillis, cost, iconBlock, environment, label, 0L, 0L);
+  }
+
+  /**
+   * Creates a status snapshot with display hints, cosmetic label, warmup delay, and combat remaining duration.
+   *
+   * @param availability            availability verdict; must not be {@code null}
+   * @param remainingCooldownMillis remaining cooldown in milliseconds (>= 0)
+   * @param cost                    teleport monetary cost (>= 0)
+   * @param iconBlock               advertised block material name hint, or {@code null}
+   * @param environment             destination dimension environment hint, or {@code null}
+   * @param label                   cosmetic display label, or {@code null}
+   * @param delayMillis             warmup delay in milliseconds (>= 0)
+   * @param combatRemainingMillis   remaining PvP combat tag in milliseconds (>= 0)
+   */
+  public RtpTargetStatus(Availability availability, long remainingCooldownMillis, double cost,
+      String iconBlock, String environment, String label, long delayMillis, long combatRemainingMillis) {
     if (availability == null) {
       throw new IllegalArgumentException("availability must not be null");
     }
@@ -89,6 +110,8 @@ public final class RtpTargetStatus {
     this.iconBlock = (iconBlock == null || iconBlock.isBlank()) ? null : iconBlock.trim();
     this.environment = (environment == null || environment.isBlank()) ? null : environment.trim();
     this.label = (label == null || label.isBlank()) ? null : label.trim();
+    this.delayMillis = Math.max(0L, delayMillis);
+    this.combatRemainingMillis = Math.max(0L, combatRemainingMillis);
   }
 
   /**
@@ -161,6 +184,24 @@ public final class RtpTargetStatus {
     return label;
   }
 
+  /**
+   * Returns the warmup delay for this target in milliseconds, or 0 if immediate.
+   *
+   * @return delay in milliseconds (>= 0)
+   */
+  public long delayMillis() {
+    return delayMillis;
+  }
+
+  /**
+   * Returns the remaining PvP combat tag duration in milliseconds, or 0 if not in combat.
+   *
+   * @return remaining combat tag duration in milliseconds (>= 0)
+   */
+  public long combatRemainingMillis() {
+    return combatRemainingMillis;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
@@ -168,6 +209,8 @@ public final class RtpTargetStatus {
     RtpTargetStatus that = (RtpTargetStatus) o;
     return remainingCooldownMillis == that.remainingCooldownMillis
         && Double.compare(that.cost, cost) == 0
+        && delayMillis == that.delayMillis
+        && combatRemainingMillis == that.combatRemainingMillis
         && availability == that.availability
         && Objects.equals(iconBlock, that.iconBlock)
         && Objects.equals(environment, that.environment)
@@ -176,7 +219,7 @@ public final class RtpTargetStatus {
 
   @Override
   public int hashCode() {
-    return Objects.hash(availability, remainingCooldownMillis, cost, iconBlock, environment, label);
+    return Objects.hash(availability, remainingCooldownMillis, cost, iconBlock, environment, label, delayMillis, combatRemainingMillis);
   }
 
   @Override
@@ -184,6 +227,8 @@ public final class RtpTargetStatus {
     return "RtpTargetStatus["
         + availability
         + ", cooldownMs=" + remainingCooldownMillis
+        + ", delayMs=" + delayMillis
+        + ", combatMs=" + combatRemainingMillis
         + ", cost=" + cost
         + (iconBlock == null ? "" : ", iconBlock=" + iconBlock)
         + (environment == null ? "" : ", environment=" + environment)

@@ -11,9 +11,11 @@ command:
   name: "teams"
   permission: "rtp.command.teams"
   description: "Queue for a 2v2 team duel"
-  aliases:
-    - "teamduel"
-    - "2v2"
+  # Root command aliases (opt-in; empty by default to keep root command namespace clean)
+  aliases: []
+  # aliases:
+  #   - "teamduel"
+  #   - "2v2"
   subcommands:
     leave:
       description: "Forfeit the team match"

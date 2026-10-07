@@ -69,16 +69,16 @@ to match.
 
 | Variable | Value applied | Why |
 |---|---|---|
-| Outer radius | **16384 blocks (1024 chunks), every plugin** | Raised from 4096 for the next run set. Equalize selectable area. RTP region `radius: 1024` chunks; BetterRTP `MaxRadius`, EzRTP `radius.max`, JustRTP per-world `radius.max` raised to match. |
-| Inner radius | left per-plugin (RTP 1024, EzRTP 500, BetterRTP 10) | Negligible central exclusion at this scale. |
+| Outer radius | **16384 blocks (1024 chunks), every plugin** | Equalize selectable area across all 6 contenders. RTP region `radius: 16384b` (1024 chunks); BetterRTP `MaxRadius: 17408` (yields 16384 effective blocks due to formula truncation); EzRTP `radius.max: 16384`; JustRTP `max_radius: 16384`; JakesRTP `radius.max: 16384`; HuskHomes `region.max: 16384`. |
+| Inner radius | **1024 blocks (64 chunks), every plugin** | Full inner exclusion parity. RTP `centerRadius: 64` chunks (64 * 16 = 1024 blocks); BetterRTP `MinRadius: 1024`; EzRTP `radius.min: 1024`; JustRTP `min_radius: 1024`; JakesRTP `radius.min: 1024`; HuskHomes `region.min: 1024`. |
 | Pregen envelope | must cover the full 16384 radius per cell | Binding constraint on the radius increase - past the pregenerated edge the run silently becomes a worldgen benchmark. |
 | Cooldowns / delays / countdowns | zeroed on every plugin | Cooldown is anti-spam policy, not throughput. |
 | Worldgen | pregenerated world retained | A fresh world neutralizes RTP's anvil prefilter and turns the test into a worldgen benchmark. |
 | `delay-chunk-unloads-by` (Paper) | 10s -> 0s | Default lets each teleport coast on the retention cache instead of paying a real load. |
-| Phase length | ~600 s per plugin, one plugin dispatched per phase | Steady state; avoids cross-plugin residency bleed. |
-| Sequence gap | 240 s | TPS settle between phases. |
+| Workload unit | **4,096 teleports (`per-target-count: 4096`)** | Standardized sample size (N=4,096) across both burst and paced runs. Ensures spatial dispersion, duplicate rates, and chunk loads are directly comparable. |
+| Sequence gap | 180 s (3 minutes) | TPS and G1GC settle between phases, allowing background chunk unloads to stabilize. |
 | JIT warm-up | 30 s, 1 cycle through every target | Without it the first plugin pays the harness's JIT tax. CSV and spark writes disabled during warm-up. |
-| Per-player dispatch gap | 3 ticks (default) or 0 ticks (throughput-ceiling runs) | gap=0 is unthrottled dispatch; never compare a gap=0 number against a gap=3 one. |
+| Dispatch regime | Test A: unthrottled (gap=0, immediate-redispatch: true)<br>Test B: paced 5.0 TP/s (interval=200ms, gap=4t) | Count and rate are decoupled: Test A measures peak capacity / clearance under surge; Test B measures steady-state tick impact. |
 | Per-attempt timeout | 5 s | Capture-window expiry, not a server failure. See section 4. |
 | Client load | 3 real OPed accounts, concurrency 4, burst 10 | No fake-player infrastructure. |
 | Server JVM | Java 21, `-Xmx` 16 GB, default G1GC | REQ-RTP-SYS-001. |
@@ -93,6 +93,94 @@ or refill 16x more often, and the section 8 residency, GC and heap-pressure
 columns finally have signal to read. Consequence: **no 16384-radius number is
 comparable to any 4096-radius number in section 5** - the radius is now part of
 the run condition, like the dispatch gap.
+
+### 3.1 The Decoupled 4,096-Teleport Benchmark Architecture
+
+Earlier benchmark iterations coupled attempt counts to elapsed wall time (e.g. 1-hour unpaced runs),
+causing fast engines to deliver vastly more attempts than slower engines (130,120 attempts for
+LeafRTP vs 16,573 for JustRTP). Comparing cumulative wall time, gross GC churn, or spatial
+scatter density across an 8x sample-size divergence introduces severe statistical skew.
+
+In this updated methodology, **Count** and **Rate** are treated as orthogonal variables:
+- **Workload Unit:** A fixed quota of **N = 4,096 teleports** (`per-target-count: 4096`) is held
+  constant across all contenders.
+- **Two Operational Regimes:** The identical 4,096-teleport workload is evaluated under two
+  complementary testing regimes answering distinct administrative questions:
+
+```
+                    THE 4,096-TELEPORT BENCHMARK MATRIX
+                   (Fixed Work Unit: N = 4,096 teleports)
+                                     │
+           ┌─────────────────────────┴─────────────────────────┐
+           ▼                                                   ▼
+Test A: Burst Saturation ("Faster 4,096")     Test B: Steady-State Paced ("Slower 4,096")
+────────────────────────────────────────      ───────────────────────────────────────────
+• Pacing: Unthrottled / Rate-Unlimited         • Pacing: Matched 5.0 TP/s (200 ms interval)
+• Question: "What is peak capacity under       • Question: "During regular gameplay, what
+  queue spikes and DoS bursts?"                 does the server actually feel?"
+• Harness Settings:                            • Harness Settings:
+  - per-target-count: 4096                       - per-target-count: 4096
+  - immediate-redispatch: true                   - immediate-redispatch: false
+  - dispatch-interval-ms: 0                      - dispatch-interval-ms: 200
+  - per-player-gap-ticks: 0                      - per-player-gap-ticks: 4
+  - default-concurrency: 4                       - default-concurrency: 4
+• Primary Metrics:                             • Primary Metrics:
+  - 4,096 queue clearance wall time (s)          - Marginal tick impact (ΔMSPT)
+  - Sustained throughput ceiling (TP/s)          - Main-thread CPU utilization (%)
+  - Tail latency under surge (p95, p99)          - STW GC pause duration per 1,000 teleports
+  - Minimum TPS during phase                     - Async chunk load share (%)
+  - Folia / Paper watchdog stalls (S-005)
+           │                                                   │
+           └─────────────────────────┬─────────────────────────┘
+                                     ▼
+                      UNIFIED ARTIFACTS & ANALYSIS
+                      ────────────────────────────
+• Spatial Analysis: Clark-Evans dispersion (R), nearest-neighbor distances,
+  duplicate landing counts, and 6-plugin scatter plots (N = 4,096 everywhere).
+• Chunk Economics: Total chunk loads generated to find 4,096 safe destinations.
+• Memory Churn: JFR-attributed target package bytes allocated across 4,096 attempts.
+```
+
+#### Why Test A Matters (Burst Saturation / Queue Clearance)
+When multiple players join simultaneously, a faction runs an automated command script, or an
+adversary attempts to DoS the server via command spam, how does each engine behave?
+Test A runs unthrottled with `immediate-redispatch: true` and `per-player-gap-ticks: 0`. It
+measures:
+1. **Queue Clearance Time:** How many seconds or minutes does it take to clear 4,096 requests?
+2. **Throughput Ceiling:** Sustained TP/s under 100% saturation.
+3. **Resilience & Watchdogs:** Does the engine lock up region threads, trip Folia watchdogs,
+   or crash into multi-second GC pauses?
+
+#### Why Test B Matters (Steady-State Server Overhead)
+During ordinary gameplay, player traffic is paced. An administrator wants to know:
+*"At 5 teleports per second, which plugin introduces the least lag and jitter?"*
+Comparing gross CPU in Test A penalizes fast engines for executing more work per second.
+In Test B, every plugin delivers the exact same 5.0 TP/s. Throughput is eliminated as a variable,
+isolating pure algorithmic overhead:
+1. **Marginal Tick Overhead ($\Delta$MSPT):** Computed as `MSPT_phase - MSPT_settle_baseline`,
+   isolating the exact tick time added by the plugin's workload above ambient server background.
+2. **Main-Thread CPU %:** Percentage of the primary server tick thread consumed by teleport logic.
+3. **STW GC Freeze Ratio:** Percentage of real wall-clock time spent in Stop-The-World garbage
+   collection pauses while recycling candidate objects.
+4. **Off-Tick Chunk Share:** Percentage of chunk reads performed asynchronously (S-005 compliance).
+
+#### Spatial Analysis Parity (Why Constant N is Essential)
+Nearest-neighbor spatial metrics like the Clark-Evans dispersion index ($R = \bar{r}_A / \bar{r}_E$)
+rely on expected Poisson distance $\bar{r}_E = 1 / (2\sqrt{\rho})$, where spatial point density
+$\rho = N / A$. If $N$ diverges across plugins (e.g. 130,000 dots vs 16,000 dots within the same
+area $A$), $\rho$ shifts by nearly an order of magnitude. This makes scatter plots visually
+deceptive and distorts nearest-neighbor distances. Standardizing $N = 4,096$ across all 6 engines
+ensures identical density $\rho$, making Clark-Evans $R$, duplicate counts, and 3-chunk proximity
+clustering mathematically comparable.
+
+#### Publication Architecture: Lab Working Notes vs Public MkDocs
+- **Internal Scratchpad (`helpers/StressTestRTP/`):** Houses raw test harness code, local CSV files,
+  execution logs, and working notes (`PRE_WRITEUP.md`).
+- **Canonical Public Documentation (`docs/site/benchmarks.md`):** Final consolidated results,
+  comparative tables, spatial charts, and reproduction guides will be authored under `docs/site/`
+  and published automatically via MkDocs to `https://dailystruggle.github.io/RTP/site/benchmarks/`.
+  This provides responsive mobile tables, dark/light theme support, client-side search indexing,
+  and permanent, durable links from public storefront pages (`FRONT_PAGE.md`).
 
 ---
 
@@ -483,6 +571,11 @@ survive competitor releases. Anything version-pinned belongs in section 5.
 - Cold-start carries no first-attempt penalty: the pre-warmed `keptLocations`
   queue serves the first `/rtp` of a phase as fast as the thousandth.
 - Bounded p99 is the direct payoff of the count-bound pipeline (ADR-015).
+- **Unit convention verification:** In `config.yml`, `radius: 16384b` explicitly
+  uses the `b` suffix for blocks, while `centerRadius: 64` defaults to chunks
+  (64 chunks * 16 blocks/chunk = 1,024 blocks). This confirms that LeafRTP
+  operates on the exact 1,024 to 16,384 block boundary, maintaining 1:1 parity
+  with all competitor configs without discrepancy.
 - **No entry TTL by default.** Queue entries are invalidated by events (served,
   config change, spatial-memory rejection), not by a clock, so in a claim-free
   and edit-free world effective entry lifetime is "until served". Prior
@@ -501,6 +594,32 @@ survive competitor releases. Anything version-pinned belongs in section 5.
 
 - **Config edits revert on shutdown.** Verify the radius actually took effect
   via the destination scatter, or `attrib +R` the file after editing.
+- **Radius calculation bug (`RandomLocation.generateRound()`):** Decompilation of
+  `me.SuperRonanCraft.BetterRTP.references.rtpinfo.RandomLocation.generateRound()`
+  reveals an arithmetic bug in its annulus boundary calculation:
+  ```java
+  int minRadius = rtpWorld.getMinRadius();
+  int maxRadius = rtpWorld.getMaxRadius();
+  int delta = maxRadius - minRadius;
+  // Factoring error: substitutes delta instead of maxRadius into the area formula:
+  double d5 = Math.PI * (delta - minRadius) * (delta + minRadius);
+  double rand = d5 * random.nextDouble();
+  double r = Math.sqrt(rand / Math.PI + (minRadius * minRadius));
+  ```
+  Substituting `delta = maxRadius - minRadius` reduces the area factor to:
+  `d5 = PI * (max - 2*min) * max`. When `random.nextDouble()` approaches 1.0,
+  the maximum distance evaluates to:
+  `R_effective = sqrt((max - 2*min)*max + min^2) = maxRadius - minRadius`.
+  Because BetterRTP unintentionally subtracts `minRadius` from its outer reach,
+  configuring `MaxRadius: 16384` with `MinRadius: 1024` only searches up to
+  **15,360 blocks** (a 1,024-block truncation). Setting `MaxRadius: 17408` is
+  the mathematically necessary compensation to achieve the intended **16,384-block**
+  outer perimeter (`17408 - 1024 = 16384`).
+- **Radial striping and spiral banding:** BetterRTP calculates its angle as
+  `theta = 2 * Math.PI * (r - Math.floor(r))`. Because the angle is coupled
+  directly to the fractional remainder of the distance rather than an
+  independent uniform random angle, candidate destinations cluster into
+  distinct spiral stripes and radial bands visible in scatter plots.
 - `MaxAttempts: 32` retry loop: failures surface as long latency on the one
   successful retry, not as failure rows.
 - Has a `Queue.Enabled` pre-warm; serialises per-player ("already rtp'ing"
@@ -713,40 +832,39 @@ means NOT AVAILABLE. The harness writes its own schema notes alongside the CSVs.
 | Heap-pressure triggers | `heap_pressure_events`, `heap_pressure_first_heap_used_mb`, `heap_pressure_first_trigger`, plus `<stamp>-heap-triggers.csv` | Some engines govern their own heap and cut max attempts / serve cache-only above a limit; a comparison drawn across that boundary is not like-for-like. The harness records the trigger line and the heap level only - no response is inferred. Patterns are deliberately narrow (`heap-pressure-patterns`), since a false positive becomes a claimed behaviour change that never happened. |
 | Crash-safe phase capture | `<stamp>-phases-partial.csv` | The per-attempt and 50 ms heap CSVs already flush per row, but the phase *summary* was only written at phase end, so the section 5.2 crash lost its aggregate. `flushPartialPhase()` now snapshots the in-flight phase (self-throttled to once per 2 s, called from `Runner.tick()`); `endPhase` deletes the sidecar, so a leftover file is itself the signal that the phase it describes crashed. |
 
-Method work to do before the next run:
+Method work and status for the 4,096-attempt benchmark series:
 
-1. Set the base `chunk-load-cost-us` per platform so `cpu_ms_with_chunks*`
-   becomes quotable (section 6 calibration note).
-2. Configure `residency-target-plugin` per arm, or leave one target per run so
-   the harness can infer it, otherwise `peak_target_plugin_tickets` stays `-1`.
-3. Override `heap-pressure-patterns` with the vocabulary of each plugin under
-   test; the built-in defaults will not match a competitor's wording.
-4. Narrow `console-fail-patterns` - the empty default is what produced the
-   spurious warm-up "zero successful attempts" warning in every run above.
-5. Fill the HuskHomes gap=0 slot, dispatched **last** (section 5.2).
-6. Arrival-block safety audit (classify landings: safe / water / lava / cave /
+1. **[DONE] Equalize search boundary across all 6 contenders:** Fully audited and aligned on the
+   Paper 26.2 test server to a 1,024 to 16,384 block radius:
+   - LeafRTP: `radius: 16384b`, `centerRadius: 64` (chunks = 1,024b), `centerX: 0`, `centerZ: 0`.
+   - BetterRTP: `MaxRadius: 17408` (yielding 16,384b effective due to the delta truncation bug),
+     `MinRadius: 1024`, `CenterX: 0`, `CenterZ: 0`, `Shape: circle`.
+   - EzRTP: `radius.min: 1024`, `radius.max: 16384`, `center: 0, 0`, `search-pattern: circle`.
+   - JustRTP: `min_radius: 1024`, `max_radius: 16384`, `center_x: 0`, `center_z: 0`.
+   - JakesRTP: `radius.min: 1024`, `radius.max: 16384`, `shape: circle`, `center: 0, 0`.
+   - HuskHomes: `region.min: 1024`, `region.max: 16384`.
+2. **[READY] Configure Test A (Burst Saturation / Queue Clearance):**
+   - In `plugins/StressTestRTP/config.yml`: `per-target-count: 4096`, `immediate-redispatch: true`,
+     `dispatch-interval-ms: 0`, `per-player-gap-ticks: 0`, `sequence.gap-seconds: 180`,
+     `sequence.per-target-seconds: 3600`.
+   - Measures peak throughput ceiling, total 4,096-attempt clearance time, surge tail latencies,
+     and watchdog stalls across all 6 targets.
+3. **[QUEUED] Configure Test B (Steady-State Paced at 5.0 TP/s):**
+   - In `plugins/StressTestRTP/config.yml`: `per-target-count: 4096`, `immediate-redispatch: false`,
+     `dispatch-interval-ms: 200`, `per-player-gap-ticks: 4`, `sequence.gap-seconds: 180`,
+     `sequence.per-target-seconds: 1200`.
+   - Measures pure marginal tick impact ($\Delta$MSPT against settle baseline), on-tick CPU share,
+     and GC freeze ratio with throughput equalized.
+4. **[IN PROGRESS] Publication Pipeline to MkDocs (`docs/site/benchmarks.md`):**
+   - Synthesize Test A and Test B CSV outputs, Spark flame graphs, and JFR allocations directly
+     into `docs/site/benchmarks.md` for web publishing and storefront links.
+5. Set the base `chunk-load-cost-us` per platform if chunk-amended CPU modeling is desired (section 6 calibration note).
+6. Configure `residency-target-plugin` per arm if isolated per-plugin ticket counts are desired in multi-target sequence CSVs.
+7. Arrival-block safety audit (classify landings: safe / water / lava / cave /
    suffocating / void) on the pregenerated world. This is the correctness axis
    the whole benchmark still lacks: a plugin can look fast precisely because it
    skips verification, and the harness counts a completed `PlayerTeleportEvent`
    without asking whether the landing was safe.
-7. Re-cut the world at the section 3 radius (16384 blocks) and pregen every cell
-   to the full envelope before dispatching. Retire the 4096-radius rows from the
-   comparison table rather than mixing scales.
-8. Add the JustRTP arm: plugin-unique dispatch verified by `<TAB>`, per-world
-   radius raised to match, cache TTL and cap recorded in section 6.
-9. **Long-phase run for every cache-based engine.** At least 2x the longest
-   *finite* cache TTL in the roster (~30 min per phase against JustRTP's
-   ~15 min), reported first-half vs second-half so the drain and the refill are
-   separable. This is the run that makes section 4's practicality axis quotable,
-   and the one the new residency / GC / heap-pressure columns exist for. Note
-   the asymmetry: for a time-expired cache the long phase reveals hit-rate
-   decay, while for an event-invalidated one (RTP, and EzRTP's spatial state) it
-   reveals whether residency plateaus or keeps climbing. Report those as two
-   different questions, not one column.
-10. **Confirm RTP's unbounded entry lifetime at the raised radius.** The "no TTL
-    in a claim-free world" claim rests on earlier lifecycle measurement at 4096;
-    re-derive it from `peak_resident_chunks`, `peak_plugin_tickets` and queue
-    occupancy at 16384 before publishing it as a design advantage.
 
 ---
 

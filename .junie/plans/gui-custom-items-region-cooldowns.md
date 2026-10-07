@@ -234,7 +234,7 @@ Verification relies on unit and component tests across `rtp-api`, `rtp-core`, an
 
 # Delivery Steps
 
-### * Step 1: Implement Region Cooldown & Delay Configuration with Independent Tracking
+### ✓ Step 1: Implement Region Cooldown & Delay Configuration with Independent Tracking
 Regions support optional per-region cooldown and warmup delay settings with independent cooldown timers per player.
 
 - Add `cooldown` and `delay` keys to `io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys`.
@@ -243,7 +243,7 @@ Regions support optional per-region cooldown and warmup delay settings with inde
 - Update `RTPCmd` and `TeleportPipelineTask` to resolve cooldown and warmup delay through the precedence hierarchy: permission bypass (`rtp.nocooldown`, `rtp.nodelay`) -> permission override (`rtp.cooldown.<sec>`, `rtp.delay.<sec>`) -> region setting -> global config default.
 - Add unit tests in `rtp-core` validating region configuration parsing, precedence order, and independent cooldown enforcement.
 
-###   Step 2: Integrate Combat Availability and Delay into RtpTargetStatus
+### ✓ Step 2: Integrate Combat Availability and Delay into RtpTargetStatus
 `RtpTargetStatus` reflects active PvP combat state and exposes destination warmup delay for menu consumers.
 
 - Add `Availability.IN_COMBAT` to `io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability`.
@@ -252,7 +252,7 @@ Regions support optional per-region cooldown and warmup delay settings with inde
 - Update `RTPAPI.getTargetStatus` to evaluate region-specific cooldowns and attach the resolved region's warmup delay.
 - Add unit tests in `rtp-core` and `rtp-api` covering combat status reporting, region cooldown calculations, and delay exposure.
 
-###   Step 3: Build Prefix-Routed Custom Item Resolver for Bukkit GUI
+### ✓ Step 3: Build Prefix-Routed Custom Item Resolver for Bukkit GUI
 The Bukkit GUI addon resolves items from ItemsAdder, Oraxen, Nexo, HeadDatabase, player skins, and CustomModelData without hard dependencies.
 
 - Implement `BukkitCustomItemResolver` in `io.github.dailystruggle.rtp.guiaddon.bukkit.item.BukkitCustomItemResolver`.
@@ -261,7 +261,7 @@ The Bukkit GUI addon resolves items from ItemsAdder, Oraxen, Nexo, HeadDatabase,
 - Update `DestinationPickerGui.java` to route all icon creation (destinations, filler, dashboard, action selector, operator hub) through `BukkitCustomItemResolver`.
 - Add unit tests verifying prefix routing, CustomModelData parsing, and fallback behavior.
 
-###   Step 4: Implement Barrier Block Swapping and Configurable Lore Templates in GUI Addon
+### ✓ Step 4: Implement Barrier Block Swapping and Configurable Lore Templates in GUI Addon
 Blocked destinations display as barrier blocks at a glance, and hover lore renders configurable templates with dynamic placeholders.
 
 - Add `barrierOnUnavailable: true` and configurable lore template keys (`loreReady`, `loreCooldown`, `loreCombat`, `loreNoFunds`, `loreNoPermission`) to `guimenu.yml` and `GuiMenuKeys`.

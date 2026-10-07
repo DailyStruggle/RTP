@@ -17,6 +17,8 @@ public final class MenuEntry {
   private final long remainingCooldownMillis;
   private final double cost;
   private final boolean ready;
+  private final long delayMillis;
+  private final long combatRemainingMillis;
 
   MenuEntry(
       RtpTarget target,
@@ -25,6 +27,18 @@ public final class MenuEntry {
       String iconName,
       long remainingCooldownMillis,
       double cost) {
+    this(target, availability, displayName, iconName, remainingCooldownMillis, cost, 0L, 0L);
+  }
+
+  MenuEntry(
+      RtpTarget target,
+      RtpTargetStatus.Availability availability,
+      String displayName,
+      String iconName,
+      long remainingCooldownMillis,
+      double cost,
+      long delayMillis,
+      long combatRemainingMillis) {
     this.target = target;
     this.availability = availability;
     this.displayName = displayName;
@@ -32,6 +46,8 @@ public final class MenuEntry {
     this.remainingCooldownMillis = remainingCooldownMillis;
     this.cost = cost;
     this.ready = availability == RtpTargetStatus.Availability.READY;
+    this.delayMillis = Math.max(0L, delayMillis);
+    this.combatRemainingMillis = Math.max(0L, combatRemainingMillis);
   }
 
   /** The target this row teleports to when clicked. */
@@ -62,5 +78,13 @@ public final class MenuEntry {
 
   public boolean ready() {
     return ready;
+  }
+
+  public long delayMillis() {
+    return delayMillis;
+  }
+
+  public long combatRemainingMillis() {
+    return combatRemainingMillis;
   }
 }

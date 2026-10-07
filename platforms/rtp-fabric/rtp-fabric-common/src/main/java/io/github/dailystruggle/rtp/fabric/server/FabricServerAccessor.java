@@ -2567,6 +2567,26 @@ public final class FabricServerAccessor implements RTPServerAccessor {
             });
     io.github.dailystruggle.rtp.fabric.commands.FabricCommandRegistrar
         .registerRtpCommand(rootCommand, bridgeCtx, aliases);
+
+    MinecraftServer s = this.server;
+    if (s != null && rootCommand instanceof io.github.dailystruggle.commandsapi.common.CommandsAPICommand cmd) {
+      try {
+        com.mojang.brigadier.CommandDispatcher dispatcher = s.getCommands().getDispatcher();
+        io.github.dailystruggle.rtp.fabric.commands.RTPCmdFabric.register(dispatcher, cmd, bridgeCtx, aliases);
+        try {
+          Object playerList = s.getPlayerList();
+          java.lang.reflect.Method getPlayers = playerList.getClass().getMethod("getPlayers");
+          java.util.List<?> players = (java.util.List<?>) getPlayers.invoke(playerList);
+          java.lang.reflect.Method sendCommands = s.getCommands().getClass().getMethod("sendCommands", Class.forName("net.minecraft.server.level.ServerPlayer"));
+          for (Object p : players) {
+            sendCommands.invoke(s.getCommands(), p);
+          }
+        } catch (Throwable ignored) {
+        }
+      } catch (Throwable t) {
+        log(Level.WARNING, "[RTP][Fabric] Dynamic runtime command registration failed: " + t.getMessage());
+      }
+    }
   }
 
   // ---------------------------------------------------------------------------

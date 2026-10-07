@@ -1,15 +1,16 @@
 package io.github.dailystruggle.rtp.common.factory;
 
-import java.util.function.Function;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import io.github.dailystruggle.rtp.common.search.FuzzySearchEngine;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
 /**
  * this exists solely because java is so stubborn about constructors and generics. rather than
@@ -121,9 +122,10 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
   }
 
   /**
-   * Set data using a map of string keys and objects
+   * Set data using a map of string keys and objects. Property keys are resolved
+   * case-insensitively and typo-tolerantly with warning diagnostics.
    *
-   * @param data - data to apply. key is case-sensitive
+   * @param data - data to apply
    * @throws IllegalArgumentException - if the data is invalid
    */
   public void setData(final Map<String, Object> data) throws IllegalArgumentException {
@@ -131,16 +133,45 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     // a concurrent set() is not lost between the snapshot and the publish.
     synchronized (dataLock) {
       EnumMap<E, Object> rebuilt = this.data.clone();
+
+      // Build candidate map from myClass enum constants
+      Map<String, E> candidateMap = new LinkedHashMap<>();
+      for (E constant : myClass.getEnumConstants()) {
+        candidateMap.put(constant.name(), constant);
+      }
+
       data.forEach(
           (keyStr, value) -> {
-            if (keyStr == null) return;
-            if (value == null) return;
+            if (keyStr == null || value == null) return;
 
-            try {
-              E key = Enum.valueOf(myClass, keyStr);
-              rebuilt.put(key, value);
-            } catch (IllegalArgumentException ignored) {
+            FuzzySearchEngine.FuzzyLookupResult<E> lookup =
+                FuzzySearchEngine.resolveCandidate(keyStr, candidateMap);
 
+            if (lookup.isExact()) {
+              rebuilt.put(lookup.match(), value);
+            } else if (lookup.isPerceptible()) {
+              RTP.log(
+                  Level.WARNING,
+                  "[RTP] Property '"
+                      + keyStr
+                      + "' in "
+                      + myClass.getSimpleName()
+                      + " was not recognized, but closely matches '"
+                      + lookup.matchedKey()
+                      + "'. Autocorrecting to '"
+                      + lookup.matchedKey()
+                      + "'.");
+              rebuilt.put(lookup.match(), value);
+            } else {
+              RTP.log(
+                  Level.WARNING,
+                  "[RTP] Unrecognized property '"
+                      + keyStr
+                      + "' for "
+                      + myClass.getSimpleName()
+                      + " (valid properties: "
+                      + String.join(", ", lookup.availableCandidates())
+                      + "). Ignoring.");
             }
           });
       this.data = rebuilt;

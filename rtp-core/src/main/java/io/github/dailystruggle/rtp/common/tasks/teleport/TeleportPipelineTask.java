@@ -521,7 +521,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
         teleportData.sender = (context.sender() != null) ? context.sender() : player;
         teleportData.completed = false;
         teleportData.time = System.currentTimeMillis();
-        teleportData.delay = teleportData.sender.delay();
+        teleportData.delay = RTP.getDelay(teleportData.sender, region != null ? region.getSettings() : null);
         teleportData.targetRegion = region;
         teleportData.originWorldName = player.getLocation().world().name();
         teleportData.originServerId =
@@ -691,7 +691,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
           teleportData.sender = (context.sender() != null) ? context.sender() : player;
           teleportData.completed = false;
           teleportData.time = System.currentTimeMillis();
-          teleportData.delay = teleportData.sender.delay();
+          teleportData.delay = RTP.getDelay(teleportData.sender, region != null ? region.getSettings() : null);
           teleportData.targetRegion = region;
           teleportData.originWorldName = player.getLocation().world().name();
           teleportData.originServerId =
@@ -843,7 +843,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
                 long start = System.currentTimeMillis();
                 long lastTime = teleportData.time;
-                long delay = sender().delay();
+                long delay = RTP.getDelay(sender(), region != null ? region.getSettings() : null);
                 long dT = (start - lastTime);
                 long remainingTime = delay - dT;
                 long toTicks = remainingTime / 50;
@@ -1026,6 +1026,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
       teleportData.completed = true;
       teleportData.processingTime = System.currentTimeMillis() - teleportData.time;
       RTP.updateSharedLastTeleportTime(playerId, teleportData.time);
+      if (region != null && region.name != null) {
+        RTP.setLastRegionTeleportTime(playerId, region.name, teleportData.time);
+      }
       RTP.getInstance().processingPlayers.remove(playerId);
 
       // ADR-072: clamp the player's view distance immediately before the teleport so the engine's

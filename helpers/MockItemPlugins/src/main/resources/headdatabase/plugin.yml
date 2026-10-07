@@ -1,0 +1,5 @@
+name: HeadDatabase
+version: 1.0.0-MOCK
+main: io.github.dailystruggle.helpers.mockitems.MockHeadDatabasePlugin
+api-version: "1.20"
+description: Mock HeadDatabase stub plugin for testing LeafRTP integrations.

@@ -1121,6 +1121,17 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
         if (rootCommand == null) return;
         synchronized (this) {
             pendingCommandRegistrations.add(new CommandRegistrationEntry(rootCommand, aliases));
+            if (server != null) {
+                try {
+                    io.github.dailystruggle.rtp.neoforge.commands.NeoForgeCommandRegistrar
+                        .register(server.getCommands().getDispatcher(), rootCommand, aliases);
+                    for (net.minecraft.server.level.ServerPlayer player : server.getPlayerList().getPlayers()) {
+                        server.getCommands().sendCommands(player);
+                    }
+                } catch (Throwable t) {
+                    log(Level.WARNING, "[RTP][NeoForge] Dynamic runtime command registration failed: " + t.getMessage());
+                }
+            }
         }
     }
 

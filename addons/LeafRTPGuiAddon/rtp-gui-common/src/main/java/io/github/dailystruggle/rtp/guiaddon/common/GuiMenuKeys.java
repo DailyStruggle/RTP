@@ -134,10 +134,25 @@ public enum GuiMenuKeys {
   iconOnCooldown,
   /** Icon material name for an unavailable (no permission / disabled) target. */
   iconUnavailable,
+  /** Icon material name for a target blocked by PvP combat tag. */
+  iconInCombat,
   /** Icon material name for a target the player cannot afford. */
   iconNoFunds,
   /** Icon material name for the server-health dashboard tile. */
   iconDashboard,
+  /** When true, destinations that are not ready display as BARRIER blocks (or iconUnavailable). */
+  barrierOnUnavailable,
+
+  /** Configurable hover lore template lines for ready targets. */
+  loreReady,
+  /** Configurable hover lore template lines for targets on cooldown. */
+  loreCooldown,
+  /** Configurable hover lore template lines for targets in combat. */
+  loreCombat,
+  /** Configurable hover lore template lines for targets with insufficient funds. */
+  loreNoFunds,
+  /** Configurable hover lore template lines for targets locked by permission. */
+  loreNoPermission,
 
   /** Lore line shown on a ready target. */
   textReady,

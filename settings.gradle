@@ -427,3 +427,5 @@ include 'helpers:PeriodicWorldSaver'
 // and competitor plugins under identical workloads to fill the front-page
 // comparison table. See helpers/StressTestRTP/README.md.
 include 'helpers:StressTestRTP'
+// Mock stub plugins for testing third-party item integrations (ItemsAdder, Oraxen, Nexo, HeadDatabase).
+include 'helpers:MockItemPlugins'

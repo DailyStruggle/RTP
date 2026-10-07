@@ -348,4 +348,104 @@ public class MenuModelTest {
             RTPAPI.targetStatusDelegate = origStatus;
         }
     }
+
+    @Test
+    void iconName_barrierOnUnavailableSwapsBlockedDestinations() {
+        GuiMenuConfig config = new GuiMenuConfig();
+        assertTrue(config.barrierOnUnavailable());
+
+        RtpTarget target = RtpTarget.region("wild");
+
+        // Ready target keeps original icon
+        RtpTargetStatus readyStatus = new RtpTargetStatus(RtpTargetStatus.Availability.READY, 0L, 0.0);
+        assertEquals("GRASS_BLOCK", config.iconName(target, readyStatus));
+
+        // Blocked targets swap to BARRIER
+        RtpTargetStatus cdStatus = new RtpTargetStatus(RtpTargetStatus.Availability.ON_COOLDOWN, 45000L, 0.0);
+        assertEquals("BARRIER", config.iconName(target, cdStatus));
+
+        RtpTargetStatus combatStatus = new RtpTargetStatus(RtpTargetStatus.Availability.IN_COMBAT, 0L, 0.0, null, null, null, 0L, 12000L);
+        assertEquals("BARRIER", config.iconName(target, combatStatus));
+
+        RtpTargetStatus noFundsStatus = new RtpTargetStatus(RtpTargetStatus.Availability.NO_FUNDS, 0L, 100.0);
+        assertEquals("BARRIER", config.iconName(target, noFundsStatus));
+
+        RtpTargetStatus noPermStatus = new RtpTargetStatus(RtpTargetStatus.Availability.NO_PERMISSION, 0L, 0.0);
+        assertEquals("BARRIER", config.iconName(target, noPermStatus));
+    }
+
+    @Test
+    void formatDuration_convertsMillisToConciseUnits() {
+        assertEquals("0s", MenuIcons.formatDuration(0L));
+        assertEquals("0s", MenuIcons.formatDuration(-500L));
+        assertEquals("45s", MenuIcons.formatDuration(45000L));
+        assertEquals("1m 30s", MenuIcons.formatDuration(90000L));
+        assertEquals("5m", MenuIcons.formatDuration(300000L));
+        assertEquals("1h", MenuIcons.formatDuration(3600000L));
+        assertEquals("2h 1m", MenuIcons.formatDuration(7260000L));
+    }
+
+    @Test
+    void expandPlaceholders_substitutesAllKeys() {
+        RtpTarget target = RtpTarget.region("overworld");
+        MenuEntry entry = new MenuEntry(
+                target,
+                RtpTargetStatus.Availability.READY,
+                "Overworld Wilds",
+                "GRASS_BLOCK",
+                0L,
+                50.0,
+                3000L,
+                0L);
+
+        String template = "&7Target: &f{target} | Cost: &6{cost} | Delay: &e{delay} | Status: {status} | Region: {region}";
+        String expanded = MenuIcons.expandPlaceholders(template, entry);
+
+        assertTrue(expanded.contains("Overworld Wilds"));
+        assertTrue(expanded.contains("50"));
+        assertTrue(expanded.contains("3s"));
+        assertTrue(expanded.contains("&aREADY"));
+        assertTrue(expanded.contains("overworld"));
+    }
+
+    @Test
+    void entryLore_evaluatesConfigurableTemplates() {
+        RtpTarget target = RtpTarget.region("nether");
+
+        // 1. Ready entry
+        MenuEntry readyEntry = new MenuEntry(
+                target, RtpTargetStatus.Availability.READY, "Nether", "NETHERRACK", 0L, 0.0, 5000L, 0L);
+        java.util.List<String> readyLore = MenuIcons.entryLore(readyEntry);
+        assertTrue(readyLore.stream().anyMatch(l -> l.contains("&aREADY")));
+        assertTrue(readyLore.stream().anyMatch(l -> l.contains("5s")));
+        assertTrue(readyLore.stream().anyMatch(l -> l.contains("Free")));
+        assertTrue(readyLore.stream().anyMatch(l -> l.contains("Click to teleport!")));
+
+        // 2. Cooldown entry
+        MenuEntry cdEntry = new MenuEntry(
+                target, RtpTargetStatus.Availability.ON_COOLDOWN, "Nether", "BARRIER", 45000L, 0.0, 0L, 0L);
+        java.util.List<String> cdLore = MenuIcons.entryLore(cdEntry);
+        assertTrue(cdLore.stream().anyMatch(l -> l.contains("&eON COOLDOWN")));
+        assertTrue(cdLore.stream().anyMatch(l -> l.contains("45s")));
+
+        // 3. Combat entry
+        MenuEntry combatEntry = new MenuEntry(
+                target, RtpTargetStatus.Availability.IN_COMBAT, "Nether", "BARRIER", 0L, 0.0, 0L, 15000L);
+        java.util.List<String> combatLore = MenuIcons.entryLore(combatEntry);
+        assertTrue(combatLore.stream().anyMatch(l -> l.contains("&cIN COMBAT")));
+        assertTrue(combatLore.stream().anyMatch(l -> l.contains("15s")));
+
+        // 4. No funds entry
+        MenuEntry fundsEntry = new MenuEntry(
+                target, RtpTargetStatus.Availability.NO_FUNDS, "Nether", "BARRIER", 0L, 250.0, 0L, 0L);
+        java.util.List<String> fundsLore = MenuIcons.entryLore(fundsEntry);
+        assertTrue(fundsLore.stream().anyMatch(l -> l.contains("INSUFFICIENT FUNDS")));
+        assertTrue(fundsLore.stream().anyMatch(l -> l.contains("250")));
+
+        // 5. No permission entry
+        MenuEntry permEntry = new MenuEntry(
+                target, RtpTargetStatus.Availability.NO_PERMISSION, "Nether", "BARRIER", 0L, 0.0, 0L, 0L);
+        java.util.List<String> permLore = MenuIcons.entryLore(permEntry);
+        assertTrue(permLore.stream().anyMatch(l -> l.contains("&cLOCKED")));
+    }
 }

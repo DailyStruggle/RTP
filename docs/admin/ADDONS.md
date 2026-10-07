@@ -87,6 +87,7 @@ gets the visual menu immediately.
 - Bare `/rtp` opens the picker too, and **falls back to a classic teleport** when no menu
   renderer is available (e.g. wrong platform) or the caller is not a resolvable player -
   it never silently does nothing.
+- **Custom items & at-a-glance status**: Destination and filler icons in `guimenu.yml` support custom items from ItemsAdder (`ia:<id>`), Oraxen (`oraxen:<id>`), Nexo (`nexo:<id>`), HeadDatabase (`hdb:<id>`), Base64 heads, and CustomModelData (`MATERIAL:CMD`). Blocked destinations swap to barrier blocks (`barrierOnUnavailable: true`), and hover tooltips render configurable duration and state placeholders. Third-party proprietary plugin compatibility is maintained on a best-effort basis (see [Custom Item & Menu Icon Integration](CUSTOM_ITEMS.md)).
 - To revert bare `/rtp` to the classic immediate teleport while keeping the addon, change
   the menu style in the GUI addon's config (see the GUI addon's README).
 - To remove the GUI entirely, delete its jar from `plugins/RTP/addons/` and restart.
@@ -107,6 +108,7 @@ gets the visual menu immediately.
 ## See also
 
 - [FAQ.md](FAQ.md) - Development & Addons section.
+- [CUSTOM_ITEMS.md](CUSTOM_ITEMS.md) - custom item prefix routing, barrier cues, and third-party item plugin compatibility.
 - [Addon developers guide](../FOR_ADDON_DEVELOPERS.md) - how RTP discovers, loads, and extends addons.
 - [configuration/INTEGRATIONS.md](configuration/INTEGRATIONS.md) - bundled claim-plugin
   integrations (folded into the jar, not loaded as addons).
