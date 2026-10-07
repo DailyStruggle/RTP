@@ -18,7 +18,7 @@
         <link rel="prev" href="../ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/">
       
       
-        <link rel="next" href="../ADR-097-per-action-pre-validated-caches-and-bounded-retries/">
+        <link rel="next" href="../ADR-095-subspace-anchor-providers-and-near-teleport-primitives/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -3051,7 +3051,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3495,6 +3495,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#amendment-advisory-regex-hygiene-scan-2026-10-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      Amendment: advisory regex-hygiene scan (2026-10-06)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#references" class="md-nav__link">
     <span class="md-ellipsis">
       References
@@ -3507,6 +3516,27 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
     </li>
   
 
@@ -3729,6 +3759,48 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3816,6 +3888,15 @@
   <a href="#definition-of-done-audit-2026-09-12" class="md-nav__link">
     <span class="md-ellipsis">
       Definition-of-done audit (2026-09-12)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#amendment-advisory-regex-hygiene-scan-2026-10-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      Amendment: advisory regex-hygiene scan (2026-10-06)
     </span>
   </a>
   
@@ -4095,12 +4176,36 @@ lowering the OWASP threshold; making signing unconditional) touches build and CI
 configuration and is deliberately <strong>not</strong> folded into this amendment; it is proposed
 separately under rule D-005 and, once landed, recorded here or in the follow-up ADR
 that this ADR already anticipates for the remote quality-gate half.</p>
+<h2 id="amendment-advisory-regex-hygiene-scan-2026-10-06">Amendment: advisory regex-hygiene scan (2026-10-06)<a class="headerlink" href="#amendment-advisory-regex-hygiene-scan-2026-10-06" title="Permanent link">&para;</a></h2>
+<p>Avoidable regex use (per-call <code>Pattern</code> compilation, <code>String#replaceAll</code> /
+<code>replaceFirst</code> / <code>matches</code>, regex-path <code>String#split</code>, and regex text concatenated
+without <code>Pattern.quote</code>) is flagged by a second, <strong>advisory</strong> PMD ruleset,
+<a href="https://github.com/DailyStruggle/RTP/blob/V3/config/pmd/regex.xml"><code>config/pmd/regex.xml</code></a>, run by the <code>pmdRegexMain</code>
+task on production sources.</p>
+<ol>
+<li><strong>Advisory, not gating.</strong> <code>pmdRegexMain</code> sets <code>ignoreFailures = true</code>; it runs
+   under <code>-PstaticAnalysis</code> (alongside the gating <code>pmdMain</code>/<code>pmdTest</code>) or alone under
+   <code>-PregexAnalysis</code>. The existing call sites would otherwise fail the gate on day
+   one; individual rules move into <code>ruleset.xml</code> once their findings are triaged.</li>
+<li><strong>SonarCloud surface.</strong> SonarCloud cannot load custom Java rule plugins, so
+   project-specific PMD rules reach it as external issues through
+   <code>sonar.java.pmd.reportPaths</code> (set per subproject when either flag is present);
+   <code>.github/workflows/sonar.yml</code> passes <code>-PregexAnalysis</code>. Built-in Sonar rules
+   <code>java:S4248</code> and <code>java:S5361</code> cover the same ground natively.</li>
+<li><strong>IDE surface.</strong> <code>.sonarlint/connectedMode.json</code> shares the SonarQube for IDE
+   binding, so the bound quality profile (including built-in quick fixes) applies
+   in the editor. External PMD issues are server-side only; locally, run
+   <code>.\gradlew.bat :&lt;module&gt;:pmdRegexMain -PregexAnalysis</code> or point an IDE PMD plugin
+   at <code>config/pmd/regex.xml</code>.</li>
+</ol>
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="https://github.com/DailyStruggle/RTP/blob/V3/build.gradle"><code>build.gradle</code></a> — root <code>subprojects</code> block: tier exclusion,
   opt-in JaCoCo (<code>-Pcoverage</code>), opt-in PMD (<code>-PstaticAnalysis</code>).</li>
 <li><a href="https://github.com/DailyStruggle/RTP/blob/V3/config/pmd/ruleset.xml"><code>config/pmd/ruleset.xml</code></a> — curated + appendable
   starter ruleset, including the <code>PreferNonLockingExecution</code> custom XPath rule.</li>
+<li><a href="https://github.com/DailyStruggle/RTP/blob/V3/config/pmd/regex.xml"><code>config/pmd/regex.xml</code></a> — advisory regex-hygiene
+  ruleset run by <code>pmdRegexMain</code> (<code>-PregexAnalysis</code>).</li>
 <li><a href="https://github.com/DailyStruggle/RTP/blob/V3/scripts/diff-coverage.py"><code>scripts/diff-coverage.py</code></a> — server-less
   changed-line coverage gate.</li>
 <li><a href="https://github.com/DailyStruggle/RTP/blob/V3/scripts/bench-tests.py"><code>scripts/bench-tests.py</code></a> — per-suite wall-time

@@ -3040,7 +3040,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3414,6 +3414,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3608,6 +3629,48 @@
   
   <span class="md-ellipsis">
     ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
   </span>
   
 
@@ -3889,14 +3952,17 @@ For specific code-level and platform-specific requirements, please refer to the 
 <li>Integration hooks for third-party land-protection plugins (GriefPrevention, WorldGuard, Towny) and economy plugins (Vault).</li>
 <li>A stable, versioned public API (<code>rtp-api</code>) for addon developers to register custom shapes, vertical adjustors, and validation checks.</li>
 <li>Platform adapters for Spigot, Paper, Folia, Fabric, and NeoForge ensuring correct thread-safety on each server type. NeoForge support is deferred until the Fabric adapter stabilizes; see <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a> and <a href="../MULTI_PLATFORM_PLAN/">MULTI_PLATFORM_PLAN.md</a>.</li>
+<li>Network mode: optional, disabled-by-default coordination of teleportation across multiple backend servers behind one or more Velocity/BungeeCord proxies, with world state remaining authoritative on backends (section 1.6, <a href="../../adr/ADR-036-network-mode-multi-server-multi-proxy/">ADR-036</a>, <a href="../../adr/ADR-049-network-mode-platform-neutral-lift/">ADR-049</a>, <a href="../MULTI_SERVER_PLAN/">MULTI_SERVER_PLAN.md</a>).</li>
+<li>Built-in interactive menus rendered as written books with chat fallback, driven by the command tree; core menus shall not use inventory click events (<a href="../../adr/ADR-035-interactive-menus-book-first/">ADR-035</a>, <a href="../../adr/ADR-050-concrete-menu-commands-supersede-tokens/">ADR-050</a>).</li>
+<li>Bundled addons: companion addons shipped inside the distribution jar and self-extracted once into <code>plugins/RTP/addons/</code> (e.g. <code>LeafRTPGuiAddon</code>, <code>LeafRTPClaimAddon</code>, <code>LeafRTPCountdownAddon</code>, <code>LeafRTPActionAddon</code>). Each bundled addon shall depend only on <code>rtp-api</code>, shall be removable by deleting its jar, and shall be replaceable by any third-party addon implementing the same SPI (<a href="../../adr/ADR-057-platform-agnostic-addon-spi/">ADR-057</a>, <a href="../../adr/ADR-069-claim-integrations-extracted-to-bundled-addon/">ADR-069</a>, <a href="../../admin/ADDONS/"><code>docs/admin/ADDONS.md</code></a>).</li>
 </ul>
 <h3 id="out-of-scope">Out of Scope<a class="headerlink" href="#out-of-scope" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>World generation:</strong> RTP does not generate or modify terrain. It selects locations within existing worlds only.</li>
 <li><strong>Economy management:</strong> RTP does not implement an economy system. It delegates cost checks to Vault if present.</li>
 <li><strong>Anti-cheat:</strong> RTP does not detect or prevent cheating. It is the responsibility of the server operator to configure compatible anti-cheat plugins.</li>
-<li><strong>GUI / inventory menus:</strong> RTP does not provide a graphical interface. All interaction is command- and config-based.</li>
-<li><strong>Cross-server teleportation:</strong> RTP operates within a single server instance. BungeeCord/Velocity network teleportation is out of scope.</li>
+<li><strong>Inventory GUIs in core:</strong> <code>rtp-core</code> and the platform adapters shall not implement inventory (chest) menus. Inventory GUIs are delivered only by addons - the bundled <code>LeafRTPGuiAddon</code> binds bare <code>/rtp</code> through the pluggable root action (<a href="../../adr/ADR-056-bare-rtp-root-action/">ADR-056</a>) and may be removed or replaced without changing core behaviour; with no GUI addon present, bare <code>/rtp</code> performs the classic teleport.</li>
+<li><strong>Proxy-owned world state:</strong> The proxy coordinator does not own world state, region definitions, or chunk data, and does not validate locations (REQ-RTP-NET-005).</li>
 <li><strong>Unsupported platforms:</strong> RTP shall target Bukkit-derived software (Spigot, Paper, Folia), Fabric, and NeoForge. Legacy Forge, Sponge, Minestom, hybrid servers (Mohist, Magma, Arclight), and Bedrock-native servers (PocketMine-MP, Nukkit, BDS) shall not be supported. Rationale and the phased adapter plans are recorded in <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a>, <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a>, and <a href="../MULTI_PLATFORM_PLAN/">MULTI_PLATFORM_PLAN.md</a>.</li>
 <li><strong>Legacy Minecraft and Java versions:</strong> RTP targets Java 21+ (REQ-RTP-SYS-001) and the Minecraft versions enumerated by the shipped versioned platform adapter submodules (ADR-010). Older Minecraft versions and older Java runtimes are out of scope; users on legacy servers shall be directed to the last RTP release that supported their server. Revisit conditions and rationale are recorded in <a href="../../adr/ADR-021-legacy-mc-and-java-support-scope/">ADR-021</a>.</li>
 </ul>

@@ -3051,7 +3051,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3388,19 +3388,28 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#6-adaptive-stride-scaling-deriveadaptivestride-nyquist-bin-sampling-limit" class="md-nav__link">
+  <a href="#6-adaptive-stride-scaling-deriveadaptivestride-full-bin-stride-limit" class="md-nav__link">
     <span class="md-ellipsis">
-      6. Adaptive Stride Scaling (deriveAdaptiveStride) &amp; Nyquist Bin Sampling Limit
+      6. Adaptive Stride Scaling (deriveAdaptiveStride) &amp; Full-Bin Stride Limit
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="6. Adaptive Stride Scaling (deriveAdaptiveStride) & Nyquist Bin Sampling Limit">
+    <nav class="md-nav" aria-label="6. Adaptive Stride Scaling (deriveAdaptiveStride) & Full-Bin Stride Limit">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#signal-processing-hard-limit-nyquist-bin-sampling-rule-s-le-fractextbinarea2" class="md-nav__link">
+  <a href="#hard-limit-full-bin-stride-rule-s-le-textbinarea" class="md-nav__link">
     <span class="md-ellipsis">
-      Signal Processing Hard Limit: Nyquist Bin Sampling Rule ($S \le \frac{\text{binArea}}{2}$)
+      Hard Limit: Full-Bin Stride Rule ($S \le \text{binArea}$)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#superseded-half-bin-nyquist-rule-s-le-fractextbinarea2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Superseded: Half-Bin "Nyquist" Rule ($S \le \frac{\text{binArea}}{2}$)
     </span>
   </a>
   
@@ -3433,6 +3442,15 @@
   <a href="#9-configuration-command-interface" class="md-nav__link">
     <span class="md-ellipsis">
       9. Configuration &amp; Command Interface
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10-reroll-cell-slot-spacing-cross-lane-floor" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. REROLL Cell-Slot Spacing (Cross-Lane Floor)
     </span>
   </a>
   
@@ -3605,6 +3623,27 @@
   
   <span class="md-ellipsis">
     ADR-094 — Quality-Engineering Gates: Tiered Logic Tests, Local Static Analysis, and Changed-Line Coverage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
   </span>
   
 
@@ -3831,6 +3870,48 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3943,19 +4024,28 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#6-adaptive-stride-scaling-deriveadaptivestride-nyquist-bin-sampling-limit" class="md-nav__link">
+  <a href="#6-adaptive-stride-scaling-deriveadaptivestride-full-bin-stride-limit" class="md-nav__link">
     <span class="md-ellipsis">
-      6. Adaptive Stride Scaling (deriveAdaptiveStride) &amp; Nyquist Bin Sampling Limit
+      6. Adaptive Stride Scaling (deriveAdaptiveStride) &amp; Full-Bin Stride Limit
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="6. Adaptive Stride Scaling (deriveAdaptiveStride) & Nyquist Bin Sampling Limit">
+    <nav class="md-nav" aria-label="6. Adaptive Stride Scaling (deriveAdaptiveStride) & Full-Bin Stride Limit">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#signal-processing-hard-limit-nyquist-bin-sampling-rule-s-le-fractextbinarea2" class="md-nav__link">
+  <a href="#hard-limit-full-bin-stride-rule-s-le-textbinarea" class="md-nav__link">
     <span class="md-ellipsis">
-      Signal Processing Hard Limit: Nyquist Bin Sampling Rule ($S \le \frac{\text{binArea}}{2}$)
+      Hard Limit: Full-Bin Stride Rule ($S \le \text{binArea}$)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#superseded-half-bin-nyquist-rule-s-le-fractextbinarea2" class="md-nav__link">
+    <span class="md-ellipsis">
+      Superseded: Half-Bin "Nyquist" Rule ($S \le \frac{\text{binArea}}{2}$)
     </span>
   </a>
   
@@ -3988,6 +4078,15 @@
   <a href="#9-configuration-command-interface" class="md-nav__link">
     <span class="md-ellipsis">
       9. Configuration &amp; Command Interface
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10-reroll-cell-slot-spacing-cross-lane-floor" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. REROLL Cell-Slot Spacing (Cross-Lane Floor)
     </span>
   </a>
   
@@ -4053,8 +4152,8 @@
 
 
 <h1 id="adr-088-configurable-downsampling-stride-filter-for-spatial-candidate-selection">ADR-088 - Configurable Downsampling Stride Filter for Spatial Candidate Selection<a class="headerlink" href="#adr-088-configurable-downsampling-stride-filter-for-spatial-candidate-selection" title="Permanent link">&para;</a></h1>
-<p><strong>Status:</strong> Accepted (amended 2026-09-08)<br />
-<strong>Date:</strong> 2026-09-08 (amended; originally proposed 2026-09-08)</p>
+<p><strong>Status:</strong> Accepted (amended 2026-10-06)
+<strong>Date:</strong> 2026-09-08 (amended 2026-10-06: full-bin stride bound replaces the half-bin bound; REROLL cell-slot spacing, section 10)</p>
 <h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
 <p>Under legacy polar Archimedean spiral mapping (<code>Circle</code>, <a href="../ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>), continuous radial dispersion $r(\theta) = a + b\theta$ skipped approximately two-thirds (~68.2%) of discrete integer chunk coordinates in outer rings. While mathematically unintended—creating coverage voids, radial spoke gaps, and kaleidoscope coordinate aliasing—server operators observed an accidental operational benefit in live production:
 1. <strong>Implicit Inter-Player Separation:</strong> Consecutive <code>/rtp</code> executions rarely landed on immediately adjacent chunk boundaries, naturally dispersing arrivals across the region.
@@ -4114,21 +4213,24 @@ where $\gamma = \text{0x9E3779B97F4A7C15L}$ (the golden ratio fractional constan
 <p>In <code>SquareOptimizedDualLayer</code>, every virtual good index maps bijectively to a valid safe chunk. Legacy retry loops (<code>for (int attempts = 0; attempts &lt; 100; attempts++)</code>) have been eliminated entirely. Candidate coordinate generation executes in a <strong>single-pass, branchless formula</strong>:
 - Latency drops from $12.6\,\mu\text{s} \to 1.56\,\mu\text{s}$ per selection ($&gt; 600{,}000$ coordinates/second).
 - 100% loop-free and retry-free.</p>
-<h3 id="6-adaptive-stride-scaling-deriveadaptivestride-nyquist-bin-sampling-limit">6. Adaptive Stride Scaling (<code>deriveAdaptiveStride</code>) &amp; Nyquist Bin Sampling Limit<a class="headerlink" href="#6-adaptive-stride-scaling-deriveadaptivestride-nyquist-bin-sampling-limit" title="Permanent link">&para;</a></h3>
+<h3 id="6-adaptive-stride-scaling-deriveadaptivestride-full-bin-stride-limit">6. Adaptive Stride Scaling (<code>deriveAdaptiveStride</code>) &amp; Full-Bin Stride Limit<a class="headerlink" href="#6-adaptive-stride-scaling-deriveadaptivestride-full-bin-stride-limit" title="Permanent link">&para;</a></h3>
 <p>A static stride $S = 256$ on small shapes ($R = 16$, $1{,}024$ chunks) causes subset starvation (only 4 candidates per subset). Stride $S$ scales adaptively based on domain size:
 $$S = \begin{cases} 1 &amp; \text{for } \text{domain} &lt; 64 \ 4 &amp; \text{for } \text{domain} &lt; 256 \quad (R \le 8) \ 16 &amp; \text{for } \text{domain} &lt; 1024 \quad (R \le 16) \ 64 &amp; \text{for } \text{domain} &lt; 8192 \quad (R \le 64) \ 256 &amp; \text{for } \text{domain} \ge 8192 \quad (R \ge 128) \end{cases}$$
 This guarantees that every subset maintains $\ge 64$ candidates while keeping inter-player physical spacing proportional across all world sizes.</p>
-<h4 id="signal-processing-hard-limit-nyquist-bin-sampling-rule-s-le-fractextbinarea2">Signal Processing Hard Limit: Nyquist Bin Sampling Rule ($S \le \frac{\text{binArea}}{2}$)<a class="headerlink" href="#signal-processing-hard-limit-nyquist-bin-sampling-rule-s-le-fractextbinarea2" title="Permanent link">&para;</a></h4>
-<p>To prevent spatial aliasing, pattern degradation, and cross-phase boundary overlap across macro-tile / bin boundaries, stride $S$ is subject to a strict signal processing upper bound:
-$$S \le \max\left(1, \left\lfloor \frac{\text{binArea}}{2} \right\rfloor \right) \quad \text{where } \text{binArea} = P^2 = \text{pointEdgeChunks}^2$$</p>
+<h4 id="hard-limit-full-bin-stride-rule-s-le-textbinarea">Hard Limit: Full-Bin Stride Rule ($S \le \text{binArea}$)<a class="headerlink" href="#hard-limit-full-bin-stride-rule-s-le-textbinarea" title="Permanent link">&para;</a></h4>
+<p>Stride $S$ is bounded by one key per bin:
+$$S \le \max\left(1, \text{binArea} \right) \quad \text{where } \text{binArea} = P^2 = \text{pointEdgeChunks}^2$$</p>
 <ul>
-<li><strong>Rule Rationale:</strong> In digital signal processing and spatial sampling, sampling frequency must be at least twice the maximum spatial frequency ($f_s \ge 2 f_{\max}$). If stride step $S$ exceeds half the number of chunks in a macro-tile / bin ($S &gt; \frac{\text{binArea}}{2}$), the sampling interval falls below the Nyquist rate for the bin partition. Under sub-Nyquist sampling, points alias across bin boundaries and cause adjacent-tile coordinate overlap without falling back on the presumption of the next phase (interstitial points).</li>
+<li><strong>Rule Rationale:</strong> At $S = P^2$ a phase lane holds the same intra-bin Hilbert offset in every bin. Bins of equal orientation translate that offset by multiples of $P$, so same-lane keys sit at least $P$ chunks apart. The floor breaks only where the spiral re-orients a bin at a ring corner; that share is about $1/\text{rings}$, and derived $P \le 2R/64$ keeps $\text{rings} \ge 32$, so at least ~95% of keys keep the floor (measured 5.1% / 2.6% / 1.35% seam keys at 32 / 64 / 128 rings; on the shipped 16,384-block circle no same-lane pair is closer than 22.6 chunks). Below $P^2$ a lane takes several keys per bin, and the Hilbert sub-quadrants they land in are transposed or reflected relative to each other, so no spacing floor holds: $S = P^2/2$ leaves 78-92% and $S = P^2/4$ leaves 97-99% of keys within $\sqrt{S}$ of a same-lane key inside a bin, independent of radius (<code>ConsecutiveLandingSpacingSimTest</code>). Being a power of four is not sufficient; the stride must cover the whole bin.</li>
+<li><strong>Predictability:</strong> A lane narrows the next window of 16-64 landings to $N / S$ keys sharing one intra-bin offset (about 3,200 chunks on the shipped circle). The order within the lane, the next lane and the window length stay keyed (C7), so this does not let a player trap a landing.</li>
 <li><strong>Enforced Caps:</strong></li>
-<li>For $P = 32$ ($\text{binArea} = 1{,}024\text{ chunks}$): $S \le 512$.</li>
-<li>For $P = 16$ ($\text{binArea} = 256\text{ chunks}$): $S \le 128$.</li>
+<li>For $P = 32$ ($\text{binArea} = 1{,}024\text{ chunks}$): $S \le 1{,}024$.</li>
+<li>For $P = 16$ ($\text{binArea} = 256\text{ chunks}$): $S \le 256$.</li>
 <li>Stride is additionally bounded by $S \le \frac{\text{domainSize}}{4}$.</li>
 <li><strong>Resolution of Domain Saturation:</strong> When benchmarking or operating at large strides ($S = 256$), the world radius must provide sufficient domain capacity ($R \ge 1{,}024\text{ chunks}$ for concurrent bursts $N \ge 500$) so that macro-tile occupancy remains below the packing threshold ($\le 10\%$), preventing seam boundary overlap between adjacent occupied bins.</li>
 </ul>
+<h4 id="superseded-half-bin-nyquist-rule-s-le-fractextbinarea2">Superseded: Half-Bin "Nyquist" Rule ($S \le \frac{\text{binArea}}{2}$)<a class="headerlink" href="#superseded-half-bin-nyquist-rule-s-le-fractextbinarea2" title="Permanent link">&para;</a></h4>
+<p>The original rule capped $S$ at half the bin, citing the sampling theorem ($f_s \ge 2 f_{\max}$) against aliasing across bin boundaries. The key space is a bijection rather than a sampled signal, so no aliasing applies. The cap clamped the resolution-derived $S = P^2$ to $P^2/2$, which put two keys of each lane in mirrored halves of every bin, as close as 1.4 chunks.</p>
 <h3 id="7-strict-separation-of-ground-truth-vs-candidate-sampling">7. Strict Separation of Ground Truth vs. Candidate Sampling<a class="headerlink" href="#7-strict-separation-of-ground-truth-vs-candidate-sampling" title="Permanent link">&para;</a></h3>
 <p>Safety ground truth shall never be degraded:
 1. <strong>Full-Resolution Run Table Storage:</strong> <code>SegmentedKeyRunTable</code> stores and verifies terrain at full 1-chunk resolution ($S = 1$). Safety verdicts are registered at exact chunk coordinates.
@@ -4163,6 +4265,15 @@ $$S \le \max\left(1, \left\lfloor \frac{\text{binArea}}{2} \right\rfloor \right)
 <ul>
 <li>Supported in command overrides: <code>/rtp shape:square_optimized_duallayer selectionstride:256</code>.</li>
 </ul>
+<h3 id="10-reroll-cell-slot-spacing-cross-lane-floor">10. REROLL Cell-Slot Spacing (Cross-Lane Floor)<a class="headerlink" href="#10-reroll-cell-slot-spacing-cross-lane-floor" title="Permanent link">&para;</a></h3>
+<p>Section 6 gives a floor only among keys of one lane. Lanes are permuted under independent keys, so keys of two lanes fall at random relative to each other: a 4,096-landing REROLL stress run on the 16,384-block circle had 98 pairs within 48 blocks (3 chunks), about the uniform rate.</p>
+<p>In <code>MODE_REROLL</code> the key domain is fixed, so the stride keys are regrouped by aligned 8x8-chunk cells:
+1. <strong>Cells:</strong> for $P \ge 8$, every aligned 64-key block of a bin's Hilbert index is an aligned $8 \times 8$-chunk cell, and its 64 offsets are an isometric copy of the base order-3 curve under all eight bin orientations. A stride $S$ that is a multiple of 64 splits into $S/64$ cell <strong>slots</strong>; key $= b \cdot S + 64 \cdot \text{slot} + \ell$.
+2. <strong>Inset offsets:</strong> $\ell$ is restricted to the 16 offsets whose chunk sits $\ge 2$ chunks from every cell edge (local coordinates $[2, 5]^2$). Any two picks in distinct cells are then $\ge 5$ chunks apart on some axis (more than 64 blocks), whichever window drew them.
+3. <strong>Shared slot order:</strong> all windows on a slot advance one counter through one keyed permutation of the $\text{range}/S$ stride blocks ($K = \text{secretServerSeed} \oplus (\text{epoch} + \text{cycle}) \cdot \ldots \oplus \text{slot} \cdot \gamma$). No cell repeats within a <strong>pass</strong> of $\text{range}/64$ picks (65,472 on the shipped 16,384-block circle; a 20,000-entry backlog plus 4,096 landings at 40% rejection draws about 34,000).
+4. <strong>Windows unchanged:</strong> a window holds one (slot, offset) pair for a Gaussian 16-64 picks, so picks inside it keep the section 6 lattice. Every $S/64$ windows visit each slot once in a keyed order, so slot passes advance evenly; the offset is keyed per window. <code>BINNED_AMORTIZED</code> uses the pure-in-$t$ form: slot $= \text{reverse}(t \bmod S/64)$, block counter $t / (S/64)$, offset keyed per draw.</p>
+<p><strong>Bounds:</strong> the floor holds within a pass; a later pass revisits cells at a fresh keyed offset, so cross-pass pairs fall back toward the uniform rate. <code>MODE_ACCUMULATE</code> keeps the per-lane path, because renumbered good indices do not stay on cells. Predictability (C7): the next pick is one of $\text{range}/S$ blocks under a keyed permutation; an observer learns at most the current slot and offset of a window.</p>
+<p><strong>Coverage trade-off:</strong> only the $4 \times 4$ core of each cell is selectable, 25% of chunks, on a lattice with an 8-chunk period. The spread by area stays even, because every cell offers the same subset (<code>CellSlotSpacingTest</code>), but land patches narrower than about 4 chunks that fall entirely in cell borders are never picked. A 16x16 cell with the same 2-chunk inset keeps the 5-chunk floor and reaches 56% of chunks, but its pass is 4x shorter (16,368 picks on the shipped circle), below the draws of a 20,000-entry backlog.</p>
 <h2 id="criteria">Criteria<a class="headerlink" href="#criteria" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -4185,8 +4296,8 @@ $$S \le \max\left(1, \left\lfloor \frac{\text{binArea}}{2} \right\rfloor \right)
 </tr>
 <tr>
 <td>C3</td>
-<td><strong>Deterministic Spacing &amp; Nyquist Bound:</strong> Distance between consecutive indices satisfies $d \ge \sqrt{S}$ chunks within Nyquist limit $S \le \text{binArea}/2$</td>
-<td><strong>MET</strong></td>
+<td><strong>Deterministic Spacing &amp; Full-Bin Bound:</strong> At $S = P^2$ same-lane keys satisfy $d \ge P$ chunks except at spiral ring-corner seams (share ~$1/\text{rings} \le$ ~5%); sub-bin strides carry no spacing floor; $S \le \text{binArea}$</td>
+<td><strong>MET</strong> (raw draw order: 0 back-to-back pairs under 256 blocks per 4,096 draws. With ~40% terrain rejection under ACCUMULATE, and with backlog and live searches interleaved, back-to-back pairs stay ~95% below uniform, because the remap offset between nearby picks is only the rejections learned between them. Dense learned bad areas push that offset toward a full bin and loosen in-bin spacing)</td>
 </tr>
 <tr>
 <td>C4</td>
@@ -4196,12 +4307,12 @@ $$S \le \max\left(1, \left\lfloor \frac{\text{binArea}}{2} \right\rfloor \right)
 <tr>
 <td>C5</td>
 <td><strong>Full Ergodicity:</strong> Rotating dyadic phase over $S$ offsets covers 100% of addressable chunk coordinates without coordinate starvation</td>
-<td><strong>MET</strong></td>
+<td><strong>PARTIAL</strong> (ACCUMULATE: met. REROLL with cell-slot spacing: 25% of chunks, the core of each 8x8 cell, section 10)</td>
 </tr>
 <tr>
 <td>C6</td>
 <td><strong>Zero Duplicate Selections:</strong> Keyed Feistel permutation guarantees 0 duplicate chunk landings ($0.0\%$) across the domain</td>
-<td><strong>MET</strong></td>
+<td><strong>PARTIAL</strong> (holds while the permuted domain is fixed, as in REROLL mode. Under ACCUMULATE each merged rejection renumbers good indices, and with <code>expand: false</code> landings are not marked, so used chunks repeat at about the uniform rate)</td>
 </tr>
 <tr>
 <td>C7</td>
@@ -4217,6 +4328,11 @@ $$S \le \max\left(1, \left\lfloor \frac{\text{binArea}}{2} \right\rfloor \right)
 <td>C9</td>
 <td><strong>Scale-Invariant Density:</strong> Adaptive stride scaling prevents subset starvation on small arenas ($R \le 16$)</td>
 <td><strong>MET</strong></td>
+</tr>
+<tr>
+<td>C10</td>
+<td><strong>Cross-Lane Floor (REROLL):</strong> any two picks within a pass are $\ge 5$ chunks apart on some axis, with no area marked</td>
+<td><strong>MET</strong> (section 10; 0 pairs within 48 blocks over 4,096 landings after a 20,000-draw backlog, <code>CellSlotSpacingTest</code>)</td>
 </tr>
 </tbody>
 </table>

@@ -3040,7 +3040,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3414,6 +3414,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3608,6 +3629,48 @@
   
   <span class="md-ellipsis">
     ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
   </span>
   
 
@@ -5138,13 +5201,14 @@ platforms/rtp-fabric/    -- FabricMetricsBinding (server tick callbacks)
 <li>All bStats lambdas shall read pre-cached values from <code>Metrics.snapshot()</code> rather than invoking platform calls inline. Bucketisation happens once per snapshot, not once per chart fetch.</li>
 <li>Submission cadence respects bStats defaults; do not add custom timers.</li>
 <li>Chart IDs registered on bStats.org should be locked into a small constants class (<code>BStatsChartIds</code>) so a typo in one place doesn't silently break a chart.</li>
-<li>The bStats integration ships in <code>rtp-plugin</code> (Bukkit family) and <code>rtp-fabric</code> (when bStats-Fabric is wired in Phase M2). Velocity / BungeeCord proxies get a separate, smaller bStats chart set in Phase M3 once the proxy adapter exists — the proxy chart set deliberately omits backend-shape charts to avoid fingerprinting backend pools.</li>
+<li>No bStats library is bundled. The dependency-free v2 client lives in the reusable <code>:bstats-api</code> module (<a href="https://github.com/DailyStruggle/RTP/blob/V3/api/bstats-api/docs/adr/bstats-api-ADR-001-dependency-free-client.md">bstats-api-ADR-001</a>): payload, endpoint (<code>/api/v2/data/&lt;platform&gt;</code>), jitter (3-6 min initial, 30 min period) and opt-out match the upstream <code>MetricsBase</code>, and <code>BStatsPlatform</code> maps neutral server facts onto the <code>bukkit</code> endpoint's wire fields. The existing shared <code>bStats/config.yml</code> / <code>config.txt</code> is read, never rewritten, so the server UUID and install counts carry over.</li>
+<li>Every backend starts bStats through one entry point, <code>RtpBStats</code> in <code>rtp-core</code> <code>common.metrics.bstats</code>, which adapts <code>RTP.scheduler</code> / <code>RTP.log</code> and registers the single chart catalogue (<code>RtpBStatsCatalogue</code>). Platforms supply only a <code>Host</code> (platform label, chunk-load mode, server facts, optional addon whitelist): Bukkit uses <code>BukkitBStatsHost</code> (main-thread collection, async send); Fabric and NeoForge use the core-state default <code>Host.of(loader)</code>. All report to one service (<code>bukkit</code> endpoint, id 30865 full / 12277 lite), separable via the <code>platform</code> chart. Proxies (Velocity / BungeeCord) do not report to bStats: they have no server metrics, and the backends already report their own.</li>
 </ul>
 <h4 id="phasing_2">Phasing<a class="headerlink" href="#phasing_2" title="Permanent link">&para;</a></h4>
 <ul>
 <li><strong>Phase M1</strong>: ship the <em>Configuration adoption</em> group (low effort, immediate insight).</li>
 <li><strong>Phase M2</strong>: add the <em>Runtime health</em> group once <code>Metrics.snapshot()</code> is live on Folia/Fabric.</li>
-<li><strong>Phase M3</strong>: add the <em>Feature-shape rollups</em> and the proxy-side chart set.</li>
+<li><strong>Phase M3</strong>: add the <em>Feature-shape rollups</em>.</li>
 </ul>
 <hr />
 <h2 id="sufficiency-audit-2026-05-01">Sufficiency Audit (2026-05-01)<a class="headerlink" href="#sufficiency-audit-2026-05-01" title="Permanent link">&para;</a></h2>

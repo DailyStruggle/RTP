@@ -3051,7 +3051,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3603,6 +3603,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3797,6 +3818,48 @@
   
   <span class="md-ellipsis">
     ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
   </span>
   
 
@@ -4103,7 +4166,7 @@ $$\text{cacheCap}<em _text_config="\text{config">{\text{effective}} = \min\left(
 <li>When new disjoint region instantiations approach the concurrency ceiling:
      $$C_{\text{max_regional_inflight}} \le \max\left(1, \left\lfloor \frac{\text{availableProcessors}}{2} \right\rfloor\right)$$
      The scheduler defers new candidate regional dispatches until in-flight checks complete, preventing the creation of disjoint Folia regions faster than the server's thread pool can process them.</li>
-<li><em>Why RTP has avoided stalls historically up to ~14 TP/s:</em> RTP's single-threaded async pulse (<code>AsyncTaskProcessing</code>) combined with the Anvil/Linear off-tick prefilter (ADR-016, ADR-077) evaluates candidates directly from disk without touching live chunks or creating Folia regions. Live regional dispatches only occur on the final promotion path. However, when the prefilter is disabled, on custom ungenerated worlds, or under high burst loads, formalizing this in-scheduler gating ensures RTP remains immune to Folia region exhaustion across all deployments.</li>
+<li><em>Why RTP has avoided stalls historically up to ~14 TP/s:</em> RTP's single-threaded async pulse (<code>AsyncTaskProcessing</code>) combined with the Anvil/Linear off-tick prefilter (ADR-016, ADR-077; 2026-10-06: Linear reader withdrawn from core, see ADR-077, so Linear references in this ADR apply only to addon-registered readers) evaluates candidates directly from disk without touching live chunks or creating Folia regions. Live regional dispatches only occur on the final promotion path. However, when the prefilter is disabled, on custom ungenerated worlds, or under high burst loads, formalizing this in-scheduler gating ensures RTP remains immune to Folia region exhaustion across all deployments.</li>
 <li><strong>Spatial Distribution Balance and Candidate Compute Reordering:</strong></li>
 <li>In RTP's tiered pipeline (ADR-078), new Folia ticking regions are primarily instantiated at two specific transition points:<ol>
 <li><strong>L2 (Cold) $\to$ L1 (Hot) Promotion:</strong> Activating a chunk ticket (<code>keep(true)</code>) and binding coordinates to live server state.</li>

@@ -3040,7 +3040,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3414,6 +3414,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3608,6 +3629,48 @@
   
   <span class="md-ellipsis">
     ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
   </span>
   
 
@@ -4092,18 +4155,18 @@ flowchart TB
 <h3 id="downsampling-state-machine-and-phase-permutation">Downsampling State Machine and Phase Permutation<a class="headerlink" href="#downsampling-state-machine-and-phase-permutation" title="Permanent link">&para;</a></h3>
 <pre class="mermaid"><code>%% Color legend: green=active phase candidate, blue=cryptographic mixing, yellow=phase progression, red=epoch transition
 flowchart TD
-    subgraph StrideConfig [Stride Derivation &amp; Nyquist Bound]
-        InitDomain[Domain Size N / totalGood]:::data --&gt; DeriveS[deriveAdaptiveStride&lt;br/&gt;S in 1, 4, 16, 64, 256]:::data
-        DeriveS --&gt; NyquistCheck{Nyquist Bound Check&lt;br/&gt;S &amp;le; binArea / 2 ?&lt;br/&gt;binArea = P^2}
-        NyquistCheck -- S &gt; binArea/2 --&gt; ClampS[Clamp Stride S = max 1, binArea / 2]:::data
-        NyquistCheck -- S &amp;le; binArea/2 --&gt; ValidS[Final Stride S &amp; bits = log2 S]:::data
+    subgraph StrideConfig [Stride Derivation &amp; Full-Bin Bound]
+        InitDomain[Domain Size N / totalGood]:::data --&gt; DeriveS[deriveEffectiveStride&lt;br/&gt;resolution / uniquePlacements / adaptive]:::data
+        DeriveS --&gt; BinCheck{Full-Bin Bound Check&lt;br/&gt;S &amp;le; binArea ?&lt;br/&gt;binArea = P^2}
+        BinCheck -- S &gt; binArea --&gt; ClampS[Clamp Stride S = max 1, binArea]:::data
+        BinCheck -- S &amp;le; binArea --&gt; ValidS[Final Stride S &amp; bits = log2 S]:::data
     end
 
     subgraph PhaseProgression [Dyadic Bit-Reversal Anti-Resonance]
         ValidS --&gt; AdvCounter[Advance Monotonic Counter t&lt;br/&gt;t = selectionCounter.getAndIncrement]:::async
         AdvCounter --&gt; EpochSlice[Epoch Slice: epoch = t / subsetCapacity&lt;br/&gt;subsetIdx = epoch mod S]:::data
         EpochSlice --&gt; BitRev[Dyadic Bit-Reversal Bisection Sequence&lt;br/&gt;&amp;phi; = reverse subsetIdx &gt;&gt;&gt; 32 - bits]:::data
-        BitRev --&gt; PhaseExhaustion["Exhaust all candidates in active phase &amp;phi; before next rotation&lt;br/&gt;(Guarantees physical distance d &amp;ge; &amp;radic;S chunks)"]:::data
+        BitRev --&gt; PhaseExhaustion["Exhaust all candidates in active phase &amp;phi; before next rotation&lt;br/&gt;(S = P^2: d &amp;ge; P chunks except at spiral ring corners)"]:::data
     end
 
     subgraph FeistelNetwork [4-Round Feistel Pseudorandom Permutation]
@@ -4352,7 +4415,7 @@ sequenceDiagram
 <li><code>WorldBacklogBinIndex</code>: cross-region weak index mapping <code>RegionFileCoord</code> to candidate entries for <code>.mca</code> batch verification.</li>
 <li><code>Region.processBacklog()</code>: hysteresis-gated refill, one-bin-per-pulse Anvil pre-filtering, and head-blocking L2 promotion.</li>
 <li><strong>Verification and Safety:</strong></li>
-<li><code>AnvilRegionByteCache</code> / <code>anvil-api</code>: off-tick <code>.mca</code> and <code>.linear</code> NBT pre-filtering without server chunk tickets (<code>REQ-RTP-S-005</code>).</li>
+<li><code>AnvilRegionByteCache</code> / <code>anvil-api</code>: off-tick <code>.mca</code> (and addon-registered format) NBT pre-filtering without server chunk tickets (<code>REQ-RTP-S-005</code>).</li>
 </ul>
 
 

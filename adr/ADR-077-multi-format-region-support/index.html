@@ -26,7 +26,7 @@
     
     
       
-        <title>ADR-077 - Multi-Format Region Support: Linear - LeafRTP</title>
+        <title>ADR-077 - Multi-Format Region Support: Pluggable Region Readers - LeafRTP</title>
       
     
     
@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#adr-077-multi-format-region-support-linear-zstd-and-pluggable-region-readers" class="md-skip">
+        <a href="#adr-077-multi-format-region-support-pluggable-region-readers-linear-via-addon" class="md-skip">
           Skip to content
         </a>
       
@@ -112,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              ADR-077 - Multi-Format Region Support: Linear
+              ADR-077 - Multi-Format Region Support: Pluggable Region Readers
             
           </span>
         </div>
@@ -3060,7 +3060,7 @@
           
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3071,7 +3071,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3093,9 +3093,18 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#revision-2026-09-23-linear-folded-into-anvil-api-via-a-pure-java-decoder" class="md-nav__link">
+  <a href="#revision-2026-10-06-linear-withdrawn-from-core-ships-later-as-a-guarded-addon" class="md-nav__link">
     <span class="md-ellipsis">
-      Revision (2026-09-23) - Linear folded into anvil-api via a pure-Java decoder
+      Revision (2026-10-06) - Linear withdrawn from core; ships later as a guarded addon
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#revision-2026-09-23-linear-folded-into-anvil-api-via-a-pure-java-decoder-superseded-2026-10-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      Revision (2026-09-23) - Linear folded into anvil-api via a pure-Java decoder (superseded 2026-10-06)
     </span>
   </a>
   
@@ -3519,6 +3528,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3729,6 +3759,48 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3777,9 +3849,18 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#revision-2026-09-23-linear-folded-into-anvil-api-via-a-pure-java-decoder" class="md-nav__link">
+  <a href="#revision-2026-10-06-linear-withdrawn-from-core-ships-later-as-a-guarded-addon" class="md-nav__link">
     <span class="md-ellipsis">
-      Revision (2026-09-23) - Linear folded into anvil-api via a pure-Java decoder
+      Revision (2026-10-06) - Linear withdrawn from core; ships later as a guarded addon
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#revision-2026-09-23-linear-folded-into-anvil-api-via-a-pure-java-decoder-superseded-2026-10-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      Revision (2026-09-23) - Linear folded into anvil-api via a pure-Java decoder (superseded 2026-10-06)
     </span>
   </a>
   
@@ -3848,12 +3929,46 @@
   
 
 
-<h1 id="adr-077-multi-format-region-support-linear-zstd-and-pluggable-region-readers">ADR-077 - Multi-Format Region Support: Linear (ZSTD) and Pluggable Region Readers<a class="headerlink" href="#adr-077-multi-format-region-support-linear-zstd-and-pluggable-region-readers" title="Permanent link">&para;</a></h1>
-<p><strong>Status:</strong> Accepted (revised 2026-09-23 - see Revision)
+<h1 id="adr-077-multi-format-region-support-pluggable-region-readers-linear-via-addon">ADR-077 - Multi-Format Region Support: Pluggable Region Readers (Linear via Addon)<a class="headerlink" href="#adr-077-multi-format-region-support-pluggable-region-readers-linear-via-addon" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Accepted (revised 2026-09-23, revised again 2026-10-06 - see Revisions)
 <strong>Date:</strong> 2026-08-26
 <strong>Extends:</strong> <a href="../ADR-016-anvil-subsystem/">ADR-016</a> (Anvil Read-Only Subsystem)
 <strong>Related:</strong> <a href="../ADR-028-l3-backlog-cache/">ADR-028</a> (L3 Backlog Cache), <a href="../ADR-067-adaptive-scan-rate-and-mca-header-generation-check/">ADR-067</a> (Adaptive Scan Rate and Header Generation Check)</p>
-<h2 id="revision-2026-09-23-linear-folded-into-anvil-api-via-a-pure-java-decoder">Revision (2026-09-23) - Linear folded into <code>anvil-api</code> via a pure-Java decoder<a class="headerlink" href="#revision-2026-09-23-linear-folded-into-anvil-api-via-a-pure-java-decoder" title="Permanent link">&para;</a></h2>
+<h2 id="revision-2026-10-06-linear-withdrawn-from-core-ships-later-as-a-guarded-addon">Revision (2026-10-06) - Linear withdrawn from core; ships later as a guarded addon<a class="headerlink" href="#revision-2026-10-06-linear-withdrawn-from-core-ships-later-as-a-guarded-addon" title="Permanent link">&para;</a></h2>
+<p>The built-in <code>LinearRegionReader</code> did not implement the real Linear format. The
+reference implementation (xymb <code>LinearRegionFileFormatTools</code>, <code>linear.py</code>, used by
+LinearPaper and Leaves) uses signature <code>0xc3ff13183cca9d9a</code> at both the start and the end
+of the file, a 32-byte header, and keeps the 1024-entry <code>(size, timestamp)</code> table <em>inside</em>
+the compressed blob. The reader expected a different signature, a 22-byte header and
+plain size/timestamp tables before the compressed payload, so every real <code>.linear</code> file
+failed its signature check and returned <code>UNKNOWN</code> after a whole-file read. Its tests built
+fixtures in the reader's own layout and so passed against it. The reader also summed
+untrusted chunk lengths into an <code>int</code> without bounds and let the decompressor skip up to
+~2 GiB.</p>
+<p>Decision: Linear is removed from core.</p>
+<ul>
+<li><code>LinearRegionReader</code>, its tests and its fuzz target are deleted.</li>
+<li><code>RegionFormatRegistry</code> registers only <code>.mca</code> by default.</li>
+<li><code>RegionFileResolver</code> keeps no Linear special case (no <code>isLinear</code> flag, no hard-coded
+  <code>.linear</code> fallback).</li>
+<li><code>AnvilRegionScanner</code> and <code>PregenBiomeExtractor</code> read only <code>.mca</code> and registered
+  extensions. A file in an unregistered format is never handed to <code>AnvilReader</code>.</li>
+<li><code>io.airlift:aircompressor</code> is dropped from <code>anvil-api</code> and from both shaded jars, and
+  <code>zstd-jni</code> is dropped from the test classpath. The plugin jar shades no third-party
+  library.</li>
+<li>The <code>RegionFileReader</code> / <code>RegionFileReaderProvider</code> / <code>RegionFormatRegistry</code> SPI stays.
+  A future addon shall provide a Linear reader that is guarded:</li>
+<li>validate both signatures and the header;</li>
+<li>decompress into a buffer of capped size;</li>
+<li>add up chunk sizes as a <code>long</code>, with a per-chunk cap;</li>
+<li>test against files produced by the reference converter.</li>
+</ul>
+<p>On a Linear world, core resolves no region file, so the probe returns <code>UNKNOWN</code>
+and the chunk goes to the live async load path (S-004, S-005). That was already the
+effective behaviour, minus the wasted whole-file read. None of the Linear code reached a
+release (3.2.1 shipped Anvil only). This revision supersedes the 2026-09-23 revision
+below, Decision items 2, 3 and 5 for Linear, and Option F.</p>
+<h2 id="revision-2026-09-23-linear-folded-into-anvil-api-via-a-pure-java-decoder-superseded-2026-10-06">Revision (2026-09-23) - Linear folded into <code>anvil-api</code> via a pure-Java decoder (superseded 2026-10-06)<a class="headerlink" href="#revision-2026-09-23-linear-folded-into-anvil-api-via-a-pure-java-decoder-superseded-2026-10-06" title="Permanent link">&para;</a></h2>
 <p>The original decision (Option E) packaged the Linear decoder as a standalone
 <code>LeafRTPLinearAddon</code> specifically to keep the native <code>com.github.luben:zstd-jni</code>
 library (~6.3 MiB of multi-platform native binaries) out of the core jar. That
@@ -3930,12 +4045,19 @@ Option E below and the addon-specific wording in the Decision/Consequences.</p>
 <td style="text-align: left;">Kept the native zstd-jni out of core, but required operators on <code>.linear</code> worlds to install a separate addon jar. Superseded once the native dependency was replaced by the tiny pure-Java aircompressor decoder (see Revision).</td>
 </tr>
 <tr>
-<td style="text-align: left;">Option F: Build Linear into <code>anvil-api</code> using a pure-Java ZStandard decoder (Selected, 2026-09-23)</td>
-<td style="text-align: left;">RTP only decompresses (read-only, off-tick), so a pure-Java decoder (<code>io.airlift:aircompressor</code>, ~0.26 MiB shaded, no native binaries) delivers built-in <code>.linear</code> support for both editions with negligible size cost and no per-platform native packaging or linkage-failure risk.</td>
+<td style="text-align: left;">Option F: Build Linear into <code>anvil-api</code> using a pure-Java ZStandard decoder (selected 2026-09-23; superseded 2026-10-06)</td>
+<td style="text-align: left;">The shipped reader did not match the real Linear layout and lacked input bounds, and the decoder was the plugin's only shaded third-party library.</td>
+</tr>
+<tr>
+<td style="text-align: left;">Option G: Anvil-only core; Linear as a guarded addon on the existing SPI (Selected, 2026-10-06)</td>
+<td style="text-align: left;">Keeps core free of shaded dependencies and of an unverified parser. Linear worlds fall back to live async loads until the addon ships, which is what already happened in practice.</td>
 </tr>
 </tbody>
 </table>
 <h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
+<p>The 2026-10-06 revision supersedes the Linear-specific points below. Core pre-filters
+only <code>.mca</code>; <code>.linear</code> worlds fall back to live async chunk loads until a Linear addon
+registers a reader.</p>
 <ul>
 <li><strong>Positive:</strong></li>
 <li>Leaves, Gale, and modded servers using <code>.linear</code> retain full off-tick biome and safety pre-filtering out of the box, in both the Lite and Pro editions, with no operator action.</li>

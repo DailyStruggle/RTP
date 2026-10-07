@@ -3040,7 +3040,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3414,6 +3414,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3624,6 +3645,48 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3715,18 +3778,45 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#2026-10-04-web-editor-treats-polygon-vertices-as-blocks-the-plugin-reads-them-as-chunks" class="md-nav__link">
+  <a href="#2026-10-06-arrived-players-sync-load-their-landing-chunk-on-the-main-thread-paper" class="md-nav__link">
     <span class="md-ellipsis">
-      2026-10-04 — Web editor treats POLYGON vertices as blocks; the plugin reads them as chunks
+      2026-10-06 — Arrived players sync-load their landing chunk on the main thread (Paper)
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#2026-10-04-factoryvaluegetnumberconcurrencytest-fails-intermittently-in-the-full-suite" class="md-nav__link">
+  <a href="#2026-10-06-accumulate-repeats-used-chunks-landing-spacing-loosens-on-dense-learned-bad-area" class="md-nav__link">
     <span class="md-ellipsis">
-      2026-10-04 — FactoryValueGetNumberConcurrencyTest fails intermittently in the full suite
+      2026-10-06 — ACCUMULATE repeats used chunks; landing spacing loosens on dense learned bad area
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2026-10-06-weekly-jazzer-job-fuzzes-one-anvil-target-for-2-s-and-passes" class="md-nav__link">
+    <span class="md-ellipsis">
+      2026-10-06 — Weekly Jazzer job fuzzes one Anvil target for 2 s and passes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2026-10-06-pregen-biome-extraction-reads-surface-biomes-with-the-anvil-probe-for-every-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      2026-10-06 — Pregen biome extraction reads surface biomes with the Anvil probe for every format
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2026-10-06-fuzz-targets-unreachable-paths-exception-only-oracles-missing-parsers" class="md-nav__link">
+    <span class="md-ellipsis">
+      2026-10-06 — Fuzz targets: unreachable paths, exception-only oracles, missing parsers
     </span>
   </a>
   
@@ -3757,7 +3847,7 @@
 
 <h1 id="potential-bugs-backlog">Potential Bugs Backlog<a class="headerlink" href="#potential-bugs-backlog" title="Permanent link">&para;</a></h1>
 <p>A queue of incidental discoveries — suspected bugs, latent races, missing validations, stale comments — that were spotted while working on an <strong>unrelated</strong> task and deliberately <strong>not</strong> fixed in-line, per the <em>Stay-On-Task Policy</em> in <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a>.</p>
-<p>This file is a backlog, not a tracker. Promote an entry to a real issue (or fold it into a future task's <code>Effective Issue</code>) when it is ready to be worked on. Once an entry is resolved, <strong>delete it</strong> — this file does not maintain a resolved-bug archive.</p>
+<p>This file is a backlog, not a tracker. Promote an entry to a Linear issue (<code>RTP-&lt;n&gt;</code>, see <em>Issue Tracking (Linear)</em> in <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a>) or fold it into a future task's <code>Effective Issue</code> when it is ready to be worked on. Once filed, the entry keeps its technical detail and gains a <code>**Linear:**</code> line; Linear owns its status from then on. Once an entry is resolved, <strong>delete it</strong> — this file does not maintain a resolved-bug archive.</p>
 <h2 id="what-this-file-is-and-is-not">What this file is — and is not<a class="headerlink" href="#what-this-file-is-and-is-not" title="Permanent link">&para;</a></h2>
 <p><strong>Yes:</strong> "I was doing X, I noticed Y looks broken, Y is <em>not</em> part of X, and I am walking away from Y. Recording it here so a future task can pick it up."</p>
 <p><strong>No</strong> — do not use this file for any of:</p>
@@ -3783,27 +3873,76 @@
 <span class="k">-</span><span class="w"> </span><span class="gs">**Symptom / hypothesis:**</span> &lt;one or two sentences&gt;
 <span class="k">-</span><span class="w"> </span><span class="gs">**Impact:**</span> &lt;user-visible effect, best guess&gt;
 <span class="k">-</span><span class="w"> </span><span class="gs">**Suggested next step:**</span> &lt;minimal investigation or fix sketch&gt;
+<span class="k">-</span><span class="w"> </span><span class="gs">**Linear:**</span> RTP-&lt;n&gt; (add only once filed; omit before)
 </code></pre></div>
 <h2 id="open">Open<a class="headerlink" href="#open" title="Permanent link">&para;</a></h2>
-<h3 id="2026-10-04-web-editor-treats-polygon-vertices-as-blocks-the-plugin-reads-them-as-chunks">2026-10-04 — Web editor treats POLYGON vertices as blocks; the plugin reads them as chunks<a class="headerlink" href="#2026-10-04-web-editor-treats-polygon-vertices-as-blocks-the-plugin-reads-them-as-chunks" title="Permanent link">&para;</a></h3>
+<h3 id="2026-10-06-arrived-players-sync-load-their-landing-chunk-on-the-main-thread-paper">2026-10-06 — Arrived players sync-load their landing chunk on the main thread (Paper)<a class="headerlink" href="#2026-10-06-arrived-players-sync-load-their-landing-chunk-on-the-main-thread-paper" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> High</li>
+<li><strong>Status:</strong> In Progress</li>
+<li><strong>Discovered during:</strong> spark analysis of stress run <code>20261006-195124</code> (Paper 26.2, LeafRTP phase)</li>
+<li><strong>Location:</strong> <code>platforms/rtp-bukkit/rtp-bukkit-common/.../entity/BukkitRTPPlayer.java</code> <code>setLocation</code> (sync <code>player.teleport</code> path) and the arrival-chunk ticket lifetime in <code>TeleportPipelineTask</code> / <code>BukkitRTPWorld.setForceLoadedImpl</code></li>
+<li><strong>Symptom / hypothesis:</strong> 14.1 s of the 115.7 s phase (about 3.4 ms per teleport) is the server thread parked in <code>ServerChunkCache.syncLoad</code>, reached from the arrived player's first tick (<code>LivingEntity.baseTick</code> &gt; <code>Entity.isInWall</code> &gt; <code>getChunk</code>). The landing chunk is not at FULL when the player first ticks: either the arrival ticket is released before the player's own ticket holds it, or <code>viewDistanceTeleport: 0</code> skips the pre-load. BetterRTP and EzRTP show about 0.1 ms per teleport on this path. The harness reports <code>chunks_sync_requested = 0</code> because <code>SyncLoadAttributor</code> only charges plugin-initiated loads.</li>
+<li><strong>Impact:</strong> S-005 violation on every cache-served teleport. It is the largest LeafRTP-attributable main-thread cost (more than LeafRTP's own 1.8 ms per teleport) and caps main-thread throughput.</li>
+<li><strong>Suggested next step:</strong> Cause: the pipeline released the arrival ticket in the teleport tick, and with <code>delay-chunk-unloads-by: 0s</code> the chunk unloaded before the player's first tick. Fix pending bench verification: <code>TeleportPipelineTask.holdArrivalReservation</code> keeps it for <code>ARRIVAL_HOLD_TICKS</code>. Remove this entry once a spark run shows the <code>isInWall &gt; syncLoad</code> stack gone in the LeafRTP phase.</li>
+<li><strong>Linear:</strong> RTP-4</li>
+</ul>
+<h3 id="2026-10-06-accumulate-repeats-used-chunks-landing-spacing-loosens-on-dense-learned-bad-area">2026-10-06 — ACCUMULATE repeats used chunks; landing spacing loosens on dense learned bad area<a class="headerlink" href="#2026-10-06-accumulate-repeats-used-chunks-landing-spacing-loosens-on-dense-learned-bad-area" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> Medium</li>
+<li><strong>Status:</strong> Triaged</li>
+<li><strong>Discovered during:</strong> cross-plugin destination chart for the Paper 26.2 stress run <code>20261006-135938</code></li>
+<li><strong>Location:</strong> <code>MemoryShape.resolve</code> (ACCUMULATE good-index remap; uniquePlacements gated on <code>expand</code>); <code>AbstractDualLayerShape.selectL3Candidate</code> / <code>keyForCounter</code> (BINNED_AMORTIZED)</li>
+<li><strong>Symptom / hypothesis:</strong> In teleport order, 79 of LeafRTP's 4,096 landings fell within 256 blocks of one of the previous 64 (35 by the same player), against about 69 for a random scatter. Modelled by <code>ConsecutiveLandingSpacingSimTest</code> on the shipped default circle (P=32, S=1024 now that the stride cap is the full bin, ADR-088). The raw draw order keeps spacing: no lane holds two keys under 256 blocks apart, and there are 0 back-to-back pairs under 256 blocks per 4,096 draws (uniform 0.88). Per 4,096 landings with ~40% synthetic bad terrain (uniform: back-to-back 1.13, 64-lookback 64.1, repeats 3.94):</li>
+<li><strong>Spacing holds under rejection and cache mixing:</strong> cold-only ACCUMULATE gives back-to-back 0.06 and 64-lookback 50.0; FAST/COLD interleaving gives 0.06 and 54.4. The remap offset between two nearby picks is only the rejections learned between them, a few Hilbert steps, so the P-chunk lattice is nudged, not lost; the exact stride residue (0.5% kept) is stricter than spacing. FAST and COLD share one <code>rand()</code> stream, so mixing adds no repeats (3.56 against 4.44 cold-only). The 64-lookback metric is not a lane promise: windows of 16-64 draws change lane.</li>
+<li><strong>Repeats under ACCUMULATE (known limit):</strong> every merged rejection renumbers good indices, so a used chunk can reappear at an undrawn index; with <code>expand: false</code> landings are never marked, so repeats sit at the uniform rate (4.44 vs 3.94, about 0.1% of landings). REROLL never renumbers. Marking landings is gated on <code>expand</code> on purpose: without expand the range never grows back, so uniquePlacements marks drain the good domain until search tasks pile up without finding a location (<code>MemoryShape.resolve</code>).</li>
+<li><strong>Dense learned bad area (open, not simulated):</strong> where scan or pregen has learned large bad regions, the offset difference between nearby picks approaches a full bin (1,024) and in-bin spacing falls back toward uniform.</li>
+<li><strong>BINNED_AMORTIZED (open):</strong> this non-default backlog runs its own counter, stride rule (capped at 256, no phase windows) and per-draw phase, so it collides with the main ordering and comes out worse than uniform (1.19x).</li>
+<li>No model reproduces the stress run's excess over uniform (79 vs ~69); real terrain clustering is the likely cause.</li>
+<li><strong>Impact:</strong> With <code>expand: false</code>, consecutive players can land on a chunk an earlier player used, about as often as with random picks. Back-to-back spacing holds on typical terrain and loosens where learned bad area is dense. Disclosed in <code>docs/admin/configuration/REGIONS.md</code> (<em>Spacing, repeats and worst case by mode</em>); FRONT_PAGE.md links there.</li>
+<li><strong>Suggested next step:</strong> Keep the repeat limit documented; both obvious fixes are ruled out. Physical-order lanes need per-lane occupancy state instead of run tables (the encoding that failed earlier performance tests, and it breaks C8), and marking landings without <code>expand</code> exhausts the region. Any future fix must consume no good area and keep the run encoding. Route BINNED_AMORTIZED through the main counter and phase windows. Flip the <code>dups &gt; 0</code> pin in <code>ConsecutiveLandingSpacingSimTest.terrainRejectionKeepsBackToBackSpacing</code> only with such a fix.</li>
+<li><strong>Linear:</strong> RTP-2</li>
+</ul>
+<h3 id="2026-10-06-weekly-jazzer-job-fuzzes-one-anvil-target-for-2-s-and-passes">2026-10-06 — Weekly Jazzer job fuzzes one Anvil target for 2 s and passes<a class="headerlink" href="#2026-10-06-weekly-jazzer-job-fuzzes-one-anvil-target-for-2-s-and-passes" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Severity:</strong> Medium</li>
 <li><strong>Status:</strong> Open</li>
-<li><strong>Discovered during:</strong> ADR-106 editor curve runner / typed settings form (page side)</li>
-<li><strong>Location:</strong> <code>docs/editor/index.html</code> (<code>getRegionSpan</code> POLYGON branch, vertex drawing / drag, <code>syncShapeSpecificControls</code> default <code>[[-2000, 3000], ...]</code>) vs <code>RegionConfigLoader.applyPolygonVertices</code> -&gt; <code>Polygon.pointInPolygon(coords.x, coords.z)</code> on <code>locationToXZ</code> chunk coordinates</li>
-<li><strong>Symptom / hypothesis:</strong> The page draws, fits and drags polygon vertices in block units, but Java tests membership with the same numbers as chunk coordinates, so the area the plugin uses is 16x larger than the outline the editor shows. The page's helper path (<code>Polygon.js</code>, chunk params) and the vertex outline therefore don't line up.</li>
-<li><strong>Impact:</strong> Operators drawing a polygon in the editor get a region 16x larger (per axis) than drawn; the path drawn from the helper and the vertex outline disagree on the map.</li>
-<li><strong>Suggested next step:</strong> Confirm the intended unit in REGIONS.md, then either convert in the page (draw vertices x16 and accept unit suffixes) or document vertices as chunks; add a page/Java round-trip test for one polygon.</li>
+<li><strong>Discovered during:</strong> v3.3.0 pre-release audit (Jazzer fuzz targets)</li>
+<li><strong>Location:</strong> <code>api/anvil-api/src/test/.../AnvilRegionFuzzTest.java</code> (four <code>@FuzzTest</code> methods); <code>.github/workflows/fuzzing.yml</code> ~46-55; root <code>build.gradle</code> <code>tasks.withType(Test)</code> ~147-172</li>
+<li><strong>Symptom / hypothesis:</strong></li>
+<li>Jazzer 0.30.0 fuzzes one <code>@FuzzTest</code> per run ("Only one fuzz test can be run at a time"). A local <code>JAZZER_FUZZ=1</code> run of the class fuzzed <code>fuzzNbtReaders</code> for about 3 s and reported the LZ4, column-probe and chunk-view targets as SKIPPED; the task still passed.</li>
+<li>The workflow passes <code>-Djazzer.duration</code>, but the option is <code>jazzer.max_duration</code>, and Gradle <code>-D</code> sets a property on the Gradle JVM, not on the forked test JVM. Every target runs for the annotation's <code>maxDuration = "2s"</code>, not the advertised 5 minutes.</li>
+<li><code>JAZZER_FUZZ</code> is not a <code>Test</code> task input, so a cached <code>:anvil-api:test</code> result can be reused and no fuzzing happens at all; a second local run did exactly that.</li>
+<li>No seed corpus or <code>&lt;Class&gt;Inputs/</code> regression files are committed, so the normal build runs each target on an empty input only.</li>
+<li><strong>Impact:</strong> The fuzzing badge gives false assurance: the LZ4 decoder and region view builders (ADR-016's "fuzzable" rationale for the in-house decoder) have effectively never been fuzzed in CI.</li>
+<li><strong>Suggested next step:</strong> One <code>@FuzzTest</code> per class (or one matrix entry per method with <code>--tests Class.method</code>); forward <code>jazzer.max_duration</code> with <code>systemProperty</code> and declare <code>JAZZER_FUZZ</code> as a task input (or <code>outputs.upToDateWhen { false }</code> in fuzz mode); seed corpora from the existing <code>.mca</code> test fixtures; commit any crash reproducers under <code>&lt;Class&gt;Inputs/</code>. The future Linear addon (ADR-077) shall carry its own fuzz target with a working setup.</li>
+<li><strong>Linear:</strong> RTP-21</li>
 </ul>
-<h3 id="2026-10-04-factoryvaluegetnumberconcurrencytest-fails-intermittently-in-the-full-suite">2026-10-04 — <code>FactoryValueGetNumberConcurrencyTest</code> fails intermittently in the full suite<a class="headerlink" href="#2026-10-04-factoryvaluegetnumberconcurrencytest-fails-intermittently-in-the-full-suite" title="Permanent link">&para;</a></h3>
+<h3 id="2026-10-06-pregen-biome-extraction-reads-surface-biomes-with-the-anvil-probe-for-every-format">2026-10-06 — Pregen biome extraction reads surface biomes with the Anvil probe for every format<a class="headerlink" href="#2026-10-06-pregen-biome-extraction-reads-surface-biomes-with-the-anvil-probe-for-every-format" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Severity:</strong> Low</li>
 <li><strong>Status:</strong> Open</li>
-<li><strong>Discovered during:</strong> ADR-104 world-wide land survey / tiled walk path rework (full <code>.\gradlew.bat build</code>)</li>
-<li><strong>Location:</strong> <code>rtp-core/src/test/java/io/github/dailystruggle/rtp/common/factory/FactoryValueGetNumberConcurrencyTest.java</code> (<code>getNumber_onAutoString_resolvesCorrectlyWithoutThrowing</code>), <code>FactoryValue.java</code> (both uncommitted)</li>
-<li><strong>Symptom / hypothesis:</strong> In one of two full builds <code>spatialResolution</code> <code>auto</code> resolved to <code>10</code> instead of <code>1</code>; the test passes alone and passed in the other full build, so it likely depends on static/shared config state left by another test class.</li>
-<li><strong>Impact:</strong> CI noise only; possible real ordering dependence in <code>auto</code> resolution if the shared state is production state.</li>
-<li><strong>Suggested next step:</strong> Run <code>:rtp-core:test</code> with a fixed seed/order or <code>--tests "*factory*"</code> plus the editor suites; look for a test mutating the global config that <code>auto</code> reads, and reset it in <code>@AfterEach</code>.</li>
+<li><strong>Discovered during:</strong> removing the built-in Linear reader (ADR-077 revision)</li>
+<li><strong>Location:</strong> <code>rtp-core/.../commands/editor/PregenBiomeExtractor.java</code> <code>sampleRegionFile</code> (~264-300): <code>reader.isChunkGenerated(...)</code> then <code>AnvilReader.readColumnProbe(bytes, ...)</code></li>
+<li><strong>Symptom / hypothesis:</strong> The generated check uses the registered reader, but the surface-biome probe always parses the bytes as Anvil. For an addon-registered format the probe throws (caught), so every chunk falls back to the shape's biome cache or <code>minecraft:plains</code>.</li>
+<li><strong>Impact:</strong> None today (only <code>.mca</code> is built in). Once a Linear addon registers a reader, the editor's land and biome backdrop for Linear worlds would show plains or cached biomes instead of the real ones.</li>
+<li><strong>Suggested next step:</strong> Probe through the registered reader: <code>reader.readChunk(...)</code> then <code>AnvilReader.toView(entry.root)</code> for the surface biome, or add a column-probe method to the <code>RegionFileReader</code> SPI with an Anvil default.</li>
+<li><strong>Linear:</strong> RTP-22</li>
+</ul>
+<h3 id="2026-10-06-fuzz-targets-unreachable-paths-exception-only-oracles-missing-parsers">2026-10-06 — Fuzz targets: unreachable paths, exception-only oracles, missing parsers<a class="headerlink" href="#2026-10-06-fuzz-targets-unreachable-paths-exception-only-oracles-missing-parsers" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Severity:</strong> Low</li>
+<li><strong>Status:</strong> Open</li>
+<li><strong>Discovered during:</strong> v3.3.0 pre-release audit (Jazzer fuzz targets)</li>
+<li><strong>Location:</strong> <code>AnvilRegionFuzzTest.java</code>; <code>rtp-proxy-common/src/test/.../RespProtocolFuzzTest.java</code></li>
+<li><strong>Symptom / hypothesis:</strong></li>
+<li>The Anvil targets always read chunk <code>(0, 0)</code>, so other location-table slots are never exercised. <code>readChunkView</code> is only constructed, never queried, so lazy palette decoding is not exercised.</li>
+<li>Oracles only check which exception escapes. The open <code>palette[0]</code> fail-open returns normally and cannot be detected; no target asserts "malformed input never yields ACCEPT" through <code>AnvilPrefilter</code>.</li>
+<li><code>RespProtocolFuzzTest</code> tolerates <code>NumberFormatException</code> and the Anvil targets tolerate <code>IllegalArgumentException</code>, although the parsers convert or never throw these; a regression that leaks them would go unnoticed.</li>
+<li>Parsers of untrusted or semi-trusted input with no target: <code>RtpYamlReader</code> (imported configs; would find the open depth issue at once), <code>EditorLoopbackJson</code>, <code>EditorSessionManager.parseJsonStringMap</code>, <code>PluginMessageEnvelope.open</code>, <code>ProxyDirectWire</code>, <code>BiomeBinCodec</code>/<code>WorldBiomeStore.load</code>, <code>TinyJsonReader</code>, <code>SafetyTokenParser</code>, and the Bukkit plugin-message length reader.</li>
+<li><strong>Impact:</strong> Coverage gap only; no production defect.</li>
+<li><strong>Suggested next step:</strong> Let the fuzzer pick the chunk coordinates (<code>FuzzedDataProvider</code>); add a prefilter target asserting the verdict is never ACCEPT on malformed data; narrow the tolerated exceptions; add targets for YAML, editor JSON and the network envelope first.</li>
+<li><strong>Linear:</strong> RTP-28</li>
 </ul>
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->
 

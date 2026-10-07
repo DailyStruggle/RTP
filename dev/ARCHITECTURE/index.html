@@ -3040,7 +3040,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3414,6 +3414,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3624,6 +3645,48 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3770,7 +3833,7 @@ For the rationale behind key architectural decisions (why, not just what), see <
 <ul>
 <li><strong>rtp-api</strong>: Contains the interfaces, APIs, and shared models used by the plugin and external integrations. Addon developers should compile against this module.</li>
 <li><strong>rtp-core</strong>: Contains the core logic of the plugin. This includes region management, random location selection algorithms (shapes), queue management, database interactions, and memory tracking. It is agnostic of the specific server platform.</li>
-<li><strong>anvil-api</strong> (<code>api/anvil-api</code>): A standalone, platform-neutral off-tick region decoder and prefilter framework (ADR-016, ADR-077). Implements the <code>RegionFileReader</code> SPI to read and decode both Anvil (<code>.mca</code> / Zlib / LZ4) and Linear (<code>.linear</code> / ZSTD) region formats off the main thread. Linear decoding uses a pure-Java ZStandard reader (<code>io.airlift:aircompressor</code>, no native binaries) built directly into this module.</li>
+<li><strong>anvil-api</strong> (<code>api/anvil-api</code>): A standalone, platform-neutral off-tick region decoder and prefilter framework (ADR-016, ADR-077). Defines the <code>RegionFileReader</code> SPI and ships one built-in reader, Anvil (<code>.mca</code> / Zlib / LZ4), decoded off the main thread. Addons may register other formats through <code>RegionFormatRegistry</code> or a <code>RegionFileReaderProvider</code> service; files in an unregistered format (e.g. <code>.linear</code>) are ignored and their chunks fall back to the platform's live async chunk load.</li>
 <li><strong>commands-api</strong>: A unified command framework (formerly external) now integrated to handle multi-platform command structures, including future support for Brigadier on Fabric.</li>
 <li><strong>effects-api</strong>: A unified visual/particle effects framework (formerly external) now integrated for cross-platform visual consistency.</li>
 </ul>

@@ -3040,7 +3040,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3414,6 +3414,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3608,6 +3629,48 @@
   
   <span class="md-ellipsis">
     ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
   </span>
   
 
@@ -4006,6 +4069,15 @@
   <a href="#gradle-daemon-java-version-mismatch" class="md-nav__link">
     <span class="md-ellipsis">
       Gradle daemon / Java version mismatch
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#gradlewbat-lock-wrapper-never-splice-into-powershell-source-2026-10-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      gradlew.bat lock wrapper: never splice %* into PowerShell source (2026-10-05)
     </span>
   </a>
   
@@ -4478,6 +4550,8 @@
 <h2 id="build-environment">Build &amp; Environment<a class="headerlink" href="#build-environment" title="Permanent link">&para;</a></h2>
 <h3 id="gradle-daemon-java-version-mismatch">Gradle daemon / Java version mismatch<a class="headerlink" href="#gradle-daemon-java-version-mismatch" title="Permanent link">&para;</a></h3>
 <p>The Gradle daemon caches the JVM it was started with. If the active JDK changes between sessions (e.g., Java 17 → Java 25), Gradle logs a daemon-context mismatch and starts a new daemon. This is normal; do <strong>not</strong> kill or restart the daemon manually.</p>
+<h3 id="gradlewbat-lock-wrapper-never-splice-into-powershell-source-2026-10-05"><code>gradlew.bat</code> lock wrapper: never splice <code>%*</code> into PowerShell source (2026-10-05)<a class="headerlink" href="#gradlewbat-lock-wrapper-never-splice-into-powershell-source-2026-10-05" title="Permanent link">&para;</a></h3>
+<p>The Windows lock wrapper once pasted <code>%*</code> into an inline <code>powershell -Command "..."</code> script. A quoted argument such as <code>--tests "*Foo*"</code> closed that string early, so PowerShell failed to parse and printed only <code>#&lt; CLIXML</code>, with exit 1 and no Gradle output (it looked like an idle hang). The lock logic now lives in <code>gradle/rtp-gradle-lock.ps1</code>: <code>gradlew.bat</code> passes its arguments only as data (<code>RTP_GRADLE_RAW_ARGS</code>, set unquoted outside any parenthesized block), and the script re-runs <code>gradlew.bat</code> with <code>cmd /d /s /c --% ""%RTP_GRADLE_SELF%" %RTP_GRADLE_RAW_ARGS%"</code>, which keeps the original command line byte for byte. Call the native command at script level, not from a function: a function captures Gradle's output as its return value instead of letting it stream.</p>
 <h2 id="2026-05-02-stresstestrtp-spark-profiles-empty-when-only-ticks-over-is-set">2026-05-02 - StressTestRTP spark profiles empty when --only-ticks-over is set<a class="headerlink" href="#2026-05-02-stresstestrtp-spark-profiles-empty-when-only-ticks-over-is-set" title="Permanent link">&para;</a></h2>
 <p>Symptom: a stress run finishes, .sparkprofile files appear in plugins/spark/profiles/, but opening them on the spark viewer shows little/no Server Thread sample data - even though some ticks visibly exceeded the threshold in /spark tickmonitor.</p>
 <p>Cause: <code>StressTestRTP</code>'s <code>SparkHook</code> was passing <code>--only-ticks-over 50</code> by default. Spark's tick filter discards every sample taken during a tick that did not cross the threshold, evaluated per-rotation-slice. On idle phases, warm-up windows, or short rotation slices that happen to miss a spike, the saved profile contains zero qualifying samples and renders as empty.</p>

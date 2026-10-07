@@ -3040,7 +3040,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3414,6 +3414,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3624,6 +3645,48 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3727,17 +3790,17 @@
 
 <h1 id="licensing-and-edition-clarity">Licensing and Edition Clarity<a class="headerlink" href="#licensing-and-edition-clarity" title="Permanent link">&para;</a></h1>
 <blockquote>
-<p><strong>Scope:</strong> Repository dual-licensing structure, open-core boundaries, and edition differentiation (LeafRTP Lite vs. LeafRTP Pro).
-<strong>Related:</strong> <a href="../../adr/ADR-100-superseding-adr-024-sla-and-support-tier/">ADR-100</a> (Superseding ADR-024: Technical Parity and Pro as SLA &amp; Support Tier), <a href="../../adr/ADR-024-rtp-lite-assembly-variant/">ADR-024</a> (superseded), <a href="../../adr/ADR-061-open-core-dual-licensing/">ADR-061</a> (Open-Core Dual Licensing), <a href="../../adr/ADR-069-claim-integrations-extracted-to-bundled-addon/">ADR-069</a> (Claim Addon Extraction), <code>LICENSE</code>, <code>LICENSE-MIT</code>.</p>
+<p><strong>Scope:</strong> Repository licensing and edition differentiation (LeafRTP Lite vs. LeafRTP Pro).
+<strong>Related:</strong> <a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/">ADR-108</a> (All-MIT Licensing; Pro as Support), <a href="../../adr/ADR-100-superseding-adr-024-sla-and-support-tier/">ADR-100</a> (Technical Parity and Pro as SLA &amp; Support Tier), <a href="../../adr/ADR-061-open-core-dual-licensing/">ADR-061</a> (superseded), <a href="../../adr/ADR-024-rtp-lite-assembly-variant/">ADR-024</a> (superseded), <a href="../../adr/ADR-069-claim-integrations-extracted-to-bundled-addon/">ADR-069</a> (Claim Addon Extraction), <code>LICENSE</code>, <code>LICENSE-MIT</code>.</p>
 </blockquote>
 <hr />
 <h2 id="1-executive-summary">1. Executive Summary<a class="headerlink" href="#1-executive-summary" title="Permanent link">&para;</a></h2>
-<p>RTP uses an <strong>open-core dual-licensing</strong> model:</p>
+<p>RTP is <strong>MIT-licensed</strong> (<a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/">ADR-108</a>):</p>
 <ol>
-<li><strong>Permissive Open Core (MIT):</strong> The foundation modules (<code>rtp-api</code>, <code>rtp-core</code>, <code>anvil-api</code>, <code>commands-api</code>, <code>effects-api</code>, <code>maps-api</code>, <code>metrics-api</code>, <code>tags-api</code>, <code>yaml-api</code>), the Paper/Spigot and Fabric adapters, the plugin-message network transport, and the free <strong>LeafRTP (Lite)</strong> binary distribution are licensed under the <strong>MIT License</strong> (<code>LICENSE-MIT</code>). Anyone can use, modify, distribute, or bundle them, commercially or non-commercially.</li>
-<li><strong>Enterprise &amp; Pro Extensions (PolyForm Noncommercial 1.0.0):</strong> Advanced enterprise extensions (durable SQL and Redis network state bindings, external SQL/Redis persistence drivers and accessors, tuned native Folia multithreading adapter, login reserve cache, dynamic tag refresh engine) and the <strong>LeafRTP Pro</strong> binary assembly are licensed under <strong>PolyForm Noncommercial 1.0.0</strong> (<code>LICENSE</code>).</li>
-<li><strong>Purchased Pro Deliverables:</strong> Pre-compiled release binaries of LeafRTP Pro purchased via BuiltByBit grant production commercial usage on the purchaser's server networks, while source builds remain subject to PolyForm Noncommercial terms.</li>
-<li><strong>GPL-Licensed Modules:</strong> NeoForge platform components and carrier modules are licensed under <strong>GPL-3.0-or-later</strong> (<code>neoforge.mods.toml</code>). Standalone addon modules (e.g. <code>LeafRTPGuiAddon</code>) carry their respective open-source licenses and are bundled into release artifacts.</li>
+<li><strong>All source is MIT.</strong> Every module, platform adapter, the network/proxy modules, and both binaries (<strong>LeafRTP (Lite)</strong> and <strong>LeafRTP Pro</strong>) are licensed under the MIT License (root <code>LICENSE</code>, identical to <code>LICENSE-MIT</code>). Anyone can use, modify, distribute, or bundle them, commercially or non-commercially.</li>
+<li><strong>Pro is a service, not a licence.</strong> Buying Pro grants no additional copyright rights; it buys priority/SLA support routing, early-access builds, and sponsorship (ADR-100).</li>
+<li><strong>More specific grants win.</strong> NeoForge platform components and carrier modules are licensed under <strong>GPL-3.0-or-later</strong> (<code>neoforge.mods.toml</code>). Addon modules that ship their own licence keep it.</li>
+<li><strong>Earlier releases.</strong> Releases published before 2026-10-05 keep the licence they shipped with (ADR-061 open-core terms); MIT is strictly more permissive, so no licensee loses rights.</li>
 </ol>
 <hr />
 <h2 id="2-license-matrix-by-module-and-artifact">2. License Matrix by Module and Artifact<a class="headerlink" href="#2-license-matrix-by-module-and-artifact" title="Permanent link">&para;</a></h2>
@@ -3752,46 +3815,46 @@
 </thead>
 <tbody>
 <tr>
-<td><strong><code>rtp-api</code></strong></td>
+<td><strong><code>rtp-api</code></strong>, <strong><code>rtp-core</code></strong></td>
 <td><strong>MIT</strong></td>
 <td style="text-align: center;">Yes</td>
-<td><code>LICENSE-MIT</code> / <code>rtp-api/LICENSE</code></td>
-</tr>
-<tr>
-<td><strong><code>rtp-core</code></strong></td>
-<td><strong>MIT</strong></td>
-<td style="text-align: center;">Yes</td>
-<td><code>LICENSE-MIT</code> / <code>rtp-core/LICENSE</code></td>
+<td><code>LICENSE</code> / <code>rtp-api/LICENSE</code> / <code>rtp-core/LICENSE</code></td>
 </tr>
 <tr>
 <td><strong>SPI modules</strong> (<code>commands-api</code>, <code>effects-api</code>, <code>maps-api</code>, <code>metrics-api</code>, <code>anvil-api</code>, <code>tags-api</code>, <code>yaml-api</code>)</td>
 <td><strong>MIT</strong></td>
 <td style="text-align: center;">Yes</td>
-<td><code>LICENSE-MIT</code></td>
+<td><code>LICENSE</code></td>
 </tr>
 <tr>
-<td><strong>Platform Adapters (Spigot/Paper, Fabric)</strong></td>
+<td><strong>Platform Adapters</strong> (Spigot/Paper, Folia, Fabric)</td>
 <td><strong>MIT</strong></td>
 <td style="text-align: center;">Yes</td>
-<td><code>LICENSE-MIT</code></td>
+<td><code>LICENSE</code></td>
 </tr>
 <tr>
-<td><strong>Basic Folia Support (<code>FoliaAwareScheduler</code>)</strong></td>
+<td><strong>Network &amp; Proxy Modules</strong> (plugin-message transport, <code>RespRedisClient</code>, SQL/Redis bindings, <code>rtp-proxy-*</code>)</td>
 <td><strong>MIT</strong></td>
 <td style="text-align: center;">Yes</td>
-<td><code>rtp-paper-common</code> (<code>LICENSE-MIT</code>)</td>
+<td><code>LICENSE</code></td>
 </tr>
 <tr>
-<td><strong>Plugin-Message Network Transport</strong></td>
+<td><strong>SQL Persistence &amp; Pool</strong> (SQLite / H2 / MySQL / PostgreSQL accessors, in-house pool per ADR-101)</td>
 <td><strong>MIT</strong></td>
 <td style="text-align: center;">Yes</td>
-<td><code>rtp-core</code> (<code>LICENSE-MIT</code>)</td>
+<td><code>LICENSE</code></td>
 </tr>
 <tr>
-<td><strong>LeafRTP Lite Jar</strong> (<code>LeafRTP-&lt;version&gt;.jar</code>)</td>
+<td><strong>Safety Tag / Predicate Grammar</strong> (<code>SafetyTokenParser</code>, <code>SafetyTokenExpander</code>; offline <code>tags-api</code> resolver)</td>
 <td><strong>MIT</strong></td>
 <td style="text-align: center;">Yes</td>
-<td><code>LICENSE-MIT</code> (bundled inside jar)</td>
+<td><code>LICENSE</code></td>
+</tr>
+<tr>
+<td><strong>Login Reserve Cache</strong> (<code>LoginCacheTask</code>, ADR-023)</td>
+<td><strong>MIT</strong></td>
+<td style="text-align: center;">Yes</td>
+<td><code>LICENSE</code></td>
 </tr>
 <tr>
 <td><strong>NeoForge Carrier &amp; Adapters</strong> (<code>rtp-neoforge-*</code>)</td>
@@ -3800,52 +3863,28 @@
 <td><code>neoforge.mods.toml</code></td>
 </tr>
 <tr>
-<td><strong>Bundled Addons</strong> (<code>LeafRTPClaimAddon</code>, <code>LeafRTPGuiAddon</code>)</td>
-<td><strong>GPL-3.0 / MIT</strong></td>
+<td><strong>Bundled Addons</strong> (<code>LeafRTPClaimAddon</code>, <code>LeafRTPGuiAddon</code>, <code>LeafRTPCountdownAddon</code>, <code>LeafRTPActionAddon</code>)</td>
+<td><strong>MIT</strong> unless the addon ships its own licence</td>
 <td style="text-align: center;">Yes</td>
 <td>Bundled in both Lite and Pro jars</td>
 </tr>
 <tr>
-<td><strong>Tuned Folia Adapter</strong> (<code>rtp-folia</code>)</td>
-<td><strong>PolyForm Noncommercial 1.0.0</strong></td>
-<td style="text-align: center;">Non-commercial only (source) / Commercial with purchased license</td>
-<td><code>LICENSE</code></td>
-</tr>
-<tr>
-<td><strong>Durable Network &amp; Proxy Modules</strong> (<code>rtp-proxy-common</code> SQL/Redis bindings, <code>rtp-proxy-velocity</code>)</td>
-<td><strong>PolyForm Noncommercial 1.0.0</strong></td>
-<td style="text-align: center;">Non-commercial only (source) / Commercial with purchased license</td>
-<td><code>LICENSE</code></td>
-</tr>
-<tr>
-<td><strong>SQL &amp; Redis Persistence</strong> (HikariCP, Jedis, SQLite JDBC, H2, PostgreSQL, MySQL accessors)</td>
-<td><strong>PolyForm Noncommercial 1.0.0</strong></td>
-<td style="text-align: center;">Non-commercial only (source) / Commercial with purchased license</td>
-<td><code>LICENSE</code></td>
-</tr>
-<tr>
-<td><strong>Dynamic Tags Engine</strong> (<code>rtp-tags</code>, <code>tagsRefresh.yml</code>)</td>
-<td><strong>PolyForm Noncommercial 1.0.0</strong></td>
-<td style="text-align: center;">Non-commercial only (source) / Commercial with purchased license</td>
-<td><code>LICENSE</code></td>
-</tr>
-<tr>
-<td><strong>Login Reserve Cache</strong> (<code>LoginCacheTask</code>, ADR-023)</td>
-<td><strong>PolyForm Noncommercial 1.0.0</strong></td>
-<td style="text-align: center;">Non-commercial only (source) / Commercial with purchased license</td>
-<td><code>LICENSE</code></td>
+<td><strong>LeafRTP Lite Jar</strong> (<code>LeafRTP-&lt;version&gt;.jar</code>)</td>
+<td><strong>MIT</strong></td>
+<td style="text-align: center;">Yes</td>
+<td><code>LICENSE-MIT</code> (bundled inside jar as <code>LICENSE</code>)</td>
 </tr>
 <tr>
 <td><strong>LeafRTP Pro Jar</strong> (<code>LeafRTP-Pro-&lt;version&gt;.jar</code>)</td>
-<td><strong>PolyForm Noncommercial 1.0.0</strong></td>
-<td style="text-align: center;">Non-commercial only (source) / Commercial with purchased license</td>
-<td><code>LICENSE</code></td>
+<td><strong>MIT</strong></td>
+<td style="text-align: center;">Yes</td>
+<td>root <code>LICENSE</code> (bundled inside jar)</td>
 </tr>
 </tbody>
 </table>
 <hr />
 <h2 id="3-edition-feature-comparison-lite-vs-pro">3. Edition Feature Comparison (Lite vs. Pro)<a class="headerlink" href="#3-edition-feature-comparison-lite-vs-pro" title="Permanent link">&para;</a></h2>
-<p>As detailed in <a href="../../adr/ADR-024-rtp-lite-assembly-variant/">ADR-024</a>, <a href="../../adr/ADR-061-open-core-dual-licensing/">ADR-061</a>, and <a href="../../adr/ADR-069-claim-integrations-extracted-to-bundled-addon/">ADR-069</a>:</p>
+<p>As detailed in <a href="../../adr/ADR-100-superseding-adr-024-sla-and-support-tier/">ADR-100</a>, <a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/">ADR-108</a>, and <a href="../../adr/ADR-069-claim-integrations-extracted-to-bundled-addon/">ADR-069</a>. Both jars ship the same code; the editions differ only in support and release cadence.</p>
 <table>
 <thead>
 <tr>
@@ -3859,8 +3898,20 @@
 <tr>
 <td><strong>License</strong></td>
 <td style="text-align: center;"><strong>MIT</strong></td>
-<td style="text-align: center;"><strong>PolyForm Noncommercial 1.0.0</strong></td>
-<td>Lite jar bundles <code>LICENSE-MIT</code>; Pro jar ships root <code>LICENSE</code>.</td>
+<td style="text-align: center;"><strong>MIT</strong></td>
+<td>Lite jar bundles <code>LICENSE-MIT</code>; Pro jar ships the identical root <code>LICENSE</code>.</td>
+</tr>
+<tr>
+<td><strong>Support</strong></td>
+<td style="text-align: center;">Community</td>
+<td style="text-align: center;">Priority / SLA</td>
+<td>Routed via marketplace buyer metadata (ADR-100).</td>
+</tr>
+<tr>
+<td><strong>Release cadence</strong></td>
+<td style="text-align: center;">Stable milestones</td>
+<td style="text-align: center;">Early access</td>
+<td>ADR-100 section 2.3.</td>
 </tr>
 <tr>
 <td><strong>Single-Server Random Teleport</strong></td>
@@ -3888,15 +3939,15 @@
 </tr>
 <tr>
 <td><strong>Folia Support</strong></td>
-<td style="text-align: center;">Basic (regionized fallback)</td>
-<td style="text-align: center;">Tuned native adapter</td>
-<td>Lite hops via <code>FoliaAwareScheduler</code>; Pro includes throughput-optimized <code>rtp-folia</code>.</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;">Yes</td>
+<td>Both editions ship the native <code>rtp-folia</code> adapter (ADR-100).</td>
 </tr>
 <tr>
 <td><strong>Storage / Persistence</strong></td>
 <td style="text-align: center;">Full (SQLite / H2 / MySQL / PostgreSQL / Redis / YAML)</td>
 <td style="text-align: center;">Full (SQLite / H2 / MySQL / PostgreSQL / Redis / YAML)</td>
-<td>Both editions support the complete database suite and HikariCP connection pooling (ADR-100).</td>
+<td>Both editions support the complete database suite and the in-house connection pool (ADR-100, ADR-101).</td>
 </tr>
 <tr>
 <td><strong>Cross-Server / Network Mode</strong></td>
@@ -3906,15 +3957,15 @@
 </tr>
 <tr>
 <td><strong>Login Reserve Cache (ADR-023)</strong></td>
-<td style="text-align: center;">No (stripped)</td>
 <td style="text-align: center;">Yes</td>
-<td>Pro pre-warms a dedicated queue for join-time teleports (<code>rtp.onevent.join</code>).</td>
+<td style="text-align: center;">Yes</td>
+<td>Pre-warms a dedicated queue for join-time teleports (<code>rtp.onevent.join</code>); <code>LoginCacheTask</code> retained in Lite (ADR-100).</td>
 </tr>
 <tr>
 <td><strong>Safety Lists &amp; Predicates</strong></td>
-<td style="text-align: center;">Standard + Predicates</td>
-<td style="text-align: center;">Standard + Predicates + Dynamic Tag Refresh</td>
-<td>Both support base <code>safety.yml</code> block tags and predicates; Pro adds <code>rtp-tags</code> engine.</td>
+<td style="text-align: center;">Full grammar</td>
+<td style="text-align: center;">Full grammar</td>
+<td><code>#tag</code>, <code>[...]</code> predicates and <code>-</code> subtraction resolve against the live server tag registry in both editions (<code>rtp-api</code> / <code>rtp-core</code>; <a href="../../admin/configuration/SAFETY/"><code>SAFETY.md</code></a>).</td>
 </tr>
 <tr>
 <td><strong>Claim Plugin Integrations</strong></td>
@@ -3947,10 +3998,10 @@
 <td>Maps API and book rendering available across both editions.</td>
 </tr>
 <tr>
-<td><strong>Anvil / Linear Prefilter (ADR-016, ADR-077)</strong></td>
+<td><strong>Anvil Prefilter (ADR-016, ADR-077)</strong></td>
 <td style="text-align: center;">Yes</td>
 <td style="text-align: center;">Yes</td>
-<td>Off-tick chunk prefiltering enabled in both editions (<code>rtp-anvil</code> retained in Lite).</td>
+<td>Off-tick chunk prefiltering enabled in both editions (<code>rtp-anvil</code> retained in Lite). Other region formats require an addon reader.</td>
 </tr>
 <tr>
 <td><strong>Operator Documentation Extraction</strong></td>
@@ -3975,9 +4026,9 @@
 <hr />
 <h2 id="4-verification-and-compliance">4. Verification and Compliance<a class="headerlink" href="#4-verification-and-compliance" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Build-Time License Auditing:</strong> The Gradle task <code>:rtp-plugin:liteJarStructureCheck</code> inspects the built Lite jar to verify that <code>LICENSE</code> contains the MIT terms, does not contain PolyForm Noncommercial text, and confirms that forbidden Pro classes (tuned Folia adapter, <code>LoginCacheTask</code>, <code>rtp-tags</code>) do not leak into the Lite assembly while verifying SQL/Redis parity per ADR-100.</li>
+<li><strong>Build-Time License Auditing:</strong> The Gradle task <code>:rtp-plugin:liteJarStructureCheck</code> inspects the built Lite jar to verify that <code>LICENSE</code> contains the MIT terms (and no PolyForm text), while Folia, <code>LoginCacheTask</code>, SQL and Redis are retained per ADR-100.</li>
 <li><strong>Network Transport Integrity:</strong> The build audit verifies that the tier-1 <code>PluginMessageNetworkBinding</code> and proxy auto-detection classes, as well as the native <code>RespRedisClient</code> transport bindings, are preserved in Lite per ADR-100.</li>
-<li><strong>Third-Party Dependency Compliance:</strong> Shaded third-party libraries (e.g. HikariCP, Jedis, SnakeYAML, SQLite JDBC) are compatible with Apache 2.0, MIT, or BSD licenses and audited via CycloneDX SBOM generation (<code>bom.json</code>) on every release.</li>
+<li><strong>Third-Party Dependency Compliance:</strong> The plugin jars shade no third-party library (ADR-077); dependencies are audited via CycloneDX SBOM generation (<code>bom.json</code>) on every release. LZ4 region decode is in-house code (ADR-016 section 15); lz4-java is a test-scope dependency only and is not shipped.</li>
 </ul>
 
 

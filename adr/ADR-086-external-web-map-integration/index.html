@@ -3051,7 +3051,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3591,6 +3591,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3785,6 +3806,48 @@
   
   <span class="md-ellipsis">
     ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
   </span>
   
 
@@ -3998,7 +4061,7 @@
 <p><strong>Context:</strong>
 - <a href="../ADR-016-anvil-subsystem/">ADR-016</a> — Anvil Read-Only Subsystem (Prefilter, Backed Chunk View, Shared Module).
 - <a href="../ADR-046-maps-api-module/">ADR-046</a> — <code>maps-api</code> Module for Runtime Cartography Chart Generation.
-- <a href="../ADR-077-multi-format-region-support/">ADR-077</a> — Multi-Format Region Support: Linear (ZSTD) and Pluggable Region Readers.
+- <a href="../ADR-077-multi-format-region-support/">ADR-077</a> — Multi-Format Region Support: Pluggable Region Readers (Linear via Addon).
 - <a href="../ADR-085-spiral-addressed-hilbert-key-space/">ADR-085</a> — Spiral-Addressed Hilbert Key Space for Learned State.
 - <a href="https://github.com/DailyStruggle/RTP/blob/V3/api/maps-api/docs/adr/maps-api-ADR-001-bootstrap.md"><code>maps-api-ADR-001</code></a> — Module Bootstrap, Package Layout, and Palette Policy.</p>
 <hr />
@@ -4023,7 +4086,7 @@
 - <strong>Zero-Chunk-Load Pipeline:</strong> When the browser requests tile <code>(z, x, y)</code>:
   1. The tile bounds are converted to world chunk bounds $[cx_{\min}..cx_{\max}, cz_{\min}..cz_{\max}]$.
   2. For chunks already evaluated: The safety verdict and biome are resolved in memory via <code>MemoryShape.isBadLocation(k)</code> in <strong>$O(\log N)$ binary search time ($208\text{ ns}$ per chunk)</strong>.
-  3. For unverified chunks: The tile provider queries <code>anvil-api</code> / <code>RegionFileReader</code> (ADR-016 / ADR-077) off-tick directly from <code>.mca</code> / <code>.linear</code> files on disk, bypassing the server's chunk loading pipeline entirely (<strong>Zero main-thread blocking, S-005 compliant</strong>).
+  3. For unverified chunks: The tile provider queries <code>anvil-api</code> / <code>RegionFileReader</code> (ADR-016 / ADR-077) off-tick directly from <code>.mca</code> / <code>.linear</code> files on disk, bypassing the server's chunk loading pipeline entirely (<strong>Zero main-thread blocking, S-005 compliant</strong>). (2026-10-06: Linear reader withdrawn from core, see ADR-077; <code>.linear</code> files are read only when an addon registers a reader.)
   4. The raster image is painted into an off-main buffer using <code>maps-api</code>'s <code>HeatmapRenderer</code> and streamed directly to the browser as PNG/WebP bytes.</p>
 <h3 id="2b-vector-volume-and-marker-sets-bluemap-dynmap-pl3xmap">2b. Vector Volume and Marker Sets (BlueMap / Dynmap / Pl3xMap)<a class="headerlink" href="#2b-vector-volume-and-marker-sets-bluemap-dynmap-pl3xmap" title="Permanent link">&para;</a></h3>
 <p>For 3D WebGL and vector overlay layers:

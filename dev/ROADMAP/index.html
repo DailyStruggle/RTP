@@ -3040,7 +3040,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3414,6 +3414,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3624,6 +3645,48 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3794,7 +3857,7 @@ commit/ADR that closed it.</p>
 <p>Tier ordering reflects priority, not chronology:</p>
 <ul>
 <li><strong>Tier 0</strong> — must-ship items before <code>3.0.0</code> loses the <code>-beta.1</code> tag. <em>(All Tier 0 items complete; <code>3.0.0</code> shipped.)</em></li>
-<li><strong>Tier 1</strong> — directly narrows a caveat currently documented in <code>docs/FRONT_PAGE.bbcode</code> or
+<li><strong>Tier 1</strong> — directly narrows a caveat currently documented in <code>docs/publishing/FRONT_PAGE.md</code> or
   <code>docs/admin/</code>.</li>
 <li><strong>Tier 2</strong> — new capability that earns a <code>3.1.0</code> / <code>3.1.x</code> release note.</li>
 <li><strong>Tier 3</strong> — polish, long-tail, and infrastructure.</li>
@@ -3889,8 +3952,8 @@ reproducible by readers".</p>
   size, methodology, and per-dimension safe-fraction columns for Overworld / Nether / End. Until
   this exists, the ~45% figure is an author claim, not a reproducible one.~~</li>
 <li>[x] ~~<strong>Extend the existing bStats integration with custom charts.</strong> Default metrics are already
-  wired (<code>RTPBukkitPlugin</code> → bStats ID <code>30865</code>, relocated <code>org.bstats</code> →
-  <code>io.github.dailystruggle.rtp.bstats</code>); what is missing is <code>addCustomChart(...)</code> for RTP-specific
+  wired (bStats ID <code>30865</code>, now sent by the in-tree <code>bstats-api</code> client per
+  <a href="https://github.com/DailyStruggle/RTP/blob/V3/api/bstats-api/docs/adr/bstats-api-ADR-001-dependency-free-client.md">bstats-api-ADR-001</a>); what is missing is <code>addCustomChart(...)</code> for RTP-specific
   aggregates — platform split, region count, queue depth, and observed safe-fraction histograms per
   dimension.~~</li>
 <li>[x] ~~<strong>Replace the qualitative Nether/End phrasing</strong> on the front page with measured figures once
@@ -3906,7 +3969,7 @@ reproducible by readers".</p>
   captures spatial memory from the parent region for O(1) candidate selection.</li>
 <li>[x] ~~<strong>Region-confinement (tether) addon (<code>LeafRTPTetherAddon</code>).</strong>~~ Superseded and folded into
   the active scripted actions and confinement architecture (<a href="../../adr/ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/">ADR-093</a>,
-  <a href="../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives.md">ADR-095</a>). Confinement
+  <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/">ADR-095</a>). Confinement
   is actively functional via the action engine (<code>confinement.enabled: true</code>, tether pull-back,
   <code>MemoryShape.contains</code> boundary enforcement) using <code>PlayerMoveDispatcher</code> (ADR-075); the stand-alone
   addon experiment is abandoned.</li>
@@ -3981,7 +4044,7 @@ reproducible by readers".</p>
   cache locality without disrupting 1D spiral bijections.</li>
 <li>[x] ~~<strong>Anvil PRESCAN accuracy measurement → conditional FULLSCAN retirement.</strong>~~ Retired:
   the scan path in <code>ScanTask</code> has been streamlined into a single hybrid pass. Generated chunks are
-  probed off-tick via Anvil (<code>.mca</code> / <code>.linear</code>), while ungenerated chunks route to targeted on-demand
+  probed off-tick via Anvil (<code>.mca</code>, or an addon-registered format), while ungenerated chunks route to targeted on-demand
   generation without globally switching the scan phase or requiring an unconditional Pass 2 FULLSCAN
   sweep. S-001 safety remains authoritatively enforced at teleport selection time.</li>
 <li>[ ] <strong>Chunky-driven generation pass for <code>/rtp scan</code> (near-term focus, D-005 + ADR gated).</strong> Today
@@ -4266,10 +4329,17 @@ reproducible by readers".</p>
 <li><strong>5-Stage Setup Parity:</strong> Replicate stages 1–5 (Stage 1: World Topology single vs. multi-world auto-expansion; Stage 2: Gameplay Style templates survival / arena / skyblock / oneblock; Stage 3: Performance Profile low / high / folia-tuned; Stage 4: Addon &amp; Effect toggles claim integrations, economy, and cinematic effects; Stage 5: Dry-Run Diff Preview &amp; Atomic Apply).</li>
 <li><strong>Prefab &amp; Recipe Compilation:</strong> Compose user answers into the identical ordered sparse <code>Prefab</code> recipe overlay pipeline as <code>SetupRecipe</code>, rendering live cumulative deltas across <code>performance.yml</code>, <code>safety.yml</code>, and <code>definitions/regions/*.yml</code> in the editor's Staging Diff Inspector before commit.</li>
 <li><strong>Dual Commit Path:</strong> Support both direct WebSocket hot-apply and offline token-based command fallback (<code>/rtp editor apply token=&lt;token&gt;</code>) with server-side validation against geometry invariants (ADR-034) and automated non-destructive <code>.bak</code> file backups.</li>
+<li>[ ] <strong>Shared spatial memory across servers.</strong> Let backends that serve the same world share what
+  each one has learned about it (rejected segments and their causes, biome results) through the
+  SQL / Redis backends, so a scan or a rejection on one server saves the others the same work. Only
+  valid between servers whose world files match; the design must say how that is detected and how
+  concurrent writes merge. Requires a D-005 proposal and an ADR before implementation. Until it
+  ships, the front page shall not describe spatial memory as shareable.</li>
 </ul>
 <hr />
 <h2 id="tier-3-polish-and-long-tail">Tier 3 — Polish and long tail<a class="headerlink" href="#tier-3-polish-and-long-tail" title="Permanent link">&para;</a></h2>
 <ul>
+<li>[ ] <strong>Pre-release runtime verification of <code>/rtp back</code>.</strong> Command implementation is landed in <code>rtp-core</code> (<code>BackCmd</code> with unit coverage in <code>BackCmdTest</code>), but requires runtime verification across live platform adapters and multi-server devstack before release (origin coordinate toggling, cross-server network mode target return, permission gating on <code>rtp.back</code>, and cooldown tracking).</li>
 <li>[ ] <strong>Standalone <code>rtp-anvil</code> publication.</strong> The module is genuinely reusable outside RTP (any
   plugin wanting off-tick region-file reads could depend on it). If pursued, add a Maven Central
   publish target and write the "why this lives alone" ADR.</li>
@@ -4290,8 +4360,9 @@ reproducible by readers".</p>
 <li>Completed items: do <strong>not</strong> delete the line. Strike it through and append the commit short-SHA or
   ADR number that closed it. This preserves the velocity signal.</li>
 <li>New caveats discovered between releases: add under the appropriate Tier 1 subsection and mirror
-  the front-page entry in <code>docs/FRONT_PAGE.bbcode</code>'s "Roadmap" block with a vague, non-technical
-  summary (no REQ-*, no ADR identifiers — those stay in this document).</li>
+  it in the Caveats or FAQ section of <code>docs/publishing/FRONT_PAGE.md</code> (then rebuild with
+  <code>scripts/release/build_front_pages.py</code>) as a plain, non-technical summary (no REQ-*, no ADR
+  identifiers — those stay in this document).</li>
 <li>Features requested by operators: land in Tier 2 with the requesting issue linked, or get
   explicitly declined with a one-line rationale.</li>
 <li>This file is the only TODO source of truth for release planning. Do not duplicate it into

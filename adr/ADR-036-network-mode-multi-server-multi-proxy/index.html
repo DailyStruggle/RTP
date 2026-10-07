@@ -2337,6 +2337,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#amendment-2026-10-05-authenticated-transports-fail-closed" class="md-nav__link">
+    <span class="md-ellipsis">
+      Amendment (2026-10-05): Authenticated Transports Fail Closed
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#alternatives-considered" class="md-nav__link">
     <span class="md-ellipsis">
       Alternatives Considered
@@ -3223,7 +3232,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3597,6 +3606,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3807,6 +3837,48 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3954,6 +4026,15 @@
   <a href="#amendment-2026-06-12-plugin-message-promoted-to-tier-1-default" class="md-nav__link">
     <span class="md-ellipsis">
       Amendment (2026-06-12): Plugin-Message Promoted to Tier-1 Default
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#amendment-2026-10-05-authenticated-transports-fail-closed" class="md-nav__link">
+    <span class="md-ellipsis">
+      Amendment (2026-10-05): Authenticated Transports Fail Closed
     </span>
   </a>
   
@@ -4132,6 +4213,14 @@
 <li><strong>Honest limits (durable-tier upgrade boundary).</strong> Everything rides an online player's connection (a player-empty or idle-self-paused Fabric/NeoForge backend cannot broadcast, so its availability goes stale; treat unknown/stale as accept and let the destination decide); single-proxy <code>Forward</code> fan-out only; no durable reservation across a proxy restart. Multi-proxy, always-fresh-availability, and atomic-claim deployments move to the SQL/Redis tiers.</li>
 <li><strong>Safety unchanged.</strong> The destination always runs the normal local pipeline (spiral -&gt; chunk -&gt; safety), so S-001/S-004/S-005 hold; tier-1 transports <em>intent</em>, not a coordinate. Move failures are logged, never swallowed (S-004); busy/invalid messages are configurable (S-007).</li>
 <li><strong>Contract detail:</strong> subproject ADR <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-016-plugin-message-default-transport.md"><code>rtp-proxy-ADR-016-plugin-message-default-transport</code></a>. Lite-assembly impact: <a href="../ADR-024-rtp-lite-assembly-variant/">ADR-024</a>. Plan amendment: <code>docs/dev/MULTI_SERVER_PLAN.md</code> <em>Amendment: Plugin-Message Default Tier</em>.</li>
+</ul>
+<h2 id="amendment-2026-10-05-authenticated-transports-fail-closed">Amendment (2026-10-05): Authenticated Transports Fail Closed<a class="headerlink" href="#amendment-2026-10-05-authenticated-transports-fail-closed" title="Permanent link">&para;</a></h2>
+<p>Security detail: <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-010-security-hardening.md"><code>rtp-proxy-ADR-010</code></a> amendment of the same date. The ratified components are otherwise unchanged.</p>
+<ul>
+<li><strong>Every shared-store record is signed:</strong> reservation tokens (including <code>regionKey</code>), request-queue entries and Redis shared-waitlist entries. Plugin-message heartbeats and proxy-cache snapshots are signed too, so the tier-1 default no longer trusts unsigned gossip unless <code>network.allowUnsigned: true</code> is set.</li>
+<li><strong>No silent downgrade:</strong> <code>redis</code>, <code>sql</code> and <code>proxy-direct</code> shall not start without a valid <code>RTP_NET_SECRET</code>; a weak or missing secret disables network mode rather than switching to an in-memory store.</li>
+<li><strong>Transport options:</strong> Redis TLS and ACL users; <code>proxy-direct</code> loopback-by-default bind, client allow-list, and TLS / mTLS.</li>
+<li><strong>Upgrade constraint:</strong> signed formats changed, so mixed-version networks cannot share a store.</li>
 </ul>
 <h2 id="alternatives-considered">Alternatives Considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
 <table>

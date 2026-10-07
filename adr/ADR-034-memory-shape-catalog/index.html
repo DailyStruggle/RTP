@@ -3151,7 +3151,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3525,6 +3525,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3719,6 +3740,48 @@
   
   <span class="md-ellipsis">
     ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
   </span>
   
 
@@ -3932,7 +3995,7 @@
 <p><strong><code>Polygon</code></strong> <em>(new — this ADR)</em> — Admin-authored closed polygon, optionally concave; self-intersection rejected at load.</p>
 </li>
 <li><strong>Inheritance from <code>Square</code>.</strong> <code>Polygon extends Square</code>, consistent with the established <code>MemoryShape</code> hierarchy (<code>Square_Normal extends Square</code>, <code>Circle_Normal extends Circle</code>; <code>Ellipse</code> previously extended <code>Circle</code> and as of the 2026-05-14 amendment extends <code>MemoryShape&lt;EllipseMemoryShapeParams&gt;</code> directly — the precedent of "extend the closest primitive that shares your param enum" stands). The inherited <code>Square</code> sized to the polygon's axis-aligned bounding box carries the spiral index, the segmented bad-locations store, persistence, uniqueness, cache-key contribution (<a href="../ADR-022-shape-cache-key-seed-plus-config-hash/">ADR-022</a>), and registry integration unchanged; <code>Polygon</code> adds the polygon predicate, the load-time mask population, and an <code>expand</code> override.</li>
-<li><strong>Params (<code>PolygonMemoryShapeParams</code>):</strong> <code>vertices</code> (Chunky-compatible list of <code>(x, z)</code> pairs), <code>centerX</code> / <code>centerZ</code> (optional override; defaults to AABB center), <code>weight</code>, <code>uniquePlacements</code>, <code>mode</code>. <code>expand</code> is <strong>not</strong> part of the declared param surface; the config layer does not surface it for <code>Polygon</code>, and <code>Polygon</code> overrides the expansion accessor to hard-return <code>false</code>. A warning is logged via <code>RTP.log(Level.WARNING, …)</code> if a config explicitly sets <code>expand=true</code> on a polygon region.</li>
+<li><strong>Params (<code>PolygonMemoryShapeParams</code>):</strong> <code>vertices</code> (Chunky-compatible list of <code>(x, z)</code> pairs), <code>weight</code>, <code>uniquePlacements</code>, <code>mode</code>; <code>Polygon.keys()</code> reports exactly these names (the web editor's schema reads them). The bounding-square settings (<code>radius</code>, <code>centerX</code>, <code>centerZ</code>, <code>centerRadius</code>) are derived from the vertex AABB on every <code>setVertices</code> and are not configurable. <code>expand</code> is <strong>not</strong> part of the declared param surface; the config layer does not surface it for <code>Polygon</code>, and <code>Polygon</code> overrides the expansion accessor to hard-return <code>false</code>. A warning is logged via <code>RTP.log(Level.WARNING, …)</code> if a config explicitly sets <code>expand=true</code> on a polygon region.</li>
 <li><strong>Vertex format:</strong> Chunky-parity. Admins paste the same vertex list they already use in <code>/chunky shape polygon</code>. Stored in YAML as a collection so it round-trips as a single value through the existing config layer.</li>
 <li><strong>Validation at load:</strong><ul>
 <li>Reject polygons with fewer than 3 vertices.</li>

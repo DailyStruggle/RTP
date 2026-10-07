@@ -3202,7 +3202,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3576,6 +3576,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3770,6 +3791,48 @@
   
   <span class="md-ellipsis">
     ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
   </span>
   
 
@@ -4007,7 +4070,7 @@
 <td><code>anvilPrefilterEnabled</code></td>
 <td>Boolean</td>
 <td><code>true</code></td>
-<td>Off-thread region prefilter: screens candidate destinations by reading region files (<code>.mca</code> Anvil or <code>.linear</code> Linear format) from disk, dropping known-unsafe ones before they cost a chunk load. A chunk it cannot read (e.g. not yet generated) is not rejected - it passes through to the normal live-load safety check.</td>
+<td>Off-thread region prefilter: screens candidate destinations by reading region files (<code>.mca</code> Anvil format, plus any format an addon registers) from disk, dropping known-unsafe ones before they cost a chunk load. A chunk it cannot read (e.g. not yet generated, or stored in an unregistered format such as <code>.linear</code>) is not rejected - it passes through to the normal live-load safety check.</td>
 </tr>
 </tbody>
 </table>
@@ -4114,16 +4177,16 @@
 <p>Block filter settings are configured in <a href="../CONFIGURATION/#blocks-advancedblocksyml"><code>advanced/blocks.yml</code></a>.</p>
 <p>The <code>airBlocks</code> and <code>unsafeBlocks</code> lists use a specific grammar to match blocks and properties.</p>
 <blockquote>
-<p><strong>Edition note (Pro only).</strong> The plain-material rows below work in every edition, but the <strong>block-tag and block-state-predicate grammar</strong> (<code>#namespace:tag</code>, <code>MATERIAL[...]</code>, <code>*[...]</code>, including the numeric range predicates) ships only in the full (Pro) edition. The <strong>rtp-lite</strong> build parses <code>unsafeBlocks</code> / <code>airBlocks</code> as a <strong>flat material allow/deny list</strong> and does not honour any <code>#tag</code> token or <code>[...]</code> predicate. See the bundled lite docs (<code>SAFETY.md</code> inside the lite jar) for the lite-only surface.</p>
+<p><strong>Editions.</strong> The full grammar below, including block tags and block-state predicates, works identically in the free and Pro builds. Tags resolve against the server's live block-tag registry when the config loads.</p>
 </blockquote>
 <h3 id="grammar-token-syntax">Grammar (Token Syntax)<a class="headerlink" href="#grammar-token-syntax" title="Permanent link">&para;</a></h3>
 <ul>
-<li><code>MATERIAL</code> — Plain material (e.g., <code>LAVA</code>). <em>(All editions.)</em></li>
-<li><strong>(Pro)</strong> <code>MATERIAL[prop=val,prop2=val2]</code> — Match only when block-state properties match (string equality).</li>
-<li><strong>(Pro)</strong> <code>MATERIAL[prop&gt;=n]</code> — Match only when a numeric block-state property satisfies a range comparison. Operators: <code>&gt;=</code>, <code>&lt;=</code>, <code>&gt;</code>, <code>&lt;</code>. The bound <code>n</code> must be a whole number (e.g., <code>LAVA[level&lt;=3]</code> for near-source lava, <code>FIRE[age&gt;=10]</code>).</li>
-<li><strong>(Pro)</strong> <code>#namespace:tag</code> — Expands to every material in that block tag (e.g., <code>#minecraft:logs</code>).</li>
-<li><strong>(Pro)</strong> <code>#namespace:tag[prop=val]</code> — Tag members only when properties match.</li>
-<li><strong>(Pro)</strong> <code>*[prop=val]</code> — ANY material when properties match (wildcard, e.g., <code>*[waterlogged=true]</code>).</li>
+<li><code>MATERIAL</code> — Plain material (e.g., <code>LAVA</code>).</li>
+<li><code>MATERIAL[prop=val,prop2=val2]</code> — Match only when block-state properties match (string equality).</li>
+<li><code>MATERIAL[prop&gt;=n]</code> — Match only when a numeric block-state property satisfies a range comparison. Operators: <code>&gt;=</code>, <code>&lt;=</code>, <code>&gt;</code>, <code>&lt;</code>. The bound <code>n</code> must be a whole number (e.g., <code>LAVA[level&lt;=3]</code> for near-source lava, <code>FIRE[age&gt;=10]</code>).</li>
+<li><code>#namespace:tag</code> — Expands to every material in that block tag (e.g., <code>#minecraft:logs</code>).</li>
+<li><code>#namespace:tag[prop=val]</code> — Tag members only when properties match.</li>
+<li><code>*[prop=val]</code> — ANY material when properties match (wildcard, e.g., <code>*[waterlogged=true]</code>).</li>
 </ul>
 <h4 id="predicate-notes">Predicate notes<a class="headerlink" href="#predicate-notes" title="Permanent link">&para;</a></h4>
 <ul>

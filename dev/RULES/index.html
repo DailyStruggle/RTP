@@ -3040,7 +3040,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3414,6 +3414,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3608,6 +3629,48 @@
   
   <span class="md-ellipsis">
     ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
   </span>
   
 
@@ -3848,6 +3911,18 @@
 <td>Mirror prose voice for external user copy</td>
 <td>self-contained</td>
 </tr>
+<tr>
+<td>D-007</td>
+<td>Doc</td>
+<td>New subsystem updates scope (REQUIREMENTS section 0) in the same change</td>
+<td><code>REQUIREMENTS.md</code> section 0</td>
+</tr>
+<tr>
+<td>D-008</td>
+<td>Code</td>
+<td>Large deduplicated classes delegate to package-private helpers</td>
+<td>self-contained</td>
+</tr>
 </tbody>
 </table>
 <h2 id="core-development-rules">Core Development Rules<a class="headerlink" href="#core-development-rules" title="Permanent link">&para;</a></h2>
@@ -3946,11 +4021,24 @@
 <li>
 <p><strong>Rule D-006: Mirror Prose Voice for External User Copy</strong></p>
 </li>
-<li><strong>Description</strong>: When authoring external listings, README, marketing copy, or release notes, mirror the maintainer's established voice: first person, conversational, low ceremony, honest about limits and trade-offs. Prefer concrete evidence over adjectives (benchmark numbers, reproducibility notes; no AI hype buzzwords). State technical specifics plainly (spiral math, <code>.mca</code> / <code>.linear</code> pre-filter, async caching). Use ASCII punctuation only (hyphens/colons, no em/en dashes; see <a href="../FRONT_PAGE_LITE.md"><code>docs/FRONT_PAGE_LITE.md</code></a>).</li>
+<li>
+<p><strong>Description</strong>: When authoring external listings, README, marketing copy, or release notes, mirror the maintainer's established voice: first person, conversational, low ceremony, honest about limits and trade-offs. Prefer concrete evidence over adjectives (benchmark numbers, reproducibility notes; no AI hype buzzwords). State technical specifics plainly (spiral math, <code>.mca</code> pre-filter, async caching). Use ASCII punctuation only (hyphens/colons, no em/en dashes; see <a href="../../publishing/FRONT_PAGE/"><code>docs/publishing/FRONT_PAGE.md</code></a>). Storefront pages (BuiltByBit, Modrinth, Hangar) are generated from that one source by <code>scripts/release/build_front_pages.py</code>; paid-support copy goes in <code>kind: promo</code> blocks so it never reaches Hangar or Modrinth.</p>
+</li>
+<li>
+<p><strong>Rule D-007: Scope Travels With the Subsystem</strong></p>
+</li>
+<li>
+<p><strong>Description</strong>: A change that introduces a new subsystem (a new command family, module, bundled addon, network surface, or operator-facing engine) shall update the In Scope / Out of Scope lists in <a href="../REQUIREMENTS/"><code>REQUIREMENTS.md</code> section 0</a> in the same change set, and the D-005 proposal shall state the scope impact. Features outside selection, the teleport pipeline, and the platform adapters should ship as addons against <code>rtp-api</code> (ADR-057) unless the proposal records why core is required.</p>
+</li>
+<li>
+<p><strong>Rule D-008: Deduplicate Behind a Facade, Not Into One File</strong></p>
+</li>
+<li><strong>Description</strong>: When deduplication concentrates shared behaviour in one class (e.g. <code>MemoryShape</code>, <code>MenuRedeemSubcommand</code>, <code>ScanTask</code>, <code>ConfigParser</code>), keep that class as the single public entry point and move cohesive concerns (codec, table, persistence, rendering) into package-private helpers in the same package. Apply this opportunistically when a change already touches the concern; do not open refactor-only changes without a D-005 proposal. Public API and persisted formats shall not change as part of such a split.</li>
 </ul>
 <h2 id="maintenance-protocol">Maintenance Protocol<a class="headerlink" href="#maintenance-protocol" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Any new ADR that introduces a prohibition or a new safety/architectural invariant MUST add a corresponding rule to this file (and its quick-reference row) in the same change set.</li>
+<li>Any new ADR that introduces a subsystem MUST update <code>REQUIREMENTS.md</code> section 0 in the same change set (Rule D-007).</li>
 <li>When a rule's underlying requirement is renamed or renumbered, update both the detailed bullet and the quick-reference table row; stale requirement IDs silently break <code>Rule D-001</code>.</li>
 </ul>
 <hr />

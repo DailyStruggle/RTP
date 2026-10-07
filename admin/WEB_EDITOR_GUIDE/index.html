@@ -3211,7 +3211,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3585,6 +3585,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3779,6 +3800,48 @@
   
   <span class="md-ellipsis">
     ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
   </span>
   
 
@@ -4038,6 +4101,9 @@
 <li><strong>Cryptographic Tokens:</strong> Sessions use cryptographically random 128-bit hex tokens (<code>SecureRandom</code>). Tokens expire automatically and are invalidated once applied.</li>
 <li><strong>Fail-Closed Geometry Validation:</strong> Proposed region boundaries are validated against ADR-034 non-self-intersection rules and world borders before any config file is updated on disk.</li>
 <li><strong>Non-Destructive Backups:</strong> The server automatically writes <code>.bak</code> copies of all affected configuration files prior to applying modifications.</li>
+<li><strong>Secrets Stay on the Server:</strong> Passwords and other secret values are uploaded as <code>&lt;redacted&gt;</code>. Applying a file that still shows <code>&lt;redacted&gt;</code> keeps the value already on disk.</li>
+<li><strong>Trusted Browsers:</strong> A new browser has to be trusted once in-game with <code>/rtp editor trust &lt;code&gt;</code>. The code matches the one shown on the page and expires after 5 minutes. To revoke trust, run <code>/rtp editor untrust key=&lt;fingerprint prefix&gt;</code>, or <code>key=all</code> to revoke every browser.</li>
+<li><strong>Trust Expiry:</strong> Set <code>editor.trust.maxAgeDays</code> in <code>advanced/network.yml</code> to make trusted browsers expire after that many days. The default <code>0</code> never expires them.</li>
 </ol>
 <hr />
 <h2 id="3-recommended-dual-screen-setup">3. Recommended Dual-Screen Setup<a class="headerlink" href="#3-recommended-dual-screen-setup" title="Permanent link">&para;</a></h2>
@@ -4078,9 +4144,12 @@ https://dailystruggle.github.io/RTP/editor#e4d2a90f1b2c3d4e
 <p>Click the link to open the workspace in your browser on Screen 2.</p>
 <ul>
 <li><strong>Panel 1: 🗺 Visual Region Editor</strong></li>
-<li><strong>Pan &amp; Zoom:</strong> Navigate around world coordinate origins (X: 0, Z: 0).</li>
-<li><strong>Drag Vertices:</strong> Click and drag polygon vertices to adjust region perimeters. Redundant collinear points are simplified dynamically (ADR-099).</li>
-<li><strong>Adjust Donut Rings:</strong> Modify the outer <code>radius</code> or inner <code>centerRadius</code> (deadzone exclusion).</li>
+<li><strong>Pan &amp; Zoom:</strong> Scroll to zoom; drag empty map space (or right / middle drag, Shift / Ctrl + drag) to pan.</li>
+<li><strong>Move a Region:</strong> Drag the round centre handle to move the region. <code>centerX</code> / <code>centerZ</code> snap to whole chunks (or the 🧲 Snap grid) and keep the unit you wrote (<code>4096b</code> stays in blocks, <code>256c</code> / <code>256</code> stay in chunks). For a polygon, drag the centre handle or anywhere inside the shape to shift every vertex.</li>
+<li><strong>Resize a Region:</strong> Drag the square handles on the outer edge to change <code>radius</code> (<code>ELLIPSE</code>: <code>radius</code> on the X axis, <code>radius2</code> on the Z axis; <code>RECTANGLE</code>: <code>width</code> / <code>height</code> from the edges, both from the corners). Drag the pink handles on the inner ring to change <code>centerRadius</code> / <code>centerRadius2</code> (the deadzone hole). The hole always stays smaller than the outer edge. For a polygon, the outer handles scale every vertex about the centre, and a scale that would collapse or cross the outline is refused.</li>
+<li><strong>Live Values:</strong> The cursor changes over a handle, and a label shows the value as you drag (e.g. <code>radius 260c (4160 b)</code>). The YAML diff updates while you drag; the server path preview is requested once, when you let go.</li>
+<li><strong>Drag Vertices:</strong> Click and drag polygon vertices to adjust region perimeters. Vertices take priority over the move / resize handles. Redundant collinear points are simplified dynamically (ADR-099).</li>
+<li><strong>Type Exact Values:</strong> Every value a handle changes can also be typed in the shape settings form, which uses the same staging path.</li>
 <li>
 <p><strong>Visualization Layers:</strong> Toggle overlays for chunk-resolution pregenerated land (biome data streamed progressively to maintain &gt; 5 FPS), rejected candidate blocks (<code>bad-locations</code>), and 1D Archimedean spiral walk traces (ADR-001).</p>
 </li>

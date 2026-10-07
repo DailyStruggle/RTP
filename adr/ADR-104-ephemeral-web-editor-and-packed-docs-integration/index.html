@@ -3051,7 +3051,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3409,6 +3409,27 @@
   
   <span class="md-ellipsis">
     ADR-094 — Quality-Engineering Gates: Tiered Logic Tests, Local Static Analysis, and Changed-Line Coverage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
   </span>
   
 
@@ -3804,6 +3825,48 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4123,7 +4186,7 @@
 <li><strong>Schema Validation &amp; Gutter Diagnostics:</strong> The active YAML buffer is checked against:</li>
 <li>the server's registered shapes and vertical adjustors with typed parameters (session payload <code>schema</code>: <code>{shape|vert: {NAME: {key: {type, default, options}}}}</code>, the type taken from each implementation's default value as <code>integer | number | boolean | enum | list | string</code>; includes add-on and Chunky shapes; built-in names until a session loads), validated by block (<code>shape.name</code> vs <code>vert.name</code>) and for any key annotated <code>@source: shape|vert</code>. Parameter types and enum options drive the value checks inside shape / vert blocks; comment annotations override them;</li>
 <li>the shipped files' <code>@type</code> / <code>@options</code> / <code>@range</code> annotations (enums, booleans, numeric ranges);</li>
-<li>duplicate keys at any depth, unknown keys inside shape / vert blocks and at the top level of single-instance files, and unrecognised unit suffixes. A <code>POLYGON</code> block warns on <code>radius</code>, <code>centerRadius</code>, <code>centerX</code> and <code>centerZ</code>, which a polygon infers from its vertices.</li>
+<li>duplicate keys at any depth, unknown keys inside shape / vert blocks and at the top level of single-instance files, and unrecognised unit suffixes. A block key is known when the implementation's <code>keys()</code> lists it; a key that appears in shipped shape / vert blocks but that no registered implementation lists counts as parser-level and does not warn. The page holds no per-shape key lists of its own (a <code>POLYGON</code> block warns on <code>radius</code> because <code>Polygon.keys()</code> omits it), and shape switching prunes block keys by the same schema.</li>
 <li>Errors and warnings are marked in the gutter (escaped hover text, every message per line), listed in the doc tracker, and summarised for every staged file in the staging diff. Committing with schema errors requires explicit confirmation.</li>
 <li><strong>Unit Slider &amp; Conversion Chips:</strong> When the cursor is on a spatial value (<code>b</code>, <code>c</code>, <code>r</code>, <code>km</code>, <code>mi</code>, e.g. <code>256c</code>, <code>5r</code>), an in-editor chip and the doc tracker show the block conversion (e.g. $256\text{c} = 4{,}096\text{ blocks}$, $5\text{r} = 2{,}560\text{ blocks}$). A slider rewrites the value in its unit, and converter badges rewrite it in another unit where the conversion is exact. Duration suffixes (<code>s</code>, <code>m</code>, <code>h</code>, <code>d</code>, <code>t</code>, <code>ms</code>) are not treated as distances.</li>
 </ul>
@@ -4144,7 +4207,7 @@
 </ul>
 </li>
 <li><strong>Bi-directional Synchronization &amp; Back-Propagation:</strong></li>
-<li><strong>Signed two-way channel (<a href="../ADR-106-shape-curve-helpers-and-signed-editor-channel/">ADR-106</a> section 5):</strong> <code>/rtp editor</code> opens a channel on a WebSocket relay (bytesocks, default <code>https://bytesocks.lucko.me</code>, configurable next to the bytebin URL), joins it outbound, and puts <code>channel: {relay, id, pluginKey}</code> in the snapshot. Every message is signed (<code>{msg, signature}</code>, SHA256withRSA). The plugin acts on page edits only from browser keys the operator has trusted in game (<code>/rtp editor trust &lt;nonce&gt;</code>). If the relay can't be created, the session is snapshot-only and the reason is logged (S-004).</li>
+<li><strong>Signed two-way channel (<a href="../ADR-106-shape-curve-helpers-and-signed-editor-channel/">ADR-106</a> section 5):</strong> <code>/rtp editor</code> opens a channel on a WebSocket relay (bytesocks; <code>advanced/network.yml editor.relayUrl</code>, next to <code>editor.bytebinUrl</code>, interim default <code>https://usersockets.luckperms.net</code>), joins it outbound, and puts <code>channel: {relay, id, pluginKey}</code> in the snapshot. Every message is signed (<code>{msg, signature}</code>, SHA256withRSA). The plugin acts on page edits only from browser keys the operator has trusted in game (<code>/rtp editor trust &lt;nonce&gt;</code>). If the relay can't be created, the session is snapshot-only and the reason is logged (S-004).</li>
 <li><strong>Outbound Web Commits:</strong> With the channel connected and the browser key trusted, clicking <strong>"Hot-Apply"</strong> in the browser transmits the mutation directly (<code>apply</code> / <code>apply_ack</code>, bytebin hand-off above the 32 KiB frame cap), hot-reloading server regions through the same validation pipeline as <code>/rtp editor apply</code> without any manual command pasting.</li>
 <li><strong>Command Fallback (<code>/rtp editor apply &lt;token&gt;</code>):</strong> In offline, restricted, or disconnected environments, clicking "Save" generates the <code>/rtp editor apply &lt;token&gt;</code> command for copy-pasting into chat or console.</li>
 <li><strong>In-Game Back-Propagation:</strong> When mutations occur in-game (e.g., via <code>/rtp region set</code>, WorldEdit selection <code>/rtp region fromselection</code>, or in-game book GUI), the server broadcasts a delta to the active web session, updating the browser canvas and staging diff in real time to prevent stale-overwrite conflicts. Curve changes (<code>curve</code>, for example after <code>expand</code>), hazard run deltas (<code>hazard-delta</code>) and focus-driven land bins (<code>land</code>) travel over the same channel (ADR-106 section 5.3).</li>
@@ -4272,7 +4335,7 @@
 <h3 id="negative-trade-offs">Negative / Trade-offs<a class="headerlink" href="#negative-trade-offs" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Requires external byte store endpoint for ephemeral session transport. If external network is down, operators fall back to the in-game book editor (<code>/rtp admin</code>) and in-game packed docs (<code>/rtp docs</code>).</li>
-<li>Hosted live updates depend on a third-party WebSocket relay (<code>bytesocks.lucko.me</code> by default, configurable), as uploads depend on bytebin. If the relay can't be reached, the session stays snapshot-only with a logged reason and a page badge. Each new browser key needs one in-game trust action (ADR-106 section 5.2).</li>
+<li>Hosted live updates depend on a third-party WebSocket relay (LuckPerms' <code>usersockets.luckperms.net</code> by default, <code>advanced/network.yml editor.relayUrl</code>), as uploads depend on bytebin. If the relay can't be reached, the session stays snapshot-only with a logged reason and a page badge. Each new browser key needs one in-game trust action (ADR-106 section 5.2).</li>
 <li>The local <code>feed.js</code> files (section 4.6) exist only for local exports opened from the server's own <code>editor/</code> folder; a copied or downloaded <code>index.html</code> shows WAITING FOR FEED and stays a snapshot (still drawing verified curves from its embedded helpers). The loopback channel additionally needs the browser on the server machine.</li>
 <li>The survey samples biomes at a fixed Y (64 by default), not the surface heightmap; mountain chunks may report cave biomes. Ungenerated land carries no biome data.</li>
 <li>Until the full-detail pass reaches a bin, its biomes are estimates from 1 or 64 samples per region file.</li>

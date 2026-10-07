@@ -3040,7 +3040,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3414,6 +3414,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3608,6 +3629,48 @@
   
   <span class="md-ellipsis">
     ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
   </span>
   
 
@@ -3888,10 +3951,10 @@
 <ul>
 <li><strong>Paper &amp; Forks (Leaf, Leaves, Purpur, Pufferfish, Airplane, DivineMC):</strong></li>
 <li><strong>Status:</strong> <strong>Tested</strong> (Paper on 1.20.x, 1.21.x via automated build gates and nightly devstack); <strong>Best-effort</strong> (downstream forks and MC 26.x tracking).</li>
-<li>Uses native Paper asynchronous chunk loading (<code>World.getChunkAtAsync</code>). Linear (<code>.linear</code> / ZSTD) format supported via off-tick pre-filtering (ADR-077).</li>
+<li>Uses native Paper asynchronous chunk loading (<code>World.getChunkAtAsync</code>). Linear (<code>.linear</code> / ZSTD) worlds are supported through the live async chunk load path; core does not pre-filter <code>.linear</code> files unless an addon registers a reader (ADR-077).</li>
 <li><strong>Folia:</strong></li>
 <li><strong>Status:</strong> <strong>Tested</strong> (1.20.x, 1.21.x via automated build gates, thread affinity ArchUnit rules, and nightly devstack).</li>
-<li>Operates strictly under Folia Region &amp; Entity schedulers with Count-Bound task pipelines (ADR-004, ADR-015). Off-tick Anvil/Linear pre-filtering on common pool avoids cross-region hops.</li>
+<li>Operates strictly under Folia Region &amp; Entity schedulers with Count-Bound task pipelines (ADR-004, ADR-015). Off-tick Anvil pre-filtering on common pool avoids cross-region hops.</li>
 <li><strong>Spigot:</strong></li>
 <li><strong>Status:</strong> <strong>Best-effort</strong> (1.20.x, 1.21.x; compiles via <code>rtp-bukkit</code> adapter and unit tested, but lacks scheduled live multi-server devstack verification in CI).</li>
 <li>Uses background Anvil (<code>.mca</code>) parser for off-tick candidate pre-filtering to prevent main-thread chunk load stalls (S-005).</li>

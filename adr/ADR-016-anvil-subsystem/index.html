@@ -2079,6 +2079,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#15-chunk-payload-codecs-amended-2026-10-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      15. Chunk-payload codecs (amended 2026-10-05)
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3298,7 +3307,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3672,6 +3681,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3866,6 +3896,48 @@
   
   <span class="md-ellipsis">
     ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
   </span>
   
 
@@ -4113,6 +4185,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#15-chunk-payload-codecs-amended-2026-10-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      15. Chunk-payload codecs (amended 2026-10-05)
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4256,6 +4337,16 @@
 <h3 id="14-telemetry">14. Telemetry<a class="headerlink" href="#14-telemetry" title="Permanent link">&para;</a></h3>
 <p><code>BiomeSourceMetrics</code> exposes two process-global <code>AtomicLong</code> totals (<code>anvilHits</code>, <code>liveHits</code>) plus a reason-keyed <code>ConcurrentHashMap&lt;String, AtomicLong&gt;</code> with canonical reasons <code>anvil-hit</code>, <code>no-view-cached</code>, <code>view-missing-biome</code>, <code>anvil-throw</code>. <code>BukkitRTPWorld#getBiome</code> and <code>FoliaRTPWorld#getBiome</code> call <code>record(reason)</code> exactly once per read and emit a rate-limited <code>[RTP] Anvil biome fallthrough reason=&lt;reason&gt; world=&lt;w&gt; chunk=(cx,cz)</code> line per <code>BIOME_LOG_BUDGET_PER_REASON = 200</code> (INFO, then FINE). <code>AnvilPrefilter.DIAG_LOG_BUDGET_PER_REASON</code> and the adapter <code>GATE_SKIP_BUDGET_PER_REASON</code> constants share the same budget. Surfaced at runtime by <code>rtp test biome-source</code> and <code>rtp test full</code>.</p>
 <p>The adapter <code>logGateSkip</code> suppresses <code>reason=chunk-already-loaded</code> entirely — the <code>RTP.log(...)</code> call is skipped while the counter in <code>GATE_SKIP_COUNTERS</code> still increments, preserving the metric surface for <code>rtp test/anvil-prefilter</code> and future telemetry consumers. On Paper/Folia this reason is the steady-state outcome for every candidate that reaches the adapter path after <code>LocationGenerator</code>'s call-site probe (section 1.1), so surfacing it at any operator-visible level carries no diagnostic signal and drowns the log. All other gate-skip reasons (<code>dimension-unsupported</code>, <code>world-save-disabled</code>, <code>config-disabled(...)</code>) retain the rate-limited INFO→FINE budget and remain operator-actionable.</p>
+<h3 id="15-chunk-payload-codecs-amended-2026-10-05">15. Chunk-payload codecs (amended 2026-10-05)<a class="headerlink" href="#15-chunk-payload-codecs-amended-2026-10-05" title="Permanent link">&para;</a></h3>
+<p>Region files are untrusted input. <code>.mca</code> chunk payloads shall be decompressed only by the JDK (<code>GZIPInputStream</code>, <code>InflaterInputStream</code> for modes 1 and 2) or by in-house pure-Java code in <code>rtp-anvil</code>. Third-party codec libraries shall not be runtime dependencies of the <code>.mca</code> decode path.</p>
+<ul>
+<li>Mode 4 (<code>region-file-compression=lz4</code>, lz4-java <code>LZ4BlockOutputStream</code> container) is decoded by <code>Lz4BlockDecoder</code>: header validation, LZ4 block decode, and the 28-bit-masked XXHash32 block checksum (seed <code>0x9747b28c</code>).</li>
+<li>The decoder shall operate on <code>byte[]</code> with explicit bounds checks and shall not use <code>sun.misc.Unsafe</code> or JNI.</li>
+<li>Declared decompressed sizes shall be validated against <code>AnvilReader.MAX_DECOMPRESSED_CHUNK_BYTES</code> and the per-block level bound before any output allocation.</li>
+<li>Every malformed stream shall surface as <code>CorruptRegionEntryException</code> (section 2 fall-through to <code>Verdict.UNKNOWN</code>).</li>
+<li>lz4-java is a test-scope reference only (differential tests in <code>Lz4BlockDecoderTest</code>, Jazzer target in <code>AnvilRegionFuzzTest</code>).</li>
+</ul>
+<p>Rationale: two memory-safety CVEs in lz4-java's native/<code>Unsafe</code> paths within a year (CVE-2025-12183, CVE-2026-59949) against roughly 250 lines of fuzzable code for a fixed, simple container format. <code>.linear</code> (ADR-077) retains the pure-Java aircompressor ZStandard decoder until that format is retired. (2026-10-06: Linear reader withdrawn from core, see ADR-077; aircompressor is no longer a dependency and core ships no third-party codec.)</p>
 <h2 id="consequences">Consequences<a class="headerlink" href="#consequences" title="Permanent link">&para;</a></h2>
 <p><strong>Positive:</strong></p>
 <ul>
@@ -4291,7 +4382,7 @@
 <li>ADR-004 "Count-Bound Task Pipe on Folia".</li>
 <li>ADR-006 "Async Queue Pre-Generation".</li>
 <li>ADR-015 "Stale-Chunk Guard for Count-Bound Pipes".</li>
-<li>Regression guards: <code>AnvilPrefilterTest</code>, <code>AnvilFixtureParityTest</code>, <code>AnvilChunkViewTest</code>, <code>PaletteNormalizerTest</code>, <code>AnvilPackageBoundaryArchTest</code>, <code>ReqRtpS004NullChunkAttributionTest</code>, <code>ReqRtpAnvilFirstTest</code>, <code>TestBiomeSourceCmdTest</code>, <code>TestFullCmdTest</code>.</li>
+<li>Regression guards: <code>AnvilPrefilterTest</code>, <code>AnvilFixtureParityTest</code>, <code>AnvilChunkViewTest</code>, <code>PaletteNormalizerTest</code>, <code>AnvilPackageBoundaryArchTest</code>, <code>ReqRtpS004NullChunkAttributionTest</code>, <code>ReqRtpAnvilFirstTest</code>, <code>TestBiomeSourceCmdTest</code>, <code>TestFullCmdTest</code>, <code>Lz4BlockDecoderTest</code>, <code>AnvilLz4CompressionTest</code>, <code>AnvilRegionFuzzTest</code>.</li>
 </ul>
 
 

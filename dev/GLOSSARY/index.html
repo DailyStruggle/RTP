@@ -3040,7 +3040,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3414,6 +3414,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3608,6 +3629,48 @@
   
   <span class="md-ellipsis">
     ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
   </span>
   
 
@@ -3990,6 +4053,11 @@
 <td>Any byte-level shipping channel</td>
 <td>A <em>named binding for network-mode coordination state</em> (<code>RedisNetworkStateBinding</code>, <code>PostgresNetworkStateBinding</code>, <code>GenericSqlNetworkStateBinding</code>, <code>InMemoryNetworkStateBinding</code>). Not a Minecraft entity transport, vehicle, or plugin-message channel. See <em>Transport</em> entry below.</td>
 </tr>
+<tr>
+<td><strong>Linear</strong></td>
+<td>The Linear issue tracker (team <code>LeafRTP</code>, issue IDs <code>RTP-&lt;n&gt;</code>)</td>
+<td>The <em>Linear region file format</em> (<code>.linear</code>, ZSTD). Core does not read it; an addon may register a reader through the region-format SPI (ADR-077). Say "Linear tracker" for issues and "<code>.linear</code> region format" for files; tracker labels use <code>area:region-format-linear</code>. See <em>Linear Region Format</em> entry below.</td>
+</tr>
 </tbody>
 </table>
 <hr />
@@ -4057,7 +4125,7 @@
 <tr>
 <td>"anvil" / "anvil prefilter"</td>
 <td><code>rtp-anvil</code> / <code>anvil-api</code> module; <a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a>, <a href="../../adr/ADR-077-multi-format-region-support/">ADR-077</a></td>
-<td>NBT pre-filter reading Anvil (<code>.mca</code>) and Linear (<code>.linear</code> / ZSTD) formats off-tick.</td>
+<td>NBT pre-filter reading Anvil (<code>.mca</code>) off-tick, plus any format an addon registers via <code>RegionFormatRegistry</code>.</td>
 </tr>
 <tr>
 <td>"claim plugin" / "claim integration"</td>
@@ -4162,7 +4230,7 @@ The Bukkit/Spigot entry-point class. RTP's entry point lives in <code>rtp-plugin
 <p><strong>Land Protection Plugin</strong>
 A third-party Minecraft plugin (e.g., GriefPrevention, WorldGuard, Towny) that marks areas of the world as claimed or restricted. RTP integrates with these via the claim-check hook in <code>rtp-api</code>.</p>
 <p><strong>Linear Region Format (<code>.linear</code>)</strong>
-An alternative on-disk Minecraft region storage format introduced by high-performance server forks (such as Leaves and Gale) and modded environments. Replaces Mojang's 4 KiB sector-aligned Anvil layout with continuous ZStandard (<code>zstd</code>) streams to eliminate sector quantization padding, reduce world disk space by 30-60%, and accelerate sequential I/O. Decoded off-tick via <code>LinearRegionReader</code> under ADR-077.</p>
+An alternative on-disk Minecraft region storage format introduced by high-performance server forks (such as Leaves and Gale) and modded environments. Replaces Mojang's 4 KiB sector-aligned Anvil layout with continuous ZStandard (<code>zstd</code>) streams to eliminate sector quantization padding, reduce world disk space by 30-60%, and accelerate sequential I/O. Core does not decode it (ADR-077): <code>.linear</code> files are ignored unless an addon registers a reader, and their chunks fall back to the platform's live async chunk load.</p>
 <p><strong>Lock-Free Read</strong>
 A concurrency pattern where shared data is read without acquiring a mutex, typically using <code>volatile</code> fields, <code>ConcurrentHashMap</code>, or <code>EnumMap</code>. RTP requires lock-free reads on configuration data to avoid synchronization bottlenecks under high teleport load.</p>
 <hr />

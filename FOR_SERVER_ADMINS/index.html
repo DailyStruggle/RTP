@@ -3187,7 +3187,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3561,6 +3561,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3771,6 +3792,48 @@
   
   
     <li class="md-nav__item">
+      <a href="../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3937,7 +4000,7 @@
 If you install, configure, or maintain RTP on a Paper, Spigot, Folia, Fabric, or NeoForge server, this is your entry point.</p>
 <hr />
 <h2 id="minimum-operational-requirements">Minimum Operational Requirements<a class="headerlink" href="#minimum-operational-requirements" title="Permanent link">&para;</a></h2>
-<p>RTP is engineered for zero main-thread tick impact and deterministic memory management. Pre-warmed destination queues, spatial rejection memory, and off-tick region file pre-filtering eliminate synchronous chunk loads and avoid the unbounded reroll loops that cause GC churn in naive implementations. Memory usage is bounded and tracked by an active ticket reaper.</p>
+<p>RTP is engineered for minimal main-thread tick impact and deterministic memory management. Pre-warmed destination queues, spatial rejection memory, and off-tick region file pre-filtering keep candidate checks off the tick thread and avoid the unbounded reroll loops that cause GC churn in naive implementations. On Paper and Folia, chunk loads go through the async API; on Spigot, a candidate the pre-filter cannot answer (ungenerated terrain, unknown data version) costs one on-tick chunk load. Memory usage is bounded and tracked by an active ticket reaper.</p>
 <ul>
 <li><strong>Java 21+</strong> (hard requirement).</li>
 <li><strong>Predictable memory footprint.</strong> <code>cacheCap</code> and <code>activeChunkCap</code> (in region files) are <em>absolute</em> per-region bounds. Cached entries are lightweight coordinate descriptors; destination chunks are kept in memory only while in the hot L1 queue. Total cache memory scales with configured region counts, not world radius. Spatial memory uses compressed bit-segments to record rejected terrain without storing chunk objects. RTP includes an active heap-pressure gate (<code>performance.yml</code> -&gt; <code>maxHeapPercent</code>, default 85%) that throttles background pre-warming under memory pressure while pre-cached teleports continue serving instantly.</li>

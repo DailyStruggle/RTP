@@ -2,6 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <!-- Session tokens ride in the URL: keep it out of Referer headers -->
+  <meta name="referrer" content="no-referrer">
+  <!-- Served from file:// (local export, inline payload, live/*.js sidecars) and the docs site. The curve
+       runner srcdoc frame and its blob: Worker inherit this policy, hence 'unsafe-eval' and worker-src blob:.
+       ws: covers the loopback relay, which may be [::1] (no CSP host-source form for IPv6 literals). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' 'unsafe-eval' file:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https: wss: ws:; worker-src blob:; child-src blob:; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LeafRTP Web Workspace - Visual Region Editor & Staging</title>
   <style>
@@ -83,6 +89,8 @@
       transition: background 0.15s, border-color 0.15s;
     }
     .btn:hover { border-color: var(--accent); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; border-color: var(--overlay); }
+    .btn:disabled:hover { border-color: var(--overlay); }
     .btn-primary { background: var(--green); color: var(--dark); border: none; }
     .btn-primary:hover { opacity: 0.9; }
     #workspace { flex: 1; display: flex; overflow: hidden; position: relative; }
@@ -722,6 +730,8 @@
   <div class="nav-actions">
     <button class="btn" style="border-color:var(--accent); color:var(--accent);" onclick="openSearchModal()">⌖ Quick Find <kbd style="font-size:0.7rem; background:rgba(255,255,255,0.1); padding:1px 4px; border-radius:3px;">Ctrl+K</kbd></button>
     <button class="btn" onclick="exportPng()">📷 Snapshot</button>
+    <button id="btn-undo" class="btn" onclick="EditorHistoryManager.undo()" disabled title="Undo (Ctrl+Z)">↶ Undo <kbd style="font-size:0.7rem; background:rgba(255,255,255,0.1); padding:1px 4px; border-radius:3px;">Ctrl+Z</kbd></button>
+    <button id="btn-redo" class="btn" onclick="EditorHistoryManager.redo()" disabled title="Redo (Ctrl+Y)">↷ Redo <kbd style="font-size:0.7rem; background:rgba(255,255,255,0.1); padding:1px 4px; border-radius:3px;">Ctrl+Y</kbd></button>
     <button class="btn" onclick="resetStaging()">↺ Revert</button>
     <button class="btn btn-primary" onclick="commitChanges()">⚡ Commit / Apply</button>
   </div>
@@ -1338,6 +1348,192 @@ function blankRegionProfile(name) {
 
 let regionProfiles = { default: blankRegionProfile('default') };
 let regionState = regionProfiles.default;
+
+const initialRegionSnapshots = {};
+
+function cloneRegionSnapshot(state) {
+  if (!state) return null;
+  return {
+    name: state.name || (typeof regionState !== 'undefined' && regionState ? regionState.name : 'default'),
+    shape: state.shape || '',
+    settings: Object.assign({}, state.settings || {}),
+    vertices: Array.isArray(state.vertices) ? state.vertices.map(v => [Number(v[0]), Number(v[1])]) : []
+  };
+}
+
+function recordInitialRegionSnapshot(profile) {
+  if (!profile || !profile.name) return;
+  if (!initialRegionSnapshots[profile.name]) {
+    initialRegionSnapshots[profile.name] = cloneRegionSnapshot(profile);
+  }
+}
+recordInitialRegionSnapshot(regionProfiles.default);
+
+function updateHistoryToolbarUI() {
+  if (typeof document === 'undefined' || !document || typeof document.getElementById !== 'function') return;
+  const undoBtn = document.getElementById('btn-undo');
+  if (undoBtn) {
+    const can = typeof EditorHistoryManager !== 'undefined' && EditorHistoryManager.canUndo();
+    undoBtn.disabled = !can;
+    const desc = (typeof EditorHistoryManager !== 'undefined' && EditorHistoryManager.getUndoDesc()) || '';
+    undoBtn.title = can ? (desc ? `Undo: ${desc} (Ctrl+Z)` : 'Undo (Ctrl+Z)') : 'Undo (Ctrl+Z)';
+  }
+  const redoBtn = document.getElementById('btn-redo');
+  if (redoBtn) {
+    const can = typeof EditorHistoryManager !== 'undefined' && EditorHistoryManager.canRedo();
+    redoBtn.disabled = !can;
+    const desc = (typeof EditorHistoryManager !== 'undefined' && EditorHistoryManager.getRedoDesc()) || '';
+    redoBtn.title = can ? (desc ? `Redo: ${desc} (Ctrl+Y)` : 'Redo (Ctrl+Y)') : 'Redo (Ctrl+Y)';
+  }
+}
+
+function applyHistorySnapshot(snapshot) {
+  if (!snapshot) return;
+  const regionName = snapshot.name || (typeof regionState !== 'undefined' && regionState ? regionState.name : 'default');
+  let profile = (typeof regionProfiles !== 'undefined' && regionProfiles) ? regionProfiles[regionName] : null;
+  if (!profile && typeof regionState !== 'undefined' && regionState) {
+    profile = regionState;
+  }
+  if (profile) {
+    profile.shape = snapshot.shape;
+    profile.settings = Object.assign({}, snapshot.settings || {});
+    profile.vertices = Array.isArray(snapshot.vertices) ? snapshot.vertices.map(v => [Number(v[0]), Number(v[1])]) : [];
+  }
+  if (typeof regionState !== 'undefined' && regionState && regionState.name !== regionName && typeof changeRegionProfile === 'function' && typeof regionProfiles !== 'undefined' && regionProfiles && regionProfiles[regionName]) {
+    changeRegionProfile(regionName);
+  }
+  if (typeof document !== 'undefined' && document && typeof document.getElementById === 'function') {
+    const hudShape = document.getElementById('hud-shape');
+    if (hudShape && typeof regionState !== 'undefined' && regionState) hudShape.textContent = regionState.shape || '-';
+  }
+  const current = typeof regionState !== 'undefined' && regionState ? regionState : profile;
+  if (typeof populateShapeSelect === 'function' && current) populateShapeSelect(current.shape);
+  if (typeof syncShapeSpecificControls === 'function' && current) syncShapeSpecificControls(current);
+  if (typeof renderShapeSettingsForm === 'function' && current) renderShapeSettingsForm(current);
+  if (typeof renderPolygonVerticesList === 'function') renderPolygonVerticesList();
+  if (typeof syncPolygonAABB === 'function') syncPolygonAABB();
+  if (typeof drawMap === 'function') drawMap();
+  if (typeof stageRegionGeometry === 'function' && current) stageRegionGeometry(current);
+  if (typeof updateStagingDiff === 'function') updateStagingDiff();
+}
+
+const HistoryEntry = class {
+  constructor(desc, regionName, before, after) {
+    this.desc = desc || 'Action';
+    this.regionName = regionName || 'default';
+    this.before = before;
+    this.after = after;
+    this.timestamp = Date.now();
+  }
+};
+
+const EditorHistoryManager = (() => {
+  let maxStack = 50;
+  const undoStack = [];
+  const redoStack = [];
+  let pendingGestureStart = null;
+
+  function beginGesture(desc, state) {
+    const s = state || (typeof regionState !== 'undefined' ? regionState : null);
+    if (!s) return;
+    pendingGestureStart = {
+      desc: desc || 'Edit',
+      regionName: s.name || (typeof regionState !== 'undefined' && regionState ? regionState.name : 'default'),
+      before: cloneRegionSnapshot(s)
+    };
+  }
+
+  function commitGesture(state) {
+    if (!pendingGestureStart) return;
+    const { desc, regionName, before } = pendingGestureStart;
+    pendingGestureStart = null;
+    const s = state || ((typeof regionProfiles !== 'undefined' && regionProfiles && regionProfiles[regionName]) ? regionProfiles[regionName] : (typeof regionState !== 'undefined' ? regionState : null));
+    const after = cloneRegionSnapshot(s);
+    if (!after || JSON.stringify(before) === JSON.stringify(after)) return;
+    push(new HistoryEntry(desc, regionName, before, after));
+  }
+
+  function cancelGesture() {
+    pendingGestureStart = null;
+  }
+
+  function push(entry) {
+    if (!entry || !entry.before || !entry.after) return;
+    if (JSON.stringify(entry.before) === JSON.stringify(entry.after)) return;
+    undoStack.push(entry);
+    while (undoStack.length > maxStack) undoStack.shift();
+    redoStack.length = 0;
+    updateHistoryToolbarUI();
+  }
+
+  function undo() {
+    if (undoStack.length === 0) return false;
+    const entry = undoStack.pop();
+    redoStack.push(entry);
+    applyHistorySnapshot(entry.before);
+    updateHistoryToolbarUI();
+    return true;
+  }
+
+  function redo() {
+    if (redoStack.length === 0) return false;
+    const entry = redoStack.pop();
+    undoStack.push(entry);
+    applyHistorySnapshot(entry.after);
+    updateHistoryToolbarUI();
+    return true;
+  }
+
+  function clear() {
+    undoStack.length = 0;
+    redoStack.length = 0;
+    pendingGestureStart = null;
+    updateHistoryToolbarUI();
+  }
+
+  function setMaxStack(depth) {
+    maxStack = Math.max(1, depth);
+    while (undoStack.length > maxStack) undoStack.shift();
+  }
+
+  function getMaxStack() {
+    return maxStack;
+  }
+
+  function canUndo() {
+    return undoStack.length > 0;
+  }
+
+  function canRedo() {
+    return redoStack.length > 0;
+  }
+
+  function getUndoDesc() {
+    return undoStack.length > 0 ? undoStack[undoStack.length - 1].desc : '';
+  }
+
+  function getRedoDesc() {
+    return redoStack.length > 0 ? redoStack[redoStack.length - 1].desc : '';
+  }
+
+  return {
+    beginGesture,
+    commitGesture,
+    cancelGesture,
+    push,
+    undo,
+    redo,
+    clear,
+    setMaxStack,
+    getMaxStack,
+    canUndo,
+    canRedo,
+    getUndoDesc,
+    getRedoDesc,
+    get undoStack() { return undoStack; },
+    get redoStack() { return redoStack; }
+  };
+})();
 
 let canvasZoom = 1.0;
 let canvasPanX = 0;
@@ -2495,8 +2691,9 @@ function updateDocTracker(key, file, lineText = '', refToken = null, parentPath 
   let yamlDoc = null;
   if (entry) {
     nodeEl.textContent = entry.title;
-    if (entry.html) {
-      descEl.innerHTML = entry.html;
+    // Payload HTML gets the addon-markdown allow-list; before that module exists, plain text
+    if (entry.html && EditorExtensionTabs) {
+      descEl.replaceChildren(EditorExtensionTabs.sanitizeHtml(entry.html));
     } else {
       descEl.textContent = entry.desc;
     }
@@ -2826,10 +3023,14 @@ function renderMarkdownToHtml(markdown) {
     res = res.replace(/\*([^*]+)\*/g, '<i>$1</i>');
     res = res.replace(/_([^_]+)_/g, '<i>$1</i>');
     res = res.replace(/~~([^~]+)~~/g, '<del>$1</del>');
-    // Links [text](url)
-    // Links [text](url); script-capable schemes render as plain text
-    res = res.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, label, url) =>
-      /^\s*(javascript|vbscript|data):/i.test(url) ? label : `<a href="${url}" target="_blank" rel="noopener">${label}</a>`);
+    // Links [text](url): allow-list http(s)/mailto/relative; browsers drop tabs/newlines inside
+    // a scheme (java&#9;script:), so whitespace and controls are stripped before the check
+    res = res.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, label, url) => {
+      const probe = url.replace(/[\u0000-\u0020\u007f]+/g, '');
+      const scheme = /^([a-z][a-z0-9+.\-]*):/i.exec(probe);
+      const ok = !scheme || /^(https?|mailto)$/i.test(scheme[1]);
+      return ok ? `<a href="${url}" target="_blank" rel="noopener">${label}</a>` : label;
+    });
     // Checkboxes [ ] and [x]
     res = res.replace(/\[ \]/g, '<input type="checkbox" disabled style="margin-right:4px;">');
     res = res.replace(/\[[xX]\]/g, '<input type="checkbox" checked disabled style="margin-right:4px;">');
@@ -3011,7 +3212,15 @@ async function fetchOfficialSitePage(siteUrl) {
   const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
   const art = doc.querySelector('article.md-content__inner') || doc.querySelector('.md-content') || doc.querySelector('article') || doc.querySelector('main');
   if (!art) throw new Error('No article');
-  art.querySelectorAll('.md-content__button, nav, footer, script, style').forEach(e => e.remove());
+  art.querySelectorAll('.md-content__button, .headerlink, nav, footer, script, style').forEach(e => e.remove());
+  // Relative links / images point at the docs site, not the editor; the sanitiser keeps https: only
+  art.querySelectorAll('[href], [src]').forEach(n => {
+    for (const at of ['href', 'src']) {
+      const v = n.getAttribute(at);
+      if (v === null) continue;
+      try { n.setAttribute(at, new URL(v, siteUrl).href); } catch (e) { n.removeAttribute(at); }
+    }
+  });
   return art.innerHTML;
 }
 
@@ -3022,7 +3231,12 @@ async function updateDocDisplayContent(docKey, targetEl, pillEl) {
     if (pillEl) { pillEl.textContent = 'FETCHING SITE...'; }
     try {
       const h = await fetchOfficialSitePage(u);
-      if (targetEl) targetEl.innerHTML = h;
+      // Fetched site HTML gets the addon-markdown allow-list (plus https images); before that module exists, plain text
+      if (targetEl && EditorExtensionTabs) {
+        targetEl.replaceChildren(EditorExtensionTabs.sanitizeHtml(h, { site: true }));
+      } else if (targetEl) {
+        targetEl.textContent = new DOMParser().parseFromString(h, 'text/html').body.textContent;
+      }
       if (pillEl) { pillEl.textContent = 'OFFICIAL SITE'; pillEl.className = 'source-badge source-site'; }
       return;
     } catch (e) {}
@@ -5872,6 +6086,8 @@ function startRegionHandleDrag(h, mx, my, t) {
   const worldX = (mx - t.wox) / t.scale, worldZ = (my - t.woy) / t.scale;
   const polygon = regionShapeFamily(regionState.shape) === 'polygon';
   const setCh = k => settingValue(regionState, k) !== undefined ? settingChunks(regionState, k, 0) : null;
+  const desc = h.role === 'scale' ? 'Scale Region' : (h.kind === 'move' ? 'Move Region' : 'Adjust Region Handle');
+  if (typeof EditorHistoryManager !== 'undefined') EditorHistoryManager.beginGesture(desc, regionState);
   regionHandleDrag = {
     id: h.id, handle: h, polygon, applied: new Map(), scale: 0,
     startX: worldX, startZ: worldZ, dx: 0, dz: 0,
@@ -5933,6 +6149,9 @@ function endRegionHandleDrag() {
   }
   drawMap();
   updateStagingDiff();
+  if (typeof clearTimeout === 'function' && typeof shapeSettingTimer !== 'undefined' && shapeSettingTimer) { clearTimeout(shapeSettingTimer); shapeSettingTimer = null; }
+  if (typeof shapeSettingStartSnapshot !== 'undefined') shapeSettingStartSnapshot = null;
+  if (typeof EditorHistoryManager !== 'undefined') EditorHistoryManager.commitGesture(regionState);
   return true;
 }
 
@@ -6021,6 +6240,7 @@ canvas.addEventListener('mousedown', (e) => {
     dragGrabDX = (v[0] * 16 + 8) - (mx - wox) / scale;
     dragGrabDZ = (v[1] * 16 + 8) - (my - woy) / scale;
     canvas.style.cursor = 'grabbing';
+    EditorHistoryManager.beginGesture('Drag Vertex', regionState);
     updateJumpToYamlButton();
     drawMap();
     return;
@@ -6065,6 +6285,7 @@ window.addEventListener('mouseup', () => {
     syncPolygonAABB();
     drawMap();
     updateStagingDiff();
+    EditorHistoryManager.commitGesture(regionState);
   }
   endRegionHandleDrag();
 });
@@ -6090,11 +6311,11 @@ function renderPolygonVerticesList() {
       <span style="font-size:0.75rem; font-weight:600; color:var(--accent); min-width:24px;">P${i + 1}</span>
       <div style="display:flex; align-items:center; gap:4px; flex:1;">
         <span style="font-size:0.7rem; color:var(--subtext);">X:</span>
-        <input type="text" id="poly-vx-${i}" class="control-input" style="padding:2px 4px; font-size:0.75rem; height:24px;" value="${v[0] !== undefined ? v[0] : 0}c" placeholder="chunks (c) or units (e.g. 125c, 2000b)" title="Chunks (c); b, r and km suffixes convert" oninput="updateVertexCoord(${i}, 0, this.value)" onchange="updateVertexCoord(${i}, 0, this.value); renderPolygonVerticesList();">
+        <input type="text" id="poly-vx-${i}" class="control-input" style="padding:2px 4px; font-size:0.75rem; height:24px;" value="${v[0] !== undefined ? v[0] : 0}c" placeholder="chunks (c) or units (e.g. 125c, 2000b)" title="Chunks (c); b, r and km suffixes convert" oninput="updateVertexCoord(${i}, 0, this.value)" onchange="updateVertexCoord(${i}, 0, this.value); commitVertexCoordEdit(); renderPolygonVerticesList();" onblur="commitVertexCoordEdit()">
       </div>
       <div style="display:flex; align-items:center; gap:4px; flex:1;">
         <span style="font-size:0.7rem; color:var(--subtext);">Z:</span>
-        <input type="text" id="poly-vz-${i}" class="control-input" style="padding:2px 4px; font-size:0.75rem; height:24px;" value="${v[1] !== undefined ? v[1] : 0}c" placeholder="chunks (c) or units (e.g. 187c, 3000b)" title="Chunks (c); b, r and km suffixes convert" oninput="updateVertexCoord(${i}, 1, this.value)" onchange="updateVertexCoord(${i}, 1, this.value); renderPolygonVerticesList();">
+        <input type="text" id="poly-vz-${i}" class="control-input" style="padding:2px 4px; font-size:0.75rem; height:24px;" value="${v[1] !== undefined ? v[1] : 0}c" placeholder="chunks (c) or units (e.g. 187c, 3000b)" title="Chunks (c); b, r and km suffixes convert" oninput="updateVertexCoord(${i}, 1, this.value)" onchange="updateVertexCoord(${i}, 1, this.value); commitVertexCoordEdit(); renderPolygonVerticesList();" onblur="commitVertexCoordEdit()">
       </div>
       <button type="button" style="background:${canDelete ? 'rgba(243,139,168,0.2)' : 'rgba(255,255,255,0.05)'}; color:${canDelete ? 'var(--red)' : 'var(--subtext)'}; border:none; border-radius:3px; padding:2px 6px; font-size:0.75rem; cursor:${canDelete ? 'pointer' : 'not-allowed'};" title="${canDelete ? 'Delete Point' : 'At least 3 vertices required'}" ${canDelete ? '' : 'disabled'} onclick="removePolygonVertex(${i})">✕</button>
     </div>
@@ -6112,17 +6333,42 @@ function parseVertexCoord(value) {
   return isNaN(num) ? 0 : num;
 }
 
+let vertexCoordTimer = null;
+let vertexCoordStartSnapshot = null;
+
+function commitVertexCoordEdit() {
+  if (typeof clearTimeout === 'function' && vertexCoordTimer) {
+    clearTimeout(vertexCoordTimer);
+    vertexCoordTimer = null;
+  }
+  if (!vertexCoordStartSnapshot) return;
+  const before = vertexCoordStartSnapshot;
+  vertexCoordStartSnapshot = null;
+  const after = cloneRegionSnapshot(regionState);
+  if (after && JSON.stringify(before) !== JSON.stringify(after)) {
+    EditorHistoryManager.push(new HistoryEntry('Edit Vertex Coordinate', regionState.name, before, after));
+  }
+}
+
 function updateVertexCoord(index, axis, value) {
   if (!regionState.vertices || !regionState.vertices[index]) return;
+  if (typeof vertexCoordStartSnapshot !== 'undefined' && !vertexCoordStartSnapshot) {
+    vertexCoordStartSnapshot = cloneRegionSnapshot(regionState);
+  }
   const num = parseVertexCoord(value);
   regionState.vertices[index][axis] = num;
   syncPolygonAABB();
   drawMap();
   updateStagingDiff();
+  if (typeof vertexCoordTimer !== 'undefined') {
+    if (typeof clearTimeout === 'function' && vertexCoordTimer) clearTimeout(vertexCoordTimer);
+    if (typeof setTimeout === 'function') vertexCoordTimer = setTimeout(commitVertexCoordEdit, 500);
+  }
 }
 
 function addPolygonVertex() {
   if (!regionState.vertices) regionState.vertices = [];
+  const before = cloneRegionSnapshot(regionState);
   const n = regionState.vertices.length;
   let newX = 0, newZ = 0;
   if (n >= 2) {
@@ -6140,10 +6386,13 @@ function addPolygonVertex() {
   syncPolygonAABB();
   drawMap();
   updateStagingDiff();
+  const after = cloneRegionSnapshot(regionState);
+  EditorHistoryManager.push(new HistoryEntry('Add Vertex', regionState.name, before, after));
 }
 
 function removePolygonVertex(index) {
   if (!regionState.vertices || regionState.vertices.length <= 3) return;
+  const before = cloneRegionSnapshot(regionState);
   regionState.vertices.splice(index, 1);
   if (selectedVertex >= regionState.vertices.length || selectedVertex === index) selectedVertex = -1;
   updateJumpToYamlButton();
@@ -6151,9 +6400,14 @@ function removePolygonVertex(index) {
   syncPolygonAABB();
   drawMap();
   updateStagingDiff();
+  const after = cloneRegionSnapshot(regionState);
+  EditorHistoryManager.push(new HistoryEntry('Remove Vertex', regionState.name, before, after));
 }
 
 function handleRegionSelectChange(val) {
+  if (typeof commitShapeSettingEdit === 'function') commitShapeSettingEdit();
+  commitVertexCoordEdit();
+  EditorHistoryManager.cancelGesture();
   if (val === '__add_region__') {
     const selectEl = document.getElementById('reg-profile-select');
     if (selectEl) selectEl.value = regionState.name;
@@ -6192,6 +6446,7 @@ function promptAddNewRegion() {
     settings: { radius: '256c', centerRadius: '64c', centerX: '0', centerZ: '0' },
     vertices: []
   };
+  recordInitialRegionSnapshot(regionProfiles[cleanName]);
 
   syncRegionProfiles();
   populateConfigSidebar();
@@ -6209,6 +6464,7 @@ function removeCurrentRegion() {
   if (!confirmDel) return;
 
   delete regionProfiles[currentName];
+  delete initialRegionSnapshots[currentName];
   delete configs[`definitions/regions/${currentName}.yml`];
   delete configs[`regions/${currentName}.yml`];
 
@@ -6238,6 +6494,7 @@ function syncRegionProfiles() {
       delete g.local;
       if (prof) Object.assign(prof, g);
       else regionProfiles[regionName] = Object.assign({ name: regionName }, g);
+      recordInitialRegionSnapshot(regionProfiles[regionName]);
     }
   }
 
@@ -6400,12 +6657,18 @@ function syncShapeSpecificControls(region) {
 // Settings the new shape does not take stay in the model (switching back restores them); the
 // writer leaves them out
 function updateRegionShape(val) {
+  const before = cloneRegionSnapshot(regionState);
   regionState.shape = val;
-  document.getElementById('hud-shape').textContent = val;
+  const hudShape = document.getElementById('hud-shape');
+  if (hudShape) hudShape.textContent = val;
   syncShapeSpecificControls(regionState);
   renderShapeSettingsForm(regionState);
   drawMap();
   updateStagingDiff();
+  const after = cloneRegionSnapshot(regionState);
+  if (after && JSON.stringify(before) !== JSON.stringify(after)) {
+    EditorHistoryManager.push(new HistoryEntry(`Switch Shape to ${val}`, regionState.name, before, after));
+  }
 }
 
 /**
@@ -6503,6 +6766,8 @@ function buildShapeSettingRow(region, shape, key, p, curveInput) {
       input.setAttribute('list', list.id);
     }
     input.addEventListener('input', () => applyShapeSetting(key, input.value.trim(), row));
+    input.addEventListener('change', () => commitShapeSettingEdit(key));
+    input.addEventListener('blur', () => commitShapeSettingEdit(key));
   }
   input.dataset.settingKey = key;
   if (typeof p.description === 'string' && p.description) input.title = p.description;
@@ -6553,6 +6818,23 @@ function refreshShapeSettingHint(row, value, p) {
     : '';
 }
 
+let shapeSettingTimer = null;
+let shapeSettingStartSnapshot = null;
+
+function commitShapeSettingEdit(descKey) {
+  if (typeof clearTimeout === 'function' && shapeSettingTimer) {
+    clearTimeout(shapeSettingTimer);
+    shapeSettingTimer = null;
+  }
+  if (!shapeSettingStartSnapshot) return;
+  const before = shapeSettingStartSnapshot;
+  shapeSettingStartSnapshot = null;
+  const after = cloneRegionSnapshot(regionState);
+  if (after && JSON.stringify(before) !== JSON.stringify(after)) {
+    EditorHistoryManager.push(new HistoryEntry(`Change ${descKey || 'Setting'}`, regionState.name, before, after));
+  }
+}
+
 // A form edit: stored as the YAML scalar, staged into the region file, path redrawn from the helper
 function applyShapeSetting(key, value, row) {
   const region = regionState;
@@ -6560,10 +6842,32 @@ function applyShapeSetting(key, value, row) {
   if (row) refreshShapeSettingHint(row, value, p);
   // Half-typed or invalid input keeps the last valid value (and the YAML) untouched
   if (value === '' || shapeSettingError(value, p)) return;
+  const isDiscrete = p.kind === 'boolean' || p.kind === 'enum';
+  const trackHistory = typeof regionHandleDrag === 'undefined' || regionHandleDrag === null;
+  let before = null;
+  if (trackHistory) {
+    if (isDiscrete) {
+      before = cloneRegionSnapshot(region);
+    } else if (typeof shapeSettingStartSnapshot !== 'undefined' && !shapeSettingStartSnapshot) {
+      shapeSettingStartSnapshot = cloneRegionSnapshot(region);
+    }
+  }
   if (!region.settings) region.settings = {};
-  region.settings[settingKeyOf(region, key)] = value;
+  const sk = typeof settingKeyOf === 'function' ? settingKeyOf(region, key) : key;
+  region.settings[sk] = value;
   drawMap();
   updateStagingDiff();
+  if (trackHistory) {
+    if (isDiscrete) {
+      const after = cloneRegionSnapshot(region);
+      if (after && JSON.stringify(before) !== JSON.stringify(after)) {
+        if (typeof EditorHistoryManager !== 'undefined') EditorHistoryManager.push(new HistoryEntry(`Change ${key}`, region.name, before, after));
+      }
+    } else if (typeof shapeSettingTimer !== 'undefined') {
+      if (typeof clearTimeout === 'function' && shapeSettingTimer) clearTimeout(shapeSettingTimer);
+      if (typeof setTimeout === 'function') shapeSettingTimer = setTimeout(() => commitShapeSettingEdit(key), 500);
+    }
+  }
 }
 
 // ADR-034 Mathematical Validation & Polygon Non-Self-Intersection
@@ -7087,16 +7391,21 @@ function copyApplyCmd() {
 }
 
 function resetStaging() {
-  regionState.shape = 'CIRCLE';
-  regionState.settings = { radius: '256c', centerRadius: '64c', centerX: '0', centerZ: '0' };
-  regionState.vertices = [[-125, 187], [125, 187], [125, -187], [-125, -187]];
-  const hudShape = document.getElementById('hud-shape');
-  if (hudShape) hudShape.textContent = 'CIRCLE';
-  populateShapeSelect('CIRCLE');
-  syncShapeSpecificControls(regionState);
-  renderShapeSettingsForm(regionState);
-  drawMap();
-  updateStagingDiff();
+  if (!regionState) return;
+  const name = regionState.name || 'default';
+  let baseline = initialRegionSnapshots[name];
+  if (!baseline) {
+    baseline = {
+      name: name,
+      shape: 'CIRCLE',
+      settings: { radius: '256c', centerRadius: '64c', centerX: '0', centerZ: '0' },
+      vertices: [[-125, 187], [125, 187], [125, -187], [-125, -187]]
+    };
+  }
+  const current = cloneRegionSnapshot(regionState);
+  if (JSON.stringify(current) === JSON.stringify(baseline)) return;
+  EditorHistoryManager.push(new HistoryEntry('Revert to baseline', name, current, cloneRegionSnapshot(baseline)));
+  applyHistorySnapshot(baseline);
 }
 
 function exportPng() {
@@ -7842,19 +8151,45 @@ var EditorExtensionTabs = (() => {
     return root === undefined || root === null ? undefined : pointer(root, m[2]);
   }
 
-  function markdown(text) {
-    const tpl = document.createElement('template');
-    tpl.innerHTML = renderMarkdownToHtml(String(text || '').slice(0, 20000));
-    tpl.content.querySelectorAll('img, button, script, iframe, object, embed, style, form, input').forEach(n => n.remove());
-    tpl.content.querySelectorAll('a').forEach(a => {
+  // Reduces a parsed, not yet attached fragment to inert markup: no active / embedding elements,
+  // no on* / srcdoc / formaction / xlink attributes, https: links only (new tab, no opener / referrer).
+  // site: docs-site pages keep https: / raster data: images and lose id / name (no DOM clobbering)
+  function clean(frag, site) {
+    const keepImg = n => site && n.tagName === 'IMG' && /^(https:\/\/|data:image\/(png|gif|jpeg|webp);)/i.test(n.getAttribute('src') || '');
+    frag.querySelectorAll('img, button, script, iframe, object, embed, style, form, input').forEach(n => { if (!keepImg(n)) n.remove(); });
+    frag.querySelectorAll('frame, frameset, link, meta, base, textarea, select, svg, math, template, audio, video, source, picture, area, map, noscript').forEach(n => n.remove());
+    frag.querySelectorAll('a').forEach(a => {
       if (!/^https:\/\//i.test(a.getAttribute('href') || '')) { a.replaceWith(document.createTextNode(a.textContent)); return; }
       a.setAttribute('target', '_blank');
       a.setAttribute('rel', 'noopener noreferrer');
     });
-    tpl.content.querySelectorAll('*').forEach(n => {
-      for (const at of [...n.attributes]) if (/^on/i.test(at.name)) n.removeAttribute(at.name);
+    frag.querySelectorAll('*').forEach(n => {
+      for (const at of [...n.attributes]) if (/^(on|srcdoc$|formaction$|xlink:)/i.test(at.name)) n.removeAttribute(at.name);
+      if (site) { n.removeAttribute('id'); n.removeAttribute('name'); }
     });
-    return tpl.content;
+    frag.querySelectorAll('img').forEach(i => {
+      for (const at of ['srcset', 'sizes', 'usemap']) i.removeAttribute(at);
+      i.setAttribute('referrerpolicy', 'no-referrer');
+      i.setAttribute('loading', 'lazy');
+      i.style.maxWidth = '100%';
+    });
+    return frag;
+  }
+
+  function markdown(text) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = renderMarkdownToHtml(String(text || '').slice(0, 20000));
+    return clean(tpl.content);
+  }
+
+  // Payload / docs-site HTML: cleaned while still in the inert parsed document; adopting first would
+  // start image loads whose on* handlers fire even on removed nodes
+  function sanitizeHtml(html, opts) {
+    const body = new DOMParser().parseFromString(String(html || ''), 'text/html').body;
+    clean(body, !!(opts && opts.site));
+    const frag = document.createDocumentFragment();
+    frag.append(...body.childNodes);
+    return frag;
   }
 
   function fmt(v, format) {
@@ -8140,7 +8475,7 @@ var EditorExtensionTabs = (() => {
   }
 
   EditorChannelClient.onStatus((status) => { if (status === 'connected') checkServerSet(); });
-  return { install, checkServerSet, pointer };
+  return { install, checkServerSet, pointer, sanitizeHtml };
 })();
 
 // Plugin -> page messages; each handler gets a verified message addressed to this browser
@@ -8574,7 +8909,43 @@ async function triggerRemoteSynonymExpansion(query) {
   }, 250);
 }
 
-// Global Keyboard Navigation (Ctrl+K, Up/Down, Enter, Esc)
+function isNativeTextEditingTarget(target) {
+  if (!target) return false;
+  const tag = (target.tagName || '').toUpperCase();
+  if (tag === 'TEXTAREA') return true;
+  if (tag === 'INPUT') {
+    const type = (target.type || 'text').toLowerCase();
+    return type === 'text' || type === 'search' || type === 'number' || type === 'password' || type === 'email' || type === 'url';
+  }
+  if (target.isContentEditable) return true;
+  return false;
+}
+
+function handleEditorHistoryHotkeys(e) {
+  if (!e) return false;
+  const isCtrlOrMeta = !!(e.ctrlKey || e.metaKey);
+  if (!isCtrlOrMeta) return false;
+
+  const target = e.target || (typeof document !== 'undefined' ? document.activeElement : null);
+  if (isNativeTextEditingTarget(target) || (typeof document !== 'undefined' && document && isNativeTextEditingTarget(document.activeElement))) {
+    return false;
+  }
+
+  const key = String(e.key || '').toLowerCase();
+  if (!e.shiftKey && key === 'z') {
+    if (typeof e.preventDefault === 'function') e.preventDefault();
+    if (typeof EditorHistoryManager !== 'undefined') EditorHistoryManager.undo();
+    return true;
+  }
+  if (key === 'y' || (e.shiftKey && key === 'z')) {
+    if (typeof e.preventDefault === 'function') e.preventDefault();
+    if (typeof EditorHistoryManager !== 'undefined') EditorHistoryManager.redo();
+    return true;
+  }
+  return false;
+}
+
+// Global Keyboard Navigation (Ctrl+K, Up/Down, Enter, Esc, Undo/Redo)
 window.addEventListener('keydown', (e) => {
   const overlay = document.getElementById('search-modal-overlay');
   const isSearchOpen = overlay && overlay.style.display === 'flex';
@@ -8583,6 +8954,10 @@ window.addEventListener('keydown', (e) => {
     e.preventDefault();
     if (isSearchOpen) closeSearchModal();
     else openSearchModal();
+    return;
+  }
+
+  if (handleEditorHistoryHotkeys(e)) {
     return;
   }
 
@@ -8740,6 +9115,7 @@ function ingestSessionPayload(payload) {
       if (prof.walkPathData) prof.walkPathData._sig = sig;
       // Server geometry is the new baseline, not a canvas edit to write back
       delete regionProfiles[rName]._baseSig;
+      recordInitialRegionSnapshot(prof);
     }
     syncRegionProfiles();
   }
@@ -9035,6 +9411,16 @@ window.__rtpLivePathTile = function (r, tx, tz, tile) {
 (async function autoLoadSessionFromUrl() {
   const params = new URLSearchParams(window.location.search);
   let token = params.get('token');
+  if (token) {
+    // Out of the address bar at once (history, bookmarks, shared screenshots); other params and the fragment stay
+    params.delete('token');
+    const rest = params.toString();
+    try {
+      history.replaceState(history.state, '', window.location.pathname + (rest ? '?' + rest : '') + window.location.hash);
+    } catch (e) {
+      console.warn('[RTP Web Editor] Could not remove the session token from the address bar:', e);
+    }
+  }
   if (!token && window.location.hash) {
     const h = window.location.hash.replace(/^#/, '').trim();
     if (h && !h.includes('/')) token = h;

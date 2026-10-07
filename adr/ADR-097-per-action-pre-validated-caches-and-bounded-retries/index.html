@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/">
       
       
-        <link rel="prev" href="../ADR-094-quality-engineering-gates/">
+        <link rel="prev" href="../ADR-095-subspace-anchor-providers-and-near-teleport-primitives/">
       
       
         <link rel="next" href="../ADR-098-declarative-command-parameters-permissions-and-defaults/">
@@ -3051,7 +3051,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3422,6 +3422,27 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -3762,6 +3783,48 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3917,7 +3980,7 @@
 <h1 id="adr-097-per-action-pre-validated-caches-anvil-region-pre-screening-and-bounded-subspace-placement-retries">ADR-097 — Per-Action Pre-Validated Caches, Anvil Region Pre-Screening, and Bounded Subspace Placement Retries<a class="headerlink" href="#adr-097-per-action-pre-validated-caches-anvil-region-pre-screening-and-bounded-subspace-placement-retries" title="Permanent link">&para;</a></h1>
 <p><strong>Status:</strong> Accepted (amended 2026-09-25)
 <strong>Date:</strong> 2026-09-25 (amended; accepted 2026-09-23)
-<strong>Extends:</strong> <a href="../ADR-016-anvil-subsystem/">ADR-016</a> (Anvil Subsystem), <a href="../ADR-028-l3-backlog-cache/">ADR-028</a> (L3 Backlog Cache), <a href="../ADR-078-composable-cache-pipeline-stages/">ADR-078</a> (Composable Cache Pipeline Stages), <a href="../ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/">ADR-093</a> (Scripted Actions), <a href="ADR-095-subspace-anchor-providers-and-near-teleport-primitives.md">ADR-095</a> (Subspace Anchor Providers)
+<strong>Extends:</strong> <a href="../ADR-016-anvil-subsystem/">ADR-016</a> (Anvil Subsystem), <a href="../ADR-028-l3-backlog-cache/">ADR-028</a> (L3 Backlog Cache), <a href="../ADR-078-composable-cache-pipeline-stages/">ADR-078</a> (Composable Cache Pipeline Stages), <a href="../ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/">ADR-093</a> (Scripted Actions), <a href="../ADR-095-subspace-anchor-providers-and-near-teleport-primitives/">ADR-095</a> (Subspace Anchor Providers)
 <strong>Related:</strong> <a href="../ADR-077-multi-format-region-support/">ADR-077</a> (Multi-Format Region Support), <a href="../ADR-079-cause-based-ttl-and-staged-expiration/">ADR-079</a> (Cause-Based TTL and Spatial Memory Learning), S-001..S-005 (Safety Invariants)</p>
 <hr />
 <h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
@@ -3931,7 +3994,7 @@
 <hr />
 <h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
 <h3 id="1-two-stage-subspace-candidate-pipeline-anvil-region-pre-screening-binned-with-l3">1. Two-Stage Subspace Candidate Pipeline (Anvil Region Pre-Screening Binned with L3)<a class="headerlink" href="#1-two-stage-subspace-candidate-pipeline-anvil-region-pre-screening-binned-with-l3" title="Permanent link">&para;</a></h3>
-<p>Subspace placement adopts a decoupled two-stage pipeline operating alongside the L3 Backlog cache (ADR-028) and the Anvil/Linear pre-filter (ADR-016, ADR-077):</p>
+<p>Subspace placement adopts a decoupled two-stage pipeline operating alongside the L3 Backlog cache (ADR-028) and the Anvil/Linear pre-filter (ADR-016, ADR-077). (2026-10-06: Linear reader withdrawn from core, see ADR-077; core pre-screens only <code>.mca</code>, and the Linear references below apply only when an addon registers a reader.)</p>
 <div class="highlight"><pre><span></span><code>[Stage 1: Off-Tick Anvil Region Pre-Screening]
 Lattice / Sector Generators
        │

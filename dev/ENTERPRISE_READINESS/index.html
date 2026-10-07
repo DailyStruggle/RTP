@@ -3040,7 +3040,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3414,6 +3414,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3608,6 +3629,48 @@
   
   <span class="md-ellipsis">
     ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
   </span>
   
 
@@ -3855,19 +3918,28 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#10-definition-of-done-scorecard-audited-2026-09-15" class="md-nav__link">
+  <a href="#10-definition-of-done-scorecard-re-audited-2026-10-05" class="md-nav__link">
     <span class="md-ellipsis">
-      10. Definition-of-done scorecard (audited 2026-09-15)
+      10. Definition-of-done scorecard (re-audited 2026-10-05)
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="10. Definition-of-done scorecard (audited 2026-09-15)">
+    <nav class="md-nav" aria-label="10. Definition-of-done scorecard (re-audited 2026-10-05)">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
   <a href="#101-criterion-1-re-scope-runtime-attested-devstack-coverage" class="md-nav__link">
     <span class="md-ellipsis">
       10.1 Criterion #1 re-scope (runtime-attested devstack coverage)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#102-re-audit-findings-2026-10-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      10.2 Re-audit findings (2026-10-05)
     </span>
   </a>
   
@@ -3960,6 +4032,10 @@ something a stranger can check from a release page or a CI run.</p>
 <p>Live JaCoCo run: <code>./gradlew :&lt;module&gt;:jacocoTestReport</code> across the platform-neutral
 graph. These are instruction / branch percentages, not estimates.</p>
 <h3 id="21-platform-neutral-modules-the-90-target-set">2.1 Platform-neutral modules (the 90%+ target set)<a class="headerlink" href="#21-platform-neutral-modules-the-90-target-set" title="Permanent link">&para;</a></h3>
+<blockquote>
+<p>Historical 2026-09-10 baseline (several rows are superseded). Current measured values
+live in the section 10 scorecard; do not quote this table as current state.</p>
+</blockquote>
 <table>
 <thead>
 <tr>
@@ -4956,17 +5032,20 @@ Mutation score, soak tests, measured compatibility matrix, published policy.</p>
 the coverage number, the signing and SBOM status. That language ages into the claim
 on its own, and it matches the evidence-over-adjectives voice the project already uses.</p>
 <hr />
-<h2 id="10-definition-of-done-scorecard-audited-2026-09-15">10. Definition-of-done scorecard (audited 2026-09-15)<a class="headerlink" href="#10-definition-of-done-scorecard-audited-2026-09-15" title="Permanent link">&para;</a></h2>
+<h2 id="10-definition-of-done-scorecard-re-audited-2026-10-05">10. Definition-of-done scorecard (re-audited 2026-10-05)<a class="headerlink" href="#10-definition-of-done-scorecard-re-audited-2026-10-05" title="Permanent link">&para;</a></h2>
 <p>Graded against section 9 by reading the repository, not the checklist. Evidence
 column names the file an outside reviewer can open. Update this table (and the date)
 whenever a criterion changes state; never tick a section 4-7 item as a substitute.</p>
+<p>The 2026-10-05 re-audit downgraded criteria 2, 4, 5, 6 and 7 from MET (prior audit:
+2026-09-15, all MET except #1). Findings and fix sketches are in subsection 10.2.</p>
 <table>
 <thead>
 <tr>
 <th>#</th>
 <th>Criterion (section 9)</th>
 <th>Status</th>
-<th>Evidence</th>
+<th>Prior (09-15)</th>
+<th>Evidence (2026-10-05)</th>
 <th>Remaining work</th>
 </tr>
 </thead>
@@ -4975,50 +5054,57 @@ whenever a criterion changes state; never tick a section 4-7 item as a substitut
 <td>1</td>
 <td>Every platform-neutral module &gt;= 90% instruction / 80% branch, build-gated (re-scoped: strict 90/80 <strong>unit</strong> floors for the pure-logic modules; the <code>rtp-core</code> platform/pipeline seams credited by <strong>runtime-attested</strong> devstack coverage - see 10.1)</td>
 <td><strong>PARTIAL</strong></td>
-<td><code>build.gradle</code> <code>coverageFloors</code>: all platform-neutral modules gated (<code>:metrics-api</code> 0.95/0.85 [100%/94.6%], <code>:tags-api</code> 0.95/0.85 [98.2%/90.9%], <code>:yaml-api</code> 0.92/0.80 [97.0%/88.1%], <code>:rtp-api</code> 0.90/0.80 [95.7%/81.3%], <code>:commands-api</code> 0.90/0.80 [93.5%/80.1%], <code>:maps-api</code> 0.90/0.78 [94.7%/82.1%], <code>:anvil-api</code> 0.86/0.75 [90.5%/80.5%], <code>:rtp-core</code> 0.62/0.47 [67.5%/52.8%, selection/region at 90.72%/80.62%], <code>:rtp-proxy:rtp-proxy-common</code> 0.55/0.40 [60.1%/45.5%]).</td>
-<td>Strict 90/80 <strong>unit</strong> floors remain the bar for the pure-logic modules: 7 of 9 platform-neutral modules (<code>metrics-api</code>, <code>tags-api</code>, <code>yaml-api</code>, <code>maps-api</code>, <code>anvil-api</code>, <code>commands-api</code>, <code>rtp-api</code>) meet the target today; ratchet upward with <code>scripts/ratchet-coverage.py</code> after each green <code>-Pcoverage</code> run. The <code>rtp-core</code> platform/pipeline seams (the <code>RTP</code> bootstrap lambdas, teleport/dispatch pipeline, adapter glue) are closed by <strong>runtime-attested</strong> devstack coverage rather than increasingly artificial unit tests - see <a href="../DEVSTACK_COVERAGE_PLAN/"><code>DEVSTACK_COVERAGE_PLAN.md</code></a> and subsection 10.1.</td>
+<td>PARTIAL</td>
+<td>Root <code>build.gradle</code> <code>coverageFloors</code> gates all 9 modules, but only 5 at the full 90/80 bar (<code>metrics-api</code> 0.95/0.85, <code>tags-api</code> 0.95/0.85, <code>yaml-api</code> 0.92/0.80, <code>rtp-api</code> 0.90/0.80, <code>commands-api</code> 0.90/0.80). Below-target floors: <code>maps-api</code> 0.90/0.78, <code>anvil-api</code> 0.86/0.75, <code>rtp-core</code> 0.80/0.64 (package floors <code>tasks.teleport</code> 0.87/0.75, <code>selection.region</code> 0.82/0.68, <code>selection.worldborder</code> 0.99/0.89), <code>rtp-proxy-common</code> 0.85/0.67. Measured 2026-10-05 (<code>-Pcoverage</code>, instruction/branch %): <code>metrics-api</code> 100/94.6, <code>tags-api</code> 98.2/90.9, <code>yaml-api</code> 95.5/83.9, <code>maps-api</code> 95.5/<strong>79.5</strong>, <code>commands-api</code> 93.3/80.4, <code>rtp-api</code> 92.5/82.4, <code>anvil-api</code> 91.9/82.4; <code>rtp-core</code> and <code>rtp-proxy-common</code> pending.</td>
+<td>6 of the 7 measured pure-logic modules meet 90/80; <code>maps-api</code> branch coverage regressed below 80 (F-1). Raise the <code>maps-api</code> and <code>anvil-api</code> floors to 0.90/0.80 once green; record <code>rtp-core</code> / <code>rtp-proxy-common</code> from the next full <code>-Pcoverage</code> run. <code>rtp-core</code> seams stay on the devstack runtime-coverage track (10.1, <a href="../DEVSTACK_COVERAGE_PLAN/"><code>DEVSTACK_COVERAGE_PLAN.md</code></a>).</td>
 </tr>
 <tr>
 <td>2</td>
 <td>Mutation score &gt;= 60% on the safety packages</td>
-<td><strong>MET</strong></td>
-<td><code>rtp-core/build.gradle</code> <code>-Pmutation</code> gate, <code>mutationThreshold = 60</code>; all safety packages meet or exceed the floor: <code>selection/worldborder</code> passed (83%), <code>selection/region/cache</code> passed (81%), <code>selection/region/selectors/verticalAdjustors</code> passed (85%), <code>selection/region/selectors/memory/table</code> passed (77%), <code>tasks/teleport</code> passed (61%, 285/465 killed, test strength 72%); <code>.github/workflows/mutation-testing.yml</code> wired.</td>
-<td>Keep test assertions strong across future refactors so package mutation scores remain &gt;= 60%.</td>
+<td><strong>PARTIAL</strong></td>
+<td>MET</td>
+<td><code>rtp-core/build.gradle</code> <code>-Pmutation</code> defaults to 60 over <code>tasks.teleport.*</code>, <code>selection.region.*</code>, <code>selection.worldborder.*</code>, <code>tools.*</code>. The only scheduled gate, <code>.github/workflows/mutation-testing.yml</code> (weekly, not on PR), shards 3 targets and gates <code>tasks.teleport.*</code> at <strong>40</strong>; <code>selection.region</code> is covered only through its <code>cache</code> subpackage. The previously cited scores (worldborder 83%, region/cache 81%, verticalAdjustors 85%, memory/table 77%, teleport 61%) have no committed or linked PIT report.</td>
+<td>F-2: set the teleport shard to 60, add <code>selection.region.*</code> and <code>tools.*</code> shards, and publish the PIT reports as evidence.</td>
 </tr>
 <tr>
 <td>3</td>
 <td>Every S-00x prohibition has an automated rule cited in <code>TRACEABILITY.md</code></td>
-<td><strong>MET</strong></td>
-<td><code>RTPArchitectureTest</code> rules 1-10; <code>TRACEABILITY.md</code> REQ-RTP-S-001..S-007 rows.</td>
-<td>Keep the rows current when rules move.</td>
+<td><strong>MET</strong> (weak evidence)</td>
+<td>MET</td>
+<td>Every REQ-RTP-S-001..S-007 row in <code>TRACEABILITY.md</code> cites dedicated automated tests (<code>SafetyScanTest</code>, <code>ReqRtpS002PipelineLeakAssertionTest</code>, <code>ReqRtpS003SchematicFootprintClaimTest</code>, <code>ReqRtpS004VerifierFailSafeTest</code>, <code>AnvilPrefilterTest</code>, <code>RtpApiTeleportSurfaceTest</code>, <code>ReqRtpMenuConcreteCommandsTest</code>). <code>RTPArchitectureTest</code> structurally enforces only S-002 (rules 5/6) and part of S-005 (rules 2/7).</td>
+<td>F-3: drop the padded ArchUnit citations on S-001/S-003/S-006/S-007; make rule 10 (S-005) scan the platform adapters, where synchronous chunk loads are actually reachable.</td>
 </tr>
 <tr>
 <td>4</td>
 <td>Support matrix distinguishes tested vs best-effort; tested cells re-verified by CI on a schedule</td>
-<td><strong>MET</strong></td>
-<td><code>SUPPORT_MATRIX.md</code>; <code>.github/workflows/devstack-acceptance.yml</code> (nightly: Velocity + Paper + Folia + Fabric on modern MC; Java 21 LTS &amp; 25+).</td>
-<td>Tested cells in <code>SUPPORT_MATRIX.md</code> match automated CI / devstack suites; platforms without scheduled live CI suites (Spigot, NeoForge, BungeeCord, non-LTS Java) are categorized as Best-effort.</td>
+<td><strong>PARTIAL</strong></td>
+<td>MET</td>
+<td><code>devstack/docker-compose.yml</code> (the stack <code>run-acceptance.sh</code> boots nightly) runs Velocity, Paper, Folia and Fabric on <strong>MC 1.21.11 with <code>java25</code> images only</strong>, plus NeoForge 1.21.1 on <code>java21</code>.</td>
+<td>F-4: <code>SUPPORT_MATRIX.md</code> marks Paper/Folia/Fabric MC 1.20.x, Fabric 26.x and "Java 21 nightly" as Tested with no scheduled job behind them, while the nightly NeoForge 1.21.1 node is listed as Best-effort. Reclassify those cells, or add a version and JDK matrix to the nightly job.</td>
 </tr>
 <tr>
 <td>5</td>
 <td>Each release ships SBOM, signed artifacts, checksums, acceptance log</td>
-<td><strong>MET</strong></td>
-<td><code>.github/workflows/release.yml</code>: <code>cyclonedxBom</code>, <code>generateChecksums</code>, <code>signDeliverables</code> (using <code>SIGNING_KEY</code> / <code>SIGNING_PASSWORD</code>), <code>attest-build-provenance</code> wired; <code>.asc</code>, <code>.sha256</code>, <code>.sha512</code>, <code>bom.json</code>, and <code>acceptance-evidence.zip</code> (retrieved from successful acceptance run) attached to GitHub releases.</td>
-<td>Release workflow wires all required assets and attestation.</td>
+<td><strong>PARTIAL</strong></td>
+<td>MET</td>
+<td>Lite (<code>release.yml</code>): jar, <code>.sha256/.sha512</code>, <code>bom.json</code> and SLSA provenance are attached. Pro (<code>release-bbb.yml</code>): only the jar and SLSA provenance; the SBOM, checksums and <code>.asc</code> are built but never published. <code>signDeliverables</code> (<code>rtp-plugin/build.gradle</code>) skips silently when no key is configured, on both paths. <code>acceptance-evidence.zip</code> is the latest successful nightly run, is not bound to the release SHA, and is silently omitted when none is found.</td>
+<td>F-5: fail the release when signing is unconfigured, publish the Pro SBOM and checksums, and match the evidence run's <code>head_sha</code> to the release commit.</td>
 </tr>
 <tr>
 <td>6</td>
 <td>API compatibility gated automatically; deprecation policy published</td>
-<td><strong>MET</strong></td>
-<td><code>DEPRECATION_POLICY.md</code> published; <code>build.gradle</code> <code>checkBinaryCompatibility</code> enforces binary compatibility across all 7 public API modules against baseline release artifact (<code>japicmpBaselineVersion</code>, default <code>3.2.0</code>) with <code>richReport</code> rules and unannounced-break failure verified against <code>config/binary-compatibility-accepted-breaks.json</code>; wired into <code>.github/workflows/gradle.yml</code> for CI gating on push and pull requests.</td>
-<td>Keep <code>config/binary-compatibility-accepted-breaks.json</code> updated with rationale whenever announced removals pass the mandatory 2-minor deprecation notice window.</td>
+<td><strong>NOT MET</strong></td>
+<td>MET</td>
+<td><code>DEPRECATION_POLICY.md</code> is published. <code>build.gradle</code> <code>checkBinaryCompatibility</code> defaults to baseline <code>3.2.0</code>, which is <strong>not on Maven Central</strong>: only 3.2.1 is published, and <code>anvil-api</code> / <code>tags-api</code> are not published at all. The <code>onlyIf</code> guard therefore skips every module and the aggregate task reports success. No <code>build/reports/japicmp-*.txt</code> exists in the working tree.</td>
+<td>F-6: move the baseline to a published version, make an unresolvable baseline fail the build, publish or exclude <code>anvil-api</code> / <code>tags-api</code>, and add <code>yaml-api</code> (public per <code>SEMVER.md</code>) to the checked set.</td>
 </tr>
 <tr>
 <td>7</td>
 <td>Zero known CVEs in shipped dependencies, checked automatically</td>
-<td><strong>MET</strong></td>
-<td><code>.github/workflows/dependency-check.yml</code> now gates at <code>--failOnCVSS 4</code> with <code>continue-on-error</code> removed (an unsuppressed finding fails the run); runs weekly, on push, and on pull requests touching <code>gradle/libs.versions.toml</code> / <code>build.gradle</code> / <code>**/build.gradle</code> / <code>config/dependency-check-suppressions.xml</code>; accepted findings require written justification in <code>config/dependency-check-suppressions.xml</code>.</td>
-<td>Keep suppressions justified and current; revisit the CVSS floor toward 0 as the surface stabilizes.</td>
+<td><strong>NOT MET</strong> (unverified)</td>
+<td>MET</td>
+<td><code>.github/workflows/dependency-check.yml</code> gates at <code>--failOnCVSS 4</code>, but runs the Dependency-Check CLI action over the raw source tree (<code>path: '.'</code>) with no Gradle build first. The CLI has no Gradle analyzer, so Gradle-declared dependencies and the shaded jar are most likely never scanned. <code>config/dependency-check-suppressions.xml</code> is empty.</td>
+<td>F-7: confirm from the latest report artifact how many dependencies were scanned. Then build first and scan <code>rtp-plugin/build/libs</code>, or switch to the <code>org.owasp.dependencycheck</code> Gradle plugin; add the suppressions file to the <code>push</code> path filter.</td>
 </tr>
 </tbody>
 </table>
@@ -5051,10 +5137,51 @@ Criterion #1's definition of done is therefore re-scoped, not weakened:</p>
 measured state (floors locked at the values in the scorecard above); the remaining
 gap is closed by the ongoing devstack runtime-coverage track rather than by
 blocking the release on unit-only floors.</p>
+<h3 id="102-re-audit-findings-2026-10-05">10.2 Re-audit findings (2026-10-05)<a class="headerlink" href="#102-re-audit-findings-2026-10-05" title="Permanent link">&para;</a></h3>
+<p>Each finding names the file an outside reviewer can open. Fixes are sketches, not
+approved designs; build and workflow changes go through the usual proposal step.</p>
+<ul>
+<li><strong>F-1 (criterion 1, doc drift).</strong> The 09-15 scorecard quoted <code>rtp-core</code> floors 0.62/0.47 and
+  <code>rtp-proxy-common</code> 0.55/0.40, but the root <code>build.gradle</code> already enforced 0.80/0.64 and
+  0.85/0.67. <code>maps-api</code> branch coverage measured 79.5%, below the 80% target, though above its
+  0.78 floor. Section 2.1 is a 2026-09-10 snapshot and is now labelled historical.</li>
+<li><strong>F-2 (criterion 2).</strong> <code>mutation-testing.yml</code> gates <code>tasks.teleport.*</code> at
+  <code>mutationThreshold=40</code>. It omits <code>selection.region.*</code> (except <code>cache</code>), <code>tools.*</code>,
+  <code>verticalAdjustors</code> and <code>memory/table</code>, although the prior scorecard cited scores for the last
+  two. It runs weekly only, and its <code>actions/upload-artifact@v4</code> is tag-pinned, not SHA-pinned (item 41).
+  The <code>rtp-core/build.gradle</code> comment and section 0 still say "three" safety packages; the
+  default list has four globs.</li>
+<li><strong>F-3 (criterion 3).</strong> <code>RTPArchitectureTest</code> rule 10 (<code>no_synchronous_chunk_io_on_platform_world</code>)
+  only matches <code>org.bukkit.World</code> / <code>net.minecraft</code> owners inside core/api, which rule 1 already
+  forbids, so it cannot fire. The platform adapters are not scanned. The S-001/S-003/S-006/S-007
+  rows cite rule 1 or rule 9 as enforcement of unrelated prohibitions.</li>
+<li><strong>F-4 (criterion 4).</strong> The nightly devstack covers MC 1.21.11 on Java 25 for
+  Paper/Folia/Fabric/Velocity, and NeoForge 1.21.1 on Java 21. <code>SUPPORT_MATRIX.md</code> section 1
+  says the nightly runs "on Java 21 LTS", section 3.1 marks MC 1.20.x and Fabric 26.x as Tested,
+  and the section 4 topology omits NeoForge.</li>
+<li><strong>F-5 (criterion 5).</strong> Pro releases publish no SBOM, checksums or signature. Signing is optional
+  and silent on both release paths. The acceptance log is not bound to the released commit.
+  <code>release-bbb.yml</code> comments still say <code>release.yml</code> triggers on the same PR merge, which
+  contradicts its <code>workflow_dispatch</code>-only trigger. <code>release.yml</code> provisions only JDK 21 while
+  <code>build-full</code> and <code>release-bbb.yml</code> provision 21+25 for the JDK-25 carriers (verify that
+  toolchain auto-provisioning covers this).</li>
+<li><strong>F-6 (criterion 6).</strong> <code>checkBinaryCompatibility</code> is a silent no-op: baseline <code>3.2.0</code> is
+  unpublished (Maven Central lists 3.2.1), and the <code>onlyIf</code> guard turns "baseline missing" into
+  a skip. <code>anvil-api</code> / <code>tags-api</code> are absent from <code>publishedModulePaths</code>, so they can never
+  have a baseline.</li>
+<li><strong>F-7 (criterion 7).</strong> The Dependency-Check job scans source files, not the resolved Gradle
+  dependency graph or the shaded jar. A green run therefore does not show zero CVEs in
+  shipped dependencies.</li>
+<li><strong>F-8 (item 48 regression).</strong> <code>cross_plugin_destinations_scatter_chart.png</code> and
+  <code>cross_plugin_destinations_scatter_chart_16k.png</code> are tracked at the repository root again
+  (the root <code>*.log</code> files are gitignored local clutter only).</li>
+</ul>
 <hr />
-<p><strong>Claim language until all rows read MET:</strong> state the numbers ("rtp-core 60% instruction,
-floors enforced at 0.55/0.42; SBOM + SHA-256/512 + SLSA provenance on every release;
-nightly Velocity/Paper/Folia/Fabric acceptance run"), not the adjective.</p>
+<p><strong>Claim language until all rows read MET:</strong> state the numbers, not the adjective. For
+example: "platform-neutral APIs at 92-100% instruction coverage with build-enforced floors;
+SBOM, SHA-256/512 and SLSA provenance on Lite releases; nightly Velocity/Paper/Folia/Fabric/NeoForge
+acceptance on MC 1.21.11 / 1.21.1". Do not claim API-compatibility gating or automated CVE
+scanning of shipped dependencies until F-6 and F-7 are closed.</p>
 
 
 

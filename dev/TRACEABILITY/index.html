@@ -3040,7 +3040,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3414,6 +3414,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3608,6 +3629,48 @@
   
   <span class="md-ellipsis">
     ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
   </span>
   
 
@@ -3882,9 +3945,9 @@
 <tr>
 <td>REQ-RTP-F-007</td>
 <td>Uniform distribution</td>
-<td>DESIGN.md section 3</td>
-<td><code>Circle</code>, <code>Square</code></td>
-<td><code>DeterministicShapeTest</code>, <code>MemoryShapeSelectionParityTest</code></td>
+<td>DESIGN.md section 3; ADR-088 section 10</td>
+<td><code>Circle</code>, <code>Square</code>; <code>AbstractDualLayerShape.sampleCellSpaced</code> / <code>cellSpacedKeyForCounter</code> (REROLL cell-slot spacing keeps the even spread by area)</td>
+<td><code>DeterministicShapeTest</code>, <code>MemoryShapeSelectionParityTest</code>, <code>CellSlotSpacingTest</code></td>
 </tr>
 <tr>
 <td>REQ-RTP-F-008</td>
@@ -3932,8 +3995,8 @@
 <td>REQ-RTP-F-014</td>
 <td>Foreign configuration &amp; permission import (<code>/rtp config import &lt;plugin&gt;</code>)</td>
 <td><a href="../../adr/ADR-066-foreign-config-importer/">ADR-066</a></td>
-<td><code>ForeignConfigImporter</code>, <code>ForeignConfigImporterRegistry</code>, <code>BetterRtpConfigImporter</code>, <code>JustRtpConfigImporter</code>, <code>EzRtpConfigImporter</code>, <code>JakesRtpConfigImporter</code>, <code>PermissionMigrationService</code>, <code>ConfigImportCmd</code></td>
-<td><code>ConfigImporterTest</code>, <code>PermissionMigrationTest</code></td>
+<td><code>ForeignConfigImporter</code>, <code>ForeignConfigImporterRegistry</code>, <code>BetterRtpConfigImporter</code>, <code>JustRtpConfigImporter</code>, <code>EzRtpConfigImporter</code>, <code>JakesRtpConfigImporter</code>, <code>PermissionMigrationService</code>, <code>ConfigImportCmd</code>; <code>AbstractForeignConfigImporter#resolveSafeChild</code> (imported world/region/zone names cannot write outside the target directory); <code>PermissionSourceResolver</code> (without <code>source=</code>, the generic permission mapper only runs for plugin folders that look like an rtp plugin; <code>rtp.*</code> / <code>rtp.admin</code> / <code>rtp.reload</code> require a named <code>source=</code>)</td>
+<td><code>ConfigImporterTest</code>, <code>PermissionMigrationTest</code>, <code>ForeignImporterPathContainmentTest</code>, <code>ReqRtpF014PermissionSourceResolverTest</code></td>
 </tr>
 <tr>
 <td>REQ-RTP-NF-001</td>
@@ -3974,36 +4037,36 @@
 <td>REQ-RTP-S-001</td>
 <td>No lethal destination</td>
 <td>DESIGN.md section 3</td>
-<td><code>SafetyCheck</code>, <code>SafetyScan</code></td>
-<td><code>RTPArchitectureTest</code> (<code>core_and_api_must_not_depend_on_platform_apis</code> enforces platform-neutral safety checks without leaked platform states), <code>SafetyScanTest</code></td>
+<td><code>SafetyCheck</code>, <code>SafetyScan</code>, <code>AnvilPrefilter</code> (malformed or truncated block/biome palette data fails closed to UNKNOWN, preventing misreading corrupt data as safe terrain)</td>
+<td><code>RTPArchitectureTest</code> (<code>core_and_api_must_not_depend_on_platform_apis</code> enforces platform-neutral safety checks without leaked platform states), <code>SafetyScanTest</code>, <code>AnvilCorruptedRegionHardeningTest</code></td>
 </tr>
 <tr>
 <td>REQ-RTP-S-002</td>
 <td>No chunk leaks</td>
 <td>DESIGN.md section 6</td>
-<td><code>ChunkReservation</code>, <code>MemoryTracker</code>; <code>RegionQueueManager#demoteToUnkept</code> (sole hot-to-cold disposal path: closes the reservation before offering the bare coordinate, shared by <code>releaseToNetworkKept</code>, <code>disableLoginCache</code>, <code>closePersonalQueue</code>); <code>CacheStage</code>, <code>SimpleCacheStage</code>, <code>RingCacheStage</code>, <code>KeyedCacheStage</code>, <code>HotSink</code>, <code>HotBudgetAllocator</code> (<a href="../../adr/ADR-078-composable-cache-pipeline-stages/">ADR-078</a> phase 1 &amp; 3: disposal is the single terminal release path, so overflow, down-size, and teardown all release through one handler; budget allocator moves hot entries with zero ticket leaks); <code>GroupSubspaceHotSink</code>, <code>GroupColdToHotTransition</code> (ADR-078 phase 6: multi-chunk footprint reservations closed on overflow/failure)</td>
-<td><code>ChunkTicketLifecycleTest</code>, <code>ReqRtpS002PipelineLeakAssertionTest</code> (full pipeline run, cancellation, failure, and GC sweep leak assertions), <code>RegionQueueManagerNetworkReservedLifecycleTest</code> (5 demotion/hand-back ticket-hygiene cases), <code>CacheStageContractTest</code>, <code>KeyedCacheStageTest</code>, <code>HotSinkTransferEligibilityTest</code>, <code>HotBudgetAllocatorTest</code>, <code>GroupSubspaceCacheTest</code>, <code>RTPArchitectureTest</code> (<code>only_ChunkReservation_and_RTPWorld_may_call_setForceLoaded</code>, <code>only_RTPWorld_may_call_setForceLoadedImpl</code>)</td>
+<td><code>ChunkReservation</code>, <code>MemoryTracker</code>; <code>RegionQueueManager#demoteToUnkept</code> (sole hot-to-cold disposal path: closes the reservation before offering the bare coordinate, shared by <code>releaseToNetworkKept</code>, <code>disableLoginCache</code>, <code>closePersonalQueue</code>); <code>CacheStage</code>, <code>SimpleCacheStage</code>, <code>RingCacheStage</code>, <code>KeyedCacheStage</code>, <code>HotSink</code>, <code>HotBudgetAllocator</code> (<a href="../../adr/ADR-078-composable-cache-pipeline-stages/">ADR-078</a> phase 1 &amp; 3: disposal is the single terminal release path, so overflow, down-size, and teardown all release through one handler; budget allocator moves hot entries with zero ticket leaks); <code>GroupSubspaceHotSink</code>, <code>GroupColdToHotTransition</code> (ADR-078 phase 6: multi-chunk footprint reservations closed on overflow/failure); <code>TeleportPipelineTask#holdArrivalReservation</code> / <code>#flushArrivalReservations</code> (post-arrival hold of the landing ticket for <code>ARRIVAL_HOLD_TICKS</code> so the arrived player never sync-loads it, REQ-RTP-S-005; released once by the delayed task or <code>RTP.stop</code>, immediately on a failed teleport; <code>MemoryTracker</code> counts and keeps held chunks)</td>
+<td><code>ChunkTicketLifecycleTest</code>, <code>ReqRtpS002PipelineLeakAssertionTest</code> (full pipeline run, cancellation, failure, and GC sweep leak assertions), <code>ReqRtpS005ArrivalChunkHoldTest</code> (hold window, failed-teleport release, shutdown flush without double release, overlapping holders, no-scheduler fallback), <code>RegionQueueManagerNetworkReservedLifecycleTest</code> (5 demotion/hand-back ticket-hygiene cases), <code>CacheStageContractTest</code>, <code>KeyedCacheStageTest</code>, <code>HotSinkTransferEligibilityTest</code>, <code>HotBudgetAllocatorTest</code>, <code>GroupSubspaceCacheTest</code>, <code>RTPArchitectureTest</code> (<code>only_ChunkReservation_and_RTPWorld_may_call_setForceLoaded</code>, <code>only_RTPWorld_may_call_setForceLoadedImpl</code>)</td>
 </tr>
 <tr>
 <td>REQ-RTP-S-003</td>
 <td>Respect claims</td>
 <td>ADR-019, <a href="../../adr/ADR-058-region-specific-schematic-paste/">ADR-058</a> (schematic-paste footprint guard)</td>
-<td><code>GlobalRegionVerifiers</code>; <code>TeleportPipelineTask#schematicFootprintClear</code> (region schematic paste runs the whole footprint through the verifier registry and suppresses the paste on any claim intersection, falling back to the default platform)</td>
-<td><code>ReqRtpS003SchematicFootprintClaimTest</code>, <code>RTPArchitectureTest</code> (<code>core_and_api_must_not_depend_on_platform_apis</code> gates claim calls from leaking into core/api)</td>
+<td><code>GlobalRegionVerifiers</code>; <code>TeleportPipelineTask#schematicFootprintClear</code> (region schematic paste runs the whole footprint through the verifier registry and suppresses the paste on any claim intersection, falling back to the default platform); <code>ClaimCheckFailure</code> (<code>LeafRTPClaimAddon</code>: a per-call checker error rejects the location and keeps the integration active; only a missing/incompatible claim API disables it); <code>ModClaimCheckFailure</code> / <code>NeoForgeClaimCheckFailure</code> with <code>ModClaimIntegrations</code> / <code>NeoForgeModClaimIntegrations</code> (FTB Chunks and Open Parties and Claims on Fabric/NeoForge: same failure policy; verifiers register the negated "in a claim" verdict); <code>ClaimAnchoredRegionTracker#encapsulateClaim</code> / <code>#ingestMemoryFromRegion</code> (claim envelopes and inherited hazards are keyed in chunk units)</td>
+<td><code>ReqRtpS003SchematicFootprintClaimTest</code>, <code>ClaimCheckFailureRuleS003Test</code>, <code>ModClaimCheckFailureRuleS003Test</code>, <code>ClaimAnchoredRegionTrackerTest</code>, <code>RTPArchitectureTest</code> (<code>core_and_api_must_not_depend_on_platform_apis</code> gates claim calls from leaking into core/api)</td>
 </tr>
 <tr>
 <td>REQ-RTP-S-004</td>
 <td>No silent failure</td>
 <td>DESIGN.md section 1</td>
-<td>TeleportPipelineTask; <code>GlobalRegionVerifiers</code> (a throwing sync <em>or</em> async region verifier is logged at WARNING and the location is rejected/fail-safe, never silently accepted); <code>StageTransition</code>, <code>TransitionOutcome</code>, <code>RejectionReason</code> (<a href="../../adr/ADR-078-composable-cache-pipeline-stages/">ADR-078</a> phase 1: a declined promotion carries a stated cause instead of a bare empty result); <code>GroupBacklogToColdTransition</code>, <code>GroupColdToHotTransition</code> (ADR-078 phase 6: explicit <code>TransitionOutcome</code> rejections across group cache tiers); <code>GroupPlacementDispatcher</code></td>
-<td>FailureModeTest, RegionPipelineTest, <code>ReqRtpS004VerifierFailSafeTest</code>, <code>TransitionOutcomeTest</code>, <code>GroupSubspaceCacheTest</code>, <code>GroupPlacementDispatcherTest</code>, <code>QueueTaskTest</code>, <code>RTPArchitectureTest</code> (<code>no_print_stack_trace_in_core_or_api</code>, <code>no_system_out_or_bukkit_getlogger_in_core_or_api</code> enforce structured logging via <code>RTP.log(Level.WARNING, ...)</code> rather than silent drops or raw stderr dumps)</td>
+<td>TeleportPipelineTask; <code>GlobalRegionVerifiers</code> (a throwing sync <em>or</em> async region verifier is logged at WARNING and the location is rejected/fail-safe, never silently accepted); <code>StageTransition</code>, <code>TransitionOutcome</code>, <code>RejectionReason</code> (<a href="../../adr/ADR-078-composable-cache-pipeline-stages/">ADR-078</a> phase 1: a declined promotion carries a stated cause instead of a bare empty result); <code>GroupBacklogToColdTransition</code>, <code>GroupColdToHotTransition</code> (ADR-078 phase 6: explicit <code>TransitionOutcome</code> rejections across group cache tiers); <code>GroupPlacementDispatcher</code>; <code>DefaultRtpDispatcher</code> (one in-flight dispatch per player), <code>TransportRequestTriggerSource</code> (requests for players not connected to this proxy are refused and logged); <code>FabricMenuRenderer</code> / <code>NeoForgeMenuRenderer</code> (classic-teleport fallback reports failures to player and log)</td>
+<td>FailureModeTest, RegionPipelineTest, <code>ReqRtpS004VerifierFailSafeTest</code>, <code>TransitionOutcomeTest</code>, <code>GroupSubspaceCacheTest</code>, <code>GroupPlacementDispatcherTest</code>, <code>QueueTaskTest</code>, <code>DefaultRtpDispatcherDispatchGateTest</code>, <code>TransportRequestTriggerSourcePresenceGateTest</code>, <code>TransportRequestTriggerSourceForeignPlayerTest</code> (a shared-queue entry for a player held by another proxy is handed back, not cancelled), <code>ActionSyntaxAndGateEvaluationTest</code>, <code>RTPArchitectureTest</code> (<code>no_print_stack_trace_in_core_or_api</code>, <code>no_system_out_or_bukkit_getlogger_in_core_or_api</code> enforce structured logging via <code>RTP.log(Level.WARNING, ...)</code> rather than silent drops or raw stderr dumps)</td>
 </tr>
 <tr>
 <td>REQ-RTP-S-005</td>
 <td>No sync chunk I/O</td>
 <td>ADR-015/016, <a href="../../adr/ADR-077-multi-format-region-support/">ADR-077</a></td>
-<td>RTPTaskPipe, adapters, <code>RegionFileReader</code>, <code>AnvilReader</code>, <code>LinearRegionReader</code>, <code>RegionFileResolver</code>; <code>HotSink#accepts</code> / <code>HotSink#transferEligible</code>, <code>HotBudgetAllocator#rebalance</code> (<a href="../../adr/ADR-078-composable-cache-pipeline-stages/">ADR-078</a> phase 1 &amp; 3: transfer eligibility and rebalancing operate as pure in-memory rechecks against the entry's already-resident chunk, moving entries between sinks with zero chunk load/unload I/O); <code>GroupBacklogToColdTransition</code>, <code>GroupColdToHotTransition</code> (ADR-078 phase 6: off-tick candidate screening and async chunk loading)</td>
-<td>AnvilPrefilterTest, LinearRegionReaderTest, AnvilCorruptedRegionHardeningTest, <code>RTPArchitectureTest</code> (<code>no_blocking_future_calls_in_core_or_api</code>, <code>no_thread_instantiation_or_executors_outside_carveouts</code>, <code>no_synchronous_chunk_io_on_platform_world</code>), <code>ReqRtpMap002NoChunkIoTest</code>, <code>HotSinkTransferEligibilityTest</code>, <code>HotBudgetAllocatorTest</code>, <code>GroupSubspaceCacheTest</code></td>
+<td>RTPTaskPipe, adapters, <code>RegionFileReader</code>, <code>AnvilReader</code>, <code>Lz4BlockDecoder</code> (ADR-016 section 15: in-house mode-4 decode, size cap checked before allocation, malformed input fails closed to <code>CorruptRegionEntryException</code>), <code>Nbt</code> (512-level depth limit; array/list counts checked against remaining input before allocation; malformed NBT fails closed to <code>IOException</code>), <code>RegionFormatRegistry</code> (only <code>.mca</code> built in; files in an unregistered format such as <code>.linear</code> are never decoded and their chunks fall back to the live async load), <code>RegionFileResolver</code> (<code>resolveExisting</code>: window-bounded existence memo), <code>AnvilRegionScanner</code>, <code>PregenBiomeExtractor</code> (read only <code>.mca</code> and registered extensions); <code>AnvilSectorReader</code>, <code>AnvilRegionHeaderCache</code>, <code>AnvilPrefilter#probeColumn</code> (single-chunk <code>.mca</code> probes on every adapter read only the location table and the chunk's own sectors, off-tick; a stale table is detected by chunk position and re-read, corrupt runs fail closed per REQ-RTP-S-004); <code>AnvilRegionByteCache.Lease</code> (whole-file reads reuse pooled buffers with an explicit file length); <code>HotSink#accepts</code> / <code>HotSink#transferEligible</code>, <code>HotBudgetAllocator#rebalance</code> (<a href="../../adr/ADR-078-composable-cache-pipeline-stages/">ADR-078</a> phase 1 &amp; 3: transfer eligibility and rebalancing operate as pure in-memory rechecks against the entry's already-resident chunk, moving entries between sinks with zero chunk load/unload I/O); <code>GroupBacklogToColdTransition</code>, <code>GroupColdToHotTransition</code> (ADR-078 phase 6: off-tick candidate screening and async chunk loading)</td>
+<td>AnvilPrefilterTest (<code>prefilterReadsOnlyChunkSectors</code>), <code>AnvilSectorReaderTest</code>, <code>AnvilRegionByteCacheTest</code> (lease pinning, oversized-buffer reuse), <code>RegionFormatRegistryTest</code> (<code>testLinearNotBuiltIn</code>, <code>testUnregisteredLinearIgnored</code>, <code>testRegisteredLinearPreferredOverMca</code>), <code>AnvilRegionScannerTest</code> (<code>unregisteredFormatIsSkipped</code>, <code>registeredFormatIsScanned</code>), <code>PregenBiomeExtractorTest</code> (<code>unregisteredFormatIgnored</code>, <code>registeredFormatPreferred</code>), AnvilCorruptedRegionHardeningTest (incl. <code>testUnregisteredFormatFailsClosed</code>), <code>Lz4BlockDecoderTest</code> (differential vs lz4-java, truncation/forged-header/checksum rejection), <code>AnvilLz4CompressionTest</code>, <code>AnvilRegionFuzzTest#fuzzLz4BlockDecoder</code>, <code>NbtUntrustedInputTest</code> (depth boundary 512/513, 16M declared counts rejected with bounded allocation), <code>AnvilRegionFuzzTest#fuzzNbtReaders</code>, <code>RTPArchitectureTest</code> (<code>no_blocking_future_calls_in_core_or_api</code>, <code>no_thread_instantiation_or_executors_outside_carveouts</code>, <code>no_synchronous_chunk_io_on_platform_world</code>), <code>ReqRtpMap002NoChunkIoTest</code>, <code>HotSinkTransferEligibilityTest</code>, <code>HotBudgetAllocatorTest</code>, <code>GroupSubspaceCacheTest</code></td>
 </tr>
 <tr>
 <td>REQ-RTP-S-006</td>
@@ -4078,9 +4141,9 @@
 <tr>
 <td>REQ-RTP-OBS-003</td>
 <td>Bounded heap / TPS / MSPT sampling cost (M2 extends to Folia per-region samplers and the Fabric / NeoForge server-tick samplers; bStats <em>Runtime health</em> charts consume the same snapshot). On the vanilla single-loop runtimes MSPT is sourced from the server's own average in-tick work duration, never from the sleep-padded tick interval (see <em>Vanilla MSPT Source</em> in METRICS_PLAN.md)</td>
-<td><a href="../METRICS_PLAN/">METRICS_PLAN.md</a>, <a href="https://github.com/DailyStruggle/RTP/blob/V3/metrics-api/docs/adr/metrics-api-ADR-001-module-extraction.md">metrics-api-ADR-001</a></td>
-<td><code>HeapSampler</code> (<code>rtp-core</code>), <code>PaperMetricsBinding</code>, <code>BukkitTpsSampler</code>, <code>FoliaMetricsBinding</code>, <code>FoliaRegionTpsSampler</code>, <code>FabricMetricsBinding</code>, <code>NeoForgeMetricsBinding</code> (platform adapters, implementing <code>metrics-api</code> <code>MetricsBinding</code>); tick-work sources wired at install: <code>RTPFabricMod.reflectTickWorkNanos</code>, <code>RTPNeoForgeMod</code> (<code>MinecraftServer#getAverageTickTimeNanos</code>); <code>MetricsBindingDispatcher</code>, <code>RTPCostMetricsCharts</code> (bStats <em>Runtime health</em> chart group)</td>
-<td><code>ReqRtpObs003HeapSamplerTest</code>, <code>PaperMetricsBindingTest</code>, <code>BukkitTpsSamplerTest</code>, <code>FoliaMetricsBindingTest</code>, <code>FabricMetricsBindingTest</code> (incl. <code>mspt_reports_work_duration_not_tick_interval</code>, <code>mspt_decreases_after_a_spike_subsides</code>), <code>NeoForgeMetricsBindingTest</code>, <code>RuntimeHealthBucketsTest</code></td>
+<td><a href="../METRICS_PLAN/">METRICS_PLAN.md</a>, <a href="https://github.com/DailyStruggle/RTP/blob/V3/metrics-api/docs/adr/metrics-api-ADR-001-module-extraction.md">metrics-api-ADR-001</a>, <a href="https://github.com/DailyStruggle/RTP/blob/V3/api/bstats-api/docs/adr/bstats-api-ADR-001-dependency-free-client.md">bstats-api-ADR-001</a></td>
+<td><code>HeapSampler</code> (<code>rtp-core</code>), <code>PaperMetricsBinding</code>, <code>BukkitTpsSampler</code>, <code>FoliaMetricsBinding</code>, <code>FoliaRegionTpsSampler</code>, <code>FabricMetricsBinding</code>, <code>NeoForgeMetricsBinding</code> (platform adapters, implementing <code>metrics-api</code> <code>MetricsBinding</code>); tick-work sources wired at install: <code>RTPFabricMod.reflectTickWorkNanos</code>, <code>RTPNeoForgeMod</code> (<code>MinecraftServer#getAverageTickTimeNanos</code>); <code>MetricsBindingDispatcher</code>, <code>RtpBStatsCatalogue</code> + <code>RtpBStats</code> (<code>rtp-core</code>; bStats <em>Runtime health</em> chart group, sent via the <code>bstats-api</code> client)</td>
+<td><code>ReqRtpObs003HeapSamplerTest</code>, <code>PaperMetricsBindingTest</code>, <code>BukkitTpsSamplerTest</code>, <code>FoliaMetricsBindingTest</code>, <code>FabricMetricsBindingTest</code> (incl. <code>mspt_reports_work_duration_not_tick_interval</code>, <code>mspt_decreases_after_a_spike_subsides</code>), <code>NeoForgeMetricsBindingTest</code>, <code>RuntimeHealthBucketsTest</code>, <code>RtpBStatsTest</code>, <code>BStatsServiceTest</code>, <code>BStatsPlatformTest</code></td>
 </tr>
 <tr>
 <td>REQ-RTP-OBS-004</td>
@@ -4173,6 +4236,13 @@
 <td><a href="../../adr/ADR-098-declarative-command-parameters-permissions-and-defaults/">ADR-098</a> (extends <a href="../../adr/ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/">ADR-093</a>)</td>
 <td><code>ParameterType</code>, <code>ParameterSpec</code>, <code>ActionDefinition.CommandSpec</code> (<code>rtp-api</code>); <code>ActionConfigLoader.parseParameters</code>, <code>ActionCommand</code> (<code>rtp-core</code>); <code>RTPCommandSender.isRtpAdmin</code></td>
 <td><code>DeclarativeParameterTest</code> (<code>rtp-api</code>), <code>ActionCommandTest</code> (<code>testDeclarativeTargetPermissionDenied</code>, <code>testDeclarativeTargetPermissionAllowed</code>, <code>testDeclarativeDefaultSelfUnrestricted</code>), <code>ActionManagerTest</code> (open-matchmaking vs targeted reciprocity)</td>
+</tr>
+<tr>
+<td>REQ-API-F-008</td>
+<td>Addon web editor extensions (namespaced <code>&lt;id&gt;.&lt;type&gt;</code> messages routed, budgeted and rate-limited by core; <code>protocol</code> / <code>extensions</code> negotiation in the snapshot and <code>hello-reply</code>; tier 1 tabs rendered by the page from declarative widgets with no addon code in the page origin; declared addon YAML written only by Hot-Apply after the addon's <code>validate</code>, errors in <code>apply_ack</code> per REQ-RTP-S-004; extension calls isolated; registry fails closed per REQ-RTP-S-006)</td>
+<td><a href="../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/">ADR-107</a> (extends <a href="../../adr/ADR-106-shape-curve-helpers-and-signed-editor-channel/">ADR-106</a>), DESIGN.md <em>Web Editor Extensions</em></td>
+<td><code>EditorExtension</code>, <code>EditorSession</code>, <code>EditorMessage</code>, <code>EditorDelivery</code>, <code>EditorTab</code> / <code>EditorWidget</code> / <code>EditorFrame</code> (<code>rtp-api</code>, <code>api.editor</code>); <code>EditorExtensionRegistry</code>, <code>RTPHooks.editorExtensions()</code>; <code>EditorExtensions</code>, <code>EditorChannel</code> (namespace, delivery classes, extension shares), <code>EditorChannelWiring</code>, <code>EditorSessionManager.collectCurrentConfigs</code> / <code>applyPayload</code>, <code>EditorLiveFeed</code> (<code>rtp-core</code>); <code>EditorChannelClient</code>, <code>EditorExtensionTabs</code>, <code>yamlSetScalar</code> (<code>docs/editor/index.html</code>)</td>
+<td><code>EditorExtensionsTest</code>, <code>EditorExtensionConfigFilesTest</code>, <code>EditorExtensionTabsPageTest</code>, <code>EditorChannelPageContractTest</code></td>
 </tr>
 <tr>
 <td>REQ-API-NF-001</td>
@@ -4896,8 +4966,8 @@
 <td>REQ-RTP-PROXY-007</td>
 <td>Authenticated Transport</td>
 <td>ADR-036 section 3 D4; <code>rtp-proxy-ADR-010</code> (Proposed)</td>
-<td>— (unimplemented)</td>
-<td>—</td>
+<td><code>HmacVerifier</code>; <code>CanonicalEnvelopes</code> (token v2 covers <code>regionKey</code>, queue envelope, shared waitlist entry; delimiter-bearing fields rejected); <code>RedisNetworkStateBinding</code>, <code>SqlNetworkStateBinding</code> (redeem verifies stored HMAC), <code>RedisNetworkRequestQueue</code>, <code>SqlNetworkRequestQueue</code>, <code>RedisNetworkWaitlist</code> (unverified entries purged on drain); <code>PluginMessageEnvelope</code>, <code>AbstractPluginMessageNetworkBinding</code>, <code>VelocityProxyCacheListener</code> (signed heartbeats / snapshots); <code>ProxyDirectWire</code>, <code>ProxyDirectListener</code>, <code>ProxyDirectNetworkBinding</code>, <code>ProxyDirectTlsConfig</code>, <code>ProxyDirectAllowlist</code>; <code>RespProtocol</code>, <code>RespEndpoint</code> (TLS, ACL user, reply limits); <code>NetworkConfig</code>, <code>NetworkBindings</code> (weak or missing secret fails closed)</td>
+<td><code>CanonicalEnvelopesTest</code>, <code>RedisSharedStoreSigningUnitTest</code>, <code>SqlSharedStoreSigningH2Test</code>, <code>PluginMessageHmacSecurityTest</code>, <code>VelocityProxyCacheHmacTest</code>, <code>ProxyDirectWireTest</code>, <code>ProxyDirectAllowlistTest</code>, <code>ProxyDirectTlsConfigTest</code>, <code>ProxyDirectListenerTest</code>, <code>ProxyDirectNetworkBindingTest</code>, <code>RespProtocolLimitsTest</code>, <code>NetworkConfigTest</code>, <code>NetworkBindingsTest</code>, <code>NetworkBindingsEdgeTest</code></td>
 </tr>
 <tr>
 <td>REQ-RTP-PROXY-008</td>
@@ -5145,7 +5215,7 @@
 <tr>
 <td>Root / System</td>
 <td>24</td>
-<td>12 (REQ-RTP-F-001 <code>SLATest</code>+<code>RegionPipelineTest</code>, REQ-RTP-F-006/007 <code>RegionPipelineTest</code>, REQ-RTP-F-008, REQ-RTP-F-012 <code>ScanCmdTest</code>+<code>ScanTaskProcessingTest</code>, REQ-RTP-F-013 <code>ConfigParserLanguageTest</code>, REQ-RTP-NF-002, REQ-RTP-NF-003 via <code>RTPArchitectureTest</code>, REQ-RTP-SYS-001 via build, REQ-RTP-S-004 <code>FailureModeTest</code>+<code>RegionPipelineTest</code>, REQ-RTP-S-005, REQ-RTP-S-006 <code>RTPAPIGuardTest</code>)</td>
+<td>12 (REQ-RTP-F-001 <code>SLATest</code>+<code>RegionPipelineTest</code>, REQ-RTP-F-006/007 <code>RegionPipelineTest</code>, REQ-RTP-F-008, REQ-RTP-F-012 <code>ScanCmdTest</code>+<code>ScanTaskProcessingTest</code>, REQ-RTP-F-013 <code>ConfigParserLanguageTest</code>, REQ-RTP-NF-002, REQ-RTP-NF-003 via <code>RTPArchitectureTest</code>, REQ-RTP-SYS-001 via build, REQ-RTP-S-004 <code>FailureModeTest</code>+<code>RegionPipelineTest</code>+<code>AsyncTaskProcessingTest</code> (pulse non-overlap guard)+<code>FactoryValueGetNumberConcurrencyTest</code> (lock-free config reads), REQ-RTP-S-005, REQ-RTP-S-006 <code>RTPAPIGuardTest</code>)</td>
 </tr>
 <tr>
 <td>rtp-api</td>

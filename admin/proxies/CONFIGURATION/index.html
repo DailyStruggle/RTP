@@ -1334,6 +1334,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#proxy-direct-keys-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      proxy-direct keys (backend)
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3196,7 +3205,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3570,6 +3579,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3780,6 +3810,48 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3859,6 +3931,15 @@
   <a href="#transportredis" class="md-nav__link">
     <span class="md-ellipsis">
       transport.redis
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#proxy-direct-keys-backend" class="md-nav__link">
+    <span class="md-ellipsis">
+      proxy-direct keys (backend)
     </span>
   </a>
   
@@ -3984,7 +4065,13 @@
 <td><code>secretEnv</code></td>
 <td>String</td>
 <td><code>"RTP_NET_SECRET"</code></td>
-<td>Environment variable holding the shared HMAC secret. Required when <code>enabled: true</code> <strong>and</strong> <code>transport.type: redis</code>. The SQL binding treats it as optional (DB auth + TLS is the security boundary).</td>
+<td>Environment variable holding the shared HMAC secret: Base64, at least 32 bytes after decoding, identical on every backend and proxy. <code>redis</code>, <code>sql</code> and <code>proxy-direct</code> refuse to start without it. <code>auto</code> and <code>plugin-message</code> also stay off without it unless <code>allowUnsigned: true</code>.</td>
+</tr>
+<tr>
+<td><code>allowUnsigned</code></td>
+<td>Boolean</td>
+<td><code>false</code></td>
+<td>Run <code>auto</code> / <code>plugin-message</code> without a secret. Heartbeats are then unsigned, so a modded client can fake server or region availability. Set the same option on the proxy companion too.</td>
 </tr>
 </tbody>
 </table>
@@ -4074,7 +4161,7 @@
 <td><code>host</code></td>
 <td>String</td>
 <td><code>"localhost"</code></td>
-<td>Hostname/IP of the Redis instance shared by every backend and proxy.</td>
+<td>Hostname/IP of the Redis instance shared by every backend and proxy. A <code>rediss://[user@]host[:port]</code> URL turns on TLS and sets the ACL user. On backends this URL is the only way to set TLS or a username.</td>
 </tr>
 <tr>
 <td><code>port</code></td>
@@ -4083,13 +4170,77 @@
 <td>Redis port.</td>
 </tr>
 <tr>
+<td><code>passwordEnv</code></td>
+<td>String</td>
+<td><code>"RTP_REDIS_PASSWORD"</code></td>
+<td>Environment variable read for the Redis password, checked before <code>password</code>.</td>
+</tr>
+<tr>
 <td><code>password</code></td>
 <td>String</td>
 <td><code>""</code></td>
-<td>Optional. Empty for unauthenticated Redis; set when Redis ACL / <code>requirepass</code> is configured.</td>
+<td>Fallback when the <code>passwordEnv</code> variable is unset. Empty for unauthenticated Redis. A value here logs a one-time warning; prefer <code>passwordEnv</code>.</td>
 </tr>
 </tbody>
 </table>
+<p>The proxy companion's <code>network-proxy.yml</code> also accepts <code>tls: true</code> and <code>username</code> in its <code>transport.redis</code> block. TLS uses the JVM's default trust store.</p>
+<h3 id="proxy-direct-keys-backend"><code>proxy-direct</code> keys (backend)<a class="headerlink" href="#proxy-direct-keys-backend" title="Permanent link">&para;</a></h3>
+<p>Used when <code>type: proxy-direct</code>. The keys sit directly under <code>transport</code>, and the proxy companion's <code>transport.direct</code> block must use matching TLS settings.</p>
+<table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>proxies</code></td>
+<td>List</td>
+<td><em>(required)</em></td>
+<td><code>host:port</code> of each proxy companion listener.</td>
+</tr>
+<tr>
+<td><code>port</code></td>
+<td>Integer</td>
+<td><code>25599</code></td>
+<td>Port used for entries without one.</td>
+</tr>
+<tr>
+<td><code>connectTimeoutMs</code> / <code>readTimeoutMs</code></td>
+<td>Integer</td>
+<td><code>1000</code> / <code>2000</code></td>
+<td>Socket timeouts.</td>
+</tr>
+<tr>
+<td><code>tls</code></td>
+<td>Boolean</td>
+<td>unset</td>
+<td><code>true</code> for TLS. The proxy refuses a non-loopback plain listener unless its side sets <code>tls: false</code> explicitly.</td>
+</tr>
+<tr>
+<td><code>truststore</code> / <code>truststoreType</code> / <code>truststorePasswordEnv</code></td>
+<td>String</td>
+<td>JVM trust / <code>PKCS12</code> / <code>RTP_DIRECT_TRUSTSTORE_PASSWORD</code></td>
+<td>Trust for the proxy's certificate.</td>
+</tr>
+<tr>
+<td><code>keystore</code> / <code>keystoreType</code> / <code>keystorePasswordEnv</code></td>
+<td>String</td>
+<td>none / <code>PKCS12</code> / <code>RTP_DIRECT_KEYSTORE_PASSWORD</code></td>
+<td>Client certificate, needed when the proxy requires one (mTLS).</td>
+</tr>
+<tr>
+<td><code>verifyHostname</code></td>
+<td>Boolean</td>
+<td><code>true</code></td>
+<td>Check the proxy certificate's host name.</td>
+</tr>
+</tbody>
+</table>
+<p>On the proxy, <code>transport.direct</code> binds <code>127.0.0.1</code> by default, accepts an <code>allowedClients</code> IP/CIDR list, and uses <code>requireClientAuth</code> (default <code>true</code> when a truststore is set) for mTLS.</p>
 <h2 id="heartbeat-state-publication-cadence"><code>heartbeat</code> (State publication cadence)<a class="headerlink" href="#heartbeat-state-publication-cadence" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

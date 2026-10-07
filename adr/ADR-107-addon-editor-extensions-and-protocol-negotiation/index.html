@@ -1,0 +1,4694 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/">
+      
+      
+        <link rel="prev" href="../ADR-106-shape-curve-helpers-and-signed-editor-channel/">
+      
+      
+        <link rel="next" href="../ADR-108-all-mit-licensing-pro-as-support/">
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#adr-107-addon-editor-extensions-shared-data-addon-tabs-and-protocol-negotiation" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../site/why/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../" class="md-tabs__link">
+          
+  
+  Architecture decisions
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ACTIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Actions & arenas
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/WEB_EDITOR_GUIDE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Web Workspace & Editor
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../dev/HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/TTL/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Spatial memory TTL
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../dev/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../dev/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/shape-algorithms/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Shape algorithm testing & charts
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Architecture decisions
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Architecture decisions
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-000-development-workflow/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-000 - Development Workflow
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-001-archimedean-spiral-1d-mapping/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-001 — Archimedean Spiral 1D Mapping for Location Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-002-h2-sqlite-over-flat-file-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-002 — H2/SQLite for Spatial Memory Persistence Over Flat-File Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-003-rtp-plugin-bridge-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-003 — rtp-plugin as a Separate Bridge Module from rtp-core
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-004-countbound-taskpipe-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-004 — CountBoundTaskPipe Instead of TimeBoundTaskPipe on Folia Regional Threads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-005-paperlib-removal/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-005 — Removal of PaperLib in Favour of Native Paper APIs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-006-async-queue-pre-generation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-006 — Async Queue Pre-Generation Over On-Demand Async Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-007-per-user-isolated-queues/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-007 — Per-User Isolated Queues Alongside the Global Queue
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-008-memory-tracker-active-gc/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-008 — MemoryTracker as Active Task GC with WeakReference Deallocation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-009-configurable-spatial-distributions/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-009 — Configurable Spatial Distributions: Flat, Normal, Exponential
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-010-versioned-platform-adapter-submodules/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-010 — Versioned Platform Adapter Submodules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-011-rtp-api-separate-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-011 — `rtp-api` as a Separately Published Addon Interface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-012-chunk-reservation-abstraction/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-012 — `ChunkReservation` as an Internal Chunk Ticket Abstraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-013-addons-as-external-gradle-projects/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-013 — Addons as External Gradle Projects Rather Than Built-In Optional Modules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-015-stale-chunk-guard-countbound-pipes/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-015 — Stale-Chunk Guard for Count-Bound Pipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-016-anvil-subsystem/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-016 — Anvil Read-Only Subsystem
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-017-block-tags-and-state-predicates-in-safety-lists/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-017 — Block Tags and Block-State Predicates in Safety Lists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-018-agents-md-public-release-structure/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-018 — `AGENTS.md` Public Release Structure: Thin Router + Canonical Sources
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-019-claim-plugin-integrations-folded-into-plugin/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-019 — Claim-Plugin Integrations Folded Into `rtp-plugin`; Example Addon Retained
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-020-language-bootstrap-and-locale-aware-configparser/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-020 — Language Bootstrap and Locale-Aware ConfigParser
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-021-legacy-mc-and-java-support-scope/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-021 — Legacy Minecraft and Java Support Are Out of Scope
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-022-shape-cache-key-seed-plus-config-hash/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-022 — Region Shape Cache Key: Seed + Canonical Config Hash
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-023-login-reserve-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-023 — Login Reserve Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-024-rtp-lite-assembly-variant/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-024 — RTP-lite Assembly Variant
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-025 — Replace SimpleYaml with an Internal Comment-Preserving YAML Library
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-026-external-hook-api-surface/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-026 — Unified External-Hook API Surface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-028-l3-backlog-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-028 — L3 Backlog Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-032-teleport-pipeline-latency-histogram/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-032 — Teleport Pipeline Latency Histogram: 256-Sample Wait-Free Ring, Never Reset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-033-neoforge-platform-in-scope/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-033 — NeoForge Platform In-Scope
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-034-memory-shape-catalog/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-034 — Memory Shape Catalog and Polygon Shape
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-035-interactive-menus-book-first/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-035 — Interactive Menus via Written Book
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-036-network-mode-multi-server-multi-proxy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-036 — Network Mode: Multi-Server, Multi-Proxy RTP
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-037-harden-rtp-config-commands/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-037 — Harden RTP Config Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-038-rtpadmin-setup-wizards/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-038 — `/rtp admin setup` & Setup Wizards
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-039-rtpadmin-diagnostic-surfaces/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-039 — `/rtpadmin` Diagnostic Surfaces
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-040-cross-backend-metric-time-series-publication/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-040 — Cross-Backend Metric Time-Series Publication via `MemoryTracker` Tier Promotion
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-041-config-command-and-save-implementation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-041 — `/rtp config` Command and Save Mechanics: Implementation Strategy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-042-yaml-comment-preservation-block-only/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-042 — YAML Comment Preservation: Block-Only, Surgical Text-Edit Substrate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-043-personal-queue-permission-semantics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-043 — `rtp.personalqueue` Permission Semantics: Bucket-Only Opt-In
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-044-command-tree-menu-reflector/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-044 — `menu-api` Module for Generalized Interactive Menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-045-rtp-docs-menu-consumer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-045 — `/rtp docs` Menu Consumer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-046-maps-api-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-046 — `maps-api` Module for Runtime Cartography Chart Generation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-047-declarative-chart-composition-bridge/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-047 - Declarative Chart Composition Bridge
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-048-menu-builders-behind-server-accessor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-048 - Move menu page builders into `rtp-api` behind `RTPServerAccessor`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-049-network-mode-platform-neutral-lift/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-049 - Network-mode plumbing in `rtp-core`, platform-specific via `PlayerLifecycleHook` SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-050-concrete-menu-commands-supersede-tokens/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-050 - Concrete Menu Commands Supersede Token Registries
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-051-two-tier-api-extension-model/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-051 - Two-Tier API Model: Thin `rtp-api` Contract + `rtp-core` Extension API
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-052-outcome-metrics-and-cause-tagged-bad-locations/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-052 — Always-on generation outcome metrics and cause-tagged bad-location persistence
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-053 — Pipeline Latency Percentiles and Slow-Teleport Audit
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-054-rtprunnable-self-scheduling-thread-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-054 — RTPRunnable Self-Scheduling Thread Routing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-055-pvp-combat-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-055 - Optional PvP / combat-tag pre-flight gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-056-bare-rtp-root-action/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-056 - Pluggable bare-`/rtp` root action
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-057-platform-agnostic-addon-spi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-057 — Platform-agnostic addon SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-058-region-specific-schematic-paste/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-058 — Region-Specific Schematic
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-059-relative-ground-distance-safety-predicate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-059 — Relative Ground-Distance Safety Predicate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-060-emergency-platform-block-restoration-timeout/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-060 — Emergency-Platform Block-Restoration Timeout
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-061-open-core-dual-licensing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-061 — Open-Core Dual Licensing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-062-biome-probability-weighting/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-062 — Biome-probability weighting for location selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-063-biome-first-menu-and-auto-region-by-biome/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-063 — Biome-First Menu with Auto-Region Selection by Biome Availability
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-064-config-comment-format-summary-line-as-menu-hover/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-064 — Config-Comment Format: Summary Line as Menu Hover Text
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-065-world-override-region-and-world-menu/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-065 — World-Override Regions and the `/rtp` World Menu
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-066-foreign-config-importer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-066 - Foreign Config Importer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-067-adaptive-scan-rate-and-mca-header-generation-check/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-067 — Automatic PRESCAN, Adaptive Scan Rate Control, and `.mca`-Header Generation Check
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-068-cross-server-persisted-teleport-limits/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-068 - Cross-Server Persisted Teleport Limits
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-069-claim-integrations-extracted-to-bundled-addon/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-069 - Claim-Plugin Integrations Extracted to the Bundled `LeafRTPClaimAddon`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-070-platform-neutral-rtp-command-root/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-070 - Platform-neutral `/rtp` command root
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-071-config-organization-and-discoverability/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-071 - Config Organization and Discoverability
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-072-teleport-view-distance-clamp-and-restore/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-072: Teleport View-Distance Clamp and Steady Restore
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-073-config-default-inheritance-references/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-073 - Config Default Inheritance via `@<file>` References
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-074-operator-facing-throughput-and-cost-metrics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-074 - Operator-Facing RTP Throughput and Cost Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-075-platform-neutral-player-move-event-spi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-075 - Platform-Neutral Player-Move Event SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-076-config-folder-consolidation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-076 - Config Folder Consolidation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-077-multi-format-region-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-078-composable-cache-pipeline-stages/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-078 - Composable Cache Pipeline Stages, Domain Stage Nomenclature, and Dynamic Hot Quota Allocation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-079-cause-based-ttl-and-staged-expiration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-079 — Cause-Based TTL and Staged Expiration on Spatial Memory Segments
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-080-opt-in-simulation-benchmark-tier/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-080 — Opt-In Simulation Benchmark Tier
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-081-unified-blocked-biome-run-table/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-081 — Unified Blocked Biome Run Table in `MemoryShape`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-082-cache-conscious-b-plus-tree-primitive-arrays/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-082 — Cache-Conscious B+ Tree of Primitive Array Pages for Spatial Run Memory
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-083-two-tier-probabilistic-region-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-083 - Two-Tier Hierarchical Cell Routing: Probabilistic Macro-Cell Selection to Intra-Macro-Cell Manifold
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-084-layered-spiral-hilbert-rle-index/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-084 - Layered Learned-State Index: Coarse Spiral Directory over Per-Cell Hilbert RLE Blobs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-085-spiral-addressed-hilbert-key-space/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-085 - Spiral-Addressed Hilbert Key Space for Learned State
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-086-external-web-map-integration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-086 - External Web Map Integration via `anvil-api`, `maps-api`, and Spatial Memory
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-088-configurable-downsampling-stride-filter/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-088 - Configurable Downsampling Stride Filter for Spatial Candidate Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-089-universal-mapcanvas-bridge-biome-hazard-overlays-and-pipeline-gauges/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-089 — Universal MapCanvas Bridge, Biome-Hazard Composite Overlays, and Visual Pipeline Gauges
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-090-test-driver-and-synthetic-mca-architecture/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-090 — Test-Driver, Synthetic MCA Generator, and Dimension Benchmark Dataset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-091-headless-player-protocol-driver-for-devstack/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-091 — Automated Headless Client for Devstack via Mineflayer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-092-hybrid-bit-packed-and-16-bit-run-container-hazard-table/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-092 — Hybrid Bit-Packed and 16-Bit Run Container Hazard Table
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-093 - Declarative Scripted Actions via Core Confinement, Subspace Placement, and Minecraft Command Lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-094-quality-engineering-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-094 — Quality-Engineering Gates: Tiered Logic Tests, Local Static Analysis, and Changed-Line Coverage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-097 — Per-Action Pre-Validated Caches, Anvil Region Pre-Screening, and Bounded Subspace Placement Retries
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-098-declarative-command-parameters-permissions-and-defaults/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-098 - Declarative Command Parameters, Per-Parameter Permissions, and Authoritative Defaults
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-099-visual-region-creation-and-interactive-cartography-bridges/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-099 — Zero-Overhead Visual Region Creation via Ecosystem Selection Bridges and Cartography Models
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-100-superseding-adr-024-sla-and-support-tier/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-100 — Superseding ADR-024: Technical Parity and Pro as SLA & Support Tier
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-101-in-house-sql-connection-pool-and-hikaricp-retirement/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-101 — In-House SQL Connection Pool and Retirement of HikariCP
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-102-coverage-guided-fuzz-testing-and-parser-input-hardening/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-102 — Coverage-Guided Fuzz Testing and Parser Input Hardening
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-103-multi-version-platform-adapter-deduplication/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-103 — Multi-Version Platform Adapter Deduplication and Runtime Coverage Normalization
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-104-ephemeral-web-editor-and-packed-docs-integration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-104 — Ephemeral Web Editor and In-Game Packed Docs Integration
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-105-intent-based-documentation-architecture-and-operator-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-105 — Intent-Based Documentation Architecture, Operator-Centric Routing, and Documentation Lifecycle Refinement
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-106-shape-curve-helpers-and-signed-editor-channel/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-context-and-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Context and Problem Statement
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-decision-drivers" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Decision Drivers
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-considered-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Considered Options
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-public-api-rtp-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Public API (rtp-api)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Public API (rtp-api)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.1 Registry
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-extension-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.2 Extension contract
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-threading-s-005" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.3 Threading (S-005)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-wire-protocol-extends-adr-106-section-5" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Wire Protocol (extends ADR-106 section 5)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Wire Protocol (extends ADR-106 section 5)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-type-namespace" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.1 Type namespace
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-negotiation" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.2 Negotiation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-delivery-classes-and-bundles" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.3 Delivery classes and bundles
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-caps-and-budget-shares" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.4 Caps and budget shares
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-inbound-routing" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.5 Inbound routing
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-addon-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Addon UI
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Addon UI">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-tier-1-declarative-tabs-page-rendered" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.1 Tier 1: declarative tabs (page-rendered)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-tier-2-sandboxed-frame-contract-fixed-runner-may-follow" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.2 Tier 2: sandboxed frame (contract fixed; runner may follow)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-addon-configuration-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. Addon Configuration Writes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-changes-to-adr-106" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. Changes to ADR-106
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-scope-and-phasing" class="md-nav__link">
+    <span class="md-ellipsis">
+      9. Scope and Phasing
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. Consequences
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Consequences">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#positive" class="md-nav__link">
+    <span class="md-ellipsis">
+      Positive
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#negative-trade-offs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Negative / Trade-offs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      11. References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-TEMPLATE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-NNN — Title
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-context-and-problem-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Context and Problem Statement
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-decision-drivers" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Decision Drivers
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-considered-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Considered Options
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-public-api-rtp-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Public API (rtp-api)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Public API (rtp-api)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.1 Registry
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-extension-contract" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.2 Extension contract
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-threading-s-005" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.3 Threading (S-005)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-wire-protocol-extends-adr-106-section-5" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Wire Protocol (extends ADR-106 section 5)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Wire Protocol (extends ADR-106 section 5)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-type-namespace" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.1 Type namespace
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-negotiation" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.2 Negotiation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-delivery-classes-and-bundles" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.3 Delivery classes and bundles
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#54-caps-and-budget-shares" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.4 Caps and budget shares
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#55-inbound-routing" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.5 Inbound routing
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-addon-ui" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Addon UI
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Addon UI">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-tier-1-declarative-tabs-page-rendered" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.1 Tier 1: declarative tabs (page-rendered)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-tier-2-sandboxed-frame-contract-fixed-runner-may-follow" class="md-nav__link">
+    <span class="md-ellipsis">
+      6.2 Tier 2: sandboxed frame (contract fixed; runner may follow)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-addon-configuration-writes" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. Addon Configuration Writes
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-changes-to-adr-106" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. Changes to ADR-106
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-scope-and-phasing" class="md-nav__link">
+    <span class="md-ellipsis">
+      9. Scope and Phasing
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-consequences" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. Consequences
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Consequences">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#positive" class="md-nav__link">
+    <span class="md-ellipsis">
+      Positive
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#negative-trade-offs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Negative / Trade-offs
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      11. References
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="adr-107-addon-editor-extensions-shared-data-addon-tabs-and-protocol-negotiation">ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation<a class="headerlink" href="#adr-107-addon-editor-extensions-shared-data-addon-tabs-and-protocol-negotiation" title="Permanent link">&para;</a></h1>
+<p><strong>Status:</strong> Accepted (2026-10-05)
+<strong>Date:</strong> 2026-10-05
+<strong>Authors:</strong> RTP Core Team
+<strong>Extends:</strong> <a href="../ADR-106-shape-curve-helpers-and-signed-editor-channel/">ADR-106</a> (Signed Two-Way Editor Channel), <a href="../ADR-104-ephemeral-web-editor-and-packed-docs-integration/">ADR-104</a> (Ephemeral Web Editor), <a href="../ADR-057-platform-agnostic-addon-spi/">ADR-057</a> (Platform-Agnostic Addon SPI), <a href="../ADR-051-two-tier-api-extension-model/">ADR-051</a> (Two-Tier API Extension Model)
+<strong>Related REQs:</strong> S-004, S-005, S-006, S-007, REQ-RTP-F-013</p>
+<hr />
+<h2 id="1-context-and-problem-statement">1. Context and Problem Statement<a class="headerlink" href="#1-context-and-problem-statement" title="Permanent link">&para;</a></h2>
+<p>The web editor (<code>docs/editor/index.html</code>, hosted at <code>https://dailystruggle.github.io/RTP/editor/</code> and packaged into local exports) shows four hardcoded tabs: Visual Region Editor, Diagnostics &amp; Radar, Config &amp; Prefabs and Shipped Docs. Addons have no way to put their own data or their own tab in it. <code>LeafRTPActionAddon</code> is the first addon that needs one: its actions and physical trigger zones are configured in addon YAML and are best edited next to the region map.</p>
+<p>The in-game GUI addon already solves the same problem for menus. It never reads network heartbeats. It reads typed <code>rtp-api</code> objects (<code>RtpTarget</code>, <code>RtpTargetStatus</code> through <code>RTPAPI</code>), and core fills them from the network snapshot on its own schedule. The editor needs the same split: core owns the schedule and the transport, addons supply data and handle their own messages.</p>
+<p>The editor contract is harder to change later than ordinary API, for two reasons:
+- <strong>Version skew.</strong> The hosted page is deployed separately from the plugin, and local exports embed a copy of the page from the plugin's build. A page and a plugin of different versions meet in every session.
+- <strong>Frozen API.</strong> Once third-party addons compile against an editor API, its shape is frozen (ADR-051 contract tier).</p>
+<p>Five parts of the ADR-106 channel would break addons if extended after addons ship:
+1. <strong>Type names.</strong> <code>EditorChannel.TYPE</code> is <code>[a-z][a-z0-9_\-]{0,31}</code> with no namespace, so an addon type and a later core type can collide.
+2. <strong>Bundled pushes.</strong> On paced transports, only the fixed set <code>BUNDLED = {feed, curve, land, hazard-delta}</code> is bundled (<code>DROPPABLE</code> likewise), and the page's <code>CHANNEL_BUNDLED</code> drops every other bundle item as <code>bad bundle item</code>. ADR-106 section 5.3 says the page ignores other items; the page instead drops and logs them.
+3. <strong>No feature negotiation.</strong> The payload carries <code>"version": 1</code>, which names the payload format only. Nothing tells the page which protocol features the plugin supports.
+4. <strong>Where addon UI code runs.</strong> The page holds the trusted, non-extractable signing key, and <code>EditorChannelClient.send('apply', ...)</code> writes config. Any addon script in the page's origin could Hot-Apply anything.
+5. <strong>Write paths.</strong> Hot-Apply (<code>apply</code>) is the one audited write path with visible failures. The <code>files</code> map is built from core's config parsers only (<code>EditorSessionManager.collectCurrentConfigs</code>), so addon YAML can't use it.</p>
+<p>Handing addons the <code>EditorChannel</code> itself is not an option. It is a <code>final</code> class in <code>rtp-core</code> (<code>commands.editor.channel</code>). Its wiring (<code>EditorChannelWiring.register</code>) is package-private and registers four handlers (<code>focus</code>, <code>walkpath</code>, <code>curve-state</code>, <code>apply</code>). Publishing it would freeze the transport, the signing and the caps, and ADR-106 section 8 still plans binary frames and a self-hosted relay.</p>
+<hr />
+<h2 id="2-decision-drivers">2. Decision Drivers<a class="headerlink" href="#2-decision-drivers" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Contract now, UI later.</strong> Every part listed in section 1 shall be fixed in 3.3.0. Rendering richer addon UI may follow as additive changes.</li>
+<li><strong>Core owns the transport.</strong> Addons never sign, never see keys or channel ids, and never bypass the frame cap, the outbound budget or the pacing of ADR-106 section 5.5.</li>
+<li><strong>No addon code in the page origin.</strong> A crafted descriptor or a hostile addon shall not run script on the page origin or reach the signing key (extends ADR-106 driver "No page-origin code execution").</li>
+<li><strong>One write path.</strong> Addon config changes go through Hot-Apply with its validation, <code>.bak</code> copies, atomic writes and visible <code>apply_ack</code> errors (S-004).</li>
+<li><strong>Forward and backward compatible.</strong> An older page shall ignore what it doesn't know. A newer page shall detect what an older plugin lacks without guessing.</li>
+<li><strong>Isolation.</strong> An addon exception, slow call or oversized output shall not break the core feed, other extensions, or the session (DESIGN.md <em>Exception Isolation</em>).</li>
+<li><strong>Off the main thread (S-005).</strong> No extension callback runs on a main or region thread.</li>
+<li><strong>Fail closed (S-006).</strong> The registry throws <code>IllegalStateException</code> before core loads, like every <code>RTPHooks</code> registry.</li>
+</ul>
+<hr />
+<h2 id="3-considered-options">3. Considered Options<a class="headerlink" href="#3-considered-options" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>A. Publish <code>EditorChannel</code> / <code>register(type, handler)</code> to addons</strong></td>
+<td><em>Rejected:</em> freezes the transport, signing and caps in <code>rtp-api</code>; addon types share the core namespace; addons could flood the channel past the core feed.</td>
+</tr>
+<tr>
+<td><strong>B. Addon JavaScript loaded into the page origin</strong></td>
+<td><em>Rejected:</em> the script could sign <code>apply</code> with the trusted key and rewrite any config (section 1 item 4).</td>
+</tr>
+<tr>
+<td><strong>C. One relay channel per addon</strong></td>
+<td><em>Rejected:</em> bytesocks counts frames per IP across all channels (ADR-106 section 5.5); a second channel halves the core share.</td>
+</tr>
+<tr>
+<td><strong>D. Declarative tab descriptors rendered by the page</strong></td>
+<td><em>Accepted</em> as tier 1. Covers forms over addon YAML, tables, status, markdown and action buttons with no addon code in the page.</td>
+</tr>
+<tr>
+<td><strong>E. Addon script in a sandboxed opaque-origin iframe, talking over <code>postMessage</code></strong></td>
+<td><em>Accepted</em> as tier 2: the contract is fixed now, the runner may ship later. Same sandbox model as the curve helpers (ADR-106 section 4.5).</td>
+</tr>
+<tr>
+<td><strong>F. Extension types multiplexed over the existing channel, routed and budgeted by core</strong></td>
+<td><em>Accepted</em> (section 5).</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="4-public-api-rtp-api">4. Public API (<code>rtp-api</code>)<a class="headerlink" href="#4-public-api-rtp-api" title="Permanent link">&para;</a></h2>
+<h3 id="41-registry">4.1 Registry<a class="headerlink" href="#41-registry" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>RTPHooks</code> shall gain <code>default EditorExtensionRegistry editorExtensions()</code>, following <code>claimBoundaries()</code>: a default method, so other <code>RTPHooks</code> implementations stay binary compatible. <code>RTPAPI.hooks()</code> keeps throwing <code>IllegalStateException</code> before core loads (S-006).</li>
+<li><code>EditorExtensionRegistry</code> (<code>io.github.dailystruggle.rtp.api.hooks</code>, <code>@PublicApi</code>):</li>
+<li><code>void register(EditorExtension extension)</code>: throws <code>IllegalArgumentException</code> on an invalid or reserved id (section 5.1) and <code>IllegalStateException</code> when another extension holds that id.</li>
+<li><code>boolean unregister(String id)</code>.</li>
+<li><code>List&lt;EditorExtension&gt; registered()</code>: a snapshot in id order.</li>
+<li>Registration takes effect at the next <code>/rtp editor</code> session. A session's extension list is fixed when its snapshot is built. An extension unregistered during a session gets <code>sessionClosed</code> for that session, and its inbound types are dropped from then on.</li>
+<li>Addons register from <code>RTPAddon</code> enable (ADR-057) and unregister on disable. Core unregisters every extension on plugin disable.</li>
+</ul>
+<h3 id="42-extension-contract">4.2 Extension contract<a class="headerlink" href="#42-extension-contract" title="Permanent link">&para;</a></h3>
+<p>New package <code>io.github.dailystruggle.rtp.api.editor</code>, all <code>@PublicApi</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">public</span><span class="w"> </span><span class="kd">interface</span> <span class="nc">EditorExtension</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">String</span><span class="w"> </span><span class="nf">id</span><span class="p">();</span><span class="w">                                   </span><span class="c1">// section 5.1 grammar; stable across releases</span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="nf">version</span><span class="p">();</span><span class="w">                                 </span><span class="c1">// the addon&#39;s own descriptor/message version, &gt;= 1</span>
+<span class="w">    </span><span class="n">String</span><span class="w"> </span><span class="nf">displayName</span><span class="p">();</span><span class="w">                          </span><span class="c1">// plain text, shown in tab tooltips and errors</span>
+<span class="w">    </span><span class="k">default</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">EditorTab</span><span class="o">&gt;</span><span class="w"> </span><span class="nf">tabs</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">List</span><span class="p">.</span><span class="na">of</span><span class="p">();</span><span class="w"> </span><span class="p">}</span><span class="w">                 </span><span class="c1">// tier 1 descriptors (section 6.1)</span>
+<span class="w">    </span><span class="k">default</span><span class="w"> </span><span class="n">Map</span><span class="o">&lt;</span><span class="n">String</span><span class="p">,</span><span class="w"> </span><span class="n">EditorDelivery</span><span class="o">&gt;</span><span class="w"> </span><span class="nf">pushTypes</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">Map</span><span class="p">.</span><span class="na">of</span><span class="p">();</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="c1">// local type -&gt; delivery</span>
+<span class="w">    </span><span class="k">default</span><span class="w"> </span><span class="n">Set</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="nf">inboundTypes</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">Set</span><span class="p">.</span><span class="na">of</span><span class="p">();</span><span class="w"> </span><span class="p">}</span><span class="w">              </span><span class="c1">// local types the page may send</span>
+<span class="w">    </span><span class="k">default</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="nf">configFiles</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">List</span><span class="p">.</span><span class="na">of</span><span class="p">();</span><span class="w"> </span><span class="p">}</span><span class="w">             </span><span class="c1">// section 7</span>
+<span class="w">    </span><span class="k">default</span><span class="w"> </span><span class="n">EditorFrame</span><span class="w"> </span><span class="nf">frame</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w">                         </span><span class="c1">// tier 2 (section 6.2)</span>
+<span class="w">    </span><span class="k">default</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="nf">snapshotJson</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w">  </span><span class="c1">// JSON value under extensions[].snapshot</span>
+<span class="w">    </span><span class="k">default</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="nf">stateJson</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="kc">null</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w">     </span><span class="c1">// polled live state, pushed as &lt;id&gt;.state when changed</span>
+<span class="w">    </span><span class="k">default</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">onMessage</span><span class="p">(</span><span class="n">EditorMessage</span><span class="w"> </span><span class="n">message</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+<span class="w">    </span><span class="k">default</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">String</span><span class="o">&gt;</span><span class="w"> </span><span class="nf">validate</span><span class="p">(</span><span class="n">String</span><span class="w"> </span><span class="n">path</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">yaml</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">List</span><span class="p">.</span><span class="na">of</span><span class="p">();</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="c1">// errors block the apply</span>
+<span class="w">    </span><span class="k">default</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">applied</span><span class="p">(</span><span class="n">String</span><span class="w"> </span><span class="n">path</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+<span class="w">    </span><span class="k">default</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">sessionOpened</span><span class="p">(</span><span class="n">EditorSession</span><span class="w"> </span><span class="n">session</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+<span class="w">    </span><span class="k">default</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">sessionClosed</span><span class="p">(</span><span class="n">EditorSession</span><span class="w"> </span><span class="n">session</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+<span class="p">}</span>
+
+<span class="kd">public</span><span class="w"> </span><span class="kd">enum</span><span class="w"> </span><span class="n">EditorDelivery</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">LATEST</span><span class="p">,</span><span class="w"> </span><span class="n">ORDERED</span><span class="w"> </span><span class="p">}</span>
+
+<span class="kd">public</span><span class="w"> </span><span class="kd">interface</span> <span class="nc">EditorSession</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">String</span><span class="w"> </span><span class="nf">id</span><span class="p">();</span><span class="w">          </span><span class="c1">// opaque per-session id, not the channel id</span>
+<span class="w">    </span><span class="kt">boolean</span><span class="w"> </span><span class="nf">isOpen</span><span class="p">();</span>
+<span class="w">    </span><span class="kt">boolean</span><span class="w"> </span><span class="nf">push</span><span class="p">(</span><span class="n">String</span><span class="w"> </span><span class="n">localType</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">bodyJson</span><span class="p">);</span><span class="w">                     </span><span class="c1">// ORDERED, or LATEST keyed by type</span>
+<span class="w">    </span><span class="kt">boolean</span><span class="w"> </span><span class="nf">push</span><span class="p">(</span><span class="n">String</span><span class="w"> </span><span class="n">localType</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">coalesceKey</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">bodyJson</span><span class="p">);</span><span class="w"> </span><span class="c1">// LATEST keyed by type + key</span>
+<span class="p">}</span>
+
+<span class="kd">public</span><span class="w"> </span><span class="kd">interface</span> <span class="nc">EditorMessage</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">String</span><span class="w"> </span><span class="nf">type</span><span class="p">();</span><span class="w">                 </span><span class="c1">// local type, without the &quot;&lt;id&gt;.&quot; prefix</span>
+<span class="w">    </span><span class="n">Map</span><span class="o">&lt;</span><span class="n">String</span><span class="p">,</span><span class="w"> </span><span class="n">Object</span><span class="o">&gt;</span><span class="w"> </span><span class="nf">body</span><span class="p">();</span><span class="w">    </span><span class="c1">// parsed JSON object without header fields</span>
+<span class="w">    </span><span class="n">String</span><span class="w"> </span><span class="nf">sender</span><span class="p">();</span><span class="w">               </span><span class="c1">// browser key fingerprint (already trusted)</span>
+<span class="w">    </span><span class="n">EditorSession</span><span class="w"> </span><span class="nf">session</span><span class="p">();</span>
+<span class="w">    </span><span class="kt">boolean</span><span class="w"> </span><span class="nf">reply</span><span class="p">(</span><span class="n">String</span><span class="w"> </span><span class="n">localType</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">bodyJson</span><span class="p">);</span>
+<span class="p">}</span>
+
+<span class="kd">public</span><span class="w"> </span><span class="kd">record</span> <span class="nc">EditorTab</span><span class="p">(</span><span class="n">String</span><span class="w"> </span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">title</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">icon</span><span class="p">,</span><span class="w"> </span><span class="n">List</span><span class="o">&lt;</span><span class="n">EditorWidget</span><span class="o">&gt;</span><span class="w"> </span><span class="n">widgets</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+<span class="kd">public</span><span class="w"> </span><span class="kd">record</span> <span class="nc">EditorWidget</span><span class="p">(</span><span class="n">String</span><span class="w"> </span><span class="n">kind</span><span class="p">,</span><span class="w"> </span><span class="n">Map</span><span class="o">&lt;</span><span class="n">String</span><span class="p">,</span><span class="w"> </span><span class="n">Object</span><span class="o">&gt;</span><span class="w"> </span><span class="n">props</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+<span class="kd">public</span><span class="w"> </span><span class="kd">record</span> <span class="nc">EditorFrame</span><span class="p">(</span><span class="n">String</span><span class="w"> </span><span class="n">resource</span><span class="p">,</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="n">sha256</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span>
+</code></pre></div>
+<ul>
+<li><code>bodyJson</code> and the <code>*Json()</code> returns are JSON texts. Core parses them with <code>EditorLoopbackJson</code>, and a value that doesn't parse is refused and logged (S-004).</li>
+<li><code>push</code> and <code>reply</code> return <code>false</code> when the session is closed, the type isn't declared, the body is over a cap or the budget refuses it (section 5.4). The caller decides whether to retry. Core logs every refusal, rate-limited per extension and reason.</li>
+<li><code>EditorWidget.props</code> values are JSON values only: <code>String</code>, <code>Number</code>, <code>Boolean</code>, <code>List</code>, <code>Map</code> and <code>null</code>. Records keep the Java surface small, while the widget catalog grows through <code>kind</code> strings (section 6.1) instead of new Java types.</li>
+</ul>
+<h3 id="43-threading-s-005">4.3 Threading (S-005)<a class="headerlink" href="#43-threading-s-005" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Callback</th>
+<th>Thread</th>
+<th>Budget</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>snapshotJson</code>, <code>tabs</code>, <code>configFiles</code>, descriptor getters</td>
+<td>the async payload build of <code>/rtp editor</code></td>
+<td>logged when over 50 ms</td>
+</tr>
+<tr>
+<td><code>stateJson</code></td>
+<td>the <code>EditorLiveFeed</code> async tick, at most once per tick per extension</td>
+<td>logged when over 5 ms</td>
+</tr>
+<tr>
+<td><code>onMessage</code>, <code>sessionOpened</code>, <code>sessionClosed</code></td>
+<td>the channel's transport thread</td>
+<td>must not block; logged when over 5 ms</td>
+</tr>
+<tr>
+<td><code>validate</code>, <code>applied</code></td>
+<td>the Hot-Apply pipeline thread, off the main thread</td>
+<td><code>validate</code> logged when over 50 ms</td>
+</tr>
+</tbody>
+</table>
+<p>No callback runs on a main or region thread. An extension that needs world or player access schedules that work through <code>RTP.scheduler</code> (ADR-054) and answers later with <code>push</code> or <code>reply</code>. Every call is wrapped: a thrown exception is logged (rate-limited to one line per extension per minute) and never reaches core. Three failures in one session mark the extension <code>failed</code> for that session: its tabs show the failure, its types are dropped, and core keeps running.</p>
+<hr />
+<h2 id="5-wire-protocol-extends-adr-106-section-5">5. Wire Protocol (extends ADR-106 section 5)<a class="headerlink" href="#5-wire-protocol-extends-adr-106-section-5" title="Permanent link">&para;</a></h2>
+<h3 id="51-type-namespace">5.1 Type namespace<a class="headerlink" href="#51-type-namespace" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Core types keep the grammar <code>[a-z][a-z0-9_\-]{0,31}</code> and are reserved to core: core may add any undotted type in any release.</li>
+<li>Extension types are <code>&lt;id&gt;.&lt;local&gt;</code>:</li>
+<li><code>id</code>: <code>[a-z][a-z0-9\-]{1,23}</code>;</li>
+<li><code>local</code>: <code>[a-z][a-z0-9_\-]{0,31}</code>;</li>
+<li>so a full type is at most 56 characters. The channel's <code>TYPE</code> pattern becomes <code>[a-z][a-z0-9_\-]{0,31}(\.[a-z][a-z0-9_\-]{0,31})?</code>, with the id part checked against the id grammar.</li>
+<li>Reserved ids: <code>rtp</code>, <code>core</code>, <code>editor</code>, <code>bundle</code>, <code>ext</code>, <code>sys</code>.</li>
+<li>The local type <code>state</code> is reserved for core's <code>stateJson()</code> pushes, and <code>error</code> for core's error replies.</li>
+<li>Addons pass local types only. Core adds and strips the prefix, so an extension can never send or receive another extension's or core's types.</li>
+</ul>
+<h3 id="52-negotiation">5.2 Negotiation<a class="headerlink" href="#52-negotiation" title="Permanent link">&para;</a></h3>
+<p>The snapshot (<code>EditorSessionManager.createPayloadJson</code>) shall gain two top-level members. <code>"version": 1</code> stays and still names the payload format.</p>
+<div class="highlight"><pre><span></span><code><span class="nt">&quot;protocol&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;channel&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;extensions&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">},</span>
+<span class="nt">&quot;extensions&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">  </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;leafrtp-action&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Actions&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;tabs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;triggers&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;title&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Action Triggers&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;icon&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;⚡&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;widgets&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="err">...</span><span class="w"> </span><span class="p">]</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;push&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nt">&quot;state&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;latest&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;zones&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;latest&quot;</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;log&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ordered&quot;</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;inbound&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="s2">&quot;run&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;refresh&quot;</span><span class="w"> </span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;files&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w"> </span><span class="s2">&quot;addons/LeafRTPActionAddon/actions.yml&quot;</span><span class="w"> </span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;frame&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;snapshot&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="err">...</span><span class="w"> </span><span class="p">},</span>
+<span class="w">    </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">]</span>
+</code></pre></div>
+<ul>
+<li><code>protocol.channel</code>: 1 is ADR-106 as shipped, and 2 adds sections 5.1, 5.3 and 5.4. <code>protocol.extensions</code>: the version of this ADR's descriptor format (sections 6 and 7). A missing <code>protocol</code> means <code>{channel: 1, extensions: 0}</code>.</li>
+<li><code>extensions</code> is in id order. An extension whose descriptor fails validation, or whose snapshot is over its cap, is listed with only <code>id</code>, <code>version</code>, <code>name</code> and <code>error</code> (<code>descriptor-invalid</code>, <code>snapshot-cap</code>, <code>failed</code>). The page shows that error in place of the tab, and the plugin logs it.</li>
+<li><code>hello-reply</code> with <code>state: "trusted"</code> shall repeat <code>protocol</code> and carry <code>extensions: [{id, version}]</code>, so a page that reconnects after a plugin reload notices a changed set and offers to reload the session.</li>
+<li><strong>Rules for older and newer peers:</strong> a page ignores unknown top-level members, unknown descriptor fields and unknown widget kinds (section 6.1). A plugin answers an inbound type it doesn't know with the ADR-106 drop, which is unchanged. A page shall not send extension types to a plugin with <code>protocol.channel &lt; 2</code>.</li>
+</ul>
+<h3 id="53-delivery-classes-and-bundles">5.3 Delivery classes and bundles<a class="headerlink" href="#53-delivery-classes-and-bundles" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Delivery becomes a per-type attribute instead of the fixed <code>BUNDLED</code> / <code>DROPPABLE</code> sets:</li>
+<li><strong>reply</strong>: every message sent with <code>to</code>. Ordered, never dropped, only delayed (ADR-106 section 5.5).</li>
+<li><strong>latest</strong>: a broadcast push that the next push with the same coalescing key replaces. It may be dropped over budget. Core's <code>feed</code>, <code>curve</code> (keyed by region) and <code>land</code> map here.</li>
+<li><strong>ordered</strong>: a broadcast push held in order and never coalesced. Over budget or backlog it is refused and the producer is told (<code>push</code> returns <code>false</code>). Core's <code>hazard-delta</code> maps here.</li>
+<li>Extension pushes take their class from <code>pushTypes()</code>. <code>&lt;id&gt;.state</code> is always <code>latest</code>.</li>
+<li>Every <code>latest</code> and <code>ordered</code> push is bundle-eligible on paced transports.</li>
+<li><strong>Page rule (changes ADR-106 section 5.3):</strong> the page shall dispatch every bundle item that has a registered handler, and shall ignore an item with a well-formed type and no handler, counting it without logging a drop. Only malformed items (not an object, or no valid type) are dropped as <code>bad bundle item</code>. The page shall apply the same rule to unbundled frames, so frames that arrive alone or in bundles behave the same.</li>
+</ul>
+<h3 id="54-caps-and-budget-shares">5.4 Caps and budget shares<a class="headerlink" href="#54-caps-and-budget-shares" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The frame cap (32 KiB) and session budget (2 MiB/min) of ADR-106 section 5.5 apply unchanged. Extension traffic counts against them.</li>
+<li><strong>Per-extension share:</strong> an extension's outbound bytes are capped at 256 KiB per minute. All extensions together are capped at 25 % of the session budget (512 KiB/min).</li>
+<li><strong>Paced channels:</strong> extension pushes may take at most 2 frames of each pacing window and hold at most 8 KiB of backlog per extension.</li>
+<li><strong>Priority order when over budget:</strong> extension <code>latest</code>, then extension <code>ordered</code>, then core <code>land</code>, then core <code>hazard-delta</code>. Replies and <code>curve</code> are never dropped (ADR-106).</li>
+<li>Snapshot caps: 64 KiB per extension <code>snapshot</code>, 16 KiB per extension descriptor without the snapshot, and 256 KiB for the whole <code>extensions</code> member. <code>stateJson()</code> results over 16 KiB are refused.</li>
+<li>No bytebin hand-off for extension traffic in protocol 2. An oversized extension message is refused and logged (S-004).</li>
+</ul>
+<h3 id="55-inbound-routing">5.5 Inbound routing<a class="headerlink" href="#55-inbound-routing" title="Permanent link">&para;</a></h3>
+<ul>
+<li>A page message <code>&lt;id&gt;.&lt;local&gt;</code> is accepted only under the existing ADR-106 rules (trusted key, valid signature, live challenge, higher <code>seq</code>) and only when <code>local</code> is in that extension's <code>inboundTypes()</code>. Anything else is dropped with the ADR-106 drop log.</li>
+<li>Inbound extension messages are limited to 20 per second per extension per session. Excess messages are dropped, logged, and answered with <code>&lt;id&gt;.error {reason: "rate"}</code>.</li>
+<li>Core strips header fields before <code>onMessage</code> and passes the sender's fingerprint as <code>sender</code>. Trust is session-wide: a trusted browser may use every extension. Per-extension permissions are deferred (section 9).</li>
+</ul>
+<hr />
+<h2 id="6-addon-ui">6. Addon UI<a class="headerlink" href="#6-addon-ui" title="Permanent link">&para;</a></h2>
+<h3 id="61-tier-1-declarative-tabs-page-rendered">6.1 Tier 1: declarative tabs (page-rendered)<a class="headerlink" href="#61-tier-1-declarative-tabs-page-rendered" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Extension tabs follow the core tabs in <code>nav-tabs</code>, with DOM id <code>ext-&lt;extensionId&gt;-&lt;tabId&gt;</code> (tab ids use the extension id grammar). The page renders every widget itself: text is set as text, and <code>markdown</code> goes through the page's existing sanitising renderer.</li>
+<li>Descriptors carry no HTML, no script and no styles. Colours are chosen from the page's palette tokens by name. Links are <code>https:</code> only and open with <code>noopener</code>.</li>
+<li>Widget kinds for <code>protocol.extensions = 1</code>:</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Props</th>
+<th>Binding</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>markdown</code></td>
+<td><code>text</code></td>
+<td>static</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td><code>label</code>, <code>source</code>, <code>levels</code></td>
+<td><code>source</code></td>
+</tr>
+<tr>
+<td><code>keyValue</code></td>
+<td><code>source</code>, <code>labels?</code></td>
+<td><code>source</code></td>
+</tr>
+<tr>
+<td><code>table</code></td>
+<td><code>source</code>, <code>columns: [{key, title, format?}]</code>, <code>rowAction?</code></td>
+<td><code>source</code></td>
+</tr>
+<tr>
+<td><code>form</code></td>
+<td><code>file</code>, <code>fields: [{path, title, kind, options?, description?}]</code></td>
+<td><code>file</code> (section 7)</td>
+</tr>
+<tr>
+<td><code>button</code></td>
+<td><code>label</code>, <code>send: local type</code>, <code>body?</code>, <code>confirm?</code></td>
+<td>sends <code>&lt;id&gt;.&lt;send&gt;</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><code>source</code> is <code>snapshot:&lt;JSON Pointer&gt;</code> or <code>state:&lt;JSON Pointer&gt;</code> (RFC 6901). The newest <code>&lt;id&gt;.state</code> push replaces the <code>state</code> root, and a missing state shows the widget's empty state.</li>
+<li>Prop details:</li>
+<li><code>status.levels</code> maps a value (as text) to a palette name: <code>green</code>, <code>yellow</code>, <code>red</code>, <code>blue</code>, <code>accent</code>, <code>mauve</code>, <code>teal</code>, <code>text</code>, <code>subtext</code>.</li>
+<li><code>table.columns[].format</code>: <code>text</code> (default), <code>number</code>, <code>percent</code> (a 0..1 fraction), <code>time</code> (epoch ms) or <code>bool</code>. A table shows at most 500 rows and 16 columns.</li>
+<li><code>table.rowAction</code>: <code>{label, send, keys?, confirm?}</code>. It sends <code>&lt;id&gt;.&lt;send&gt;</code> with body <code>{row: {...}}</code>, holding the row's scalar cells for <code>keys</code> (default: the column keys).</li>
+<li><code>button.body</code> must be a JSON object; <code>confirm</code> is a plain-text question asked before sending.</li>
+<li><code>form.fields[].path</code> is a dotted key path of at most 8 plain keys (<code>[A-Za-z0-9_-]</code>). An edit is checked against its kind, then written into the staged file text in place, keeping comments and other keys. Missing parents are created; an existing block is never replaced by a scalar.</li>
+<li>The page sends <code>button</code> / <code>rowAction</code> messages only when the type is in the extension's <code>inbound</code>, the link is trusted and <code>protocol.channel &gt;= 2</code>, and the extension has not failed. A form only edits files in the extension's <code>files</code>.</li>
+<li>An extension listed with <code>error</code> gets one tab named after it that shows the reason. When a trusted <code>hello-reply</code> carries a different extension set (ids or versions) than the snapshot, every extension tab shows a notice to reopen the editor.</li>
+<li><code>form</code> field kinds reuse the ADR-106 section 4.3 settings form: <code>distance</code>, <code>integer</code>, <code>number</code>, <code>boolean</code>, <code>enum</code>, plus <code>string</code>.</li>
+<li><strong>Reserved kinds</strong> (later releases, additive): <code>mapOverlay</code> (zones and markers drawn on the region map, with drag-to-draw producing a staged YAML edit) and <code>chart</code>.</li>
+<li>An unknown <code>kind</code> is rendered as a placeholder ("needs a newer editor"), never as an error, so a newer addon still works on an older page.</li>
+</ul>
+<h3 id="62-tier-2-sandboxed-frame-contract-fixed-runner-may-follow">6.2 Tier 2: sandboxed frame (contract fixed; runner may follow)<a class="headerlink" href="#62-tier-2-sandboxed-frame-contract-fixed-runner-may-follow" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>EditorFrame.resource</code> names a classpath resource in the addon jar of at most 64 KiB. Core sends it once per snapshot, with its lowercase hex SHA-256, under <code>extensions[].frame: {sha256, js}</code>. The page refuses a source whose hash differs.</li>
+<li>It runs only in an <code>&lt;iframe sandbox="allow-scripts"&gt;</code> with an opaque origin and the CSP of the curve-helper sandbox (ADR-106 section 4.5). It never runs in the page origin.</li>
+<li><strong><code>postMessage</code> API, frame to page:</strong></li>
+<li><code>{op: "send", type, body}</code>: forwarded as <code>&lt;id&gt;.&lt;type&gt;</code> only when <code>type</code> is in <code>inbound</code>;</li>
+<li><code>{op: "stage", path, text}</code>: stages an edit to a file in this extension's <code>files</code> only;</li>
+<li><code>{op: "resize", height}</code>.</li>
+<li><strong>Page to frame:</strong> <code>{op: "init", snapshot, state, files}</code> (this extension's own data only), <code>{op: "push", type, body}</code> for this extension's types, and <code>{op: "staged", path, ok, error?}</code>.</li>
+<li>The frame never receives keys, the channel id, the relay URL, other extensions' data or core data beyond its own descriptor. It can't trigger <code>apply</code>: staged edits wait for the operator's Hot-Apply in the page.</li>
+<li>A frame that throws, times out on <code>init</code> (5 s) or sends a malformed message is torn down and its tab shows the reason.</li>
+</ul>
+<hr />
+<h2 id="7-addon-configuration-writes">7. Addon Configuration Writes<a class="headerlink" href="#7-addon-configuration-writes" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>configFiles()</code> lists paths relative to the plugin data folder. Each shall:</li>
+<li>normalise inside the data folder (no absolute paths, no <code>..</code>, no symlink escape when resolved);</li>
+<li>end in <code>.yml</code> or <code>.yaml</code>;</li>
+<li>not name a core config file: no file in the plugin folder root, nothing under <code>regions/</code>, <code>worlds/</code>, <code>advanced/</code>, <code>definitions/</code>, <code>lang/</code> or <code>schematics/</code>, and no hidden (<code>.</code>) path segment. Addon files normally live under <code>addons/&lt;Addon&gt;/</code>.
+  Invalid paths are rejected at registration and logged. When two extensions declare one path, the first in id order owns it and the later claim is logged and ignored.</li>
+<li><code>collectCurrentConfigs</code> adds the declared files, read off the main thread, to the session <code>files</code> map. Their contents count toward the existing payload limits.</li>
+<li>The Hot-Apply pipeline (<code>EditorLoopbackApply.handleAuthorized</code> -&gt; <code>EditorSessionManager.applyPayload</code>) accepts a declared file and handles it like a core file:</li>
+<li>structural YAML checks, then the symlink check, then the owning extension's <code>validate(path, yaml)</code>;</li>
+<li>any returned error, or a <code>validate</code> that throws, fails the whole apply, with every message (prefixed <code>&lt;path&gt; (&lt;id&gt;):</code>) in <code>apply_ack</code> (S-004);</li>
+<li>then the <code>.bak</code> copy and the atomic write, then <code>applied(path)</code> for the owning extension, before core's own reload. A throwing <code>applied</code> is logged and does not undo the write.
+  Core does not reload addon config: <code>applied</code> is the addon's signal to reload.</li>
+<li>No other write path exists for extensions. An <code>onMessage</code> handler may change addon state, but changes to files on disk shall go through Hot-Apply. This keeps one audited write path.</li>
+</ul>
+<hr />
+<h2 id="8-changes-to-adr-106">8. Changes to ADR-106<a class="headerlink" href="#8-changes-to-adr-106" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Section 5.1:</strong> the type grammar gains the dotted extension namespace of section 5.1 here.</li>
+<li><strong>Section 5.2:</strong> <code>hello-reply {state: "trusted"}</code> carries <code>protocol</code> and <code>extensions: [{id, version}]</code>.</li>
+<li><strong>Section 5.3:</strong> the <code>bundle</code> row's "ignores any other item type" is made normative as section 5.3 here, and applies to unbundled frames too. Delivery classes replace the fixed <code>BUNDLED</code> / <code>DROPPABLE</code> sets.</li>
+<li><strong>Section 5.5:</strong> extension shares and the priority order of section 5.4 here.</li>
+<li><strong>Section 8:</strong> addon editor tabs and data are decided here, not deferred.</li>
+</ul>
+<hr />
+<h2 id="9-scope-and-phasing">9. Scope and Phasing<a class="headerlink" href="#9-scope-and-phasing" title="Permanent link">&para;</a></h2>
+<p><strong>3.3.0 (contract; breaking later if skipped):</strong>
+- the <code>rtp-api</code> interfaces of section 4 and <code>RTPHooks.editorExtensions()</code>;
+- the type namespace, delivery classes, budget shares and inbound routing in <code>EditorChannel</code> / <code>EditorChannelWiring</code>;
+- <code>protocol</code> and <code>extensions</code> in the snapshot and <code>hello-reply</code>;
+- the tolerant bundle and frame dispatch in the page;
+- addon <code>files</code> through Hot-Apply;
+- tier 1 rendering of <code>markdown</code>, <code>status</code>, <code>keyValue</code>, <code>table</code>, <code>button</code> and <code>form</code>;
+- in-memory transport tests covering namespacing, routing, budgets, the old-page/new-plugin and new-page/old-plugin cases, and the isolation of a throwing extension.</p>
+<p><strong>Later (additive under <code>protocol.extensions</code> bumps):</strong>
+- the tier 2 frame runner;
+- <code>mapOverlay</code> with drag-to-draw trigger zones and <code>chart</code>;
+- per-extension permissions beyond key trust;
+- bytebin hand-off for extension messages;
+- the first consumer tab in <code>LeafRTPActionAddon</code>.</p>
+<hr />
+<h2 id="10-consequences">10. Consequences<a class="headerlink" href="#10-consequences" title="Permanent link">&para;</a></h2>
+<h3 id="positive">Positive<a class="headerlink" href="#positive" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Addons get editor tabs and live data the way the GUI addon gets typed API objects: core keeps the schedule, the transport and the limits.</li>
+<li>Core's protocol stays free to change (binary frames, a self-hosted relay) behind a small, stable addon surface.</li>
+<li>Older and newer pages and plugins tell each other what they support instead of guessing, and unknown things degrade to placeholders, not errors.</li>
+<li>No addon code runs in the page origin. The signing key and Hot-Apply stay under the page's control.</li>
+<li>Addon config gets the same validation, backups and visible failures as core config.</li>
+</ul>
+<h3 id="negative-trade-offs">Negative / Trade-offs<a class="headerlink" href="#negative-trade-offs" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Tier 1 widgets can't express every UI an addon wants until tier 2 or new kinds ship.</li>
+<li>Extension traffic shares one relay budget with the core feed. The fixed shares can feel tight for chatty addons.</li>
+<li>Trust is all-or-nothing per browser key until per-extension permissions exist.</li>
+<li>More protocol surface to test: version-skew cases and per-extension caps need explicit tests.</li>
+</ul>
+<hr />
+<h2 id="11-references">11. References<a class="headerlink" href="#11-references" title="Permanent link">&para;</a></h2>
+<ul>
+<li><code>EditorChannel</code>, <code>ChannelTransport</code>, <code>BytesocksTransport</code> (<code>rtp-core/.../commands/editor/channel/</code>).</li>
+<li><code>EditorChannelWiring</code>, <code>EditorSessionManager.createPayloadJson</code> / <code>collectCurrentConfigs</code>, <code>EditorLiveFeed</code>, <code>EditorLoopbackApply</code> (<code>rtp-core/.../commands/editor/</code>).</li>
+<li><code>RTPHooks</code>, <code>RootActionRegistry</code>, <code>ClaimBoundaryRegistry</code> (<code>rtp-api/.../api/hooks/</code>).</li>
+<li><code>docs/editor/index.html</code> (<code>EditorChannelClient</code>, <code>CHANNEL_BUNDLED</code>, <code>nav-tabs</code>).</li>
+<li><a href="../../dev/DESIGN/">DESIGN.md</a> section <em>Web Editor Extensions</em>.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      LeafRTP v3.3.0
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

@@ -3040,7 +3040,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3414,6 +3414,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3624,6 +3645,48 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3771,6 +3834,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Extensibility and API Boundaries">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#web-editor-extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Web Editor Extensions
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3897,7 +3975,7 @@
 <td><strong>Backlog (binned)</strong> <em>(implemented, <a href="../../adr/ADR-028-l3-backlog-cache/">ADR-028</a>)</em></td>
 <td><code>backlogLocations</code> (<code>BacklogLocationBuffer</code>, nullable)</td>
 <td><strong>Unverified</strong> spiral picks with a tri-state per-entry <code>Validity</code> (<code>UNVERIFIED</code> / <code>VALIDATED</code> / <code>INVALIDATED</code>); head-blocking FIFO</td>
-<td>None on the backlog itself; verification is region-prefilter only (Anvil <code>.mca</code> / Linear <code>.linear</code>, <a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a>, <a href="../../adr/ADR-077-multi-format-region-support/">ADR-077</a>)</td>
+<td>None on the backlog itself; verification is region-prefilter only (Anvil <code>.mca</code> or an addon-registered format, <a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a>, <a href="../../adr/ADR-077-multi-format-region-support/">ADR-077</a>)</td>
 <td><code>backlogCacheCap</code> (default <code>1000</code>; lite default <code>0</code> ⇒ disabled)</td>
 <td>No</td>
 </tr>
@@ -3906,13 +3984,13 @@
 <p>Refill / promotion flow:</p>
 <div class="highlight"><pre><span></span><code>shape pick ─▶ backlog ─(region-verified, in-order)─▶ cold (unkept) ─▶ hot (kept) ─▶ /rtp
                      ▲ refill (pure math, no chunk I/O)
-                     │ verify: one bin (32×32 chunks = one .mca/.linear) per Region.execute() pulse
+                     │ verify: one bin (32×32 chunks = one region file) per Region.execute() pulse
 </code></pre></div>
 <p>Backlog design invariants (<a href="../../adr/ADR-028-l3-backlog-cache/">ADR-028</a>, which keeps its historical <code>L3</code> title as the record of the decision):</p>
 <ul>
 <li><strong>Order preservation.</strong> Entries are inserted in spiral-selection order and never reordered. The promotion contract to the cold stage is <em>head-only, contiguous-verified</em>: an unverified entry at the backlog head blocks all later entries from advancing, even if those later entries have already been anvil-verified. This preserves the spatial-distribution semantics established by the Archimedean spiral mapping (<a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>).</li>
-<li><strong>One bin per pulse.</strong> Each <code>Region.execute()</code> pulse picks the bin (region file = 32 × 32 chunks; <code>.linear</code> or <code>.mca</code> per <a href="../../adr/ADR-077-multi-format-region-support/">ADR-077</a>) containing the <em>oldest</em> unverified backlog entry, runs the region pre-filter for every backlog entry whose chunk lies inside that bin, and marks each entry's <code>verified</code> flag. This bounds per-pulse work (count-bound on Folia per <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/">ADR-015</a>) and amortizes the single region-file read across all in-bin candidates.</li>
-<li><strong>Anvil/Linear-only verification.</strong> Backlog verification is a cheap <em>rejection filter</em> - prefilter passes still face the full pipeline (chunk load + vert + biome + safety) at cold -&gt; hot promotion. Prefilter rejects are dropped without chunk I/O, DB row, or chunk reservation. On platforms / worlds where the region pre-filter is unavailable (e.g. unflushed region files, custom generators, Fabric pre-stabilization), backlog entries fall through as "verified by default" so the backlog never stalls a freshly generated world.</li>
+<li><strong>One bin per pulse.</strong> Each <code>Region.execute()</code> pulse picks the bin (region file = 32 × 32 chunks; <code>.mca</code> or an addon-registered format per <a href="../../adr/ADR-077-multi-format-region-support/">ADR-077</a>) containing the <em>oldest</em> unverified backlog entry, runs the region pre-filter for every backlog entry whose chunk lies inside that bin, and marks each entry's <code>verified</code> flag. This bounds per-pulse work (count-bound on Folia per <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/">ADR-015</a>) and amortizes the single region-file read across all in-bin candidates.</li>
+<li><strong>Region-prefilter-only verification.</strong> Backlog verification is a cheap <em>rejection filter</em> - prefilter passes still face the full pipeline (chunk load + vert + biome + safety) at cold -&gt; hot promotion. Prefilter rejects are dropped without chunk I/O, DB row, or chunk reservation. On platforms / worlds where the region pre-filter is unavailable (e.g. unflushed region files, region files in an unregistered format such as <code>.linear</code>, custom generators, Fabric pre-stabilization), backlog entries fall through as "verified by default" so the backlog never stalls a freshly generated world.</li>
 <li><strong>No DB persistence.</strong> Unverified entries are not written through <code>installDatabaseCallbacks</code>; spiral re-selection after restart is cheap and avoids a "tentative row" schema delta.</li>
 <li><strong>Default-off in lite.</strong> The <code>rtp-lite</code> assembly (<a href="../../adr/ADR-024-rtp-lite-assembly-variant/">ADR-024</a>) ships with the key omitted; runtime default <code>0</code> keeps the trimmed memory profile. The full assembly defaults to <code>1000</code>, sized well above <code>cacheCap</code> so binning yields meaningful amortization.</li>
 </ul>
@@ -3950,6 +4028,57 @@
 <h2 id="extensibility-and-api-boundaries">Extensibility and API Boundaries<a class="headerlink" href="#extensibility-and-api-boundaries" title="Permanent link">&para;</a></h2>
 <p>The <code>rtp-api</code> module provides a strict, defined interface for external integrations:
 - <strong>Safe Extensibility</strong>: Developers can inject custom <code>Shape</code> algorithms or claim-plugin validations (e.g., GriefPrevention) via the API without modifying or compromising the reliability guarantees of the <code>rtp-core</code> module.</p>
+<h3 id="web-editor-extensions">Web Editor Extensions<a class="headerlink" href="#web-editor-extensions" title="Permanent link">&para;</a></h3>
+<p>Addons contribute data, message handlers and tabs to the web editor through <code>RTPAPI.hooks().editorExtensions()</code> (<a href="../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/">ADR-107</a>, extending <a href="../../adr/ADR-106-shape-curve-helpers-and-signed-editor-channel/">ADR-106</a>). This follows the GUI-addon pattern: the GUI reads typed <code>rtp-api</code> objects that core fills from the network snapshot, and never reads heartbeats. In the same way, an editor extension supplies values, and core decides when and how they travel.</p>
+<p>Ownership split:</p>
+<table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Owner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Transport, envelope, signing, trust, challenge / <code>seq</code> checks</td>
+<td>core (<code>EditorChannel</code>, never published)</td>
+</tr>
+<tr>
+<td>Schedule: snapshot build, live-state polling, push pacing, bundles</td>
+<td>core (<code>EditorSessionManager</code>, <code>EditorLiveFeed</code>)</td>
+</tr>
+<tr>
+<td>Type prefixing (<code>&lt;id&gt;.&lt;type&gt;</code>), routing, inbound rate limit</td>
+<td>core (<code>EditorChannelWiring</code>)</td>
+</tr>
+<tr>
+<td>Budget shares and drop priority</td>
+<td>core</td>
+</tr>
+<tr>
+<td>Snapshot data, live state, tab descriptors, message handling</td>
+<td>extension (<code>EditorExtension</code>)</td>
+</tr>
+<tr>
+<td>Addon YAML validation and reload after Hot-Apply</td>
+<td>extension (<code>validate</code>, <code>applied</code>)</td>
+</tr>
+<tr>
+<td>Rendering of tier 1 widgets; sandbox for tier 2 frames</td>
+<td>page (<code>docs/editor/index.html</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Invariants:
+- <strong>Namespace.</strong> Undotted types belong to core in every release. Extension types are <code>&lt;id&gt;.&lt;local&gt;</code>, and core adds and strips the prefix, so an extension can't send or receive another extension's or core's types.
+- <strong>Negotiation.</strong> The snapshot carries <code>protocol {channel, extensions}</code> and an <code>extensions[]</code> descriptor list, and <code>hello-reply</code> repeats them. Each peer ignores what it doesn't know: unknown members, unknown descriptor fields, unknown widget kinds as placeholders, and well-formed bundle items or frames with no handler, ignored without a drop. Neither side infers features from <code>pluginVersion</code>.
+- <strong>Delivery.</strong> Every message is <code>reply</code>, <code>latest</code> (coalesced, droppable) or <code>ordered</code> (held in order, refused when full). Pacing and bundling read the class, not a fixed type list.
+- <strong>Budget.</strong> Extension traffic counts against the session budget (2 MiB/min). It is also capped per extension (256 KiB/min) and for all extensions together (25 % of the budget), and it is dropped before core <code>land</code> / <code>hazard-delta</code>. Replies and <code>curve</code> are never dropped.
+- <strong>Threading (S-005).</strong> Snapshot and descriptor getters run on the async payload build. <code>stateJson()</code> runs on the feed's async tick. <code>onMessage</code> runs on the transport thread and must not block. <code>validate</code> / <code>applied</code> run on the Hot-Apply pipeline. None runs on a main or region thread. Work that needs the world is scheduled through <code>RTP.scheduler</code>.
+- <strong>Isolation.</strong> Every extension call is wrapped. An exception or an oversized result is logged, rate-limited to one line per extension per minute, and refused. Three failures mark the extension <code>failed</code> for that session, and core and other extensions carry on.
+- <strong>No page-origin code.</strong> Tier 1 descriptors are data rendered by the page as text and sanitised markdown. Tier 2 code runs only in an opaque-origin sandboxed iframe, checked by SHA-256 and reached over <code>postMessage</code>. It sees only its own extension's data, and it can stage but never apply.
+- <strong>One write path (S-004).</strong> Addon YAML listed in <code>configFiles()</code> joins the session <code>files</code> map and goes through Hot-Apply only: path checks, structural checks, then <code>validate</code>, <code>.bak</code>, atomic write and <code>applied</code>. Errors return in <code>apply_ack</code>.
+- <strong>Fail closed (S-006).</strong> The registry throws <code>IllegalStateException</code> before core loads. A session's extension list is fixed when its snapshot is built.</p>
 <h2 id="platform-adapter-design-details">Platform Adapter Design Details<a class="headerlink" href="#platform-adapter-design-details" title="Permanent link">&para;</a></h2>
 <h3 id="rtp-core-implementation-notes">rtp-core Implementation Notes<a class="headerlink" href="#rtp-core-implementation-notes" title="Permanent link">&para;</a></h3>
 <ul>

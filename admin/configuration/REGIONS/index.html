@@ -1045,6 +1045,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#spacing-repeats-and-worst-case-by-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Spacing, repeats and worst case by mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#shape-engines-and-parameters" class="md-nav__link">
     <span class="md-ellipsis">
       Shape Engines and Parameters
@@ -3379,7 +3388,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3753,6 +3762,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3963,6 +3993,48 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4093,6 +4165,15 @@
   <a href="#common-shape-keys" class="md-nav__link">
     <span class="md-ellipsis">
       Common Shape Keys
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#spacing-repeats-and-worst-case-by-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Spacing, repeats and worst case by mode
     </span>
   </a>
   
@@ -4432,7 +4513,7 @@ However, RTP supports <strong>spatial unit suffixes</strong> on any distance par
 <li><code>c</code>, <code>chunk</code>, <code>chunks</code>: Chunks (1 chunk = 16 blocks). E.g. <code>radius: 256c</code> (4,096 blocks).</li>
 <li><code>b</code>, <code>block</code>, <code>blocks</code>: Minecraft blocks (1 block = 1 meter). E.g. <code>radius: 4096b</code> (256 chunks).</li>
 <li><code>nb</code>, <code>netherblock</code>, <code>netherblocks</code>: Nether coordinate blocks (8 Overworld blocks). E.g. <code>radius: 500nb</code> (4,000 blocks).</li>
-<li><code>r</code>, <code>region</code>, <code>regions</code>: Anvil / Linear region files (1 region = 32 chunks = 512 blocks). E.g. <code>radius: 4r</code> (128 chunks = 2,048 blocks).</li>
+<li><code>r</code>, <code>region</code>, <code>regions</code>: Region files (1 region = 32 chunks = 512 blocks). E.g. <code>radius: 4r</code> (128 chunks = 2,048 blocks).</li>
 <li><strong>Metric Units (1 block = 1 meter):</strong></li>
 <li><code>m</code>, <code>meter</code>, <code>meters</code>, <code>metre</code>, <code>metres</code>: Meters (1 meter = 1 block). E.g. <code>radius: 5000m</code>.</li>
 <li><code>km</code>, <code>k</code>, <code>kilo</code>, <code>kilos</code>, <code>kilometer</code>, <code>kilometers</code>, <code>kilometre</code>, <code>kilometres</code>: Kilometers. E.g. <code>radius: 5km</code> (5,000 blocks = 312.5 chunks).</li>
@@ -4559,13 +4640,62 @@ However, RTP supports <strong>spatial unit suffixes</strong> on any distance par
 <ul>
 <li><code>name</code>: The shape engine to use.</li>
 <li><code>mode</code>: The selection logic.</li>
-<li><code>ACCUMULATE</code>: (Recommended) Even distribution, pre-calculated sectors. Best for most cases.</li>
+<li><code>ACCUMULATE</code>: (Recommended) Draws only from chunks not known to be bad, so learned bad ground costs nothing. Best for most cases. With <code>expand: false</code> a spot can occasionally come up again; see <a href="#spacing-repeats-and-worst-case-by-mode">Spacing, repeats and worst case by mode</a>.</li>
 <li><code>NEAREST</code>: Finds the closest non-blocked spot. Fast but may cause clustering.</li>
-<li><code>REROLL</code>: Simple random selection with retries. Even but unbounded.</li>
+<li><code>REROLL</code>: Skips known-bad chunks and draws again. On <code>CIRCLE</code> and <code>SQUARE</code> no spot comes up twice until the shuffle has cycled, and spacing stays exact; each known-bad chunk costs one in-memory check. See <a href="#spacing-repeats-and-worst-case-by-mode">Spacing, repeats and worst case by mode</a>.</li>
 <li><code>NONE</code>: No pre-check. Fastest but ignores pre-computed safety data.</li>
 <li><code>centerX</code> / <code>centerZ</code>: The center of the region in <strong>chunks</strong>.</li>
-<li><code>uniquePlacements</code>: Chunk radius cleared around a spot once a player lands there so it is never reused. <code>0</code> = off, <code>1</code> = the landing chunk only, <code>N</code> = an <code>(2N-1)x(2N-1)</code> chunk square. (Legacy <code>true</code>/<code>false</code> still work and map to <code>1</code>/<code>0</code>.) Setting <code>auto</code> automatically derives the radius from the server's effective view distance (lowest power of 2 at or under view distance, e.g. 10 -&gt; 8 chunks). When paired with <code>expand: true</code> in dual-layer shapes, it enables zero-memory dyadic stride downsampling ($S = (2R_u-1)^2$), keeping concurrent players isolated by view distance while driving rapid outward frontier expansion.</li>
+<li><code>uniquePlacements</code>: Chunk radius cleared around a spot once a player lands there so it is never reused. <code>0</code> = off, <code>1</code> = the landing chunk only, <code>N</code> = an <code>(2N-1)x(2N-1)</code> chunk square. (Legacy <code>true</code>/<code>false</code> still work and map to <code>1</code>/<code>0</code>.) It only takes effect with <code>expand: true</code>, where the region grows to replace the cleared area; with <code>expand: false</code> it is ignored so the region cannot run out of destinations. Setting <code>auto</code> automatically derives the radius from the server's effective view distance (lowest power of 2 at or under view distance, e.g. 10 -&gt; 8 chunks). When paired with <code>expand: true</code> in dual-layer shapes, it enables zero-memory dyadic stride downsampling ($S = (2R_u-1)^2$), keeping concurrent players isolated by view distance while driving rapid outward frontier expansion.</li>
 </ul>
+<h3 id="spacing-repeats-and-worst-case-by-mode">Spacing, repeats and worst case by mode<a class="headerlink" href="#spacing-repeats-and-worst-case-by-mode" title="Permanent link">&para;</a></h3>
+<p>This applies to <code>CIRCLE</code> and <code>SQUARE</code> (the dual-layer shapes). The other shapes don't use the keyed shuffle described here.</p>
+<p>Candidates come from a keyed shuffle of the region, drawn in lanes that take the same spot in each bin. On the default 16,384-block circle, spots drawn back to back sit one bin apart (512 blocks). Where the spiral turns at its corners, bins change orientation and spots can come closer: about 5% of spots on the smallest regions, fewer on larger ones. On the default circle the closest pair is 362 blocks. A new lane starts every 16 to 64 draws, and spots from different lanes fall at random relative to each other. RTP keeps no list of past destinations and doesn't check where players are.</p>
+<p>The two modes handle known-bad ground differently:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>ACCUMULATE</code> (default)</th>
+<th><code>REROLL</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>What it draws from</td>
+<td>Only chunks not known to be bad</td>
+<td>Every chunk; a known-bad chunk is skipped and the next one drawn</td>
+</tr>
+<tr>
+<td>Back-to-back spacing</td>
+<td>In a simulation with 40% bad ground, pairs under 256 blocks were about 95% rarer than with random picks. Loosens toward random where the region has learned large bad areas (from <code>/rtp scan</code> or pregen)</td>
+<td>Exact. A bad chunk removes one spot from the lane and moves no other</td>
+</tr>
+<tr>
+<td>Repeat landings, <code>expand: false</code></td>
+<td>Possible, about as often as random picks (around 0.1% of landings in the simulation)</td>
+<td>None until the shuffle has cycled</td>
+</tr>
+<tr>
+<td>Cost of known-bad ground</td>
+<td>None</td>
+<td>One in-memory check per known-bad chunk, roughly a microsecond</td>
+</tr>
+<tr>
+<td>Worst case</td>
+<td>Bounded</td>
+<td>Bounded: each known-bad chunk is drawn at most once per pass, and progress carries over between requests</td>
+</tr>
+</tbody>
+</table>
+<p>The ready cache is filled from the same draw order as live searches, so mixing cached and live answers adds no repeats and keeps back-to-back spacing.</p>
+<p><strong>Why <code>ACCUMULATE</code> can repeat.</strong> It numbers only the good chunks. Every newly learned rejection renumbers them, so a chunk a player already used can land on a number that hasn't been drawn yet. Landings are marked as used only with <code>uniquePlacements</code> and <code>expand: true</code>. Marking them with <code>expand: false</code> isn't an option: the region never grows back, so the marks would use it up until searches stop finding locations.</p>
+<p><strong><code>REROLL</code> limits.</strong></p>
+<ul>
+<li>One request skips at most 10,000 known-bad chunks and then fails. The next request carries on where it stopped. On a region that is nearly all bad, a player can see a failed attempt even though good ground is left.</li>
+<li>With <code>expand: true</code>, every new bad mark grows the range and restarts the shuffle with a new key. The pass starts over, so the once-per-pass ceiling no longer holds.</li>
+<li>Unexplored chunks cost a region-file read or a chunk load in either mode. Each one is checked once, and the result is remembered.</li>
+</ul>
+<p>For comparison, picking a random spot and retrying has no ceiling. Each retry fails with the same odds as the last, and the same bad chunk can be loaded again on a later request.</p>
 <h3 id="shape-engines-and-parameters">Shape Engines and Parameters<a class="headerlink" href="#shape-engines-and-parameters" title="Permanent link">&para;</a></h3>
 <blockquote>
 <p><strong>What is available on <em>your</em> server.</strong> The engines documented below ship with RTP, but addons may register more. On every startup and <code>/rtp reload</code>, RTP writes the live catalog of registered shapes and their settings to <code>plugins/RTP/definitions/regions/SHAPES.md</code> (and vertical adjustors to <code>VERT.md</code>), in your configured language. Those files are generated from the running registry, so they are authoritative for your install - read them rather than guessing, and do not edit them (edits are overwritten on reload). The same catalog drives the type picker in the in-game menu.</p>
@@ -4602,7 +4732,18 @@ However, RTP supports <strong>spatial unit suffixes</strong> on any distance par
 - <code>rotation</code>: Rotation in degrees around the center.</p>
 <h4 id="polygon"><code>POLYGON</code><a class="headerlink" href="#polygon" title="Permanent link">&para;</a></h4>
 <p>An arbitrary closed boundary, including concave ones, defined by a vertex list instead of a radius. It inherits the square sized to the polygon's bounding box for the spiral index and the spatial-memory store, then masks off everything outside the polygon.
-- <code>vertices</code>: List of <code>[x, z]</code> pairs in traversal order, same format Chunky uses for <code>/chunky shape polygon</code>. Needs at least 3 vertices, not all collinear, and no self-intersecting edges - any of those is rejected with a warning and falls back to the bounding square.
+- <code>vertices</code>: List of <code>[x, z]</code> pairs in traversal order, written Chunky-style - one bracketed pair per list item:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">shape</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">POLYGON</span>
+<span class="w">  </span><span class="nt">vertices</span><span class="p">:</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">-125c</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">187c</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2000b</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">3000b</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">10</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">-4</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<p>The single-line form <code>vertices: [[-125c, 187c], [2000b, 3000b], [10, -4]]</code> is equivalent. Like other distance and coordinate parameters, each coordinate supports spatial unit suffixes (<code>b</code> for blocks, <code>c</code> for chunks, <code>r</code> for regions, <code>km</code>, <code>m</code>, etc.). A coordinate <strong>without a suffix is in chunks</strong> (1 chunk = 16 blocks), so <code>[10, -4]</code> means <code>[10c, -4c]</code>; write explicit units to avoid ambiguity.
+  - Block coordinates (Chunky / world coordinates): e.g. <code>[-2000b, 3000b]</code>, <code>[2000b, 3000b]</code>. Block values are converted to chunks and rounded to the nearest chunk (<code>3000b</code> = 187.5 chunks -&gt; <code>188c</code>).
+  - Chunk coordinates: e.g. <code>[-125c, 187c]</code> (same as <code>[-125, 187]</code>).
+  - Needs at least 3 vertices, not all collinear, and no self-intersecting edges - any of those is rejected with a warning and falls back to the bounding square.
 - <code>centerX</code> / <code>centerZ</code>: Optional. Defaults to the center of the vertex bounding box.
 - <code>weight</code>, <code>uniquePlacements</code>, <code>mode</code>: Same meaning as <code>SQUARE</code>.
 - <code>expand</code> is not supported here and is ignored (with a warning if set) - the boundary is yours, and expanding it would push selections outside the polygon you authored.</p>
@@ -4640,7 +4781,7 @@ However, RTP supports <strong>spatial unit suffixes</strong> on any distance par
 <h3 id="how-it-works">How it works<a class="headerlink" href="#how-it-works" title="Permanent link">&para;</a></h3>
 <ul>
 <li>The spiral selector drops unverified candidates straight into the backlog — <strong>no chunk load, no database write</strong>.</li>
-<li>Each region tick pulses the backlog: the oldest unverified entry is picked, the region file (32×32 chunk bin: <code>.mca</code> Anvil or <code>.linear</code> Linear) it falls in is identified, and <em>every</em> unverified entry that shares that bin is classified in one pass via the region pre-filter. This amortises the per-bin cost over many candidates.</li>
+<li>Each region tick pulses the backlog: the oldest unverified entry is picked, the region file (32×32 chunk bin: <code>.mca</code> Anvil, or another format registered by an addon) it falls in is identified, and <em>every</em> unverified entry that shares that bin is classified in one pass via the region pre-filter. This amortises the per-bin cost over many candidates.</li>
 <li>Entries are promoted into the verified queue <strong>in insertion order</strong>. An unverified head blocks promotion; an invalidated head is dropped silently and the next entry is considered. This preserves spiral order without stalling on failed candidates.</li>
 <li>The backlog is <strong>not</strong> persisted across restarts by design — entries are re-selected fresh on startup, so the cost of dropping them is bounded.</li>
 </ul>

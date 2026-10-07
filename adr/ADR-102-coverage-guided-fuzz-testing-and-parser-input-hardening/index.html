@@ -3051,7 +3051,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3425,6 +3425,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
@@ -3726,6 +3747,48 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3850,7 +3913,7 @@
 <hr />
 <h2 id="1-context">1. Context<a class="headerlink" href="#1-context" title="Permanent link">&para;</a></h2>
 <p>RTP processes external, untrusted, or semi-trusted data across multiple performance-critical surfaces:
-1. <strong>World chunk data (<code>.mca</code> Anvil and <code>.linear</code> ZSTD region files):</strong> Parsed off-tick by <code>anvil-api</code> (<code>AnvilReader</code>, <code>LinearRegionReader</code>, and <code>Nbt</code>). In Minecraft, players can manipulate chunk state or exploit vanilla glitches to create corrupted chunks, oversized NBT structures, or invalid heightmaps.
+1. <strong>World chunk data (<code>.mca</code> Anvil and <code>.linear</code> ZSTD region files):</strong> Parsed off-tick by <code>anvil-api</code> (<code>AnvilReader</code>, <code>LinearRegionReader</code>, and <code>Nbt</code>). In Minecraft, players can manipulate chunk state or exploit vanilla glitches to create corrupted chunks, oversized NBT structures, or invalid heightmaps. (2026-10-06: Linear reader withdrawn from core, see ADR-077; core parses only <code>.mca</code>.)
 2. <strong>Redis network frames (<code>RespProtocol</code>):</strong> Used in proxy/network mode (<code>rtp-proxy-common</code>). In shared hosting or multi-plugin Redis networks, malformed frames or rogue plugins can inject malicious payloads.
 3. <strong>Player command arguments and gate expressions (<code>commands-api</code>, <code>GateExpressionParser</code>):</strong> Executed on live threads during gameplay.</p>
 <p>Traditional static unit testing and random property-based generators (<code>jqwik</code>) can miss edge-case byte sequences, magic-byte boundaries, and resource exhaustion vectors (e.g. integer overflow or unchecked memory allocations).</p>
@@ -3866,7 +3929,7 @@
 <p><strong>Adopt Coverage-Guided In-Process Fuzz Testing (Jazzer) &amp; Two-Tier CI Model:</strong></p>
 </li>
 <li>Introduce <code>com.code-intelligence:jazzer-junit</code> into the test toolchain (<code>gradle/libs.versions.toml</code>).</li>
-<li>Write <code>@FuzzTest</code> suites targeting <code>AnvilReader</code> (for <code>.mca</code> and <code>.linear</code> chunk decoding) and <code>RespProtocol</code> (for RESP2 wire parsing).</li>
+<li>Write <code>@FuzzTest</code> suites targeting <code>AnvilReader</code> (for <code>.mca</code> and <code>.linear</code> chunk decoding) and <code>RespProtocol</code> (for RESP2 wire parsing). (2026-10-06: Linear reader withdrawn from core, see ADR-077; the Linear fuzz target is deleted.)</li>
 <li><strong>Tier 1 (Fast Regression on PR/Push):</strong> In standard CI and test execution (<code>./gradlew test</code>), fuzz tests execute deterministic regression seeds in milliseconds without launching the genetic mutation loop, ensuring zero slowdown or non-deterministic test times on PRs.</li>
 <li><strong>Tier 2 (Scheduled &amp; Dispatch Exploratory Fuzzing in CI):</strong> A dedicated CI workflow (<code>.github/workflows/fuzzing.yml</code>) executes extended in-process coverage-guided mutation loops weekly and on manual dispatch. It executes <code>./gradlew test</code> with <code>JAZZER_FUZZ=1</code> enabled, tests the fuzz targets for extended durations, and captures crash artifacts/reproducers if violations or hangs are uncovered.</li>
 </ol>

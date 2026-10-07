@@ -18,7 +18,7 @@
         <link rel="prev" href="../ADR-105-intent-based-documentation-architecture-and-operator-routing/">
       
       
-        <link rel="next" href="../ADR-TEMPLATE/">
+        <link rel="next" href="../ADR-107-addon-editor-extensions-and-protocol-negotiation/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -3051,7 +3051,7 @@
         
   
   <span class="md-ellipsis">
-    ADR-077 - Multi-Format Region Support: Linear
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
   </span>
   
 
@@ -3409,6 +3409,27 @@
   
   <span class="md-ellipsis">
     ADR-094 — Quality-Engineering Gates: Tiered Logic Tests, Local Static Analysis, and Changed-Line Coverage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
   </span>
   
 
@@ -3861,6 +3882,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#58-amendment-2026-10-05-snapshot-redaction-apply-limits-trust-lifetime" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.8 Amendment (2026-10-05): Snapshot redaction, apply limits, trust lifetime
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3939,6 +3969,48 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
     </li>
   
 
@@ -4200,6 +4272,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#58-amendment-2026-10-05-snapshot-redaction-apply-limits-trust-lifetime" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.8 Amendment (2026-10-05): Snapshot redaction, apply limits, trust lifetime
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4297,7 +4378,8 @@
 <strong>Date:</strong> 2026-10-04
 <strong>Authors:</strong> RTP Core Team
 <strong>Extends:</strong> <a href="../ADR-104-ephemeral-web-editor-and-packed-docs-integration/">ADR-104</a> (Ephemeral Web Editor), <a href="../ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a> (1D Spiral Mapping), <a href="../ADR-034-memory-shape-catalog/">ADR-034</a> (Memory Shape Catalog), <a href="../ADR-052-outcome-metrics-and-cause-tagged-bad-locations/">ADR-052</a> (Cause-Tagged Bad Locations), <a href="../ADR-085-spiral-addressed-hilbert-key-space/">ADR-085</a> (Spiral-Addressed Hilbert Key Space)
-<strong>Related REQs:</strong> S-004, S-005, S-007, REQ-RTP-F-013</p>
+<strong>Related REQs:</strong> S-004, S-005, S-007, REQ-RTP-F-013
+<strong>Extended by:</strong> <a href="../ADR-107-addon-editor-extensions-and-protocol-negotiation/">ADR-107</a> (Addon Editor Extensions: type namespace, protocol negotiation, delivery classes, budget shares; see its section 8 for the changes to sections 5.1-5.5 and 8)</p>
 <hr />
 <h2 id="1-context-and-problem-statement">1. Context and Problem Statement<a class="headerlink" href="#1-context-and-problem-statement" title="Permanent link">&para;</a></h2>
 <p>The main editor target is the hosted page at <code>https://dailystruggle.github.io/RTP/editor/</code> (ADR-104 section 4.2). <code>/rtp editor</code> uploads one gzip snapshot to bytebin (<code>EditorCmd</code> -&gt; <code>EditorSessionManager.createPayloadJson()</code> -&gt; <code>EditorHttpTransport.postPayload</code>), and the static page reads it once. The hosted page has no live feed, no path tiles and no loopback channel. It gets only a 2,048-point sketch of each region's walk path and a 2D hazard grid taken at export time. The full-resolution path (<code>WalkPathTiles</code>) and live hazards (<code>HazardTiles</code>) exist only for local exports (ADR-104 section 4.6).</p>
@@ -4409,7 +4491,8 @@
 <p>Settings the shape doesn't declare are not shown. Add-on shapes get a form the same way. An edit to a setting in <code>curveParams</code> redraws the path from the helper immediately. When the channel is connected, a <code>curve-state</code> request (section 5.3) replaces the estimated state with the exact one.</p>
 <h3 id="44-snapshot-fields-and-the-curve-hash">4.4 Snapshot fields and the curve hash<a class="headerlink" href="#44-snapshot-fields-and-the-curve-hash" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong><code>curveCode: {SHAPE: {sha256, js}}</code></strong> at the payload top level, one entry per registered shape name in use by a region, keyed by that name. <code>sha256</code> is the lowercase hex SHA-256 of the UTF-8 <code>js</code>. Each source is sent once per snapshot, however many regions use it.</li>
+<li><strong><code>curveCode: {SHAPE: {sha256, js, sample?}}</code></strong> at the payload top level, one entry per registered shape name with a helper, whether or not a region uses it, keyed by that name. <code>sha256</code> is the lowercase hex SHA-256 of the UTF-8 <code>js</code>. Each source is sent once per snapshot, however many regions use it.</li>
+<li><code>sample</code> is the <code>curve</code> block (below) of a clone of the registered shape at its defaults. For a shape no region uses (a shape planned on the page), the page checks its helper against <code>sample</code> instead of a region's <code>curve</code>.</li>
 <li><strong>Per region, <code>curve: {shape, params, state, hash}</code></strong>, about 100-200 bytes:</li>
 <li><code>shape</code>: the registered name, the key into <code>curveCode</code>;</li>
 <li><code>params</code>: the normalised settings in <code>curveParams</code>;</li>
@@ -4508,6 +4591,7 @@
 <li><code>from</code> is the sender's fingerprint.</li>
 <li><code>seq</code> increases strictly per sender, within a challenge (page) or over the channel lifetime (plugin).</li>
 <li><code>to</code> addresses a reply to one browser key when several tabs share the relay.</li>
+<li><code>channel</code>, <code>seq</code>, <code>from</code> and <code>to</code> are reserved: a message body shall not use them for its own fields, and <code>EditorChannel.send</code> refuses a body that does.</li>
 </ul>
 <h3 id="52-handshake-and-trust">5.2 Handshake and trust<a class="headerlink" href="#52-handshake-and-trust" title="Permanent link">&para;</a></h3>
 <ol>
@@ -4541,12 +4625,12 @@
 <tr>
 <td><code>ping</code> / <code>pong</code></td>
 <td>both</td>
-<td>keepalive every 30 s; 3 missed pongs mark the link lost</td>
+<td>keepalive: the page checks every 15 s and, on a paced relay, pings only after 40 s without sending (any verified plugin frame counts as a pong); 3 missed pongs mark the link lost. The relay's proxy drops a socket silent for about a minute, so <code>BytesocksTransport</code> also sends a WebSocket ping control frame every 20 s, which bytesocks does not count as a message</td>
 </tr>
 <tr>
 <td><code>feed</code></td>
 <td>plugin -&gt; page</td>
-<td>local feed head push (ADR-104 section 4.6 item 6), unchanged in meaning</td>
+<td>local feed head push (ADR-104 section 4.6 item 6), unchanged in meaning; pushed only when it changes, after a <code>focus</code>, or as a 40 s heartbeat (section 5.5), which keeps the page's socket under the proxy's idle limit. A hosted page applies its telemetry, survey progress and region stats; its tile versions name local files</td>
 </tr>
 <tr>
 <td><code>curve</code></td>
@@ -4561,17 +4645,22 @@
 <tr>
 <td><code>hazard-delta</code></td>
 <td>plugin -&gt; page</td>
-<td><code>{region, from, to, add: runs, remove: runs}</code> against hazard version <code>from</code>; <code>{region, to, reset: true, runs}</code> when the page's version is unknown or stale</td>
+<td><code>{region, base, version, add: runs, remove: runs}</code> against hazard version <code>base</code>; <code>{region, version, reset: true, runs}</code> when the page's version is unknown or stale</td>
 </tr>
 <tr>
 <td><code>land</code></td>
 <td>plugin -&gt; page</td>
-<td>focus-driven land bins <code>[rx, rz, level, base64Runs]</code> (<code>BiomeBinCodec</code>, ADR-104 section 4.6 item 1)</td>
+<td><code>{world, y, palette, bins}</code>: focus-driven land bins <code>[rx, rz, level, base64Runs]</code> (<code>BiomeBinCodec</code>, ADR-104 section 4.6 item 1); every frame carries the world's whole palette, so a page that connects late or misses a frame still names every cell. A <code>focus</code> repeating the current view pushes its bins again unless they are still queued. Bins go out in walk order: those inside a tracked region by the earliest curve position of five probe chunks (centre outward along the region's curve), the rest after them by Chebyshev ring around the view centre</td>
+</tr>
+<tr>
+<td><code>land-ref</code></td>
+<td>plugin -&gt; page</td>
+<td>sessions with a bytebin hand-off (hosted): <code>{world, y, bins, bytebinKey, sha256}</code>; the bytebin body is a <code>land</code> message <code>{world, y, palette, bins}</code>. The plugin uploads the bins of the page's view plus 2 bins of padding whose version the page does not hold (the snapshot's embed, then earlier uploads), in walk order, at most one upload per 30 s and none while nothing in view changed. A failed upload is retried with the next period; a trusted hello or a <code>focus</code> with <code>landReset: true</code> (the page could not fetch or verify a <code>land-ref</code>) drops everything but the snapshot from what the page holds, so it is sent again. A hosted session sends no <code>land</code> frames</td>
 </tr>
 <tr>
 <td><code>focus</code></td>
 <td>page -&gt; plugin</td>
-<td>debounced view rectangle <code>{world, y, minRx, minRz, maxRx, maxRz}</code>, plus <code>verified: [regions]</code> and <code>hazardVersions: {region: v}</code></td>
+<td>debounced view rectangle <code>{world, y, minRx, minRz, maxRx, maxRz}</code>, plus <code>verified: [regions]</code>, <code>hazardVersions: {region: v}</code> and, after a lost <code>land-ref</code>, <code>landReset: true</code></td>
 </tr>
 <tr>
 <td><code>walkpath</code></td>
@@ -4581,7 +4670,12 @@
 <tr>
 <td><code>apply</code> / <code>apply_ack</code></td>
 <td>page -&gt; plugin / plugin -&gt; page</td>
-<td>Hot-Apply: <code>{files}</code> inline, or <code>{bytebinKey, sha256}</code> above the frame cap; runs the full <code>/rtp editor apply</code> validation pipeline; acknowledged with the result</td>
+<td>Hot-Apply: <code>{files}</code> inline (every staged file that differs from the server copy: worlds, regions, config), or <code>{bytebinKey, sha256}</code> above the frame cap; runs the full <code>/rtp editor apply</code> validation pipeline; acknowledged with the result, after which the page treats the sent text as the server copy</td>
+</tr>
+<tr>
+<td><code>bundle</code></td>
+<td>plugin -&gt; page</td>
+<td>paced transports only (section 5.5): <code>{items: [..]}</code> of held <code>feed</code>, <code>curve</code>, <code>land</code>, <code>land-ref</code> and <code>hazard-delta</code> pushes, signed once; the page dispatches each item to its own handler and ignores any other item type</td>
 </tr>
 </tbody>
 </table>
@@ -4589,7 +4683,8 @@
 <h3 id="54-transports">5.4 Transports<a class="headerlink" href="#54-transports" title="Permanent link">&para;</a></h3>
 <p><code>EditorChannel</code> owns the envelope, signing and verification, trust, the challenge and <code>seq</code> checks, routing by <code>type</code> and the outbound caps. <code>ChannelTransport</code> is only <code>send(String)</code>, an inbound callback and a state / close callback. There are three implementations:
 - <strong><code>BytesocksTransport</code> (hosted):</strong>
-  - It creates a channel with <code>GET &lt;relay&gt;/create</code> (the bytesocks API used by the LuckPerms and spark clients: the relay answers <code>201</code> with the channel id in the <code>Location</code> header) and reads the id from that header. The default relay is <code>https://bytesocks.lucko.me</code>, configurable next to the bytebin URL in <code>EditorHttpTransport</code>.
+  - It creates a channel with <code>GET &lt;relay&gt;/create</code> (the bytesocks API used by the LuckPerms and spark clients: the relay answers <code>201</code> with the channel id in the <code>Location</code> header; <code>POST</code> gets <code>405</code>) and reads the id from that header.
+  - The relay is <code>editor.relayUrl</code> in <code>advanced/network.yml</code>, next to <code>editor.bytebinUrl</code>, read off the main thread for every session. Blank means the default, and an invalid value is logged and replaced by the default. The interim default is LuckPerms' public instance <code>https://usersockets.luckperms.net</code>, because <code>bytesocks.lucko.me</code> does not resolve.
   - It then joins <code>wss://&lt;relay host&gt;/&lt;id&gt;</code> outbound through the JDK <code>java.net.http.WebSocket</code> on the existing <code>HttpClient</code>. There is no new dependency and no own threads. Timers and retries run through <code>RTP.scheduler</code>.
   - It reconnects with backoff (1 s, doubling, at most 60 s) and expires 30 minutes after the session starts, the same lifetime as the local feed.
 - <strong><code>LoopbackTransport</code> (local):</strong> wraps <code>EditorLoopbackChannel</code>. The loopback handshake rules (loopback peer and Host, Origin check, token, at most 4 clients) stay as defence in depth. The local export's <code>channel.relay</code> is the loopback <code>ws://127.0.0.1:&lt;port&gt;/rtp-editor-ws?token=...</code> address, so the page runs the identical handshake and messages.
@@ -4600,13 +4695,19 @@
 <li>Frames are capped at <strong>32 KiB</strong> (the envelope included) on every transport, so local runs test the hosted limits. Larger inbound frames are refused and logged.</li>
 <li>Outbound traffic is capped at <strong>2 MiB per session per minute</strong>. Over the cap, <code>land</code> batches are deferred first, then <code>hazard-delta</code>. <code>curve</code> and replies are never dropped, only delayed. Deferral is logged once per minute.</li>
 <li>Data larger than a frame (a large apply, a hazard reset over the cap) goes through bytebin and is referenced as <code>{bytebinKey, sha256}</code>, the LuckPerms pattern. The receiver fetches it, checks the digest and then processes it as if it had been sent inline.</li>
+<li>Frame pacing: bytesocks counts frames per IP (30 per 2 minutes by default, all channels together), closes a socket over the limit with 1008 and deletes a channel once its last client has left. A transport may therefore declare a frame share per 2-minute window (<code>ChannelTransport.framesPerWindow</code>). The bytesocks transport declares 18 and the page keeps to 10 on any <code>wss://</code> relay, since page and server often share one IP; loopback and in-memory transports are unpaced.</li>
+<li>On a paced channel, replies go first and wait in order when the share is used up. Broadcast pushes are held (newest <code>feed</code>, newest <code>curve</code> per region, <code>land</code> and <code>hazard-delta</code> in order) and leave as one <code>bundle</code> at most every 8 s, leaving 4 frames of the share for replies. A new push is refused while a frame's worth is already held, so its producer resends later. <code>bye</code> is never held.</li>
+<li>The page coalesces queued <code>focus</code> messages, counts every outbound frame (hello and ping included), and treats any verified plugin frame as proof of liveness. The plugin skips a <code>pong</code> within 10 s of other outbound traffic.</li>
+<li>On every channel the feed pushes a head only when the page would see something new: <code>seq</code> and <code>timestamp</code> alone do not count, and the telemetry gauges count only beyond their jitter (TPS 0.5, MSPT 1 ms or 20 %, tick budget 5 %, heap 0.25 GiB, measured against the last pushed value). A <code>focus</code> (sent first by a page that has just connected) forces the next head, and an unchanged head is still pushed every 60 s as a heartbeat. An idle session therefore costs about 2 plugin frames per 2 minutes instead of a bundle every 8 s; the local <code>feed.js</code> file is still rewritten every tick.</li>
+<li>The page marks a connected link <code>feed stale</code> when no head has arrived for 90 s (heartbeat plus a bundle gap and margin).</li>
 </ul>
 <h3 id="56-relay-failure-behaviour-s-004">5.6 Relay failure behaviour (S-004)<a class="headerlink" href="#56-relay-failure-behaviour-s-004" title="Permanent link">&para;</a></h3>
 <ul>
 <li>A failed channel create or connect, a disconnect, a reconnect, the expiry and plugin disable are each logged with their reason. The operator gets a configurable in-game notice for "opened", "lost" and "expired".</li>
 <li>If the relay can't be created, <code>/rtp editor</code> still uploads the snapshot without a <code>channel</code> block (snapshot-only session) and logs the reason.</li>
+<li>A rejoin refused with HTTP 400 or 404 means the relay has deleted the channel. The transport then closes for good, with a reason telling the operator to run <code>/rtp editor</code> again, instead of retrying until expiry.</li>
 <li>Opening never blocks a thread (S-005, <code>RTPArchitectureTest</code> rule 2, no exclusion): <code>ChannelTransport.start</code> and <code>EditorChannel.start</code> return futures, and the hosted create-then-join is one chain bounded by its timeouts that completes with no channel on any failure. <code>/rtp editor</code> composes it with the payload build and upload.</li>
-<li>The page's status badge shows one of: <code>connecting</code>, <code>awaiting trust</code>, <code>connected</code>, <code>reconnecting</code>, <code>snapshot only (&lt;reason&gt;)</code>. The page keeps working from the snapshot in every state. Without the channel, drawing stays exact for verified regions, and edited state is labelled "estimated".</li>
+<li>The page's status badge shows one of: <code>connecting</code>, <code>awaiting trust</code>, <code>connected</code> (or <code>feed stale (&lt;age&gt;)</code>, section 5.5), <code>reconnecting</code>, <code>snapshot only (&lt;reason&gt;)</code>. The page keeps working from the snapshot in every state. Without the channel, drawing stays exact for verified regions, and edited state is labelled "estimated".</li>
 <li>Expiry and plugin disable close the transport. The page sees the close and switches to <code>snapshot only (expired)</code> / <code>snapshot only (closed)</code>.</li>
 </ul>
 <h3 id="57-security-notes">5.7 Security notes<a class="headerlink" href="#57-security-notes" title="Permanent link">&para;</a></h3>
@@ -4615,6 +4716,14 @@
 <li>The relay sees message contents: they are signed but not encrypted, the same as LuckPerms. No secrets go over the channel: no loopback tokens and no keys. Hot-Apply carries only YAML.</li>
 <li>A stolen channel id gives read access to live map data. It is as sensitive as the bytebin key, which is already unlisted. Writes need a trusted, signed browser key.</li>
 <li>The plugin only connects outbound, so the zero-inbound rule of ADR-104 section 2 still holds.</li>
+</ul>
+<h3 id="58-amendment-2026-10-05-snapshot-redaction-apply-limits-trust-lifetime">5.8 Amendment (2026-10-05): Snapshot redaction, apply limits, trust lifetime<a class="headerlink" href="#58-amendment-2026-10-05-snapshot-redaction-apply-limits-trust-lifetime" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Redaction:</strong> secret-bearing config values (block and inline/flow style) are replaced by a <code>&lt;redacted&gt;</code> sentinel in every snapshot, hosted or local. On apply, a value still equal to the sentinel keeps the on-disk value, so a round trip never writes the placeholder.</li>
+<li><strong>Apply limits:</strong> only <code>.yml</code> files inside the plugin folder, never under <code>editor/</code>, resolved through symlinks before containment is checked. A bytebin hand-off requires its <code>sha256</code>; outbound URLs are https / wss except loopback; gzip bodies are capped at 4 MiB.</li>
+<li><strong>Trust lifetime:</strong> <code>/rtp editor untrust key=&lt;fingerprint prefix|all&gt;</code> revokes trusted browser keys. <code>editor.trust.maxAgeDays</code> in <code>advanced/network.yml</code> (default <code>0</code>, no expiry) expires old trust entries. The trust prompt shows the full fingerprint, and wrong trust codes are limited to 5 per minute.</li>
+<li><strong>Sessions:</strong> sessions expire after 30 minutes, at most 32 are open at once, and tokens are logged by prefix only. The key file and local exports are owner-only, Windows included. Each local export closes the previous loopback socket and opens a new one with a fresh token.</li>
+<li><strong>Hosted page:</strong> <code>no-referrer</code> and a CSP meta tag; <code>?token=</code> is removed from the address bar after load; fetched docs HTML is sanitised, and links are limited to an allow-list.</li>
 </ul>
 <hr />
 <h2 id="6-snapshot-size">6. Snapshot Size<a class="headerlink" href="#6-snapshot-size" title="Permanent link">&para;</a></h2>
@@ -4659,7 +4768,7 @@
 <ul>
 <li>Helpers are written by hand per shape and can drift from Java. This is guarded by the parity test (built-ins) and the runtime hash (every shape), with a visible fallback.</li>
 <li>Some browsers may not allow a Worker inside an opaque-origin iframe. The iframe-only runner then uses smaller batches, and a timeout costs recreating the iframe.</li>
-<li>Hosted two-way features depend on a third-party relay (<code>bytesocks.lucko.me</code>), as uploads already depend on bytebin. The URL is configurable, and the snapshot-only session is always available.</li>
+<li>Hosted two-way features depend on a third-party relay, as uploads already depend on bytebin. The default, <code>usersockets.luckperms.net</code>, is run for LuckPerms and its use by other clients is not documented, so it may be rate-limited or blocked. The URL is configurable (<code>advanced/network.yml editor.relayUrl</code>, for example a self-hosted bytesocks), and the snapshot-only session is always available.</li>
 <li>Each new browser needs one in-game trust action, and per-tab keys (no IndexedDB) need it every time.</li>
 <li>A test-only GraalJS dependency is added to <code>rtp-core</code>'s test classpath.</li>
 </ul>
@@ -4671,7 +4780,7 @@
 <li><strong>More run layers:</strong> landing-heat and learned-biome runs in curve space, using the section 4.7 format. Landing heat stays on the local feed files until then.</li>
 <li><strong>Viewport-interval queries:</strong> the page asks for runs only within the curve intervals in view.</li>
 <li><strong>Binary frames and deflate</strong> on the channel instead of base64 JSON.</li>
-<li><strong>A self-hosted RTP relay.</strong> The relay URL is configurable now, but no relay is built.</li>
+<li><strong>A self-hosted RTP relay</strong> (a bytesocks instance) as the default, replacing the interim LuckPerms relay. The relay URL is configurable now, but no relay is run.</li>
 <li>Loading <code>editor-data.json</code> from the site next to the hosted page instead of uploading it in every snapshot.</li>
 <li>Removing local <code>feed.js</code> polling. It stays as the one-way fallback for a page copied off the server machine.</li>
 </ul>
