@@ -138,14 +138,18 @@ public final class FoliaRTPPlayer implements RTPPlayer {
         try {
           to.world().platform(to);
 
-          player.getScheduler().run((Plugin) RTP.getInstance().getPlugin(), task -> {
+          // S-004: a retired entity (player quit) never runs the task, so the retired
+          // callback and a null schedule result must both fail the future, not hang it.
+          Object scheduled = player.getScheduler().run((Plugin) RTP.getInstance().getPlugin(), task -> {
             // On the entity scheduler: reset fall distance and micro-rubberband (a second
             // teleportAsync) to snap the player onto the newly built platform. Any
             // slow-falling / blindness effects live in effects/default.yml (postteleport
             // fallback group), configurable without a code change.
             player.setFallDistance(0.0f);
-            player.teleportAsync(destinationLocation).thenAccept(s -> completionFuture.complete(true));
-          }, null);
+            player.teleportAsync(destinationLocation)
+                .whenComplete((s, err) -> completionFuture.complete(err == null && Boolean.TRUE.equals(s)));
+          }, () -> completionFuture.complete(false));
+          if (scheduled == null) completionFuture.complete(false);
         } catch (Exception e) {
           completionFuture.complete(false);
           if (to.getReservation() != null) to.getReservation().close();
@@ -294,12 +298,13 @@ public final class FoliaRTPPlayer implements RTPPlayer {
   }
 
   /**
-   * Strips legacy {@code &x} color codes and {@code #RRGGBB} hex codes from a bar title (boss-bar
-   * titles render as plain text on most clients) and truncates to Bukkit's 64-character limit.
+   * Strips legacy {@code &x} / {@code §x} color codes and {@code #RRGGBB} / {@code &#RRGGBB} hex codes
+   * from a bar title (boss-bar titles render as plain text on most clients) and truncates to Bukkit's
+   * 64-character limit. Regex-free: runs on every bar update.
    */
   private static String sanitizeBarTitle(String title) {
     if (title == null) return "";
-    String out = title.replaceAll("&[0-9a-fA-FklmnorKLMNOR]", "").replaceAll("#[0-9a-fA-F]{6}", "");
+    String out = io.github.dailystruggle.rtp.common.text.LegacyColorStrip.strip(title);
     return out.length() > 64 ? out.substring(0, 64) : out;
   }
 

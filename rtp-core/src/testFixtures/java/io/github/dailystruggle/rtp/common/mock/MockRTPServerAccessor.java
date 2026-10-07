@@ -41,6 +41,14 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     private final Map<UUID, RTPCommandSender> sendersById = new ConcurrentHashMap<>();
     private final Map<String, MockRTPPlayer> playersByName = new ConcurrentHashMap<>();
     private final Map<String, Object> registeredCommands = new ConcurrentHashMap<>();
+    private final Map<String, Map<UUID, Integer>> scoreboardScores = new ConcurrentHashMap<>();
+
+    @Override
+    public Integer getScoreboardScore(UUID playerId, String objective) {
+        if (playerId == null || objective == null) return null;
+        Map<UUID, Integer> map = scoreboardScores.get(objective);
+        return map != null ? map.get(playerId) : null;
+    }
 
     private final MockRTPPlayer consolePlayer = new MockRTPPlayer(RTP.serverId, "CONSOLE", null);
     private final MockRTPScheduler scheduler = new MockRTPScheduler();
@@ -490,6 +498,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     public void setScoreboardScore(UUID playerId, String objective, int score) {
         if (playerId == null || objective == null || objective.isBlank()) return;
         executedCommands.add("scoreboard players set " + playerId + " " + objective + " " + score);
+        scoreboardScores.computeIfAbsent(objective, k -> new ConcurrentHashMap<>()).put(playerId, score);
     }
 
     @Override
@@ -497,8 +506,13 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
         if (playerId == null) return;
         if (objective != null && !objective.isBlank()) {
             executedCommands.add("scoreboard players reset " + playerId + " " + objective);
+            Map<UUID, Integer> map = scoreboardScores.get(objective);
+            if (map != null) map.remove(playerId);
         } else {
             executedCommands.add("scoreboard players reset " + playerId);
+            for (Map<UUID, Integer> map : scoreboardScores.values()) {
+                map.remove(playerId);
+            }
         }
     }
 

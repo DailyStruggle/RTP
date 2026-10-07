@@ -769,9 +769,30 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   // Palette identifier normalization & reconciliation SPI
   // ---------------------------------------------------------------------------
 
+  /**
+   * Raw palette name to reconciled name. {@code Material.matchMaterial} compiles a regex per
+   * call and safety scans hit it per block name; the material set is fixed for the server's
+   * lifetime, so answers never go stale.
+   */
+  private final java.util.concurrent.ConcurrentHashMap<String, String> paletteIdentifierMemo =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
+  /** Bound on memoized names; palettes carry a few thousand distinct block ids at most. */
+  private static final int PALETTE_MEMO_MAX = 8192;
+
   @Override
   public String reconcilePaletteIdentifier(String raw) {
     if (raw == null) return null;
+    String memo = paletteIdentifierMemo.get(raw);
+    if (memo != null) return memo;
+    String reconciled = reconcilePaletteIdentifierUncached(raw);
+    if (reconciled != null && paletteIdentifierMemo.size() < PALETTE_MEMO_MAX) {
+      paletteIdentifierMemo.putIfAbsent(raw, reconciled);
+    }
+    return reconciled;
+  }
+
+  private static String reconcilePaletteIdentifierUncached(String raw) {
     try {
       org.bukkit.Material material = org.bukkit.Material.matchMaterial(raw);
       if (material != null) return material.name();

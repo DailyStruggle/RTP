@@ -28,6 +28,7 @@ public final class MenuModel {
   private final String dashboardIconName;
   private final List<MenuEntry> entries;
   private final MetricsSnapshot metrics;
+  private final boolean isRoot;
 
   MenuModel(
       String title,
@@ -37,6 +38,18 @@ public final class MenuModel {
       String dashboardIconName,
       List<MenuEntry> entries,
       MetricsSnapshot metrics) {
+    this(title, rows, fillerName, showDashboard, dashboardIconName, entries, metrics, false);
+  }
+
+  MenuModel(
+      String title,
+      int rows,
+      String fillerName,
+      boolean showDashboard,
+      String dashboardIconName,
+      List<MenuEntry> entries,
+      MetricsSnapshot metrics,
+      boolean isRoot) {
     this.title = title;
     this.rows = rows;
     this.fillerName = fillerName;
@@ -44,6 +57,7 @@ public final class MenuModel {
     this.dashboardIconName = dashboardIconName;
     this.entries = Collections.unmodifiableList(entries);
     this.metrics = metrics;
+    this.isRoot = isRoot;
   }
 
   /**
@@ -55,7 +69,19 @@ public final class MenuModel {
    * @return an immutable model; never {@code null}
    */
   public static MenuModel build(UUID playerId, GuiMenuConfig config) {
-    List<MenuEntry> entries = new ArrayList<>();
+    return build(playerId, config, 0);
+  }
+
+  /**
+   * Builds a paginated main destination menu model for {@code playerId}.
+   *
+   * @param playerId the viewing player
+   * @param config the resolved menu configuration
+   * @param page zero-based page index
+   * @return an immutable model; never {@code null}
+   */
+  public static MenuModel build(UUID playerId, GuiMenuConfig config, int page) {
+    List<MenuEntry> destinationEntries = new ArrayList<>();
     List<RtpTarget> targets = RTPAPI.getAllowedTargets(playerId);
     boolean groupBiomes = config.groupBiomesIntoSubmenu();
     boolean hasBiomes = false;
@@ -95,7 +121,7 @@ public final class MenuModel {
           continue; // skip duplicate display label
         }
 
-        entries.add(
+        destinationEntries.add(
             new MenuEntry(
                 target,
                 availability,
@@ -111,8 +137,8 @@ public final class MenuModel {
     // whenever at least one genuinely selectable destination exists. On a lobby
     // backend with no local RTP world but live cross-server regions, this drops
     // the leftover local-default barrier while keeping the network regions.
-    if (entries.stream().anyMatch(MenuModel::isSelectable)) {
-      entries.removeIf(e -> !isSelectable(e));
+    if (destinationEntries.stream().anyMatch(MenuModel::isSelectable)) {
+      destinationEntries.removeIf(e -> !isSelectable(e));
     }
 
     // Lobby case: a dispatch-only backend has no local RTP world, so its bare
@@ -122,13 +148,15 @@ public final class MenuModel {
     // even while the network rows are still reported DISABLED (e.g. a peer
     // heartbeat not yet observed as reachable), so the lobby never shows its
     // own "no regions" placeholder next to the network regions.
-    if (entries.stream().anyMatch(MenuModel::isNetwork)) {
-      entries.removeIf(e -> !isNetwork(e) && !isSelectable(e));
+    if (destinationEntries.stream().anyMatch(MenuModel::isNetwork)) {
+      destinationEntries.removeIf(e -> !isNetwork(e) && !isSelectable(e));
     }
+
+    List<MenuEntry> submenuEntries = new ArrayList<>();
 
     // If biomes are grouped and available, add the Biome Selector entry to the main menu
     if (groupBiomes && hasBiomes) {
-      entries.add(
+      submenuEntries.add(
           new MenuEntry(
               RtpTarget.action("menu:biomes:0"),
               RtpTargetStatus.Availability.READY,
@@ -152,7 +180,7 @@ public final class MenuModel {
           }
         }
         if (hasActions) {
-          entries.add(
+          submenuEntries.add(
               new MenuEntry(
                   RtpTarget.action("menu:actions:0"),
                   RtpTargetStatus.Availability.READY,
@@ -170,7 +198,7 @@ public final class MenuModel {
       boolean hasPerm = (perm != null && !perm.isBlank() && RTPAPI.checkPermission(playerId, perm))
           || RTPAPI.checkPermission(playerId, "rtp.admin");
       if (hasPerm) {
-        entries.add(
+        submenuEntries.add(
             new MenuEntry(
                 RtpTarget.action("menu:operator"),
                 RtpTargetStatus.Availability.READY,
@@ -181,15 +209,66 @@ public final class MenuModel {
       }
     }
 
+    // Paginate destinations if needed, reserving the submenu row
+    List<MenuEntry> finalEntries = new ArrayList<>();
+    int totalDestinations = destinationEntries.size();
+    int maxPage;
+    int currentPage;
+
+    if (submenuEntries.isEmpty() && totalDestinations <= 28) {
+      maxPage = 0;
+      currentPage = 0;
+      finalEntries.addAll(destinationEntries);
+    } else {
+      int pageSize = 21;
+      maxPage = Math.max(0, (int) Math.ceil(totalDestinations / (double) pageSize) - 1);
+      currentPage = Math.max(0, Math.min(page, maxPage));
+
+      int startIndex = currentPage * pageSize;
+      int endIndex = Math.min(startIndex + pageSize, totalDestinations);
+      if (startIndex < totalDestinations) {
+        finalEntries.addAll(destinationEntries.subList(startIndex, endIndex));
+      }
+
+      if (currentPage > 0) {
+        finalEntries.add(
+            new MenuEntry(
+                RtpTarget.action("menu:main:" + (currentPage - 1)),
+                RtpTargetStatus.Availability.READY,
+                "&e[Previous Page]",
+                config.iconPreviousPage(),
+                0L,
+                0.0));
+      }
+
+      finalEntries.addAll(submenuEntries);
+
+      if (currentPage < maxPage) {
+        finalEntries.add(
+            new MenuEntry(
+                RtpTarget.action("menu:main:" + (currentPage + 1)),
+                RtpTargetStatus.Availability.READY,
+                "&e[Next Page]",
+                config.iconNextPage(),
+                0L,
+                0.0));
+      }
+    }
+
+    String title = (maxPage > 0)
+        ? config.title() + " (" + (currentPage + 1) + "/" + (maxPage + 1) + ")"
+        : config.title();
+
     MetricsSnapshot metrics = config.showDashboard() ? RTPAPI.getMetricsSnapshot() : null;
     return new MenuModel(
-        config.title(),
+        title,
         config.rows(),
         config.fillerName(),
         config.showDashboard(),
         config.dashboardIconName(),
-        entries,
-        metrics);
+        finalEntries,
+        metrics,
+        currentPage == 0);
   }
 
   /**
@@ -575,5 +654,10 @@ public final class MenuModel {
   /** Server-health snapshot for the dashboard tile, or {@code null} if disabled/unavailable. */
   public MetricsSnapshot metrics() {
     return metrics;
+  }
+
+  /** Whether this model represents the root (/rtp) destination menu. */
+  public boolean isRoot() {
+    return isRoot;
   }
 }

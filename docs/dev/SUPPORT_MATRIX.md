@@ -45,10 +45,10 @@ RTP requires Java 21 or higher across all platforms and components (REQ-RTP-SYS-
 #### Platform-Specific Notes:
 - **Paper & Forks (Leaf, Leaves, Purpur, Pufferfish, Airplane, DivineMC):**
   - **Status:** **Tested** (Paper on 1.20.x, 1.21.x via automated build gates and nightly devstack); **Best-effort** (downstream forks and MC 26.x tracking).
-  - Uses native Paper asynchronous chunk loading (`World.getChunkAtAsync`). Linear (`.linear` / ZSTD) format supported via off-tick pre-filtering (ADR-077).
+  - Uses native Paper asynchronous chunk loading (`World.getChunkAtAsync`). Linear (`.linear` / ZSTD) worlds are supported through the live async chunk load path; core does not pre-filter `.linear` files unless an addon registers a reader (ADR-077).
 - **Folia:**
   - **Status:** **Tested** (1.20.x, 1.21.x via automated build gates, thread affinity ArchUnit rules, and nightly devstack).
-  - Operates strictly under Folia Region & Entity schedulers with Count-Bound task pipelines (ADR-004, ADR-015). Off-tick Anvil/Linear pre-filtering on common pool avoids cross-region hops.
+  - Operates strictly under Folia Region & Entity schedulers with Count-Bound task pipelines (ADR-004, ADR-015). Off-tick Anvil pre-filtering on common pool avoids cross-region hops.
 - **Spigot:**
   - **Status:** **Best-effort** (1.20.x, 1.21.x; compiles via `rtp-bukkit` adapter and unit tested, but lacks scheduled live multi-server devstack verification in CI).
   - Uses background Anvil (`.mca`) parser for off-tick candidate pre-filtering to prevent main-thread chunk load stalls (S-005).

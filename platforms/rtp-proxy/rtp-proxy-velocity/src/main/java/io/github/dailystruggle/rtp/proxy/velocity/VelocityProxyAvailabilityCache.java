@@ -52,6 +52,8 @@ public final class VelocityProxyAvailabilityCache {
 
     /** Upper bound on distinct live server ids (mirrors the backend peer-table cap). */
     public static final int MAX_LIVE_SERVERS = AbstractPluginMessageNetworkBinding.MAX_TRACKED_SERVERS;
+    /** Maximum clock skew tolerance (ms) when validating pushed heartbeat timestamps. */
+    public static final long SKEW_TOLERANCE_MS = AbstractPluginMessageNetworkBinding.SKEW_TOLERANCE_MS;
 
     private final Object admitLock = new Object();
     private final Map<String, List<String>> configuredRegions;
@@ -61,7 +63,7 @@ public final class VelocityProxyAvailabilityCache {
     private final LongSupplier clock;
     private final Map<String, Live> live = new ConcurrentHashMap<>();
 
-    private record Live(BackendHeartbeat hb, long seenMs) {
+    private record Live(BackendHeartbeat hb, long seenMs, long sentAtMs, long lastSeq) {
     }
 
     /**
@@ -113,17 +115,37 @@ public final class VelocityProxyAvailabilityCache {
      * @return {@code true} when the row was stored
      */
     public boolean onPush(BackendHeartbeat hb) {
-        if (hb == null || hb.serverId() == null || hb.serverId().isEmpty()) return false;
+        return onPush(hb, 0L, 0L);
+    }
+
+    public boolean onPush(BackendHeartbeat hb, long sentAtMs, long seq) {
+        return onPushDetailed(hb, sentAtMs, seq) == null;
+    }
+
+    public PluginMessageEnvelope.Rejection onPushDetailed(BackendHeartbeat hb, long sentAtMs, long seq) {
+        if (hb == null || hb.serverId() == null || hb.serverId().isEmpty()) {
+            return PluginMessageEnvelope.Rejection.MALFORMED;
+        }
         long now = clock.getAsLong();
-        Live fresh = new Live(hb, now);
-        if (live.computeIfPresent(hb.serverId(), (k, v) -> fresh) != null) return true;
         synchronized (admitLock) {
-            if (!live.containsKey(hb.serverId()) && live.size() >= MAX_LIVE_SERVERS) {
-                live.entrySet().removeIf(e -> now - e.getValue().seenMs() > staleAfterMs);
-                if (live.size() >= MAX_LIVE_SERVERS) return false;
+            Live prev = live.get(hb.serverId());
+            if (sentAtMs != 0L || seq != 0L) {
+                long delta = Math.abs(now - sentAtMs);
+                if (delta > staleAfterMs + SKEW_TOLERANCE_MS) {
+                    return PluginMessageEnvelope.Rejection.STALE;
+                }
+                if (prev != null) {
+                    if (seq <= prev.lastSeq() && sentAtMs <= prev.sentAtMs()) {
+                        return PluginMessageEnvelope.Rejection.REPLAY;
+                    }
+                }
             }
-            live.put(hb.serverId(), fresh);
-            return true;
+            if (prev == null && live.size() >= MAX_LIVE_SERVERS) {
+                live.entrySet().removeIf(e -> now - e.getValue().seenMs() > staleAfterMs);
+                if (live.size() >= MAX_LIVE_SERVERS) return PluginMessageEnvelope.Rejection.LIMITS;
+            }
+            live.put(hb.serverId(), new Live(hb, now, sentAtMs, seq));
+            return null;
         }
     }
 
@@ -142,7 +164,7 @@ public final class VelocityProxyAvailabilityCache {
     public PluginMessageEnvelope.Rejection onPushPayload(byte[] payload, HmacVerifier verifier) {
         PluginMessageEnvelope.Result r = PluginMessageEnvelope.open(payload, verifier);
         if (!r.accepted()) return r.rejection();
-        return onPush(r.heartbeat()) ? null : PluginMessageEnvelope.Rejection.LIMITS;
+        return onPushDetailed(r.heartbeat(), r.sentAtMs(), r.seq());
     }
 
     /**
@@ -195,8 +217,9 @@ public final class VelocityProxyAvailabilityCache {
      */
     public List<byte[]> snapshotPayloads(HmacVerifier verifier) {
         List<byte[]> out = new ArrayList<>();
+        long now = clock.getAsLong();
         for (BackendHeartbeat hb : snapshot()) {
-            byte[] sealed = PluginMessageEnvelope.seal(hb, verifier);
+            byte[] sealed = PluginMessageEnvelope.seal(hb, verifier, now, 0L);
             if (sealed != null) out.add(sealed);
         }
         return out;

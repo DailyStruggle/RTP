@@ -78,8 +78,8 @@ Base causes map directly to RTP's internal failure categories:
 | `worldBorder` | `-1` (infinite) | Static | Candidate falls outside vanilla world border. |
 | `vert` | `-1` (infinite) | Static | No suitable vertical landing surface found. |
 | `safety` | `-1` (infinite) | Static | Unsafe landing block (lava, void, hazard blocks). |
-| `prefilterBiome` | `-1` (infinite) | Static | Filtered out during Anvil/Linear NBT biome pre-scan. |
-| `prefilterBlock` | `-1` (infinite) | Static | Filtered out during Anvil/Linear NBT block pre-scan. |
+| `prefilterBiome` | `-1` (infinite) | Static | Filtered out during the region-file (Anvil) NBT biome pre-scan. |
+| `prefilterBlock` | `-1` (infinite) | Static | Filtered out during the region-file (Anvil) NBT block pre-scan. |
 | `uniquePlacement` | `30d` | Dynamic | Temporary exclusion zone created around a recent player teleport. |
 | `safetyExternal` | `14d` | Dynamic | Base fallback duration for external claim/protection plugins. |
 

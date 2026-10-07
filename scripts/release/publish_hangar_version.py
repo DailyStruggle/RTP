@@ -148,8 +148,8 @@ def main() -> None:
 
     token = os.environ.get("HANGAR_TOKEN")
     if not token and not args.dry_run:
-        print("::warning::HANGAR_TOKEN environment variable not set; skipping Hangar publish.")
-        sys.exit(0)
+        print("::error::HANGAR_TOKEN environment variable not set.", file=sys.stderr)
+        sys.exit(1)
 
     versions = valid_platform_versions() if not args.dry_run else list(CANDIDATE_VERSIONS)
 

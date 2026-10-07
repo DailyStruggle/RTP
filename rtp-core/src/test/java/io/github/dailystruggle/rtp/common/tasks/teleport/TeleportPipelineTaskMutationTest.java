@@ -1666,10 +1666,13 @@ public class TeleportPipelineTaskMutationTest {
         fChunkSet.set(task, chunkSet);
 
         int scheduledBefore = accessor.getMockScheduler().getScheduledTasks().size();
+        int holdsBefore = TeleportPipelineTask.pendingArrivalReleaseCount();
         task.run();
 
-        // Should NOT have scheduled a delayed task because it ran inline
-        int scheduledAfter = accessor.getMockScheduler().getScheduledTasks().size();
+        // Should NOT have scheduled a delayed task because it ran inline. The deferred
+        // arrival-ticket release (REQ-RTP-S-005) is not a player task and is excluded.
+        int arrivalHolds = TeleportPipelineTask.pendingArrivalReleaseCount() - holdsBefore;
+        int scheduledAfter = accessor.getMockScheduler().getScheduledTasks().size() - arrivalHolds;
         assertEquals(scheduledBefore, scheduledAfter, "Inline execution on primary thread must not schedule player task");
     }
 

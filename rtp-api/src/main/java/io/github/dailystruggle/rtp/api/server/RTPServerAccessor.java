@@ -380,6 +380,17 @@ public interface RTPServerAccessor {
   }
 
   /**
+   * Retrieves the current scoreboard score for the specified player and objective name.
+   *
+   * @param playerId  the player's unique identifier; must not be {@code null}
+   * @param objective the objective name; must not be {@code null}
+   * @return the player's score, or {@code null} if the objective or score does not exist
+   */
+  default Integer getScoreboardScore(UUID playerId, String objective) {
+    return null;
+  }
+
+  /**
    * Applies colour codes and placeholders in player context.
    *
    * @param player player UUID for placeholders or {@code null} for console

@@ -522,7 +522,27 @@ public class MetricsRecorder {
             + "  firing thread, which Paper and Folia make near 100% for every plugin." + System.lineSeparator()
             + "phases CSV chunks_inclusive_per_attempt (all loads / attempts) is the chunk" + System.lineSeparator()
             + "  figure to publish across plugins. chunks_per_attempt charges on-tick loads to" + System.lineSeparator()
-            + "  the most recently dispatched attempt and is not comparable on Folia." + System.lineSeparator();
+            + "  the most recently dispatched attempt and is not comparable on Folia." + System.lineSeparator()
+            + "phases CSV cpu_*_ms: process CPU split by thread name, summed from per-thread" + System.lineSeparator()
+            + "  deltas (CpuSampler). server = tick thread; region = Folia region threads;" + System.lineSeparator()
+            + "  scheduler = Bukkit async workers, split per plugin in cpu_scheduler_by_plugin" + System.lineSeparator()
+            + "  from the name Paper gives a worker while it runs a task (charged to the plugin" + System.lineSeparator()
+            + "  named at sample time; (idle) = between tasks); async_scheduler = Paper/Folia" + System.lineSeparator()
+            + "  AsyncScheduler; chunk_system = chunk load/generation/IO workers; network =" + System.lineSeparator()
+            + "  Netty; other_java = the rest, top names in cpu_other_top. cpu_non_java_ms =" + System.lineSeparator()
+            + "  process CPU minus all of these: GC, JIT and VM threads (not Java threads) plus" + System.lineSeparator()
+            + "  the last interval of threads that exited between samples. cpu_gc_ms is the" + System.lineSeparator()
+            + "  JVM's GC-thread CPU counter (JDK 26+), a subset of non_java; -1 when absent." + System.lineSeparator()
+            + "  cpu_breakdown_samples = samples inside the phase (more = less exit loss)." + System.lineSeparator()
+            + "  The harness's own async work appears as StressTestRTP in by_plugin." + System.lineSeparator()
+            + "phases CSV chunks_landing_area: loads within viewDistance+1 chunks (Chebyshev)" + System.lineSeparator()
+            + "  of an account's last successful destination, from that teleport until the" + System.lineSeparator()
+            + "  same account's next dispatch (never time-based, so one account's teleports" + System.lineSeparator()
+            + "  cannot overlap). Checked before the most-recent-dispatch rule, and excluded" + System.lineSeparator()
+            + "  from chunks_loaded_attributed and chunks_loaded_background, so attributed +" + System.lineSeparator()
+            + "  landing_area + background = chunks_loaded. chunks_per_teleport =" + System.lineSeparator()
+            + "  (attributed + landing_area) / attempts: chunk loads charged to a teleport," + System.lineSeparator()
+            + "  independent of how long the plugin's teleports take." + System.lineSeparator();
 
     public static final String PHASES_CSV_HEADER =
             "phase_label,start_epoch_ms,end_epoch_ms,wall_ms,attempts,successes,"
@@ -620,9 +640,26 @@ public class MetricsRecorder {
                     // loads named by requester (stack attribution, gated on
                     // the startup self-test).
                     + "main_thread_cpu_scope,"
-                    + "chunks_sync_requested,chunks_sync_by_plugin,chunks_sync_selftest";
+                    + "chunks_sync_requested,chunks_sync_by_plugin,chunks_sync_selftest,"
+                    // Process CPU by thread group; -1 / empty when not measured.
+                    + "cpu_breakdown_samples,cpu_breakdown_threads,"
+                    + "cpu_server_thread_ms,cpu_region_threads_ms,cpu_scheduler_ms,"
+                    + "cpu_async_scheduler_ms,cpu_chunk_system_ms,cpu_network_ms,"
+                    + "cpu_other_java_ms,cpu_non_java_ms,cpu_gc_ms,"
+                    + "cpu_scheduler_by_plugin,cpu_other_top,"
+                    + "chunks_landing_area,chunks_landing_area_per_attempt,chunks_per_teleport";
 
     private final Path csvPath;
+    /** Persistent per-attempt CSV writer. Rows arrive from event, region and
+     *  async-tick threads; reopening per row cost ~0.4 ms on the server
+     *  thread (Windows close). Guarded by {@link #rowLock}; opened lazily so a
+     *  write after {@link #close} reopens in append mode instead of failing. */
+    private final Object rowLock = new Object();
+    private BufferedWriter rowWriter;
+    private long lastRowFlushMs = 0L;
+    private int rowWriterOpens = 0;
+    /** Upper bound on unflushed rows' age: a crash loses at most this much. */
+    static final long ROW_FLUSH_MS = 1000L;
     private final Path phasesCsvPath;
     /** Sidecar holding a periodically-refreshed snapshot of the in-flight
      *  phase, so a mid-phase server crash (e.g. a competitor plugin stalling
@@ -652,6 +689,8 @@ public class MetricsRecorder {
     private volatile long phaseStartEpochMs = -1L;
     private volatile long phaseStartProcessCpuNs = -1L;
     private volatile long phaseStartMainCpuNs = -1L;
+    @SuppressWarnings("java:S3077") // Volatile reference publication for snapshot record
+    private volatile CpuSampler.Breakdown phaseStartBreakdown;
     private volatile int phaseStartTotal = 0;
     private volatile int phaseStartSuccesses = 0;
 
@@ -987,6 +1026,8 @@ public class MetricsRecorder {
 
     /** Writes every held row whose wait has elapsed ({@code all}: every row). */
     public void flushDeferred(boolean all) {
+        // Called every runner tick in every mode: drives the time-based flush.
+        if (csvPath != null) flushRowsIfDue();
         if (deferredRows.isEmpty()) return;
         long now = System.currentTimeMillis();
         for (Map.Entry<Attempt, Long> e : deferredRows.entrySet()) {
@@ -1103,14 +1144,91 @@ public class MetricsRecorder {
                 landing == null ? "" : landing.floor(),
                 landing == null ? "" : landing.feet(),
                 landing == null ? "" : landing.head());
-        try (BufferedWriter w = Files.newBufferedWriter(csvPath, StandardCharsets.UTF_8,
-                StandardOpenOption.APPEND)) {
-            w.write(row);
-            w.newLine();
+        writeRow(row);
+    }
+
+    private void writeRow(String row) {
+        synchronized (rowLock) {
+            try {
+                if (rowWriter == null) {
+                    rowWriter = Files.newBufferedWriter(csvPath, StandardCharsets.UTF_8,
+                            StandardOpenOption.APPEND);
+                    rowWriterOpens++;
+                    lastRowFlushMs = System.currentTimeMillis();
+                }
+                rowWriter.write(row);
+                rowWriter.newLine();
+                long now = System.currentTimeMillis();
+                if (now - lastRowFlushMs >= ROW_FLUSH_MS) {
+                    rowWriter.flush();
+                    lastRowFlushMs = now;
+                }
+            } catch (IOException e) {
+                closeRowWriterQuietly();
+                // CSV write failures are diagnostic-only; the run continues.
+                // Logged at the plugin level via Runner's exception path.
+                throw new RuntimeException("CSV append failed: " + e.getMessage(), e);
+            }
+        }
+    }
+
+    /** Flushes buffered rows older than {@link #ROW_FLUSH_MS}; covers idle
+     *  stretches where no further row arrives to trigger the flush. */
+    private void flushRowsIfDue() {
+        synchronized (rowLock) {
+            if (rowWriter == null) return;
+            long now = System.currentTimeMillis();
+            if (now - lastRowFlushMs < ROW_FLUSH_MS) return;
+            flushRowsLocked(now);
+        }
+    }
+
+    /** Forces buffered per-attempt rows to disk. */
+    public void flushRows() {
+        synchronized (rowLock) {
+            if (rowWriter != null) flushRowsLocked(System.currentTimeMillis());
+        }
+    }
+
+    private void flushRowsLocked(long now) {
+        try {
+            rowWriter.flush();
+            lastRowFlushMs = now;
         } catch (IOException e) {
-            // CSV write failures are diagnostic-only; the run continues.
-            // Logged at the plugin level via Runner's exception path.
-            throw new RuntimeException("CSV append failed: " + e.getMessage(), e);
+            closeRowWriterQuietly();
+            throw new RuntimeException("CSV flush failed: " + e.getMessage(), e);
+        }
+    }
+
+    /** Flushes and closes the per-attempt CSV writer. Idempotent; a later row
+     *  reopens the file in append mode. */
+    public void close() {
+        synchronized (rowLock) {
+            if (rowWriter == null) return;
+            try {
+                rowWriter.close();
+            } catch (IOException e) {
+                throw new RuntimeException("CSV close failed: " + e.getMessage(), e);
+            } finally {
+                rowWriter = null;
+            }
+        }
+    }
+
+    private void closeRowWriterQuietly() {
+        if (rowWriter == null) return;
+        try {
+            rowWriter.close();
+        } catch (IOException ignored) {
+            // Already failing; the caller reports the original error.
+        }
+        rowWriter = null;
+    }
+
+    /** Number of times the per-attempt writer has been opened. Test hook. */
+    int rowWriterOpenCount() {
+        synchronized (rowLock) {
+            return rowWriterOpens;
         }
     }
 
@@ -1159,6 +1277,7 @@ public class MetricsRecorder {
         CpuSampler s = cpuSampler;
         phaseStartProcessCpuNs = s != null ? s.processCpuTimeNs() : -1L;
         phaseStartMainCpuNs = s != null ? s.mainThreadCpuTimeNs() : -1L;
+        phaseStartBreakdown = s != null ? s.sampleBreakdown() : null;
         phaseStartTotal = total.get();
         phaseStartSuccesses = successes.get();
         ChunkLoadCounter cc = chunkCounter;
@@ -1202,6 +1321,7 @@ public class MetricsRecorder {
     public void endPhase(@SuppressWarnings("unused") String label) {
         // Held rows belong to the closing phase's classifier and CSV block.
         flushDeferred(true);
+        if (csvPath != null) flushRows();
         if (!recording) return;
         if (phaseLabel == null) return;
         long endEpoch = System.currentTimeMillis();
@@ -1245,13 +1365,14 @@ public class MetricsRecorder {
         phaseStartEpochMs = -1L;
         phaseStartProcessCpuNs = -1L;
         phaseStartMainCpuNs = -1L;
+        phaseStartBreakdown = null;
     }
 
     /**
      * Periodically snapshots the in-flight phase to {@link #partialPhaseCsvPath}
      * so a mid-phase server crash still leaves the latest partial aggregate of
-     * the phase that was running (the per-attempt and heap-series CSVs already
-     * flush per row, but the phase summary is only written by {@link #endPhase}
+     * the phase that was running (the per-attempt CSV flushes at least every
+     * {@link #ROW_FLUSH_MS}, but the phase summary is only written by {@link #endPhase}
      * at phase end). Safe to call every tick: self-throttled to at most once
      * per {@link #PARTIAL_PHASE_FLUSH_MS} and a no-op when no phase is active or
      * recording is disabled. Read-only with respect to phase/chunk state.
@@ -1287,6 +1408,10 @@ public class MetricsRecorder {
         CpuSampler s = cpuSampler;
         long endProcessCpu = s != null ? s.processCpuTimeNs() : -1L;
         long endMainCpu = s != null ? s.mainThreadCpuTimeNs() : -1L;
+        CpuSampler.Breakdown startBd = phaseStartBreakdown;
+        CpuSampler.Breakdown bd = (s != null && startBd != null)
+                ? s.sampleBreakdown().minus(startBd) : null;
+        if (bd != null && !bd.available) bd = null;
         long wallMs = Math.max(0L, endEpoch - phaseStartEpochMs);
         int attempts = Math.max(0, total.get() - phaseStartTotal);
         int succ = Math.max(0, successes.get() - phaseStartSuccesses);
@@ -1322,6 +1447,11 @@ public class MetricsRecorder {
                 ? (double) chunksAttributed / attempts : -1.0;
         double chunksInclusivePerAtt = (chunksLoaded >= 0 && attempts > 0)
                 ? (double) chunksLoaded / attempts : -1.0;
+        long chunksLanding = cc != null ? cc.phaseLanding() : -1L;
+        double chunksLandingPerAtt = (chunksLanding >= 0 && attempts > 0)
+                ? (double) chunksLanding / attempts : -1.0;
+        double chunksPerTeleport = (chunksLanding >= 0 && chunksAttributed >= 0 && attempts > 0)
+                ? (double) (chunksAttributed + chunksLanding) / attempts : -1.0;
 
         // Chunk-load cost amendment. When a calibration value is set
         // (chunkLoadCostNs > 0, typically obtained from `/rtp test
@@ -1629,8 +1759,28 @@ public class MetricsRecorder {
                 s != null ? s.mainThreadScope() : "",
                 Long.toString(sync != null ? sync.phaseSyncLoads() : -1L),
                 sync != null ? csv(sync.phaseByPluginSummary()) : "",
-                sync != null ? sync.selfTest().name() : SyncLoadAttributor.SelfTest.NOT_RUN.name());
+                sync != null ? sync.selfTest().name() : SyncLoadAttributor.SelfTest.NOT_RUN.name(),
+                Long.toString(bd != null ? bd.samples : -1L),
+                Integer.toString(bd != null ? bd.threads : -1),
+                cpuMs(bd, CpuSampler.Group.SERVER),
+                cpuMs(bd, CpuSampler.Group.REGION),
+                cpuMs(bd, CpuSampler.Group.SCHEDULER),
+                cpuMs(bd, CpuSampler.Group.ASYNC_SCHEDULER),
+                cpuMs(bd, CpuSampler.Group.CHUNK_SYSTEM),
+                cpuMs(bd, CpuSampler.Group.NETWORK),
+                cpuMs(bd, CpuSampler.Group.OTHER),
+                bd != null && bd.nonJavaNs() >= 0 ? Long.toString(bd.nonJavaNs() / 1_000_000L) : "-1",
+                bd != null && bd.gcNs >= 0 ? Long.toString(bd.gcNs / 1_000_000L) : "-1",
+                bd != null ? csv(CpuSampler.Breakdown.summary(bd.schedulerByPluginNs, 0)) : "",
+                bd != null ? csv(CpuSampler.Breakdown.summary(bd.otherByNameNs, 8)) : "",
+                chunksLanding >= 0 ? Long.toString(chunksLanding) : "",
+                chunksLandingPerAtt >= 0 ? fmt(chunksLandingPerAtt) : "",
+                chunksPerTeleport >= 0 ? fmt(chunksPerTeleport) : "");
         return row;
+    }
+
+    private static String cpuMs(CpuSampler.Breakdown bd, CpuSampler.Group g) {
+        return bd != null ? Long.toString(bd.groupNs(g) / 1_000_000L) : "-1";
     }
 
     private static String csv(String s) {

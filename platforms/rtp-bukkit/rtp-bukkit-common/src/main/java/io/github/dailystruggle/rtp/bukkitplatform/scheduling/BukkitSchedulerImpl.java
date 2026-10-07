@@ -17,6 +17,7 @@ public class BukkitSchedulerImpl implements RTPScheduler {
 
   @Override
   public TrackedRTPTask runTaskAsynchronously(Runnable task) {
+    if (task == null) return null;
     String taskId = UUID.randomUUID().toString();
     TrackedRTPTask trackedTask = new TrackedRTPTask(task instanceof io.github.dailystruggle.rtp.common.tasks.RTPRunnable ? (io.github.dailystruggle.rtp.common.tasks.RTPRunnable) task : new io.github.dailystruggle.rtp.common.tasks.RTPRunnable() {
       @Override
@@ -33,6 +34,7 @@ public class BukkitSchedulerImpl implements RTPScheduler {
 
   @Override
   public void runTask(Runnable task) {
+    if (task == null) return;
     // If we are already on the main thread, execute instantly (0ms delay)
     if (org.bukkit.Bukkit.isPrimaryThread()) {
       task.run();

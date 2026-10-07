@@ -99,7 +99,12 @@ public final class ActionManager implements ActionService {
    * Default public constructor for ActionManager.
    */
   public ActionManager() {
-    // Intentionally empty; fields initialized at point of declaration
+    try {
+      if (RTP.serverAccessor != null && RTP.serverAccessor.getPlayerLifecycleHook() != null) {
+        RTP.serverAccessor.getPlayerLifecycleHook().onPlayerQuit(this::handlePlayerQuit);
+      }
+    } catch (Throwable ignored) {
+    }
   }
 
   /**
@@ -444,13 +449,26 @@ public final class ActionManager implements ActionService {
             + "': current queue size="
             + queue.size());
 
-    // Prune entries where participants are no longer available or already in a session
+    final long now = System.currentTimeMillis();
+    final long waitQueueTimeoutMs = 60_000L; // 60s TTL
+    // Prune entries where participants are no longer available, already in a session, or timed out
     queue.removeIf(entry -> {
       if (entry.future.isDone()) return true;
+      if (entry.enqueuedAt > 0 && (now - entry.enqueuedAt) > waitQueueTimeoutMs) {
+        entry.future.complete(ActionSessionResult.failure("Action wait queue timed out"));
+        return true;
+      }
       for (UUID pid : entry.participants) {
         if (participantToSession.containsKey(pid)) {
           entry.future.complete(ActionSessionResult.failure("Participant joined another session: " + pid));
           return true;
+        }
+        if (RTP.serverAccessor != null) {
+          io.github.dailystruggle.rtp.api.entity.RTPPlayer p = RTP.serverAccessor.getPlayer(pid);
+          if (p != null && !p.isOnline()) {
+            entry.future.complete(ActionSessionResult.failure("Participant offline: " + pid));
+            return true;
+          }
         }
       }
       return false;
@@ -475,6 +493,16 @@ public final class ActionManager implements ActionService {
         if (i == j) continue;
         ActionWaitQueueEntry other = entryList.get(j);
         if (!queue.contains(other) || candidateEntries.contains(other)) continue;
+
+        // Reciprocity check: do not pair non-reciprocal targeted or mixed open/targeted entries
+        boolean compatible = true;
+        for (ActionWaitQueueEntry existing : candidateEntries) {
+          if (!isReciprocalOrOpenMatch(existing, other)) {
+            compatible = false;
+            break;
+          }
+        }
+        if (!compatible) continue;
 
         candidateEntries.add(other);
         combinedParticipants.addAll(other.participants);
@@ -781,29 +809,6 @@ public final class ActionManager implements ActionService {
         if (ActionPlaceholderSanitizer.containsUnresolvedPrefix(substituted, "target")) {
           return;
         }
-        // If message addresses target (e.g. prompt to Bob), send to target if present; if target is missing/any, drop it
-        if (action.payload().contains("[target") || action.payload().contains("challenged you")) {
-          Object targetObj = tokens.get("target_uuid");
-          if (targetObj == null) targetObj = tokens.get("target");
-          if (targetObj == null) targetObj = tokens.get("target_name");
-          if (targetObj == null || targetObj.toString().isBlank() || targetObj.toString().equalsIgnoreCase("any")) {
-            // No target specified (e.g. open challenge matchmaking) - do not send invitation prompt to self or anyone
-            return;
-          }
-          if (targetObj instanceof UUID tId) {
-            accessor.sendMessage(tId, substituted);
-            return;
-          } else if (targetObj instanceof String tName) {
-            io.github.dailystruggle.rtp.api.entity.RTPPlayer tp = accessor.getPlayer(tName);
-            if (tp != null) {
-              accessor.sendMessage(tp.uuid(), substituted);
-              return;
-            }
-          }
-          // Target could not be resolved, do not send to sender
-          return;
-        }
-
         Object pObj = tokens.get("player");
         if (pObj instanceof UUID pid) {
           accessor.sendMessage(pid, substituted);
@@ -811,6 +816,27 @@ public final class ActionManager implements ActionService {
           // If no player token, send to all participants
           for (UUID pid : participants) {
             accessor.sendMessage(pid, substituted);
+          }
+        }
+      }
+      case MESSAGE_TARGET -> {
+        String substituted = ActionPlaceholderSanitizer.substitute(action.payload(), tokens);
+        if (ActionPlaceholderSanitizer.containsUnresolvedPrefix(substituted, "target")) {
+          return;
+        }
+        Object targetObj = tokens.get("target_uuid");
+        if (targetObj == null) targetObj = tokens.get("target");
+        if (targetObj == null) targetObj = tokens.get("target_name");
+        if (targetObj == null || targetObj.toString().isBlank() || targetObj.toString().equalsIgnoreCase("any")) {
+          // No target specified (e.g. open challenge matchmaking) - do not send invitation prompt
+          return;
+        }
+        if (targetObj instanceof UUID tId) {
+          accessor.sendMessage(tId, substituted);
+        } else if (targetObj instanceof String tName) {
+          io.github.dailystruggle.rtp.api.entity.RTPPlayer tp = accessor.getPlayer(tName);
+          if (tp != null) {
+            accessor.sendMessage(tp.uuid(), substituted);
           }
         }
       }
@@ -1034,7 +1060,7 @@ public final class ActionManager implements ActionService {
     }
 
     return allChecksPass
-        .thenApply(
+        .thenCompose(
             passed -> {
               if (!Boolean.TRUE.equals(passed)) {
                 // Learn claim hazard dynamically in spatial memory (ADR-079, ADR-095)
@@ -1054,21 +1080,32 @@ public final class ActionManager implements ActionService {
                   }
                 }
                 cached.release();
-                return ActionSessionResult.failure("Cached placement slot rejected by revalidation");
+                rollbackReservation(participants, sessionId);
+                return CompletableFuture.completedFuture(
+                    ActionSessionResult.failure("Cached placement slot rejected by revalidation"));
               }
 
               // Revalidation passed! Assign cached slots to participants, dispatch teleports, and start session
               Map<UUID, int[]> assignedSlots = new HashMap<>();
               String worldName = locList.get(0).world().name();
 
+              List<CompletableFuture<Boolean>> teleports = new ArrayList<>(participants.size());
               for (int i = 0; i < participants.size(); i++) {
                 UUID pid = participants.get(i);
                 RTPLocation loc = locList.get(i);
                 assignedSlots.put(pid, new int[] {loc.x(), loc.y(), loc.z()});
                 if (RTP.serverAccessor != null) {
-                  try {
-                    io.github.dailystruggle.rtp.api.entity.RTPPlayer player = RTP.serverAccessor.getPlayer(pid);
-                    if (player != null && player.isOnline()) {
+                  io.github.dailystruggle.rtp.api.entity.RTPPlayer player = RTP.serverAccessor.getPlayer(pid);
+                  if (player != null && !player.isOnline()) {
+                    cached.release();
+                    rollbackReservation(participants, sessionId);
+                    return CompletableFuture.completedFuture(
+                        ActionSessionResult.failure("Participant offline: " + pid));
+                  }
+                  if (player != null) {
+                    CompletableFuture<Boolean> done = new CompletableFuture<>();
+                    teleports.add(done);
+                    try {
                       player.setLocation(loc).whenComplete((ok, ex) -> {
                         if (loc.getReservation() != null) {
                           try {
@@ -1076,17 +1113,32 @@ public final class ActionManager implements ActionService {
                           } catch (Throwable ignored) {
                           }
                         }
+                        if (ex != null || !Boolean.TRUE.equals(ok)) {
+                          done.complete(false);
+                        } else {
+                          done.complete(true);
+                        }
                       });
-                    } else if (loc.getReservation() != null) {
-                      loc.getReservation().close();
+                    } catch (Throwable t) {
+                      if (loc.getReservation() != null) {
+                        try {
+                          loc.getReservation().close();
+                        } catch (Throwable ignored) {
+                        }
+                      }
+                      done.complete(false);
                     }
-                  } catch (Throwable t) {
-                    if (loc.getReservation() != null) {
+                  } else if (loc.getReservation() != null) {
+                    try {
                       loc.getReservation().close();
+                    } catch (Throwable ignored) {
                     }
                   }
                 } else if (loc.getReservation() != null) {
-                  loc.getReservation().close();
+                  try {
+                    loc.getReservation().close();
+                  } catch (Throwable ignored) {
+                  }
                 }
               }
 
@@ -1101,28 +1153,46 @@ public final class ActionManager implements ActionService {
                 }
               }
 
-              ActionSessionImpl session =
-                  new ActionSessionImpl(
-                      sessionId,
-                      def,
-                      participants,
-                      effectiveContext,
-                      assignedSlots,
-                      worldName,
-                      cached.anchorX,
-                      cached.anchorZ,
-                      parentRegion,
-                      this::handleDisarm,
-                      externalPredicates);
+              return CompletableFuture.allOf(teleports.toArray(new CompletableFuture[0]))
+                  .thenApply(
+                      ignored -> {
+                        boolean allSuccess = teleports.stream().allMatch(f -> Boolean.TRUE.equals(f.getNow(false)));
+                        if (!allSuccess) {
+                          cached.release();
+                          rollbackReservation(participants, sessionId);
+                          return ActionSessionResult.failure("One or more participant teleports failed");
+                        }
 
-              activeSessions.put(sessionId, session);
-              for (UUID pid : participants) {
-                participantToSession.put(pid, sessionId);
-              }
+                        ActionSessionImpl session =
+                            new ActionSessionImpl(
+                                sessionId,
+                                def,
+                                participants,
+                                effectiveContext,
+                                assignedSlots,
+                                worldName,
+                                cached.anchorX,
+                                cached.anchorZ,
+                                parentRegion,
+                                this::handleDisarm,
+                                externalPredicates);
 
-              session.arm();
-              session.triggerStart();
-              return ActionSessionResult.success(sessionId);
+                        activeSessions.put(sessionId, session);
+                        for (UUID pid : participants) {
+                          participantToSession.put(pid, sessionId);
+                        }
+
+                        Runnable startAction = () -> {
+                          session.arm();
+                          session.triggerStart();
+                        };
+                        if (RTP.scheduler != null) {
+                          RTP.scheduler.runTask(startAction);
+                        } else {
+                          startAction.run();
+                        }
+                        return ActionSessionResult.success(sessionId);
+                      });
             })
         .exceptionally(
             ex -> {
@@ -1191,6 +1261,7 @@ public final class ActionManager implements ActionService {
                   + result.reason());
 
               if (!result.isSuccess() || result.placements().isEmpty()) {
+                rollbackReservation(participants, sessionId);
                 return ActionSessionResult.failure(
                     "Spatial subspace placement failed: " + result.reason());
               }
@@ -1215,31 +1286,6 @@ public final class ActionManager implements ActionService {
                   minZ = Math.min(minZ, wz);
                   maxX = Math.max(maxX, wx);
                   maxZ = Math.max(maxZ, wz);
-
-                  // Dispatch teleport for online player and close chunk reservation (S-002 / S-005)
-                  if (RTP.serverAccessor != null) {
-                    try {
-                      io.github.dailystruggle.rtp.api.entity.RTPPlayer player = RTP.serverAccessor.getPlayer(pid);
-                      if (player != null && player.isOnline()) {
-                        player.setLocation(loc).whenComplete((ok, ex) -> {
-                          if (loc.getReservation() != null) {
-                            try {
-                              loc.getReservation().close();
-                            } catch (Throwable ignored) {
-                            }
-                          }
-                        });
-                      } else if (loc.getReservation() != null) {
-                        loc.getReservation().close();
-                      }
-                    } catch (Throwable t) {
-                      if (loc.getReservation() != null) {
-                        loc.getReservation().close();
-                      }
-                    }
-                  } else if (loc.getReservation() != null) {
-                    loc.getReservation().close();
-                  }
                 }
               }
 
@@ -1265,8 +1311,15 @@ public final class ActionManager implements ActionService {
                 participantToSession.put(pid, sessionId);
               }
 
-              session.arm();
-              session.triggerStart();
+              Runnable startAction = () -> {
+                session.arm();
+                session.triggerStart();
+              };
+              if (RTP.scheduler != null) {
+                RTP.scheduler.runTask(startAction);
+              } else {
+                startAction.run();
+              }
 
               return ActionSessionResult.success(sessionId);
             });
@@ -1417,5 +1470,106 @@ public final class ActionManager implements ActionService {
         participantToSession.remove(pid, sessionId);
       }
     }
+  }
+
+  /**
+   * Handles a player disconnect/quit: prunes their pending wait-queue requests and eliminates/cancels
+   * them from any active running action session.
+   */
+  public void handlePlayerQuit(UUID playerUuid) {
+    if (playerUuid == null) return;
+
+    // 1. Drain pending wait queue entries containing this player
+    for (java.util.Queue<ActionWaitQueueEntry> queue : waitQueues.values()) {
+      if (queue == null || queue.isEmpty()) continue;
+      queue.removeIf(entry -> {
+        if (entry.participants.contains(playerUuid)) {
+          if (!entry.future.isDone()) {
+            entry.future.complete(ActionSessionResult.failure("Participant disconnected: " + playerUuid));
+          }
+          return true;
+        }
+        return false;
+      });
+    }
+
+    // 2. Terminate or surrender from active running session
+    UUID sessionId = participantToSession.remove(playerUuid);
+    if (sessionId != null) {
+      ActionSessionImpl session = activeSessions.get(sessionId);
+      if (session != null) {
+        UUID winner = null;
+        for (UUID p : session.participants()) {
+          if (!p.equals(playerUuid)) {
+            winner = p;
+            break;
+          }
+        }
+        session.triggerDeath(playerUuid, winner);
+      }
+    }
+  }
+
+  private static boolean isReciprocalOrOpenMatch(ActionWaitQueueEntry e1, ActionWaitQueueEntry e2) {
+    Object t1 = getTargetIdentifier(e1);
+    Object t2 = getTargetIdentifier(e2);
+
+    // Both are open matchmaking: valid pair
+    if (t1 == null && t2 == null) {
+      return true;
+    }
+
+    // One is targeted and the other is open: cannot pair
+    if (t1 == null || t2 == null) {
+      return false;
+    }
+
+    // Both are targeted: verify reciprocity
+    UUID s1 = e1.participants.isEmpty() ? null : e1.participants.get(0);
+    Object sName1 = e1.context.metadata().get("sender_name");
+    UUID s2 = e2.participants.isEmpty() ? null : e2.participants.get(0);
+    Object sName2 = e2.context.metadata().get("sender_name");
+
+    boolean t1Matches2 = matchesParticipant(t1, s2, sName2);
+    boolean t2Matches1 = matchesParticipant(t2, s1, sName1);
+
+    return t1Matches2 && t2Matches1;
+  }
+
+  private static Object getTargetIdentifier(ActionWaitQueueEntry e) {
+    if (e == null || e.context == null) return null;
+    Map<String, Object> meta = e.context.metadata();
+    if (meta == null) return null;
+    Object t = meta.get("target_uuid");
+    if (t == null) t = meta.get("target_name");
+    if (t == null) t = meta.get("target");
+    if (t != null) {
+      String str = t.toString().trim();
+      if (str.isEmpty() || str.equalsIgnoreCase("any")) {
+        return null;
+      }
+    }
+    return t;
+  }
+
+  private static boolean matchesParticipant(Object target, UUID senderUuid, Object senderName) {
+    if (target == null) return false;
+    if (target instanceof UUID tUuid && senderUuid != null) {
+      return tUuid.equals(senderUuid);
+    }
+    String tStr = target.toString().trim();
+    if (senderUuid != null && tStr.equalsIgnoreCase(senderUuid.toString())) {
+      return true;
+    }
+    if (senderName != null && tStr.equalsIgnoreCase(senderName.toString().trim())) {
+      return true;
+    }
+    if (RTP.serverAccessor != null && senderUuid != null) {
+      io.github.dailystruggle.rtp.api.entity.RTPPlayer p = RTP.serverAccessor.getPlayer(senderUuid);
+      if (p != null && p.name() != null && tStr.equalsIgnoreCase(p.name().trim())) {
+        return true;
+      }
+    }
+    return false;
   }
 }

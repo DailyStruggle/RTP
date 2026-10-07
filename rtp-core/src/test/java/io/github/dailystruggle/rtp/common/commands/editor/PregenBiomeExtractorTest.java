@@ -1,5 +1,8 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
+import io.github.dailystruggle.rtp.anvil.AnvilReader;
+import io.github.dailystruggle.rtp.anvil.RegionFileReader;
+import io.github.dailystruggle.rtp.anvil.RegionFormatRegistry;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -14,6 +17,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Map;
 
@@ -129,5 +135,49 @@ class PregenBiomeExtractorTest {
         // When no region folder exists for "test_world", should safely return null (not fall back to unrelated folders)
         java.nio.file.Path resolved = PregenBiomeExtractor.resolveRegionFolder(region);
         assertNull(resolved);
+    }
+
+    @Test
+    @DisplayName("ADR-077: unregistered .linear files are ignored and never sampled as Anvil")
+    void unregisteredFormatIgnored() throws IOException {
+        RegionFormatRegistry.reset();
+        Path dir = Files.createDirectories(tempDir.toPath().resolve("w").resolve("region"));
+        Files.write(dir.resolve("r.0.0.linear"), new byte[8192]);
+
+        assertNull(PregenBiomeExtractor.regionFileIn(dir, "r.0.0"), "no reader for .linear, no .mca");
+        Files.write(dir.resolve("r.0.0.mca"), new byte[8192]);
+        assertEquals(dir.resolve("r.0.0.mca"), PregenBiomeExtractor.regionFileIn(dir, "r.0.0"));
+
+        int[] calls = {0};
+        int generated = PregenBiomeExtractor.sampleRegionFile(new byte[8192], ".linear", 0, 0,
+                0, 0, 31, 31, null, (cx, cz, b) -> { calls[0]++; return true; });
+        assertEquals(0, generated);
+        assertEquals(0, calls[0]);
+    }
+
+    @Test
+    @DisplayName("ADR-077: an addon-registered format is preferred over a stale .mca")
+    void registeredFormatPreferred() throws IOException {
+        Path dir = Files.createDirectories(tempDir.toPath().resolve("w2").resolve("region"));
+        Files.write(dir.resolve("r.0.0.mca"), new byte[8192]);
+        Files.write(dir.resolve("r.0.0.linear"), new byte[8192]);
+        RegionFormatRegistry.register(".linear", new RegionFileReader() {
+            @Override
+            public AnvilReader.ChunkEntry readChunk(byte[] regionBytes, int rx, int rz) {
+                return null;
+            }
+
+            @Override
+            public boolean isChunkGenerated(byte[] regionBytes, int rx, int rz) {
+                return false;
+            }
+        });
+        try {
+            Path picked = PregenBiomeExtractor.regionFileIn(dir, "r.0.0");
+            assertEquals(dir.resolve("r.0.0.linear"), picked);
+            assertEquals(".linear", PregenBiomeExtractor.extensionOf(picked));
+        } finally {
+            RegionFormatRegistry.reset();
+        }
     }
 }

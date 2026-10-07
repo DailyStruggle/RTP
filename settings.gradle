@@ -379,9 +379,9 @@ if (!excludeNeoforge) {
 }
 
 include 'addons:LeafRTPCountdownAddon'
-// LeafRTPLinearAddon was folded into anvil-api on 2026-09-23 (ADR-077 revised):
-// .linear (ZStandard) decode is now built in, using the pure-Java aircompressor
-// decoder (no native binaries), so no separate addon module is required.
+// Linear (.linear) region support is not built into anvil-api (ADR-077): a future
+// guarded reader ships as an addon registering a RegionFileReader with
+// RegionFormatRegistry.
 // LeafRTPRiftAddon - reference demo of effect registration. Registers a single
 // new effects-api prototype ("RIFT", a client-side "world deconstruction" warmup
 // animation) so it joins the built-in effects by name. Fully platform-neutral: the

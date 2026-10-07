@@ -5,6 +5,7 @@ import tempfile
 import unittest
 
 from scripts.release.build_front_pages import (
+    RAW_BASE,
     SOURCE,
     TARGETS,
     FrontPageError,
@@ -158,6 +159,43 @@ class CommittedSourceTest(unittest.TestCase):
             bad.write_text(NOTES + "Buy the support tier\n", encoding="utf-8")
             self.assertEqual(1, main(["--check", "--source", str(bad), "--out-dir", str(out)]))
             self.assertFalse(out.exists())
+
+
+class LocalImageTest(unittest.TestCase):
+
+    def test_local_image_resolves_to_absolute_url(self):
+        body = "![Web editor](../assets/img/web_editor.png)\n"
+        out_md = _render(body, "hangar")
+        self.assertIn("![Web editor](https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/web_editor.png)", out_md)
+        out_bb = _render(body, "bbb-pro")
+        self.assertIn("[IMG]https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/web_editor.png[/IMG]", out_bb)
+
+    def test_repo_root_relative_image_resolves(self):
+        body = "![Web editor](docs/assets/img/web_editor.png)\n"
+        out = _render(body, "modrinth")
+        self.assertIn("https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/web_editor.png", out)
+
+    def test_multiple_images_on_same_line_resolve(self):
+        body = "![one](../assets/img/menu_1.png) ![two](../assets/img/menu_2.png)\n"
+        out = _render(body, "bbb-lite")
+        self.assertIn("[IMG]https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/menu_1.png[/IMG] [IMG]https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/menu_2.png[/IMG]", out)
+
+    def test_nonexistent_local_image_fails(self):
+        body = "![ghost](../assets/img/nonexistent_image_123.png)\n"
+        with self.assertRaises(FrontPageError) as ctx:
+            _render(body, "modrinth")
+        self.assertIn("does not exist on disk", str(ctx.exception))
+
+    def test_absolute_image_url_preserved(self):
+        body = "![ext](https://example.com/ext.png)\n"
+        out = _render(body, "hangar")
+        self.assertIn("https://example.com/ext.png", out)
+
+    def test_custom_raw_base(self):
+        body = "![pic](../assets/img/menu_1.png)\n"
+        custom_base = "https://cdn.example.com/rtp"
+        out = render(NOTES + body, TARGETS["modrinth"], raw_base=custom_base)[0]
+        self.assertIn("https://cdn.example.com/rtp/docs/assets/img/menu_1.png", out)
 
 
 if __name__ == "__main__":

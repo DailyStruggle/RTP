@@ -300,6 +300,7 @@ public class OnEventTeleports implements Listener {
     long start = System.nanoTime();
 
     RTPCommandSender sender = RTP.serverAccessor.getSender(player.getUniqueId());
+    if (sender == null) return;
     boolean hasFirstJoin = ParsePermissions.hasPerm(sender, "rtp.onevent.", "firstjoin");
     boolean hasJoin = ParsePermissions.hasPerm(sender, "rtp.onevent.", "join");
 

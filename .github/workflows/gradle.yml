@@ -97,11 +97,14 @@ jobs:
       # lines are covered, measured against the PR base (pull_request) or the
       # previous commit (push). Reads the JaCoCo XML produced above.
       - name: Changed-line coverage gate
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE_SHA: ${{ github.event.before }}
         run: |
-          if [ -n "${{ github.base_ref }}" ]; then
-            BASELINE="origin/${{ github.base_ref }}"
+          if [ -n "$BASE_REF" ]; then
+            BASELINE="origin/$BASE_REF"
           else
-            BASELINE="${{ github.event.before }}"
+            BASELINE="$BEFORE_SHA"
             if [ -z "$BASELINE" ] || [ "$BASELINE" = "0000000000000000000000000000000000000000" ]; then
               BASELINE="HEAD~1"
             fi

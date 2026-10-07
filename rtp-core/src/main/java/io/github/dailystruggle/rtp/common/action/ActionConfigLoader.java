@@ -529,7 +529,12 @@ public final class ActionConfigLoader {
         case "REGION" -> ConfinementBoundary.REGION;
         case "LEASH" -> ConfinementBoundary.LEASH;
         case "SHAPE" -> ConfinementBoundary.SHAPE;
-        default -> ConfinementBoundary.SUBSPACE;
+        case "NONE" -> ConfinementBoundary.NONE;
+        case "SUBSPACE" -> ConfinementBoundary.SUBSPACE;
+        default -> {
+          RTP.log(Level.WARNING, "[RTP Action] Unknown confinement boundary: '" + bStr + "', falling back to SUBSPACE");
+          yield ConfinementBoundary.SUBSPACE;
+        }
       };
     }
 
@@ -732,13 +737,32 @@ public final class ActionConfigLoader {
         delaySeconds = n.longValue();
       }
 
-      if (typedMap.containsKey("gate") && typedMap.containsKey("run")) {
+      if (typedMap.containsKey("gate")) {
         Object gObj = typedMap.get("gate");
         Map<String, Object> gateConfig = (gObj instanceof RtpYamlSection s)
             ? s.getValues(false)
             : (gObj instanceof Map<?, ?> m ? (Map<String, Object>) m : Collections.emptyMap());
-        List<?> runList = (List<?>) typedMap.get("run");
-        List<ActionDefinition.CommandAction> actions = parseActions(runList);
+
+        List<ActionDefinition.CommandAction> actions;
+        if (typedMap.containsKey("run")) {
+          Object runObj = typedMap.get("run");
+          if (runObj instanceof List<?> runList) {
+            actions = parseActions(runList);
+          } else if (runObj instanceof Map<?, ?> runMap) {
+            actions = parseActionFromMap((Map<String, Object>) runMap);
+          } else if (runObj instanceof RtpYamlSection runSec) {
+            actions = parseActionFromMap(runSec.getValues(false));
+          } else {
+            actions = Collections.emptyList();
+          }
+        } else {
+          // Inline gated action: actions defined directly on typedMap (excluding gate/delay)
+          Map<String, Object> actionMap = new LinkedHashMap<>(typedMap);
+          actionMap.remove("gate");
+          actionMap.remove("delay");
+          actionMap.remove("delaySeconds");
+          actions = parseActionFromMap(actionMap);
+        }
         steps.add(new ActionDefinition.LifecycleStep(gateConfig, actions, delaySeconds));
       } else {
         // Ungated step: single action map, e.g. { CONSOLE: "..." } or { FOR_EACH: { ... } }
@@ -775,6 +799,7 @@ public final class ActionConfigLoader {
         case "PLAYER" -> res.add(ActionDefinition.CommandAction.player(val != null ? val.toString() : ""));
         case "ACTION" -> res.add(ActionDefinition.CommandAction.action(val != null ? val.toString() : ""));
         case "MESSAGE", "TELL", "MSG" -> res.add(ActionDefinition.CommandAction.message(val != null ? val.toString() : ""));
+        case "MESSAGE_TARGET", "TELL_TARGET", "MSG_TARGET" -> res.add(ActionDefinition.CommandAction.messageTarget(val != null ? val.toString() : ""));
         case "FOR_EACH" -> {
           if (val instanceof RtpYamlSection sec) {
             List<ActionDefinition.CommandAction> subActions = parseActionFromMap(sec.getValues(false));

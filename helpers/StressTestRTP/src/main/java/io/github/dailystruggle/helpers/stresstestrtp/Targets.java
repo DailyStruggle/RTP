@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 /**
  * Resolves the configured target commands. Multiple co-installed RTP-style
@@ -34,6 +35,8 @@ public final class Targets {
             return template.replace("{player}", playerName);
         }
     }
+
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
     private Targets() {}
 
@@ -72,7 +75,7 @@ public final class Targets {
                     }
                 } else if (o instanceof String s && !s.isEmpty()) {
                     // Bare-string entry: derive a label from the first whitespace-separated token.
-                    String label = s.split("\\s+", 2)[0];
+                    String label = WHITESPACE.split(s, 2)[0];
                     out.add(new Entry(label, s));
                 }
             }

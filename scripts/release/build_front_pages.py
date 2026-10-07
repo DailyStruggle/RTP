@@ -23,7 +23,9 @@ what sits between them, so the raw source must never be published directly.
 The BBCode converter accepts a markdown subset (headings, paragraphs, `-` lists,
 pipe tables, links, images, badges, **bold**, *italic*, `code`, centred <div>,
 <details>/<summary>, ---) and rejects anything else instead of guessing. Numbered
-steps ("1. ...") pass through as plain text lines.
+steps ("1. ...") pass through as plain text lines. Local image references
+(![alt](../assets/img/...)) are validated against disk and rewritten to absolute
+raw GitHub URLs during rendering for all storefront targets.
 
 Usage:
     python scripts/release/build_front_pages.py                  # write all outputs
@@ -86,12 +88,14 @@ DENYLIST = [
 DRIFT_WARN = 0.15
 
 HEADING_COLOR = "#27AE60"
+RAW_BASE = "https://raw.githubusercontent.com/dailystruggle/RTP/V3"
 
 _OPEN = re.compile(r"^\s*<!--\s*(kind|only|not)\s*:\s*(.*?)\s*-->\s*$")
 _CLOSE = re.compile(r"^\s*<!--\s*/(kind|only|not)\s*-->\s*$")
 _VAR = re.compile(r"\{\{\s*(\w+)\s*\}\}")
 _LATEX = re.compile(r"\$[^$\s][^$]*\$")
 _RELATIVE_LINK = re.compile(r"\]\((?!https?://|#|mailto:)([^)]*)\)")
+_IMAGE = re.compile(r"!\[(?P<alt>[^\]]*)\]\((?P<src>[^)\s]+)\)")
 
 
 class FrontPageError(Exception):
@@ -194,6 +198,35 @@ def _substitute(line_no, line, target):
             raise FrontPageError(f"line {line_no}: unknown variable '{{{{{key}}}}}'")
         return target.variables[key]
     return _VAR.sub(repl, line)
+
+
+def _resolve_images(line_no, line, source_dir=SOURCE.parent, raw_base=RAW_BASE):
+    """Rewrites local image paths to absolute raw-GitHub URLs, validating existence on disk."""
+    def repl(m):
+        alt = m.group("alt")
+        src = m.group("src")
+        if src.startswith("http://") or src.startswith("https://") or src.startswith("//"):
+            return m.group(0)
+        has_angles = src.startswith("<") and src.endswith(">")
+        raw_path = src[1:-1] if has_angles else src
+        clean_src = raw_path.split("?")[0].split("#")[0]
+        suffix = raw_path[len(clean_src):]
+
+        candidate = (source_dir / clean_src).resolve()
+        if not candidate.is_file():
+            candidate = (ROOT / clean_src.lstrip("/\\")).resolve()
+        if not candidate.is_file():
+            raise FrontPageError(f"line {line_no}: local image '{src}' does not exist on disk")
+
+        try:
+            rel_to_root = candidate.relative_to(ROOT).as_posix()
+        except ValueError:
+            raise FrontPageError(f"line {line_no}: local image '{src}' resolves outside the repository: {candidate}")
+
+        new_url = f"{raw_base.rstrip('/')}/{rel_to_root}{suffix}"
+        return f"![{alt}]({new_url})"
+
+    return _IMAGE.sub(repl, line)
 
 
 def _lint(kept):
@@ -377,10 +410,12 @@ def check_denylist(target, text):
     return problems
 
 
-def render(source_text, target):
+def render(source_text, target, source_path=SOURCE, raw_base=RAW_BASE):
     """Returns (output text, audience-specific line count, shared line count)."""
+    source_dir = source_path.parent if isinstance(source_path, pathlib.Path) else pathlib.Path(source_path).parent
     kept, specific, shared = select_lines(source_text, target.name)
     kept = [(n, _substitute(n, line, target)) for n, line in kept]
+    kept = [(n, _resolve_images(n, line, source_dir=source_dir, raw_base=raw_base)) for n, line in kept]
     _lint(kept)
     if target.fmt == "bbcode":
         lines = to_bbcode(kept)
@@ -396,11 +431,11 @@ def render(source_text, target):
     return text, specific, shared
 
 
-def build_all(source_text):
+def build_all(source_text, source_path=SOURCE, raw_base=RAW_BASE):
     outputs = {}
     stats = (0, 0)
     for name, target in TARGETS.items():
-        text, specific, shared = render(source_text, target)
+        text, specific, shared = render(source_text, target, source_path=source_path, raw_base=raw_base)
         outputs[name] = text
         stats = (specific, shared)
     return outputs, stats
@@ -414,13 +449,15 @@ def main(argv=None):
     parser.add_argument("--stdout", action="store_true", help="print instead of writing (needs --target)")
     parser.add_argument("--source", type=pathlib.Path, default=SOURCE)
     parser.add_argument("--out-dir", type=pathlib.Path, default=OUT_DIR)
+    parser.add_argument("--raw-base", default=RAW_BASE,
+                        help="base URL for rewritten local image links (default: %(default)s)")
     args = parser.parse_args(argv)
 
     if args.stdout and not args.target:
         parser.error("--stdout needs --target")
     try:
         source_text = args.source.read_text(encoding="utf-8")
-        outputs, (specific, shared) = build_all(source_text)
+        outputs, (specific, shared) = build_all(source_text, source_path=args.source, raw_base=args.raw_base)
     except (FrontPageError, OSError) as e:
         print(f"::error::front pages: {e}", file=sys.stderr)
         return 1

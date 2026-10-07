@@ -37,6 +37,7 @@ public final class BackendHeartbeatCodec {
      * (no HMAC line). This is the byte sequence the Redis HMAC layer signs over.
      */
     public static String encode(BackendHeartbeat r) {
+        if (r == null) return "";
         return canonical(toFieldMap(r));
     }
 
@@ -53,6 +54,7 @@ public final class BackendHeartbeatCodec {
     /** Builds the fixed-order field map for a heartbeat (insertion order is canonical). */
     public static Map<String, String> toFieldMap(BackendHeartbeat r) {
         Map<String, String> m = new LinkedHashMap<>();
+        if (r == null) return m;
         m.put("serverId", r.serverId());
         m.put("schemaVersion", Integer.toString(r.schemaVersion()));
         m.put("pluginState", r.pluginState().name());

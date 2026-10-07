@@ -99,25 +99,15 @@ jobs:
             exit 1
           fi
 
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9]+)*$ ]]; then
+            echo "::error::Invalid release version format: ${VERSION}"
+            exit 1
+          fi
+
           TAG="v${VERSION}"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "Prepared release version: ${VERSION} with tag: ${TAG}"
-
-      - name: Create and push Git tag
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="${{ steps.version.outputs.tag }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          if git rev-parse "$TAG" >/dev/null 2>&1 || git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "${TAG}"; then
-            echo "Tag ${TAG} already exists locally or remotely. Skipping tag creation."
-          else
-            echo "Creating and pushing tag ${TAG}..."
-            git tag -a "$TAG" -m "Release ${TAG}"
-            git push origin "$TAG"
-          fi
 
       - name: Set up JDK 21 and 25
         uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
@@ -164,8 +154,9 @@ jobs:
 
       - name: Extract release notes from CHANGELOG.md
         id: notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
           # Pro / Full release notes only: the full section including **(Pro)**
           # bullets. The Lite-filtered notes are produced by release.yml for the
           # Modrinth and GitHub Release listings.
@@ -249,6 +240,21 @@ jobs:
           fi
 
           echo "Successfully published LeafRTP Pro ${VERSION} to BuiltByBit!"
+
+      - name: Create and push Git tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git rev-parse "$TAG" >/dev/null 2>&1 || git ls-remote --tags origin "refs/tags/${TAG}" | grep -q "${TAG}"; then
+            echo "Tag ${TAG} already exists locally or remotely. Skipping tag creation."
+          else
+            echo "Creating and pushing tag ${TAG}..."
+            git tag -a "$TAG" -m "Release ${TAG}"
+            git push origin "$TAG"
+          fi
 
       # The `v<version>` tag, Modrinth publish, and the public GitHub Release are
       # intentionally NOT handled here: they are Git / markdown-listing concerns

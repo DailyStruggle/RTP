@@ -120,11 +120,14 @@ public class Polygon extends Square {
     long centerX = ((long) lx + (long) hx) / 2;
     long centerZ = ((long) lz + (long) hz) / 2;
 
-    data.put(GenericMemoryShapeParams.radius, (int) radius);
-    data.put(GenericMemoryShapeParams.centerX, (int) centerX);
-    data.put(GenericMemoryShapeParams.centerZ, (int) centerZ);
-    data.put(GenericMemoryShapeParams.centerRadius, 0);
-    data.put(GenericMemoryShapeParams.expand, false);
+    // Copy-on-write: the shape may already be shared with lock-free readers.
+    java.util.EnumMap<GenericMemoryShapeParams, Object> rebuilt = getData();
+    rebuilt.put(GenericMemoryShapeParams.radius, (int) radius);
+    rebuilt.put(GenericMemoryShapeParams.centerX, (int) centerX);
+    rebuilt.put(GenericMemoryShapeParams.centerZ, (int) centerZ);
+    rebuilt.put(GenericMemoryShapeParams.centerRadius, 0);
+    rebuilt.put(GenericMemoryShapeParams.expand, false);
+    replaceData(rebuilt);
 
     // Schedule the async curve-walker iff the segmented bad-locations store is
     // currently empty. A prior session's serialized mask or runtime discoveries

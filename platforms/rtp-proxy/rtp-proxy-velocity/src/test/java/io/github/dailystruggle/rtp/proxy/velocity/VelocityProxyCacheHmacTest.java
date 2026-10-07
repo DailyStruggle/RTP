@@ -111,4 +111,42 @@ class VelocityProxyCacheHmacTest {
         assertEquals(PluginMessageEnvelope.Rejection.OVERSIZED, cache.onPushPayload(huge, null));
         assertTrue(cache.snapshot().isEmpty());
     }
+
+    @Test
+    @DisplayName("RTP-18: replayed and stale pushes to velocity cache are rejected")
+    void replayAndStalePushRejected() {
+        HmacVerifier v = verifier((byte) 3);
+        AtomicLong now = new AtomicLong(10000L);
+        VelocityProxyAvailabilityCache cache = new VelocityProxyAvailabilityCache(Map.of(), 5000L, now::get);
+
+        // 1. Initial push at T=10000, seq=1
+        byte[] p1 = PluginMessageEnvelope.seal(hb("srv-1"), v, 10000L, 1L);
+        assertNull(cache.onPushPayload(p1, v));
+        assertEquals(1, cache.liveCount());
+
+        // 2. Replayed push (identical payload) -> rejected with REPLAY
+        assertEquals(PluginMessageEnvelope.Rejection.REPLAY, cache.onPushPayload(p1, v));
+
+        // 3. Stale push (|10000 - 0| = 10000 = boundary, 0L is delta 10000 <= 10000, let's use -1000L delta 11000)
+        byte[] pStale = PluginMessageEnvelope.seal(hb("srv-stale"), v, -1000L, 1L);
+        assertEquals(PluginMessageEnvelope.Rejection.STALE, cache.onPushPayload(pStale, v));
+
+        // 4. Futuristic push (|10000 - 30000| = 20000 > 10000) -> rejected with STALE
+        byte[] pFuture = PluginMessageEnvelope.seal(hb("srv-future"), v, 30000L, 1L);
+        assertEquals(PluginMessageEnvelope.Rejection.STALE, cache.onPushPayload(pFuture, v));
+
+        // 5. Monotonic progression: seq=2 at T=11000 -> accepted
+        now.set(11000L);
+        byte[] p2 = PluginMessageEnvelope.seal(hb("srv-1"), v, 11000L, 2L);
+        assertNull(cache.onPushPayload(p2, v));
+
+        // 6. Non-monotonic push: seq=1 at T=11000 -> rejected with REPLAY
+        byte[] pOldSeq = PluginMessageEnvelope.seal(hb("srv-1"), v, 11000L, 1L);
+        assertEquals(PluginMessageEnvelope.Rejection.REPLAY, cache.onPushPayload(pOldSeq, v));
+
+        // 7. Reboot progression: seq resets to 1, but sentAtMs advances to T=12000 -> accepted
+        now.set(12000L);
+        byte[] pReboot = PluginMessageEnvelope.seal(hb("srv-1"), v, 12000L, 1L);
+        assertNull(cache.onPushPayload(pReboot, v));
+    }
 }

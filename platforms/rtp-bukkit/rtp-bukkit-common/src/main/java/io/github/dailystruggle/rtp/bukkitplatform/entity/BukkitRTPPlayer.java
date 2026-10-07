@@ -279,12 +279,13 @@ public class BukkitRTPPlayer implements RTPPlayer {
   }
 
   /**
-   * Strips legacy {@code &x} color codes and {@code #RRGGBB} hex codes from a bar title (boss-bar
-   * titles render as plain text on most clients) and truncates to Bukkit's 64-character limit.
+   * Strips legacy {@code &x} / {@code §x} color codes and {@code #RRGGBB} / {@code &#RRGGBB} hex codes
+   * from a bar title (boss-bar titles render as plain text on most clients) and truncates to Bukkit's
+   * 64-character limit. Regex-free: runs on every bar update.
    */
   private static String sanitizeBarTitle(String title) {
     if (title == null) return "";
-    String out = title.replaceAll("&[0-9a-fA-FklmnorKLMNOR]", "").replaceAll("#[0-9a-fA-F]{6}", "");
+    String out = io.github.dailystruggle.rtp.common.text.LegacyColorStrip.strip(title);
     return out.length() > 64 ? out.substring(0, 64) : out;
   }
 

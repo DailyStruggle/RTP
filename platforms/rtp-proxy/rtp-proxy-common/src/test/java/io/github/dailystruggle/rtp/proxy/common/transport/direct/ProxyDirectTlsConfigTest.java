@@ -193,8 +193,10 @@ class ProxyDirectTlsConfigTest {
                 assertEquals(42, s.getInputStream().read());
             }
 
-            assertThrows(IOException.class,
-                    () -> client.wrapClient(connect(ss.getLocalPort()), "wrong.invalid", ss.getLocalPort()).close());
+            try (Socket rawSocket = connect(ss.getLocalPort())) {
+                assertThrows(IOException.class,
+                        () -> client.wrapClient(rawSocket, "wrong.invalid", ss.getLocalPort()));
+            }
 
             try (SSLSocket s = clientNoVerify.wrapClient(connect(ss.getLocalPort()), "wrong.invalid", ss.getLocalPort())) {
                 s.getOutputStream().write(7);

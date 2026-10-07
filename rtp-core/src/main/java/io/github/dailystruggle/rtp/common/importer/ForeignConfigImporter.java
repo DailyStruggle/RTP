@@ -98,10 +98,10 @@ public interface ForeignConfigImporter {
      */
     static String sanitizeForeignYaml(String raw) {
         if (raw == null || raw.isEmpty()) return "";
-        String[] lines = raw.split("\r?\n", -1);
-        Pattern emptyBrackets = Pattern.compile("^(\\s*+[^#:\\r\\n\\s][^#:\\r\\n]*+:)\\s*+(\\[\\]|\\{\\})(.*)$");
-        Pattern immediateComment = Pattern.compile("^(\\s*+[^#:\\r\\n\\s][^#:\\r\\n]*+:)\\s*+#.*$");
-        Pattern flowSeq = Pattern.compile("^(\\s*+)([^#:\\r\\n\\s][^#:\\r\\n]*+:)\\s*+\\[([^\\]]*+)\\]\\s*+(#.*+)?$");
+        String[] lines = ForeignYamlPatterns.LINE_BREAK.split(raw, -1);
+        Pattern emptyBrackets = ForeignYamlPatterns.EMPTY_BRACKETS;
+        Pattern immediateComment = ForeignYamlPatterns.IMMEDIATE_COMMENT;
+        Pattern flowSeq = ForeignYamlPatterns.FLOW_SEQ;
 
         List<String> pass1 = new ArrayList<>();
         for (int i = 0; i < lines.length; i++) {
@@ -218,4 +218,14 @@ public interface ForeignConfigImporter {
         }
         return String.join("\n", resultLines);
     }
+}
+
+/** Precompiled patterns for {@link ForeignConfigImporter#sanitizeForeignYaml}; kept off the public interface. */
+final class ForeignYamlPatterns {
+    static final Pattern LINE_BREAK = Pattern.compile("\r?\n");
+    static final Pattern EMPTY_BRACKETS = Pattern.compile("^(\\s*+[^#:\\r\\n\\s][^#:\\r\\n]*+:)\\s*+(\\[\\]|\\{\\})(.*)$");
+    static final Pattern IMMEDIATE_COMMENT = Pattern.compile("^(\\s*+[^#:\\r\\n\\s][^#:\\r\\n]*+:)\\s*+#.*$");
+    static final Pattern FLOW_SEQ = Pattern.compile("^(\\s*+)([^#:\\r\\n\\s][^#:\\r\\n]*+:)\\s*+\\[([^\\]]*+)\\]\\s*+(#.*+)?$");
+
+    private ForeignYamlPatterns() {}
 }

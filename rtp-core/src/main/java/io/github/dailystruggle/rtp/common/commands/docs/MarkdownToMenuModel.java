@@ -26,6 +26,10 @@ public final class MarkdownToMenuModel {
     private static final Pattern LINK_PATTERN = Pattern.compile("\\[([^]]+)]\\(([^)]+)\\)");
     private static final Pattern INLINE_CODE_PATTERN = Pattern.compile("`([^`]+)`");
     private static final Pattern BOLD_PATTERN = Pattern.compile("\\*\\*([^*]+)\\*\\*");
+    private static final Pattern HEADING_PREFIX = Pattern.compile("^#+\\s*");
+    private static final Pattern NUMBERED_ITEM = Pattern.compile("^\\d+\\.\\s+.*");
+    private static final Pattern URL_ANCHOR = Pattern.compile("#.*$");
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
     private MarkdownToMenuModel() {
     }
@@ -80,7 +84,7 @@ public final class MarkdownToMenuModel {
                     pages.add(new MenuPage(List.copyOf(currentLines)));
                     currentLines.clear();
                 }
-                String headingText = trimmed.replaceFirst("^#+\\s*", "");
+                String headingText = HEADING_PREFIX.matcher(trimmed).replaceFirst("");
                 currentLines.add(MenuLine.of(new MenuFragment("&1&l" + headingText, null, null)));
                 currentLines.add(new MenuLine(List.of())); // spacer
                 continue;
@@ -88,7 +92,7 @@ public final class MarkdownToMenuModel {
 
             // Subheadings: ###, #### stay in current page
             if (trimmed.startsWith("### ") || trimmed.startsWith("#### ")) {
-                String subText = trimmed.replaceFirst("^#+\\s*", "");
+                String subText = HEADING_PREFIX.matcher(trimmed).replaceFirst("");
                 currentLines.add(MenuLine.of(new MenuFragment("&5&l" + subText, null, null)));
                 continue;
             }
@@ -115,7 +119,7 @@ public final class MarkdownToMenuModel {
             }
 
             // Numbered list item
-            if (trimmed.matches("^\\d+\\.\\s+.*")) {
+            if (NUMBERED_ITEM.matcher(trimmed).matches()) {
                 int dotIdx = trimmed.indexOf('.');
                 String num = trimmed.substring(0, dotIdx + 1);
                 String rest = trimmed.substring(dotIdx + 1).trim();
@@ -185,7 +189,7 @@ public final class MarkdownToMenuModel {
                     action = null;
                 }
             } else if (url.endsWith(".md") || url.contains(".md#")) {
-                String cleanPath = url.replaceAll("#.*$", "");
+                String cleanPath = URL_ANCHOR.matcher(url).replaceAll("");
                 action = new MenuAction.RunRtpCommand(new String[]{"docs", cleanPath});
             } else {
                 action = null;
@@ -213,7 +217,7 @@ public final class MarkdownToMenuModel {
             return Collections.singletonList(text);
         }
         List<String> result = new ArrayList<>();
-        String[] words = text.split("\\s+");
+        String[] words = WHITESPACE.split(text);
         StringBuilder current = new StringBuilder();
 
         for (String word : words) {

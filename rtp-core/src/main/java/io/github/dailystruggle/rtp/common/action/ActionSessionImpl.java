@@ -22,11 +22,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.logging.Level;
+import java.util.regex.Pattern;
 
 /**
  * Implementation of an active scripted action session (ADR-093).
  */
 public final class ActionSessionImpl implements ActionSession {
+
+  private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
   private final UUID sessionId;
   private final ActionDefinition definition;
@@ -43,8 +46,11 @@ public final class ActionSessionImpl implements ActionSession {
   private final Map<UUID, AtomicInteger> violations = new ConcurrentHashMap<>();
   private final Map<UUID, AutoCloseable> moveWatchers = new ConcurrentHashMap<>();
   private final Map<UUID, Boolean> participantInBoundsState = new ConcurrentHashMap<>();
+  private final Map<UUID, Integer> participantBreachType = new ConcurrentHashMap<>();
   private final Map<UUID, Long> lastDamageSeconds = new ConcurrentHashMap<>();
   private final AtomicBoolean active = new AtomicBoolean(true);
+  private final AtomicBoolean ending = new AtomicBoolean(false);
+  private final java.util.Set<UUID> pullBackInFlight = ConcurrentHashMap.newKeySet();
   private final Consumer<UUID> onDisarmCallback;
   private final Map<String, Predicate<ActionGateContext>> externalPredicates;
 
@@ -208,6 +214,9 @@ public final class ActionSessionImpl implements ActionSession {
 
   private double calculateDistanceOutside(double px, double pz) {
     ConfinementBoundary boundary = definition.confinement().boundary();
+    if (boundary == ConfinementBoundary.NONE) {
+      return 0.0;
+    }
     double rBlocks = currentBoundaryRadius();
     double dx = Math.abs(px - anchorX);
     double dz = Math.abs(pz - anchorZ);
@@ -227,13 +236,18 @@ public final class ActionSessionImpl implements ActionSession {
     if (!active.get()) return;
     UUID pid = event.playerId();
     if (!participants.contains(pid)) return;
+    if (pullBackInFlight.contains(pid)) return;
 
-    boolean inBounds = checkInBounds(event.worldName(), event.toX(), event.toZ());
-    participantInBoundsState.put(pid, inBounds);
-    if (!inBounds) {
+    int breachType = getBoundaryBreachType(event.worldName(), event.toX(), event.toZ());
+    Integer prevBreach = participantBreachType.put(pid, breachType);
+    participantInBoundsState.put(pid, breachType == 0);
+
+    if (breachType != 0) {
       double distOutside = calculateDistanceOutside(event.toX(), event.toZ());
-      int breachCount = violations.computeIfAbsent(pid, k -> new AtomicInteger(0)).incrementAndGet();
-      triggerBoundaryViolation(pid, event.worldName(), event.toX(), event.toY(), event.toZ(), breachCount);
+      if (prevBreach == null || prevBreach != breachType) {
+        int breachCount = violations.computeIfAbsent(pid, k -> new AtomicInteger(0)).incrementAndGet();
+        triggerBoundaryViolation(pid, event.worldName(), event.toX(), event.toY(), event.toZ(), breachCount);
+      }
 
       // Hard boundary limit enforcement: check relative distance or static initial boundary ceiling
       double maxDistanceOutside = definition.confinement().maxDistanceOutside();
@@ -259,6 +273,9 @@ public final class ActionSessionImpl implements ActionSession {
 
   private double calculateDistanceOutsideInitial(double px, double pz) {
     ConfinementBoundary boundary = definition.confinement().boundary();
+    if (boundary == ConfinementBoundary.NONE) {
+      return 0.0;
+    }
     double rBlocks = initialBoundaryRadius();
     double dx = Math.abs(px - anchorX);
     double dz = Math.abs(pz - anchorZ);
@@ -305,50 +322,55 @@ public final class ActionSessionImpl implements ActionSession {
     }
   }
 
-  private boolean checkInBounds(String moveWorld, int x, int z) {
-    // If movement occurs in a different world than the session world, participant is out of bounds
-    if (worldName != null && moveWorld != null && !worldName.equals(moveWorld)) {
-      return false;
+  private int getBoundaryBreachType(String moveWorld, int x, int z) {
+    if (worldName != null && moveWorld != null && !worldName.equalsIgnoreCase(moveWorld)) {
+      return 1; // WRONG_WORLD
     }
 
     ConfinementBoundary boundary = definition.confinement().boundary();
+    if (boundary == null || boundary == ConfinementBoundary.NONE) return 0;
     return switch (boundary) {
       case REGION -> {
-        if (parentRegion == null) yield true;
-        // ADR-093 Section 8: Live evaluation against MemoryShape accounts for expand: true
-        yield parentRegion.getShape().contains(x, z);
+        if (parentRegion == null) yield 0;
+        yield parentRegion.getShape().contains(x, z) ? 0 : 3;
       }
       case SUBSPACE -> {
         double rBlocks = currentBoundaryRadius();
-        yield Math.abs(x - anchorX) <= rBlocks && Math.abs(z - anchorZ) <= rBlocks;
+        yield (Math.abs(x - anchorX) <= rBlocks && Math.abs(z - anchorZ) <= rBlocks) ? 0 : 3;
       }
       case LEASH -> {
         double leash = currentBoundaryRadius();
         double dx = (double) x - (double) anchorX;
         double dz = (double) z - (double) anchorZ;
-        yield (dx * dx + dz * dz) <= (leash * leash);
+        yield ((dx * dx + dz * dz) <= (leash * leash)) ? 0 : 3;
       }
       case SHAPE -> {
         double rBlocks = currentBoundaryRadius();
-        int centerR = definition.confinement().centerRadius();
+        int centerR = definition.confinement().centerRadius() > 0
+            ? definition.confinement().centerRadius()
+            : definition.placement().centerRadius();
         double dx = (double) x - (double) anchorX;
         double dz = (double) z - (double) anchorZ;
         String sName = definition.confinement().shapeName();
         if ("CIRCLE".equalsIgnoreCase(sName)) {
           double distSq = dx * dx + dz * dz;
-          if (distSq > rBlocks * rBlocks) yield false;
-          if (centerR > 0 && distSq < (double) centerR * centerR) yield false;
-          yield true;
+          if (centerR > 0 && distSq < (double) centerR * centerR) yield 2; // INNER_EXCLUSION
+          if (distSq > rBlocks * rBlocks) yield 3; // OUTER_BOUNDARY
+          yield 0;
         } else {
-          // Default to SQUARE / Chebyshev distance
           double absX = Math.abs(dx);
           double absZ = Math.abs(dz);
-          if (absX > rBlocks || absZ > rBlocks) yield false;
-          if (centerR > 0 && Math.max(absX, absZ) < centerR) yield false;
-          yield true;
+          if (centerR > 0 && Math.max(absX, absZ) < centerR) yield 2; // INNER_EXCLUSION
+          if (absX > rBlocks || absZ > rBlocks) yield 3; // OUTER_BOUNDARY
+          yield 0;
         }
       }
+      default -> 0;
     };
+  }
+
+  boolean checkInBounds(String moveWorld, int x, int z) {
+    return getBoundaryBreachType(moveWorld, x, z) == 0;
   }
 
   /**
@@ -630,8 +652,9 @@ public final class ActionSessionImpl implements ActionSession {
   }
 
   public void triggerExpire() {
+    if (!ending.compareAndSet(false, true)) return;
     try {
-      executeLifecycleSteps(definition.lifecycle().onExpire(), null);
+      executeLifecycleSteps(definition.lifecycle().onExpire(), null, true);
     } catch (Exception e) {
       RTP.log(Level.WARNING, "[RTP Action] Error executing onExpire lifecycle steps", e);
     } finally {
@@ -640,6 +663,7 @@ public final class ActionSessionImpl implements ActionSession {
   }
 
   public void triggerCancel(UUID participantId) {
+    if (!ending.compareAndSet(false, true)) return;
     try {
       Map<String, Object> extra = new HashMap<>();
       if (participantId != null) {
@@ -651,7 +675,7 @@ public final class ActionSessionImpl implements ActionSession {
       if (steps.isEmpty()) {
         steps = definition.lifecycle().onExpire();
       }
-      executeLifecycleStepsWithTokens(steps, null, extra);
+      executeLifecycleStepsWithTokens(steps, null, extra, true);
     } catch (Exception e) {
       RTP.log(Level.WARNING, "[RTP Action] Error executing onCancel lifecycle steps", e);
     } finally {
@@ -660,12 +684,13 @@ public final class ActionSessionImpl implements ActionSession {
   }
 
   public void triggerDeath(UUID victimId, UUID winnerId) {
+    if (!ending.compareAndSet(false, true)) return;
     try {
       Map<String, Object> extra = new HashMap<>();
       if (victimId != null) extra.put("victim", victimId);
       if (winnerId != null) extra.put("winner", winnerId);
 
-      executeLifecycleStepsWithTokens(definition.lifecycle().onDeath(), null, extra);
+      executeLifecycleStepsWithTokens(definition.lifecycle().onDeath(), null, extra, true);
     } catch (Exception e) {
       RTP.log(Level.WARNING, "[RTP Action] Error executing onDeath lifecycle steps", e);
     } finally {
@@ -676,8 +701,12 @@ public final class ActionSessionImpl implements ActionSession {
   @Override
   public void pullBack(UUID participantId) {
     if (participantId == null) return;
+    if (!pullBackInFlight.add(participantId)) return;
     int[] slot = assignedSlots.get(participantId);
-    if (slot == null) return;
+    if (slot == null) {
+      pullBackInFlight.remove(participantId);
+      return;
+    }
 
     RTPServerAccessor accessor = RTP.serverAccessor;
     if (accessor != null) {
@@ -688,22 +717,62 @@ public final class ActionSessionImpl implements ActionSession {
         io.github.dailystruggle.rtp.api.world.RTPLocation targetLoc =
             new io.github.dailystruggle.rtp.api.world.RTPLocation(world, slot[0], slot[1], slot[2]);
         player.setLocation(targetLoc).whenComplete((success, ex) -> {
-          if (ex != null) {
-            RTP.log(Level.WARNING, "[RTP] Action pull-back failed for player " + participantId, ex);
-          } else if (Boolean.FALSE.equals(success)) {
-            RTP.log(Level.WARNING, "[RTP] Action pull-back rejected for player " + participantId);
-          } else {
-            participantInBoundsState.put(participantId, true);
+          try {
+            if (ex != null) {
+              RTP.log(Level.WARNING, "[RTP] Action pull-back failed for player " + participantId, ex);
+            } else if (Boolean.FALSE.equals(success)) {
+              RTP.log(Level.WARNING, "[RTP] Action pull-back rejected for player " + participantId);
+            } else {
+              participantBreachType.put(participantId, 0);
+              participantInBoundsState.put(participantId, true);
+            }
+          } finally {
+            pullBackInFlight.remove(participantId);
           }
         });
+      } else {
+        pullBackInFlight.remove(participantId);
       }
+    } else {
+      pullBackInFlight.remove(participantId);
+    }
+  }
+
+  public void eliminate(UUID participantId) {
+    if (participantId == null) return;
+    RTPServerAccessor accessor = RTP.serverAccessor;
+    if (accessor != null) {
+      accessor.executeCommand(new UUID(0, 0), "gamemode survival " + participantId);
+    }
+    pullBack(participantId);
+    int alive = 0;
+    UUID remaining = null;
+    for (UUID pid : participants) {
+      if (!pid.equals(participantId)) {
+        if (accessor != null) {
+          io.github.dailystruggle.rtp.api.entity.RTPPlayer p = accessor.getPlayer(pid);
+          if (p != null && p.isOnline()) {
+            alive++;
+            remaining = pid;
+          }
+        } else {
+          alive++;
+          remaining = pid;
+        }
+      }
+    }
+    if (alive <= 1 && participants.size() > 1) {
+      triggerDeath(participantId, remaining);
     }
   }
 
   @Override
   public void disarm() {
+    ending.set(true);
     if (!active.compareAndSet(true, false)) return;
 
+    pullBackInFlight.clear();
+    participantBreachType.clear();
     MemoryTracker.untrack(this);
     resetConfinementWorldBorder();
     cleanupScoreboards();
@@ -723,13 +792,26 @@ public final class ActionSessionImpl implements ActionSession {
   }
 
   private void executeLifecycleSteps(List<ActionDefinition.LifecycleStep> steps, ActionGateContext gateCtx) {
-    executeLifecycleStepsWithTokens(steps, gateCtx, Collections.emptyMap());
+    executeLifecycleStepsWithTokens(steps, gateCtx, Collections.emptyMap(), false);
+  }
+
+  private void executeLifecycleSteps(
+      List<ActionDefinition.LifecycleStep> steps, ActionGateContext gateCtx, boolean terminal) {
+    executeLifecycleStepsWithTokens(steps, gateCtx, Collections.emptyMap(), terminal);
   }
 
   private void executeLifecycleStepsWithTokens(
       List<ActionDefinition.LifecycleStep> steps,
       ActionGateContext gateCtx,
       Map<String, Object> additionalTokens) {
+    executeLifecycleStepsWithTokens(steps, gateCtx, additionalTokens, false);
+  }
+
+  private void executeLifecycleStepsWithTokens(
+      List<ActionDefinition.LifecycleStep> steps,
+      ActionGateContext gateCtx,
+      Map<String, Object> additionalTokens,
+      boolean terminal) {
 
     if (steps == null || steps.isEmpty()) return;
 
@@ -794,7 +876,25 @@ public final class ActionSessionImpl implements ActionSession {
           // Schedule delayed execution
           long delayTicks = Math.max(1L, step.delaySeconds() * 20L);
           RTP.scheduler.runTaskLater(() -> {
-            if (!active.get()) return;
+            if (!terminal && !active.get()) return;
+            if (terminal) {
+              Object pObj = baseTokens.get("player");
+              if (pObj == null) pObj = baseTokens.get("violator");
+              if (pObj instanceof UUID pid && RTP.serverAccessor != null) {
+                io.github.dailystruggle.rtp.api.entity.RTPPlayer p = RTP.serverAccessor.getPlayer(pid);
+                if (p == null || !p.isOnline()) return;
+              } else if (!participants.isEmpty() && RTP.serverAccessor != null) {
+                boolean anyOnline = false;
+                for (UUID pid : participants) {
+                  io.github.dailystruggle.rtp.api.entity.RTPPlayer p = RTP.serverAccessor.getPlayer(pid);
+                  if (p != null && p.isOnline()) {
+                    anyOnline = true;
+                    break;
+                  }
+                }
+                if (!anyOnline) return;
+              }
+            }
             try {
               // Re-evaluate gate if context present (e.g. opt-out check)
               ActionGateContext currentGateCtx = gateCtx;
@@ -859,6 +959,12 @@ public final class ActionSessionImpl implements ActionSession {
               || cmd.payload().contains("[player_uuid]");
           if (hasPlayerToken && !tokens.containsKey("player") && !participants.isEmpty()) {
             for (UUID pid : participants) {
+              if (RTP.serverAccessor != null) {
+                io.github.dailystruggle.rtp.api.entity.RTPPlayer player = RTP.serverAccessor.getPlayer(pid);
+                if (player != null && !player.isOnline()) {
+                  continue;
+                }
+              }
               Map<String, Object> perPlayerTokens = new HashMap<>(tokens);
               perPlayerTokens.put("player", pid);
               if (ActionPlaceholderSanitizer.hasMissingTarget(cmd.payload(), perPlayerTokens)) {
@@ -917,6 +1023,13 @@ public final class ActionSessionImpl implements ActionSession {
               }
             }
             case "DISARM" -> disarm();
+            case "ELIMINATE" -> {
+              Object pObj = tokens.get("violator");
+              if (pObj == null) pObj = tokens.get("player");
+              if (pObj instanceof UUID pid) {
+                eliminate(pid);
+              }
+            }
             default -> RTP.log(Level.WARNING, "[RTP Action] Unknown action command: " + actionName);
           }
         }
@@ -933,6 +1046,28 @@ public final class ActionSessionImpl implements ActionSession {
             // Broadcast to all participants
             for (UUID pid : participants) {
               dispatchPlayerMessage(pid, raw);
+            }
+          }
+        }
+        case MESSAGE_TARGET -> {
+          String raw = ActionPlaceholderSanitizer.substitute(cmd.payload(), tokens);
+          if (ActionPlaceholderSanitizer.containsUnresolvedPrefix(raw, "target")) {
+            return;
+          }
+          Object targetObj = tokens.get("target_uuid");
+          if (targetObj == null) targetObj = tokens.get("target");
+          if (targetObj == null) targetObj = tokens.get("target_name");
+          if (targetObj != null && !targetObj.toString().isBlank() && !targetObj.toString().equalsIgnoreCase("any")) {
+            if (targetObj instanceof UUID tId) {
+              dispatchPlayerMessage(tId, raw);
+            } else if (targetObj instanceof String tName) {
+              RTPServerAccessor accessor = RTP.serverAccessor;
+              if (accessor != null) {
+                io.github.dailystruggle.rtp.api.entity.RTPPlayer tp = accessor.getPlayer(tName);
+                if (tp != null) {
+                  dispatchPlayerMessage(tp.uuid(), raw);
+                }
+              }
             }
           }
         }
@@ -967,7 +1102,7 @@ public final class ActionSessionImpl implements ActionSession {
       // If a command begins with 'msg ' or 'tell ' without a target player, fallback to sending message directly
       String trimmed = commandLine.trim();
       if ((trimmed.startsWith("msg ") || trimmed.startsWith("tell ")) && !trimmed.contains("[player]")) {
-        String[] parts = trimmed.split("\\s+", 3);
+        String[] parts = WHITESPACE.split(trimmed, 3);
         // parts[0] is 'msg' or 'tell'. If parts.length < 3, there's no recipient before the message text.
         // e.g. "msg &aArrived near spawn." -> parts = ["msg", "&aArrived", "near spawn."]
         // If parts[1] starts with formatting/color (&, §) or doesn't look like a player name, send message directly.

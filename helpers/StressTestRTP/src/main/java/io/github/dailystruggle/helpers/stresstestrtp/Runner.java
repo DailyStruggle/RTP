@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
+import java.util.regex.Pattern;
 
 /**
  * Run loop: dispatches the configured command against the roster while
@@ -29,6 +30,8 @@ import java.util.logging.Level;
  * online to drive the run.
  */
 public final class Runner {
+
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
     public enum Mode { TIMED, BURST, SEQUENCE, WARMUP }
 
@@ -186,7 +189,7 @@ public final class Runner {
         if (dp == null || !dp.available() || entry == null) return false;
         String owner = dp.ownerPluginName();
         if (owner == null || owner.isBlank()) return false;
-        String firstTok = entry.template.trim().split("\\s+", 2)[0];
+        String firstTok = WHITESPACE.split(entry.template.trim(), 2)[0];
         int colon = firstTok.indexOf(':');
         String name = colon > 0 ? firstTok.substring(0, colon) : firstTok;
         return name.equalsIgnoreCase(owner);
@@ -442,6 +445,8 @@ public final class Runner {
             if (a != null) recorder.onTimeout(a);
             deadlines.remove(id);
         }
+        // No tick runs after stop to drive the time-based flush.
+        recorder.flushRows();
         // Close the per-run heap-pressure series so the file is flushed and
         // no idle-server samples bleed into the run's data after it ends.
         sampler.stopHeapSeries();
@@ -509,7 +514,7 @@ public final class Runner {
             if (inMeasurementPhase) {
                 spark.rotateIfDue(now);
                 // Same crash-safety rationale as the spark rotation above: the
-                // per-attempt and heap-series CSVs flush per row, but the phase
+                // per-attempt CSV flushes at least every second, but the phase
                 // summary is only written by MetricsRecorder.endPhase at phase
                 // end. A mid-phase server crash (e.g. a competitor plugin
                 // stalling the main thread to death under unthrottled dispatch)
@@ -1198,7 +1203,7 @@ public final class Runner {
      * the result is independent of {@link Bukkit#getName()}, which forks
      * routinely override.
      */
-    private static boolean isPaperFamily() {
+    static boolean isPaperFamily() {
         try {
             Class.forName("com.destroystokyo.paper.PaperConfig");
             return true;
@@ -1212,7 +1217,7 @@ public final class Runner {
      * Luminol). Tested by probing for the regionised-server class that only
      * Folia-derived builds ship.
      */
-    private static boolean isFoliaFamily() {
+    static boolean isFoliaFamily() {
         try {
             Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
             return true;

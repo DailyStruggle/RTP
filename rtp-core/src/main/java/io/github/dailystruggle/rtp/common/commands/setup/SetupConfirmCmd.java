@@ -81,75 +81,84 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
             return true;
         }
 
-        List<String> writtenFiles = new ArrayList<>();
-        List<Path> backups = new ArrayList<>();
-        String defaultRegionFileId = "definitions/regions/" + io.github.dailystruggle.rtp.common.commands.prefab.MultiWorldExpander.DEFAULT_REGION_ID;
+        sessionRegistry.remove(effectiveCaller);
+        SetupHandlerSupport.sendMessage(callerId, "&7[RTP Setup] Applying setup recipe in background...");
 
-        try {
-            for (Map.Entry<String, List<PrefabApplier.Change>> entry : diff.entrySet()) {
-                String fileId = entry.getKey();
-                Map<String, Object> newTree = result.newTrees().get(fileId);
-                if (newTree == null) continue;
+        Runnable applyTask = () -> {
+            List<String> writtenFiles = new ArrayList<>();
+            List<Path> backups = new ArrayList<>();
+            String defaultRegionFileId = "definitions/regions/" + io.github.dailystruggle.rtp.common.commands.prefab.MultiWorldExpander.DEFAULT_REGION_ID;
 
-                String templateFileId = (fileId.startsWith("definitions/regions/") && !fileId.equals(defaultRegionFileId))
-                        ? defaultRegionFileId : null;
-
-                Path bak = PrefabDiskIO.writeWithBackup(
-                        baseDir,
-                        fileId,
-                        newTree,
-                        entry.getValue(),
-                        PrefabDiskIO.DEFAULT_BAK_RETENTION,
-                        templateFileId
-                );
-                writtenFiles.add(fileId + ".yml");
-                if (bak != null) {
-                    backups.add(bak);
-                }
-            }
-
-            RTP.log(Level.INFO, "[setup] Applied setup wizard recipe for caller=" + callerId
-                    + ", writtenFiles=" + writtenFiles.size() + ", backups=" + backups.size());
-            SetupHandlerSupport.sendMessage(callerId, "&a[RTP Setup] Successfully applied setup recipe!");
-            SetupHandlerSupport.sendMessage(callerId, "&7Written: &f" + String.join(", ", writtenFiles));
-            SetupHandlerSupport.sendMessage(callerId, "&7Created &a" + backups.size() + " &7timestamped .bak backups.");
-
-            boolean reloaded = false;
-            Throwable reloadFailure = null;
             try {
-                CommandsAPICommand reload = (RTP.baseCommand != null)
-                        ? RTP.baseCommand.getCommandLookup().get("reload")
-                        : null;
-                if (reload != null) {
-                    reloaded = reload.onCommand(callerId, java.util.Collections.emptyMap(), null);
-                } else if (RTP.configs != null) {
-                    RTP.reloading.set(true);
-                    try {
-                        reloaded = RTP.configs.reload();
-                    } finally {
-                        RTP.reloading.set(false);
+                for (Map.Entry<String, List<PrefabApplier.Change>> entry : diff.entrySet()) {
+                    String fileId = entry.getKey();
+                    Map<String, Object> newTree = result.newTrees().get(fileId);
+                    if (newTree == null) continue;
+
+                    String templateFileId = (fileId.startsWith("definitions/regions/") && !fileId.equals(defaultRegionFileId))
+                            ? defaultRegionFileId : null;
+
+                    Path bak = PrefabDiskIO.writeWithBackup(
+                            baseDir,
+                            fileId,
+                            newTree,
+                            entry.getValue(),
+                            PrefabDiskIO.DEFAULT_BAK_RETENTION,
+                            templateFileId
+                    );
+                    writtenFiles.add(fileId + ".yml");
+                    if (bak != null) {
+                        backups.add(bak);
                     }
                 }
-            } catch (RuntimeException re) {
-                reloadFailure = re;
-                RTP.reloading.set(false);
-            }
 
-            if (reloaded) {
-                SetupHandlerSupport.sendMessage(callerId, "&a[RTP Setup] Configuration reload completed!");
-            } else if (reloadFailure != null) {
-                SetupHandlerSupport.sendMessage(callerId, "&e[RTP Setup] Config reload failed: "
-                        + reloadFailure.getMessage() + " - try &f/rtp reload&e.");
-            } else {
-                SetupHandlerSupport.sendMessage(callerId, "&7[RTP Setup] Run &f/rtp reload&7 to pick up changes.");
-            }
+                RTP.log(Level.INFO, "[setup] Applied setup wizard recipe for caller=" + callerId
+                        + ", writtenFiles=" + writtenFiles.size() + ", backups=" + backups.size());
+                SetupHandlerSupport.sendMessage(callerId, "&a[RTP Setup] Successfully applied setup recipe!");
+                SetupHandlerSupport.sendMessage(callerId, "&7Written: &f" + String.join(", ", writtenFiles));
+                SetupHandlerSupport.sendMessage(callerId, "&7Created &a" + backups.size() + " &7timestamped .bak backups.");
 
-            sessionRegistry.remove(effectiveCaller);
-            return true;
-        } catch (IOException | RuntimeException e) {
-            RTP.log(Level.WARNING, "[setup] Failed to write setup recipe to disk: " + e.getMessage(), e);
-            SetupHandlerSupport.sendMessage(callerId, "&c[RTP Setup] Error writing setup configuration to disk: " + e.getMessage());
-            return false;
+                boolean reloaded = false;
+                Throwable reloadFailure = null;
+                try {
+                    CommandsAPICommand reload = (RTP.baseCommand != null)
+                            ? RTP.baseCommand.getCommandLookup().get("reload")
+                            : null;
+                    if (reload != null) {
+                        reloaded = reload.onCommand(callerId, java.util.Collections.emptyMap(), null);
+                    } else if (RTP.configs != null) {
+                        RTP.reloading.set(true);
+                        try {
+                            reloaded = RTP.configs.reload();
+                        } finally {
+                            RTP.reloading.set(false);
+                        }
+                    }
+                } catch (RuntimeException re) {
+                    reloadFailure = re;
+                    RTP.reloading.set(false);
+                }
+
+                if (reloaded) {
+                    SetupHandlerSupport.sendMessage(callerId, "&a[RTP Setup] Configuration reload completed!");
+                } else if (reloadFailure != null) {
+                    SetupHandlerSupport.sendMessage(callerId, "&e[RTP Setup] Config reload failed: "
+                            + reloadFailure.getMessage() + " - try &f/rtp reload&e.");
+                } else {
+                    SetupHandlerSupport.sendMessage(callerId, "&7[RTP Setup] Run &f/rtp reload&7 to pick up changes.");
+                }
+            } catch (IOException | RuntimeException e) {
+                RTP.log(Level.WARNING, "[setup] Failed to write setup recipe to disk: " + e.getMessage(), e);
+                SetupHandlerSupport.sendMessage(callerId, "&c[RTP Setup] Error writing setup configuration to disk: " + e.getMessage());
+            }
+        };
+
+        if (RTP.scheduler != null) {
+            RTP.scheduler.runTaskAsynchronously(applyTask);
+        } else {
+            applyTask.run();
         }
+
+        return true;
     }
 }

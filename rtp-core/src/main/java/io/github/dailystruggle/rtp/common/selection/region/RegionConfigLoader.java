@@ -16,8 +16,11 @@ import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
+import java.util.regex.Pattern;
 
 public class RegionConfigLoader {
+
+    private static final Pattern VERTEX_SEPARATORS = Pattern.compile("[,;\\s]+");
 
     @SuppressWarnings("unchecked") // raw config values are instanceof-checked to Map before the String-keyed cast
     public static RegionSettings load(ConfigParser<RegionKeys> regionParser) {
@@ -310,7 +313,7 @@ public class RegionConfigLoader {
             String s = entry.toString().trim();
             if (s.startsWith("[") && s.endsWith("]")) s = s.substring(1, s.length() - 1);
             if (s.startsWith("(") && s.endsWith(")")) s = s.substring(1, s.length() - 1);
-            for (String part : s.split("[,;\\s]+")) {
+            for (String part : VERTEX_SEPARATORS.split(s)) {
                 if (!part.isEmpty()) parts.add(part);
             }
         }

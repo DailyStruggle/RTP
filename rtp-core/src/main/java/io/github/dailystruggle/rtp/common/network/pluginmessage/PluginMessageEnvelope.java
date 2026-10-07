@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.proxy.common.transport.codec.BackendHeartbeat
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Versioned, optionally HMAC-signed envelope for {@link BackendHeartbeat} rows
@@ -15,17 +16,19 @@ import java.util.Map;
  *
  * <p>Wire form (UTF-8, newline-delimited):</p>
  * <pre>
- *   pmv=2
+ *   pmv=3
+ *   sentAtMs=<timestamp>
+ *   seq=<sequence>
  *   &lt;BackendHeartbeatCodec canonical fields&gt;
  *   hmac=&lt;hex&gt;          (present iff the sender holds a verifier)
  * </pre>
  *
- * <p>MAC input: {@code HmacVerifier.sign(row.schemaVersion, "pmv=2\n" + canonical)},
+ * <p>MAC input: {@code HmacVerifier.sign(row.schemaVersion, signedBody)},
  * canonical rebuilt in fixed field order from the parsed map (never from wire
  * order), so the verified bytes are exactly the bytes decoded. Legacy (v1)
  * payloads carry no {@code pmv} line; with a verifier they are rejected as
- * {@link Rejection#UNSIGNED}, never mis-parsed. Old codec readers ignore the
- * extra keys, so v2 stays readable by unsigned v1 peers.</p>
+ * {@link Rejection#UNSIGNED}, never mis-parsed. v2 payloads without timestamp/seq
+ * remain verifiable during rolling upgrades.</p>
  *
  * <p>Bounded parse (REQ-RTP-S-004 hardening): payload bytes, line count,
  * server-id length and per-collection entry counts are capped before the row
@@ -34,15 +37,19 @@ import java.util.Map;
 public final class PluginMessageEnvelope {
 
     /** Envelope format version emitted by this build. */
-    public static final int VERSION = 2;
+    public static final int VERSION = 3;
     static final String VERSION_KEY = "pmv";
     static final String HMAC_KEY = "hmac";
+    static final String SENT_AT_KEY = "sentAtMs";
+    static final String SEQ_KEY = "seq";
+
+    private static final AtomicLong DEFAULT_SEQ = new AtomicLong(0);
 
     /** Max envelope bytes; fits the signed-short length prefix of the plugin-message frames. */
     public static final int MAX_PAYLOAD_BYTES = Short.MAX_VALUE;
     /** Max whole plugin-message frame (envelope + framing headers) accepted before parsing. */
     public static final int MAX_FRAME_BYTES = MAX_PAYLOAD_BYTES + 512;
-    /** Max {@code key=value} lines in one envelope (19 codec fields + pmv + hmac + slack). */
+    /** Max {@code key=value} lines in one envelope (19 codec fields + pmv + sentAtMs + seq + hmac + slack). */
     public static final int MAX_LINES = 64;
     /** Max server-id length. */
     public static final int MAX_SERVER_ID_CHARS = 128;
@@ -51,17 +58,25 @@ public final class PluginMessageEnvelope {
 
     /** Why an inbound envelope was dropped. */
     public enum Rejection {
-        OVERSIZED, MALFORMED, UNSUPPORTED_VERSION, UNSIGNED, BAD_SIGNATURE, LIMITS
+        OVERSIZED, MALFORMED, UNSUPPORTED_VERSION, UNSIGNED, BAD_SIGNATURE, LIMITS, STALE, REPLAY
     }
 
     /** Outcome of {@link #open}: exactly one of {@code heartbeat} / {@code rejection} is non-null. */
-    public record Result(BackendHeartbeat heartbeat, Rejection rejection) {
+    public record Result(BackendHeartbeat heartbeat, Rejection rejection, long sentAtMs, long seq) {
+        public Result(BackendHeartbeat heartbeat, Rejection rejection) {
+            this(heartbeat, rejection, 0L, 0L);
+        }
+
+        static Result ok(BackendHeartbeat hb, long sentAtMs, long seq) {
+            return new Result(hb, null, sentAtMs, seq);
+        }
+
         static Result ok(BackendHeartbeat hb) {
-            return new Result(hb, null);
+            return new Result(hb, null, 0L, 0L);
         }
 
         static Result reject(Rejection r) {
-            return new Result(null, r);
+            return new Result(null, r, 0L, 0L);
         }
 
         public boolean accepted() {
@@ -73,14 +88,23 @@ public final class PluginMessageEnvelope {
     }
 
     /**
-     * Encode {@code row} as a v2 envelope, signed when {@code verifier} is non-null.
+     * Encode {@code row} as a v3 envelope with heartbeat timestamp and next default sequence.
      *
      * @return UTF-8 envelope bytes, or {@code null} when the encoding exceeds
      *         {@link #MAX_PAYLOAD_BYTES} (caller drops + logs)
      */
     public static byte[] seal(BackendHeartbeat row, HmacVerifier verifier) {
+        long sentAt = row != null ? row.lastSeenEpochMs() : System.currentTimeMillis();
+        return seal(row, verifier, sentAt, DEFAULT_SEQ.incrementAndGet());
+    }
+
+    /**
+     * Encode {@code row} as a v3 envelope with explicit timestamp and sequence,
+     * signed when {@code verifier} is non-null.
+     */
+    public static byte[] seal(BackendHeartbeat row, HmacVerifier verifier, long sentAtMs, long seq) {
         String canonical = BackendHeartbeatCodec.encode(row);
-        String body = signedBody(Integer.toString(VERSION), canonical);
+        String body = signedBody(VERSION, sentAtMs, seq, canonical);
         StringBuilder sb = new StringBuilder(body.length() + 80).append(body);
         if (verifier != null) {
             sb.append('\n').append(HMAC_KEY).append('=').append(verifier.sign(row.schemaVersion(), body));
@@ -90,8 +114,8 @@ public final class PluginMessageEnvelope {
     }
 
     /**
-     * Verify-then-decode an inbound envelope. With a verifier: only signed v2
-     * envelopes with a valid MAC pass (fail closed). Without: v1 and v2 are
+     * Verify-then-decode an inbound envelope. With a verifier: only signed
+     * envelopes with a valid MAC pass (fail closed). Without: v1..v3 are
      * accepted unauthenticated (legacy / no-secret deployments).
      */
     public static Result open(byte[] payload, HmacVerifier verifier) {
@@ -99,13 +123,39 @@ public final class PluginMessageEnvelope {
         if (payload.length > MAX_PAYLOAD_BYTES) return Result.reject(Rejection.OVERSIZED);
         Map<String, String> m = parseBounded(new String(payload, StandardCharsets.UTF_8));
         if (m == null) return Result.reject(Rejection.MALFORMED);
-        String version = m.remove(VERSION_KEY);
+        String versionStr = m.remove(VERSION_KEY);
         String hmacHex = m.remove(HMAC_KEY);
-        if (version != null && !Integer.toString(VERSION).equals(version)) {
-            return Result.reject(Rejection.UNSUPPORTED_VERSION);
+        String sentAtStr = m.remove(SENT_AT_KEY);
+        String seqStr = m.remove(SEQ_KEY);
+
+        int version = 0;
+        if (versionStr != null) {
+            try {
+                version = Integer.parseInt(versionStr);
+            } catch (NumberFormatException e) {
+                return Result.reject(Rejection.MALFORMED);
+            }
+            if (version < 2 || version > VERSION) {
+                return Result.reject(Rejection.UNSUPPORTED_VERSION);
+            }
         }
+
+        long sentAtMs = 0L;
+        long seq = 0L;
+        if (version >= 3) {
+            if (sentAtStr == null || seqStr == null) {
+                return Result.reject(Rejection.MALFORMED);
+            }
+            try {
+                sentAtMs = Long.parseLong(sentAtStr);
+                seq = Long.parseLong(seqStr);
+            } catch (NumberFormatException e) {
+                return Result.reject(Rejection.MALFORMED);
+            }
+        }
+
         if (verifier != null) {
-            if (version == null || hmacHex == null || hmacHex.isEmpty()) {
+            if (versionStr == null || hmacHex == null || hmacHex.isEmpty()) {
                 return Result.reject(Rejection.UNSIGNED);
             }
             int sv;
@@ -114,18 +164,26 @@ public final class PluginMessageEnvelope {
             } catch (NumberFormatException e) {
                 return Result.reject(Rejection.MALFORMED);
             }
-            if (!verifier.verify(sv, signedBody(version, BackendHeartbeatCodec.canonical(m)), hmacHex)) {
+            String expectedBody = signedBody(version, sentAtMs, seq, BackendHeartbeatCodec.canonical(m));
+            if (!verifier.verify(sv, expectedBody, hmacHex)) {
                 return Result.reject(Rejection.BAD_SIGNATURE);
             }
         }
         BackendHeartbeat hb = BackendHeartbeatCodec.fromFieldMap(m);
         if (hb == null) return Result.reject(Rejection.MALFORMED);
         if (!withinLimits(hb)) return Result.reject(Rejection.LIMITS);
-        return Result.ok(hb);
+        return Result.ok(hb, sentAtMs, seq);
     }
 
-    private static String signedBody(String version, String canonical) {
-        return VERSION_KEY + "=" + version + "\n" + canonical;
+    private static String signedBody(int version, long sentAtMs, long seq, String canonical) {
+        if (version >= 3) {
+            return VERSION_KEY + "=" + version + "\n"
+                    + SENT_AT_KEY + "=" + sentAtMs + "\n"
+                    + SEQ_KEY + "=" + seq + "\n"
+                    + canonical;
+        } else {
+            return VERSION_KEY + "=" + version + "\n" + canonical;
+        }
     }
 
     /** Line-capped flat parse; duplicate keys are malformed (no last-wins ambiguity). */

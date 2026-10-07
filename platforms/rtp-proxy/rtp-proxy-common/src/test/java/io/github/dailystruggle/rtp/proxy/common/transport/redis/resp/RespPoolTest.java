@@ -142,6 +142,24 @@ class RespPoolTest {
     }
 
     @Test
+    @DisplayName("Pooled connection delegates binary-safe executeCommandBytes to the live socket")
+    void testPooledExecuteCommandBytesDelegates() throws IOException {
+        try (RespPool pool = new RespPool("127.0.0.1", port, 1000, null, 1)) {
+            try (RespConnection conn = pool.getResource()) {
+                Object reply = conn.executeCommandBytes(
+                        java.util.List.of("PING".getBytes(StandardCharsets.UTF_8)));
+                String text = reply instanceof byte[] b ? RespProtocol.toUtf8(b) : String.valueOf(reply);
+                assertEquals("PONG", text);
+                assertFalse(conn.isBroken());
+            }
+            // Returned to the pool intact (a wrapper-socket failure would have broken it).
+            try (RespConnection again = pool.getResource()) {
+                assertEquals("PONG", again.ping());
+            }
+        }
+    }
+
+    @Test
     @DisplayName("RespPubSub subscription processes messages and unsubscribes")
     void testPubSub() throws Exception {
         try (RespConnection conn = new RespConnection("127.0.0.1", port, 2000, null)) {

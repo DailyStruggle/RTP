@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.fabric.server;
 
 import io.github.dailystruggle.rtp.api.server.ProgressBar;
+import io.github.dailystruggle.rtp.common.text.LegacyColorStrip;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerBossEvent;
@@ -113,12 +114,13 @@ public final class FabricProgressBars {
     }
 
     /**
-     * Strips legacy {@code &x} color codes and {@code #RRGGBB} hex codes from a bar title
-     * (boss-bar titles render as plain text) and truncates to a sane length.
+     * Strips legacy {@code &x} / {@code §x} color codes and {@code #RRGGBB} / {@code &#RRGGBB} hex
+     * codes from a bar title (boss-bar titles render as plain text) and truncates to a sane length.
+     * Regex-free: runs on every bar update.
      */
     private static String sanitizeBarTitle(String title) {
         if (title == null) return "";
-        String out = title.replaceAll("&[0-9a-fA-FklmnorKLMNOR]", "").replaceAll("#[0-9a-fA-F]{6}", "");
+        String out = LegacyColorStrip.strip(title);
         return out.length() > 64 ? out.substring(0, 64) : out;
     }
 

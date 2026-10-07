@@ -34,7 +34,7 @@ public class TriggerSubCmd extends BaseTriggerCmd {
   @Override
   protected boolean execute(UUID senderId, Map<String, List<String>> parameterValues) {
     RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
-    if (!sender.hasPermission("rtp.trigger") && !sender.hasPermission("rtp.*")) {
+    if (sender == null || (!sender.hasPermission("rtp.trigger") && !sender.hasPermission("rtp.*"))) {
       RTP.serverAccessor.sendMessage(senderId, senderId, "[RTP] You don't have permission to manage triggers.");
       return true;
     }

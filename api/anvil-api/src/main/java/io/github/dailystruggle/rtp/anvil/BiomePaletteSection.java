@@ -52,10 +52,11 @@ public record BiomePaletteSection(int sectionY, List<String> palette, long[] dat
 
     /**
      * Returns the raw biome identifier at section-local block coordinates
-     * {@code (lx, ly, lz)}, each in {@code 0..15}. The block coords are internally
+     * {@code (lx, ly, lz)}, each in {@code 0..15}, or {@code null} if the palette
+     * data is missing or malformed. The block coords are internally
      * down-scaled to the 4×4×4 cell grid.
      *
-     * @return the identifier string (e.g. {@code "minecraft:plains"}); never {@code null}
+     * @return the identifier string (e.g. {@code "minecraft:plains"}), or {@code null} if malformed
      * @throws IndexOutOfBoundsException if any coord is outside {@code 0..15}
      */
     public String biomeIdAt(int lx, int ly, int lz) {
@@ -63,8 +64,11 @@ public record BiomePaletteSection(int sectionY, List<String> palette, long[] dat
             throw new IndexOutOfBoundsException(
                     "section-local coords out of range 0..15: (" + lx + "," + ly + "," + lz + ")");
         }
-        if (palette.size() == 1 || data == null || data.length == 0) {
+        if (palette.size() == 1) {
             return palette.get(0);
+        }
+        if (data == null || data.length == 0) {
+            return null;
         }
         int idx = biomeCellIndex(lx >> 2, ly >> 2, lz >> 2);
         int bits = biomeBitsPerEntry(palette.size());
@@ -72,17 +76,25 @@ public record BiomePaletteSection(int sectionY, List<String> palette, long[] dat
         int longIdx = idx / entriesPerLong;
         int slot = idx - longIdx * entriesPerLong;
         if (longIdx < 0 || longIdx >= data.length) {
-            // Defensive: malformed data array. Fall back to palette[0] rather than
-            // throw (ADR-016 "malformed → UNKNOWN, never crash").
-            return palette.get(0);
+            return null;
         }
         long word = data[longIdx];
         long mask = (1L << bits) - 1L;
         int paletteIdx = (int) ((word >>> (slot * bits)) & mask);
         if (paletteIdx < 0 || paletteIdx >= palette.size()) {
-            return palette.get(0);
+            return null;
         }
         return palette.get(paletteIdx);
+    }
+
+    /** True if this section contains malformed or truncated biome palette data. */
+    public boolean hasMalformedData() {
+        if (palette.size() <= 1) return false;
+        if (data == null || data.length == 0) return true;
+        int bits = biomeBitsPerEntry(palette.size());
+        int entriesPerLong = 64 / bits;
+        int requiredLongs = (64 + entriesPerLong - 1) / entriesPerLong;
+        return data.length < requiredLongs;
     }
 
     @Override

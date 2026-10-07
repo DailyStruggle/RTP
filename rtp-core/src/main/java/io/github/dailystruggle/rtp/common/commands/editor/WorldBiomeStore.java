@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -35,9 +36,27 @@ public final class WorldBiomeStore {
     static final String CACHE_DIR = "cache/biomes";
     private static final int MAGIC = 0x52425331; // "RBS1"
     private static final int FORMAT = 1;
+    private static final Pattern UNSAFE_FILE_CHARS = Pattern.compile("[^A-Za-z0-9_.\\-]");
 
     /** One sample-Y layer of a bin: {@code level} is -1 when stale or unread. */
-    public record Layer(int y, int level, byte[] runs) {}
+    public record Layer(int y, int level, byte[] runs) {
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof Layer other)) return false;
+            return y == other.y && level == other.level && Arrays.equals(runs, other.runs);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Objects.hash(y, level) + Arrays.hashCode(runs);
+        }
+
+        @Override
+        public String toString() {
+            return "Layer[y=" + y + ", level=" + level + ", runs=" + Arrays.toString(runs) + "]";
+        }
+    }
 
     /** Snapshot of one bin. */
     public record BinView(int rx, int rz, long mtime, long version, List<Layer> layers) {}
@@ -96,7 +115,7 @@ public final class WorldBiomeStore {
     static Path cacheFile(String world) {
         File dir = (RTP.serverAccessor != null) ? RTP.serverAccessor.getPluginDirectory() : null;
         if (dir == null) return null;
-        String safe = world.replaceAll("[^A-Za-z0-9_.\\-]", "_");
+        String safe = UNSAFE_FILE_CHARS.matcher(world).replaceAll("_");
         return dir.toPath().resolve(CACHE_DIR).resolve(safe + ".rbs");
     }
 

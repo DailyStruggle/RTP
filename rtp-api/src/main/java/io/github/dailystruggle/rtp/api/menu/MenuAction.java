@@ -504,6 +504,22 @@ public sealed interface MenuAction
      */
     String MULTICONFIG_ENTRY_NAME_REGEX = "[A-Za-z0-9_.\\-]+";
 
+    /** Char-scan equivalent of {@link #MULTICONFIG_ENTRY_NAME_REGEX} (ASCII only). */
+    private static boolean isMultiConfigEntryName(String s) {
+        if (s.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            boolean ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
+                    || c == '_' || c == '.' || c == '-';
+            if (!ok) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /**
      * Open the list page for a {@code MultiConfigParser} kind (ADR-071).
      * Permission-gated by {@code rtp.config.view}.
@@ -534,7 +550,7 @@ public sealed interface MenuAction
             if (entryName.isEmpty()) {
                 throw new IllegalArgumentException("entryName must not be empty");
             }
-            if (!entryName.matches(MULTICONFIG_ENTRY_NAME_REGEX)) {
+            if (!isMultiConfigEntryName(entryName)) {
                 throw new IllegalArgumentException(
                         "entryName must match " + MULTICONFIG_ENTRY_NAME_REGEX
                                 + " (got '" + entryName + "')");
@@ -565,7 +581,7 @@ public sealed interface MenuAction
             if (entryName.isEmpty()) {
                 throw new IllegalArgumentException("entryName must not be empty");
             }
-            if (!entryName.matches(MULTICONFIG_ENTRY_NAME_REGEX)) {
+            if (!isMultiConfigEntryName(entryName)) {
                 throw new IllegalArgumentException(
                         "entryName must match " + MULTICONFIG_ENTRY_NAME_REGEX
                                 + " (got '" + entryName + "')");

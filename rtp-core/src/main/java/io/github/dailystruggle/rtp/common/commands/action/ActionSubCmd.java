@@ -51,7 +51,7 @@ public class ActionSubCmd extends BaseRTPCmdImpl {
     if (nextCommand != null) return true;
 
     RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
-    if (!sender.hasPermission("rtp.action") && !sender.hasPermission("rtp.*")) {
+    if (sender == null || (!sender.hasPermission("rtp.action") && !sender.hasPermission("rtp.*"))) {
       RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.noPerms);
       return true;
     }

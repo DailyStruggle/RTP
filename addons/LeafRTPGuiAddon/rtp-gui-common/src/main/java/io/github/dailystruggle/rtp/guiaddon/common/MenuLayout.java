@@ -82,8 +82,19 @@ public final class MenuLayout {
     int rows = Math.max(3, Math.min(MAX_ROWS, contentRows + 2));
     int innerRows = rows - 2;
 
+    // Reserve submenu rows so that submenus are never crowded out by destination overflow
+    if (!submenus.isEmpty() && destRows + submenuRows > innerRows) {
+      int maxAllowedDestRows = Math.max(0, innerRows - submenuRows);
+      if (destRows > maxAllowedDestRows) {
+        destRows = maxAllowedDestRows;
+        io.github.dailystruggle.rtp.common.RTP.log(
+            java.util.logging.Level.WARNING,
+            "[RTP-GUI] Menu layout exceeded inner row capacity; reserving submenu row and capping destinations");
+      }
+    }
+
     // Vertically centre the content block within the inner rows if spare rows exist.
-    int topRow = 1 + Math.max(0, (innerRows - contentRows) / 2);
+    int topRow = 1 + Math.max(0, (innerRows - (destRows + submenuRows)) / 2);
 
     int dashboardSlot = model.showDashboard() ? (rows - 1) * COLUMNS + (COLUMNS / 2) : -1;
     Map<Integer, MenuEntry> slotEntries = new LinkedHashMap<>();

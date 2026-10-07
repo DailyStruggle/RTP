@@ -302,4 +302,40 @@ public class MenuModelTest {
         assertFalse(MenuActions.isMenuNavigation(RtpTarget.defaultRegion()));
         assertFalse(MenuActions.isMenuNavigation(null));
     }
+
+    @Test
+    void build_paginatesDestinationsAndReservesSubmenuRow() {
+        GuiMenuConfig config = new GuiMenuConfig();
+        UUID playerId = UUID.randomUUID();
+
+        java.util.function.Function<UUID, java.util.List<RtpTarget>> origAllowed = RTPAPI.allowedTargetsDelegate;
+        java.util.function.BiFunction<UUID, RtpTarget, RtpTargetStatus> origStatus = RTPAPI.targetStatusDelegate;
+        try {
+            java.util.List<RtpTarget> targets = new java.util.ArrayList<>();
+            for (int i = 0; i < 30; i++) {
+                targets.add(RtpTarget.region("region_" + i));
+            }
+
+            RTPAPI.allowedTargetsDelegate = uuid -> targets;
+            RTPAPI.targetStatusDelegate = (uuid, t) ->
+                    new RtpTargetStatus(RtpTargetStatus.Availability.READY, 0L, 0.0);
+
+            MenuModel page0 = MenuModel.build(playerId, config, 0);
+            assertTrue(page0.isRoot(), "Page 0 of main menu must be root");
+            assertTrue(page0.title().contains("(1/2)"), "Title must indicate pagination: " + page0.title());
+            long destCountPage0 = page0.entries().stream().filter(e -> e.target().kind() != RtpTarget.Kind.ACTION).count();
+            assertEquals(21, destCountPage0);
+            assertTrue(page0.entries().stream().anyMatch(e -> "menu:main:1".equals(e.target().name())));
+
+            MenuModel page1 = MenuModel.build(playerId, config, 1);
+            assertFalse(page1.isRoot(), "Page 1 of main menu must not be root");
+            assertTrue(page1.title().contains("(2/2)"), "Title must indicate page 2: " + page1.title());
+            long destCountPage1 = page1.entries().stream().filter(e -> e.target().kind() != RtpTarget.Kind.ACTION).count();
+            assertEquals(9, destCountPage1);
+            assertTrue(page1.entries().stream().anyMatch(e -> "menu:main:0".equals(e.target().name())));
+        } finally {
+            RTPAPI.allowedTargetsDelegate = origAllowed;
+            RTPAPI.targetStatusDelegate = origStatus;
+        }
+    }
 }

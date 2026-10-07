@@ -72,7 +72,7 @@ lifecycle:
   onEnqueue:
     - CONSOLE: "tag [sender_name] add rtp_chal_[target_name]"
     - MESSAGE: "<gray>Challenge sent to <yellow>[target_name]</yellow>! Waiting for response...</gray>"
-    - MESSAGE: "<gold>[sender_name] has challenged you to a duel! </gold><green><bold><click:run_command:'/rtp action challenge player=[sender_name]'><hover:show_text:'<gray>Click to accept duel with [sender_name]</gray>'>[CLICK TO ACCEPT]</hover></click></bold></green>"
+    - MESSAGE_TARGET: "<gold>[sender_name] has challenged you to a duel! </gold><green><bold><click:run_command:'/rtp action challenge player=[sender_name]'><hover:show_text:'<gray>Click to accept duel with [sender_name]</gray>'>[CLICK TO ACCEPT]</hover></click></bold></green>"
 
   onStart:
     - CONSOLE: "tag [sender_name_1] remove rtp_chal_[sender_name_2]"
@@ -93,6 +93,6 @@ lifecycle:
   onCancel:
     - CONSOLE: "tag [sender_name] remove rtp_chal_[target_name]"
     - MESSAGE: "<gray>Challenge to <yellow>[target_name]</yellow> was cancelled.</gray>"
-    - MESSAGE: "<gray>Challenge from <yellow>[sender_name]</yellow> was cancelled.</gray>"
+    - MESSAGE_TARGET: "<gray>Challenge from <yellow>[sender_name]</yellow> was cancelled.</gray>"
 
 version: "1.0"

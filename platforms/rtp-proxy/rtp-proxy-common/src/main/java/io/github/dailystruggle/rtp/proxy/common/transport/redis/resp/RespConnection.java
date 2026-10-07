@@ -84,11 +84,20 @@ public class RespConnection implements Closeable {
     private SSLSocket wrapTls(Socket plain) throws IOException {
         SSLSocketFactory f = (SSLSocketFactory) SSLSocketFactory.getDefault();
         SSLSocket ssl = (SSLSocket) f.createSocket(plain, endpoint.host(), endpoint.port(), true);
-        SSLParameters p = ssl.getSSLParameters();
-        p.setEndpointIdentificationAlgorithm("HTTPS");
-        ssl.setSSLParameters(p);
-        ssl.startHandshake();
-        return ssl;
+        try {
+            SSLParameters p = ssl.getSSLParameters();
+            p.setEndpointIdentificationAlgorithm("HTTPS");
+            ssl.setSSLParameters(p);
+            ssl.startHandshake();
+            return ssl;
+        } catch (Throwable t) {
+            try {
+                ssl.close();
+            } catch (Throwable suppressed) {
+                t.addSuppressed(suppressed);
+            }
+            throw t;
+        }
     }
 
     public synchronized void auth(String pwd) throws IOException {

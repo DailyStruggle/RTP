@@ -26,6 +26,7 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -64,6 +65,80 @@ public final class TeleportPipelineTask extends RTPRunnable {
   public static final List<Consumer<TeleportPipelineTask>> teleportPostActions = new CopyOnWriteArrayList<>();
   public static final List<Consumer<TeleportPipelineTask>> cleanupPreActions = new CopyOnWriteArrayList<>();
   public static final List<Consumer<TeleportPipelineTask>> cleanupPostActions = new CopyOnWriteArrayList<>();
+
+  /**
+   * Ticks a successful arrival keeps its destination reservation after {@code setLocation}.
+   * Releasing in the teleport tick lets the landing chunk unload (e.g. Paper
+   * {@code delay-chunk-unloads-by: 0s}) before the player's own chunk ticket holds it, so the
+   * player's first tick sync-loads it on the main thread (S-005). Spans several player
+   * chunk-loader cycles; tickets are reference-counted, so overlapping holds are safe.
+   */
+  static final long ARRIVAL_HOLD_TICKS = 20L;
+  /** Arrival reservations awaiting their deferred release, by world; drained by {@code RTP.stop} (S-002). */
+  private static final Map<ChunkReservation, RTPWorld<?>> pendingArrivalReleases = new ConcurrentHashMap<>();
+
+  /**
+   * Defers {@code held.close()} by {@link #ARRIVAL_HOLD_TICKS} on the destination chunk's thread.
+   * Falls back to an immediate release when the hold cannot be scheduled.
+   */
+  static void holdArrivalReservation(ChunkReservation held, RTPWorld<?> world, int cx, int cz) {
+    if (held == null) return;
+    if (RTP.scheduler == null || world == null) {
+      held.close();
+      return;
+    }
+    pendingArrivalReleases.put(held, world);
+    try {
+      RTP.scheduler.runTaskLater(world, cx, cz, () -> releaseArrivalReservation(held), ARRIVAL_HOLD_TICKS);
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING, "[RTP] arrival chunk hold could not be scheduled; releasing now", t);
+      releaseArrivalReservation(held);
+    }
+  }
+
+  /** Map removal gates the close, so the delayed task and a shutdown flush never both release. */
+  private static boolean releaseArrivalReservation(ChunkReservation held) {
+    if (pendingArrivalReleases.remove(held) == null) return false;
+    try {
+      held.close();
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING, "[RTP] arrival chunk release failed", t);
+    }
+    return true;
+  }
+
+  /**
+   * Releases every pending arrival reservation now. Delayed tasks do not run after disable.
+   *
+   * @return number of reservations released
+   */
+  public static int flushArrivalReservations() {
+    int released = 0;
+    for (ChunkReservation held : pendingArrivalReleases.keySet()) {
+      if (releaseArrivalReservation(held)) released++;
+    }
+    return released;
+  }
+
+  /**
+   * Chunk keys pinned by pending arrival holds, per world. MemoryTracker treats these as live so
+   * its orphan sweep neither counts them as a leak nor releases them early.
+   */
+  public static Map<RTPWorld<?>, Set<Long>> arrivalHoldChunkKeys() {
+    Map<RTPWorld<?>, Set<Long>> keys = new java.util.HashMap<>();
+    for (Map.Entry<ChunkReservation, RTPWorld<?>> e : pendingArrivalReleases.entrySet()) {
+      ChunkSet set = e.getKey().getChunkSet();
+      if (set == null) continue;
+      long key = ((long) set.getX() & 0xffffffffL) | ((long) set.getZ() << 32);
+      keys.computeIfAbsent(e.getValue(), w -> new java.util.HashSet<>()).add(key);
+    }
+    return keys;
+  }
+
+  /** Pending deferred arrival releases; diagnostics and tests. */
+  public static int pendingArrivalReleaseCount() {
+    return pendingArrivalReleases.size();
+  }
 
   public static class ConfigCache {
     public static String unsafe = "";
@@ -964,7 +1039,10 @@ public final class TeleportPipelineTask extends RTPRunnable {
       RTP.log(Level.FINE, "[PIPELINE_TRACE] runTeleport setLocation dispatched playerId=" + playerId
               + " attempts=" + teleportData.attempts
               + " processingTime=" + teleportData.processingTime + "ms");
-      RTP.getInstance().databaseAccessor.cacheValue(teleportData);
+      // Guarded: a throw here would skip the completion callback below (arrival hold, S-004 audit).
+      if (RTP.getInstance().databaseAccessor != null) {
+        RTP.getInstance().databaseAccessor.cacheValue(teleportData);
+      }
 
       setLocation.whenComplete(
           (aBoolean, throwable) -> {
@@ -973,8 +1051,13 @@ public final class TeleportPipelineTask extends RTPRunnable {
                       + " success=" + aBoolean
                       + " throwable=" + (throwable != null ? throwable.getClass().getSimpleName() : "none"));
               if (reservation != null) {
-                reservation.close();
+                ChunkReservation held = reservation;
                 this.reservation = null;
+                if (throwable == null && aBoolean != null && aBoolean) {
+                  holdArrivalReservation(held, location.world(), location.x() >> 4, location.z() >> 4);
+                } else {
+                  held.close();
+                }
               }
               if (throwable != null) {
                 SupportLogger.logException(Level.SEVERE, "Error in setLocation callback", throwable);
@@ -1244,7 +1327,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
       RTP.log(Level.FINE, "[PIPELINE_TRACE] platform creator '" + platformCreator.creatorName()
           + "' declined; using default platform");
     }
-    at.world().platform(at);
+    // Reservation-free copy: platform() implementations close the location's reservation, which
+    // would drop the arrival ticket before setLocation. The pipeline owns that release.
+    at.world().platform(new RTPLocation(at.world(), at.x(), at.y(), at.z()));
   }
 
   /**

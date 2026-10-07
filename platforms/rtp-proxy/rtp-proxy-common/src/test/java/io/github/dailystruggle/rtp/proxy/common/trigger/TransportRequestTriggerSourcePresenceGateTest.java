@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -26,6 +27,13 @@ import static org.mockito.Mockito.when;
 
 /** Local-presence gate on dequeued shared-store envelopes. */
 class TransportRequestTriggerSourcePresenceGateTest {
+
+    private static void await(BooleanSupplier condition) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 3_000L;
+        while (!condition.getAsBoolean() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(20L);
+        }
+    }
 
     @Test
     @DisplayName("REQ-RTP-S-004: envelope for a player not connected to this proxy is cancelled, never dispatched")
@@ -46,8 +54,11 @@ class TransportRequestTriggerSourcePresenceGateTest {
             src.start();
             verify(dispatcher, timeout(3000)).dispatch(argThat(r -> local.equals(r.playerId())));
             verify(dispatcher, never()).dispatch(argThat(r -> foreign.equals(r.playerId())));
+            // Counter increments after dispatch() returns, so the verify above can win the race.
+            await(() -> src.dispatchedCount() == 1L);
             assertEquals(1L, src.dispatchedCount());
-            // Foreign player's status row was cancelled rather than left lingering.
+            // Foreign player's status row was cancelled rather than left lingering (cancel is async).
+            await(() -> queue.pollStatus(List.of(foreign)).join().isEmpty());
             assertTrue(queue.pollStatus(List.of(foreign)).get(2, TimeUnit.SECONDS).isEmpty());
         } finally {
             src.stop();

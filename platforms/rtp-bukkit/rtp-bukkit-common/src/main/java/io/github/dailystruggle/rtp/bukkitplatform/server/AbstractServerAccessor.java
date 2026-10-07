@@ -306,6 +306,25 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   @Override
+  public Integer getScoreboardScore(UUID playerId, String objective) {
+    if (playerId == null || objective == null || objective.isBlank()) return null;
+    try {
+      org.bukkit.scoreboard.ScoreboardManager sm = Bukkit.getScoreboardManager();
+      if (sm == null) return null;
+      org.bukkit.scoreboard.Scoreboard sb = sm.getMainScoreboard();
+      org.bukkit.scoreboard.Objective obj = sb.getObjective(objective);
+      if (obj == null) return null;
+      Player player = Bukkit.getPlayer(playerId);
+      String entry = (player != null) ? player.getName() : Bukkit.getOfflinePlayer(playerId).getName();
+      if (entry == null) return null;
+      org.bukkit.scoreboard.Score score = obj.getScore(entry);
+      return score.isScoreSet() ? score.getScore() : null;
+    } catch (Throwable t) {
+      return null;
+    }
+  }
+
+  @Override
   public void sendMessage(UUID target, Enum<?> msgType, String tag) {
     Object cv = RTP.configs.getConfigValue(msgType, "");
     String message = cv == null ? "" : cv.toString();
@@ -753,13 +772,13 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   /**
-   * Strips legacy {@code &x} color codes and {@code #RRGGBB} hex codes from a bar title
-   * (BossBar titles render as plain text on most clients) and truncates to Bukkit's
-   * 64-character title limit.
+   * Strips legacy {@code &x} / {@code §x} color codes and {@code #RRGGBB} / {@code &#RRGGBB} hex
+   * codes from a bar title (BossBar titles render as plain text on most clients) and truncates to
+   * Bukkit's 64-character title limit. Regex-free: runs on every bar update.
    */
   private static String sanitizeBarTitle(String title) {
     if (title == null) return "";
-    String out = title.replaceAll("&[0-9a-fA-FklmnorKLMNOR]", "").replaceAll("#[0-9a-fA-F]{6}", "");
+    String out = io.github.dailystruggle.rtp.common.text.LegacyColorStrip.strip(title);
     return out.length() > 64 ? out.substring(0, 64) : out;
   }
 
@@ -935,6 +954,9 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       if (lineConsumer != null) lineConsumer.accept(s);
     };
 
+    boolean isLuckPermsCmd = commandLine.trim().toLowerCase(java.util.Locale.ROOT).startsWith("lp")
+        || commandLine.trim().toLowerCase(java.util.Locale.ROOT).startsWith("luckperms");
+
     // Scoped log listener to capture providers (like LuckPerms) that route console output
     // to their plugin logger or the root/server logger when executing from console.
     java.util.logging.Handler logHandler = null;
@@ -947,6 +969,16 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
         @Override
         public void publish(java.util.logging.LogRecord record) {
           if (record == null) return;
+          String loggerName = record.getLoggerName();
+          if (loggerName != null) {
+            String lowerLogger = loggerName.toLowerCase(java.util.Locale.ROOT);
+            if (isLuckPermsCmd && !lowerLogger.contains("luckperms")) {
+              return;
+            }
+            if (!isLuckPermsCmd && !lowerLogger.contains("luckperms") && !lowerLogger.contains("rtp")) {
+              return;
+            }
+          }
           String msg = record.getMessage();
           if (msg != null && !msg.isBlank()) {
             trackingConsumer.accept(msg);
@@ -980,6 +1012,17 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
               Object event = args[0];
               if (event != null) {
                 try {
+                  java.lang.reflect.Method getLoggerNameMethod = event.getClass().getMethod("getLoggerName");
+                  Object lNameObj = getLoggerNameMethod.invoke(event);
+                  if (lNameObj != null) {
+                    String lower = lNameObj.toString().toLowerCase(java.util.Locale.ROOT);
+                    if (isLuckPermsCmd && !lower.contains("luckperms")) {
+                      return null;
+                    }
+                    if (!isLuckPermsCmd && !lower.contains("luckperms") && !lower.contains("rtp")) {
+                      return null;
+                    }
+                  }
                   java.lang.reflect.Method getMessageMethod = event.getClass().getMethod("getMessage");
                   Object messageObj = getMessageMethod.invoke(event);
                   if (messageObj != null) {
@@ -1001,11 +1044,39 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     } catch (Throwable ignored) {}
 
     CommandSender capturingSender = createCapturingConsoleSender(console, trackingConsumer);
+    boolean isPrimary = false;
     try {
-      boolean dispatched = Bukkit.dispatchCommand(capturingSender, commandLine);
-      if (dispatched) {
+      isPrimary = Bukkit.isPrimaryThread();
+    } catch (Throwable ignored) {}
+
+    try {
+      boolean dispatched;
+      if (!isPrimary && plugin instanceof Plugin bukkitPlugin && bukkitPlugin.isEnabled()) {
+        java.util.concurrent.CompletableFuture<Boolean> dispatchFuture = new java.util.concurrent.CompletableFuture<>();
+        Bukkit.getScheduler().runTask(bukkitPlugin, () -> {
+          try {
+            dispatchFuture.complete(Bukkit.dispatchCommand(capturingSender, commandLine));
+          } catch (Throwable t) {
+            dispatchFuture.completeExceptionally(t);
+          }
+        });
+        try {
+          dispatched = dispatchFuture.get(5, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          log(Level.WARNING, "[RTP] Async command dispatch interrupted for '" + commandLine + "': " + e.getMessage(), e);
+          return false;
+        } catch (Throwable t) {
+          log(Level.WARNING, "[RTP] Async command dispatch failed for '" + commandLine + "': " + t.getMessage(), t);
+          return false;
+        }
+      } else {
+        dispatched = Bukkit.dispatchCommand(capturingSender, commandLine);
+      }
+
+      if (dispatched && !isPrimary) {
         // Providers like LuckPerms execute command callbacks on asynchronous worker threads.
-        // Wait up to 1000ms for initial response, and then debounce until output ceases.
+        // On async worker threads, wait up to 1000ms for initial response, and then debounce until output ceases.
         long start = System.currentTimeMillis();
         while (System.currentTimeMillis() - start < 1000 && lastMessageTime.get() == 0L) {
           try {
@@ -1345,9 +1416,30 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   // Palette identifier normalization & reconciliation SPI
   // ---------------------------------------------------------------------------
 
+  /**
+   * Raw palette name to reconciled name. {@code Material.matchMaterial} compiles a regex per
+   * call and safety scans hit it per block name; the material set is fixed for the server's
+   * lifetime, so answers never go stale.
+   */
+  private final java.util.concurrent.ConcurrentHashMap<String, String> paletteIdentifierMemo =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
+  /** Bound on memoized names; palettes carry a few thousand distinct block ids at most. */
+  private static final int PALETTE_MEMO_MAX = 8192;
+
   @Override
   public String reconcilePaletteIdentifier(String raw) {
     if (raw == null) return null;
+    String memo = paletteIdentifierMemo.get(raw);
+    if (memo != null) return memo;
+    String reconciled = reconcilePaletteIdentifierUncached(raw);
+    if (reconciled != null && paletteIdentifierMemo.size() < PALETTE_MEMO_MAX) {
+      paletteIdentifierMemo.putIfAbsent(raw, reconciled);
+    }
+    return reconciled;
+  }
+
+  private static String reconcilePaletteIdentifierUncached(String raw) {
     try {
       Material material = Material.matchMaterial(raw);
       if (material != null) return material.name();

@@ -400,6 +400,35 @@ not be read without loading a chunk or crossing a region.
 `folia-region-threads:N` on Folia, where `main_thread_cpu_ms` sums every
 region scheduler thread. Folia rows without this column measured one thread.
 
+**`cpu_*_ms`** (phases) split `process_cpu_ms` by thread name, summed from
+per-thread CPU deltas sampled every `cpu-breakdown-sample-ms` (default
+1000) and at phase boundaries:
+
+| Column | Threads |
+|---|---|
+| `cpu_server_thread_ms` | the tick thread (`Server thread`) |
+| `cpu_region_threads_ms` | Folia region scheduler threads |
+| `cpu_scheduler_ms` | Bukkit async workers (`Craft Scheduler Thread`) |
+| `cpu_scheduler_by_plugin` | the same, as `plugin=ms;...` from the name Paper gives a worker while it runs a task; `(idle)` is time between tasks |
+| `cpu_async_scheduler_ms` | Paper/Folia `AsyncScheduler` workers |
+| `cpu_chunk_system_ms` | chunk load, generation and region I/O workers |
+| `cpu_network_ms` | Netty |
+| `cpu_other_java_ms` | every other Java thread; top 8 names in `cpu_other_top` |
+| `cpu_non_java_ms` | process CPU minus all of the above: GC, JIT and VM threads, plus the last interval of any thread that exited between samples |
+| `cpu_gc_ms` | the JVM's GC-thread CPU counter, a subset of `cpu_non_java_ms`; JDK 26+ only, `-1` otherwise |
+
+A worker is charged to the plugin named at sample time, so a worker that
+switched plugins within one interval bills the whole interval to the later
+one. The harness's own async work appears as `StressTestRTP`. Check
+`cpu_other_top` after a run on a new platform: a large entry there is a
+thread family the name patterns in `CpuSampler.classify` do not cover yet.
+
+`chunk-load-cost-us` is read per platform family (`-paper`, `-folia`, or
+the base key on Spigot) with no fallback, so `chunk_load_cost_ms` /
+`cpu_ms_with_chunks` stay empty on Paper and Folia unless their own key is
+set. On those platforms chunk-worker CPU is already in `process_cpu_ms`
+and is measured directly as `cpu_chunk_system_ms`.
+
 **`chunks_sync_requested` / `chunks_sync_by_plugin`** (phases) name the
 plugin that synchronously requested each load, from the `ChunkLoadEvent`
 call stack. They are `-1` unless `chunks_sync_selftest` is `PASS` (one sync
@@ -407,6 +436,18 @@ and one async load of a generated chunk at startup, `sync-load-selftest`).
 `chunks_on_tick` classifies by firing thread, which Paper and Folia make
 near 100% for every plugin; publish chunk counts from
 `chunks_inclusive_per_attempt`.
+
+**`chunks_landing_area`**. Paper loads a player's view area after the
+teleport event, so those loads used to land on whichever attempt was in
+flight, or in background when none was, which made `chunks_per_attempt`
+depend on how long a plugin's teleports take. A load within
+`viewDistance + 1` chunks (Chebyshev) of an account's last successful
+destination is now charged to that teleport until the same account's next
+dispatch. The window is never time-based, so one account's consecutive
+teleports cannot overlap. These loads are excluded from
+`chunks_loaded_attributed` and `chunks_loaded_background`, so attributed +
+landing area + background = `chunks_loaded`. `chunks_per_teleport` is
+(attributed + landing area) / attempts.
 
 **`region_tps_*`**. Folia has no server-wide TPS; `Server#getTPS()`
 throws, so the `tps` column there is a wall-clock timer on the *global*
@@ -544,7 +585,7 @@ source of irreproducible numbers:
 
 When the [spark](https://spark.lucko.me/) profiler plugin is installed,
 StressTestRTP automatically brackets each measurement phase with
-`spark profiler start --timeout N --only-ticks-over T` /
+`spark profiler start --timeout N [--only-ticks-over T] [--thread S]` /
 `spark profiler stop --comment <target_label>`. One profile is produced
 per `sequence` target (and one per `start` / `burst` run), and the spark
 upload's comment matches the CSV's `target_label` column so the two
@@ -552,12 +593,25 @@ artifacts correlate 1:1.
 
 This gives you white-box "where did the time go" data (sync chunk loads,
 GC pauses, region scans) alongside the harness's black-box per-attempt
-timings. When spark isn't installed the hook silently no-ops — no hard
-dependency.
+timings. Both a spark plugin jar and the spark that Paper 1.21+ bundles
+are detected; the bundled one registers no Bukkit plugin, so the hook
+also checks for the `/spark` command. When neither is present the hook
+logs one line and no-ops — no hard dependency.
 
 Configure under `spark:` in `config.yml` (defaults: enabled, 90 s
 timeout, only-ticks-over 50 ms). Set `spark.enabled: false` if you'd
 rather drive `/spark profiler` manually.
+
+- `spark.threads` (default `*`) is passed as `--thread <value>`, so every
+  thread is sampled, not just the server thread. Set it to `""` to omit
+  the flag (server thread only).
+- With `save-to-file`, spark writes `plugins/spark/profile-<stamp>.sparkprofile`
+  (the log line names the folder that was found). The auto-summary polls
+  that folder every ~1 s, starting after `auto-summary-delay-ticks`, until
+  `spark.auto-summary-timeout-seconds` (default 30) have passed since the
+  stop. It accepts only a profile that is new since the stop and whose size
+  is unchanged across two polls. Spark's save can take several seconds on
+  Windows.
 
 ---
 

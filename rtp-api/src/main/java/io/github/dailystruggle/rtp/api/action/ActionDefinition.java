@@ -532,6 +532,10 @@ public record ActionDefinition(
       return new CommandAction(ActionType.MESSAGE, msg, Collections.emptyList());
     }
 
+    public static CommandAction messageTarget(String msg) {
+      return new CommandAction(ActionType.MESSAGE_TARGET, msg, Collections.emptyList());
+    }
+
     public static CommandAction forEach(List<CommandAction> subActions) {
       return new CommandAction(ActionType.FOR_EACH, "", subActions);
     }
@@ -546,6 +550,7 @@ public record ActionDefinition(
     PLAYER,
     ACTION,
     MESSAGE,
+    MESSAGE_TARGET,
     FOR_EACH
   }
 }

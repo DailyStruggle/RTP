@@ -24,6 +24,19 @@ import org.bukkit.entity.Player;
 public class TownyBoundaryProvider implements ClaimBoundaryProvider {
   private static boolean exists = true;
 
+  private static int getTownBlockSize() {
+    try {
+      Class<?> settingsClass = Class.forName("com.palmergames.bukkit.towny.TownySettings");
+      Method m = settingsClass.getMethod("getTownBlockSize");
+      Object res = m.invoke(null);
+      if (res instanceof Number n && n.intValue() > 0) {
+        return n.intValue();
+      }
+    } catch (Throwable ignored) {
+    }
+    return 16;
+  }
+
   @Override
   public String namespace() {
     return "towny";
@@ -79,6 +92,7 @@ public class TownyBoundaryProvider implements ClaimBoundaryProvider {
         return Optional.empty();
       }
 
+      int tbSize = getTownBlockSize();
       int minChunkX = Integer.MAX_VALUE;
       int minChunkZ = Integer.MAX_VALUE;
       int maxChunkX = Integer.MIN_VALUE;
@@ -86,7 +100,7 @@ public class TownyBoundaryProvider implements ClaimBoundaryProvider {
       long sumX = 0;
       long sumZ = 0;
       int count = 0;
-      Set<Long> chunkKeys = new HashSet<>();
+      Set<Long> townBlockKeys = new HashSet<>();
 
       for (Object tb : blocks) {
         if (tb == null) continue;
@@ -101,17 +115,27 @@ public class TownyBoundaryProvider implements ClaimBoundaryProvider {
 
         Method getXMethod = tb.getClass().getMethod("getX");
         Method getZMethod = tb.getClass().getMethod("getZ");
-        int cx = (Integer) getXMethod.invoke(tb);
-        int cz = (Integer) getZMethod.invoke(tb);
+        int tbX = (Integer) getXMethod.invoke(tb);
+        int tbZ = (Integer) getZMethod.invoke(tb);
 
-        if (cx < minChunkX) minChunkX = cx;
-        if (cx > maxChunkX) maxChunkX = cx;
-        if (cz < minChunkZ) minChunkZ = cz;
-        if (cz > maxChunkZ) maxChunkZ = cz;
+        int minBx = tbX * tbSize;
+        int maxBx = minBx + tbSize - 1;
+        int minBz = tbZ * tbSize;
+        int maxBz = minBz + tbSize - 1;
 
-        sumX += ((long) cx << 4) + 8;
-        sumZ += ((long) cz << 4) + 8;
-        chunkKeys.add((((long) cx) << 32) | (cz & 0xFFFFFFFFL));
+        int cMinX = minBx >> 4;
+        int cMaxX = maxBx >> 4;
+        int cMinZ = minBz >> 4;
+        int cMaxZ = maxBz >> 4;
+
+        if (cMinX < minChunkX) minChunkX = cMinX;
+        if (cMaxX > maxChunkX) maxChunkX = cMaxX;
+        if (cMinZ < minChunkZ) minChunkZ = cMinZ;
+        if (cMaxZ > maxChunkZ) maxChunkZ = cMaxZ;
+
+        sumX += minBx + (tbSize / 2);
+        sumZ += minBz + (tbSize / 2);
+        townBlockKeys.add((((long) tbX) << 32) | (tbZ & 0xFFFFFFFFL));
         count++;
       }
 
@@ -145,13 +169,20 @@ public class TownyBoundaryProvider implements ClaimBoundaryProvider {
       }
       final String townId = resolvedTownId;
 
-      return Optional.of(buildBoundary(townId, worldName, chunkKeys, centroidX, centroidZ, finalMinX, finalMinZ, finalMaxX, finalMaxZ));
+      return Optional.of(buildBoundary(townId, worldName, tbSize, townBlockKeys, centroidX, centroidZ, finalMinX, finalMinZ, finalMaxX, finalMaxZ));
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.WARNING,
-          "[RTP] Towny integration encountered an error resolving claim boundary. Disabling Towny boundary lookup.",
-          t);
+      if (ClaimCheckFailure.isIncompatibility(t)) {
+        exists = false;
+        RTP.log(
+            Level.SEVERE,
+            "[RTP] Towny API is missing or incompatible. Disabling Towny boundary lookup.",
+            t);
+      } else {
+        RTP.log(
+            Level.WARNING,
+            "[RTP] Towny integration encountered an error resolving claim boundary for player " + playerId + ".",
+            t);
+      }
       return Optional.empty();
     }
   }
@@ -211,6 +242,7 @@ public class TownyBoundaryProvider implements ClaimBoundaryProvider {
         return Optional.empty();
       }
 
+      int tbSize = getTownBlockSize();
       int minChunkX = Integer.MAX_VALUE;
       int minChunkZ = Integer.MAX_VALUE;
       int maxChunkX = Integer.MIN_VALUE;
@@ -218,7 +250,7 @@ public class TownyBoundaryProvider implements ClaimBoundaryProvider {
       long sumX = 0;
       long sumZ = 0;
       int count = 0;
-      Set<Long> chunkKeys = new HashSet<>();
+      Set<Long> townBlockKeys = new HashSet<>();
 
       for (Object tb : blocks) {
         if (tb == null) continue;
@@ -233,17 +265,27 @@ public class TownyBoundaryProvider implements ClaimBoundaryProvider {
 
         Method getXMethod = tb.getClass().getMethod("getX");
         Method getZMethod = tb.getClass().getMethod("getZ");
-        int cx = (Integer) getXMethod.invoke(tb);
-        int cz = (Integer) getZMethod.invoke(tb);
+        int tbX = (Integer) getXMethod.invoke(tb);
+        int tbZ = (Integer) getZMethod.invoke(tb);
 
-        if (cx < minChunkX) minChunkX = cx;
-        if (cx > maxChunkX) maxChunkX = cx;
-        if (cz < minChunkZ) minChunkZ = cz;
-        if (cz > maxChunkZ) maxChunkZ = cz;
+        int minBx = tbX * tbSize;
+        int maxBx = minBx + tbSize - 1;
+        int minBz = tbZ * tbSize;
+        int maxBz = minBz + tbSize - 1;
 
-        sumX += ((long) cx << 4) + 8;
-        sumZ += ((long) cz << 4) + 8;
-        chunkKeys.add((((long) cx) << 32) | (cz & 0xFFFFFFFFL));
+        int cMinX = minBx >> 4;
+        int cMaxX = maxBx >> 4;
+        int cMinZ = minBz >> 4;
+        int cMaxZ = maxBz >> 4;
+
+        if (cMinX < minChunkX) minChunkX = cMinX;
+        if (cMaxX > maxChunkX) maxChunkX = cMaxX;
+        if (cMinZ < minChunkZ) minChunkZ = cMinZ;
+        if (cMaxZ > maxChunkZ) maxChunkZ = cMaxZ;
+
+        sumX += minBx + (tbSize / 2);
+        sumZ += minBz + (tbSize / 2);
+        townBlockKeys.add((((long) tbX) << 32) | (tbZ & 0xFFFFFFFFL));
         count++;
       }
 
@@ -272,20 +314,29 @@ public class TownyBoundaryProvider implements ClaimBoundaryProvider {
         }
       }
 
-      return Optional.of(buildBoundary(resolvedTownId, worldName, chunkKeys, centroidX, centroidZ, minChunkX, minChunkZ, maxChunkX, maxChunkZ));
+      return Optional.of(buildBoundary(resolvedTownId, worldName, tbSize, townBlockKeys, centroidX, centroidZ, minChunkX, minChunkZ, maxChunkX, maxChunkZ));
     } catch (Throwable t) {
-      RTP.log(
-          Level.WARNING,
-          "[RTP] Towny integration encountered an error resolving claim boundary at (" + x + "," + z + ").",
-          t);
+      if (ClaimCheckFailure.isIncompatibility(t)) {
+        exists = false;
+        RTP.log(
+            Level.SEVERE,
+            "[RTP] Towny API is missing or incompatible. Disabling Towny boundary lookup.",
+            t);
+      } else {
+        RTP.log(
+            Level.WARNING,
+            "[RTP] Towny integration encountered an error resolving claim boundary at (" + x + "," + z + ").",
+            t);
+      }
       return Optional.empty();
     }
   }
 
-  private static ClaimBoundary buildBoundary(
+  static ClaimBoundary buildBoundary(
       String townId,
       String worldName,
-      Set<Long> chunkKeys,
+      int tbSize,
+      Set<Long> townBlockKeys,
       int centroidX,
       int centroidZ,
       int minChunkX,
@@ -305,13 +356,24 @@ public class TownyBoundaryProvider implements ClaimBoundaryProvider {
 
       @Override
       public boolean contains(int x, int z) {
-        return containsChunk(x >> 4, z >> 4);
+        int tbX = Math.floorDiv(x, tbSize);
+        int tbZ = Math.floorDiv(z, tbSize);
+        long key = (((long) tbX) << 32) | (tbZ & 0xFFFFFFFFL);
+        return townBlockKeys.contains(key);
       }
 
       @Override
       public boolean containsChunk(int cx, int cz) {
-        long key = (((long) cx) << 32) | (cz & 0xFFFFFFFFL);
-        return chunkKeys.contains(key);
+        if (tbSize == 16) {
+          long key = (((long) cx) << 32) | (cz & 0xFFFFFFFFL);
+          return townBlockKeys.contains(key);
+        }
+        int centerX = (cx << 4) + 8;
+        int centerZ = (cz << 4) + 8;
+        int tbX = Math.floorDiv(centerX, tbSize);
+        int tbZ = Math.floorDiv(centerZ, tbSize);
+        long key = (((long) tbX) << 32) | (tbZ & 0xFFFFFFFFL);
+        return townBlockKeys.contains(key);
       }
 
       @Override

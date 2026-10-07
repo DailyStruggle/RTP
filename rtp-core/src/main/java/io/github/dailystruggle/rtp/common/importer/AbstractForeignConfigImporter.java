@@ -2,6 +2,8 @@ package io.github.dailystruggle.rtp.common.importer;
 
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import io.github.dailystruggle.rtp.common.search.FuzzySearchEngine;
+import io.github.dailystruggle.rtp.common.search.ThesaurusIndex;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -28,19 +30,19 @@ import java.util.regex.Pattern;
 public abstract class AbstractForeignConfigImporter implements ForeignConfigImporter {
 
     private static final Pattern NON_ALPHANUMERIC = Pattern.compile("[^a-zA-Z0-9]");
+    private static final Pattern POTION_SEPARATORS = Pattern.compile("[:\\s]+");
 
     /**
      * Normalizes a key by stripping punctuation, symbols, and lowercasing for fuzzy matching.
      * E.g. "min-radius", "min_radius", "MinRadius", "min.radius" -> "minradius".
      */
     protected static String normalizeKey(String key) {
-        if (key == null) return "";
-        return NON_ALPHANUMERIC.matcher(key).replaceAll("").toLowerCase(java.util.Locale.ROOT);
+        return FuzzySearchEngine.normalize(key);
     }
 
     /**
      * Finds an entry value in a section matching any of the candidate keys via exact, case-insensitive,
-     * or normalized fuzzy match.
+     * normalized fuzzy match, thesaurus synonym, or adaptive edit distance.
      */
     protected Object findValueFuzzy(RtpYamlSection section, String... candidateKeys) {
         if (section == null || candidateKeys == null || candidateKeys.length == 0) return null;
@@ -73,6 +75,32 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
                 if (normActual.equals(normTarget)) {
                     Object val = section.get(actual);
                     if (val != null) return val;
+                }
+            }
+        }
+
+        // 4. Thesaurus synonym match across direct keys
+        ThesaurusIndex thesaurus = ThesaurusIndex.getInstance();
+        for (String ck : candidateKeys) {
+            String normTarget = normalizeKey(ck);
+            if (normTarget.isEmpty()) continue;
+            for (String actual : directKeys) {
+                if (thesaurus.hasSynonymMatch(actual, List.of(normTarget))) {
+                    Object val = section.get(actual);
+                    if (val != null && !(val instanceof RtpYamlSection)) return val;
+                }
+            }
+        }
+
+        // 5. Adaptive Levenshtein distance match across direct keys (typo tolerance)
+        for (String ck : candidateKeys) {
+            String normTarget = normalizeKey(ck);
+            if (normTarget.length() < FuzzySearchEngine.MIN_FUZZY_LENGTH) continue;
+            for (String actual : directKeys) {
+                String normActual = normalizeKey(actual);
+                if (FuzzySearchEngine.isFuzzyMatch(normTarget, normActual)) {
+                    Object val = section.get(actual);
+                    if (val != null && !(val instanceof RtpYamlSection)) return val;
                 }
             }
         }
@@ -161,6 +189,10 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
     protected String getStringCaseInsensitive(RtpYamlSection section, String def, String... keys) {
         if (section == null) return def;
         Object val = findValueFuzzy(section, keys);
+        if (val instanceof List<?> l) {
+            if (!l.isEmpty() && l.get(0) != null) return l.get(0).toString();
+            return def;
+        }
         return val != null ? val.toString() : def;
     }
 
@@ -468,7 +500,7 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
             if (enabled) {
                 List<String> rawPotions = getStringListCaseInsensitive(potionSec, "list", "List");
                 for (String pot : rawPotions) {
-                    String[] parts = pot.split("[:\\s]+");
+                    String[] parts = POTION_SEPARATORS.split(pot);
                     if (parts.length >= 1) {
                         String type = parts[0].toUpperCase(Locale.ROOT);
                         int duration = (parts.length >= 2) ? parseDurationTicks(parts[1]) : 100;
@@ -481,7 +513,7 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
             List<String> rawPotions = effectsSec.getStringList("potions");
             if (rawPotions != null) {
                 for (String pot : rawPotions) {
-                    String[] parts = pot.split("[:\\s]+");
+                    String[] parts = POTION_SEPARATORS.split(pot);
                     if (parts.length >= 1) {
                         String type = parts[0].toUpperCase(Locale.ROOT);
                         int duration = (parts.length >= 2) ? parseDurationTicks(parts[1]) : 100;

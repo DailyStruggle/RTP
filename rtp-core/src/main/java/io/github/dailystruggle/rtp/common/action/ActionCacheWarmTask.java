@@ -82,6 +82,49 @@ public final class ActionCacheWarmTask implements Runnable {
   /**
    * Resolves the target participant slot count for warming this action's cache.
    */
+  public static int resolveSlotCount(ActionDefinition def) {
+    if (def == null) return 2;
+    ActionDefinition.PlacementSpec pSpec = def.placement();
+    if (pSpec != null) {
+      Map<String, Object> params = pSpec.parameters();
+      if (params.containsKey("slots")) {
+        Object v = params.get("slots");
+        if (v instanceof Number n) return Math.max(1, n.intValue());
+      }
+      if (params.containsKey("participants")) {
+        Object v = params.get("participants");
+        if (v instanceof Number n) return Math.max(1, n.intValue());
+      }
+    }
+    // Inspect def.gates() for player requirement (e.g. players: ">= 4")
+    if (def.gates() != null) {
+      for (Map<String, Object> gateMap : def.gates()) {
+        if (gateMap == null) continue;
+        for (Map.Entry<String, Object> entry : gateMap.entrySet()) {
+          String key = entry.getKey().toLowerCase();
+          if (key.equals("players") || key.equals("participants") || key.equals("participantcount") || key.equals("player_count")) {
+            Object val = entry.getValue();
+            if (val != null) {
+              String s = val.toString().trim();
+              java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d+)").matcher(s);
+              if (m.find()) {
+                try {
+                  int count = Integer.parseInt(m.group(1));
+                  if (count > 0) return count;
+                } catch (NumberFormatException ignored) {
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return 2;
+  }
+
+  /**
+   * Resolves the target participant slot count for warming this action's cache.
+   */
   public static int resolveSlotCount(ActionDefinition.PlacementSpec pSpec) {
     if (pSpec == null) return 2;
     Map<String, Object> params = pSpec.parameters();
@@ -104,17 +147,23 @@ public final class ActionCacheWarmTask implements Runnable {
 
     final String actionId = def.id();
     final ActionDefinition.PlacementSpec pSpec = def.placement();
-    final int n = resolveSlotCount(pSpec);
+    final int n = resolveSlotCount(def);
 
     List<UUID> dummyParticipants = new ArrayList<>(n);
     for (int i = 0; i < n; i++) {
       dummyParticipants.add(UUID.randomUUID());
     }
 
+    int centerRadius = pSpec.centerRadius();
+    if (centerRadius <= 0 && pSpec.parameters() != null && pSpec.parameters().get("centerRadius") instanceof Number num) {
+      centerRadius = num.intValue();
+    }
+
     GroupProfileSpec profile =
         GroupProfileSpec.of(
             pSpec.shapeName(),
             pSpec.radius(),
+            centerRadius,
             pSpec.minSeparation(),
             pSpec.elevationTolerance(),
             n,

@@ -458,17 +458,10 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
 
         return CompletableFuture.supplyAsync(() -> {
             try {
-                java.nio.file.Path regionFile =
-                    io.github.dailystruggle.rtp.anvil.AnvilPrefilter
-                        .regionFileFor(worldFolder, dim, cx, cz);
-                byte[] regionBytes =
-                    io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
-                if (regionBytes == null) return null;
-                int rx = Math.floorMod(cx, 32);
-                int rz = Math.floorMod(cz, 32);
+                // Reads only this chunk's sectors (location table cached per region file).
                 io.github.dailystruggle.rtp.anvil.ColumnProbe probe =
-                    io.github.dailystruggle.rtp.anvil.AnvilReader.readColumnProbe(
-                        regionBytes, rx, rz, finalMinY, finalMaxY);
+                    io.github.dailystruggle.rtp.anvil.AnvilPrefilter.probeColumn(
+                        worldFolder, dim, cx, cz, finalMinY, finalMaxY);
                 if (probe == null) return null;
                 return ChunkColumnProbe.of(new AnvilColumnProbeAdapter(probe, cx, cz,
                     s -> (RTP.serverAccessor != null)
@@ -502,31 +495,9 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                 io.github.dailystruggle.rtp.anvil.AnvilPrefilter
                     .regionFileFor(worldFolder, dim, rcx << 5, rcz << 5);
             if (regionFile == null) return java.util.Collections.emptyMap();
-            byte[] regionBytes =
-                io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
-            if (regionBytes == null) return java.util.Collections.emptyMap();
-            java.util.HashMap<Long, String> out = new java.util.HashMap<>(1024);
-            for (int rx = 0; rx < 32; rx++) {
-                for (int rz = 0; rz < 32; rz++) {
-                    try {
-                        io.github.dailystruggle.rtp.anvil.AnvilChunkView view =
-                            io.github.dailystruggle.rtp.anvil.AnvilReader.readChunkView(
-                                regionBytes, rx, rz);
-                        if (view == null) continue;
-                        String raw = view.getBiomeAt(8, y, 8);
-                        if (raw == null) continue;
-                        String canonical = canonicaliseBiome(raw);
-                        if (canonical == null || canonical.isEmpty()) continue;
-                        int cx = (rcx << 5) | rx;
-                        int cz = (rcz << 5) | rz;
-                        long key = ((long) cx << 32) | (cz & 0xFFFF_FFFFL);
-                        out.put(key, canonical);
-                    } catch (Throwable ignored) {
-                        // chunk not present / unreadable; skip silently.
-                    }
-                }
-            }
-            return out;
+            // One whole-file read under a pooled-buffer lease.
+            return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.readAllBiomes(
+                regionFile, rcx, rcz, y, NeoForgeRTPWorld::canonicaliseBiome);
         } catch (Throwable t) {
             RTP.log(java.util.logging.Level.FINE,
                 "[RTP] NeoForgeRTPWorld.readBiomesInRegionFile failed for world=" + name

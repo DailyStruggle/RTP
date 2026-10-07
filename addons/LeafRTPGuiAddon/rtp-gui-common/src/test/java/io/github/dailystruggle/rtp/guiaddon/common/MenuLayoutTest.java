@@ -102,4 +102,35 @@ public class MenuLayoutTest {
         assertEquals("Select Biome...", placed.get(20).displayName());
         assertEquals("Special Teleports", placed.get(24).displayName());
     }
+
+    @Test
+    void compute_preservesSubmenuRowUnderDestinationOverflow() {
+        List<MenuEntry> entries = new ArrayList<>();
+        // Add 25 destinations (would take 4 rows without submenus)
+        for (int i = 0; i < 25; i++) {
+            entries.add(new MenuEntry(
+                    RtpTarget.region("r" + i),
+                    RtpTargetStatus.Availability.READY,
+                    "Region " + i,
+                    "GRASS_BLOCK",
+                    0L,
+                    0.0));
+        }
+        // Add 1 submenu button
+        entries.add(new MenuEntry(
+                RtpTarget.action("menu:biomes:0"),
+                RtpTargetStatus.Availability.READY,
+                "Select Biome...",
+                "COMPASS",
+                0L,
+                0.0));
+
+        MenuModel model = new MenuModel("Test", 6, "AIR", false, "", entries, null);
+        MenuLayout layout = MenuLayout.compute(model);
+
+        // Submenu must be present in layout
+        boolean submenuPlaced = layout.slotEntries().values().stream()
+                .anyMatch(e -> "Select Biome...".equals(e.displayName()));
+        assertTrue(submenuPlaced, "Submenu must not be crowded out by destination overflow");
+    }
 }

@@ -376,13 +376,18 @@ public class SelectionAPI {
    */
   @SuppressWarnings("unchecked") // multiConfigParserMap keyed by WorldKeys/RegionKeys class guarantees the parser's E
   public Region getRegion(RTPPlayer player) {
+    if (player == null) return getRegionOrDefault("default");
     Set<String> worldsAttempted = new HashSet<>();
-    String worldName = player.getLocation().world().name();
+    io.github.dailystruggle.rtp.api.world.RTPLocation loc = player.getLocation();
+    if (loc == null || loc.world() == null) return getRegionOrDefault("default");
+    String worldName = loc.world().name();
     RTP.log(Level.FINE, "[SELECT_TRACE] SelectionAPI.getRegion ENTER playerId=" + player.uuid()
         + " startingWorld=" + worldName);
     MultiConfigParser<WorldKeys> worldParsers =
         (MultiConfigParser<WorldKeys>) RTP.configs.multiConfigParserMap.get(WorldKeys.class);
+    if (worldParsers == null) return getRegionOrDefault("default");
     ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
+    if (worldParser == null) return getRegionOrDefault("default");
     boolean requirePermission =
         Boolean.parseBoolean(
             worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
@@ -398,6 +403,7 @@ public class SelectionAPI {
           + " from=" + previousWorld + " to=" + worldName
           + " attemptedSoFar=" + worldsAttempted);
       worldParser = worldParsers.getParser(worldName);
+      if (worldParser == null) return getRegionOrDefault("default");
       requirePermission =
           Boolean.parseBoolean(
               worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
@@ -408,7 +414,9 @@ public class SelectionAPI {
         + " resolvedWorld=" + worldName + " initialRegion=" + regionName);
     MultiConfigParser<RegionKeys> regionParsers =
         (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
+    if (regionParsers == null) return getRegionOrDefault("default");
     ConfigParser<RegionKeys> regionParser = regionParsers.getParser(regionName);
+    if (regionParser == null) return getRegionOrDefault("default");
     requirePermission =
         Boolean.parseBoolean(
             regionParser.getConfigValue(RegionKeys.requirePermission, false).toString());
@@ -426,6 +434,7 @@ public class SelectionAPI {
           + " from=" + previousRegion + " to=" + regionName
           + " attemptedSoFar=" + regionsAttempted);
       regionParser = regionParsers.getParser(regionName);
+      if (regionParser == null) return getRegionOrDefault("default");
       requirePermission =
           Boolean.parseBoolean(
               regionParser.getConfigValue(RegionKeys.requirePermission, false).toString());
@@ -443,10 +452,13 @@ public class SelectionAPI {
    */
   @SuppressWarnings("unchecked") // multiConfigParserMap keyed by WorldKeys.class guarantees the parser's E
   public Region getRegion(RTPWorld world) {
+    if (world == null) return getRegionOrDefault("default");
     String worldName = world.name();
     MultiConfigParser<WorldKeys> worldParsers =
         (MultiConfigParser<WorldKeys>) RTP.configs.multiConfigParserMap.get(WorldKeys.class);
+    if (worldParsers == null) return getRegionOrDefault("default");
     ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
+    if (worldParser == null) return getRegionOrDefault("default");
     String regionName = String.valueOf(worldParser.getConfigValue(WorldKeys.region, "default"));
     return permRegionLookup.get(regionName);
   }

@@ -172,7 +172,7 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
       int attempt,
       int maxAttempts) {
     return SubspaceAnchorResolver.resolveAnchor(region, anchorSource)
-        .thenCompose(genResult -> allocate(region, spec, participants, n, genResult))
+        .thenCompose(genResult -> allocate(region, spec, participants, n, genResult, anchorSource))
         .thenCompose(
             result -> {
               if (result.isSuccess() || attempt >= maxAttempts) {
@@ -230,7 +230,8 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
       GroupProfileSpec spec,
       List<UUID> participants,
       int n,
-      GenerationResult genResult) {
+      GenerationResult genResult,
+      io.github.dailystruggle.rtp.api.group.AnchorSource anchorSource) {
 
     if (genResult == null || genResult.coords() == null) {
       String rName = (region != null) ? region.name : "unspecified";
@@ -281,7 +282,9 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
     // 5. Build the subspace, warm surviving footprint chunks asynchronously, and select safe slots.
     final SubspaceShape subspace;
     try {
-      subspace = new SubspaceShape(anchor, spec.radius(), spec.centerRadius(), region);
+      boolean floatingAnchorY = anchorSource instanceof io.github.dailystruggle.rtp.api.group.AnchorSource.ClaimBoundaryAnchorSource
+          || anchorSource instanceof io.github.dailystruggle.rtp.api.group.AnchorSource.ClaimHazardAnchorSource;
+      subspace = new SubspaceShape(anchor, spec.radius(), spec.centerRadius(), region, floatingAnchorY);
       if (this.rng != null) {
         subspace.setRng(this.rng);
       } else if (region != null && region.getShape() instanceof MemoryShape<?> ms && ms.getRng() != null) {
@@ -578,6 +581,9 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
     }
 
     if (teleports.isEmpty()) {
+      for (io.github.dailystruggle.rtp.api.world.RTPLocation dest : placements.values()) {
+        releaseSlotReservation(dest);
+      }
       return CompletableFuture.completedFuture(
           GroupPlacementResult.failure(
               GroupPlacementResult.Reason.CANCELLED, "all participants offline at dispatch"));
@@ -607,6 +613,7 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
                     .setLocation(m.dest)
                     .whenComplete(
                         (ok, ex) -> {
+                          releaseSlotReservation(m.dest);
                           if (ex != null) {
                             RTP.log(
                                 Level.WARNING,
@@ -617,6 +624,7 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
                           }
                         });
               } catch (Throwable t) {
+                releaseSlotReservation(m.dest);
                 RTP.log(Level.WARNING, "[group] teleport threw for participant " + m.uuid, t);
                 m.done.complete(false);
               }
@@ -636,7 +644,17 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
     }
 
     return CompletableFuture.allOf(teleports.toArray(new CompletableFuture[0]))
-        .thenApply(ignored -> GroupPlacementResult.success(placements));
+        .thenApply(ignored -> {
+          boolean allSuccess = teleports.stream().allMatch(f -> Boolean.TRUE.equals(f.getNow(false)));
+          if (!allSuccess) {
+            for (io.github.dailystruggle.rtp.api.world.RTPLocation loc : placements.values()) {
+              releaseSlotReservation(loc);
+            }
+            return GroupPlacementResult.failure(
+                GroupPlacementResult.Reason.ERROR, "one or more participant teleports failed");
+          }
+          return GroupPlacementResult.success(placements);
+        });
   }
 
   /** Packs chunk (x, z) into a single long key (x in low 32 bits, z in high 32). */

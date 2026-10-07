@@ -11,6 +11,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.logging.Level;
+import java.util.regex.Pattern;
 
 /**
  * Subcommand {@code /rtp config import permissions [source] [apply=true|false]}.
@@ -18,6 +19,8 @@ import java.util.logging.Level;
  * and non-destructively plans or applies LeafRTP equivalents.
  */
 public class ConfigImportPermissionsCmd extends BaseRTPCmdImpl {
+
+    private static final Pattern COLOR_CODE = Pattern.compile("&[0-9a-fk-or]");
 
     public static final String PARAM_SOURCE = "source";
     public static final String PARAM_APPLY = "apply";
@@ -74,88 +77,99 @@ public class ConfigImportPermissionsCmd extends BaseRTPCmdImpl {
             }
         }
 
-        migrationService.loadTemplatesFromConfig();
-
-        sendMessage(callerId, "&7[RTP] Querying permission provider for groups"
-                + (sourceFilter != null ? " (filter: &f" + sourceFilter + "&7)" : "")
-                + " &7[mode=&f" + (apply ? "APPLY" : "DRY-RUN") + "&7]...");
-
-        // Query provider group list via template
-        String groupListCmd = migrationService.getGroupListTemplate();
-        sendMessage(callerId, "&7[RTP] Provider group discovery command: &8" + groupListCmd);
-
         if (RTP.serverAccessor == null) {
             sendMessage(callerId, "&c[RTP] Server accessor unavailable; cannot execute commands.");
             return false;
         }
 
-        // Group Discovery: Dispatch configured group list template with capturing sender
-        List<String> groupLines = new ArrayList<>();
-        boolean groupDispatched = RTP.serverAccessor.executeCommandWithCapture(groupListCmd, groupLines::add);
-        if (!groupDispatched && groupLines.isEmpty()) {
-            sendMessage(callerId, "&e[WARN] Could not capture group list from permission provider.");
+        final boolean finalApply = apply;
+        final String finalSourceFilter = sourceFilter;
+
+        Runnable migrationTask = () -> {
+            migrationService.loadTemplatesFromConfig();
+
+            sendMessage(callerId, "&7[RTP] Querying permission provider for groups"
+                    + (finalSourceFilter != null ? " (filter: &f" + finalSourceFilter + "&7)" : "")
+                    + " &7[mode=&f" + (finalApply ? "APPLY" : "DRY-RUN") + "&7]...");
+
+            // Query provider group list via template
+            String groupListCmd = migrationService.getGroupListTemplate();
+            sendMessage(callerId, "&7[RTP] Provider group discovery command: &8" + groupListCmd);
+
+            // Group Discovery: Dispatch configured group list template with capturing sender
+            List<String> groupLines = new ArrayList<>();
+            boolean groupDispatched = RTP.serverAccessor.executeCommandWithCapture(groupListCmd, groupLines::add);
+            if (!groupDispatched && groupLines.isEmpty()) {
+                sendMessage(callerId, "&e[WARN] Could not capture group list from permission provider.");
+                sendMessage(callerId, "&7Tip: Configured templates map competitor nodes with context preservation:");
+                sendMessage(callerId, "  &7Group query: &f" + migrationService.getGroupGetTemplate());
+                sendMessage(callerId, "  &7Group set:   &f" + migrationService.getGroupSetTemplate());
+                return;
+            }
+
+            List<String> discoveredGroups = migrationService.parseGroupListOutput(groupLines);
+            if (discoveredGroups.isEmpty()) {
+                sendMessage(callerId, "&7[RTP] No permission groups discovered from output.");
+                return;
+            }
+
+            sendMessage(callerId, "&a[RTP] Discovered groups: &f" + String.join(", ", discoveredGroups));
+
+            Set<String> derivedSources = deriveSourcesFor(callerId, finalSourceFilter);
+
+            int totalMigrated = 0;
+            int totalPlanned = 0;
+
+            // Node Inspection & Migration: For each group, query permission info and plan/apply migration
+            for (String group : discoveredGroups) {
+                String permInfoCmd = migrationService.formatGroupGet(group);
+                List<String> permLines = new ArrayList<>();
+                RTP.serverAccessor.executeCommandWithCapture(permInfoCmd, permLines::add);
+
+                List<PermissionMigrationService.ParsedNode> parsedNodes =
+                        migrationService.parsePermissionInfoOutput(permLines);
+                if (parsedNodes.isEmpty()) continue;
+
+                PermissionMigrationService.MigrationPlan plan =
+                        migrationService.planMigration("group", group, parsedNodes, finalSourceFilter, derivedSources, finalApply);
+
+                totalPlanned += plan.getGeneratedCommands().size();
+                totalMigrated += plan.getExecutedCommands().size();
+                reportSkippedPrivileged(callerId, group, plan);
+
+                if (!finalApply) {
+                    for (PermissionMigrationService.PermissionEntry entry : plan.getMappedEntries()) {
+                        sendMessage(callerId, "  &7[DRY-RUN] &f" + group + "&7: &e" + entry.getSourcePermission()
+                                + " &7-> &a" + entry.getTargetPermission()
+                                + (!entry.getContexts().isEmpty() ? " &8(" + entry.getContexts() + ")" : ""));
+                    }
+                    for (String cmd : plan.getGeneratedCommands()) {
+                        sendMessage(callerId, "    &8Planned: " + cmd);
+                    }
+                }
+            }
+
+            if (finalApply) {
+                sendMessage(callerId, "&a[RTP] Successfully migrated &f" + totalMigrated
+                        + "&a competitor permission(s) across &f" + discoveredGroups.size() + "&a groups.");
+                RTP.log(Level.INFO, "[RTP] Permission migration applied " + totalMigrated
+                        + " permission set commands across " + discoveredGroups.size() + " groups.");
+            } else {
+                sendMessage(callerId, "&7[RTP] Dry-run complete: &f" + totalPlanned
+                        + "&7 permission(s) planned across &f" + discoveredGroups.size()
+                        + "&7 groups. Pass &fapply=true&7 to execute.");
+            }
+
             sendMessage(callerId, "&7Tip: Configured templates map competitor nodes with context preservation:");
             sendMessage(callerId, "  &7Group query: &f" + migrationService.getGroupGetTemplate());
             sendMessage(callerId, "  &7Group set:   &f" + migrationService.getGroupSetTemplate());
-            return true;
-        }
+        };
 
-        List<String> discoveredGroups = migrationService.parseGroupListOutput(groupLines);
-        if (discoveredGroups.isEmpty()) {
-            sendMessage(callerId, "&7[RTP] No permission groups discovered from output.");
-            return true;
-        }
-
-        sendMessage(callerId, "&a[RTP] Discovered groups: &f" + String.join(", ", discoveredGroups));
-
-        Set<String> derivedSources = deriveSourcesFor(callerId, sourceFilter);
-
-        int totalMigrated = 0;
-        int totalPlanned = 0;
-
-        // Node Inspection & Migration: For each group, query permission info and plan/apply migration
-        for (String group : discoveredGroups) {
-            String permInfoCmd = migrationService.formatGroupGet(group);
-            List<String> permLines = new ArrayList<>();
-            RTP.serverAccessor.executeCommandWithCapture(permInfoCmd, permLines::add);
-
-            List<PermissionMigrationService.ParsedNode> parsedNodes =
-                    migrationService.parsePermissionInfoOutput(permLines);
-            if (parsedNodes.isEmpty()) continue;
-
-            PermissionMigrationService.MigrationPlan plan =
-                    migrationService.planMigration("group", group, parsedNodes, sourceFilter, derivedSources, apply);
-
-            totalPlanned += plan.getGeneratedCommands().size();
-            totalMigrated += plan.getExecutedCommands().size();
-            reportSkippedPrivileged(callerId, group, plan);
-
-            if (!apply) {
-                for (PermissionMigrationService.PermissionEntry entry : plan.getMappedEntries()) {
-                    sendMessage(callerId, "  &7[DRY-RUN] &f" + group + "&7: &e" + entry.getSourcePermission()
-                            + " &7-> &a" + entry.getTargetPermission()
-                            + (!entry.getContexts().isEmpty() ? " &8(" + entry.getContexts() + ")" : ""));
-                }
-                for (String cmd : plan.getGeneratedCommands()) {
-                    sendMessage(callerId, "    &8Planned: " + cmd);
-                }
-            }
-        }
-
-        if (apply) {
-            sendMessage(callerId, "&a[RTP] Successfully migrated &f" + totalMigrated
-                    + "&a competitor permission(s) across &f" + discoveredGroups.size() + "&a groups.");
-            RTP.log(Level.INFO, "[RTP] Permission migration applied " + totalMigrated
-                    + " permission set commands across " + discoveredGroups.size() + " groups.");
+        if (RTP.scheduler != null) {
+            RTP.scheduler.runTaskAsynchronously(migrationTask);
         } else {
-            sendMessage(callerId, "&7[RTP] Dry-run complete: &f" + totalPlanned
-                    + "&7 permission(s) planned across &f" + discoveredGroups.size()
-                    + "&7 groups. Pass &fapply=true&7 to execute.");
+            migrationTask.run();
         }
-
-        sendMessage(callerId, "&7Tip: Configured templates map competitor nodes with context preservation:");
-        sendMessage(callerId, "  &7Group query: &f" + migrationService.getGroupGetTemplate());
-        sendMessage(callerId, "  &7Group set:   &f" + migrationService.getGroupSetTemplate());
 
         return true;
     }
@@ -199,7 +213,7 @@ public class ConfigImportPermissionsCmd extends BaseRTPCmdImpl {
         if (callerId != null && RTP.serverAccessor != null) {
             RTP.serverAccessor.sendMessage(callerId, msg);
         } else {
-            RTP.log(Level.INFO, msg.replaceAll("&[0-9a-fk-or]", ""));
+            RTP.log(Level.INFO, COLOR_CODE.matcher(msg).replaceAll(""));
         }
     }
 

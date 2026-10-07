@@ -145,6 +145,11 @@ public class RespPool implements Closeable {
         }
 
         @Override
+        public synchronized Object executeCommandBytes(java.util.List<byte[]> args) throws IOException {
+            return delegate.executeCommandBytes(args);
+        }
+
+        @Override
         public synchronized String get(String key) throws IOException {
             return delegate.get(key);
         }

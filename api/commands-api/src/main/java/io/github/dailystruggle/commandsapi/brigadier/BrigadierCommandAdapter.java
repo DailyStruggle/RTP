@@ -22,6 +22,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 
 /**
  * commands-api-ADR-001: Brigadier Bridge.
@@ -36,6 +37,8 @@ import java.util.function.Predicate;
  * entity selectors (Player, World), which Fabric callers must handle manually.
  */
 public final class BrigadierCommandAdapter {
+
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
     private BrigadierCommandAdapter() {
         // static utility
@@ -541,7 +544,7 @@ public final class BrigadierCommandAdapter {
             // \\s+ rather than String.split(" ") so any whitespace run (tabs,
             // multiple spaces) is treated uniformly, matching Brigadier's own
             // command-line splitting.
-            for (String tok : rawStr.trim().split("\\s+")) {
+            for (String tok : WHITESPACE.split(rawStr.trim())) {
                 if (tok != null && !tok.isEmpty()) {
                     out.add(tok);
                 }

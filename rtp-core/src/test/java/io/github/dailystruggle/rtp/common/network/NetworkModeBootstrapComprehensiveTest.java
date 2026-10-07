@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.network;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.network.NetworkCommandHook;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPScheduler;
 import io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge;
@@ -11,6 +12,7 @@ import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.transport.memory.InMemoryNetworkStateBinding;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespEndpoint;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -399,5 +401,54 @@ class NetworkModeBootstrapComprehensiveTest {
         NetworkModeBootstrap bootstrap = new NetworkModeBootstrap();
         bootstrap.boot(file);
         assertNull(bootstrap.transport());
+    }
+
+    @Test
+    @DisplayName("RTP-23: parseRedisEndpoint respects tls, port defaulting, and username")
+    void parseRedisEndpointTlsAndUsername() {
+        // 1. Plain defaults
+        RtpYamlConfig cfgDefault = RtpYamlConfig.parse("redis:\n  host: localhost\n");
+        RespEndpoint epDefault = NetworkModeBootstrap.parseRedisEndpoint(cfgDefault.getConfigurationSection("redis"));
+        assertEquals("localhost", epDefault.host());
+        assertEquals(6379, epDefault.port());
+        assertFalse(epDefault.tls());
+        assertNull(epDefault.username());
+
+        // 2. TLS enabled without explicit port defaults to 6380
+        RtpYamlConfig cfgTls = RtpYamlConfig.parse("redis:\n  host: redis.internal\n  tls: true\n");
+        RespEndpoint epTls = NetworkModeBootstrap.parseRedisEndpoint(cfgTls.getConfigurationSection("redis"));
+        assertEquals("redis.internal", epTls.host());
+        assertEquals(6380, epTls.port());
+        assertTrue(epTls.tls());
+        assertNull(epTls.username());
+
+        // 3. TLS enabled with explicit port preserves port
+        RtpYamlConfig cfgTlsPort = RtpYamlConfig.parse("redis:\n  host: redis.internal\n  tls: true\n  port: 6390\n");
+        RespEndpoint epTlsPort = NetworkModeBootstrap.parseRedisEndpoint(cfgTlsPort.getConfigurationSection("redis"));
+        assertEquals("redis.internal", epTlsPort.host());
+        assertEquals(6390, epTlsPort.port());
+        assertTrue(epTlsPort.tls());
+
+        // 4. Username specified
+        RtpYamlConfig cfgUser = RtpYamlConfig.parse("redis:\n  host: redis.internal\n  username: rtp_user\n");
+        RespEndpoint epUser = NetworkModeBootstrap.parseRedisEndpoint(cfgUser.getConfigurationSection("redis"));
+        assertEquals("redis.internal", epUser.host());
+        assertEquals(6379, epUser.port());
+        assertFalse(epUser.tls());
+        assertEquals("rtp_user", epUser.username());
+
+        // 5. rediss:// URI auto-detects TLS and default port 6380
+        RtpYamlConfig cfgUri = RtpYamlConfig.parse("redis:\n  host: rediss://cluster.example.com\n");
+        RespEndpoint epUri = NetworkModeBootstrap.parseRedisEndpoint(cfgUri.getConfigurationSection("redis"));
+        assertEquals("cluster.example.com", epUri.host());
+        assertEquals(6380, epUri.port());
+        assertTrue(epUri.tls());
+
+        // 6. Null section fallback
+        RespEndpoint epNull = NetworkModeBootstrap.parseRedisEndpoint(null);
+        assertEquals("localhost", epNull.host());
+        assertEquals(6379, epNull.port());
+        assertFalse(epNull.tls());
+        assertNull(epNull.username());
     }
 }

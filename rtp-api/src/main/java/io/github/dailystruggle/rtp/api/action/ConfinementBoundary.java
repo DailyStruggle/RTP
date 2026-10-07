@@ -25,5 +25,10 @@ public enum ConfinementBoundary {
   /**
    * Confined to a custom shape geometry centered at the session anchor coordinate.
    */
-  SHAPE
+  SHAPE,
+
+  /**
+   * No spatial confinement boundary or world border.
+   */
+  NONE
 }

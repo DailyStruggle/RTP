@@ -122,14 +122,16 @@ class PluginMessageHmacSecurityTest {
         binding.publishBackendHeartbeat(hb("self", 0L)).get();
         assertEquals(1, bus.sent.size());
         String wire = new String(bus.sent.get(0), StandardCharsets.UTF_8);
-        assertTrue(wire.startsWith("pmv=2\n"), "envelope version line first");
+        assertTrue(wire.startsWith("pmv=3\n"), "envelope version line first");
+        assertTrue(wire.contains("\nsentAtMs="), "outbound gossip carries sentAtMs");
+        assertTrue(wire.contains("\nseq="), "outbound gossip carries sequence");
         assertTrue(wire.contains("\nhmac="), "outbound gossip carries an HMAC");
         assertTrue(PluginMessageEnvelope.open(bus.sent.get(0), verifier()).accepted());
         binding.close();
     }
 
     @Test
-    @DisplayName("REQ-RTP-NET-002: without a verifier, legacy and v2 unsigned rows still interoperate")
+    @DisplayName("REQ-RTP-NET-002: without a verifier, legacy and v3 unsigned rows still interoperate")
     void unsignedModeInteroperates() {
         CapturingBridge bus = new CapturingBridge();
         PluginMessageNetworkBinding binding = new PluginMessageNetworkBinding(bus, 5000L, () -> 0L);
@@ -137,10 +139,10 @@ class PluginMessageHmacSecurityTest {
         bus.inject(PluginMessageEnvelope.seal(hb("new-peer", 0L), verifier())); // signed is fine too
         assertEquals(2, binding.livePeerCount());
         // Unknown future envelope versions are rejected rather than mis-parsed.
-        String v3 = new String(PluginMessageEnvelope.seal(hb("v3", 0L), null), StandardCharsets.UTF_8)
-                .replace("pmv=2", "pmv=3");
+        String v4 = new String(PluginMessageEnvelope.seal(hb("v4", 0L), null), StandardCharsets.UTF_8)
+                .replace("pmv=3", "pmv=4");
         assertEquals(PluginMessageEnvelope.Rejection.UNSUPPORTED_VERSION,
-                PluginMessageEnvelope.open(v3.getBytes(StandardCharsets.UTF_8), null).rejection());
+                PluginMessageEnvelope.open(v4.getBytes(StandardCharsets.UTF_8), null).rejection());
         binding.close();
     }
 
@@ -262,5 +264,68 @@ class PluginMessageHmacSecurityTest {
         assertEquals(2, lines.size(), "one line per window regardless of spam volume");
         assertTrue(lines.get(1).contains("51 occurrence(s)"), lines.get(1));
         assertEquals(52, w.total());
+    }
+
+    @Test
+    @DisplayName("RTP-18: replayed, stale, futuristic, and non-monotonic envelopes are rejected")
+    void replayAndFreshnessEnforced() {
+        CapturingBridge bus = new CapturingBridge();
+        AtomicLong clock = new AtomicLong(10000L);
+        HmacVerifier v = verifier();
+        PluginMessageNetworkBinding binding = new PluginMessageNetworkBinding(bus, 5000L, clock::get, v);
+
+        // 1. Initial valid signed envelope at T=10000, seq=1
+        byte[] env1 = PluginMessageEnvelope.seal(hb("srv-replay", 10000L), v, 10000L, 1L);
+        bus.inject(env1);
+        assertEquals(1, binding.livePeerCount());
+
+        // 2. Exact same envelope replayed -> rejected
+        bus.inject(env1);
+        assertEquals(1, binding.livePeerCount());
+
+        // 3. Envelope with smaller sequence number at same timestamp -> rejected
+        byte[] envOldSeq = PluginMessageEnvelope.seal(hb("srv-replay", 10000L), v, 10000L, 0L);
+        bus.inject(envOldSeq);
+
+        // 4. Stale envelope (|now - sentAtMs| > 5000 + 5000) -> rejected
+        byte[] envStale = PluginMessageEnvelope.seal(hb("srv-stale", -50000L), v, -50000L, 1L);
+        bus.inject(envStale);
+        assertFalse(binding.readSnapshot().join().backend("srv-stale").isPresent());
+
+        // 5. Futuristic envelope (sentAtMs > now + 10000) -> rejected
+        byte[] envFuture = PluginMessageEnvelope.seal(hb("srv-future", 70000L), v, 70000L, 1L);
+        bus.inject(envFuture);
+        assertFalse(binding.readSnapshot().join().backend("srv-future").isPresent());
+
+        // 6. Monotonic progression: seq=2 at T=11000 -> accepted
+        clock.set(11000L);
+        byte[] env2 = PluginMessageEnvelope.seal(hb("srv-replay", 11000L), v, 11000L, 2L);
+        bus.inject(env2);
+        assertEquals(1, binding.livePeerCount());
+
+        // 7. Reboot sequence reset: seq resets to 1, but sentAtMs moves forward (T=12000) -> accepted
+        clock.set(12000L);
+        byte[] envReboot = PluginMessageEnvelope.seal(hb("srv-replay", 12000L), v, 12000L, 1L);
+        bus.inject(envReboot);
+        assertEquals(1, binding.livePeerCount());
+
+        binding.close();
+    }
+
+    @Test
+    @DisplayName("RTP-18: v2 backwards compatibility accepted")
+    void v2BackwardsCompatibilityAccepted() {
+        HmacVerifier v = verifier();
+        String canonical = BackendHeartbeatCodec.encode(hb("v2-compat", 0L));
+        String body = "pmv=2\n" + canonical;
+        String hmac = v.sign(1, body);
+        String wire = body + "\nhmac=" + hmac;
+        byte[] payload = wire.getBytes(StandardCharsets.UTF_8);
+
+        PluginMessageEnvelope.Result r = PluginMessageEnvelope.open(payload, v);
+        assertTrue(r.accepted());
+        assertEquals("v2-compat", r.heartbeat().serverId());
+        assertEquals(0L, r.sentAtMs());
+        assertEquals(0L, r.seq());
     }
 }

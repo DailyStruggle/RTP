@@ -108,7 +108,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
       if (resolvedWorld == null) {
         String msg =
             "&c[RTP test/chunk-probe-perf] no RTP worlds configured — cannot pick a default";
-        if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+        if (callerId != null && !callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
           RTP.serverAccessor.sendMessage(callerId, msg);
         }
         RTP.log(Level.WARNING, msg);
@@ -135,7 +135,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
             + ","
             + maxY
             + "] (random sample of pregenerated chunks)";
-    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+    if (callerId != null && !callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
       RTP.serverAccessor.sendMessage(callerId, startMsg);
     }
     RTP.log(Level.INFO, startMsg);
@@ -153,7 +153,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
           "[RTP test/chunk-probe-perf] could not resolve region folder for world="
               + world.name()
               + " — aborting";
-      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      if (callerId != null && !callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
         RTP.serverAccessor.sendMessage(callerId, msg);
       }
       RTP.log(Level.WARNING, msg);
@@ -171,7 +171,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
               + t.getClass().getSimpleName()
               + ": "
               + t.getMessage();
-      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      if (callerId != null && !callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
         RTP.serverAccessor.sendMessage(callerId, msg);
       }
       RTP.log(Level.WARNING, msg, t);
@@ -183,7 +183,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
           "[RTP test/chunk-probe-perf] no pregenerated chunks found in "
               + regionDir
               + " — nothing to sample";
-      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      if (callerId != null && !callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
         RTP.serverAccessor.sendMessage(callerId, msg);
       }
       RTP.log(Level.INFO, msg);
@@ -315,7 +315,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
             anvilRatio,
             fullOverAnvil,
             fullCpuOverAnvil);
-    if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+    if (callerId != null && !callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
       RTP.serverAccessor.sendMessage(callerId, summary);
     }
     RTP.log(Level.INFO, summary);
@@ -325,7 +325,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
           "[RTP test/chunk-probe-perf] every probe returned null — fast path is inert for this"
               + " world/adapter. Check SafetyKeys.anvilPrefilterEnabled and that the world is"
               + " an .mca-backed Bukkit/Paper/Folia world.";
-      if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
+      if (callerId != null && !callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
         RTP.serverAccessor.sendMessage(callerId, note);
       }
       RTP.log(Level.INFO, note);

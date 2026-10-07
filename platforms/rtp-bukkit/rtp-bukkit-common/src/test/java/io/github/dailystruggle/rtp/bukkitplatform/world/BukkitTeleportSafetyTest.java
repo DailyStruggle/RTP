@@ -104,6 +104,12 @@ class BukkitTeleportSafetyTest {
         assertEquals(Set.of("STONE", "LAVA"), reconciled);
         assertTrue(accessor.reconcilePaletteIdentifiers(null).isEmpty());
         assertTrue(accessor.reconcilePaletteIdentifiers(Collections.emptySet()).isEmpty());
+
+        // Memoized answers must equal the first, uncached reconciliation.
+        for (int i = 0; i < 3; i++) {
+            assertEquals("STONE", accessor.reconcilePaletteIdentifier("minecraft:stone"));
+            assertEquals("WATER", accessor.reconcilePaletteIdentifier("minecraft:water"));
+        }
     }
 
     @Test

@@ -279,6 +279,8 @@ public class ShapeEdgeCaseTest {
     void circle_uniquePlacements_noDuplicatesInSmallRange() {
         Circle shape = new Circle();
         shape.set(GenericMemoryShapeParams.uniquePlacements, true);
+        // uniquePlacements only consumes area when expand can grow it back.
+        shape.set(GenericMemoryShapeParams.expand, true);
         shape.set(GenericMemoryShapeParams.radius, 20L);
         shape.set(GenericMemoryShapeParams.centerRadius, 0L);
         shape.set(GenericMemoryShapeParams.mode, "ACCUMULATE");

@@ -29,6 +29,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 /**
  * Command-tree menu reflector (ADR-044).
  * Reflects {@link TreeCommand} nodes into plain-text {@link MenuModel}s for
@@ -36,6 +37,8 @@ import java.util.function.Predicate;
  * parameter types/bounds, or command descriptions.
  */
 public final class CommandTreeMenuBuilder {
+
+    private static final Pattern LINE_BREAK = Pattern.compile("\\R");
 
     /**
      * Number of suggestion value rows per parameter-value picker page before
@@ -1139,7 +1142,7 @@ public final class CommandTreeMenuBuilder {
             return null;
         }
         if (raw == null || raw.isEmpty()) return null;
-        String[] commentLines = raw.split("\\R", -1);
+        String[] commentLines = LINE_BREAK.split(raw, -1);
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < commentLines.length; i++) {
             String trimmed = commentLines[i].stripLeading();

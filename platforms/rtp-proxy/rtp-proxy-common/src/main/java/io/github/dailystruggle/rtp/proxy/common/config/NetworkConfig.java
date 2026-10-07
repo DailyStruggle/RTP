@@ -306,8 +306,10 @@ public final class NetworkConfig {
     /** Parse {@code transport.redis}; password never logged. */
     private static void parseRedis(Map<String, Object> redis, Builder b, Function<String, String> env) {
         String hostRaw = asString(redis, "host", "localhost");
-        int port = asInt(redis, "port", 6379);
         boolean tlsFlag = asBool(redis, "tls", false);
+        boolean tlsDetected = tlsFlag || hostRaw.trim().toLowerCase(Locale.ROOT).startsWith("rediss://");
+        int defaultPort = tlsDetected ? 6380 : 6379;
+        int port = (redis != null && redis.get("port") != null) ? asInt(redis, "port", defaultPort) : defaultPort;
         String username = asStringOrNull(redis, "username");
         if (hostRaw.isBlank()) {
             // Left for the redis-specific "host required" check below.

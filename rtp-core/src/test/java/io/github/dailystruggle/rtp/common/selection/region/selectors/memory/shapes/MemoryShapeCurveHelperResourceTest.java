@@ -125,6 +125,7 @@ class MemoryShapeCurveHelperResourceTest {
     }
 
     @Override
+    @SuppressWarnings("PMD.PreferNonLockingExecution")
     protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
       if (!name.equals(className)) return super.loadClass(name, resolve);
       synchronized (getClassLoadingLock(name)) {

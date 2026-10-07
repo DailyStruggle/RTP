@@ -286,4 +286,38 @@ class RtpApiTeleportSurfaceTest {
             RTP.reloading.set(false);
         }
     }
+
+    @Test
+    @DisplayName("RTP-16: coordinate target with missing world fails closed as INVALID_TARGET without falling back")
+    void teleportDelegate_coordinateMissingWorld_failsInvalidTarget(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
+        UUID playerId = player.uuid();
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+
+        RtpTarget coordTarget = RtpTarget.coordinate(null, "unloaded_world_xyz", 100, 64, 200);
+        CompletableFuture<RTPResult> future = RTPAPI.teleport(playerId, coordTarget);
+        assertNotNull(future);
+        RTPResult res = future.get();
+        assertFalse(res.isSuccess(), "Teleport to missing world must fail");
+        assertEquals(RTPResult.Reason.INVALID_TARGET, res.reason());
+    }
+
+    @Test
+    @DisplayName("RTP-16: ACTION target fails closed as INVALID_TARGET")
+    void teleportDelegate_actionTarget_failsInvalidTarget(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
+        UUID playerId = player.uuid();
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+
+        RtpTarget actionTarget = RtpTarget.action("nav:biome_menu");
+        CompletableFuture<RTPResult> future = RTPAPI.teleport(playerId, actionTarget);
+        assertNotNull(future);
+        RTPResult res = future.get();
+        assertFalse(res.isSuccess(), "ACTION target must not execute a teleport");
+        assertEquals(RTPResult.Reason.INVALID_TARGET, res.reason());
+    }
 }

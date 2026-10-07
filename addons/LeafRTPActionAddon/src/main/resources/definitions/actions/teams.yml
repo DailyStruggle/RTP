@@ -79,7 +79,9 @@ lifecycle:
           matches: ">= 2"
       run:
         - CONSOLE: "broadcast &c[violator] was eliminated for leaving the arena!"
-        - ACTION: PULL_BACK
+        - FOR_EACH:
+            - CONSOLE: "gamemode survival [player]"
+        - ACTION: ELIMINATE
         - ACTION: DISARM
 
   onExpire:

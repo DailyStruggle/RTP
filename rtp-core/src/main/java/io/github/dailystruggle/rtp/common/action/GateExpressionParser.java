@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.common.action;
 
+import io.github.dailystruggle.rtp.common.selection.region.util.DurationParser;
+import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -17,18 +19,16 @@ import java.util.regex.Pattern;
 public final class GateExpressionParser {
 
   private static final Pattern OP_PATTERN =
-      Pattern.compile("^(<=|>=|<|>|==|=)\\s*+(-?[0-9]++(?:\\.[0-9]++)?)\\s*+([a-zA-Z]*+)$");
+      Pattern.compile("^(<=|>=|<|>|==|=)\\s*(.+)$");
   private static final Pattern RANGE_PATTERN =
-      Pattern.compile("^(-?[0-9]++(?:\\.[0-9]++)?)\\s*+\\.\\.\\s*+(-?[0-9]++(?:\\.[0-9]++)?)\\s*+([a-zA-Z]*+)$");
-  private static final Pattern DURATION_PATTERN =
-      Pattern.compile("^([0-9]++(?:\\.[0-9]++)?)\\s*+([a-zA-Z]*+)$");
+      Pattern.compile("^(.+?)\\s*\\.\\.\\s*(.+)$");
 
   private GateExpressionParser() {}
 
   /**
    * Tests whether {@code actualValue} satisfies the gate expression {@code expr}.
    *
-   * @param expr        the expression string (e.g. "< 2", "1..5", ">= 30s")
+   * @param expr        the expression string (e.g. "< 2", "1..5", ">= 30s", ">= 1m30s")
    * @param actualValue the actual numeric value (in base units, e.g. seconds for time, blocks for distance)
    * @return true if satisfied, false otherwise
    */
@@ -39,12 +39,8 @@ public final class GateExpressionParser {
     // Range pattern: "min..max"
     Matcher rangeMatcher = RANGE_PATTERN.matcher(trimmed);
     if (rangeMatcher.matches()) {
-      double min = Double.parseDouble(rangeMatcher.group(1));
-      double max = Double.parseDouble(rangeMatcher.group(2));
-      String unit = rangeMatcher.group(3);
-      double mult = parseMultiplier(unit);
-      min *= mult;
-      max *= mult;
+      double min = parseValue(rangeMatcher.group(1));
+      double max = parseValue(rangeMatcher.group(2));
       return actualValue >= min && actualValue <= max;
     }
 
@@ -52,9 +48,7 @@ public final class GateExpressionParser {
     Matcher opMatcher = OP_PATTERN.matcher(trimmed);
     if (opMatcher.matches()) {
       String op = opMatcher.group(1);
-      double val = Double.parseDouble(opMatcher.group(2));
-      String unit = opMatcher.group(3);
-      val *= parseMultiplier(unit);
+      double val = parseValue(opMatcher.group(2));
       return switch (op) {
         case "<" -> actualValue < val;
         case "<=" -> actualValue <= val;
@@ -70,25 +64,46 @@ public final class GateExpressionParser {
       double val = Double.parseDouble(trimmed);
       return Math.abs(actualValue - val) < 1e-6;
     } catch (NumberFormatException ignored) {
+      DurationParser.ParsedDuration parsed = DurationParser.parse(trimmed, TemporalUnit.SECOND);
+      if (parsed != null) {
+        return Math.abs(actualValue - parsed.toSeconds()) < 1e-6;
+      }
       return false;
     }
   }
 
+  private static double parseValue(String text) {
+    if (text == null || text.isBlank()) return 0.0;
+    String trimmed = text.trim();
+    DurationParser.ParsedDuration parsed = DurationParser.parse(trimmed, TemporalUnit.SECOND);
+    if (parsed != null) {
+      return parsed.toSeconds();
+    }
+    try {
+      return Double.parseDouble(trimmed);
+    } catch (NumberFormatException ignored) {
+      return 0.0;
+    }
+  }
+
   /**
-   * Parses time duration in string form (e.g. "5m", "30s", "1h") to seconds.
+   * Parses time duration in string form (e.g. "5m", "30s", "1h", "1m30s", "500ms", "1w") to seconds.
    */
   public static long parseDurationSeconds(String text, long defaultVal) {
     if (text == null || text.isBlank()) return defaultVal;
-    String trimmed = text.trim();
-    Matcher m = DURATION_PATTERN.matcher(trimmed);
-    if (!m.matches()) return defaultVal;
-    double val = Double.parseDouble(m.group(1));
-    double mult = parseMultiplier(m.group(2));
-    return (long) (val * mult);
+    DurationParser.ParsedDuration parsed = DurationParser.parse(text, TemporalUnit.SECOND);
+    if (parsed != null) {
+      return Math.round(parsed.toSeconds());
+    }
+    return defaultVal;
   }
 
   private static double parseMultiplier(String unit) {
     if (unit == null || unit.isBlank()) return 1.0;
+    TemporalUnit tu = TemporalUnit.fromString(unit);
+    if (tu != null) {
+      return tu.getSecondsPerUnit();
+    }
     return switch (unit.toLowerCase()) {
       case "s", "sec", "seconds" -> 1.0;
       case "m", "min", "minutes" -> 60.0;

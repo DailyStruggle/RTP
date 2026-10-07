@@ -34,7 +34,7 @@ public class RtpYamlSection {
     }
 
     RtpYamlSection(RtpYamlMapping node, String name, String path) {
-        this.node = node;
+        this.node = node != null ? node : new RtpYamlMapping();
         this.name = name == null ? "" : name;
         this.path = path == null ? "" : path;
     }
@@ -289,6 +289,7 @@ public class RtpYamlSection {
      * simpleyaml behaviour the test suite locked in).
      */
     public Set<String> getKeys(boolean deep) {
+        if (node == null) return new LinkedHashSet<>();
         if (!deep) return new LinkedHashSet<>(node.keys());
         LinkedHashSet<String> out = new LinkedHashSet<>();
         collectKeys(node, "", out);

@@ -91,32 +91,32 @@ public class DualLayerDownsamplingResolutionTest {
   }
 
   @Test
-  @DisplayName("Nyquist rule: Stride S is capped at half the bin capacity (binArea / 2)")
-  public void testNyquistSamplingCapAtHalfBin() {
-    // When pointEdgeChunks = 16 -> binArea = 256 -> max stride is 128
+  @DisplayName("Full-bin rule: Stride S is capped at one key per bin (binArea = P^2)")
+  public void testStrideCapAtFullBin() {
+    // pointEdgeChunks = 16 -> binArea = 256 -> max stride is 256
     SquareOptimizedDualLayer square16 = new SquareOptimizedDualLayer("TEST_P16", 16);
     square16.set(GenericMemoryShapeParams.radius, 1024L);
     square16.set(GenericMemoryShapeParams.centerRadius, 64L);
     square16.set(GenericMemoryShapeParams.expand, true);
     square16.set(GenericMemoryShapeParams.uniquePlacements, 16); // Footprint 31x31=961 -> wants stride 1024
-    // But binArea = 256, so Nyquist cap is 128!
-    assertEquals(128, square16.deriveEffectiveStride(square16.getRange()));
+    assertEquals(256, square16.deriveEffectiveStride(square16.getRange()));
 
-    // When pointEdgeChunks = 32 -> binArea = 1024 -> max stride is 512
+    // pointEdgeChunks = 32 -> binArea = 1024 -> max stride is 1024
     SquareOptimizedDualLayer square32 = new SquareOptimizedDualLayer("TEST_P32", 32);
     square32.set(GenericMemoryShapeParams.radius, 1024L);
     square32.set(GenericMemoryShapeParams.centerRadius, 64L);
     square32.set(GenericMemoryShapeParams.expand, true);
     square32.set(GenericMemoryShapeParams.uniquePlacements, 32); // Footprint wants 4096
-    // But binArea = 1024, so Nyquist cap is 512!
-    assertEquals(512, square32.deriveEffectiveStride(square32.getRange()));
+    assertEquals(1024, square32.deriveEffectiveStride(square32.getRange()));
 
-    // SquareOptimizedDualLayer also respects the Nyquist cap with explicit spatialResolution
+    // Explicit spatialResolution equal to P reaches the full bin; above P it is capped there
     SquareOptimizedDualLayer explicit16 = new SquareOptimizedDualLayer("EXPLICIT_P16", 16);
     explicit16.set(GenericMemoryShapeParams.radius, 1024L);
     explicit16.set(GenericMemoryShapeParams.centerRadius, 64L);
-    explicit16.setSpatialResolution(16L); // wants 256
-    assertEquals(128, explicit16.deriveEffectiveStride(explicit16.getRange()));
+    explicit16.setSpatialResolution(16L);
+    assertEquals(256, explicit16.deriveEffectiveStride(explicit16.getRange()));
+    explicit16.setSpatialResolution(32L); // wants 1024
+    assertEquals(256, explicit16.deriveEffectiveStride(explicit16.getRange()));
   }
 
   @Test

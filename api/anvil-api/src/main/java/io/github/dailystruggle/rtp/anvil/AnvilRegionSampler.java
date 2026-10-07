@@ -83,9 +83,10 @@ public final class AnvilRegionSampler {
     long mtime = lastModifiedMillis(regionFile);
     if (mtime < 0L) return Collections.emptyMap();
 
-    byte[] cached = AnvilRegionByteCache.peek(regionFile, mtime);
-    if (cached != null) {
-      return sampleFromRegionBytes(cached, rcx, rcz, y, localIndices, canon);
+    try (AnvilRegionByteCache.Lease cached = AnvilRegionByteCache.acquireIfCached(regionFile, mtime)) {
+      if (cached != null) {
+        return sampleFromRegionBytes(cached.buffer(), cached.length(), rcx, rcz, y, localIndices, canon);
+      }
     }
 
     HashMap<Long, String> out = new HashMap<>(Math.max(16, localIndices.length * 2));
@@ -127,6 +128,29 @@ public final class AnvilRegionSampler {
   }
 
   /**
+   * Biome at chunk-local {@code (8, y, 8)} for every chunk of region {@code (rcx, rcz)}: one
+   * whole-file read under an {@link AnvilRegionByteCache} lease (pooled buffer, explicit length),
+   * shared by every platform adapter's full-region sweep. Keys and canonicalisation as
+   * {@link #sampleBiomes}; absent or undecodable chunks are skipped. Empty map when the file is
+   * missing or unreadable. Blocking: off tick thread only (S-005).
+   */
+  public static Map<Long, String> readAllBiomes(
+      Path regionFile, int rcx, int rcz, int y, UnaryOperator<String> canonicaliser) {
+    if (regionFile == null) return Collections.emptyMap();
+    UnaryOperator<String> canon = canonicaliser != null ? canonicaliser : UnaryOperator.identity();
+    try (AnvilRegionByteCache.Lease lease = AnvilRegionByteCache.acquire(regionFile)) {
+      if (lease == null) return Collections.emptyMap();
+      return sampleFromRegionBytes(lease.buffer(), lease.length(), rcx, rcz, y, ALL_INDICES, canon);
+    }
+  }
+
+  private static final int[] ALL_INDICES = new int[1024];
+
+  static {
+    for (int i = 0; i < ALL_INDICES.length; i++) ALL_INDICES[i] = i;
+  }
+
+  /**
    * Last-modified time of {@code regionFile} in epoch millis, or {@code -1} when the file is
    * missing or its attributes cannot be read. Blocking stat: off tick thread only (S-005).
    */
@@ -141,7 +165,7 @@ public final class AnvilRegionSampler {
   }
 
   private static Map<Long, String> sampleFromRegionBytes(
-      byte[] regionBytes, int rcx, int rcz, int y, int[] localIndices,
+      byte[] regionBytes, int regionLength, int rcx, int rcz, int y, int[] localIndices,
       UnaryOperator<String> canon) {
     HashMap<Long, String> out = new HashMap<>(Math.max(16, localIndices.length * 2));
     for (int idx : localIndices) {
@@ -149,7 +173,7 @@ public final class AnvilRegionSampler {
       int lx = idx & 31;
       int lz = idx >>> 5;
       try {
-        put(out, AnvilReader.readChunkView(regionBytes, lx, lz), rcx, rcz, lx, lz, y, canon);
+        put(out, AnvilReader.readChunkView(regionBytes, regionLength, lx, lz), rcx, rcz, lx, lz, y, canon);
       } catch (Exception ignored) {
         // chunk not present in region file or unreadable; skip per chunk.
       }

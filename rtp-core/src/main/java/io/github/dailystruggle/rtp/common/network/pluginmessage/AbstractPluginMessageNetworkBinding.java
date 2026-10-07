@@ -36,6 +36,8 @@ public abstract class AbstractPluginMessageNetworkBinding implements NetworkTran
 
     /** Upper bound on distinct server ids held in {@link #lastSeen}. */
     public static final int MAX_TRACKED_SERVERS = 1024;
+    /** Maximum clock skew tolerance (ms) when validating inbound heartbeat timestamps. */
+    public static final long SKEW_TOLERANCE_MS = 5000L;
 
     protected final NetworkBridge bridge;
     protected final long staleTimeoutMillis;
@@ -46,6 +48,7 @@ public abstract class AbstractPluginMessageNetworkBinding implements NetworkTran
     protected final Map<String, Entry> lastSeen = new ConcurrentHashMap<>();
     protected final CopyOnWriteArrayList<Sub> subscribers = new CopyOnWriteArrayList<>();
 
+    private final java.util.concurrent.atomic.AtomicLong outboundSeq = new java.util.concurrent.atomic.AtomicLong(0);
     private final Object admitLock = new Object();
     private final ThrottledWarning rejectedWarning;
     private final ThrottledWarning capWarning;
@@ -78,7 +81,9 @@ public abstract class AbstractPluginMessageNetworkBinding implements NetworkTran
 
     /** Encode {@code row} for the wire (signed when a verifier is configured); {@code null} if oversized. */
     protected byte[] encodeOutbound(BackendHeartbeat row) {
-        byte[] payload = PluginMessageEnvelope.seal(row, verifier);
+        long sentAt = clock.getAsLong();
+        long seq = outboundSeq.incrementAndGet();
+        byte[] payload = PluginMessageEnvelope.seal(row, verifier, sentAt, seq);
         if (payload == null) {
             outboundWarning.report("[RTP] outbound heartbeat for '" + row.serverId()
                     + "' exceeds " + PluginMessageEnvelope.MAX_PAYLOAD_BYTES
@@ -102,9 +107,16 @@ public abstract class AbstractPluginMessageNetworkBinding implements NetworkTran
             return;
         }
         BackendHeartbeat hb = result.heartbeat();
-        if (!admit(hb, clock.getAsLong())) {
-            capWarning.report("[RTP] plugin-message peer table full (" + MAX_TRACKED_SERVERS
-                    + " live servers); refusing new server id.");
+        long now = clock.getAsLong();
+        PluginMessageEnvelope.Rejection reject = admitDetailed(hb, result.sentAtMs(), result.seq(), now);
+        if (reject != null) {
+            if (reject == PluginMessageEnvelope.Rejection.LIMITS) {
+                capWarning.report("[RTP] plugin-message peer table full (" + MAX_TRACKED_SERVERS
+                        + " live servers); refusing new server id.");
+            } else {
+                rejectedWarning.report("[RTP] dropped inbound plugin-message heartbeat from '"
+                        + hb.serverId() + "' (" + reject + ") (REQ-RTP-S-004).");
+            }
             return;
         }
         for (Sub s : subscribers) {
@@ -166,18 +178,34 @@ public abstract class AbstractPluginMessageNetworkBinding implements NetworkTran
      * Store {@code hb}; existing ids refresh in place, new ids are admitted
      * only below {@link #MAX_TRACKED_SERVERS} after evicting stale entries.
      */
-    private boolean admit(BackendHeartbeat hb, long now) {
+    public PluginMessageEnvelope.Rejection admitDetailed(BackendHeartbeat hb, long sentAtMs, long seq, long now) {
         String id = hb.serverId();
-        Entry fresh = new Entry(hb, now);
-        if (lastSeen.computeIfPresent(id, (k, v) -> fresh) != null) return true;
         synchronized (admitLock) {
-            if (!lastSeen.containsKey(id) && lastSeen.size() >= MAX_TRACKED_SERVERS) {
-                lastSeen.entrySet().removeIf(e -> now - e.getValue().seenAtMs > staleTimeoutMillis);
-                if (lastSeen.size() >= MAX_TRACKED_SERVERS) return false;
+            Entry prev = lastSeen.get(id);
+            if (sentAtMs != 0L || seq != 0L) {
+                long delta = Math.abs(now - sentAtMs);
+                if (delta > staleTimeoutMillis + SKEW_TOLERANCE_MS) {
+                    return PluginMessageEnvelope.Rejection.STALE;
+                }
+                if (prev != null) {
+                    if (seq <= prev.lastSeq() && sentAtMs <= prev.sentAtMs()) {
+                        return PluginMessageEnvelope.Rejection.REPLAY;
+                    }
+                }
             }
-            lastSeen.put(id, fresh);
-            return true;
+            if (prev == null && lastSeen.size() >= MAX_TRACKED_SERVERS) {
+                lastSeen.entrySet().removeIf(e -> now - e.getValue().seenAtMs() > staleTimeoutMillis);
+                if (lastSeen.size() >= MAX_TRACKED_SERVERS) {
+                    return PluginMessageEnvelope.Rejection.LIMITS;
+                }
+            }
+            lastSeen.put(id, new Entry(hb, now, sentAtMs, seq));
+            return null;
         }
+    }
+
+    private boolean admit(BackendHeartbeat hb, long now) {
+        return admitDetailed(hb, 0L, 0L, now) == null;
     }
 
     /** Visible for tests: total tracked ids (live + not-yet-evicted stale). */
@@ -190,12 +218,12 @@ public abstract class AbstractPluginMessageNetworkBinding implements NetworkTran
         long now = clock.getAsLong();
         int n = 0;
         for (Entry e : lastSeen.values()) {
-            if (now - e.seenAtMs <= staleTimeoutMillis) n++;
+            if (now - e.seenAtMs() <= staleTimeoutMillis) n++;
         }
         return n;
     }
 
-    protected record Entry(BackendHeartbeat heartbeat, long seenAtMs) {
+    protected record Entry(BackendHeartbeat heartbeat, long seenAtMs, long sentAtMs, long lastSeq) {
     }
 
     protected final class Sub implements Subscription {

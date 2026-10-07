@@ -195,8 +195,10 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
     int minY = getNumber(JumpAdjustorKeys.minY, 0L).intValue();
     int step = getNumber(JumpAdjustorKeys.step, 0).intValue();
 
-    int worldMin = chunk.getWorld().getMinHeight();
-    int worldMax = chunk.getWorld().getMaxHeight();
+    io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = chunk.getWorld();
+    if (world == null) return false;
+    int worldMin = world.getMinHeight();
+    int worldMax = world.getMaxHeight();
     maxY = Math.min(maxY, worldMax - 2);
     minY = Math.max(minY, worldMin + 1);
     if (minY > maxY) return false;
@@ -288,8 +290,10 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
 
     int maxY = getNumber(JumpAdjustorKeys.maxY, 256L).intValue();
     int minY = getNumber(JumpAdjustorKeys.minY, 0L).intValue();
-    int worldMin = chunk.getWorld().getMinHeight();
-    int worldMax = chunk.getWorld().getMaxHeight();
+    io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = chunk.getWorld();
+    if (world == null) return null;
+    int worldMin = world.getMinHeight();
+    int worldMax = world.getMaxHeight();
     maxY = Math.min(maxY, worldMax - 2);
     minY = Math.max(minY, worldMin + 1);
     if (minY > maxY) return null;

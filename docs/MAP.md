@@ -119,7 +119,7 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - `ADR-074` Operator-facing throughput and cost metrics (proposed).
 - `ADR-075` Platform-neutral player-move event SPI.
 - `ADR-076` Config folder consolidation.
-- `ADR-077` Multi-Format Region Support: Linear (ZSTD) and pluggable region readers.
+- `ADR-077` Multi-Format Region Support: Pluggable Region Readers (Linear via Addon).
 - `ADR-078` Composable cache pipeline stages, domain stage nomenclature, and dynamic hot quota allocation.
 - `ADR-079` Cause-based TTL and staged expiration on spatial memory segments.
 - `ADR-080` Opt-in simulation benchmark tier (measurement vs model separation).
