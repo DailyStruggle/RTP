@@ -236,9 +236,9 @@ subprojects {
             // Sits at Stage A target (0.95/0.85). ENTERPRISE_READINESS.md 4.2 item 8.
             ':tags-api': [instruction: 0.95, branch: 0.85],
             // anvil-api measured: 90.5% instruction / 80.5% branch.
-            ':anvil-api': [instruction: 0.86, branch: 0.75],
+            ':anvil-api': [instruction: 0.90, branch: 0.80],
             // maps-api measured: 94.7% instruction / 82.1% branch.
-            ':maps-api': [instruction: 0.90, branch: 0.78],
+            ':maps-api': [instruction: 0.90, branch: 0.80],
             // rtp-api measured: 95.7% instruction / 81.3% branch.
             // Sits at Stage A strict 90/80 JaCoCo gate.
             ':rtp-api': [instruction: 0.90, branch: 0.80],
@@ -431,7 +431,7 @@ apiModulesForBinaryCheck.each { modulePath ->
     project(modulePath) {
         apply plugin: 'me.champeau.gradle.japicmp'
 
-        def baselineVersion = project.findProperty('japicmpBaselineVersion') as String ?: '3.2.0'
+        def baselineVersion = project.findProperty('japicmpBaselineVersion') as String ?: '3.2.1'
         def baselineArtifact = "io.github.dailystruggle:${project.name}:${baselineVersion}"
 
         configurations {

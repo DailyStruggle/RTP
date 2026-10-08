@@ -1,7 +1,7 @@
 # Deprecation and API Evolution Policy
 
 > **Scope:** Public API (`rtp-api`, SPI frameworks: `commands-api`, `effects-api`, `maps-api`, `metrics-api`, `anvil-api`, `tags-api`), platform carriers, and configuration keys.
-> **Related:** ADR-000 (development workflow), ADR-011 (`rtp-api` separate module), ADR-051 (two-tier API extension model), `MULTI_PLATFORM_PLAN.md` (carrier retirement policy).
+> **Related:** ADR-000 (development workflow), ADR-011 (`rtp-api` separate module), ADR-051 (two-tier API extension model), ADR-022 (Fabric), ADR-033 (NeoForge).
 
 ---
 
@@ -72,7 +72,7 @@ Whenever an API method, field, class, or interface is marked for deprecation:
 
 ## 3. Platform Carrier Retirement Lifecycle
 
-As defined in `MULTI_PLATFORM_PLAN.md` (*Carrier Retirement & Deprecation Policy*):
+Standard carrier support guidelines:
 
 1. **Carrier Support Window:**
    RTP maintains active carriers for:
@@ -105,7 +105,7 @@ To guarantee that breaking changes cannot enter the codebase unannounced, public
 
 1. **Verification Mechanism:**
    - Executed via `./gradlew checkBinaryCompatibility` across all public API modules (`rtp-api`, `commands-api`, `effects-api`, `maps-api`, `metrics-api`, `anvil-api`, `tags-api`).
-   - Powered by `japicmp` comparing the current compiled JAR against the baseline release artifact (`japicmpBaselineVersion`, default `3.2.0`).
+   - Powered by `japicmp` comparing the current compiled JAR against the baseline release artifact (`japicmpBaselineVersion`, default `3.2.1`).
    - Runs in CI (`.github/workflows/gradle.yml`) on every pull request and push to release branches.
 2. **Accepted Breaks Registry:**
    - If a binary-incompatible change or removal has satisfied the mandatory notice window (>= 2 minor versions) and is ready for removal in an announced release, it must be explicitly recorded in:

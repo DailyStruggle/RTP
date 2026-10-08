@@ -82,13 +82,11 @@ to the authoritative live load.
   surface) with `unpopulatedFallthrough` so `/rtp test full` can report its frequency distinctly
   from other fallbacks. Currently invisible.~~
 
-### 1.D — Fabric: supported (stable as of 2026-05-26)
+### 1.D — Fabric: supported (stable as of 2026-05-26; multi-platform expansion completed)
 
-Fabric (`rtp-fabric`) is a first-class, in-scope, stable platform. The three standing blockers
-documented in prior revisions of this section are resolved; the front page and `REQUIREMENTS.md section 0`
-should be updated to reflect that Fabric is supported, not out of scope.
+Fabric (`rtp-fabric`) and NeoForge (`rtp-neoforge`) are first-class, in-scope, stable platforms (ADR-022, ADR-033). All phases of the multi-platform expansion are completed and verified. Standing blockers documented in prior revisions are resolved; the front page and `REQUIREMENTS.md section 0` confirm full first-class support.
 
-- [x] ~~**Resolve the three standing blockers in `MULTI_PLATFORM_PLAN.md`:**~~
+- [x] ~~**Resolve the three standing blockers during platform porting:**~~
   - [x] ~~**S-005 violation in `FabricRTPWorld.getChunkAt`.**~~ — `getChunkAt` returns
     `CompletableFuture<Long>` and routes through an async chunk-load path; S-005 compliant.
   - [x] ~~**Null stub in `FabricServerAccessor.getLocationGenerator`.**~~ — fully wired; throws
@@ -100,7 +98,7 @@ should be updated to reflect that Fabric is supported, not out of scope.
   platform.~~
 - [x] ~~**Re-run the `rtp-api` interface-sufficiency analysis** and record the result as an ADR
   (April 2026 gap analysis concluded interfaces are sufficient; promote the finding from
-  `MULTI_PLATFORM_PLAN.md` to an Accepted ADR).~~
+  the platform evaluation to an Accepted ADR).~~
 
 ### 1.E — Unsourced statistics on the front page
 
@@ -347,7 +345,7 @@ reproducible by readers".
   NI book-menu + chat-prompt, NJ network-mode backend parity incl. live boot + reservation-token
   redemption, NK maps API + metrics binding + backend-state sampler) and Phase N3 (docs,
   traceability, beta release) are complete. See
-  [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) Phase 4 for the full step breakdown.
+  [ADR-033](../adr/ADR-033-neoforge-platform-in-scope.md) and [rtp-neoforge-ADR-001](../../platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md) for architectural records (multi-platform expansion completed and archived).
 
 - [ ] **Rich book-menu drawing via resource-pack soft-dependencies.** The written-book menu renderer
   (Paper's `BookMenuRenderer`, Fabric's `FabricBookMenuRenderer` on the 1.21+ / deobf 26.x carriers)

@@ -146,4 +146,15 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Linear:** RTP-32
 
 
+### 2026-10-08 — Mojibake in NeoForge build script and overly broad exclusion in check-mojibake.py
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** pre-commit mojibake violation resolution
+- **Location:** `platforms/rtp-neoforge/rtp-neoforge-common/build.gradle` lines 1, 11, 17, 53, 61, 65; `scripts/check-mojibake.py` line 87 (`if exc in rel_path:`)
+- **Symptom / hypothesis:** `platforms/rtp-neoforge/rtp-neoforge-common/build.gradle` contains several corrupted em dash sequences (double-encoded UTF-8). `scripts/check-mojibake.py` failed to detect this because `EXCLUDED_PATHS` contains `'build'`, and substring matching `if exc in rel_path:` unintentionally excludes any file named `build.gradle` or under a directory containing `build`.
+- **Impact:** Lingering encoding anomalies in Gradle files; reduced coverage of mojibake detection across Gradle build definitions in the repository.
+- **Suggested next step:** Replace the corrupted em dash sequences with clean em dashes or ASCII hyphens in `platforms/rtp-neoforge/rtp-neoforge-common/build.gradle`. Update `scripts/check-mojibake.py` to match directory components (`/build/` or Path parts) rather than simple substring matching.
+
+
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->

@@ -946,6 +946,9 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       });
       try {
         return f.get(5, java.util.concurrent.TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return false;
       } catch (Exception e) {
         return false;
       }

@@ -264,7 +264,7 @@ The region-file check needs terrain that already exists; a chunk that has never 
 
 ![Cross-plugin destination scatter comparison](../assets/img/cross_plugin_destinations_scatter_chart.png)
 
-*Where each plugin landed 4,096 players in the Paper 26.2 run (`20261006-135938`), every one set to the same 1,024 to 16,384 block circle around 0,0. The green box under each panel is the LeafRTP region shape that gives the same distance-from-center spread, so any of these distributions is a config change in LeafRTP, not a different plugin. Each config is replayed through LeafRTP's own shape code over the same terrain: EzRTP, JustRTP and JakesRTP match, and BetterRTP and HuskHomes get the closest fit. BetterRTP never went past 15,355 blocks, and a permission-group cap held JustRTP to 7,500, so those two are fitted to the ring they actually used.*
+*Where each plugin landed 4,096 players in the Paper 26.2 run (`20261008-003310`), every one set to the same 1,024 to 16,384 block circle around 0,0. The green box under each panel is the LeafRTP region shape that gives the same distance-from-center spread, so any of these distributions is a config change in LeafRTP, not a different plugin. Each config is replayed through LeafRTP's own shape code over the same terrain: LeafRTP and BetterRTP match CIRCLE, EzRTP and HuskHomes match CIRCLE_NORMAL, and JustRTP and JakesRTP match the spiral power curve.*
 
 <details>
 <summary><b>Full benchmark tables (Paper and Folia)</b></summary>
@@ -274,6 +274,17 @@ Only runs against current versions of the other plugins are listed; the older Sp
 **Metrics:** TP/s (higher is better) | latency percentiles (dispatch to teleport event, lower is better) | Min TPS (20.00 = no hiccup) | MSPT p99 / max (main-thread tick time in ms, lower is better) | Success (share of dispatched commands that produced a teleport).
 
 A "success" is the harness seeing that player's `PlayerTeleportEvent` within 5 s of dispatching the command. It doesn't check where the player landed: a teleport onto a bad block counts as a success, and a plugin that gave up cleanly with a chat message counts as a failure. The two ways to fail are the 5 s timeout and a teleport event with no destination.
+
+**Paper 26.2, unpaced (`20261008-003310`)** - 16 GB heap, 3 OPed clients, up to 4 teleports in flight, per-player gap 0, 4,096 attempts per plugin, 16,384-block radius circle around 0,0. EzRTP tested with biome checks active.
+
+| Plugin | Wall time | TP/s | p50 | p95 | p99 | Min TPS | MSPT p99 (ms) | Chunks / att (attr / inc) | Success |
+|---|---|---|---|---|---|---|---|---|---|
+| **LeafRTP** | **1.6 min (97 s)** | **42.15** | **5 ms** | **7 ms** | **9 ms** | **16.19** | **80.6** | **0.18 / 2.92** | **4,096 / 4,096 (100 %)** |
+| JakesRTP | 2.9 min (176 s) | 23.20 | 21 ms | 73 ms | 114 ms | 12.14 | 104.8 | 7.14 / 8.46 | 4,096 / 4,096 (100 %) |
+| BetterRTP | 7.4 min (444 s) | 9.22 | 223 ms | 628 ms | 1,013 ms | 13.23 | 120.2 | 24.96 / 26.06 | 4,096 / 4,096 (100 %) |
+| HuskHomes | 8.2 min (489 s) | 8.37 | 258 ms | 411 ms | 748 ms | 19.92 | 17.8 | 31.66 / 32.22 | 4,096 / 4,096 (100 %) |
+| EzRTP | 8.6 min (518 s) | 7.91 | 240 ms | 748 ms | 1,125 ms | 18.01 | 88.3 | 30.94 / 32.07 | 4,096 / 4,096 (100 %) |
+| JustRTP | 15.4 min (924 s) | 4.43 | 418 ms | 1,724 ms | 2,721 ms | 19.83 | 26.9 | 89.53 / 91.79 | 4,088 / 4,096 (99.8 %) |
 
 **Paper 26.1, no pacing (`20260617-232754`)** - 16 GB heap, 3 OPed clients, up to 4 teleports in flight, per-player gap 0: every client sends the next `/rtp` as soon as the last one lands. About 600 s per plugin, after a warm-up.
 

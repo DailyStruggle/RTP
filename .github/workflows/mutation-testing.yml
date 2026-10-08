@@ -20,12 +20,15 @@ jobs:
           - name: worldborder
             target: "io.github.dailystruggle.rtp.common.selection.worldborder.*"
             threshold: 60
-          - name: region-cache
-            target: "io.github.dailystruggle.rtp.common.selection.region.cache.*"
+          - name: region
+            target: "io.github.dailystruggle.rtp.common.selection.region.*"
             threshold: 60
           - name: teleport
             target: "io.github.dailystruggle.rtp.common.tasks.teleport.*"
-            threshold: 40
+            threshold: 60
+          - name: tools
+            target: "io.github.dailystruggle.rtp.common.tools.*"
+            threshold: 60
 
     steps:
       - name: Check out repository

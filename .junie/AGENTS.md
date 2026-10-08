@@ -121,7 +121,7 @@ Read only what the task requires. Do not read everything.
 | Domain terminology | [`docs/dev/GLOSSARY.md`](../docs/dev/GLOSSARY.md) |
 | Writing or updating tests | [`docs/dev/TESTING_GUIDE.md`](../docs/dev/TESTING_GUIDE.md) (what to test when), [`docs/dev/COVERAGE_PLAN.md`](../docs/dev/COVERAGE_PLAN.md), [`docs/dev/TRACEABILITY.md`](../docs/dev/TRACEABILITY.md) |
 | Structural architectural changes | [`docs/adr/README.md`](../docs/adr/README.md) + relevant ADR |
-| Multi-platform feature work | [`docs/dev/MULTI_PLATFORM_PLAN.md`](../docs/dev/MULTI_PLATFORM_PLAN.md) |
+| Multi-platform architecture (Fabric / NeoForge) | [`docs/adr/ADR-033-neoforge-platform-in-scope.md`](../docs/adr/ADR-033-neoforge-platform-in-scope.md), [`platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md`](../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) |
 | Multi-server / proxy (Velocity, BungeeCord) work | [`docs/dev/MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md) (ADR-036) |
 | Runtime metrics SPI (`metrics-api`) | [`metrics-api/README.md`](../metrics-api/README.md), [`docs/dev/METRICS_PLAN.md`](../docs/dev/METRICS_PLAN.md) |
 | Database / command / shutdown work | [`docs/dev/LESSONS_LEARNED.md`](../docs/dev/LESSONS_LEARNED.md) |
@@ -313,7 +313,7 @@ Cite the verification level executed and rationale in the `submit` summary under
 
 ## Current Development Focus
 
-Active multi-platform, proxy, and roadmap development frontiers are indexed in [`docs/dev/INDEX.md`](../docs/dev/INDEX.md) and tracked in [`docs/dev/ROADMAP.md`](../docs/dev/ROADMAP.md), [`docs/dev/MULTI_PLATFORM_PLAN.md`](../docs/dev/MULTI_PLATFORM_PLAN.md), and [`docs/dev/MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md).
+Active development frontiers are indexed in [`docs/dev/INDEX.md`](../docs/dev/INDEX.md) and tracked in [`docs/dev/ROADMAP.md`](../docs/dev/ROADMAP.md) and [`docs/dev/MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md) (Fabric and NeoForge platforms are complete; proxy/network mode is in progress).
 
 ---
 
@@ -351,7 +351,7 @@ When discovering durable knowledge, record it in the canonical destination:
 | Dated engineering pitfall, reproduction note, non-obvious behavior | [`docs/dev/LESSONS_LEARNED.md`](../docs/dev/LESSONS_LEARNED.md) |
 | Overloaded or ambiguous domain term | [`docs/dev/GLOSSARY.md`](../docs/dev/GLOSSARY.md) (Multipurpose Terms table) |
 | Informal alias / nickname for an existing code symbol | this file (*Domain Analogies & Aliases* table) |
-| Roadmap phase completion / decision change (multi-platform) | *Current Development Focus* above **and** [`MULTI_PLATFORM_PLAN.md`](../docs/dev/MULTI_PLATFORM_PLAN.md) |
+| Roadmap phase completion / decision change (multi-platform) | *Current Development Focus* above **and** [`docs/dev/ROADMAP.md`](../docs/dev/ROADMAP.md) |
 | Roadmap phase completion / decision change (multi-server proxy) | [`MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md); [`docs/admin/proxies/`](../docs/admin/proxies/) |
 | Roadmap phase completion / decision change (metrics) | [`METRICS_PLAN.md`](../docs/dev/METRICS_PLAN.md) |
 | Renamed / moved class referenced by a REQ-* | [`docs/dev/TRACEABILITY.md`](../docs/dev/TRACEABILITY.md) row |

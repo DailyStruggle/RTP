@@ -1,6 +1,6 @@
-﻿# Multi-Server (Proxy) Support Roadmap
+# Multi-Server (Proxy) Support Roadmap
 
-This document outlines the plan for RTP's multi-server (proxy / network) expansion. It is **distinct from** [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md): that plan covers running on additional Minecraft server flavours (Spigot/Paper/Folia/Fabric); *this* plan covers coordinating RTP across **multiple concurrent backend servers** — and, as of 2026-05-07, **multiple concurrent proxy instances** — sitting in front of those backends (Velocity, BungeeCord, Waterfall).
+This document outlines the plan for RTP's multi-server (proxy / network) expansion. It is distinct from the platform expansion work ([rtp-fabric-ADR-002](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md), [ADR-033](../adr/ADR-033-neoforge-platform-in-scope.md)): those covered running on additional Minecraft server flavours (Spigot/Paper/Folia/Fabric/NeoForge); *this* plan covers coordinating RTP across **multiple concurrent backend servers** — and, as of 2026-05-07, **multiple concurrent proxy instances** — sitting in front of those backends (Velocity, BungeeCord, Waterfall).
 
 > Status: **Phase 0 (Scope Unlock) and Phase 1 (Core SPI) both complete; Phase 2 (Velocity adapter + Redis/SQL transports) in flight as of 2026-05-19.** Requirements authored (REQ-RTP-NET-001…014); GLOSSARY entries (`backend`, `proxy`, `reservation token`, `transport`, `network snapshot`, `backend selector`) live in [`GLOSSARY.md`](GLOSSARY.md); umbrella decision captured in [ADR-036](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) (Accepted 2026-05-14) and refined by ten subproject ADRs under [`platforms/rtp-proxy/docs/adr/`](../../platforms/rtp-proxy/docs/adr/); [`INDEX.md`](INDEX.md) and [`AGENTS.md`](../../.junie/AGENTS.md) updated to co-list network mode as an active frontier. Phase 2 landed slices: 2a (Velocity no-op shell), 2b (participant skeleton + `network.yml` loader), 2c-Î± (`ServerPreConnectEvent` redemption), 2c-Î² / 2d (Brigadier `/rtp` + `CommandTriggerSource`), 2e-SQL (`SqlNetworkStateBinding`), 2e-Redis A1 (heartbeats + snapshot + pub/sub). Open Phase 2 work: Redis A2-A4, reservation-token TTL reaper, D4 HMAC distribution, regression suite, 2-proxy + 2-backend devstack acceptance.
 
@@ -57,7 +57,7 @@ These constraints are part of the acceptance criteria for ADR-036; any deviation
 
 - No proxy-side chunk logic, world data, or entity manipulation. The proxy never owns world state.
 - No replacement of the existing single-server pipeline. With `network.enabled: false`, behaviour is byte-identical to today.
-- No Forge / NeoForge proxy support. (Out of scope until Fabric platform stabilises — see `MULTI_PLATFORM_PLAN.md` Phase 4.)
+- No Forge / NeoForge proxy support. (Out of scope; proxy architecture focuses on Velocity and BungeeCord.)
 - No first-class Fabric backend networking support. Decision recorded 2026-05-24: networked Fabric setups (Velocity / BungeeCord in front of a Fabric backend) are **supported only at the SPI level** (the `rtp-proxy-common` dispatcher is platform-agnostic, and the devstack's `backend-c` Fabric instance exercises that) but are **not a prioritized feature** and ship with no documented forwarding-mode recipe until a modpack operator files a concrete request. Operators wanting to try it today use Velocity legacy forwarding + the third-party FabricProxy-Lite mod at their own risk; RTP itself adds nothing Fabric-specific to the proxy path. Revisit if demand materializes.
 - No cross-version protocol breakage without a `schemaVersion` bump.
 - **No post-arrival coordinate resolution.** Coordinates are resolved on the destination *before* the player transfers; see *Coordinate Resolution Timing* below.
@@ -174,7 +174,7 @@ Additional locked-in decisions:
 
 - **Proxy primary**: Velocity. **Secondary**: BungeeCord/Waterfall. Both eventually required.
 - **Transport preference order**: Redis (most responsive — and any RESP-compatible drop-in such as DragonflyDB or KeyDB; Redis is the reference implementation), Postgres (co-equal candidate, needs analysis), generic SQL (MySQL/MariaDB) for universal fallback, `plugin-message` for dev only.
-- **Commands**: extend `commands-api` rather than fork. Brigadier bridge work (Step G of `MULTI_PLATFORM_PLAN.md`) carries over for Velocity.
+- **Commands**: extend `commands-api` rather than fork. Brigadier bridge work (from the Fabric/NeoForge command adapter) carries over for Velocity.
 
 ### Amendment: Plugin-Message Default Tier (ratified 2026-06-12, repo owner leaf)
 
@@ -473,7 +473,7 @@ JSON columns become `JSONB` on Postgres; TEXT/CSV on SQLite (which is dev-only a
 
 - The publisher (`BackendStatePublisher`) lives in **`rtp-core`** as part of the `NetworkBridge` optional subsystem. Default-disabled when `network.enabled: false` — REQ-RTP-NET-002 must remain green.
 - The accessor member (per D3) exposes `writeBackendState(BackendStateRow)` and `readNetworkSnapshot()`. Concrete bindings (Redis / Postgres / generic SQL / in-memory) implement both.
-- No platform imports in the publisher — TPS/MSPT/heap/region data come through `RTP.serverAccessor` extensions (a small additive surface to spec in ADR-036; the *April 2026 gap analysis* in `MULTI_PLATFORM_PLAN.md` does **not** cover these new methods).
+- No platform imports in the publisher — TPS/MSPT/heap/region data come through `RTP.serverAccessor` extensions (a small additive surface to spec in ADR-036; the initial platform gap analysis does not cover these new methods).
 
 ### Open items folded into existing placeholders
 
@@ -563,7 +563,7 @@ A dedicated regression suite analogous to `ReqRtpS004NullChunkAttributionTest` i
 - `NetworkAwareCommand` mixin — when present, execution is routed through `RtpDispatcher` instead of run locally. Single-server commands stay untouched.
 - `ProxySender` abstraction in `commands-api` — adapts both Velocity's `CommandSource` and BungeeCord's `CommandSender` so `/rtp` works identically whether issued on a backend or on the proxy itself.
 - Tab-completion routing: proxy queries any backend on the transport, merges results, applies a local cache TTL.
-- Brigadier bridge (`BrigadierCommandAdapter` / `BrigadierBridgeContext` from Step G of `MULTI_PLATFORM_PLAN.md`) carries over for Velocity, which uses Brigadier internally.
+- Brigadier bridge (`BrigadierCommandAdapter` / `BrigadierBridgeContext` from `commands-api` and modded platform adapters) carries over for Velocity, which uses Brigadier internally.
 
 ---
 
@@ -650,7 +650,7 @@ The canonical wording for every `REQ-RTP-NET-NNN` requirement lives in [`REQUIRE
 
 ## Phased Roadmap
 
-Mirrors the structure of [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) so contributors can navigate either plan with the same mental model.
+Structured in phases so contributors can navigate the roadmap with a consistent mental model.
 
 ### Phase 0 — Scope Unlock *(docs only; D-005 gate)*
 

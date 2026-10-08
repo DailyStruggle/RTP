@@ -269,3 +269,16 @@ jobs:
           # The Lite jar is attested by release.yml where it is published.
           subject-path: |
             ${{ steps.artifacts.outputs.pro_jar }}
+
+      - name: Archive Pro Release Deliverables
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: leaf-rtp-pro-deliverables
+          path: |
+            ${{ steps.artifacts.outputs.pro_jar }}
+            ${{ steps.artifacts.outputs.pro_jar }}.sha256
+            ${{ steps.artifacts.outputs.pro_jar }}.sha512
+            ${{ steps.artifacts.outputs.pro_jar }}.asc
+            ${{ steps.artifacts.outputs.sbom_file }}
+          if-no-files-found: warn
+          retention-days: 90
