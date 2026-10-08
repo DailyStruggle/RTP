@@ -28,11 +28,11 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Commenting an option in a shipped YAML config | [`CONFIG_COMMENT_STYLE.md`](CONFIG_COMMENT_STYLE.md) |
 | A decision (why something is the way it is) | [`../adr/README.md`](../adr/README.md) |
 | How a developer ought to work in this repo, and why (full lifecycle: intake, planning, read-document-modify, design records, verification, divergence handling, communication, self-maintenance, optional AI tooling) | [`../adr/ADR-000-development-workflow.md`](../adr/ADR-000-development-workflow.md) |
-| Fabric status / blockers | [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) |
 | Multi-server / proxy (Velocity, BungeeCord) plan | [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md) (D-005 gated; admin stub: [`../admin/proxies/INDEX.md`](../admin/proxies/INDEX.md)) |
 | Why network mode (multi-server, multi-proxy) is in scope | [`../adr/ADR-036-network-mode-multi-server-multi-proxy.md`](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) (umbrella; subproject refinements under [`../../platforms/rtp-proxy/docs/adr/`](../../platforms/rtp-proxy/docs/adr/)) |
 | Runtime metrics SPI (TPS / MSPT / heap / pipeline samples) | [`METRICS_PLAN.md`](METRICS_PLAN.md) |
-| Why Fabric is in scope (and Forge / NeoForge are not) | [`../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md`](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) (renumbered from ADR-022) |
+| Why Fabric is in scope | [`../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md`](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) (renumbered from ADR-022) |
+| Why NeoForge is in scope | [`../adr/ADR-033-neoforge-platform-in-scope.md`](../adr/ADR-033-neoforge-platform-in-scope.md) |
 | Why legacy MC / Java are out of scope | [`../adr/ADR-021-legacy-mc-and-java-support-scope.md`](../adr/ADR-021-legacy-mc-and-java-support-scope.md) |
 | Adding or updating a locale / translation | [`TRANSLATION_GUIDE.md`](TRANSLATION_GUIDE.md) |
 | Spiral 1D math | [`../adr/ADR-001-archimedean-spiral-1d-mapping.md`](../adr/ADR-001-archimedean-spiral-1d-mapping.md) |
@@ -50,6 +50,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Build a destination menu / GUI on `rtp-api` | [`ADDON_MENUS.md`](ADDON_MENUS.md) |
 | Offer remote (network-mode) destinations from an addon | [`ADDON_CROSS_SERVER.md`](ADDON_CROSS_SERVER.md) |
 | How to load / deploy an addon (ServiceLoader, classpath, lifecycle) | [`ADDON_LOADING.md`](ADDON_LOADING.md) (ADR-057) |
+| Publish rtp-api / rtp-core artifacts (JitPack, GitHub Packages, Maven Central) | [`PUBLISHING.md`](PUBLISHING.md) |
 | Flat map of every doc | [`../MAP.md`](../MAP.md) |
 | Hazards and failure modes | [`HAZARDS.md`](HAZARDS.md) |
 | Failure detection and responses | [`HAZARDS.md#failure-modes`](HAZARDS.md#failure-modes) |
@@ -80,7 +81,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | [`SEMVER.md`](SEMVER.md) | Semantic versioning contract: public API vs internal boundaries, deprecation rules. |
 | [`LICENSING.md`](LICENSING.md) | All-MIT licensing (ADR-108), per-module licence matrix, Pro (support tier) vs Lite editions. |
 | [`DEPRECATION_POLICY.md`](DEPRECATION_POLICY.md) | Deprecation lifecycle, notice window, and compiler annotation policy. |
-| [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) | Active Fabric frontier status. |
+| [`PUBLISHING.md`](PUBLISHING.md) | Addon artifact publishing guide (JitPack, GitHub Packages, Maven Central). |
 | [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md) | Proxy / multi-server (Velocity, BungeeCord) roadmap; D-005 gated. |
 | [`METRICS_PLAN.md`](METRICS_PLAN.md) | Runtime metrics SPI (TPS/MSPT/heap/queue/pipeline); implementation eligible. |
 | [`ROADMAP.md`](ROADMAP.md) | Forward-looking work. |

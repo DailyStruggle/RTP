@@ -292,9 +292,7 @@ comment is the canonical form; do not reword it.
   introducing a new option, or the existing comment is actively misleading.
 - Bulk reformat passes across a whole config file should be a dedicated
   change, not bundled with a behavior change. See *Stay-On-Task Policy* in
-  `.junie/AGENTS.md`. For the priority order in which files should be brought
-  into this format with minimal translation cost, see
-  [`CONFIG_COMMENT_MINIMIZATION.md`](CONFIG_COMMENT_MINIMIZATION.md).
+  `.junie/AGENTS.md`.
 - When in doubt about valid options, link to the relevant admin doc
   (`docs/admin/CORE_CONFIG.md`, `docs/admin/SAFETY.md`, etc.) rather than
   duplicating an enumeration that will drift.

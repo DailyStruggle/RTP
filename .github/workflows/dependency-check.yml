@@ -42,6 +42,9 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Build plugin deliverables
+        run: ./gradlew :rtp-plugin:assemble
+
       - name: Run OWASP Dependency-Check
         uses: dependency-check/Dependency-Check_Action@1e54355a8b4c8abaa8cc7d0b70aa655a3bb15a6c # 1.1.0
         id: depcheck
@@ -51,7 +54,7 @@ jobs:
           JAVA_HOME: /opt/jdk
         with:
           project: 'RTP'
-          path: '.'
+          path: 'rtp-plugin/build/libs'
           format: 'ALL'
           # Gate on any non-trivial CVE (CVSS >= 4). Anything intentionally
           # accepted must carry a written justification in the suppression

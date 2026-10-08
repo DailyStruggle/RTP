@@ -51,7 +51,7 @@ Legacy random-teleport plugins reroll random coordinates until one lands somewhe
 | Spigot | 1.20 | Baseline adapter |
 | Paper | 1.20 | Uses async chunk loading APIs |
 | Folia | 1.20 | Full regional-thread scheduling support |
-| Fabric | 1.20 | Native mod support - **first-class, stable**, tested regularly, at feature parity with the Bukkit family. Loom-remapped obf/unobf carriers cover 1.20.x, 1.21.x, and MC 26.x ([details](docs/dev/MULTI_PLATFORM_PLAN.md)) |
+| Fabric | 1.20 | Native mod support - **first-class, stable**, tested regularly, at feature parity with the Bukkit family. Loom-remapped obf/unobf carriers cover 1.20.x, 1.21.x, and MC 26.x ([details](platforms/rtp-fabric/README.md)) |
 | NeoForge | 1.21.1 | Native mod adapter, in-scope. Carriers for 1.21.1 and MC 26.x; the 26.x carrier loads and runs, with broader runtime testing ongoing ([details](docs/dev/NEOFORGE_NOTES.md)). |
 | Forge (legacy) | — | No native adapter. Use a Bukkit-compatibility launcher (e.g. **Arclight** or **Mohist**) and run the Spigot/Paper build. |
 

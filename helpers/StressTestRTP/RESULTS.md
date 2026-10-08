@@ -12,6 +12,12 @@ Only runs against competitor versions that are still current are listed. The ear
 
 | Run | Platform | Plugin | TP/s | p95 | Min TPS | Success |
 |---|---|---|---:|---:|---:|---:|
+| `20261008-003310` | Paper 26.2, unpaced (Test A) | **LeafRTP** | **42.2** | **7 ms** | **16.2** | 100 % (4,096 / 4,096) |
+| `20261008-003310` | Paper 26.2, unpaced (Test A) | JakesRTP | 23.2 | 73 ms | 12.1 | 100 % (4,096 / 4,096) |
+| `20261008-003310` | Paper 26.2, unpaced (Test A) | BetterRTP | 9.2 | 628 ms | 13.2 | 100 % (4,096 / 4,096) |
+| `20261008-003310` | Paper 26.2, unpaced (Test A) | HuskHomes | 8.4 | 411 ms | 19.9 | 100 % (4,096 / 4,096) |
+| `20261008-003310` | Paper 26.2, unpaced (Test A) | EzRTP | 7.9 | 748 ms | 18.0 | 100 % (4,096 / 4,096) |
+| `20261008-003310` | Paper 26.2, unpaced (Test A) | JustRTP | 4.4 | 1 724 ms | 19.8 | 99.8 % (4,088 / 4,096) |
 | `20260617-232754` | Paper 26.1, unpaced | **RTP (Pro)** | **18.7** | **2 ms** | **17.5** | 100 % |
 | `20260617-232754` | Paper 26.1, unpaced | EzRTP | 13.1 | 189 ms | 10.3 | 98.3 % |
 | `20260617-232754` | Paper 26.1, unpaced | BetterRTP | 6.0 | 3 217 ms | 2.5 | 98.3 % |
@@ -20,6 +26,21 @@ Only runs against competitor versions that are still current are listed. The ear
 | `20260617-191448` | Folia 26.1 | EzRTP | 5.3 | - | - | 96.2 % |
 
 All rows are n=1 on a single rig except the Folia watchdog-stall count, which reproduced across two runs. Read them as "this rig, this version, this configuration", not as universal claims.
+
+---
+
+## Paper 26.2 - unpaced dispatch (Test A: `20261008-003310`, 4,096 teleports per plugin, 16k radius)
+
+> Full 6-plugin unpaced saturation run on Paper 26.2 (Ryzen 9 3900X, 16 GB heap). 3 OPed clients, concurrency 4, `immediate-redispatch: true`, `dispatch-interval-ms: 0`, `per-player-gap-ticks: 0`. Outer radius 16,384 blocks, inner radius 1,024 blocks. EzRTP tested with biome verification active.
+
+| Plugin | Success / Attempts | Wall Time | Throughput | Latency (p50 / p95 / p99) | Chunks / att (attr / inc) | Main CPU / att | Min TPS (Avg) | MSPT p99 | Peak Heap |
+|---|---|---|---|---|---|---|---|---|---|
+| **LeafRTP** | **4,096 / 4,096 (100 %)** | **97.2 s (1.6 min)** | **42.15 TP/s** | **5.0 ms / 7.0 ms / 9.0 ms** | **0.18 / 2.92** | **9.92 ms** | 16.19 (17.82) | 80.6 ms | 16,296 MB |
+| **JakesRTP** | 4,096 / 4,096 (100 %) | 176.5 s (2.9 min) | 23.20 TP/s | 21.0 ms / 73.0 ms / 114.0 ms | 7.14 / 8.46 | 13.17 ms | 12.14 (15.02) | 104.8 ms | 14,511 MB |
+| **BetterRTP** | 4,096 / 4,096 (100 %) | 444.2 s (7.4 min) | 9.22 TP/s | 223.0 ms / 628.0 ms / 1,013.0 ms | 24.96 / 26.06 | 24.86 ms | 13.23 (19.16) | 120.2 ms | 15,003 MB |
+| **HuskHomes** | 4,096 / 4,096 (100 %) | 489.3 s (8.2 min) | 8.37 TP/s | 258.0 ms / 411.0 ms / 748.0 ms | 31.66 / 32.22 | 30.72 ms | 19.92 (20.00) | 17.8 ms | 14,339 MB |
+| **EzRTP** | 4,096 / 4,096 (100 %) | 517.7 s (8.6 min) | 7.91 TP/s | 240.0 ms / 748.0 ms / 1,125.0 ms | 30.94 / 32.07 | 34.35 ms | 18.01 (19.57) | 88.3 ms | 14,157 MB |
+| **JustRTP** | 4,088 / 4,096 (99.8 %) | 923.8 s (15.4 min) | 4.43 TP/s | 418.0 ms / 1,724.0 ms / 2,721.0 ms | 89.53 / 91.79 | 82.79 ms | 19.83 (19.99) | 26.9 ms | 13,459 MB |
 
 ---
 
@@ -68,7 +89,22 @@ EzRTP loads slightly fewer chunks per teleport than RTP; its cost shows up on th
 
 ---
 
-## Where players landed (`20260923-000854`, 4,096 teleports per plugin)
+## Where players landed - Paper 26.2 (`20261008-003310`, 4,096 teleports per plugin, 16k radius)
+
+> Full landing analysis across all 6 contenders on Paper 26.2. 16,384-block radius, 1,024-block void around spawn. Generated from destination scatter logs via `CrossPluginDestinationScatterVisualizerTest`.
+
+| Plugin | Landed / Unique | Exact duplicates | Pairs within 48 blocks | Nearest pair | Clark-Evans R | Chunks reused | Landing block check (safe share) |
+|---|---|---:|---:|---:|---:|---:|---|
+| **LeafRTP** | 4,096 / 4,096 | **0 (0.0 %)** | **0** (random: 82) | **75.2 blocks** | **0.977** | **0** | **99.5 %** (547 / 550 safe, 3 noFloor) |
+| **JakesRTP** | 4,096 / 4,096 | 0 (0.0 %) | 108 (random: 82) | 6.7 blocks | 0.919 | 1 | 78.8 % (2,745 / 3,484 safe, 730 noFloor, 9 hazard) |
+| **BetterRTP** | 4,096 / 4,094 | 2 (0.05 %) | 123 (random: 78) | 0.0 blocks | 0.906 | 5 | 99.7 % (4,085 / 4,096 safe, 3 noFloor, 6 hazard) |
+| **HuskHomes** | 4,096 / 4,096 | 0 (0.0 %) | 136 (random: 85) | 2.2 blocks | 0.907 | 4 | 98.7 % (2,429 / 2,462 safe, 32 noFloor, 1 water) |
+| **EzRTP** | 4,096 / 4,096 | 0 (0.0 %) | 153 (random: 125) | 3.6 blocks | 0.914 | 4 | 87.9 % (3,599 / 4,096 safe, 441 water, 49 blocked, 7 hazard) |
+| **JustRTP** | 4,088 / 4,088 | 0 (0.0 %) | 115 (random: 78) | 4.1 blocks | 0.897 | 1 | 100.0 % (8 / 8 safe) |
+
+---
+
+## Where players landed - Paper 26.1 (`20260923-000854`, 4,096 teleports per plugin)
 
 | Plugin | Exact duplicates | Pairs within 48 blocks | Nearest pair | Clark-Evans R |
 |---|---:|---:|---:|---:|

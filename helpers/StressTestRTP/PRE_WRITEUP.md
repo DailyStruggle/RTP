@@ -503,6 +503,40 @@ Findings:
 - **Server pause overhead is drastically reduced**: across the 4,096 teleports, LeafRTP cost the server only 21.7 s of total stop-the-world GC pause time, compared to 47.9 s for EzRTP and 138.8 s (over 2.3 minutes) for JustRTP.
 - **Player-region TPS floor stayed solid**: LeafRTP's 5s minimum TPS remained at 18.79 (only 0.03% of samples below target), whereas EzRTP dropped to 13.04 (0.76% below target).
 
+### 5.7 Paper 26.2 unthrottled dispatch - `20261008-003310` (Test A: 6-plugin 4,096-teleport saturation run)
+
+The definitive multi-plugin saturation benchmark on Paper 26.2 (AMD Ryzen 9 3900X, 16 GB heap). 3 OPed clients, concurrency 4, unpaced dispatch (`immediate-redispatch: true`, `dispatch-interval-ms: 0`, `per-player-gap-ticks: 0`). Outer radius equalized across all contenders to 16,384 blocks with a 1,024-block void around spawn. EzRTP was evaluated with biome validation active (`plugins/EzRTP/rtp.yml`), resolving the candidate-skipping anomaly from earlier runs.
+
+| Metric | LeafRTP | JakesRTP | BetterRTP | HuskHomes | EzRTP | JustRTP |
+|---|---|---|---|---|---|---|
+| Attempts / Successes | **4,096 / 4,096 (100 %)** | 4,096 / 4,096 (100 %) | 4,096 / 4,096 (100 %) | 4,096 / 4,096 (100 %) | 4,096 / 4,096 (100 %) | 4,088 / 4,096 (99.8 %) |
+| Failures | **0** | 0 | 0 | 0 | 0 | 8 (TIMEOUTs) |
+| Wall-clock time (4k quota) | **97.2 s (1.6 min)** | 176.5 s (2.9 min) | 444.2 s (7.4 min) | 489.3 s (8.2 min) | 517.7 s (8.6 min) | 923.8 s (15.4 min) |
+| Throughput | **42.15 TP/s** | 23.20 TP/s | 9.22 TP/s | 8.37 TP/s | 7.91 TP/s | 4.43 TP/s |
+| Latency cold / p50 | **7.0 ms / 5.0 ms** | 1.0 ms / 21.0 ms | 135 ms / 223.0 ms | 212 ms / 258.0 ms | 184 ms / 240.0 ms | 263 ms / 418.0 ms |
+| Latency p95 / p99 | **7.0 ms / 9.0 ms** | 73.0 ms / 114.0 ms | 628.0 ms / 1,013.0 ms | 411.0 ms / 748.0 ms | 748.0 ms / 1,125.0 ms | 1,724.0 ms / 2,721.0 ms |
+| Fast mode served fraction | **99.97 %** | 0.0 % | 0.0 % | 0.0 % | 0.0 % | 0.0 % |
+| Chunks loaded / att (attributed) | **0.18** | 7.14 | 24.96 | 31.66 | 30.94 | 89.53 |
+| Chunks loaded / att (inclusive) | **2.92** | 8.46 | 26.06 | 32.22 | 32.07 | 91.79 |
+| Main-thread CPU / attempt | **9.92 ms** | 13.17 ms | 24.86 ms | 30.72 ms | 34.35 ms | 82.79 ms |
+| Process CPU / attempt (total) | **77.16 ms** | 74.77 ms | 197.80 ms | 226.54 ms | 240.56 ms | 530.12 ms |
+| Min TPS (Mean TPS) | 16.19 (17.82) | 12.14 (15.02) | 13.23 (19.16) | **19.92 (20.00)** | 18.01 (19.57) | 19.83 (19.99) |
+| MSPT p50 / p99 | 56.4 ms / 80.6 ms | 61.8 ms / 104.8 ms | 23.4 ms / 120.2 ms | **12.7 ms / 17.8 ms** | 23.3 ms / 88.3 ms | 16.8 ms / 26.9 ms |
+| Peak Heap MB | 16,296 MB | 14,511 MB | 15,003 MB | 14,339 MB | 14,157 MB | 13,459 MB |
+| Exact duplicate landings | **0 (0.0 %)** | 0 (0.0 %) | 2 (0.05 %) | 0 (0.0 %) | 0 (0.0 %) | 0 (0.0 %) |
+| Near pairs (<= 48 blocks) | **0** (random: 82) | 108 (random: 82) | 123 (random: 78) | 136 (random: 85) | 153 (random: 125) | 115 (random: 78) |
+| Clark-Evans R (spacing) | **0.977** (uniform) | 0.919 | 0.906 | 0.907 | 0.914 | 0.897 (clustered) |
+| Landing safety audit | **99.5 % safe** (547/550) | 78.8 % safe (730 noFloor) | 99.7 % safe (6 hazard) | 98.7 % safe (32 noFloor) | 87.9 % safe (441 water) | 100.0 % safe (8/8) |
+
+Findings:
+
+1. **Resolution of the EzRTP biome discrepancy**: In the earlier run without biome filtering (`20261006-135938`), EzRTP skipped candidate placement checks, reporting artificial throughput of 29.47 TP/s with only 13.0 chunks/att. With biome checks active in `plugins/EzRTP/rtp.yml`, throughput normalized to 7.91 TP/s with 30.94 chunks/att and 34.35 ms main CPU, perfectly matching the search cost profile of un-indexed candidate discovery. However, 441 of its landings still occurred on water surfaces due to lenient surface checks.
+2. **Instant queue clearance under saturation**: LeafRTP cleared the full 4,096 teleports in 97.2 seconds (42.15 TP/s) with a median latency of 5.0 ms and p99 of 9.0 ms, driven by a 99.97% pre-warmed queue hit rate. It loaded only 0.18 attributed candidate chunks per attempt (2.92 inclusive chunks).
+3. **Tick degradation under unconstrained search (JakesRTP)**: JakesRTP achieved the second highest throughput (23.20 TP/s), but heavily loaded the main tick thread, driving mean TPS down to 15.02 (min 12.14) and MSPT p99 to 104.8 ms. Furthermore, 730 landings lacked ground blocks (`noFloor`), dropping safe landing percentage to 78.8%.
+4. **Search timeouts and tail latency (JustRTP)**: JustRTP required 89.53 chunks and 82.79 ms main CPU per attempt, resulting in 8 failed attempts and a p99 latency of 2,721 ms (max 4,751 ms), showing that un-indexed cache replenishment under strict biome rules experiences candidate timeout.
+5. **Tick preservation through throttling (HuskHomes)**: HuskHomes maintained near-perfect tick stability (20.00 avg TPS, 17.8 ms MSPT p99) by evaluating candidates synchronously at a modest 8.37 TP/s (258 ms median latency).
+6. **Mathematical spatial uniformity**: LeafRTP achieved 0 exact duplicate landings and 0 pairs within 48 blocks (Clark-Evans R = 0.977, nearest pair 75.2 blocks), while competitors produced between 108 and 153 closely adjacent pairs.
+
 ---
 
 ## 6. Recorded test parameters
@@ -843,16 +877,14 @@ Method work and status for the 4,096-attempt benchmark series:
    - JustRTP: `min_radius: 1024`, `max_radius: 16384`, `center_x: 0`, `center_z: 0`.
    - JakesRTP: `radius.min: 1024`, `radius.max: 16384`, `shape: circle`, `center: 0, 0`.
    - HuskHomes: `region.min: 1024`, `region.max: 16384`.
-2. **[READY] Configure Test A (Burst Saturation / Queue Clearance):**
-   - In `plugins/StressTestRTP/config.yml`: `per-target-count: 4096`, `immediate-redispatch: true`,
-     `dispatch-interval-ms: 0`, `per-player-gap-ticks: 0`, `sequence.gap-seconds: 180`,
-     `sequence.per-target-seconds: 3600`.
-   - Measures peak throughput ceiling, total 4,096-attempt clearance time, surge tail latencies,
-     and watchdog stalls across all 6 targets.
-3. **[QUEUED] Configure Test B (Steady-State Paced at 5.0 TP/s):**
+2. **[DONE] Test A (Burst Saturation / Queue Clearance):**
+   - Executed in run `20261008-003310` across all 6 contenders with biome verification active.
+   - Evaluated peak throughput ceiling, total 4,096-attempt clearance time, surge tail latencies,
+     and spatial distributions. Full results recorded in section 5.7 and `RESULTS.md`.
+3. **[ACTIVE] Configure Test B (Steady-State Paced at 5.0 TP/s):**
    - In `plugins/StressTestRTP/config.yml`: `per-target-count: 4096`, `immediate-redispatch: false`,
-     `dispatch-interval-ms: 200`, `per-player-gap-ticks: 4`, `sequence.gap-seconds: 180`,
-     `sequence.per-target-seconds: 1200`.
+     `dispatch-interval-ms: 200`, `per-player-gap-ticks: 4`, `per-player-gap-ms: -1`, `sequence.gap-seconds: 180`,
+     `sequence.per-target-seconds: 1800`.
    - Measures pure marginal tick impact ($\Delta$MSPT against settle baseline), on-tick CPU share,
      and GC freeze ratio with throughput equalized.
 4. **[IN PROGRESS] Publication Pipeline to MkDocs (`docs/site/benchmarks.md`):**

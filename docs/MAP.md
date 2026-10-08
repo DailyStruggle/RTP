@@ -27,12 +27,9 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - [`dev/SUPPORT_MATRIX.md`](dev/SUPPORT_MATRIX.md) — platform x Minecraft version x Java version support matrix.
 - [`dev/DEPRECATION_POLICY.md`](dev/DEPRECATION_POLICY.md) — API evolution and deprecation lifecycle.
 - [`dev/COVERAGE_PLAN.md`](dev/COVERAGE_PLAN.md) — JaCoCo targets.
-- [`dev/DEVSTACK_COVERAGE_PLAN.md`](dev/DEVSTACK_COVERAGE_PLAN.md) — devstack integration test coverage plan.
 - [`dev/EXTERNAL_HOOKS.md`](dev/EXTERNAL_HOOKS.md) — external hooks and reflection audit (ADR-026).
 - [`dev/CONFIG_COMMAND_SPEC.md`](dev/CONFIG_COMMAND_SPEC.md) — `/rtp config` command specification and grammar.
 - [`dev/CONFIG_COMMENT_STYLE.md`](dev/CONFIG_COMMENT_STYLE.md) — configuration comment guidelines and style.
-- [`dev/CONFIG_COMMENT_MINIMIZATION.md`](dev/CONFIG_COMMENT_MINIMIZATION.md) — config comment minimization rationale.
-- [`dev/MULTI_PLATFORM_PLAN.md`](dev/MULTI_PLATFORM_PLAN.md) — Fabric frontier.
 - [`dev/MULTI_SERVER_PLAN.md`](dev/MULTI_SERVER_PLAN.md) — proxy / multi-server (Velocity, BungeeCord) roadmap; D-005 gated.
 - [`dev/METRICS_PLAN.md`](dev/METRICS_PLAN.md) — runtime metrics SPI (TPS / MSPT / heap / queue / pipeline); implementation eligible.
 - [`dev/ROADMAP.md`](dev/ROADMAP.md) — forward-looking work.
@@ -208,5 +205,5 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - [`admin/configuration/IN_GAME_CONFIG.md`](admin/configuration/IN_GAME_CONFIG.md) — managing settings live via in-game commands and menus.
 - [`admin/proxies/INDEX.md`](admin/proxies/INDEX.md) — network mode overview and multi-server architecture.
 - [`admin/proxies/CONFIGURATION.md`](admin/proxies/CONFIGURATION.md) — `network.yml` schema, proxy tokens, and transport bindings.
-- [`dev/SINGLE_BACKEND_VERIFICATION.md`](dev/SINGLE_BACKEND_VERIFICATION.md) — isolated single-backend test runbook.
-- [`dev/CROSS_SERVER_VERIFICATION.md`](dev/CROSS_SERVER_VERIFICATION.md) — multi-backend cross-server transfer verification runbook.
+- [`admin/proxies/SINGLE_BACKEND_VERIFICATION.md`](admin/proxies/SINGLE_BACKEND_VERIFICATION.md) — isolated single-backend test runbook.
+- [`admin/proxies/CROSS_SERVER_VERIFICATION.md`](admin/proxies/CROSS_SERVER_VERIFICATION.md) — multi-backend cross-server transfer verification runbook.
