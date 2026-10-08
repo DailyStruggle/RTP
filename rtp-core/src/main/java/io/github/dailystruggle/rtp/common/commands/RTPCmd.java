@@ -243,9 +243,7 @@ public interface RTPCmd extends BaseRTPCmd {
       }
 
       if (!hasSubCommand && !hasTargetArg) {
-        long cd = (senderData.targetRegion != null)
-            ? RTP.getCooldown(sender, senderData.targetRegion.getSettings())
-            : sender.cooldown();
+        long cd = sender.cooldown();
         if (dt < cd) {
           String msg = (String) RTP.configs.getConfigValue(PlayerMessages.cooldownMessage, "");
           messageMethod.accept(msg);
