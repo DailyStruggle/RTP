@@ -7,10 +7,15 @@ import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
+import org.bukkit.profile.PlayerProfile;
+import org.bukkit.profile.PlayerTextures;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Locale;
@@ -19,6 +24,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Resolves menu icon specifications to Bukkit {@link ItemStack}s.
@@ -281,12 +288,25 @@ public final class BukkitCustomItemResolver {
         item.setItemMeta(skullMeta);
       }
     } catch (Throwable t) {
-      RTP.log(Level.FINE, "[RTP-GUI] Failed to apply base64 texture to head: " + t.getMessage());
+      RTP.log(Level.WARNING, "[RTP-GUI] Failed to apply base64 texture to head: " + t.getMessage(), t);
     }
     return item;
   }
 
-  private static void applyBase64Texture(SkullMeta meta, String base64) {
+  static void applyBase64Texture(SkullMeta meta, String base64) {
+    try {
+      String json = new String(Base64.getDecoder().decode(base64), StandardCharsets.UTF_8);
+      Matcher m = Pattern.compile("\"url\"\\s*:\\s*\"([^\"]+)\"").matcher(json);
+      if (m.find()) {
+        if (applyProfileApi(meta, m.group(1))) {
+          return;
+        }
+      }
+    } catch (Throwable t) {
+      RTP.log(Level.FINE, "[RTP-GUI] Base64 JSON decoding / profile lookup failed: " + t.getMessage());
+    }
+
+    // Fall back to legacy reflection for pre-1.18 servers
     try {
       Class<?> profileClass = Class.forName("com.mojang.authlib.GameProfile");
       Constructor<?> constructor = profileClass.getConstructor(UUID.class, String.class);
@@ -313,9 +333,31 @@ public final class BukkitCustomItemResolver {
       if (profileField != null) {
         profileField.setAccessible(true);
         profileField.set(meta, profile);
+      } else {
+        RTP.log(Level.WARNING, "[RTP-GUI] Failed to find profile field on SkullMeta: " + meta.getClass().getName());
       }
     } catch (Throwable t) {
-      RTP.log(Level.FINE, "[RTP-GUI] Reflection texture injection failed: " + t.getMessage());
+      RTP.log(Level.WARNING, "[RTP-GUI] Failed to apply base64 texture to head via reflection: " + t.getMessage(), t);
+    }
+  }
+
+  static boolean applyProfileApi(SkullMeta meta, String textureUrl) {
+    try {
+      PlayerProfile pp = Bukkit.createPlayerProfile(UUID.randomUUID(), "rtp");
+      PlayerTextures textures = pp.getTextures();
+      textures.setSkin(URI.create(textureUrl).toURL());
+      pp.setTextures(textures);
+      try {
+        meta.setOwnerProfile(pp);
+        return true;
+      } catch (NoSuchMethodError e) {
+        Method m = meta.getClass().getMethod("setPlayerProfile", pp.getClass());
+        m.invoke(meta, pp);
+        return true;
+      }
+    } catch (Throwable t) {
+      RTP.log(Level.FINE, "[RTP-GUI] Public profile API failed: " + t.getMessage());
+      return false;
     }
   }
 

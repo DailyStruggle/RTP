@@ -134,4 +134,16 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Linear:** RTP-31
 
 
+### 2026-10-07 — Bare /rtp early guard enforces global cooldown when destination region override is shorter
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** v3.3.0 bare `/rtp` cooldown review
+- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/commands/RTPCmd.java` lines 245-258 (`onCommand`)
+- **Symptom / hypothesis:** When a region specifies a `cooldown` override that is shorter than the global `config.yml` cooldown (e.g. 5 seconds for a specific region vs 60 seconds global), bare `/rtp` invocations are blocked by the early spam guard in `onCommand` for the full global cooldown duration (`sender.cooldown()`). The early guard evaluates `sender.cooldown()` before the asynchronous `compute()` phase resolves the destination region and checks `RegionSettings.cooldownMillis()`.
+- **Impact:** Players cannot take advantage of shorter region-specific cooldown overrides when executing bare `/rtp`; they are held to the longer global cooldown unless they invoke an explicit target override (e.g. `/rtp region:<name>`), which bypasses the early guard.
+- **Suggested next step:** Resolve the sender's current world default region in `RTPCmd.onCommand` when evaluating the early cooldown guard for bare `/rtp`, or delegate cooldown enforcement for bare `/rtp` entirely to the `compute()` pipeline phase.
+- **Linear:** RTP-32
+
+
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->

@@ -114,6 +114,33 @@ class RTPCmdBranchTest {
     }
 
     @Test
+    void testOnCommandBareRtpUsesGlobalCooldownNotPreviousRegionCooldown() {
+        MockRTPPlayer sender = new MockRTPPlayer(UUID.randomUUID(), "zeroCooldownUser", null) {
+            @Override
+            public long cooldown() {
+                return 0L;
+            }
+        };
+        accessor.addPlayer(sender);
+
+        TeleportData data = new TeleportData();
+        data.time = System.currentTimeMillis();
+        data.completed = true;
+        io.github.dailystruggle.rtp.common.selection.region.Region targetRegion =
+                org.mockito.Mockito.mock(io.github.dailystruggle.rtp.common.selection.region.Region.class);
+        io.github.dailystruggle.rtp.common.selection.region.RegionSettings settings =
+                new io.github.dailystruggle.rtp.common.selection.region.RegionSettings(
+                        "testRegion", null, null, null, false, false, 0, 0, 0, 0, 0.0, 0, null, false, 3600000L, null);
+        org.mockito.Mockito.when(targetRegion.getSettings()).thenReturn(settings);
+        data.targetRegion = targetRegion;
+        RTP.getInstance().latestTeleportData.put(sender.uuid(), data);
+
+        boolean result = rtpCmd.onCommand(sender, rtpCmd, "rtp", new String[0]);
+        assertTrue(result);
+        assertTrue(sender.sentMessages.stream().noneMatch(msg -> msg.toLowerCase(Locale.ROOT).contains("cooldown")));
+    }
+
+    @Test
     void testOnCommandAlreadyTeleporting() {
         MockRTPPlayer sender = new MockRTPPlayer(UUID.randomUUID(), "busyUser", null);
         accessor.addPlayer(sender);

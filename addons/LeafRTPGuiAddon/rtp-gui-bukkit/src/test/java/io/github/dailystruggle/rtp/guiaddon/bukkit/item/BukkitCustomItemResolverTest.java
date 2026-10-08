@@ -20,22 +20,26 @@ import static org.mockito.Mockito.*;
 class BukkitCustomItemResolverTest {
 
   private static PluginManager mockPluginManager;
+  private static Server mockServer;
 
   @BeforeAll
   static void initServer() throws Exception {
-    Server server = mock(Server.class);
-    when(server.getLogger()).thenReturn(Logger.getLogger("MockServer"));
+    mockServer = mock(Server.class);
+    when(mockServer.getLogger()).thenReturn(Logger.getLogger("MockServer"));
     mockPluginManager = mock(PluginManager.class);
-    when(server.getPluginManager()).thenReturn(mockPluginManager);
+    when(mockServer.getPluginManager()).thenReturn(mockPluginManager);
 
     Field serverField = Bukkit.class.getDeclaredField("server");
     serverField.setAccessible(true);
-    serverField.set(null, server);
+    serverField.set(null, mockServer);
   }
 
   @AfterEach
   void resetPluginManager() {
     reset(mockPluginManager);
+    reset(mockServer);
+    when(mockServer.getLogger()).thenReturn(Logger.getLogger("MockServer"));
+    when(mockServer.getPluginManager()).thenReturn(mockPluginManager);
   }
 
   @Test
@@ -180,5 +184,53 @@ class BukkitCustomItemResolverTest {
     ItemStack hdbItem = BukkitCustomItemResolver.resolve("hdb:9999", Material.COMPASS);
     assertNotNull(hdbItem);
     assertTrue(hdbItem.getType() == Material.PLAYER_HEAD || hdbItem.getType().name().contains("SKULL") || hdbItem.getType() == Material.DIRT);
+  }
+
+  @Test
+  @DisplayName("applyBase64Texture uses Bukkit PlayerProfile API when available")
+  void testApplyBase64TextureUsesPlayerProfileApi() throws Exception {
+    String skinUrl = "http://textures.minecraft.net/texture/abc123def456";
+    String json = "{\"textures\":{\"SKIN\":{\"url\":\"" + skinUrl + "\"}}}";
+    String base64 = java.util.Base64.getEncoder().encodeToString(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+    org.bukkit.profile.PlayerProfile mockProfile = mock(org.bukkit.profile.PlayerProfile.class);
+    org.bukkit.profile.PlayerTextures mockTextures = mock(org.bukkit.profile.PlayerTextures.class);
+    when(mockProfile.getTextures()).thenReturn(mockTextures);
+    when(mockServer.createPlayerProfile(any(java.util.UUID.class), eq("rtp"))).thenReturn(mockProfile);
+
+    org.bukkit.inventory.meta.SkullMeta mockSkullMeta = mock(org.bukkit.inventory.meta.SkullMeta.class);
+
+    BukkitCustomItemResolver.applyBase64Texture(mockSkullMeta, base64);
+
+    verify(mockTextures).setSkin(java.net.URI.create(skinUrl).toURL());
+    verify(mockSkullMeta).setOwnerProfile(mockProfile);
+  }
+
+  @Test
+  @DisplayName("applyBase64Texture falls back to reflection when PlayerProfile API fails")
+  void testApplyBase64TextureFallsBackWhenProfileApiFails() {
+    String skinUrl = "http://textures.minecraft.net/texture/legacy123";
+    String json = "{\"textures\":{\"SKIN\":{\"url\":\"" + skinUrl + "\"}}}";
+    String base64 = java.util.Base64.getEncoder().encodeToString(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+    when(mockServer.createPlayerProfile(any(java.util.UUID.class), eq("rtp")))
+        .thenThrow(new UnsupportedOperationException("Pre-1.18 API"));
+
+    org.bukkit.inventory.meta.SkullMeta mockSkullMeta = mock(org.bukkit.inventory.meta.SkullMeta.class);
+
+    assertDoesNotThrow(() -> BukkitCustomItemResolver.applyBase64Texture(mockSkullMeta, base64));
+    verify(mockSkullMeta, never()).setOwnerProfile(any());
+  }
+
+  @Test
+  @DisplayName("resolve returns player head for base64 prefix")
+  void testResolveBase64Head() {
+    String skinUrl = "http://textures.minecraft.net/texture/itemtest";
+    String json = "{\"textures\":{\"SKIN\":{\"url\":\"" + skinUrl + "\"}}}";
+    String base64 = java.util.Base64.getEncoder().encodeToString(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+    ItemStack head = BukkitCustomItemResolver.resolve("base64:" + base64, Material.COMPASS);
+    assertNotNull(head);
+    assertEquals(Material.PLAYER_HEAD, head.getType());
   }
 }
