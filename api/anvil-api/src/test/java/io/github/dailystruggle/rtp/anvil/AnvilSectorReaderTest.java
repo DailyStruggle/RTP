@@ -165,6 +165,196 @@ class AnvilSectorReaderTest {
     assertEquals(1, AnvilRegionHeaderCache.size());
   }
 
+  @Test
+  @DisplayName("REQ-RTP-S-005: a session reads every chunk of one region file through a single open")
+  void session_opensOncePerFile(@TempDir Path dir) throws IOException {
+    Path file = dir.resolve("r.0.0.mca");
+    Files.write(file, layout(64,
+        new int[] {slot(0, 0), slot(3, 2), slot(31, 31)},
+        new int[] {2, 10, 40},
+        new byte[][] {payload(root(0, 0, "minecraft:stone")), payload(root(3, 2, "minecraft:sand")),
+            payload(root(31, 31, "minecraft:lava"))}));
+    try (AnvilSectorReader.Session s = AnvilSectorReader.openSession(file)) {
+      assertEquals(0L, AnvilSectorReader.regionOpens(), "open is lazy");
+      assertEquals("minecraft:sand", AnvilReader.toView(s.readChunkEntry(3, 2).root).blockIdAt(8, 0, 8));
+      assertEquals("minecraft:stone", AnvilReader.toView(s.readChunkEntry(0, 0).root).blockIdAt(8, 0, 8));
+      assertNull(s.readChunkEntry(1, 1), "empty slot");
+      assertEquals("minecraft:lava", AnvilReader.toView(s.readChunkEntry(31, 31).root).blockIdAt(8, 0, 8));
+    }
+    assertEquals(1L, AnvilSectorReader.regionOpens(), "one open for four reads");
+    assertEquals(3L, AnvilSectorReader.chunkReads());
+
+    AnvilSectorReader.readChunkEntry(file, 0, 0);
+    AnvilSectorReader.readChunkEntry(file, 3, 2);
+    assertEquals(3L, AnvilSectorReader.regionOpens(), "single-chunk reads still open per call");
+
+    try (AnvilSectorReader.Session s = AnvilSectorReader.openSession(dir.resolve("r.9.9.mca"))) {
+      assertNull(s.readChunkEntry(288, 288), "missing file");
+    }
+    assertEquals(3L, AnvilSectorReader.regionOpens(), "a missing file is never opened");
+  }
+
+  @Test
+  @DisplayName("S-004: a stale cached table is reloaded once through the open channel; later chunks use it")
+  void session_staleTable_reloadsWithoutReopen(@TempDir Path dir) throws IOException {
+    byte[] a = payload(root(0, 0, "minecraft:stone"));
+    byte[] b = payload(root(1, 0, "minecraft:sand"));
+    Path file = dir.resolve("r.0.0.mca");
+    Files.write(file, layout(4, new int[] {slot(0, 0), slot(1, 0)}, new int[] {2, 3}, new byte[][] {a, b}));
+    AnvilSectorReader.readChunkEntry(file, 0, 0);
+    Files.write(file, layout(4, new int[] {slot(0, 0), slot(1, 0)}, new int[] {3, 2}, new byte[][] {a, b}));
+    AnvilSectorReader.resetStats();
+    try (AnvilSectorReader.Session s = AnvilSectorReader.openSession(file)) {
+      assertEquals("minecraft:stone", AnvilReader.toView(s.readChunkEntry(0, 0).root).blockIdAt(8, 0, 8));
+      assertEquals("minecraft:sand", AnvilReader.toView(s.readChunkEntry(1, 0).root).blockIdAt(8, 0, 8));
+    }
+    assertEquals(1L, AnvilSectorReader.staleRetries());
+    assertEquals(1L, AnvilSectorReader.regionOpens(), "the reload reuses the session's channel");
+  }
+
+  @Test
+  @DisplayName("S-004: one corrupt chunk in a batch fails closed alone; its neighbours still decode")
+  void session_corruptChunk_isIsolated(@TempDir Path dir) throws IOException {
+    byte[] region = layout(4, new int[] {slot(0, 0)}, new int[] {2},
+        new byte[][] {payload(root(0, 0, "minecraft:stone"))});
+    int e = slot(1, 0) * 4;
+    region[e + 2] = 50; // sector 50, beyond EOF
+    region[e + 3] = 1;
+    Path file = dir.resolve("r.0.0.mca");
+    Files.write(file, region);
+    try (AnvilSectorReader.Session s = AnvilSectorReader.openSession(file)) {
+      assertThrows(CorruptRegionEntryException.class, () -> s.readChunkEntry(1, 0));
+      assertNotNull(s.readChunkEntry(0, 0));
+    }
+    assertEquals(1L, AnvilSectorReader.regionOpens());
+  }
+
+  @Test
+  @DisplayName("REQ-RTP-S-005: batched prefilter verdicts equal single probes at one open per region file")
+  void batchProbe_matchesSingleProbes(@TempDir Path world) throws IOException {
+    Path regionDir = world.resolve("region");
+    Files.createDirectories(regionDir);
+    Files.write(regionDir.resolve("r.0.0.mca"), layout(16,
+        new int[] {slot(0, 0), slot(1, 0), slot(2, 0)},
+        new int[] {2, 3, 4},
+        new byte[][] {payload(root(0, 0, "minecraft:stone")), payload(root(1, 0, "minecraft:lava")),
+            payload(root(2, 0, "minecraft:sand"))}));
+    Files.write(regionDir.resolve("r.1.0.mca"), layout(4, new int[] {slot(0, 0)}, new int[] {2},
+        new byte[][] {payload(root(32, 0, "minecraft:lava"))}));
+    java.util.Set<String> unsafe = java.util.Set.of("LAVA");
+    List<ChunkCoord> chunks = List.of(new ChunkCoord(0, 0), new ChunkCoord(1, 0), new ChunkCoord(32, 0),
+        new ChunkCoord(2, 0), new ChunkCoord(5, 5), new ChunkCoord(1, 0), new ChunkCoord(900, 900));
+
+    java.util.Map<ChunkCoord, AnvilPrefilter.ProbeResult> batch =
+        AnvilPrefilter.probeBatchSyncDetailed(world, "", chunks, unsafe, null);
+    assertEquals(2L, AnvilSectorReader.regionOpens(), "one open per existing region file");
+    assertEquals(6, batch.size(), "duplicates collapse");
+
+    for (ChunkCoord c : batch.keySet()) {
+      Verdict single = AnvilPrefilter.probeSyncDetailed(world, "", c.x(), c.z(), unsafe, null).verdict();
+      assertEquals(single, batch.get(c).verdict(), "chunk " + c);
+    }
+    assertEquals(Verdict.ACCEPT, batch.get(new ChunkCoord(0, 0)).verdict());
+    assertEquals(Verdict.REJECT, batch.get(new ChunkCoord(1, 0)).verdict());
+    assertEquals(Verdict.REJECT, batch.get(new ChunkCoord(32, 0)).verdict());
+    assertEquals(Verdict.UNKNOWN, batch.get(new ChunkCoord(5, 5)).verdict(), "empty slot");
+    assertEquals(Verdict.UNKNOWN, batch.get(new ChunkCoord(900, 900)).verdict(), "no region file");
+  }
+
+  @Test
+  @DisplayName("REQ-RTP-S-005: pending column probes for one region file share one open and match probeColumn")
+  void coalescedColumnProbes_shareOneOpen(@TempDir Path world) throws Exception {
+    Path regionDir = world.resolve("region");
+    Files.createDirectories(regionDir);
+    Files.write(regionDir.resolve("r.0.0.mca"), layout(16,
+        new int[] {slot(0, 0), slot(1, 0), slot(2, 0)},
+        new int[] {2, 3, 4},
+        new byte[][] {payload(root(0, 0, "minecraft:stone")), payload(root(1, 0, "minecraft:lava")),
+            payload(root(2, 0, "minecraft:sand"))}));
+    java.util.ArrayDeque<Runnable> pool = new java.util.ArrayDeque<>();
+    ColumnProbeCoalescer c = new ColumnProbeCoalescer(pool::add);
+    int[][] chunks = {{0, 0}, {1, 0}, {2, 0}, {5, 5}, {1, 0}};
+    List<java.util.concurrent.CompletableFuture<ColumnProbe>> futures = new java.util.ArrayList<>();
+    for (int[] ch : chunks) futures.add(c.submit(world, "", ch[0], ch[1], MIN_Y, MAX_Y));
+    assertEquals(1, pool.size(), "one drain task per region file");
+    assertTrue(futures.stream().noneMatch(java.util.concurrent.CompletableFuture::isDone), "no I/O on submit");
+    pool.poll().run();
+
+    assertEquals(1L, AnvilSectorReader.regionOpens(), "one open for five requests");
+    assertEquals(1L, c.groupsDrained());
+    assertEquals(5L, c.requestsServed());
+    for (int i = 0; i < chunks.length; i++) {
+      ColumnProbe got = futures.get(i).get();
+      ColumnProbe single = AnvilPrefilter.probeColumn(world, "", chunks[i][0], chunks[i][1], MIN_Y, MAX_Y);
+      if (single == null) {
+        assertNull(got, "empty slot");
+        continue;
+      }
+      assertEquals(single.heightmapTopY(), got.heightmapTopY());
+      assertEquals(5, got.groupSize(), "probe carries its drain's group size");
+      assertTrue(got.drainNanos() > 0L, "per-chunk drain share measured");
+      assertEquals(0, single.groupSize(), "uncoalesced probe reports no group");
+      for (int y = MIN_Y; y <= MAX_Y; y++) assertEquals(single.blockAt(y), got.blockAt(y), "y=" + y);
+    }
+    assertEquals("minecraft:lava", futures.get(1).get().blockAt(0));
+  }
+
+  @Test
+  @DisplayName("Column-probe groups close at 64 requests and are keyed per region file")
+  void coalescedColumnProbes_capAndKeying(@TempDir Path world) throws Exception {
+    Path regionDir = world.resolve("region");
+    Files.createDirectories(regionDir);
+    Files.write(regionDir.resolve("r.0.0.mca"), layout(4, new int[] {slot(0, 0)}, new int[] {2},
+        new byte[][] {payload(root(0, 0, "minecraft:stone"))}));
+    java.util.ArrayDeque<Runnable> pool = new java.util.ArrayDeque<>();
+    ColumnProbeCoalescer c = new ColumnProbeCoalescer(pool::add);
+    List<java.util.concurrent.CompletableFuture<ColumnProbe>> futures = new java.util.ArrayList<>();
+    for (int i = 0; i < ColumnProbeCoalescer.MAX_GROUP + 6; i++) {
+      futures.add(c.submit(world, "", i % 32, i / 32, MIN_Y, MAX_Y));
+    }
+    java.util.concurrent.CompletableFuture<ColumnProbe> otherFile = c.submit(world, "", 40, 0, MIN_Y, MAX_Y);
+    java.util.concurrent.CompletableFuture<ColumnProbe> otherDim = c.submit(world, "DIM-1", 0, 0, MIN_Y, MAX_Y);
+    assertEquals(4, pool.size(), "64 + 6 in one file, one other file, one other dimension");
+    while (!pool.isEmpty()) pool.poll().run();
+
+    assertEquals(64L + 6L + 2L, c.requestsServed());
+    assertEquals(2L, AnvilSectorReader.regionOpens(), "one open per group on the existing file");
+    assertEquals("minecraft:stone", futures.get(0).get().blockAt(0));
+    assertNull(futures.get(ColumnProbeCoalescer.MAX_GROUP + 5).get(), "empty slot");
+    assertNull(otherFile.get(), "missing region file");
+    assertNull(otherDim.get(), "missing dimension");
+  }
+
+  @Test
+  @DisplayName("S-004: a corrupt chunk fails only its own coalesced probe; a rejected pool fails every caller")
+  void coalescedColumnProbes_failClosedPerRequest(@TempDir Path world) throws Exception {
+    Path regionDir = world.resolve("region");
+    Files.createDirectories(regionDir);
+    byte[] region = layout(4, new int[] {slot(0, 0)}, new int[] {2},
+        new byte[][] {payload(root(0, 0, "minecraft:stone"))});
+    int e = slot(1, 0) * 4;
+    region[e + 2] = 50; // sector 50, beyond EOF
+    region[e + 3] = 1;
+    Files.write(regionDir.resolve("r.0.0.mca"), region);
+    java.util.ArrayDeque<Runnable> pool = new java.util.ArrayDeque<>();
+    ColumnProbeCoalescer c = new ColumnProbeCoalescer(pool::add);
+    java.util.concurrent.CompletableFuture<ColumnProbe> bad = c.submit(world, "", 1, 0, MIN_Y, MAX_Y);
+    java.util.concurrent.CompletableFuture<ColumnProbe> good = c.submit(world, "", 0, 0, MIN_Y, MAX_Y);
+    pool.poll().run();
+    java.util.concurrent.ExecutionException ex =
+        assertThrows(java.util.concurrent.ExecutionException.class, bad::get);
+    assertTrue(ex.getCause() instanceof CorruptRegionEntryException, "typed failure: " + ex.getCause());
+    assertEquals("minecraft:stone", good.get().blockAt(0));
+
+    ColumnProbeCoalescer rejecting = new ColumnProbeCoalescer(r -> {
+      throw new java.util.concurrent.RejectedExecutionException("shut down");
+    });
+    java.util.concurrent.CompletableFuture<ColumnProbe> refused = rejecting.submit(world, "", 0, 0, MIN_Y, MAX_Y);
+    assertTrue(refused.isCompletedExceptionally());
+    assertTrue(rejecting.submit(world, "", 0, 0, MIN_Y, MAX_Y).isCompletedExceptionally(),
+        "a rejected group is not left open for later callers");
+  }
+
   // ---------------------------------------------------------------------------- fixtures
 
   private static int slot(int lx, int lz) {

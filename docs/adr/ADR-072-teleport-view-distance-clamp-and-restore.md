@@ -175,12 +175,21 @@ directly; both avoid reflection. On a platform without a separate send-view-dist
 pin is a no-op and the feature degrades to the original tracking-only clamp behaviour (still
 correct, just with the pre-fix flash).
 
+*Note on entity teleportation (2026-10-08):* While `PaperRTPPlayer` was originally introduced
+strictly to implement view-distance APIs, inheriting `setLocation` from `BukkitRTPPlayer` left
+Paper using synchronous `player.teleport(Location)`, triggering main-thread `isInWall -> syncLoad`
+stalls (Linear issue `RTP-4`, S-005). `PaperRTPPlayer` now also overrides `setLocation(RTPLocation)`
+to route entity teleportation through Paper's native `Player#teleportAsync(Location)` per
+[ADR-005 Amendment 1](ADR-005-paperlib-removal.md).
+
 ## References
 
 - `rtp-core/.../configuration/enums/PerformanceKeys.java` - `viewDistanceTeleport`, `viewDistanceSelect`.
 - `rtp-core/.../selection/region/Region.java` - existing `viewDistanceTeleport` preload consumption.
 - `rtp-core/.../tasks/teleport/TeleportPipelineTask.java` - teleport completion hook point.
 - `helpers/StressTestRTP/.../ChunkLoadCounter.java` - arrival-ring cost model used to quantify the burst.
+- ADR-005 Amendment 1 (native asynchronous entity teleportation on Paper via `teleportAsync`).
 - ADR-008 (MemoryTracker active GC) - lifecycle-tracking pattern reused for clamp register/release.
 - ADR-054 (RTPRunnable self-scheduling thread routing) - scheduler routing the ramp task relies on.
+- Tests: `PaperRTPPlayerSetLocationTest` (verifies native `teleportAsync` dispatch and S-004 fallback).
 - Minimum renderable view distance of 2 chunks confirmed against Paper per-player view-distance range `[2, 32]`.

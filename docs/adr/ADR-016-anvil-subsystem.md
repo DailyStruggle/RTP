@@ -1,6 +1,7 @@
 # ADR-016 — Anvil Read-Only Subsystem (Prefilter, Backed Chunk View, Shared Module)
 
 **Status:** Accepted
+**Extended by:** [ADR-109](ADR-109-measured-cost-probe-first-gate.md) (measured-cost gate on whether the center-column probe runs); [ADR-110](ADR-110-purpose-gated-live-loads.md) (speculative fill resolves through the region-file view only; live fallback only when pinned)
 
 ## Context
 

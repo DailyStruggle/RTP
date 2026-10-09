@@ -262,6 +262,19 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
      */
     @Override
     public CompletableFuture<Long> getChunkAt(int chunkX, int chunkZ) {
+        return resolveChunkKey(chunkX, chunkZ, true);
+    }
+
+    /**
+     * ADR-110: resident chunk or region-file view only; {@code null} where only a native load
+     * (or generation) could answer.
+     */
+    @Override
+    public CompletableFuture<Long> getChunkIfReadable(int chunkX, int chunkZ) {
+        return resolveChunkKey(chunkX, chunkZ, false);
+    }
+
+    private CompletableFuture<Long> resolveChunkKey(int chunkX, int chunkZ, boolean allowLive) {
         // Probe-entry: do NOT bump totalChunkLoads here. The increment happens inside
         // the server.submit body below, on the actual live chunk load. This avoids the
         // double-count via RTPWorld.getOrLoadChunk's probe-then-live composition; see
@@ -315,12 +328,15 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
                                     return CompletableFuture.completedFuture(key);
                                 }
                                 // No view available (UNKNOWN) → live load is authoritative.
-                                return loadLiveChunk(chunkX, chunkZ, key);
+                                return allowLive
+                                        ? loadLiveChunk(chunkX, chunkZ, key)
+                                        : CompletableFuture.completedFuture(null);
                             });
                 }
             }
         }
 
+        if (!allowLive && !isChunkLoaded(chunkX, chunkZ)) return CompletableFuture.completedFuture(null);
         return loadLiveChunk(chunkX, chunkZ, key);
     }
 
@@ -955,16 +971,14 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
         final int finalMinY = minY;
         final int finalMaxY = maxY;
 
-        // Mirrors the Spigot dispatch contract: AnvilIoPool runs blocking .mca
-        // reads off-tick with disk-parallelism sizing. Probe-cache hit / miss
-        // metrics are owned by ScanTask's probeOutcome* counters and the anvil
-        // module's own diagLog channel - no per-call counter is owned here.
-        return CompletableFuture.supplyAsync(() -> {
+        // Mirrors the Spigot dispatch contract: pending probes for one r.X.Z.mca are
+        // coalesced onto AnvilIoPool and share one open (S-005: no I/O on the caller).
+        // Probe-cache hit / miss metrics are owned by ScanTask's probeOutcome* counters
+        // and the anvil module's own diagLog channel - no per-call counter is owned here.
+        return io.github.dailystruggle.rtp.anvil.AnvilPrefilter.probeColumnAsync(
+                worldFolder, dim, cx, cz, finalMinY, finalMaxY).handle((probe, err) -> {
             try {
-                // Reads only this chunk's sectors (location table cached per region file).
-                io.github.dailystruggle.rtp.anvil.ColumnProbe probe =
-                    io.github.dailystruggle.rtp.anvil.AnvilPrefilter.probeColumn(
-                        worldFolder, dim, cx, cz, finalMinY, finalMaxY);
+                if (err != null) throw err;
                 if (probe == null) return null;
                 return ChunkColumnProbe.of(new AnvilColumnProbeAdapter(probe, cx, cz,
                     s -> (RTP.serverAccessor != null)
@@ -977,7 +991,7 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
                         + t.getClass().getSimpleName() + ": " + t.getMessage());
                 return null;
             }
-        }, io.github.dailystruggle.rtp.anvil.AnvilIoPool.get());
+        });
     }
 
     /**
@@ -1048,6 +1062,22 @@ public final class FabricRTPWorld extends RTPWorld<ServerLevel> {
                     + t.getClass().getSimpleName() + ": " + t.getMessage());
             return java.util.Collections.emptyMap();
         }
+    }
+
+    @Override
+    public java.nio.file.Path anvilWorldFolder() {
+        ServerLevel level = world;
+        if (level == null || level.getServer() == null) return null;
+        try {
+            return level.getServer().getWorldPath(LevelResource.ROOT);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    @Override
+    public String anvilDimensionSubpath() {
+        return dimensionRegionSubpath(world);
     }
 
     /** {@inheritDoc} S-005: blocking stat, off-tick only. */

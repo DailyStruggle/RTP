@@ -111,4 +111,48 @@ class MetricsRecorderWriterTest {
         }
         assertEquals(1, rec.rowWriterOpenCount());
     }
+
+    @Test
+    @DisplayName("phases CSV matches header column count and correctly records idle baseline and net cpu")
+    void phasesCsvIdleBaselineAndNetCpu(@TempDir Path dir) throws Exception {
+        Path csv = dir.resolve("run.csv");
+        Path phasesCsv = dir.resolve("run-phases.csv");
+        MetricsRecorder rec = new MetricsRecorder(csv);
+
+        // Pre-phase idle baseline: 12.5 ms MSPT, 0.250 main cores, 0.400 proc cores, 60s
+        MetricsRecorder.IdleBaseline baseline = new MetricsRecorder.IdleBaseline(12.5, 0.250, 0.400, 60000L);
+        rec.setNextPhaseIdleBaseline(baseline);
+
+        rec.beginPhase("rtp");
+        timedOut(rec, "rtp");
+        timedOut(rec, "rtp");
+        rec.endPhase("rtp");
+
+        List<String> l = lines(phasesCsv);
+        assertEquals(2, l.size());
+        String header = l.get(0);
+        String row = l.get(1);
+        assertEquals(MetricsRecorder.PHASES_CSV_HEADER, header);
+
+        String[] headerCols = header.split(",", -1);
+        String[] rowCols = row.split(",", -1);
+        assertEquals(headerCols.length, rowCols.length, "Row column count must match header column count");
+
+        int idleMsptIdx = -1;
+        int idleMainCoresIdx = -1;
+        int idleProcCoresIdx = -1;
+        for (int i = 0; i < headerCols.length; i++) {
+            if ("idle_mspt_p50".equals(headerCols[i])) idleMsptIdx = i;
+            if ("idle_main_cpu_cores".equals(headerCols[i])) idleMainCoresIdx = i;
+            if ("idle_process_cpu_cores".equals(headerCols[i])) idleProcCoresIdx = i;
+        }
+        assertTrue(idleMsptIdx >= 0);
+        assertTrue(idleMainCoresIdx >= 0);
+        assertTrue(idleProcCoresIdx >= 0);
+
+        assertEquals("12.500", rowCols[idleMsptIdx]);
+        assertEquals("0.250", rowCols[idleMainCoresIdx]);
+        assertEquals("0.400", rowCols[idleProcCoresIdx]);
+        rec.close();
+    }
 }

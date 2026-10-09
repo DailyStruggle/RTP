@@ -237,7 +237,7 @@ subprojects {
             ':tags-api': [instruction: 0.95, branch: 0.85],
             // anvil-api measured: 90.5% instruction / 80.5% branch.
             ':anvil-api': [instruction: 0.90, branch: 0.80],
-            // maps-api measured: 94.7% instruction / 82.1% branch.
+            // maps-api measured via jacocoTestReport (2026-10-08): 96.2% instruction / 84.6% branch.
             ':maps-api': [instruction: 0.90, branch: 0.80],
             // rtp-api measured: 95.7% instruction / 81.3% branch.
             // Sits at Stage A strict 90/80 JaCoCo gate.

@@ -145,6 +145,13 @@ warteschlangenWachstumWarnSchwelle: 0
 # @default: false
 syncLaden: false
 
+# Teleport-Pfad auf Paper. AUTO = Teleport im selben Tick, wenn der Ziel-Chunk bereits
+# geladen ist, sonst teleportAsync. ASYNC = immer teleportAsync (einen Tick langsamer).
+# @type: string
+# @options: ["AUTO", "ASYNC"]
+# @default: "AUTO"
+teleportPfad: "AUTO"
+
 # Berechtigungsknoten bei jedem Ereignis neu auswerten, statt sie zu cachen.
 # @type: boolean
 # @default: false

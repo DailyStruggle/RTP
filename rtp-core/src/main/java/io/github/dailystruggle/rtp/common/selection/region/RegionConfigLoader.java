@@ -282,28 +282,44 @@ public class RegionConfigLoader {
                 FuzzySearchEngine.resolveCandidate(shapeName, candidateMap);
 
         Shape<?> prototype = null;
+        String resolvedName = null;
         if (lookup.isExact()) {
             prototype = lookup.match();
+            resolvedName = lookup.matchedKey();
         } else if (lookup.isPerceptible()) {
             String regionPrefix = (regionName != null && !regionName.isEmpty()) ? "Region '" + regionName + "' " : "";
             RTP.log(Level.WARNING, "[RTP] " + regionPrefix + "shape '" + shapeName
                     + "' was not recognized, but closely matches '" + lookup.matchedKey()
                     + "'. Autocorrecting to '" + lookup.matchedKey() + "'.");
             prototype = lookup.match();
+            resolvedName = lookup.matchedKey();
         } else {
             String regionPrefix = (regionName != null && !regionName.isEmpty()) ? "Region '" + regionName + "' " : "";
             RTP.log(Level.WARNING, "[RTP] " + regionPrefix + "shape '" + shapeName
                     + "' is invalid (valid options: " + String.join(", ", lookup.availableCandidates())
                     + "). Falling back to CIRCLE.");
             prototype = (Shape<?>) factory.get("CIRCLE");
+            resolvedName = "CIRCLE";
             if (prototype == null && !candidateMap.isEmpty()) {
-                prototype = candidateMap.values().iterator().next();
+                Map.Entry<String, Shape<?>> first = candidateMap.entrySet().iterator().next();
+                prototype = first.getValue();
+                resolvedName = first.getKey();
             }
         }
 
         if (prototype != null) {
             Shape<?> clone = prototype.clone();
+            try {
+                if (resolvedName != null) {
+                    map.put("name", resolvedName);
+                }
+            } catch (UnsupportedOperationException ignored) {
+                // Read-only map; clone.name assignment below handles it
+            }
             clone.setData(map);
+            if (resolvedName != null) {
+                clone.name = resolvedName;
+            }
             applyPolygonVertices(clone, map);
             return clone;
         }
@@ -439,31 +455,48 @@ public class RegionConfigLoader {
                 FuzzySearchEngine.resolveCandidate(vertName, candidateMap);
 
         VerticalAdjustor<?> prototype = null;
+        String resolvedName = null;
         if (lookup.isExact()) {
             prototype = lookup.match();
+            resolvedName = lookup.matchedKey();
         } else if (lookup.isPerceptible()) {
             String regionPrefix = (regionName != null && !regionName.isEmpty()) ? "Region '" + regionName + "' " : "";
             RTP.log(Level.WARNING, "[RTP] " + regionPrefix + "vert '" + vertName
                     + "' was not recognized, but closely matches '" + lookup.matchedKey()
                     + "'. Autocorrecting to '" + lookup.matchedKey() + "'.");
             prototype = lookup.match();
+            resolvedName = lookup.matchedKey();
         } else {
             String regionPrefix = (regionName != null && !regionName.isEmpty()) ? "Region '" + regionName + "' " : "";
             RTP.log(Level.WARNING, "[RTP] " + regionPrefix + "vert '" + vertName
                     + "' is invalid (valid options: " + String.join(", ", lookup.availableCandidates())
                     + "). Falling back to LINEAR.");
             prototype = (VerticalAdjustor<?>) factory.get("LINEAR");
+            resolvedName = "LINEAR";
             if (prototype == null) {
                 prototype = (VerticalAdjustor<?>) factory.get("JUMP");
+                resolvedName = "JUMP";
             }
             if (prototype == null && !candidateMap.isEmpty()) {
-                prototype = candidateMap.values().iterator().next();
+                Map.Entry<String, VerticalAdjustor<?>> first = candidateMap.entrySet().iterator().next();
+                prototype = first.getValue();
+                resolvedName = first.getKey();
             }
         }
 
         if (prototype != null) {
             VerticalAdjustor<?> clone = (VerticalAdjustor<?>) prototype.clone();
+            try {
+                if (resolvedName != null) {
+                    map.put("name", resolvedName);
+                }
+            } catch (UnsupportedOperationException ignored) {
+                // Read-only map; clone.name assignment below handles it
+            }
             clone.setData(map);
+            if (resolvedName != null) {
+                clone.name = resolvedName;
+            }
             return clone;
         }
         return null;

@@ -160,6 +160,13 @@ maxHeap百分比: 85.0
 # @default: false
 同步加载: false
 
+# Paper 上的传送路径。AUTO = 目标区块已加载时在同一 tick 内传送，
+# 否则使用 teleportAsync。ASYNC = 始终使用 teleportAsync（慢一个 tick）。
+# @type: string
+# @options: ["AUTO", "ASYNC"]
+# @default: "AUTO"
+传送路径: "AUTO"
+
 # 权限解析（启动时）
 # onEventParsing: 与通配符权限 *.* 不兼容。
 # 影响: 中 (onEvent) / 低 (effect)

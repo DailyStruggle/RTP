@@ -110,6 +110,18 @@ if [ "${RTP_GRADLE_LOCKED:-0}" != "1" ]; then
     LOCK_SUFFIX="build"
     if [ -n "$TARGET_MODULE" ] && [ "$NON_MODULE_TASKS" -eq 0 ] && [ "$MULTIPLE_MODULES" -eq 0 ]; then
         LOCK_SUFFIX="mod_${TARGET_MODULE}"
+        # A module whose build files reference another top-level project shares that project's build
+        # outputs with any concurrent run that also depends on it (e.g. :effects-api:remapJar under both
+        # :rtp-core and :rtp-plugin), so such runs take the global lock. gradle/rtp-gradle-lock.ps1
+        # locks the dependency closure instead; flock here has too few descriptors for that.
+        APP_DIR=$(cd "${0%/*}" 2>/dev/null && pwd -P) || APP_DIR=.
+        mod_dir=$(sed -n "s/^[[:space:]]*project([[:space:]]*['\"]:${TARGET_MODULE}['\"][[:space:]]*)\.projectDir[[:space:]]*=[[:space:]]*file([[:space:]]*['\"]\([^'\"]*\)['\"].*/\1/p" "$APP_DIR/settings.gradle" 2>/dev/null | head -n 1)
+        [ -n "$mod_dir" ] || mod_dir="$TARGET_MODULE"
+        if [ -d "$APP_DIR/$mod_dir" ] && find "$APP_DIR/$mod_dir" -name build -prune -o \( -name build.gradle -o -name build.gradle.kts \) \
+                -exec grep -ho "project([[:space:]]*\(path[[:space:]]*[:=][[:space:]]*\)\{0,1\}['\"]:[A-Za-z0-9_.:-]*" {} + 2>/dev/null \
+                | sed "s/.*['\"]://; s/:.*//" | grep -qvxF "$TARGET_MODULE"; then
+            LOCK_SUFFIX="build"
+        fi
     fi
 
     # A module run takes its lock while holding the global lock; a global run holds the global lock

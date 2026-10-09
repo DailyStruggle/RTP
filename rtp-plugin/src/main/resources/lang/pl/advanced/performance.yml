@@ -145,6 +145,13 @@ progOstrzezeniaWzrostuKolejki: 0
 # @default: false
 ladowanieSync: false
 
+# Ścieżka teleportu na Paper. AUTO = teleport w tym samym ticku, gdy chunk docelowy jest
+# już załadowany, w przeciwnym razie teleportAsync. ASYNC = zawsze teleportAsync (o jeden tick wolniej).
+# @type: string
+# @options: ["AUTO", "ASYNC"]
+# @default: "AUTO"
+sciezkaTeleportu: "AUTO"
+
 # Ponownie parsuj węzły uprawnień przy każdym zdarzeniu zamiast buforowania.
 # @type: boolean
 # @default: false

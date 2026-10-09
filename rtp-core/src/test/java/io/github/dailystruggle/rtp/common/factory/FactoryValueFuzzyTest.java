@@ -58,6 +58,53 @@ class FactoryValueFuzzyTest {
     }
 
     @Test
+    @DisplayName("setData recognizes 'name' property and updates value name silently")
+    void testNamePropertyExactAndNormalized() {
+        ShapeValue val = new ShapeValue("initial");
+        Map<String, Object> map = new HashMap<>();
+        map.put("name", "CIRCLE");
+        map.put("radius", 300);
+
+        val.setData(map);
+        assertEquals("CIRCLE", val.name);
+        assertEquals(300, val.getData(ShapeParam.radius));
+
+        // Case-insensitive / normalized name property
+        Map<String, Object> map2 = new HashMap<>();
+        map2.put("NAME", "SQUARE");
+        val.setData(map2);
+        assertEquals("SQUARE", val.name);
+    }
+
+    @Test
+    @DisplayName("setData autocorrects perceptible typo for 'name' property")
+    void testNamePropertyPerceptibleTypo() {
+        ShapeValue val = new ShapeValue("initial");
+        Map<String, Object> map = new HashMap<>();
+        map.put("nam", "POLYGON"); // typo for name (dist 1)
+
+        val.setData(map);
+        assertEquals("POLYGON", val.name);
+    }
+
+    @Test
+    @DisplayName("setData lists 'name' among valid properties when logging unrecognized keys")
+    void testUnrecognizedPropertyListsNameCandidate() {
+        ShapeValue val = new ShapeValue("test");
+        Map<String, Object> map = new HashMap<>();
+        map.put("unknownPropertyXYZ", 123);
+
+        val.setData(map);
+        io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.RTP.serverAccessor;
+        assertNotNull(accessor);
+        assertTrue(
+                accessor.logMessages.stream().anyMatch(m ->
+                        m.contains("Unrecognized property 'unknownPropertyXYZ'") && m.contains("name")),
+                "Warning message must list 'name' as a valid candidate: " + accessor.logMessages);
+    }
+
+    @Test
     @DisplayName("setData autocorrects perceptible typos with warning log")
     void testPerceptibleTypos() {
         ShapeValue val = new ShapeValue("test");

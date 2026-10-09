@@ -4,7 +4,8 @@
   "description": "Headless protocol client for automated cross-server devstack acceptance testing (ADR-091)",
   "main": "mineflayer-bot.js",
   "scripts": {
-    "test": "node mineflayer-bot.js"
+    "test": "node mineflayer-bot.js",
+    "bench-swarm": "node bench-swarm.js"
   },
   "dependencies": {
     "mineflayer": "^4.39.0"

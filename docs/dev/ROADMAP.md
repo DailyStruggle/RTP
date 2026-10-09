@@ -138,6 +138,11 @@ reproducible by readers".
   - In-game selection bridge (`SelectionBridge` SPI) hooking existing WorldEdit/FAWE (`Polygonal2DRegion`, `CuboidRegion`) across Paper/Folia/Fabric/NeoForge, and FTB Chunks claim contours on modded (`/rtp region fromselection <name>`).
   - Zero-backend web map vector drawing tool (`leaf-rtp-map-tool.js`) generating one-click clipboard YAML snippets and in-game commands.
   - Cartography map item visual inspection (`maps-api` `RegionBoundaryRenderer` via `/rtp map create region_boundary`).
+- [ ] **Runtime physical trigger creation & WorldEdit selection bridge (`/rtp trigger`).**
+  Enable in-game operators to define, inspect, and remove physical trigger volumes (portals, launch pads, step-in thresholds) dynamically at runtime without manually writing coordinate bounds in action YAML files:
+  - Register the `/rtp trigger <create|remove|list>` runtime command surface in `rtp-core` wired into `PhysicalTriggerManager`.
+  - In-game WorldEdit/FAWE selection bridge compatibility (`SelectionBridge` SPI) to define cuboid trigger volumes directly from active player wand selections (`//wand`, cuboid selection) alongside center-radius boxes.
+  - Persist runtime-created triggers across server restarts with automatic synchronization to `definitions/actions/<name>.yml`.
 - [ ] **External web map raster layers ([ADR-086](../adr/ADR-086-external-web-map-integration.md)).**
   Zero-chunk-load on-demand raster heatmaps, coverage layers, and vector polygon overlays for Pl3xMap, BlueMap, and Dynmap.
 - [ ] **Seamless loading-screen-free Velocity transfers ([rtp-proxy-ADR-021](../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-021-seamless-in-play-velocity-transfers.md)).**

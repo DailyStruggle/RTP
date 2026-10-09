@@ -23,6 +23,10 @@ public final class RTPMetricsExtension implements io.github.dailystruggle.metric
     public final long queueGrowthWarnCount;
     public final int queueGrowthWarnThreshold;
     public final Map<String, RegionQueueRow> regionQueueStatus;
+    /** ADR-109 probe-first governors keyed {@code region|path}; empty until a candidate runs. */
+    public final Map<String, ProbeGovernorRow> probeGovernors;
+    /** ADR-110 purpose gate on native chunk loads, keyed by region; empty until fill runs. */
+    public final Map<String, LiveLoadGateRow> liveLoadGates;
 
     /**
      * Backward-compatible constructor that leaves the ADR-053 audit counters at zero.
@@ -67,6 +71,44 @@ public final class RTPMetricsExtension implements io.github.dailystruggle.metric
             long queueGrowthWarnCount,
             int queueGrowthWarnThreshold,
             Map<String, RegionQueueRow> regionQueueStatus) {
+        this(queueDepth, pendingTeleports, memoryTrackerEntries, chunkLoadBacklog,
+                avgPipelineMs, databaseLatencyMs, slowPipelineCount, slowPipelineThresholdMs,
+                queueGrowthWarnCount, queueGrowthWarnThreshold, regionQueueStatus, Collections.emptyMap());
+    }
+
+    public RTPMetricsExtension(
+            int queueDepth,
+            int pendingTeleports,
+            int memoryTrackerEntries,
+            int chunkLoadBacklog,
+            double avgPipelineMs,
+            int databaseLatencyMs,
+            long slowPipelineCount,
+            long slowPipelineThresholdMs,
+            long queueGrowthWarnCount,
+            int queueGrowthWarnThreshold,
+            Map<String, RegionQueueRow> regionQueueStatus,
+            Map<String, ProbeGovernorRow> probeGovernors) {
+        this(queueDepth, pendingTeleports, memoryTrackerEntries, chunkLoadBacklog,
+                avgPipelineMs, databaseLatencyMs, slowPipelineCount, slowPipelineThresholdMs,
+                queueGrowthWarnCount, queueGrowthWarnThreshold, regionQueueStatus, probeGovernors,
+                Collections.emptyMap());
+    }
+
+    public RTPMetricsExtension(
+            int queueDepth,
+            int pendingTeleports,
+            int memoryTrackerEntries,
+            int chunkLoadBacklog,
+            double avgPipelineMs,
+            int databaseLatencyMs,
+            long slowPipelineCount,
+            long slowPipelineThresholdMs,
+            long queueGrowthWarnCount,
+            int queueGrowthWarnThreshold,
+            Map<String, RegionQueueRow> regionQueueStatus,
+            Map<String, ProbeGovernorRow> probeGovernors,
+            Map<String, LiveLoadGateRow> liveLoadGates) {
         this.queueDepth = queueDepth;
         this.pendingTeleports = pendingTeleports;
         this.memoryTrackerEntries = memoryTrackerEntries;
@@ -80,6 +122,12 @@ public final class RTPMetricsExtension implements io.github.dailystruggle.metric
         this.regionQueueStatus = (regionQueueStatus == null || regionQueueStatus.isEmpty())
                 ? Collections.emptyMap()
                 : Collections.unmodifiableMap(new LinkedHashMap<>(regionQueueStatus));
+        this.probeGovernors = (probeGovernors == null || probeGovernors.isEmpty())
+                ? Collections.emptyMap()
+                : Collections.unmodifiableMap(new LinkedHashMap<>(probeGovernors));
+        this.liveLoadGates = (liveLoadGates == null || liveLoadGates.isEmpty())
+                ? Collections.emptyMap()
+                : Collections.unmodifiableMap(new LinkedHashMap<>(liveLoadGates));
     }
 
     @Override
@@ -96,6 +144,8 @@ public final class RTPMetricsExtension implements io.github.dailystruggle.metric
                 + ", queueGrowthWarnCount=" + queueGrowthWarnCount
                 + ", queueGrowthWarnThreshold=" + queueGrowthWarnThreshold
                 + ", regionQueueStatus=" + regionQueueStatus
+                + ", probeGovernors=" + probeGovernors
+                + ", liveLoadGates=" + liveLoadGates
                 + '}';
     }
 }

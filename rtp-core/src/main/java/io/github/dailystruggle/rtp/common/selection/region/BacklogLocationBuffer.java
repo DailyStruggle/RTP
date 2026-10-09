@@ -49,6 +49,11 @@ public final class BacklogLocationBuffer {
      */
     @SuppressWarnings("unused")
     private Object pinnedBinList;
+    /**
+     * Reject sink of the region that staged this entry. World bins are shared across regions,
+     * so the verifying region may not own the entry; rejections route here to teach the owner.
+     */
+    private volatile java.util.function.Consumer<BacklogEntry> ownerOnReject;
 
     BacklogEntry(RTPLocation location) {
       this.location = Objects.requireNonNull(location, "location");
@@ -93,6 +98,16 @@ public final class BacklogLocationBuffer {
      */
     public void setValidity(Validity next) {
       this.validity = Objects.requireNonNull(next, "validity");
+    }
+
+    /** Sets the owning region's reject sink; {@code null} clears it. */
+    public void setOwnerOnReject(java.util.function.Consumer<BacklogEntry> sink) {
+      this.ownerOnReject = sink;
+    }
+
+    /** @return the owning region's reject sink, or {@code null} when unset */
+    public java.util.function.Consumer<BacklogEntry> ownerOnReject() {
+      return ownerOnReject;
     }
   }
 
@@ -291,9 +306,20 @@ public final class BacklogLocationBuffer {
    * @return the oldest unverified entry, or {@code null} if none
    */
   public BacklogEntry peekOldestUnverified() {
+    return peekOldestUnverified(null);
+  }
+
+  /**
+   * Oldest {@link Validity#UNVERIFIED} entry not rejected by {@code skip}; lets the batched backlog
+   * verifier pass over entries whose region-file bin is already in flight.
+   *
+   * @param skip entries to pass over, or {@code null} for none
+   * @return the oldest eligible unverified entry, or {@code null} if none
+   */
+  public BacklogEntry peekOldestUnverified(java.util.function.Predicate<BacklogEntry> skip) {
     BacklogEntry[] curr = state.get();
     for (BacklogEntry e : curr) {
-      if (e != null && e.validity() == Validity.UNVERIFIED) return e;
+      if (e != null && e.validity() == Validity.UNVERIFIED && (skip == null || !skip.test(e))) return e;
     }
     return null;
   }

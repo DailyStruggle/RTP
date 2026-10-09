@@ -134,21 +134,35 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     synchronized (dataLock) {
       EnumMap<E, Object> rebuilt = this.data.clone();
 
-      // Build candidate map from myClass enum constants
-      Map<String, E> candidateMap = new LinkedHashMap<>();
+      // Build candidate map from myClass enum constants and the factory value "name" property
+      Map<String, Object> candidateMap = new LinkedHashMap<>();
+      boolean hasNameConstant = false;
       for (E constant : myClass.getEnumConstants()) {
         candidateMap.put(constant.name(), constant);
+        if (constant.name().equalsIgnoreCase("name")) {
+          hasNameConstant = true;
+        }
+      }
+      if (!hasNameConstant) {
+        candidateMap.put("name", "name");
       }
 
       data.forEach(
           (keyStr, value) -> {
             if (keyStr == null || value == null) return;
 
-            FuzzySearchEngine.FuzzyLookupResult<E> lookup =
+            FuzzySearchEngine.FuzzyLookupResult<Object> lookup =
                 FuzzySearchEngine.resolveCandidate(keyStr, candidateMap);
 
             if (lookup.isExact()) {
-              rebuilt.put(lookup.match(), value);
+              if (lookup.match() instanceof Enum<?> e && myClass.isInstance(e)) {
+                rebuilt.put(myClass.cast(e), value);
+              }
+              if ("name".equalsIgnoreCase(lookup.matchedKey())) {
+                if (this.name == null || !this.name.equalsIgnoreCase(String.valueOf(value))) {
+                  this.name = String.valueOf(value);
+                }
+              }
             } else if (lookup.isPerceptible()) {
               RTP.log(
                   Level.WARNING,
@@ -161,7 +175,14 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
                       + "'. Autocorrecting to '"
                       + lookup.matchedKey()
                       + "'.");
-              rebuilt.put(lookup.match(), value);
+              if (lookup.match() instanceof Enum<?> e && myClass.isInstance(e)) {
+                rebuilt.put(myClass.cast(e), value);
+              }
+              if ("name".equalsIgnoreCase(lookup.matchedKey())) {
+                if (this.name == null || !this.name.equalsIgnoreCase(String.valueOf(value))) {
+                  this.name = String.valueOf(value);
+                }
+              }
             } else {
               RTP.log(
                   Level.WARNING,

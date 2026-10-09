@@ -395,9 +395,32 @@ public final class SparkProfileSummariser {
         return sorted.get(i);
     }
 
-    /** Build a JSON document summarising the given profile. */
+    /** Build a JSON document summarising the given profile; aggregates cover the capture span. */
     public static String toJson(SamplerData d, String label, int topThreads) {
+        return toJson(d, label, topThreads, null, null);
+    }
+
+    /**
+     * True when at least half of window {@code w} lies inside {@code [fromMs, toMs]}. Windows
+     * without timestamps, or an open bound, pass, so older profiles keep every window.
+     */
+    static boolean inPhase(WindowStatistics w, Long fromMs, Long toMs) {
+        if (w.startTime == null || w.endTime == null || w.endTime <= w.startTime) return true;
+        long lo = fromMs != null ? Math.max(w.startTime, fromMs) : w.startTime;
+        long hi = toMs != null ? Math.min(w.endTime, toMs) : w.endTime;
+        return 2 * (hi - lo) >= (w.endTime - w.startTime);
+    }
+
+    /**
+     * Build a JSON document summarising the given profile. Window aggregates include only windows
+     * mostly inside {@code [phaseStartMs, phaseEndMs]} (null = the profile's capture bounds), so
+     * idle windows around the phase do not dilute MSPT.
+     */
+    public static String toJson(SamplerData d, String label, int topThreads,
+                                Long phaseStartMs, Long phaseEndMs) {
         SamplerMetadata md = d.metadata != null ? d.metadata : new SamplerMetadata();
+        Long fromMs = phaseStartMs != null ? phaseStartMs : md.startTime;
+        Long toMs = phaseEndMs != null ? phaseEndMs : md.endTime;
         PlatformMetadata plat = md.platform != null ? md.platform : new PlatformMetadata();
         PlatformStatistics ps = md.platformStats != null ? md.platformStats : new PlatformStatistics();
         Mspt mspt = ps.mspt != null ? ps.mspt : new Mspt();
@@ -426,6 +449,7 @@ public final class SparkProfileSummariser {
         for (Integer wid : wids) {
             WindowStatistics w = d.windows.get(wid);
             windowsOrdered.add(w);
+            if (!inPhase(w, fromMs, toMs)) continue;
             if (w.msptMedian != null) mediansList.add(w.msptMedian);
             if (w.msptMax != null) maxesList.add(w.msptMax);
             if (w.tps != null) tpsList.add(w.tps);
@@ -467,6 +491,11 @@ public final class SparkProfileSummariser {
             j.kv("last15m", tps.last15m);
             j.kv("game_target_tps", tps.gameTargetTps);
         j.endObj();
+        j.key("window_filter"); j.beginObj();
+            j.kv("from_epoch_ms", fromMs);
+            j.kv("to_epoch_ms", toMs);
+            j.kv("windows_total", windowsOrdered.size());
+        j.endObj();
         j.key("mspt_window_aggregate"); j.beginObj();
             j.kv("windows", mediansList.size());
             j.kv("median_of_medians", percentile(mediansList, 0.5));
@@ -500,7 +529,11 @@ public final class SparkProfileSummariser {
             WindowStatistics w = windowsOrdered.get(i);
             j.beginObj();
             j.kv("window", wids.get(i));
-            j.kv("duration_s", w.duration);
+            // spark records window duration in milliseconds.
+            j.kv("duration_s", w.duration != null ? w.duration / 1000.0 : null);
+            j.kv("start_epoch_ms", w.startTime);
+            j.kv("end_epoch_ms", w.endTime);
+            j.kv("in_phase", inPhase(w, fromMs, toMs));
             j.kv("tps", w.tps);
             j.kv("mspt_median", w.msptMedian);
             j.kv("mspt_max", w.msptMax);
@@ -532,23 +565,86 @@ public final class SparkProfileSummariser {
     // Tiny JSON builder (pretty-printed, two-space indent).
     // ------------------------------------------------------------------
 
-    private static final class JsonBuilder {
+    static final class JsonBuilder {
         private final StringBuilder sb = new StringBuilder();
         private int depth = 0;
-        private boolean firstInScope = true;
+
+        private static final class Scope {
+            final boolean isArray;
+            boolean first = true;
+            Scope(boolean isArray) { this.isArray = isArray; }
+        }
+
+        private final java.util.ArrayDeque<Scope> scopes = new java.util.ArrayDeque<>();
 
         private void indent() { for (int i = 0; i < depth; i++) sb.append("  "); }
-        private void comma() { if (!firstInScope) sb.append(",\n"); else sb.append("\n"); firstInScope = false; }
 
-        void beginObj() { sb.append("{"); depth++; firstInScope = true; }
-        void endObj() { depth--; sb.append("\n"); indent(); sb.append("}"); firstInScope = false; }
-        void beginArr() { sb.append("["); depth++; firstInScope = true; }
-        void endArr() { depth--; sb.append("\n"); indent(); sb.append("]"); firstInScope = false; }
+        void beginObj() {
+            if (!scopes.isEmpty()) {
+                Scope parent = scopes.peek();
+                if (parent.isArray) {
+                    if (!parent.first) sb.append(",\n");
+                    else { sb.append("\n"); parent.first = false; }
+                    indent();
+                }
+            }
+            sb.append("{");
+            depth++;
+            scopes.push(new Scope(false));
+        }
 
-        void key(String k) { comma(); indent(); sb.append('"').append(escape(k)).append("\": "); firstInScope = true; }
+        void endObj() {
+            scopes.pop();
+            depth--;
+            sb.append("\n");
+            indent();
+            sb.append("}");
+        }
+
+        void beginArr() {
+            if (!scopes.isEmpty()) {
+                Scope parent = scopes.peek();
+                if (parent.isArray) {
+                    if (!parent.first) sb.append(",\n");
+                    else { sb.append("\n"); parent.first = false; }
+                    indent();
+                }
+            }
+            sb.append("[");
+            depth++;
+            scopes.push(new Scope(true));
+        }
+
+        void endArr() {
+            scopes.pop();
+            depth--;
+            sb.append("\n");
+            indent();
+            sb.append("]");
+        }
+
+        void key(String k) {
+            Scope current = scopes.peek();
+            if (current != null) {
+                if (!current.first) sb.append(",\n");
+                else { sb.append("\n"); current.first = false; }
+            }
+            indent();
+            sb.append('"').append(escape(k)).append("\": ");
+        }
 
         void kv(String k, Object v) {
-            comma(); indent(); sb.append('"').append(escape(k)).append("\": ");
+            key(k);
+            writeValue(v);
+        }
+
+        void value(Object v) {
+            Scope current = scopes.peek();
+            if (current != null && current.isArray) {
+                if (!current.first) sb.append(",\n");
+                else { sb.append("\n"); current.first = false; }
+                indent();
+            }
             writeValue(v);
         }
 

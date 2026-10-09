@@ -19,6 +19,7 @@ import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.tasks.ScanTask;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
+import io.github.dailystruggle.rtp.common.tasks.tick.SyncTaskProcessing;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import java.io.File;
 import java.util.*;
@@ -81,6 +82,9 @@ public class Configs {
         logging = ((ConfigParser<LoggingKeys>) instance);
       else logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
       configParserMap.put(((ConfigParser<?>) instance).myClass, (ConfigParser<?>) instance);
+      if (((ConfigParser<?>) instance).myClass.equals(PerformanceKeys.class)) {
+        SyncTaskProcessing.updateConfig();
+      }
     } else if (instance instanceof MultiConfigParser<?>) {
       logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
       name = ((MultiConfigParser<?>) instance).name;
@@ -797,6 +801,7 @@ public class Configs {
     RTP.log(Level.FINE, "[RTP] reloadConfigs(): atomic swap of configParserMap/multiConfigParserMap");
     this.configParserMap = newConfigParserMap;
     this.multiConfigParserMap = newMultiConfigParserMap;
+    SyncTaskProcessing.updateConfig();
     // The logging parser is now visible via RTP.configs.getParser(LoggingKeys.class),
     // so the platform sink can resolve logging.yml#min_level. Replay any sub-INFO
     // records buffered during bootstrap so the configured threshold gates them
@@ -821,6 +826,7 @@ public class Configs {
     RTP.log(Level.FINE,
         "[RTP] reloadRegions(): shutting down " + RTP.selectionAPI.permRegionLookup.size()
             + " permanent and " + RTP.selectionAPI.tempRegions.size() + " temp region(s)");
+    io.github.dailystruggle.rtp.common.selection.region.ProbeFirstGovernor.resetAll();
     for (Region r : RTP.selectionAPI.permRegionLookup.values()) {
       RTP.log(Level.FINER, "[RTP] reloadRegions(): shutDown perm region '" + r.name + "'");
       r.shutDown();

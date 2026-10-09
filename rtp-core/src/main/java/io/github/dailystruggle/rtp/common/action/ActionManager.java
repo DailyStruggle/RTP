@@ -293,7 +293,12 @@ public final class ActionManager implements ActionService {
         continue;
       }
       java.util.Queue<ActionWaitQueueEntry> queue = qEntry.getValue();
-      if (queue == null || queue.isEmpty()) continue;
+      if (queue == null || queue.isEmpty()) {
+        if (queue != null && queue.isEmpty()) {
+          waitQueues.remove(qActionId, queue);
+        }
+        continue;
+      }
 
       ActionDefinition def = definitions.get(qActionId);
       List<ActionWaitQueueEntry> toRemove = new ArrayList<>();
@@ -330,6 +335,9 @@ public final class ActionManager implements ActionService {
           tokens.put("sender_uuid", participantId);
           executeEnqueueSteps(def.lifecycle().onCancel(), gateCtx, tokens, entry.participants);
         }
+      }
+      if (queue.isEmpty()) {
+        waitQueues.remove(qActionId, queue);
       }
     }
 
@@ -422,25 +430,45 @@ public final class ActionManager implements ActionService {
    * Tick update for all active sessions and action wait-queues.
    */
   public void tick() {
-    for (ActionSessionImpl session : activeSessions.values()) {
-      session.tick();
+    if (!activeSessions.isEmpty()) {
+      for (ActionSessionImpl session : activeSessions.values()) {
+        session.tick();
+      }
     }
-    processWaitQueues();
+    if (!waitQueues.isEmpty()) {
+      processWaitQueues();
+    }
   }
 
   /**
    * Evaluates queued participant entries for all actions and triggers those whose gate conditions are met.
    */
   public void processWaitQueues() {
-    for (ActionDefinition def : definitions.values()) {
-      processWaitQueue(def);
+    if (waitQueues.isEmpty()) return;
+    for (Map.Entry<String, java.util.Queue<ActionWaitQueueEntry>> entry : waitQueues.entrySet()) {
+      java.util.Queue<ActionWaitQueueEntry> queue = entry.getValue();
+      if (queue == null || queue.isEmpty()) {
+        if (queue != null && queue.isEmpty()) {
+          waitQueues.remove(entry.getKey(), queue);
+        }
+        continue;
+      }
+      ActionDefinition def = definitions.get(entry.getKey());
+      if (def != null) {
+        processWaitQueue(def, queue);
+      }
     }
   }
 
-  private void processWaitQueue(ActionDefinition def) {
+  public void processWaitQueue(ActionDefinition def) {
     if (def == null) return;
     java.util.Queue<ActionWaitQueueEntry> queue = waitQueues.get(def.id().toLowerCase());
     if (queue == null || queue.isEmpty()) return;
+    processWaitQueue(def, queue);
+  }
+
+  private void processWaitQueue(ActionDefinition def, java.util.Queue<ActionWaitQueueEntry> queue) {
+    if (def == null || queue == null || queue.isEmpty()) return;
 
     RTP.log(
         Level.FINE,
@@ -474,7 +502,10 @@ public final class ActionManager implements ActionService {
       return false;
     });
 
-    if (queue.isEmpty()) return;
+    if (queue.isEmpty()) {
+      waitQueues.remove(def.id().toLowerCase(), queue);
+      return;
+    }
 
     List<ActionWaitQueueEntry> entryList = new ArrayList<>(queue);
     for (int i = 0; i < entryList.size(); i++) {
@@ -570,6 +601,9 @@ public final class ActionManager implements ActionService {
             queue.remove(c);
           }
           final List<ActionWaitQueueEntry> matchedEntries = List.copyOf(candidateEntries);
+          if (queue.isEmpty()) {
+            waitQueues.remove(def.id().toLowerCase(), queue);
+          }
           executeDirect(def, combinedParticipants, combinedCtx).whenComplete((res, ex) -> {
             for (ActionWaitQueueEntry c : matchedEntries) {
               if (ex != null) {
@@ -1489,17 +1523,26 @@ public final class ActionManager implements ActionService {
     if (playerUuid == null) return;
 
     // 1. Drain pending wait queue entries containing this player
-    for (java.util.Queue<ActionWaitQueueEntry> queue : waitQueues.values()) {
-      if (queue == null || queue.isEmpty()) continue;
-      queue.removeIf(entry -> {
-        if (entry.participants.contains(playerUuid)) {
-          if (!entry.future.isDone()) {
-            entry.future.complete(ActionSessionResult.failure("Participant disconnected: " + playerUuid));
+    for (Map.Entry<String, java.util.Queue<ActionWaitQueueEntry>> entry : waitQueues.entrySet()) {
+      java.util.Queue<ActionWaitQueueEntry> queue = entry.getValue();
+      if (queue == null || queue.isEmpty()) {
+        if (queue != null && queue.isEmpty()) {
+          waitQueues.remove(entry.getKey(), queue);
+        }
+        continue;
+      }
+      queue.removeIf(e -> {
+        if (e.participants.contains(playerUuid)) {
+          if (!e.future.isDone()) {
+            e.future.complete(ActionSessionResult.failure("Participant disconnected: " + playerUuid));
           }
           return true;
         }
         return false;
       });
+      if (queue.isEmpty()) {
+        waitQueues.remove(entry.getKey(), queue);
+      }
     }
 
     // 2. Terminate or surrender from active running session

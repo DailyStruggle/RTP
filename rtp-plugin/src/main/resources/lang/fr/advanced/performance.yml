@@ -141,6 +141,13 @@ seuilAlerteCroissanceFile: 0
 # @default: false
 chargementSync: false
 
+# Chemin de téléportation sur Paper. AUTO = téléportation dans le même tick si le chunk
+# cible est déjà chargé, sinon teleportAsync. ASYNC = toujours teleportAsync (un tick plus lent).
+# @type: string
+# @options: ["AUTO", "ASYNC"]
+# @default: "AUTO"
+cheminTeleportation: "AUTO"
+
 # Parse permissions on every event
 # @type: boolean
 # @default: false

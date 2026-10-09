@@ -230,6 +230,17 @@ public class LocationGenerator implements ILocationGenerator {
      */
     public static CompletableFuture<GenerationResult> getLocationFuture(
             Region region, @Nullable Set<String> biomeNames) {
+        return getLocationFuture(region, biomeNames, LoadPurpose.IMMEDIATE);
+    }
+
+    /**
+     * Pregen path with an explicit {@link LoadPurpose} (ADR-110). {@link LoadPurpose#SPECULATIVE}
+     * verifies from resident chunks and region-file reads only; a native load is allowed only
+     * when its result is pinned (returned with a reservation the caller must hand to the kept
+     * queue or close).
+     */
+    public static CompletableFuture<GenerationResult> getLocationFuture(
+            Region region, @Nullable Set<String> biomeNames, LoadPurpose purpose) {
         CfDiag.locationGenPregenEntry.increment();
         CfDiag.ensureStarted();
         CompletableFuture<GenerationResult> result = new CompletableFuture<>();
@@ -240,6 +251,7 @@ public class LocationGenerator implements ILocationGenerator {
                 result.complete(null);
                 return result;
             }
+            state.purpose = (purpose == null) ? LoadPurpose.IMMEDIATE : purpose;
             PregenTask task = new PregenTask(state, result, 1L);
             RTP.serverAccessor.getScheduler().runTaskAsynchronously(task);
         } catch (Throwable t) {

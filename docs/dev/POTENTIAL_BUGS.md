@@ -55,10 +55,25 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Linear:** RTP-4
 
 
+### 2026-10-08 — Probe governor's probe time includes coalescer queue wait
 
+- **Severity:** Medium
+- **Status:** In Progress
+- **Discovered during:** stress run `20261008-170548` (`[RTP][probe-gov]` lines: `Tp = 10.2 ms` vs `Tf|direct = 8.5 ms` at `p = 0.073`)
+- **Location:** `rtp-core/.../selection/region/ProbeFirstGovernor.java` (sample recording) and the probe call sites in `PregenTask` / `QueueTask`
+- **Symptom / hypothesis:** `Tp` is measured from dispatch to result, so a probe parked in the per-region-file coalescer counts idle wait as cost. In skip mode the 1-in-32 trial probes rarely join a group and each pays a full open, so the losing option is sampled at its worst (ADR-109 measurement section).
+- **Impact:** The fill path can settle on skipping the probe for the wrong reason on fresh worlds, where same-file grouping is worth the most.
+- **Suggested next step:** Fix pending bench verification: probes carry their drain's per-chunk share and `groupSize` (`ColumnProbe` / `ChunkColumnProbe.groupSize()`); `ProbeFirstGovernor` fits `Tp(g) = perChunk + open/g` and evaluates it at the default-probing group size; SKIP-mode trials run up to 8 candidates of one region file (`binKey`); `ScanTask` completion resets the region's governors (reload already did). Covered by `ProbeFirstGovernorTest.groupedTrialsJudgedAtDefaultGroupSize`. Remove this entry once a fresh-world stress run shows `[RTP][probe-gov]` `Tp` near the PROBE-mode value while in SKIP (and a flip back where `p` warrants it).
 
+### 2026-10-08 — StressTestRTP spark thread selector matches no thread; saved profiles are empty
 
-
+- **Severity:** Medium
+- **Status:** In Progress
+- **Discovered during:** Linux A/B stress runs `20261009-005522` and `20261009-010359` (spark async mode, "save complete" logged)
+- **Location:** `helpers/StressTestRTP/.../SparkHook.java` `buildStartCommand` (~175-178); default `spark.threads: "Server thread,RTP-Anvil-IO"` in `config.yml`
+- **Symptom / hypothesis:** The comma list is appended as a single `--thread Server thread,RTP-Anvil-IO`. Spark re-joins space-split tokens (the space is harmless) but takes the whole comma list as one name, so no thread matches. The `.sparkprofile` holds only server metadata (config, plugins, datapacks) and no thread samples. The pool threads are named `RTP-Anvil-IO-<n>`, so an exact name would not match them either.
+- **Impact:** Every profiled run since the selector default was added has produced no samples; `thread_cpu_top` in the summary is empty. Runs remain valid as unprofiled benchmarks.
+- **Suggested next step:** Fix pending bench verification: `buildStartCommand` emits one `--thread` per entry (unquoted; quotes would become part of the name) and adds `--regex` when an entry has a `*` glob, since spark resolves exact names to thread IDs once at start and would miss pool threads spawned later. Default is now `Server thread,RTP-Anvil-IO-*`; covered by `SparkHookTest`. Remove this entry once a saved profile shows non-zero thread nodes for both threads.
 
 ### 2026-10-06 — ACCUMULATE repeats used chunks; landing spacing loosens on dense learned bad area
 
@@ -91,8 +106,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** The fuzzing badge gives false assurance: the LZ4 decoder and region view builders (ADR-016's "fuzzable" rationale for the in-house decoder) have effectively never been fuzzed in CI.
 - **Suggested next step:** One `@FuzzTest` per class (or one matrix entry per method with `--tests Class.method`); forward `jazzer.max_duration` with `systemProperty` and declare `JAZZER_FUZZ` as a task input (or `outputs.upToDateWhen { false }` in fuzz mode); seed corpora from the existing `.mca` test fixtures; commit any crash reproducers under `<Class>Inputs/`. The future Linear addon (ADR-077) shall carry its own fuzz target with a working setup.
 - **Linear:** RTP-21
-
-
 
 
 ### 2026-10-06 — Pregen biome extraction reads surface biomes with the Anvil probe for every format
@@ -155,6 +168,17 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** `platforms/rtp-neoforge/rtp-neoforge-common/build.gradle` contains several corrupted em dash sequences (double-encoded UTF-8). `scripts/check-mojibake.py` failed to detect this because `EXCLUDED_PATHS` contains `'build'`, and substring matching `if exc in rel_path:` unintentionally excludes any file named `build.gradle` or under a directory containing `build`.
 - **Impact:** Lingering encoding anomalies in Gradle files; reduced coverage of mojibake detection across Gradle build definitions in the repository.
 - **Suggested next step:** Replace the corrupted em dash sequences with clean em dashes or ASCII hyphens in `platforms/rtp-neoforge/rtp-neoforge-common/build.gradle`. Update `scripts/check-mojibake.py` to match directory components (`/build/` or Path parts) rather than simple substring matching.
+
+
+### 2026-10-08 — Scatter visualizer rounds landings before chunk mapping and overwrites published charts for any finished run
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** Test B (`20261008-024412`) landing statistics for RESULTS.md / PRE_WRITEUP.md section 5.8
+- **Location:** `rtp-core/src/test/.../memory/table/CrossPluginDestinationScatterVisualizerTest.java` `readLandings` (~316, `Math.round(x)`) and `testRenderCrossPluginDestinationScatterChart` (~236, `previewOnly = !missing.isEmpty()`)
+- **Symptom / hypothesis:** Landings are rounded to the nearest block before `floorDiv(.., 16)`, so a block-centre coordinate such as 15.5 or -0.5 maps to the neighbouring chunk; Test B chunk-reuse counts differ from a `floor(block / 16)` count by 1-2 per plugin (BetterRTP 9 vs 7, JustRTP 6 vs 7). Separately, `-Drtp.scatter.csv` pinned to any fully finished run writes `docs/assets/img/cross_plugin_destinations_scatter_chart*.png`, even with `-Drtp.scatter.preview=true`, so reading stats for a second run replaces the published chart of the first.
+- **Impact:** "Chunks reused" columns in RESULTS.md (Test A) may be off by a few; analysing a non-published run silently overwrites the storefront scatter image unless it is backed up and restored.
+- **Suggested next step:** Keep the double coordinates for chunk mapping (`Math.floor(x / 16)`), round only for the duplicate check; make `rtp.scatter.preview=true` force report-only output regardless of `missing`.
 
 
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->

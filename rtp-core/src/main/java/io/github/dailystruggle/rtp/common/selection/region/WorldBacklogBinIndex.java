@@ -16,6 +16,33 @@ public final class WorldBacklogBinIndex {
   private final Map<RegionFileCoord, WeakReference<List<BacklogLocationBuffer.BacklogEntry>>> bins =
       new ConcurrentHashMap<>();
 
+  /** Bins with a verification batch in flight -> claim time ({@code System.nanoTime()}). */
+  private final Map<RegionFileCoord, Long> claims = new ConcurrentHashMap<>();
+
+  /**
+   * Claims bin {@code key} for one verification batch, so regions sharing this world never read
+   * the same region file twice concurrently. A claim older than {@code ttlNanos} is treated as
+   * abandoned (owner gone without {@link #release}) and taken over.
+   *
+   * @return {@code true} when the caller now owns the claim
+   */
+  public boolean tryClaim(RegionFileCoord key, long nowNanos, long ttlNanos) {
+    Long prior = claims.putIfAbsent(key, nowNanos);
+    if (prior == null) return true;
+    return nowNanos - prior > ttlNanos && claims.replace(key, prior, nowNanos);
+  }
+
+  /** @return {@code true} while bin {@code key} has a live (unexpired) claim. */
+  public boolean isClaimed(RegionFileCoord key, long nowNanos, long ttlNanos) {
+    Long t = claims.get(key);
+    return t != null && nowNanos - t <= ttlNanos;
+  }
+
+  /** Releases the claim on bin {@code key}; no-op when unclaimed. */
+  public void release(RegionFileCoord key) {
+    claims.remove(key);
+  }
+
   /**
    * Adds {@code entry} to the bin identified by {@code key}. If the bin's list
    * has been GC'd (or never existed), a new list is created.
@@ -126,5 +153,6 @@ public final class WorldBacklogBinIndex {
   /** Clears all bins. Live entries in per-region buffers are unaffected. */
   public void clear() {
     bins.clear();
+    claims.clear();
   }
 }

@@ -131,8 +131,15 @@ public final class JfrAllocationProfiler {
     /** Package prefix configured for a phase label, or empty when unmapped. */
     public String targetPackageFor(String label) {
         if (label == null) return "";
-        String p = trackedPrefixes.get(label.toLowerCase(Locale.ROOT));
+        String p = trackedPrefixes.get(baseLabel(label));
         return p == null ? "" : p;
+    }
+
+    /** Target label without a phase suffix: ramp stages are {@code rtp@ramp0-20tps}. */
+    static String baseLabel(String label) {
+        if (label == null) return "";
+        int at = label.indexOf('@');
+        return (at >= 0 ? label.substring(0, at) : label).toLowerCase(Locale.ROOT);
     }
 
     /** Starts a fresh recording for one phase. A recording already open (e.g. a
@@ -242,7 +249,7 @@ public final class JfrAllocationProfiler {
             acc[0] += weight;
             acc[1] += 1;
         }
-        String targetLabel = label == null ? "" : label.toLowerCase(Locale.ROOT);
+        String targetLabel = baseLabel(label);
         long targetBytes = -1L;
         String targetPackage = "";
         if (trackedPrefixes.containsKey(targetLabel)) {

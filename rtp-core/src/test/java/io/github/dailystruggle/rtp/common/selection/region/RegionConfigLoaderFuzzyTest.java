@@ -87,13 +87,23 @@ class RegionConfigLoaderFuzzyTest {
         Shape<?> shape1 = RegionConfigLoader.deserializeShape(map1, "testRegion");
         assertNotNull(shape1);
         assertInstanceOf(Circle.class, shape1);
+        assertEquals("CIRCLE", shape1.name);
 
-        // "sqare" -> SQUARE
+        // "sqare" -> SQUARE (missing 'u')
         Map<String, Object> map2 = new HashMap<>();
         map2.put("name", "sqare");
         Shape<?> shape2 = RegionConfigLoader.deserializeShape(map2, "testRegion");
         assertNotNull(shape2);
         assertInstanceOf(Square.class, shape2);
+        assertEquals("SQUARE", shape2.name);
+
+        // "squae" -> SQUARE (missing 'r')
+        Map<String, Object> map3 = new HashMap<>();
+        map3.put("name", "squae");
+        Shape<?> shape3 = RegionConfigLoader.deserializeShape(map3, "testRegion");
+        assertNotNull(shape3);
+        assertInstanceOf(Square.class, shape3);
+        assertEquals("SQUARE", shape3.name);
     }
 
     @Test
@@ -104,6 +114,7 @@ class RegionConfigLoaderFuzzyTest {
         Shape<?> shape = RegionConfigLoader.deserializeShape(map, "testRegion");
         assertNotNull(shape);
         assertInstanceOf(Circle.class, shape);
+        assertEquals("CIRCLE", shape.name);
     }
 
     @Test
@@ -131,6 +142,7 @@ class RegionConfigLoaderFuzzyTest {
         VerticalAdjustor<?> vert1 = RegionConfigLoader.deserializeVert(map1, "testRegion");
         assertNotNull(vert1);
         assertInstanceOf(LinearAdjustor.class, vert1);
+        assertEquals("LINEAR", vert1.name);
 
         // "jum" -> JUMP
         Map<String, Object> map2 = new HashMap<>();
@@ -138,6 +150,7 @@ class RegionConfigLoaderFuzzyTest {
         VerticalAdjustor<?> vert2 = RegionConfigLoader.deserializeVert(map2, "testRegion");
         assertNotNull(vert2);
         assertInstanceOf(JumpAdjustor.class, vert2);
+        assertEquals("JUMP", vert2.name);
     }
 
     @Test
@@ -148,5 +161,6 @@ class RegionConfigLoaderFuzzyTest {
         VerticalAdjustor<?> vert = RegionConfigLoader.deserializeVert(map, "testRegion");
         assertNotNull(vert);
         assertInstanceOf(LinearAdjustor.class, vert);
+        assertEquals("LINEAR", vert.name);
     }
 }

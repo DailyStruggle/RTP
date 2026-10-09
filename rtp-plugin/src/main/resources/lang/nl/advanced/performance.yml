@@ -163,6 +163,13 @@ wachtrijGroeiWaarschuwDrempel: 0
 # @default: false
 synchroonLaden: false
 
+# Teleportpad op Paper. AUTO = teleport in dezelfde tick als de doelchunk al geladen is,
+# anders teleportAsync. ASYNC = altijd teleportAsync (één tick trager).
+# @type: string
+# @options: ["AUTO", "ASYNC"]
+# @default: "AUTO"
+teleportPad: "AUTO"
+
 # Rechtenparsering (opstarten)
 # verwerking_bijGebeurtenis: Incompatibel met brede rechten zoals *.*.
 # Impact: GEMIDDELD (bijGebeurtenis) / LAAG (effect)

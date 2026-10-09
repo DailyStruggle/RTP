@@ -82,6 +82,8 @@ final class PregenState {
      * Per-attempt outcome breadcrumb trail recorded across {@code PregenTask} attempt lifecycle.
      */
     final List<String> attemptOutcomes = new ArrayList<>();
+    /** ADR-110: whether native chunk loads may verify candidates; set once before dispatch. */
+    LoadPurpose purpose = LoadPurpose.IMMEDIATE;
 
     private PregenState(
             Region region,

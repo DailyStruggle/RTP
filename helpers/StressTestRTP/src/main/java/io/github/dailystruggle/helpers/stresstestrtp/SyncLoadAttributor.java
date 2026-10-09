@@ -5,12 +5,14 @@ import org.bukkit.World;
 import org.bukkit.plugin.Plugin;
 
 import java.lang.reflect.Method;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAdder;
+import java.util.function.Function;
 import java.util.logging.Level;
 
 /**
@@ -26,9 +28,12 @@ import java.util.logging.Level;
  * dispatch. An async load completes from the server's own chunk task loop,
  * with no plugin frame on the stack.
  *
- * <p><b>Rule.</b> Skip the harness's own listener frames at the top of the
- * stack, then the innermost frame whose class was defined by a plugin's class
- * loader names the requester. No plugin frame means a load nobody blocked on.
+ * <p><b>Rule.</b> Skip the listener prefix at the top of the stack (harness
+ * frames plus JDK frames such as the stack walker), up to the first server
+ * frame (event dispatch). Below that, the innermost frame whose class was
+ * defined by a plugin's class loader names the requester, the harness
+ * included: the self-test's own {@code getChunkAt} must name the harness.
+ * No plugin frame means a load nobody blocked on.
  *
  * <p><b>Self-test.</b> At startup the harness loads one already-generated,
  * unloaded chunk synchronously and one asynchronously and checks that the
@@ -43,9 +48,23 @@ import java.util.logging.Level;
 public final class SyncLoadAttributor {
 
     /** Self-test verdict, written literally to {@code chunks_sync_selftest}. */
-    public enum SelfTest { NOT_RUN, RUNNING, PASS, FAIL_SYNC, FAIL_ASYNC, NO_CANDIDATE, NO_ASYNC_API }
+    public enum SelfTest { NOT_RUN, RUNNING, PASS, FAIL_SYNC, FAIL_ASYNC, FAIL_TICKET, NO_CANDIDATE, NO_ASYNC_API }
 
-    private static final int MAX_FRAMES = 256;
+    public static final class Attribution {
+        public final String pluginName;
+        public final boolean blocking;
+
+        public Attribution(String pluginName, boolean blocking) {
+            this.pluginName = pluginName;
+            this.blocking = blocking;
+        }
+    }
+
+    /** Walk bound for ordinary loads; a Paper sync load nests the event about
+     *  30-50 frames below the caller (managedBlock task drain + chunk system). */
+    private static final int MAX_FRAMES = 96;
+    /** Walk bound for the self-test's probe chunks (one-off). */
+    private static final int PROBE_MAX_FRAMES = 512;
     private static final StackWalker WALKER =
             StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
     /** Cache value for a class loader that belongs to no plugin. */
@@ -55,15 +74,28 @@ public final class SyncLoadAttributor {
     private final ClassLoader selfLoader;
     private final Map<ClassLoader, String> loaderNames = new ConcurrentHashMap<>();
 
+    private final AtomicLong sampleIndex = new AtomicLong(0L);
+    private volatile int sampleStride = 1;
+
     private final AtomicLong phaseSyncLoads = new AtomicLong();
     private final Map<String, LongAdder> phaseByPlugin = new ConcurrentHashMap<>();
+    private final AtomicLong phaseInlinePromotions = new AtomicLong();
+    private final Map<String, LongAdder> phaseInlineByPlugin = new ConcurrentHashMap<>();
 
     private volatile SelfTest selfTest = SelfTest.NOT_RUN;
     private volatile long syncProbeKey = Long.MIN_VALUE;
     private volatile long asyncProbeKey = Long.MIN_VALUE;
+    private volatile long residentTicketProbeKey = Long.MIN_VALUE;
     private volatile String syncProbeRequester = null;
+    private volatile boolean syncProbeBlocking = false;
+    private volatile boolean syncProbeSeen = false;
+    /** Compact probe stack, logged only when the sync probe is misattributed. */
+    private volatile String syncProbeTrace = null;
     private volatile String asyncProbeRequester = null;
     private volatile boolean asyncProbeSeen = false;
+    private volatile String residentTicketProbeRequester = null;
+    private volatile boolean residentTicketProbeBlocking = false;
+    private volatile boolean residentTicketProbeSeen = false;
 
     public SyncLoadAttributor(Plugin self) {
         this.self = self;
@@ -75,33 +107,176 @@ public final class SyncLoadAttributor {
     /** True once the self-test passed; the phase columns are -1 otherwise. */
     public boolean trusted() { return selfTest == SelfTest.PASS; }
 
+    public void setSampleStride(int stride) {
+        this.sampleStride = Math.max(1, stride);
+    }
+
+    public int sampleStride() {
+        return this.sampleStride;
+    }
+
     /** Called from {@code ChunkLoadCounter#onChunkLoad} for every load. */
     void onLoad(int cx, int cz, boolean onTick) {
         long key = ((long) cx << 32) ^ (cz & 0xffffffffL);
-        boolean probe = key == syncProbeKey || key == asyncProbeKey;
+        boolean probe = key == syncProbeKey || key == asyncProbeKey || key == residentTicketProbeKey;
         if (!onTick && !probe) return; // off the tick thread nothing waited on it
-        String requester = requester();
-        if (key == syncProbeKey) syncProbeRequester = requester;
-        if (key == asyncProbeKey) { asyncProbeRequester = requester; asyncProbeSeen = true; }
+
+        int stride = sampleStride;
+        if (!probe && stride > 1) {
+            long seq = sampleIndex.getAndIncrement();
+            if ((seq % stride) != 0) return;
+        }
+
+        Attribution attr = requester(probe ? PROBE_MAX_FRAMES : MAX_FRAMES);
+        String requester = attr != null ? attr.pluginName : null;
+        boolean blocking = attr != null && attr.blocking;
+
+        if (key == syncProbeKey) {
+            syncProbeRequester = requester;
+            syncProbeBlocking = blocking;
+            syncProbeSeen = true;
+            if (requester == null) syncProbeTrace = describeStack();
+        }
+        if (key == asyncProbeKey) {
+            asyncProbeRequester = requester;
+            asyncProbeSeen = true;
+        }
+        if (key == residentTicketProbeKey) {
+            residentTicketProbeRequester = requester;
+            residentTicketProbeBlocking = blocking;
+            residentTicketProbeSeen = true;
+        }
         if (requester == null || probe) return;
         if (requester.equals(self.getName())) return; // harness's own loads
-        phaseSyncLoads.incrementAndGet();
-        phaseByPlugin.computeIfAbsent(requester, k -> new LongAdder()).increment();
+
+        long weight = (!probe && stride > 1) ? stride : 1L;
+        if (blocking) {
+            phaseSyncLoads.addAndGet(weight);
+            phaseByPlugin.computeIfAbsent(requester, k -> new LongAdder()).add(weight);
+        } else {
+            phaseInlinePromotions.addAndGet(weight);
+            phaseInlineByPlugin.computeIfAbsent(requester, k -> new LongAdder()).add(weight);
+        }
     }
 
-    /** Innermost plugin-owned frame below the harness's listener, or null. */
-    String requester() {
+    static boolean isBlockingMethod(String method) {
+        return "syncLoad".equals(method)
+                || "getChunkFallback".equals(method)
+                || "managedBlock".equals(method)
+                || "getChunkAt".equals(method)
+                || "loadChunk".equals(method);
+    }
+
+    static boolean isServerBoundaryMethod(String method) {
+        return isTickBoundaryMethod(method) || isTaskDrainMethod(method);
+    }
+
+    /** Outermost server loop frames: nothing past them requested the load. */
+    static boolean isTickBoundaryMethod(String method) {
+        return "tickServer".equals(method)
+                || "runServer".equals(method)
+                || "tickChildren".equals(method)
+                || "mainThreadHeartbeat".equals(method);
+    }
+
+    /** Task-queue drain frames. A blocking wait ({@code managedBlock}) drains
+     *  the same queue, so a drain only ends the walk if no blocking frame
+     *  lies further out. */
+    static boolean isTaskDrainMethod(String method) {
+        return "pollTask".equals(method)
+                || "executeTask".equals(method)
+                || "runAllTasks".equals(method)
+                || "pollNextChunkTask".equals(method);
+    }
+
+    /** One stack frame as the attribution rule sees it. */
+    record Frame(ClassLoader loader, String method) {}
+
+    /** Innermost plugin-owned frame below the harness's listener, and whether a blocking call was present. */
+    Attribution requester(int maxFrames) {
         try {
-            return WALKER.walk(s -> s.limit(MAX_FRAMES)
-                    .map(f -> f.getDeclaringClass().getClassLoader())
-                    .dropWhile(cl -> cl == selfLoader)
-                    .map(this::pluginNameOf)
-                    .filter(Objects::nonNull)
-                    .findFirst()
-                    .orElse(null));
+            return WALKER.walk(frames -> attribute(
+                    frames.map(f -> new Frame(f.getDeclaringClass().getClassLoader(), f.getMethodName())).iterator(),
+                    selfLoader, this::pluginNameOf, maxFrames));
         } catch (Throwable t) {
             return null;
         }
+    }
+
+    /** Innermost-first {@code tag:method} list; tag H=harness, J=JDK, S=server, else plugin name. */
+    private String describeStack() {
+        try {
+            return WALKER.walk(frames -> {
+                StringBuilder sb = new StringBuilder();
+                int[] n = {0};
+                frames.limit(PROBE_MAX_FRAMES).forEach(f -> {
+                    ClassLoader cl = f.getDeclaringClass().getClassLoader();
+                    String plugin = cl == selfLoader || isJdkLoader(cl) ? null : pluginNameOf(cl);
+                    String tag = cl == selfLoader ? "H" : isJdkLoader(cl) ? "J"
+                            : plugin != null ? plugin : "S";
+                    if (sb.length() > 0) sb.append(' ');
+                    sb.append(tag).append(':').append(f.getMethodName());
+                    n[0]++;
+                });
+                return "depth=" + n[0] + " [" + sb + "]";
+            });
+        } catch (Throwable t) {
+            return "stack unavailable: " + t;
+        }
+    }
+
+    /**
+     * The attribution rule over innermost-first frames. Harness and JDK frames
+     * are skipped only while still in the listener prefix; once a server frame
+     * was seen, a harness frame is a requester like any plugin's.
+     */
+    static Attribution attribute(Iterator<Frame> frames, ClassLoader selfLoader,
+                                 Function<ClassLoader, String> pluginOf) {
+        return attribute(frames, selfLoader, pluginOf, MAX_FRAMES);
+    }
+
+    /**
+     * A task-drain frame marks the load as drained by the server; a blocking
+     * frame further out clears that (the drain ran inside the caller's wait),
+     * and the next plugin frame is the requester. A plugin frame reached while
+     * still drained, or a tick boundary, means nobody waited on this load.
+     */
+    static Attribution attribute(Iterator<Frame> frames, ClassLoader selfLoader,
+                                 Function<ClassLoader, String> pluginOf, int maxFrames) {
+        boolean inPrefix = true;
+        boolean blocking = false;
+        boolean drained = false;
+        int count = 0;
+        while (frames.hasNext() && count++ < maxFrames) {
+            Frame f = frames.next();
+            ClassLoader cl = f.loader();
+            if (inPrefix) {
+                if (cl == selfLoader || isJdkLoader(cl)) continue;
+                inPrefix = false;
+            }
+            String method = f.method();
+            if (isBlockingMethod(method)) {
+                blocking = true;
+                drained = false;
+            }
+            if (cl != null && cl != ClassLoader.getSystemClassLoader()) {
+                String plugin = pluginOf.apply(cl);
+                if (plugin != null) {
+                    return drained ? null : new Attribution(plugin, blocking);
+                }
+            }
+            if (isTickBoundaryMethod(method)) {
+                break;
+            }
+            if (isTaskDrainMethod(method)) {
+                drained = true;
+            }
+        }
+        return null;
+    }
+
+    private static boolean isJdkLoader(ClassLoader cl) {
+        return cl == null || cl == ClassLoader.getPlatformClassLoader();
     }
 
     private String pluginNameOf(ClassLoader cl) {
@@ -118,18 +293,33 @@ public final class SyncLoadAttributor {
     }
 
     public void resetPhase() {
+        sampleIndex.set(0L);
         phaseSyncLoads.set(0L);
         phaseByPlugin.clear();
+        phaseInlinePromotions.set(0L);
+        phaseInlineByPlugin.clear();
     }
 
-    /** Synchronous loads requested by plugins this phase; -1 unless trusted. */
+    /** Synchronous blocking loads requested by plugins this phase; -1 unless trusted. */
     public long phaseSyncLoads() { return trusted() ? phaseSyncLoads.get() : -1L; }
 
     /** {@code name=count;...} sorted by name; empty unless trusted. */
     public String phaseByPluginSummary() {
+        return summarizeMap(phaseByPlugin);
+    }
+
+    /** Inline promotions (e.g. ticket promotions without blocking) requested by plugins this phase; -1 unless trusted. */
+    public long phaseInlinePromotions() { return trusted() ? phaseInlinePromotions.get() : -1L; }
+
+    /** Inline promotions {@code name=count;...} sorted by name; empty unless trusted. */
+    public String phaseInlineByPluginSummary() {
+        return summarizeMap(phaseInlineByPlugin);
+    }
+
+    private String summarizeMap(Map<String, LongAdder> map) {
         if (!trusted()) return "";
         Map<String, Long> sorted = new TreeMap<>();
-        phaseByPlugin.forEach((k, v) -> sorted.put(k, v.sum()));
+        map.forEach((k, v) -> sorted.put(k, v.sum()));
         StringBuilder sb = new StringBuilder();
         sorted.forEach((k, v) -> {
             if (sb.length() > 0) sb.append(';');
@@ -180,7 +370,10 @@ public final class SyncLoadAttributor {
                 }
                 release(world, cx, cz);
                 if (!self.getName().equals(syncProbeRequester)) {
-                    finish(SelfTest.FAIL_SYNC, "sync load attributed to " + syncProbeRequester);
+                    finish(SelfTest.FAIL_SYNC, !syncProbeSeen
+                            ? "sync load event not observed"
+                            : "sync load attributed to " + syncProbeRequester
+                                    + (syncProbeTrace != null ? "; stack " + syncProbeTrace : ""));
                     return;
                 }
                 tryCandidate(world, idx + 1, true);
@@ -204,13 +397,47 @@ public final class SyncLoadAttributor {
             Sched.runGlobalLater(self, () -> {
                 if (!asyncProbeSeen) {
                     finish(SelfTest.FAIL_ASYNC, "async load event not observed within 10 s");
+                    Sched.runOnRegion(self, world, cx, cz, () -> release(world, cx, cz));
                 } else if (asyncProbeRequester != null) {
                     finish(SelfTest.FAIL_ASYNC, "async load attributed to " + asyncProbeRequester);
+                    Sched.runOnRegion(self, world, cx, cz, () -> release(world, cx, cz));
                 } else {
-                    finish(SelfTest.PASS, "sync load -> " + syncProbeRequester + ", async load -> none");
+                    testResidentTicket(world, cx, cz);
                 }
-                Sched.runOnRegion(self, world, cx, cz, () -> release(world, cx, cz));
             }, 200L);
+        });
+    }
+
+    private void testResidentTicket(World world, int cx, int cz) {
+        Method addTicket;
+        Method removeTicket;
+        try {
+            addTicket = World.class.getMethod("addPluginChunkTicket", int.class, int.class, Plugin.class);
+            removeTicket = World.class.getMethod("removePluginChunkTicket", int.class, int.class, Plugin.class);
+        } catch (NoSuchMethodException e) {
+            // Paper ticket API not available (e.g. Spigot)
+            finish(SelfTest.PASS, "sync load -> " + syncProbeRequester + ", async load -> none (no ticket API)");
+            Sched.runOnRegion(self, world, cx, cz, () -> release(world, cx, cz));
+            return;
+        }
+
+        Sched.runOnRegion(self, world, cx, cz, () -> {
+            long key = ((long) cx << 32) ^ (cz & 0xffffffffL);
+            residentTicketProbeKey = key;
+            try {
+                addTicket.invoke(world, cx, cz, self);
+                removeTicket.invoke(world, cx, cz, self);
+            } catch (Throwable t) {
+                finish(SelfTest.FAIL_TICKET, "resident ticket promotion threw " + t);
+                release(world, cx, cz);
+                return;
+            }
+            release(world, cx, cz);
+            if (residentTicketProbeBlocking) {
+                finish(SelfTest.FAIL_TICKET, "resident ticket promotion attributed as blocking sync load");
+            } else {
+                finish(SelfTest.PASS, "sync load -> " + syncProbeRequester + ", async load -> none, resident ticket -> non-blocking");
+            }
         });
     }
 
@@ -226,6 +453,7 @@ public final class SyncLoadAttributor {
         selfTest = verdict;
         syncProbeKey = Long.MIN_VALUE;
         asyncProbeKey = Long.MIN_VALUE;
+        residentTicketProbeKey = Long.MIN_VALUE;
         Level level = verdict == SelfTest.PASS ? Level.INFO : Level.WARNING;
         self.getLogger().log(level, "[StressTestRTP] sync-load attribution self-test " + verdict
                 + " (" + detail + ")" + (verdict == SelfTest.PASS ? ""

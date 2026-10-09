@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
@@ -127,7 +128,7 @@ public class RegionCacheTask extends RTPRunnable {
             // Throttle: single-flight in-flight public-cache generation per region.
             // Collapses concurrent retry fan-out into one active train.
             // Per-player tasks (playerId != null) bypass this gate and are rate-limited upstream.
-            if (region.inFlightCalculations.get() >= 1) {
+            if (!region.inFlightCacheFill.compareAndSet(false, true)) {
                 MemoryTracker.untrack(this);
                 return;
             }
@@ -140,33 +141,43 @@ public class RegionCacheTask extends RTPRunnable {
         CfDiag.regionCacheTaskIssue.increment();
         CfDiag.ensureStarted();
         region.inFlightCalculations.incrementAndGet();
-        CompletableFuture<GenerationResult> locationFuture = RTP.serverAccessor.getLocationGenerator().getLocation(region, (java.util.Set<String>) null);
+        try {
+            // ADR-110: fill is speculative - verify from resident chunks / region files; native loads
+            // only when pinned into the kept queue. Third-party generators keep their own contract.
+            Object generator = RTP.serverAccessor.getLocationGenerator();
+            CompletableFuture<GenerationResult> locationFuture = (generator instanceof LocationGenerator)
+                    ? LocationGenerator.getLocationFuture(region, null, LoadPurpose.SPECULATIVE)
+                    : RTP.serverAccessor.getLocationGenerator().getLocation(region, (java.util.Set<String>) null);
 
-        locationFuture = locationFuture.exceptionally(e -> {
-            if (playerId != null) {
-                RTP.log(Level.SEVERE, "Failed to generate location for player " + playerId, e);
-            } else {
-                RTP.log(Level.SEVERE, "Failed to generate location", e);
-            }
-            // Cleanup is owned by processResult(null) below - keeping the
-            // decrement here as well would race with processResult on a future
-            // that completes after recovery, leaking or double-counting the
-            // counter depending on dispatch order. The releaseInFlight() CAS
-            // makes "who decrements?" unambiguous.
-            return null;
-        });
-
-        if (locationFuture.isDone()) {
-            processResult(locationFuture.join());
-        } else {
-            locationFuture.thenAccept(res -> {
-                long asyncStart = System.nanoTime();
-                try {
-                    processResult(res);
-                } finally {
-                    PerformanceTracker.totalNanosecondsConsumed.add(System.nanoTime() - asyncStart);
+            locationFuture = locationFuture.exceptionally(e -> {
+                if (playerId != null) {
+                    RTP.log(Level.SEVERE, "Failed to generate location for player " + playerId, e);
+                } else {
+                    RTP.log(Level.SEVERE, "Failed to generate location", e);
                 }
+                // Cleanup is owned by processResult(null) below - keeping the
+                // decrement here as well would race with processResult on a future
+                // that completes after recovery, leaking or double-counting the
+                // counter depending on dispatch order. The releaseInFlight() CAS
+                // makes "who decrements?" unambiguous.
+                return null;
             });
+
+            if (locationFuture.isDone()) {
+                processResult(locationFuture.join());
+            } else {
+                locationFuture.thenAccept(res -> {
+                    long asyncStart = System.nanoTime();
+                    try {
+                        processResult(res);
+                    } finally {
+                        PerformanceTracker.totalNanosecondsConsumed.add(System.nanoTime() - asyncStart);
+                    }
+                });
+            }
+        } catch (Throwable t) {
+            RTP.log(Level.SEVERE, "Failed to dispatch location generation", t);
+            releaseInFlight();
         }
     }
 
@@ -186,6 +197,20 @@ public class RegionCacheTask extends RTPRunnable {
                 if (res.coords() != null) {
                     RTPCoords coords = res.coords();
                     ChunkSet chunkSet = res.verifiedChunks();
+                    if (res.reservation() != null) {
+                        LiveLoadGate.of(region.name).onPinnedHandoff(true);
+                    }
+
+                    if (chunkSet == null && res.reservation() == null) {
+                        // ADR-110: unpinned result - no ring preload (it would unload before use).
+                        try {
+                            region.queueManager.enqueuePlayerLocation(playerId,
+                                    new RTPLocation(coords, res.attempts(), null));
+                        } finally {
+                            releaseInFlight();
+                        }
+                        return;
+                    }
 
                     if (chunkSet == null) {
                         int cx = coords.x() >> 4;
@@ -232,7 +257,20 @@ public class RegionCacheTask extends RTPRunnable {
                 }
             } else {
                 if (res.coords() != null) {
-                    if (res.reservation() != null) res.reservation().close();
+                    if (res.reservation() != null && !observationalOnly) {
+                        // ADR-110 pinned fill: the reservation moves into the kept (pinned) queue.
+                        ChunkReservation pin = res.reservation();
+                        boolean kept = region.queueManager.keptLocations.offer(
+                                new RTPLocation(res.coords(), res.attempts(), pin));
+                        LiveLoadGate.of(region.name).onPinnedHandoff(kept);
+                        if (kept) {
+                            releaseInFlight();
+                            return;
+                        }
+                        pin.close();
+                    } else if (res.reservation() != null) {
+                        res.reservation().close();
+                    }
                     // Observational mode: drop the safe candidate instead of
                     // enqueuing it. All biome / bad-location side effects already
                     // fired inside LocationGenerator; the winning candidate
@@ -254,12 +292,16 @@ public class RegionCacheTask extends RTPRunnable {
     }
 
     /**
-     * Decrements {@code region.inFlightCalculations} and untracks this task in
-     * {@link MemoryTracker} exactly once across all terminal branches via CAS.
+     * Decrements {@code region.inFlightCalculations}, resets {@code region.inFlightCacheFill}
+     * for public tasks, and untracks this task in {@link MemoryTracker} exactly once across all
+     * terminal branches via CAS.
      */
     private void releaseInFlight() {
         if (released.compareAndSet(false, true)) {
             region.inFlightCalculations.decrementAndGet();
+            if (playerId == null) {
+                region.inFlightCacheFill.set(false);
+            }
             // ADR-043: clear the per-uuid push-on-open guard on the personal
             // fill path so a future openPersonalQueue(uuid) is allowed to
             // schedule another fill once the previous one terminates

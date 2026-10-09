@@ -34,6 +34,7 @@ You can update performance settings through:
 | `viewDistanceTeleport` | Integer | `0` | Chunk radius to pre-load around the destination before teleport. `0` = just the destination chunk. | **HIGH** |
 | `viewDistanceRestoreInterval` | Integer | `0` | Ticks to ease view distance back to normal after arrival. Set to `0` (off) to prevent client-side flashing. | **LOW** |
 | `syncLoading` | Boolean | `false` | Use synchronous chunk loading for location selection. **NOT RECOMMENDED**. | **HIGH** — Can cause server hangs. |
+| `teleportPath` | String | `AUTO` | Paper only. `AUTO` teleports in the same tick when the destination chunk is already loaded and the teleport starts on the main thread, otherwise uses `teleportAsync`. `ASYNC` always uses `teleportAsync` (up to one tick slower). Folia always uses `teleportAsync`. | **LOW** |
 
 ## Caching & Pre-fill
 

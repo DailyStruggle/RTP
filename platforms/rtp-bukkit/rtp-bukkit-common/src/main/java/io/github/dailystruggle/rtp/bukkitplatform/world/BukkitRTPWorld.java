@@ -189,6 +189,19 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
   @Override
   public CompletableFuture<Long> getChunkAt(int cx, int cz) {
+    return resolveChunkKey(cx, cz, true);
+  }
+
+  /**
+   * ADR-110: resident chunk or region-file view only; {@code null} where only a native load
+   * (or generation) could answer.
+   */
+  @Override
+  public CompletableFuture<Long> getChunkIfReadable(int cx, int cz) {
+    return resolveChunkKey(cx, cz, false);
+  }
+
+  private CompletableFuture<Long> resolveChunkKey(int cx, int cz, boolean allowLive) {
     final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
 
     // ADR-016 - Anvil read-only data source (no longer a gate).
@@ -240,11 +253,20 @@ public class BukkitRTPWorld extends RTPWorld<World> {
               return CompletableFuture.completedFuture(key);
             }
             // No view available (UNKNOWN) → live load is authoritative.
-            return loadChunkFuture(cx, cz, key);
+            return allowLive ? loadChunkFuture(cx, cz, key) : CompletableFuture.completedFuture(null);
           });
     }
 
+    if (!allowLive && !isResident(cx, cz)) return CompletableFuture.completedFuture(null);
     return loadChunkFuture(cx, cz, key);
+  }
+
+  private boolean isResident(int cx, int cz) {
+    try {
+      return world != null && world.isChunkLoaded(cx, cz);
+    } catch (Throwable ignored) {
+      return false;
+    }
   }
 
   /**
@@ -287,19 +309,12 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     final String dim = dimensionRegionSubpath(world);
     final int finalMinY = minY;
     final int finalMaxY = maxY;
-    // Dispatch onto AnvilIoPool rather than inline: inline dispatch serialized
-    // ~7ms of probe I/O onto the driver's single thread, holding peak in-flight
-    // at 11-12 vs cap 50. AnvilIoPool (dedicated blocking-I/O executor, sized
-    // for disk parallelism) lets the driver saturate its semaphore and run
-    // probes in parallel; the scheduler handoff overhead is far cheaper than
-    // serializing 7ms onto the driver. S-005 preserved: AnvilIoPool threads are
-    // daemons with no region-thread affinity.
-    return CompletableFuture.supplyAsync(() -> {
+    // Coalesced on AnvilIoPool: pending probes for one r.X.Z.mca share one open (S-005: no
+    // I/O on the caller; pool threads are daemons with no region-thread affinity).
+    return io.github.dailystruggle.rtp.anvil.AnvilPrefilter.probeColumnAsync(
+        worldFolder, dim, cx, cz, finalMinY, finalMaxY).handle((probe, err) -> {
       try {
-        // Reads only this chunk's sectors (location table cached per region file).
-        io.github.dailystruggle.rtp.anvil.ColumnProbe probe =
-            io.github.dailystruggle.rtp.anvil.AnvilPrefilter.probeColumn(
-                worldFolder, dim, cx, cz, finalMinY, finalMaxY);
+        if (err != null) throw err;
         if (probe == null) return null;
         return io.github.dailystruggle.rtp.api.world.ChunkColumnProbe.of(
             new io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter(probe, cx, cz,
@@ -313,7 +328,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
                 + t.getClass().getSimpleName() + ": " + t.getMessage());
         return null;
       }
-    }, io.github.dailystruggle.rtp.anvil.AnvilIoPool.get());
+    });
   }
 
   /**
@@ -520,6 +535,21 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     } catch (Throwable ignored) {
       return null;
     }
+  }
+
+  @Override
+  public java.nio.file.Path anvilWorldFolder() {
+    try {
+      World w = world;
+      return (w == null) ? null : w.getWorldFolder().toPath();
+    } catch (Throwable ignored) {
+      return null;
+    }
+  }
+
+  @Override
+  public String anvilDimensionSubpath() {
+    return dimensionRegionSubpath(world);
   }
 
   /**

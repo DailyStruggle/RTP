@@ -141,6 +141,13 @@ queue_growth_warn_threshold: 0
 # @default: false
 synced_kibble: false
 
+# How the cat lands on Paper. AUTO = same-tick pounce when the spot's chunk is
+# already loaded, else teleportAsync. ASYNC = always teleportAsync (one tick slower).
+# @type: string
+# @options: ["AUTO", "ASYNC"]
+# @default: "AUTO"
+pounce_path: "AUTO"
+
 # Re-sniff permissions on every event
 # @type: boolean
 # @default: false

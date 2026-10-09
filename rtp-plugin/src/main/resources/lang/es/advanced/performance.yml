@@ -163,6 +163,13 @@ umbralAvisoCrecimientoCola: 0
 # @default: false
 cargaSincrona: false
 
+# Ruta de teletransporte en Paper. AUTO = teletransporte en el mismo tick si el chunk
+# de destino ya está cargado, si no teleportAsync. ASYNC = siempre teleportAsync (un tick más lento).
+# @type: string
+# @options: ["AUTO", "ASYNC"]
+# @default: "AUTO"
+rutaTeletransporte: "AUTO"
+
 # Análisis de permisos (arranque)
 # onEventParsing: Incompatible con permisos amplios tipo *.*.
 # Impacto: MEDIO (onEvent) / BAJO (effect)

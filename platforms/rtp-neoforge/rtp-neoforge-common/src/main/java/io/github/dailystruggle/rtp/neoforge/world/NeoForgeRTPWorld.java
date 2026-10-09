@@ -168,6 +168,19 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public CompletableFuture<Long> getChunkAt(int chunkX, int chunkZ) {
+        return resolveChunkKey(chunkX, chunkZ, true);
+    }
+
+    /**
+     * ADR-110: resident chunk or region-file view only; {@code null} where only a native load
+     * (or generation) could answer.
+     */
+    @Override
+    public CompletableFuture<Long> getChunkIfReadable(int chunkX, int chunkZ) {
+        return resolveChunkKey(chunkX, chunkZ, false);
+    }
+
+    private CompletableFuture<Long> resolveChunkKey(int chunkX, int chunkZ, boolean allowLive) {
         final long key = ((long) chunkX & 0xffffffffL) | ((long) chunkZ << 32);
 
         if (shouldPrefilter(chunkX, chunkZ)) {
@@ -199,12 +212,15 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                                     }
                                     return CompletableFuture.completedFuture(key);
                                 }
-                                return loadLiveChunk(chunkX, chunkZ, key);
+                                return allowLive
+                                        ? loadLiveChunk(chunkX, chunkZ, key)
+                                        : CompletableFuture.completedFuture(null);
                             });
                 }
             }
         }
 
+        if (!allowLive && !isChunkLoaded(chunkX, chunkZ)) return CompletableFuture.completedFuture(null);
         return loadLiveChunk(chunkX, chunkZ, key);
     }
 
@@ -456,12 +472,11 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         final int finalMinY = minY;
         final int finalMaxY = maxY;
 
-        return CompletableFuture.supplyAsync(() -> {
+        // Coalesced on AnvilIoPool: pending probes for one r.X.Z.mca share one open (S-005).
+        return io.github.dailystruggle.rtp.anvil.AnvilPrefilter.probeColumnAsync(
+                worldFolder, dim, cx, cz, finalMinY, finalMaxY).handle((probe, err) -> {
             try {
-                // Reads only this chunk's sectors (location table cached per region file).
-                io.github.dailystruggle.rtp.anvil.ColumnProbe probe =
-                    io.github.dailystruggle.rtp.anvil.AnvilPrefilter.probeColumn(
-                        worldFolder, dim, cx, cz, finalMinY, finalMaxY);
+                if (err != null) throw err;
                 if (probe == null) return null;
                 return ChunkColumnProbe.of(new AnvilColumnProbeAdapter(probe, cx, cz,
                     s -> (RTP.serverAccessor != null)
@@ -474,7 +489,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                         + t.getClass().getSimpleName() + ": " + t.getMessage());
                 return null;
             }
-        }, io.github.dailystruggle.rtp.anvil.AnvilIoPool.get());
+        });
     }
 
     @Override
@@ -527,6 +542,29 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                     + " region=(" + rcx + "," + rcz + "): "
                     + t.getClass().getSimpleName() + ": " + t.getMessage());
             return java.util.Collections.emptyMap();
+        }
+    }
+
+    @Override
+    public java.nio.file.Path anvilWorldFolder() {
+        ServerLevel level = world;
+        if (level == null || level.getServer() == null) return null;
+        try {
+            return level.getServer().getWorldPath(LevelResource.ROOT);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    @Override
+    public String anvilDimensionSubpath() {
+        ServerLevel level = world;
+        java.nio.file.Path worldFolder = anvilWorldFolder();
+        if (level == null || worldFolder == null) return "";
+        try {
+            return dimensionRegionSubpath(worldFolder, level);
+        } catch (Throwable t) {
+            return "";
         }
     }
 

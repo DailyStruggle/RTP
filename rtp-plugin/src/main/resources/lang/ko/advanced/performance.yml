@@ -163,6 +163,13 @@ maxHeap백분율: 85.0
 # @default: false
 동기로딩: false
 
+# Paper의 텔레포트 경로. AUTO = 목적지 청크가 이미 로드되어 있으면 같은 틱에 텔레포트,
+# 아니면 teleportAsync. ASYNC = 항상 teleportAsync (1틱 느림).
+# @type: string
+# @options: ["AUTO", "ASYNC"]
+# @default: "AUTO"
+텔레포트경로: "AUTO"
+
 # 시작 시 권한 파싱
 # onEventParsing: 와일드카드 권한 *.* 와 호환되지 않습니다.
 # 영향: 중간 (onEvent) / 낮음 (effect)

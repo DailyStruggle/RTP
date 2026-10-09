@@ -76,6 +76,7 @@ RTP-style plugin under test. Restart the server. Then in-game:
 ```
 /rtpstress start 60 4         # 60 s run, concurrency 4 (round-robin across targets)
 /rtpstress sequence 60 30 4   # run each target 60 s, 30 s gap, concurrency 4
+/rtpstress ramp betterrtp     # fixed-rate stages 5..320 TP/s; finds the stress point
 /rtpstress status             # rolling p50/p95/p99/min-TPS/p95-MSPT/heap
 /rtpstress burst 10           # one-shot 10× burst (TPS-burst column)
 /rtpstress export             # write <timestamp>-summary.txt
@@ -138,8 +139,160 @@ guarantee comparable cold-start numbers between competitors.
 - `names:` — combined with a YAML list `roster-names: [a, b, c]`.
 
 The harness only drives players that are **currently online**. To
-benchmark with many players, log many alts in (or wait for the
-follow-up out-of-process bot driver — see *Future work*).
+benchmark with many players, run the offline-mode bot roster
+(`devstack/clients/bench-swarm.js`, see *Ramp mode*).
+
+---
+
+## Ramp mode (stress point)
+
+`start` / `sequence` are closed-loop: one attempt in flight per player
+and at most `default-concurrency` in flight overall. By Little's law the
+offered rate is then at most `in-flight / latency`, so 4 accounts against
+a ~300 ms plugin can never offer more than ~13 TP/s, and a fast plugin's
+throughput reads as the harness's ceiling, not its own. Ramp mode offers
+load **open-loop at a fixed rate** and finds the rate at which each
+plugin stops keeping up.
+
+```
+/rtpstress ramp <target> [stageSeconds]   # target = a target-commands label
+/rtpstress ramp <target> 120 100          # flat 100 TP/s for 120 s (rates override ramp.stages)
+/rtpstress status                         # current stage + stress point so far
+/rtpstress stop                           # ends the ramp; completed stages are on disk
+```
+
+- Idle window (`ramp.idle-seconds`, default 30) with bots online and no
+  dispatch. Its second half is the idle baseline (CPU cores, MSPT p50)
+  applied to every stage, so the `net_*` cost-per-teleport columns in
+  `<stamp>-phases.csv` are filled. It runs before any teleport so a
+  plugin's post-teleport background work (queue fill, generation) is
+  billed to that plugin, not subtracted as ambient.
+- Optional warm-up (`ramp.warmup-seconds`, default 30) at the first
+  stage's rate; no CSV rows are written for it.
+- Each stage (`ramp.stages`, default `5,10,20,40,80,160,320` TP/s, each
+  `ramp.stage-seconds`, default 60) issues dispatch slots at exactly the
+  offered rate. Every slot goes to an idle roster player (no attempt in
+  flight, past `ramp.per-player-gap-ms`, default 0). If none is idle the
+  slot is counted as **`harness_shed`**, harness-side saturation, and is
+  not retried.
+- Concurrency is bounded only by the roster size: still one in-flight
+  attempt per player, and `default-concurrency` is ignored.
+- After the dispatch window the stage drains (at most
+  `attempt-timeout-ms` + 1 s), so late completions count toward the stage
+  that dispatched them. Then one row is appended to `<stamp>-ramp.csv`
+  and flushed before the next stage starts, so a server crash keeps
+  every completed stage. `ramp.gap-seconds` (default 5) idles between stages.
+- Each stage is also a normal measurement phase (label
+  `<target>@ramp<i>-<rate>tps`), so `<stamp>-phases.csv` keeps its CPU,
+  chunk and GC columns per stage. One spark profile spans the ramp.
+
+### Stress point
+
+A stage **passes** iff all of these hold (thresholds under `ramp.pass`):
+
+| Criterion | Default | CSV `fail_criteria` token |
+|---|---|---|
+| `achieved_tps >= 0.95 x offered_tps` (achieved = successful teleports / stage seconds) | `min-achieved-fraction: 0.95` | `ACHIEVED_BELOW_OFFERED` (+ `HARNESS_SATURATED` when shed slots alone exceed the 5 % shortfall) |
+| MSPT p95 over the stage <= 50 ms | `max-mspt-p95: 50.0` | `MSPT_P95` |
+| `(timeouts + errors) <= 1 %` of attempts | `max-fail-fraction: 0.01` | `FAILURE_RATE` |
+
+The **stress point** is the highest passing stage. The ramp stops after
+`ramp.stop.consecutive-failures` (default 2) failing stages in a row; a
+pass after a single failure resets the count. It also stops if wall-clock
+TPS stays below `ramp.stop.low-tps-threshold` (default 5) for
+`ramp.stop.low-tps-seconds` (default 10) continuously. That stage is
+aborted, recorded with `aborted=true`, and fails `LOW_TPS_ABORT`. The
+end of the ramp logs one summary line and writes `<stamp>-ramp-summary.txt`:
+stress point stage and offered rate, plus the first failing stage and
+the criterion it failed on.
+
+A stress point whose next stage failed with `HARNESS_SATURATED` is a
+**lower bound**: the roster, not the plugin, ran out. Add bots and re-run.
+
+**Busy vs failure.** Plugin-side "busy / cooldown / already teleporting"
+rejections are shed load (`busy_rejections`): they lower `achieved_tps`
+but are not failures. They are recognised only when the rejection reaches
+the **console** (`ConsoleWatcher` -> `CONSOLE_FAIL:` reason) and matches
+`ramp.busy-patterns`. A rejection sent only to the player via chat never
+reaches the server log. It surfaces as a timeout, and therefore as a
+failure. `bench-swarm.js` counts such chat replies out-of-band
+(`busy_chat=` in its stats line) so the two can be reconciled.
+
+MSPT is the sampler's value (Paper `getAverageTickTime`, a ~100-tick
+average; wall tick time on Spigot/Folia). TPS for the abort rule and
+`tps_min` is measured by a 20-tick wall-clock timer with a staleness
+bound, not Paper's 1-minute `getTPS()[0]`, which lags a 10 s rule.
+
+### `<stamp>-ramp.csv` columns
+
+```
+target,stage_index,offered_tps,stage_seconds,attempts,successes,timeouts,errors,
+busy_rejections,harness_shed,achieved_tps,achieved_fraction,fail_fraction,
+latency_p50_ms,latency_p95_ms,latency_p99_ms,mspt_p50,mspt_p95,mspt_samples,
+tps_min,heap_peak_mb,roster_size,peak_in_flight,aborted,complete,verdict,fail_criteria,
+start_epoch_ms,end_epoch_ms
+```
+
+`verdict` is `PASS`, `FAIL`, or `PARTIAL`. `PARTIAL` (`complete=false`)
+marks a stage cut short by `/rtpstress stop`; it is kept for the record
+but never counts toward the stress point. `-1` means NOT MEASURED.
+
+### Bot roster: `bench-swarm.js`
+
+Full clients cost too much RAM, so the roster is many lightweight
+offline-mode Mineflayer bots, split across a few Node worker processes
+(`--workers`, default one per 16 bots, at most CPUs - 1):
+
+```powershell
+cd devstack/clients
+npm install
+node bench-swarm.js --host <bench-host> --port 25565 --count 64
+```
+
+- Server prerequisites: `online-mode=false` (the Linux bench server
+  already runs offline) and `roster: "all"`. The bots are named
+  `bench_000`..`bench_063` (`--prefix`, `--start-index`).
+- **Connection throttle:** every bot connects from one IP, and Paper
+  rejects reconnects faster than `bukkit.yml`
+  `settings.connection-throttle` (default 4000 ms). Either set it to
+  `-1` for the bench, or keep `--join-delay-ms` above it (default 4500;
+  64 bots are then online after ~5 min). All connects and reconnects go
+  through one queue spaced by this delay.
+- Bots stay idle: no chat, no movement. They auto-respawn on death and
+  reconnect after a kick or disconnect with exponential backoff
+  (`--reconnect-base-ms` 5000 doubling to `--reconnect-max-ms` 60000).
+  Ctrl+C disconnects them cleanly.
+- Defaults keep memory low: `--view-distance 2` (the server still sends
+  real chunks, but only min(client, server) of them; raise it to model
+  real clients' send cost), physics off (no gravity simulation;
+  teleport-confirm and position packets are still sent; use `--physics`
+  if `allow-flight=false` causes mid-air fly kicks), and a lean
+  Mineflayer plugin set (`--full-plugins` restores all).
+- **Chunk decode off:** each teleport makes the server send a fresh
+  chunk square, and decoding those on one Node thread saturated the
+  event loop at ramp rates. Keepalives then queued behind chunk data and
+  both sides dropped the bots ("client timed out after 60000 ms",
+  server "keepalive timeout"). The bots now receive chunks and still
+  acknowledge every chunk batch, so server send cost stays real, but do
+  not decode them (`--keep-world` restores decoding).
+- **Server-side load distance:** Paper loads chunks around a player by
+  the *server's* view/simulation distance, whatever the client asks.
+  During a ramp the harness caps each roster player to
+  `ramp.player-view-distance` (default 2, Paper only, 0 disables), the
+  same for every target. Without it, 64 bots at view-distance 10 meant
+  ~529 fresh chunks per landing: TPS fell below 1 and every attempt
+  timed out before any plugin was measured.
+- A stats line every 30 s (one per worker) reports online count,
+  connects, kicks (top reasons), errors, deaths, busy chat replies and
+  process RSS.
+- With `dispatch-as-player: true` the bots need each target's `/rtp`
+  permission, and per-player plugin cooldowns must be zero (or bypassed)
+  for the bench. Otherwise every repeat dispatch is a cooldown rejection,
+  not load.
+
+Ramp procedure: start the swarm, wait until `online=64/64`, run
+`/rtpstress ramp <target>` from the console, then repeat for each target
+with a server restart between targets so each plugin starts cold.
 
 ---
 
@@ -602,9 +755,12 @@ Configure under `spark:` in `config.yml` (defaults: enabled, 90 s
 timeout, only-ticks-over 50 ms). Set `spark.enabled: false` if you'd
 rather drive `/spark profiler` manually.
 
-- `spark.threads` (default `*`) is passed as `--thread <value>`, so every
-  thread is sampled, not just the server thread. Set it to `""` to omit
-  the flag (server thread only).
+- `spark.threads` (default `Server thread,RTP-Anvil-IO-*`) is a comma list;
+  each entry becomes its own `--thread <name>` (names with spaces are not
+  quoted; spark re-joins them). An entry containing `*` is a wildcard and
+  adds `--regex` (exact entries are escaped), so pool threads spawned after
+  the profile starts are still sampled. `*` alone samples every thread;
+  `""` omits the flag (server thread only).
 - With `save-to-file`, spark writes `plugins/spark/profile-<stamp>.sparkprofile`
   (the log line names the folder that was found). The auto-summary polls
   that folder every ~1 s, starting after `auto-summary-delay-ticks`, until

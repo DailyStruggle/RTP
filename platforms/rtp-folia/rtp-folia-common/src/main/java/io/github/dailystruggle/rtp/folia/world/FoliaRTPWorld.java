@@ -178,6 +178,20 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   @RegionThread
   public CompletableFuture<Long> getChunkAt(int cx, int cz) {
+    return resolveChunkKey(cx, cz, true);
+  }
+
+  /**
+   * ADR-110: resident chunk or region-file view only; {@code null} where only a native load
+   * (or generation) could answer. Residency via {@link #isChunkLoaded}, which is safe off the
+   * owning region thread (an undeterminable query counts as not resident).
+   */
+  @Override
+  public CompletableFuture<Long> getChunkIfReadable(int cx, int cz) {
+    return resolveChunkKey(cx, cz, false);
+  }
+
+  private CompletableFuture<Long> resolveChunkKey(int cx, int cz, boolean allowLive) {
     // Probe-entry: do NOT bump totalChunkLoads here. The counter is incremented by
     // the live-load path (getChunkAtAsync) so RTPWorld.getOrLoadChunk's probe-then-live
     // composition counts each logical chunk-load attempt exactly once. See the Javadoc
@@ -211,10 +225,14 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
               return CompletableFuture.completedFuture(key);
             }
             // No view available (UNKNOWN) → Folia native async load is authoritative.
+            // The gate may pass for a resident chunk (off-region ThreadAccessException),
+            // so the read-only path still serves residents here.
+            if (!allowLive && !isChunkLoaded(cx, cz)) return CompletableFuture.completedFuture(null);
             return loadLiveChunk(cx, cz, key);
           });
     }
 
+    if (!allowLive && !isChunkLoaded(cx, cz)) return CompletableFuture.completedFuture(null);
     return loadLiveChunk(cx, cz, key);
   }
 
@@ -235,8 +253,8 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
    * Fast-path center-column probe for Folia. See
    * {@code BukkitRTPWorld#probeChunkColumn} for the shared contract.
    *
-   * <p>S-005 / Folia threading: all file I/O is dispatched to
-   * {@link java.util.concurrent.ForkJoinPool#commonPool()}, never to a region
+   * <p>S-005 / Folia threading: all file I/O is coalesced per region file onto
+   * {@link io.github.dailystruggle.rtp.anvil.AnvilIoPool}, never a region
    * thread. The applicability gate ({@link #shouldPrefilter}) already tolerates
    * the region-thread-restricted {@code world.isChunkLoaded} call by treating
    * a thrown {@code ThreadAccessException} as "continue into the probe", so
@@ -253,18 +271,12 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     final String dim = dimensionRegionSubpath(world);
     final int finalMinY = minY;
     final int finalMaxY = maxY;
-    // Dispatch onto AnvilIoPool rather than inline: inline dispatch serialized
-    // ~7ms of probe I/O onto the driver's single thread, capping throughput at
-    // ~140 cps (peak in-flight 11-12 vs cap 50). AnvilIoPool (dedicated
-    // blocking-I/O executor) lets the driver hand off in microseconds and run
-    // probes in parallel. S-005 preserved: AnvilIoPool threads are daemons with
-    // no region-thread affinity.
-    return CompletableFuture.supplyAsync(() -> {
+    // Coalesced on AnvilIoPool: pending probes for one r.X.Z.mca share one open (S-005: no
+    // I/O on the caller; pool threads are daemons with no region-thread affinity).
+    return io.github.dailystruggle.rtp.anvil.AnvilPrefilter.probeColumnAsync(
+        worldFolder, dim, cx, cz, finalMinY, finalMaxY).handle((probe, err) -> {
       try {
-        // Reads only this chunk's sectors (location table cached per region file).
-        io.github.dailystruggle.rtp.anvil.ColumnProbe probe =
-            io.github.dailystruggle.rtp.anvil.AnvilPrefilter.probeColumn(
-                worldFolder, dim, cx, cz, finalMinY, finalMaxY);
+        if (err != null) throw err;
         if (probe == null) return null;
         return io.github.dailystruggle.rtp.api.world.ChunkColumnProbe.of(
             new io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter(probe, cx, cz,
@@ -278,7 +290,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
                 + t.getClass().getSimpleName() + ": " + t.getMessage());
         return null;
       }
-    }, io.github.dailystruggle.rtp.anvil.AnvilIoPool.get());
+    });
   }
 
   /**
@@ -341,6 +353,20 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
               + t.getClass().getSimpleName() + ": " + t.getMessage());
       return java.util.Collections.emptyMap();
     }
+  }
+
+  @Override
+  public java.nio.file.Path anvilWorldFolder() {
+    try {
+      return (world == null) ? null : world.getWorldFolder().toPath();
+    } catch (Throwable ignored) {
+      return null;
+    }
+  }
+
+  @Override
+  public String anvilDimensionSubpath() {
+    return dimensionRegionSubpath(world);
   }
 
   /** {@inheritDoc} S-005: blocking stat, off any region thread. */
