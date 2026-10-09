@@ -1438,6 +1438,12 @@ public class RTP {
 
     configs = new Configs(serverAccessor.getPluginDirectory());
 
+    // Opt-in core backlog prefilter provider; addons that bind later replace it.
+    if (RTPAPI.hooks != null) {
+      io.github.dailystruggle.rtp.common.hooks.AnvilBatchPrefilterProvider.bindIfEnabled(
+          RTPAPI.hooks.anvilPrefilter());
+    }
+
     startupTasks.add(new RTPRunnable(() -> {
       ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) configs.getParser(ConfigKeys.class);
       if (configParser == null) return;

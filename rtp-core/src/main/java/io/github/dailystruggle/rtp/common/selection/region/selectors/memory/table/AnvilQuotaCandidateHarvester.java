@@ -106,7 +106,9 @@ public final class AnvilQuotaCandidateHarvester {
   ) {}
 
   /**
-   * Harvests safe candidates for a specific MCA region bin off-thread.
+   * Harvests safe candidates for a specific MCA region bin off-thread. Every trial probes the same
+   * region file through one {@link AnvilPrefilter.RegionProbeSession}, so the bin costs at most one
+   * file open regardless of how many trials run before the quota is met.
    */
   public HarvestResult harvest(
       Path worldFolder,
@@ -122,34 +124,36 @@ public final class AnvilQuotaCandidateHarvester {
     int probesExecuted = 0;
     int consecutiveRejects = 0;
 
-    for (int i = 0; i < maxTrials; i++) {
-      int localOffset = jitteredOffset(i, regionX, regionZ);
-      int rx = localOffset & 31;
-      int rz = (localOffset >>> 5) & 31;
-      int cx = (regionX << 5) + rx;
-      int cz = (regionZ << 5) + rz;
-      long globalKey = (binGlobalKeyBase >= 0L) ? (binGlobalKeyBase + localOffset) : -1L;
+    try (AnvilPrefilter.RegionProbeSession session =
+             AnvilPrefilter.openSession(worldFolder, dimensionSubpath, unsafeBlocks, reconciler)) {
+      for (int i = 0; i < maxTrials; i++) {
+        int localOffset = jitteredOffset(i, regionX, regionZ);
+        int rx = localOffset & 31;
+        int rz = (localOffset >>> 5) & 31;
+        int cx = (regionX << 5) + rx;
+        int cz = (regionZ << 5) + rz;
+        long globalKey = (binGlobalKeyBase >= 0L) ? (binGlobalKeyBase + localOffset) : -1L;
 
-      // Fast-path: if already known bad in memory, skip probing
-      if (hazardTable != null && globalKey >= 0L && hazardTable.isBad(globalKey)) {
-        consecutiveRejects++;
-        continue;
-      }
-
-      probesExecuted++;
-      AnvilPrefilter.ProbeResult probe = AnvilPrefilter.probeSyncDetailed(
-          worldFolder, dimensionSubpath, cx, cz, unsafeBlocks, reconciler);
-
-      if (probe.verdict() == Verdict.ACCEPT) {
-        safeLocations.add(new int[]{rx, rz});
-        if (safeLocations.size() >= targetQuota) {
-          // EARLY EXIT: Quota satisfied!
-          break;
+        // Fast-path: if already known bad in memory, skip probing
+        if (hazardTable != null && globalKey >= 0L && hazardTable.isBad(globalKey)) {
+          consecutiveRejects++;
+          continue;
         }
-      } else if (probe.verdict() == Verdict.REJECT) {
-        consecutiveRejects++;
-        if (hazardTable != null && globalKey >= 0L) {
-          hazardTable.markBad(globalKey); // free ground-truth learning
+
+        probesExecuted++;
+        AnvilPrefilter.ProbeResult probe = session.probe(cx, cz);
+
+        if (probe.verdict() == Verdict.ACCEPT) {
+          safeLocations.add(new int[]{rx, rz});
+          if (safeLocations.size() >= targetQuota) {
+            // EARLY EXIT: Quota satisfied!
+            break;
+          }
+        } else if (probe.verdict() == Verdict.REJECT) {
+          consecutiveRejects++;
+          if (hazardTable != null && globalKey >= 0L) {
+            hazardTable.markBad(globalKey); // free ground-truth learning
+          }
         }
       }
     }

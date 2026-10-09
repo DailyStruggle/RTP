@@ -191,6 +191,110 @@ sequence:
   # @default: 1
   warmup-target-cycles: 1
 
+# Ramp mode (/rtpstress ramp <target>): fixed-rate offered-load stages against one target.
+# Stress point = highest stage that passes every ramp.pass criterion.
+# Concurrency is one in-flight attempt per roster player; default-concurrency is ignored.
+ramp:
+  # Offered rates per stage, ascending. Each stage writes one row to <stamp>-ramp.csv.
+  # @type: list<number>
+  # @unit: teleports/s
+  # @default: [5, 10, 20, 40, 80, 160, 320]
+  stages: [5, 10, 20, 40, 80, 160, 320]
+
+  # Dispatch window per stage. The drain after it (<= attempt-timeout-ms + 1 s) is not counted.
+  # @type: integer
+  # @range: [1, null]
+  # @unit: seconds
+  # @default: 60
+  stage-seconds: 60
+
+  # No-dispatch window before warm-up, bots online. Its second half is the idle
+  # baseline subtracted for every stage's net_* columns in <stamp>-phases.csv.
+  # Taken before any teleport so a plugin's post-teleport background work is billed to it. 0 disables.
+  # @type: integer
+  # @range: [0, null]
+  # @unit: seconds
+  # @default: 30
+  idle-seconds: 30
+
+  # Unrecorded warm-up at the first stage's rate before stage 0. 0 disables.
+  # @type: integer
+  # @range: [0, null]
+  # @unit: seconds
+  # @default: 30
+  warmup-seconds: 30
+
+  # Idle settle between stages, after the drain.
+  # @type: integer
+  # @range: [0, null]
+  # @unit: seconds
+  # @default: 5
+  gap-seconds: 5
+
+  # Per-player re-dispatch gap during a ramp; replaces per-player-gap-ticks/-ms.
+  # 0 keeps the roster (not a cooldown) as the only harness bound.
+  # @type: integer
+  # @range: [0, 5000]
+  # @unit: ms
+  # @default: 0
+  per-player-gap-ms: 0
+
+  # Paper only: cap each roster player's server-side view and simulation distance (2-32).
+  # Paper loads max(view, simulation)+1 chunks around every player whatever the client asks,
+  # so at view-distance 10 each landing pulls ~529 chunks and a large bot roster measures
+  # world generation, not the plugin. Same for every target. 0 keeps server.properties.
+  # @type: integer
+  # @range: [0, 32]
+  # @default: 2
+  player-view-distance: 2
+
+  # Console rejection phrases counted as plugin-side busy (shed, not failure). Empty uses defaults.
+  # Only console-visible rejections can match; player-only chat replies surface as timeouts.
+  # @type: list<string>
+  busy-patterns: []
+
+  # Stage pass criteria. All must hold.
+  pass:
+    # Minimum achieved/offered ratio (achieved = successful teleports / stage seconds).
+    # @type: number
+    # @range: [0.0, 1.0]
+    # @default: 0.95
+    min-achieved-fraction: 0.95
+
+    # Maximum MSPT p95 over the stage window.
+    # @type: number
+    # @range: [0.0, null]
+    # @unit: ms
+    # @default: 50.0
+    max-mspt-p95: 50.0
+
+    # Maximum (timeouts + errors) / attempts. Busy rejections excluded.
+    # @type: number
+    # @range: [0.0, 1.0]
+    # @default: 0.01
+    max-fail-fraction: 0.01
+
+  # Ramp stop rules.
+  stop:
+    # Stop after this many consecutive failing stages.
+    # @type: integer
+    # @range: [1, null]
+    # @default: 2
+    consecutive-failures: 2
+
+    # Abort the current stage and stop when wall-clock TPS stays below this value...
+    # @type: number
+    # @range: [0.0, 20.0]
+    # @default: 5.0
+    low-tps-threshold: 5.0
+
+    # ...continuously for this long.
+    # @type: integer
+    # @range: [0, null]
+    # @unit: seconds
+    # @default: 10
+    low-tps-seconds: 10
+
 # Per-chunk-load CPU cost calibration, in microseconds. 0 disables amendment.
 # @type: number
 # @range: [0.0, null]
@@ -256,6 +360,13 @@ ticket-sample-period-ms: 1000
 # @type: boolean
 # @default: true
 sync-load-selftest: true
+
+# Sampling stride for ChunkLoadCounter stack-walk attribution (1 = inspect every load).
+# Values > 1 sample 1-in-N loads and scale attributed counts, cutting stack-walk CPU on high-load plugins.
+# @type: integer
+# @range: [1, null]
+# @default: 1
+sync-load-sample-rate: 1
 
 # Calibration probe to measure the memory and chunk footprint of a chunk ticket.
 ticket-footprint-probe:
@@ -345,22 +456,31 @@ spark:
   # @default: 0
   only-ticks-over-ms: 0
 
-  # Thread selector passed to spark profiler start. "*" samples all threads.
+  # Sampling interval in ms passed to spark profiler start via --interval. 0 uses spark's default.
+  # @type: integer
+  # @range: [0, null]
+  # @unit: ms
+  # @default: 0
+  interval-ms: 0
+
+  # Comma-separated thread names sampled by spark profiler start, one --thread flag per entry.
+  # A "*" inside an entry is a wildcard and switches spark to --regex; "*" alone samples every thread.
+  # Empty samples the server thread only.
   # @type: string
-  # @default: "*"
-  threads: "*"
+  # @default: "Server thread,RTP-Anvil-IO-*"
+  threads: "Server thread,RTP-Anvil-IO-*"
 
   # Save profiles locally (.sparkprofile) instead of uploading to bytebin.
   # @type: boolean
   # @default: true
   save-to-file: true
 
-  # Intra-phase profile rotation interval in seconds. 0 disables rotation.
+  # Intra-phase profile rotation interval in seconds. 0 disables rotation to avoid mid-phase stop/save spikes.
   # @type: integer
   # @range: [0, null]
   # @unit: seconds
-  # @default: 60
-  rotate-seconds: 60
+  # @default: 0
+  rotate-seconds: 0
 
   # Automatically decode saved spark profiles into summary JSON sidecars.
   # @type: boolean

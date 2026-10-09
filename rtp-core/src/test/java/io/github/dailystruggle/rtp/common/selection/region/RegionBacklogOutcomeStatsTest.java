@@ -40,7 +40,7 @@ class RegionBacklogOutcomeStatsTest {
 
     @Test
     @DisplayName("Backlog prefilter rejection records failure and cold promotion records success")
-    void backlogRecordsRejectionsAndPromotions() {
+    void backlogRecordsRejectionsAndPromotions() throws InterruptedException {
         RegionSettings settings = new RegionSettings(
                 "test_region",
                 world,
@@ -59,10 +59,10 @@ class RegionBacklogOutcomeStatsTest {
         );
         Region region = new Region("test_region", settings);
 
-        // Bind Anvil prefilter provider: alternate REJECT and ACCEPT
-        final int[] calls = new int[1];
+        // Bind Anvil prefilter provider: alternate REJECT and ACCEPT (called from AnvilIoPool threads)
+        final java.util.concurrent.atomic.AtomicInteger calls = new java.util.concurrent.atomic.AtomicInteger();
         RTPAPI.hooks().anvilPrefilter().bind((w, cx, cz) -> {
-            int c = calls[0]++;
+            int c = calls.getAndIncrement();
             return (c % 2 == 0)
                     ? AnvilPrefilterRegistry.Provider.Decision.REJECT
                     : AnvilPrefilterRegistry.Provider.Decision.ACCEPT;
@@ -71,14 +71,17 @@ class RegionBacklogOutcomeStatsTest {
         long initialFailures = RtpOutcomeStats.GLOBAL.failureCount(LocationGenerator.FailTypes.biome);
         long initialSuccesses = RtpOutcomeStats.GLOBAL.successCount();
 
-        // Execute pulse to fill the backlog and classify
-        region.execute(TimeUnit.MILLISECONDS.toNanos(50));
-
-        // Process another pulse to verify promotion after classification
-        region.execute(TimeUnit.MILLISECONDS.toNanos(50));
-
-        long deltaFailures = RtpOutcomeStats.GLOBAL.failureCount(LocationGenerator.FailTypes.biome) - initialFailures;
-        long deltaSuccesses = RtpOutcomeStats.GLOBAL.successCount() - initialSuccesses;
+        // First pulse fills the backlog and submits bin batches; later pulses apply them and promote.
+        long deltaFailures = 0L;
+        long deltaSuccesses = 0L;
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        do {
+            region.execute(TimeUnit.MILLISECONDS.toNanos(50));
+            deltaFailures = RtpOutcomeStats.GLOBAL.failureCount(LocationGenerator.FailTypes.biome) - initialFailures;
+            deltaSuccesses = RtpOutcomeStats.GLOBAL.successCount() - initialSuccesses;
+            if (deltaFailures > 0 && deltaSuccesses > 0) break;
+            Thread.sleep(5L);
+        } while (System.nanoTime() < deadline);
 
         assertTrue(deltaFailures > 0, "failures must be recorded for Anvil rejections");
         assertTrue(deltaSuccesses > 0, "successes must be recorded for cold promotions");

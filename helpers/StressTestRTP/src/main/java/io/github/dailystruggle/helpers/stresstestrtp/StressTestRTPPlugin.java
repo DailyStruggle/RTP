@@ -115,6 +115,12 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         // teleport pipeline, since the per-thread CPU sampler doesn't bill
         // server-internal chunk-system threads to the calling plugin.
         chunkCounter = new ChunkLoadCounter(this);
+        int sampleStride = getConfig().getInt("sync-load-sample-rate", 1);
+        if (sampleStride > 1) {
+            chunkCounter.syncAttributor().setSampleStride(sampleStride);
+            getLogger().info("StressTestRTP: sync-load stack-walk sampling enabled (1 in "
+                    + sampleStride + " loads).");
+        }
         chunkCounter.register();
         // Validate the stack-based sync-load attribution before any run reads
         // it: one sync and one async load of a generated, unloaded chunk.
@@ -528,6 +534,10 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         @Override public long coldStartLatencyMs(String targetLabel) {
             MetricsRecorder r = plugin.recorder();
             return r != null ? r.coldStartLatencyMs(targetLabel) : -1L;
+        }
+        @Override public java.util.List<Attempt> finishedDispatchedBetween(long from, long to, String targetLabel) {
+            MetricsRecorder r = plugin.recorder();
+            return r != null ? r.finishedDispatchedBetween(from, to, targetLabel) : java.util.Collections.emptyList();
         }
         @Override public java.util.List<Long> latenciesSnapshot(boolean successOnly) {
             MetricsRecorder r = plugin.recorder();

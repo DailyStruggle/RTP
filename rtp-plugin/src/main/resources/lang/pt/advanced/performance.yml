@@ -163,6 +163,13 @@ limiteAvisoCrescimentoFila: 0
 # @default: false
 carregamentoSincrono: false
 
+# Caminho de teleporte no Paper. AUTO = teleporte no mesmo tick se o chunk de destino já
+# estiver carregado, senão teleportAsync. ASYNC = sempre teleportAsync (um tick mais lento).
+# @type: string
+# @options: ["AUTO", "ASYNC"]
+# @default: "AUTO"
+caminhoTeleporte: "AUTO"
+
 # Análise de permissões (inicialização)
 # onEventParsing: Incompatível com permissões amplas tipo *.*.
 # Impacto: MÉDIO (onEvent) / BAIXO (effect)

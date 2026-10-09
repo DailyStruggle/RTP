@@ -113,4 +113,19 @@ class ChunkLoadLandingAreaTest {
         assertEquals(c.phaseTotal(), c.phaseAttributed() + c.phaseLanding() + c.phaseBackground());
         assertEquals(4, c.phaseTotal());
     }
+
+    @Test
+    @DisplayName("Listener timing tracks elapsed nanos and resets on phase boundary")
+    void listenerTimingTracksAndResets() {
+        ChunkLoadCounter c = counter();
+        assertEquals(0L, c.phaseListenerNanos());
+        assertEquals(0L, c.phaseListenerMs());
+
+        c.route(WORLD, 0, 0, false, null);
+        c.reportPhaseListenerTime("warmup"); // does not throw
+
+        c.resetPhase();
+        assertEquals(0L, c.phaseListenerNanos());
+        assertEquals(0L, c.phaseListenerMs());
+    }
 }

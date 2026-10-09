@@ -51,11 +51,17 @@ class FuzzySearchEngineCandidateTest {
         assertEquals("CIRCLE", res1.match());
         assertEquals(1, res1.editDistance());
 
-        // "sqare" -> "SQUARE" (distance 1, len 5)
+        // "sqare" -> "SQUARE" (distance 1, len 5, missing 'u')
         var res2 = FuzzySearchEngine.resolveCandidate("sqare", shapes);
         assertEquals(FuzzySearchEngine.LookupStatus.PERCEPTIBLE_TYPO, res2.status());
         assertEquals("SQUARE", res2.match());
         assertEquals(1, res2.editDistance());
+
+        // "squae" -> "SQUARE" (distance 1, len 5, missing 'r')
+        var resSquae = FuzzySearchEngine.resolveCandidate("squae", shapes);
+        assertEquals(FuzzySearchEngine.LookupStatus.PERCEPTIBLE_TYPO, resSquae.status());
+        assertEquals("SQUARE", resSquae.match());
+        assertEquals(1, resSquae.editDistance());
 
         // "rectangel" -> "RECTANGLE" (distance 2, len 9)
         var res3 = FuzzySearchEngine.resolveCandidate("rectangel", shapes);

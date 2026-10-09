@@ -146,4 +146,30 @@ public class HeapPressureMonitorTest {
             resetMonitorState();
         }
     }
+
+    @Test
+    void resumesWhenPressureSubsides() throws Exception {
+        @SuppressWarnings("unchecked")
+        ConfigParser<PerformanceKeys> perf =
+                (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        assertNotNull(perf);
+        try {
+            // First trip pressure with an extremely low threshold
+            perf.set(PerformanceKeys.maxHeapPercent, 0.0001);
+            resetMonitorState();
+            boolean underPressure = HeapPressureMonitor.underPressure();
+
+            // Now raise threshold back to default / high so pressure clears
+            perf.set(PerformanceKeys.maxHeapPercent, 99.9);
+            Field lastSampleMs = HeapPressureMonitor.class.getDeclaredField("lastSampleMs");
+            lastSampleMs.setAccessible(true);
+            ((AtomicLong) lastSampleMs.get(null)).set(0L);
+
+            boolean relieved = HeapPressureMonitor.underPressure();
+            assertFalse(relieved);
+        } finally {
+            perf.set(PerformanceKeys.maxHeapPercent, 0.0);
+            resetMonitorState();
+        }
+    }
 }

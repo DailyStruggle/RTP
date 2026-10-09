@@ -44,11 +44,7 @@ public final class BukkitCommandRegistrar extends BukkitCommand {
 
     for (String name : names) {
       if (name == null || name.isBlank()) continue;
-      PluginCommand command = null;
-      try {
-        command = Bukkit.getPluginCommand(name);
-      } catch (Throwable ignored) {
-      }
+      PluginCommand command = resolvePluginCommand(name);
       if (command != null) {
         command.setExecutor(this);
         command.setTabCompleter(this);
@@ -58,7 +54,8 @@ public final class BukkitCommandRegistrar extends BukkitCommand {
         }
         if (commandMap != null) {
           Command existing = commandMap.getCommand(name);
-          if (existing == null) {
+          String prefix = (plugin != null) ? plugin.getName().toLowerCase(java.util.Locale.ROOT) : "rtp";
+          if (existing == null || commandMap.getCommand(prefix + ":" + name) == null) {
             String desc = (root != null) ? root.description() : "";
             DynamicBukkitCommand dynamicCmd = new DynamicBukkitCommand(
                 name,
@@ -68,7 +65,6 @@ public final class BukkitCommandRegistrar extends BukkitCommand {
                 this,
                 this
             );
-            String prefix = (plugin != null) ? plugin.getName().toLowerCase() : "rtp";
             commandMap.register(prefix, dynamicCmd);
             registeredAnyDynamic = true;
           }
@@ -79,6 +75,39 @@ public final class BukkitCommandRegistrar extends BukkitCommand {
     if (registeredAnyDynamic) {
       syncCommands();
     }
+  }
+
+  private @Nullable PluginCommand resolvePluginCommand(String name) {
+    if (plugin instanceof org.bukkit.plugin.java.JavaPlugin jp) {
+      try {
+        PluginCommand cmd = jp.getCommand(name);
+        if (cmd != null && cmd.getPlugin() == plugin) {
+          return cmd;
+        }
+      } catch (Throwable ignored) {
+      }
+    }
+
+    try {
+      PluginCommand cmd = Bukkit.getPluginCommand(name);
+      if (cmd != null && (plugin == null || cmd.getPlugin() == plugin)) {
+        return cmd;
+      }
+    } catch (Throwable ignored) {
+    }
+
+    if (plugin != null) {
+      try {
+        String prefix = plugin.getName().toLowerCase(java.util.Locale.ROOT);
+        PluginCommand cmd = Bukkit.getPluginCommand(prefix + ":" + name.toLowerCase(java.util.Locale.ROOT));
+        if (cmd != null && cmd.getPlugin() == plugin) {
+          return cmd;
+        }
+      } catch (Throwable ignored) {
+      }
+    }
+
+    return null;
   }
 
   private static @Nullable CommandMap getCommandMap() {

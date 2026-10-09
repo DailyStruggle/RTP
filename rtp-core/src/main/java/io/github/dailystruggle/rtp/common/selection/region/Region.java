@@ -49,6 +49,18 @@ public class Region extends FactoryValue<RegionKeys> {
   public RegionQueueManager queueManager;
   public AtomicInteger inFlightCalculations =
       new AtomicInteger(0);
+  /**
+   * Cold->hot promotions holding a ticket while waiting for the chunk to become resident. Counts
+   * toward kept/total capacity but not {@link #inFlightCalculations}, so the wait does not stall
+   * {@link RegionCacheTask}'s single-flight fill gate.
+   */
+  public final AtomicInteger pendingKeptPromotions = new AtomicInteger(0);
+  /**
+   * Dedicated single-flight gate for public cache fill ({@link RegionCacheTask}). Ensures only one
+   * speculative fill train runs per region, decoupled from {@link #inFlightCalculations} so concurrent
+   * player teleports and promotions do not starve background cache refill.
+   */
+  public final AtomicBoolean inFlightCacheFill = new AtomicBoolean(false);
 
   public RTPTaskPipe cachePipeline;
   public RTPTaskPipe miscPipeline;
@@ -83,6 +95,20 @@ public class Region extends FactoryValue<RegionKeys> {
    * Hysteresis latch for the backlog refill loop.
    */
   private volatile boolean backlogRefillActive = true;
+
+  /** Batched backlog bin verification; per instance (reset by {@link #clone()}). */
+  private BacklogBinVerifier binVerifier = new BacklogBinVerifier();
+
+  /** Records a backlog entry this region staged as rejected and teaches its bad-chunk table. */
+  void onBacklogReject(BacklogLocationBuffer.BacklogEntry e) {
+    RtpOutcomeStats.GLOBAL.recordFailure(LocationGenerator.FailTypes.biome);
+    if (this.shape instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape ms) {
+      long loc1D = ms.xzToLocation(e.location().coords().x(), e.location().coords().z());
+      if (loc1D >= 0) {
+        ms.addBadChunk(loc1D, LocationGenerator.FailTypes.biome);
+      }
+    }
+  }
 
   /**
    * Lazily-created, cached shared {@link CandidateValidator} for this region. The validator is
@@ -514,6 +540,68 @@ public class Region extends FactoryValue<RegionKeys> {
     }
   }
 
+  /** Upper bound on waiting for a promoted chunk's ticket and native load before giving up. */
+  static final long KEPT_READY_TIMEOUT_MS = 5_000L;
+
+  /**
+   * Offer a promoted location to {@code keptLocations} only once its ticket has applied and the
+   * chunk is resident. Consumers take kept entries the moment they appear, so offering on ticket
+   * request let teleports race the platform's async load and pay it in the teleport wait.
+   * Timeout, failure or a non-resident chunk closes the reservation (S-002) and returns the
+   * location to {@code unkeptLocations}. Held in {@link #pendingKeptPromotions} until settled on
+   * every path. Waits on a copy: the apply future is shared by ref-counted callers of the same
+   * chunk.
+   */
+  @SuppressWarnings("java:S2093") // ownership transfers to keptLocations on a successful offer
+  void offerKeptWhenResident(
+      RTPLocation coldLoc, RTPCoords resolved, ChunkReservation reservation, int cx, int cz) {
+    pendingKeptPromotions.incrementAndGet();
+    CompletableFuture<Void> ready;
+    try {
+      ready = reservation.readyFuture().copy()
+          .orTimeout(KEPT_READY_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+    } catch (Throwable t) {
+      ready = CompletableFuture.failedFuture(t);
+    }
+    ready.whenComplete((v, ex) -> {
+      try {
+        RTPWorld<?> world = getWorld();
+        boolean resident = ex == null && world != null && world.isChunkLoaded(cx, cz);
+        if (!resident) {
+          reservation.close();
+          queueManager.unkeptLocations.offer(coldLoc);
+          RTP.log(Level.FINE,
+              "[Region:" + name + "] kept promotion chunk=(" + cx + "," + cz + ") not resident ("
+                  + (ex != null ? ex.getClass().getSimpleName() : "unloaded")
+                  + "); returned to unkept");
+          return;
+        }
+        boolean added = queueManager.keptLocations.offer(
+            new RTPLocation(resolved, coldLoc.attempts(), reservation));
+        RTP.log(Level.FINER,
+            "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
+                + ") keptLocations.offer added=" + added
+                + " keptSize=" + queueManager.keptLocations.size());
+        if (!added) {
+          reservation.close();
+          queueManager.unkeptLocations.offer(coldLoc);
+          RTP.log(Level.FINE,
+              "[Region:" + name + "] PushQueue rejected (cache full); returned to unkept");
+        } else {
+          // Diagram 02 (PushQueue): cache successfully grew.
+          RTP.log(Level.FINE,
+              "[Region:" + name + "] PushQueue: kept-cache size="
+                  + queueManager.keptLocations.size());
+        }
+      } catch (Throwable t) {
+        reservation.close();
+        RTP.log(Level.WARNING, "[Region:" + name + "] kept promotion failed: " + t, t);
+      } finally {
+        pendingKeptPromotions.decrementAndGet();
+      }
+    });
+  }
+
   public void execute(long availableTime) {
     io.github.dailystruggle.rtp.common.tools.CfDiag.regionExecute.increment();
     // Lobby backends advertise regions=[]/acceptingRequests=false
@@ -551,13 +639,15 @@ public class Region extends FactoryValue<RegionKeys> {
     // Region.java - inside execute()
     long activeCap = settings.activeChunkCap();
     long currentHot = queueManager.keptLocations.size();
-    long deficit = activeCap - (currentHot + inFlightCalculations.get());
+    long pendingKept = pendingKeptPromotions.get();
+    long deficit = activeCap - (currentHot + inFlightCalculations.get() + pendingKept);
 
     // Diagram 02 (ExecuteRegion -> SpawnWorker): per-region budget enforcement.
     if (deficit > 0) {
       RTP.log(Level.FINE,
           "[Region:" + name + "] hot deficit=" + deficit + " (activeCap=" + activeCap
-              + ", kept=" + currentHot + ", inFlight=" + inFlightCalculations.get() + ")");
+              + ", kept=" + currentHot + ", inFlight=" + inFlightCalculations.get()
+              + ", pendingKept=" + pendingKept + ")");
     }
 
     // Heap-pressure gate: each cold->hot promotion below loads (and retains via
@@ -687,24 +777,8 @@ public class Region extends FactoryValue<RegionKeys> {
               }
 
               ChunkReservation reservation = new ChunkReservation(chunkSet, getWorld());
-              boolean added = queueManager.keptLocations.offer(
-                      new RTPLocation(resolved, coldLoc.attempts(), reservation)
-              );
-              RTP.log(Level.FINER,
-                  "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
-                      + ") keptLocations.offer added=" + added
-                      + " keptSize=" + queueManager.keptLocations.size());
-              if (!added) {
-                reservation.close();
-                queueManager.unkeptLocations.offer(coldLoc);
-                RTP.log(Level.FINE,
-                    "[Region:" + name + "] PushQueue rejected (cache full); returned to unkept");
-              } else {
-                // Diagram 02 (PushQueue): cache successfully grew.
-                RTP.log(Level.FINE,
-                    "[Region:" + name + "] PushQueue: kept-cache size="
-                        + queueManager.keptLocations.size());
-              }
+              // Moves the slot to pendingKeptPromotions before the in-flight release below.
+              offerKeptWhenResident(coldLoc, resolved, reservation, cx, cz);
             } finally {
               inFlightCalculations.decrementAndGet();
             }
@@ -927,7 +1001,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
     try {
       // Compute cache deficit before scheduling observational task.
-      deficit = totalCap - (cachePipeline.size() + queueManager.keptLocations.size() + queueManager.unkeptLocations.size() + inFlightCalculations.get());
+      deficit = totalCap - (cachePipeline.size() + queueManager.keptLocations.size() + queueManager.unkeptLocations.size() + inFlightCalculations.get() + pendingKeptPromotions.get());
 
       for (long i = 0; i < deficit; i++) {
         cachePipeline.add(new RegionCacheTask(this, availableTime - (System.nanoTime() - start)));
@@ -1044,59 +1118,25 @@ public class Region extends FactoryValue<RegionKeys> {
           }
           if (entry == null) break; // capacity rejection
         }
+        entry.setOwnerOnReject(this::onBacklogReject);
         binIndex.insert(RegionFileCoord.of(coords), entry);
       }
     }
 
-    // Verify one bin per pulse from oldest unverified entry.
-    BacklogLocationBuffer.BacklogEntry oldest = backlog.peekOldestUnverified();
-    if (oldest != null) {
-      RegionFileCoord binKey = RegionFileCoord.of(oldest.location().coords());
-      List<BacklogLocationBuffer.BacklogEntry> snapshot = binIndex.snapshot(binKey);
-      io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry.Provider provider = null;
-      try {
-        io.github.dailystruggle.rtp.api.hooks.RTPHooks hooks =
-            io.github.dailystruggle.rtp.api.RTPAPI.hooks();
-        if (hooks != null) provider = hooks.anvilPrefilter().current();
-      } catch (Throwable t) {
-        provider = null;
-      }
-      for (BacklogLocationBuffer.BacklogEntry e : snapshot) {
-        if (e.validity() != BacklogLocationBuffer.Validity.UNVERIFIED) continue;
-        BacklogLocationBuffer.Validity next;
-        if (provider == null) {
-          next = BacklogLocationBuffer.Validity.VALIDATED;
-        } else {
-          int cx = e.location().coords().x() >> 4;
-          int cz = e.location().coords().z() >> 4;
-          io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry.Provider.Decision d;
-          try {
-            d = provider.classify(world, cx, cz);
-          } catch (Throwable t) {
-            d = io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry.Provider.Decision.UNKNOWN;
-          }
-          if (d == null) d =
-              io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry.Provider.Decision.UNKNOWN;
-          switch (d) {
-            case REJECT -> {
-              next = BacklogLocationBuffer.Validity.INVALIDATED;
-              RtpOutcomeStats.GLOBAL.recordFailure(LocationGenerator.FailTypes.biome);
-              if (this.shape instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape ms) {
-                long loc1D = ms.xzToLocation(e.location().coords().x(), e.location().coords().z());
-                if (loc1D >= 0) {
-                  ms.addBadChunk(loc1D, LocationGenerator.FailTypes.biome);
-                }
-              }
-            }
-            case ACCEPT, UNKNOWN -> next = BacklogLocationBuffer.Validity.VALIDATED;
-            default -> next = BacklogLocationBuffer.Validity.VALIDATED;
-          }
-        }
-        e.setValidity(next);
-      }
-      // Clean invalidated entries if heuristic is met to free backlog capacity.
-      backlog.cleanIfHeuristicMet();
+    // Verify region-file bins oldest-first: one classifyBatch per bin, results applied on this
+    // thread; with a provider, batches run on AnvilIoPool and land on a later pulse.
+    io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry.Provider provider = null;
+    try {
+      io.github.dailystruggle.rtp.api.hooks.RTPHooks hooks =
+          io.github.dailystruggle.rtp.api.RTPAPI.hooks();
+      if (hooks != null) provider = hooks.anvilPrefilter().current();
+    } catch (Throwable t) {
+      provider = null;
     }
+    // Entries carry their owner's sink; this one only covers entries staged without one.
+    binVerifier.pulse(world, backlog, binIndex, provider, this::onBacklogReject);
+    // Clean invalidated entries if heuristic is met to free backlog capacity.
+    backlog.cleanIfHeuristicMet();
 
     // Drain validated entries into unkeptLocations up to cold capacity.
     // Under FLAT_STRIDE (default): drains contiguous validated head (FIFO), preserving linear dyadic progression.
@@ -1229,6 +1269,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
   /** shutDown - save and clear data */
   public void shutDown() {
+    binVerifier.close();
     Shape<?> shape = getShape();
     if (shape == null) return;
 
@@ -1251,6 +1292,7 @@ public class Region extends FactoryValue<RegionKeys> {
   public Region clone() {
     Region clone = (Region) super.clone();
     clone.settings = settings;
+    clone.binVerifier = new BacklogBinVerifier();
     return clone;
   }
 

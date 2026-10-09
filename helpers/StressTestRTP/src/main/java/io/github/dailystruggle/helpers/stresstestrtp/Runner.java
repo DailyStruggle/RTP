@@ -33,7 +33,12 @@ public final class Runner {
 
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
-    public enum Mode { TIMED, BURST, SEQUENCE, WARMUP }
+    public enum Mode { TIMED, BURST, SEQUENCE, WARMUP, RAMP }
+
+    /** Ramp sub-state. SETTLE covers both the post-warm-up drain and the
+     *  inter-stage gap; DRAIN waits out a finished stage's in-flight attempts
+     *  so they are billed to the stage that dispatched them. */
+    enum RampState { IDLE, WARMUP, SETTLE, RUNNING, DRAIN }
 
     private final Plugin plugin;
     private final MetricsRecorder recorder;
@@ -74,6 +79,10 @@ public final class Runner {
      *  Safe because {@link #tick()} is strictly non-overlapping (see
      *  {@link #ticking}) and the buffer is only touched from the tick body. */
     private final List<Player> rosterBuffer = new ArrayList<>();
+    /** Player objects already capped by {@link #capPlayerDistances}; weak so a
+     *  reconnect (new Player instance) is capped again. */
+    private final Map<Player, Boolean> distanceCapped =
+            Collections.synchronizedMap(new WeakHashMap<>());
     private final ConcurrentHashMap<UUID, Long> deadlines = new ConcurrentHashMap<>();
     /** Per-player earliest-next-dispatch timestamp (epoch ms). Prevents the
      *  "you're already teleporting!" flood when concurrency > 1 and the
@@ -102,6 +111,14 @@ public final class Runner {
     private volatile long seqGapMs = 0L;
     private volatile long seqPhaseEndMs = 0L; // when current run-phase ends
     private volatile long seqGapEndMs = 0L;   // when current gap-phase ends (0 if not in gap)
+
+    // Pre-phase idle calibration state
+    private boolean gapCalibActive = false;
+    private long gapCalibStartEpochMs = 0L;
+    private long gapCalibStartProcCpuNs = -1L;
+    private long gapCalibStartMainCpuNs = -1L;
+    private final List<Double> gapCalibMsptSamples = new ArrayList<>();
+    private long lastGapMsptSampleMs = 0L;
     /** Optional fixed dispatched-attempt cap per target (config
      *  {@code per-target-count}). 0 disables it (phases end purely on time).
      *  When > 0, a measurement phase ends as soon as this many attempts have
@@ -145,6 +162,49 @@ public final class Runner {
     /** Coalesces immediate re-dispatch kicks so a burst of completions on
      *  several region threads queues at most one extra dispatch pass. */
     private final AtomicBoolean kickQueued = new AtomicBoolean(false);
+
+    // RAMP state: fixed-rate stages against one pinned target. Concurrency is
+    // bounded only by one in-flight attempt per roster player. Decisions live
+    // in RampEvaluator; this class only drives time and dispatch.
+    private volatile Targets.Entry rampTarget = null;
+    private double[] rampStages = new double[0];
+    private long rampStageMs = 60_000L;
+    private long rampWarmupMs = 0L;
+    /** Pre-warm-up window with no dispatch; its second half is the idle baseline for every stage. */
+    private long rampIdleMs = 0L;
+    private MetricsRecorder.IdleBaseline rampIdleBaseline = null;
+    private long rampGapMs = 0L;
+    private long rampPerPlayerGapMs = 0L;
+    private volatile RampState rampState = RampState.SETTLE;
+    private volatile int rampStageIdx = -1;
+    private int rampNextIdx = 0;
+    private boolean rampInWarmup = false;
+    private long rampStateStartMs = 0L;   // warm-up or stage dispatch start
+    private long rampStageEndMs = 0L;     // planned, then actual, dispatch end
+    private long rampDrainDeadlineMs = 0L;
+    private long rampSettleEndMs = 0L;
+    private long rampIssued = 0L;         // due slots consumed (dispatched + shed)
+    private int rampShed = 0;
+    private int rampPeakInFlight = 0;
+    private int rampRosterSize = 0;
+    private boolean rampAborted = false;
+    // Synchronized: an operator stop builds the partial row off the tick thread.
+    private final List<Double> rampMsptSamples = Collections.synchronizedList(new ArrayList<>());
+    private double rampTpsMin = -1.0;
+    private long rampHeapPeakMb = -1L;
+    private long rampLastSampleMs = 0L;
+    private volatile RampEvaluator rampEval = null;
+    private RampEvaluator.LowTpsWatch rampLowTps = null;
+    private volatile RampWriter rampWriter = null;
+    private List<Pattern> rampBusyPatterns = List.of();
+    private boolean rampSparkStarted = false;
+    private final AtomicBoolean rampFinalized = new AtomicBoolean(true);
+    // Wall-clock TPS from a 20-tick global timer. Paper's getTPS()[0] is a
+    // 1-minute average and lags a 10 s low-TPS rule by tens of seconds.
+    private volatile Object rampTpsTaskId = null;
+    private volatile double rampWallTps = -1.0;
+    private volatile long rampLastTpsTickMs = 0L;
+    private long rampTpsLastNs = -1L;
 
     public Runner(Plugin plugin, MetricsRecorder recorder, TeleportProbe probe,
                   TpsMsptHeapSampler sampler, FileConfiguration config) {
@@ -406,6 +466,432 @@ public final class Runner {
         return true;
     }
 
+    /** Default offered rates (TP/s) when {@code ramp.stages} is absent. */
+    static final double[] DEFAULT_RAMP_STAGES = {5, 10, 20, 40, 80, 160, 320};
+
+    /**
+     * Fixed-rate ramp against one target: optional warm-up at the first
+     * stage's rate (no CSV rows), then each stage dispatches at its offered
+     * rate for {@code stageSeconds}, drains, and writes one
+     * {@code <stamp>-ramp.csv} row. Stop rules and the stress point come
+     * from {@link RampEvaluator}.
+     */
+    public boolean startRamp(CommandSender starter, Targets.Entry target, int stageSeconds) throws java.io.IOException {
+        return startRamp(starter, target, stageSeconds, null);
+    }
+
+    /** As {@link #startRamp(CommandSender, Targets.Entry, int)}; a non-empty
+     *  {@code stagesOverride} replaces {@code ramp.stages} for this ramp only
+     *  (e.g. {@code [100]} for a flat fixed-rate run). */
+    public boolean startRamp(CommandSender starter, Targets.Entry target, int stageSeconds,
+                             double[] stagesOverride) throws java.io.IOException {
+        if (target == null) return false;
+        if (!running.compareAndSet(false, true)) return false;
+        try {
+            this.rampWriter = new RampWriter(recorder.csvPath());
+        } catch (java.io.IOException e) {
+            running.set(false);
+            throw e;
+        }
+        rememberOperator(starter);
+        this.mode = Mode.RAMP;
+        this.concurrencyCap = Integer.MAX_VALUE; // one-per-player is the only bound
+        this.rampTarget = target;
+        double[] arr = stagesOverride != null && stagesOverride.length > 0
+                ? Arrays.stream(stagesOverride).filter(d -> d > 0).toArray()
+                : config.getDoubleList("ramp.stages").stream()
+                        .mapToDouble(Double::doubleValue).filter(d -> d > 0).toArray();
+        this.rampStages = arr.length == 0 ? DEFAULT_RAMP_STAGES.clone() : arr;
+        long secs = stageSeconds > 0 ? stageSeconds : config.getLong("ramp.stage-seconds", 60L);
+        this.rampStageMs = Math.max(1L, secs) * 1000L;
+        this.rampWarmupMs = Math.max(0L, config.getLong("ramp.warmup-seconds", 30L)) * 1000L;
+        this.rampIdleMs = Math.max(0L, config.getLong("ramp.idle-seconds", 30L)) * 1000L;
+        this.rampIdleBaseline = null;
+        this.rampGapMs = Math.max(0L, config.getLong("ramp.gap-seconds", 5L)) * 1000L;
+        this.rampPerPlayerGapMs = Math.max(0L, Math.min(5000L, config.getLong("ramp.per-player-gap-ms", 0L)));
+        RampEvaluator.Thresholds th = new RampEvaluator.Thresholds(
+                config.getDouble("ramp.pass.min-achieved-fraction", 0.95),
+                config.getDouble("ramp.pass.max-mspt-p95", 50.0),
+                config.getDouble("ramp.pass.max-fail-fraction", 0.01),
+                (int) config.getLong("ramp.stop.consecutive-failures", 2L),
+                config.getDouble("ramp.stop.low-tps-threshold", 5.0),
+                Math.max(0L, config.getLong("ramp.stop.low-tps-seconds", 10L)) * 1000L);
+        this.rampEval = new RampEvaluator(th);
+        this.rampLowTps = new RampEvaluator.LowTpsWatch(th.lowTpsThreshold(), th.lowTpsWindowMs());
+        this.rampBusyPatterns = RampEvaluator.compile(config.getStringList("ramp.busy-patterns"));
+        this.rampFinalized.set(false);
+        this.rampSparkStarted = false;
+        this.rampStageIdx = -1;
+        this.rampNextIdx = 0;
+        this.rampWallTps = -1.0;
+        this.rampTpsLastNs = -1L;
+        this.rampLastTpsTickMs = System.currentTimeMillis();
+        this.rampTpsTaskId = Sched.runGlobalTimer(plugin, this::rampTpsTick, 20L);
+        long now = System.currentTimeMillis();
+        this.lastProgressEpochMs = now;
+        this.kickstartCount = 0;
+        this.rosterCursor.set(0);
+        this.nextDispatchAt.clear();
+        long total = rampIdleMs + rampWarmupMs + rampStages.length * (rampStageMs + rampGapMs);
+        this.endEpochMs = now + total;
+        gapCalibActive = false;
+        if (rampIdleMs > 0L) {
+            recorder.setRecording(false);
+            rampInWarmup = false;
+            rampState = RampState.IDLE;
+            resetRampWindow(now);
+        } else if (rampWarmupMs > 0L) {
+            recorder.setRecording(false);
+            rampInWarmup = true;
+            rampState = RampState.WARMUP;
+            resetRampWindow(now);
+        } else {
+            rampInWarmup = false;
+            beginRampStage(0, now);
+        }
+        plugin.getLogger().info(String.format(Locale.ROOT,
+                "[StressTestRTP] ramp start: target=%s stages=%s stage=%ds idle=%ds warmup=%ds gap=%ds per-player-gap=%dms thresholds=%s csv=%s",
+                target.label, Arrays.toString(rampStages), rampStageMs / 1000L, rampIdleMs / 1000L, rampWarmupMs / 1000L,
+                rampGapMs / 1000L, rampPerPlayerGapMs, th, rampWriter.csvPath().getFileName()));
+        long timerPeriodMs = Math.max(5L, config.getLong("runner-tick-ms", 20L));
+        this.taskId = Sched.runAsyncTimer(plugin, this::tick, timerPeriodMs);
+        return true;
+    }
+
+    /** 20-tick timer on the global region / main thread: wall-clock TPS. */
+    private void rampTpsTick() {
+        long ns = System.nanoTime();
+        if (rampTpsLastNs > 0L) {
+            double s = (ns - rampTpsLastNs) / 1_000_000_000.0;
+            if (s > 0.0) rampWallTps = Math.min(20.0, 20.0 / s);
+        }
+        rampTpsLastNs = ns;
+        rampLastTpsTickMs = System.currentTimeMillis();
+    }
+
+    private String rampStageLabel(int idx) {
+        String l = rampTarget == null ? "ramp" : rampTarget.label;
+        return l + "@ramp" + idx + "-" + RampEvaluator.fmtRate(rampStages[idx]) + "tps";
+    }
+
+    private void resetRampWindow(long now) {
+        rampStateStartMs = now;
+        rampIssued = 0L;
+        rampShed = 0;
+        rampPeakInFlight = 0;
+        rampAborted = false;
+        rampMsptSamples.clear();
+        rampTpsMin = -1.0;
+        rampHeapPeakMb = -1L;
+        rampLastSampleMs = 0L;
+        if (rampLowTps != null) rampLowTps.reset();
+    }
+
+    private void beginRampStage(int idx, long now) {
+        rampStageIdx = idx;
+        resetRampWindow(now);
+        rampStageEndMs = now + rampStageMs;
+        rampState = RampState.RUNNING;
+        nextDispatchAt.clear();
+        lastProgressEpochMs = now;
+        if (!rampSparkStarted) {
+            spark.startPhase((rampTarget == null ? "ramp" : rampTarget.label) + "-ramp");
+            rampSparkStarted = true;
+        }
+        if (rampIdleBaseline != null) recorder.setNextPhaseIdleBaseline(rampIdleBaseline);
+        recorder.beginPhase(rampStageLabel(idx));
+        plugin.getLogger().info(String.format(Locale.ROOT,
+                "[StressTestRTP] ramp stage %d/%d: offered %s TP/s for %ds",
+                idx, rampStages.length - 1, RampEvaluator.fmtRate(rampStages[idx]), rampStageMs / 1000L));
+    }
+
+    private void enterRampSettle(long now, long timeoutMs) {
+        rampState = RampState.SETTLE;
+        rampDrainDeadlineMs = now + timeoutMs + 1000L;
+        rampSettleEndMs = now + rampGapMs;
+    }
+
+    /** Times out every tracked attempt; used when a bounded drain expires. */
+    private void forceClearInFlight() {
+        for (UUID id : new ArrayList<>(deadlines.keySet())) {
+            MetricsRecorder.Attempt a = probe.forget(id);
+            if (a != null) recorder.onTimeout(a);
+            deadlines.remove(id);
+        }
+        inFlight.set(0);
+    }
+
+    private void beginIdleCalibration(long now) {
+        gapCalibActive = true;
+        gapCalibStartEpochMs = now;
+        CpuSampler cpu = recorder.cpuSampler();
+        gapCalibStartProcCpuNs = cpu != null ? cpu.processCpuTimeNs() : -1L;
+        gapCalibStartMainCpuNs = cpu != null ? cpu.mainThreadCpuTimeNs() : -1L;
+        gapCalibMsptSamples.clear();
+        lastGapMsptSampleMs = 0L;
+    }
+
+    private void sampleIdleCalibration(long now) {
+        if (now - lastGapMsptSampleMs < 100L) return;
+        lastGapMsptSampleMs = now;
+        double mspt = sampler != null ? sampler.latest().mspt() : -1.0;
+        if (mspt > 0.0) gapCalibMsptSamples.add(mspt);
+    }
+
+    /** Ends the active calibration window and returns its baseline. */
+    private MetricsRecorder.IdleBaseline harvestIdleCalibration(long now) {
+        CpuSampler cpu = recorder.cpuSampler();
+        MetricsRecorder.IdleBaseline b = idleBaseline(gapCalibStartEpochMs, now,
+                gapCalibStartProcCpuNs, cpu != null ? cpu.processCpuTimeNs() : -1L,
+                gapCalibStartMainCpuNs, cpu != null ? cpu.mainThreadCpuTimeNs() : -1L,
+                gapCalibMsptSamples);
+        gapCalibActive = false;
+        gapCalibMsptSamples.clear();
+        return b;
+    }
+
+    /** Cores = CPU-ns delta / wall-ns; -1 where a counter is missing or went backwards. */
+    static MetricsRecorder.IdleBaseline idleBaseline(long startMs, long endMs,
+                                                     long procStartNs, long procEndNs,
+                                                     long mainStartNs, long mainEndNs,
+                                                     List<Double> msptSamples) {
+        long wallNs = (endMs - startMs) * 1_000_000L;
+        double procCores = (procStartNs >= 0 && procEndNs >= procStartNs && wallNs > 0)
+                ? (double) (procEndNs - procStartNs) / (double) wallNs : -1.0;
+        double mainCores = (mainStartNs >= 0 && mainEndNs >= mainStartNs && wallNs > 0)
+                ? (double) (mainEndNs - mainStartNs) / (double) wallNs : -1.0;
+        double msptP50 = -1.0;
+        if (msptSamples != null && !msptSamples.isEmpty()) {
+            List<Double> sorted = new ArrayList<>(msptSamples);
+            Collections.sort(sorted);
+            msptP50 = sorted.get(sorted.size() / 2);
+        }
+        return new MetricsRecorder.IdleBaseline(msptP50, mainCores, procCores, Math.max(0L, endMs - startMs));
+    }
+
+    /** Ramp body of {@link #tick()}. Runs only inside the non-overlapping tick. */
+    private void rampTick(long now) {
+        long timeoutMs = config.getLong("attempt-timeout-ms", 30000L);
+        switch (rampState) {
+            case IDLE -> {
+                // First half settles join churn; second half is the ambient baseline.
+                if (now - rampStateStartMs >= rampIdleMs / 2) {
+                    if (!gapCalibActive) beginIdleCalibration(now);
+                    sampleIdleCalibration(now);
+                }
+                if (now - rampStateStartMs < rampIdleMs) return;
+                rampIdleBaseline = gapCalibActive ? harvestIdleCalibration(now) : null;
+                if (rampIdleBaseline != null) {
+                    plugin.getLogger().info(String.format(Locale.ROOT,
+                            "[StressTestRTP] ramp idle baseline: MSPT p50=%.2f ms, main CPU=%.3f cores, proc CPU=%.3f cores (over %.1fs); applied to every stage",
+                            rampIdleBaseline.msptP50(), rampIdleBaseline.mainCpuCores(),
+                            rampIdleBaseline.processCpuCores(), rampIdleBaseline.durationMs() / 1000.0));
+                }
+                if (rampWarmupMs > 0L) {
+                    rampInWarmup = true;
+                    rampState = RampState.WARMUP;
+                    resetRampWindow(now);
+                } else {
+                    recorder.setRecording(true);
+                    beginRampStage(0, now);
+                }
+            }
+            case WARMUP -> {
+                rampDispatchDue(now, rampStages[0], timeoutMs);
+                if (now - rampStateStartMs >= rampWarmupMs) enterRampSettle(now, timeoutMs);
+            }
+            case SETTLE -> {
+                boolean drained = inFlight.get() <= 0 || deadlines.isEmpty();
+                if (!drained && now < rampDrainDeadlineMs) return;
+                if (now < rampSettleEndMs) return;
+                if (!drained) forceClearInFlight();
+                if (rampInWarmup) {
+                    rampInWarmup = false;
+                    recorder.setRecording(true);
+                    plugin.getLogger().info("[StressTestRTP] ramp warm-up complete");
+                }
+                beginRampStage(rampNextIdx, now);
+            }
+            case RUNNING -> {
+                if (now - rampLastSampleMs >= 100L) {
+                    rampLastSampleMs = now;
+                    TpsMsptHeapSampler.Snapshot snap = sampler.latest();
+                    if (snap.mspt() > 0.0) rampMsptSamples.add(snap.mspt());
+                    if (snap.heapUsedMb() > rampHeapPeakMb) rampHeapPeakMb = snap.heapUsedMb();
+                    double tps = RampEvaluator.effectiveTps(rampWallTps, now - rampLastTpsTickMs);
+                    if (tps >= 0 && (rampTpsMin < 0 || tps < rampTpsMin)) rampTpsMin = tps;
+                    if (rampLowTps.observe(now, tps)) {
+                        rampAborted = true;
+                        plugin.getLogger().warning(String.format(Locale.ROOT,
+                                "[StressTestRTP] ramp stage %d aborted: TPS < %.1f for %ds",
+                                rampStageIdx, rampEval.thresholds().lowTpsThreshold(),
+                                rampEval.thresholds().lowTpsWindowMs() / 1000L));
+                    }
+                }
+                if (rampAborted || now >= rampStageEndMs) {
+                    rampStageEndMs = Math.min(now, rampStageEndMs);
+                    rampState = RampState.DRAIN;
+                    rampDrainDeadlineMs = now + timeoutMs + 1000L;
+                    return;
+                }
+                rampDispatchDue(now, rampStages[rampStageIdx], timeoutMs);
+            }
+            case DRAIN -> {
+                boolean drained = inFlight.get() <= 0 || deadlines.isEmpty();
+                if (!drained && now < rampDrainDeadlineMs) return;
+                if (!drained) forceClearInFlight();
+                completeRampStage(now, timeoutMs, true);
+            }
+        }
+    }
+
+    /** Fixed-rate dispatch: every due slot either dispatches to an idle
+     *  roster player or is counted as harness-side shed. */
+    private void rampDispatchDue(long now, double rate, long timeoutMs) {
+        List<Player> roster = roster();
+        rampRosterSize = roster.size();
+        long due = RampEvaluator.slotsDue(rate, now - rampStateStartMs, rampIssued);
+        boolean exhausted = roster.isEmpty();
+        for (long i = 0; i < due && running.get(); i++) {
+            rampIssued++;
+            Player p = exhausted ? null : nextIdlePlayer(roster, now);
+            if (p == null) {
+                exhausted = true; // nobody frees up within this pass
+                rampShed++;
+                continue;
+            }
+            dispatchOne(p, timeoutMs, rampTarget);
+            lastDispatchStartEpochMs = System.currentTimeMillis();
+            lastProgressEpochMs = lastDispatchStartEpochMs;
+            int f = inFlight.get();
+            if (f > rampPeakInFlight) rampPeakInFlight = f;
+        }
+    }
+
+    private Player nextIdlePlayer(List<Player> roster, long now) {
+        int n = roster.size();
+        for (int k = 0; k < n; k++) {
+            Player p = roster.get(Math.floorMod(rosterCursor.getAndIncrement(), n));
+            UUID id = p.getUniqueId();
+            if (deadlines.containsKey(id)) continue;
+            Long readyAt = nextDispatchAt.get(id);
+            if (readyAt != null && readyAt > now) continue;
+            return p;
+        }
+        return null;
+    }
+
+    /** Builds the stage row from attempts dispatched in the stage window. */
+    private void completeRampStage(long now, long timeoutMs, boolean complete) {
+        int idx = rampStageIdx;
+        if (idx < 0 || idx >= rampStages.length || rampTarget == null) return;
+        long end = Math.max(rampStateStartMs, Math.min(rampStageEndMs, now));
+        List<MetricsRecorder.Attempt> atts =
+                recorder.finishedDispatchedBetween(rampStateStartMs, end + 1L, rampTarget.label);
+        int ok = 0, to = 0, err = 0, busy = 0;
+        List<Long> lat = new ArrayList<>();
+        for (MetricsRecorder.Attempt a : atts) {
+            switch (RampEvaluator.classify(a.success, a.failReason, rampBusyPatterns)) {
+                case SUCCESS -> {
+                    ok++;
+                    long l = a.latencyMs();
+                    if (l >= 0) lat.add(l);
+                }
+                case TIMEOUT -> to++;
+                case BUSY -> busy++;
+                default -> err++;
+            }
+        }
+        List<Double> ms;
+        synchronized (rampMsptSamples) {
+            ms = new ArrayList<>(rampMsptSamples);
+        }
+        Collections.sort(ms);
+        double msptP50 = ms.isEmpty() ? -1.0 : ms.get((int) Math.round(0.50 * (ms.size() - 1)));
+        double msptP95 = ms.isEmpty() ? -1.0 : ms.get((int) Math.round(0.95 * (ms.size() - 1)));
+        double secs = Math.max(0.001, (end - rampStateStartMs) / 1000.0);
+        RampEvaluator.StageResult sr = new RampEvaluator.StageResult(idx, rampStages[idx], secs,
+                atts.size(), ok, to, err, busy, rampShed, msptP95, rampAborted);
+        RampEvaluator.Decision decision = RampEvaluator.Decision.STOP;
+        RampEvaluator.Evaluation ev;
+        if (complete) {
+            decision = rampEval.record(sr, idx >= rampStages.length - 1);
+            ev = rampEval.history().get(rampEval.history().size() - 1);
+        } else {
+            ev = RampEvaluator.evaluate(sr, rampEval.thresholds());
+        }
+        RampWriter.Extras x = new RampWriter.Extras(
+                MetricsRecorder.percentile(lat, 50), MetricsRecorder.percentile(lat, 95),
+                MetricsRecorder.percentile(lat, 99), msptP50, ms.size(), rampTpsMin, rampHeapPeakMb,
+                rampRosterSize, rampPeakInFlight, complete, rampStateStartMs, end);
+        try {
+            rampWriter.appendStage(rampTarget.label, ev, x);
+        } catch (java.io.IOException e) {
+            plugin.getLogger().log(Level.WARNING, "[StressTestRTP] ramp row write failed", e);
+        }
+        plugin.getLogger().info(String.format(Locale.ROOT,
+                "[StressTestRTP] ramp stage %d %s: offered=%s achieved=%.2f TP/s attempts=%d ok=%d timeouts=%d errors=%d busy=%d shed=%d p95=%dms mspt_p95=%.2f tps_min=%.2f%s",
+                idx, !complete ? "PARTIAL" : (ev.passed() ? "PASS" : "FAIL"),
+                RampEvaluator.fmtRate(sr.offeredTps()), sr.achievedTps(), sr.attempts(), ok, to, err,
+                busy, rampShed, x.latencyP95Ms(), msptP95, rampTpsMin,
+                ev.passed() ? "" : " [" + ev.criteriaString() + "]"));
+        recorder.endPhase(rampStageLabel(idx));
+        rampStageIdx = -1;
+        if (!complete) return;
+        if (decision == RampEvaluator.Decision.STOP) {
+            stop();
+        } else {
+            rampNextIdx = idx + 1;
+            enterRampSettle(now, timeoutMs);
+        }
+    }
+
+    /** Writes the summary once; partial stage first when stopped mid-stage. */
+    private void finishRamp(boolean operatorStop) {
+        if (!rampFinalized.compareAndSet(false, true)) return;
+        RampEvaluator ev = rampEval;
+        if (ev == null || rampTarget == null) return;
+        if (operatorStop) {
+            if (rampStageIdx >= 0 && (rampState == RampState.RUNNING || rampState == RampState.DRAIN)) {
+                long now = System.currentTimeMillis();
+                rampStageEndMs = Math.min(rampStageEndMs, now);
+                completeRampStage(now, 0L, false);
+            }
+            ev.markOperatorStop();
+        }
+        String line = ev.summaryLine(rampTarget.label);
+        plugin.getLogger().info("[StressTestRTP] " + line);
+        StringBuilder sb = new StringBuilder();
+        sb.append("StressTestRTP ramp summary\n");
+        sb.append("target: ").append(rampTarget.label).append(" = `").append(rampTarget.template).append("`\n");
+        sb.append("stages_tps: ").append(Arrays.toString(rampStages)).append('\n');
+        sb.append("stage_seconds: ").append(rampStageMs / 1000L).append('\n');
+        sb.append("thresholds: ").append(ev.thresholds()).append('\n');
+        sb.append("stress_point_stage: ").append(ev.stressPointIndex()).append('\n');
+        sb.append("stress_point_offered_tps: ").append(RampEvaluator.fmtRate(ev.stressPointTps())).append('\n');
+        RampEvaluator.Evaluation ff = ev.firstFailure();
+        sb.append("first_failure_stage: ").append(ff == null ? -1 : ff.stage().index()).append('\n');
+        sb.append("first_failure_criteria: ").append(ff == null ? "" : ff.criteriaString()).append('\n');
+        sb.append("stop_reason: ").append(ev.stopReason().name()).append('\n');
+        sb.append(line).append('\n');
+        try {
+            rampWriter.writeSummary(sb.toString());
+        } catch (java.io.IOException e) {
+            plugin.getLogger().log(Level.WARNING, "[StressTestRTP] ramp summary write failed", e);
+        }
+    }
+
+    /** One-line ramp progress for {@code /rtpstress status}; empty when not ramping. */
+    public String rampStatus() {
+        if (mode != Mode.RAMP || rampTarget == null) return "";
+        RampEvaluator ev = rampEval;
+        int idx = rampStageIdx;
+        return String.format(Locale.ROOT, "ramp target=%s state=%s stage=%s stress-point=%s",
+                rampTarget.label, rampState,
+                idx >= 0 && idx < rampStages.length ? idx + "@" + RampEvaluator.fmtRate(rampStages[idx]) + "tps" : "-",
+                ev == null || ev.stressPointIndex() < 0 ? "none" : RampEvaluator.fmtRate(ev.stressPointTps()) + "tps");
+    }
+
     private void rememberOperator(CommandSender s) {
         if (s instanceof Player p) {
             operatorName = p.getName();
@@ -420,6 +906,8 @@ public final class Runner {
         if (!running.compareAndSet(true, false)) return;
         Sched.cancel(taskId);
         taskId = null;
+        gapCalibActive = false;
+        gapCalibMsptSamples.clear();
         // If we were stopped mid-warmup, leave the recorder ready for the next
         // run and close the warmup log file.
         if (warmupActive) {
@@ -432,18 +920,37 @@ public final class Runner {
                 warmupLog = null;
             }
         }
+        if (mode == Mode.RAMP) {
+            Sched.cancel(rampTpsTaskId);
+            rampTpsTaskId = null;
+            if (rampInWarmup) {
+                rampInWarmup = false;
+                recorder.setRecording(true);
+            }
+        }
         // Stop any in-progress spark phase; label with the active target if known.
         String label = (mode == Mode.SEQUENCE && seqTargets != null
                 && seqIndex >= 0 && seqIndex < seqTargets.size())
                 ? seqTargets.get(seqIndex).label
                 : (mode == Mode.BURST ? "burst" : "timed");
-        spark.stopPhase(label);
-        recorder.endPhase(label);
+        if (mode == Mode.RAMP) {
+            String base = rampTarget == null ? "ramp" : rampTarget.label;
+            spark.stopPhase(base + "-ramp");
+        } else {
+            spark.stopPhase(label);
+            recorder.endPhase(label);
+        }
         // Time out any still-expected attempts so the CSV is closed cleanly.
         for (UUID id : new ArrayList<>(deadlines.keySet())) {
             MetricsRecorder.Attempt a = probe.forget(id);
             if (a != null) recorder.onTimeout(a);
             deadlines.remove(id);
+        }
+        // After the timeouts above so a mid-stage stop bills them to its
+        // partial row. Idempotent: a rule-based end already wrote the summary.
+        if (mode == Mode.RAMP) {
+            inFlight.set(0);
+            finishRamp(true);
         }
         // No tick runs after stop to drive the time-based flush.
         recorder.flushRows();
@@ -477,7 +984,8 @@ public final class Runner {
             long kickstartMs = config.getLong("no-progress-kickstart-ms", 30000L);
             boolean inMeasurementPhase = running.get()
                     && !warmupActive
-                    && !(mode == Mode.SEQUENCE && seqGapEndMs > 0L && now < seqGapEndMs);
+                    && !(mode == Mode.SEQUENCE && seqGapEndMs > 0L && now < seqGapEndMs)
+                    && !(mode == Mode.RAMP && rampState != RampState.RUNNING);
             if (inMeasurementPhase && kickstartMs > 0
                     && lastProgressEpochMs > 0
                     && (now - lastProgressEpochMs) > kickstartMs) {
@@ -593,6 +1101,11 @@ public final class Runner {
             }
             if (mode == Mode.BURST && burstRemaining == 0 && inFlight.get() == 0) {
                 stop();
+                return;
+            }
+            if (mode == Mode.RAMP) {
+                // Fixed-rate open loop; the closed-loop fill below never runs.
+                rampTick(now);
                 return;
             }
             Targets.Entry pinned = null;
@@ -737,8 +1250,34 @@ public final class Runner {
                 }
                 // Phase machine: run-phase → gap-phase → next target → ... → stop.
                 if (seqGapEndMs > 0L) {
-                    // In gap: dispatch nothing, just wait it out.
+                    // In gap: calibrate ambient idle baseline in the second half of the gap
+                    // (after allowing the first portion for GC and chunk unloads to settle).
+                    long gapTotalMs = seqGapMs;
+                    if (gapTotalMs >= 10000L) {
+                        long settleMs = (gapTotalMs >= 120000L) ? 60000L : (gapTotalMs / 2);
+                        long calibStartMs = (seqGapEndMs - gapTotalMs) + settleMs;
+                        if (now >= calibStartMs && now < seqGapEndMs) {
+                            if (!gapCalibActive) beginIdleCalibration(now);
+                            sampleIdleCalibration(now);
+                        }
+                    }
                     if (now < seqGapEndMs) return;
+
+                    // Gap finished - harvest idle baseline if calibration ran.
+                    if (gapCalibActive) {
+                        MetricsRecorder.IdleBaseline baseline = harvestIdleCalibration(now);
+                        double msptP50 = baseline.msptP50();
+                        double mainCores = baseline.mainCpuCores();
+                        double procCores = baseline.processCpuCores();
+                        long durationMs = baseline.durationMs();
+                        recorder.setNextPhaseIdleBaseline(baseline);
+                        int nextIdx = seqIndex + 1;
+                        String nextLabel = (nextIdx >= 0 && nextIdx < seqTargets.size()) ? seqTargets.get(nextIdx).label : "unknown";
+                        plugin.getLogger().info(String.format(java.util.Locale.ROOT,
+                                "[StressTestRTP] Idle baseline before phase '%s': MSPT p50=%.2f ms, main CPU=%.3f cores, proc CPU=%.3f cores (calibrated over %.1fs)",
+                                nextLabel, msptP50, mainCores, procCores, durationMs / 1000.0));
+                    }
+
                     // Gap finished - advance.
                     seqGapEndMs = 0L;
                     seqIndex++;
@@ -962,7 +1501,10 @@ public final class Runner {
         final boolean asPlayer = config.getBoolean("dispatch-as-player", true);
         final boolean watchPinned = Sched.isFolia()
                 && config.getBoolean("folia.pinned-position-watch", true);
+        final int distanceCap = mode == Mode.RAMP
+                ? (int) config.getLong("ramp.player-view-distance", 2L) : 0;
         Sched.runOnPlayer(plugin, target, () -> {
+            if (distanceCap > 0) capPlayerDistances(target, distanceCap);
             attempt.commandDispatchedEpochMs = System.currentTimeMillis();
             // Folia only: this runnable is executing on the thread owning the
             // player's region, so the hop itself is a region-context
@@ -1045,6 +1587,33 @@ public final class Runner {
                 return false; // best-effort: a watcher must never wedge a region
             }
         }, 1L);
+    }
+
+    /**
+     * Ramp only: cap a roster player's server-side view and simulation
+     * distance (Paper {@code Player#setViewDistance} / {@code
+     * #setSimulationDistance}, reflective; no-op on Spigot). Paper loads
+     * max(view, simulation) + 1 around every player regardless of the
+     * client's requested distance, so at view-distance 10 each landing pulls
+     * ~529 chunks (mostly fresh generation) and a 64-bot roster at 20 TP/s
+     * exhausts the heap before any plugin is measured. Identical for every
+     * target, so the comparison stays fair; runs on the player's owning
+     * thread, outside the measured span.
+     */
+    private void capPlayerDistances(Player p, int distance) {
+        if (distanceCapped.containsKey(p)) return;
+        distanceCapped.put(p, Boolean.TRUE);
+        int d = Math.max(2, Math.min(32, distance));
+        for (String name : new String[]{"setViewDistance", "setSimulationDistance"}) {
+            try {
+                p.getClass().getMethod(name, int.class).invoke(p, d);
+            } catch (NoSuchMethodException e) {
+                // Spigot: no per-player distance API; server.properties applies.
+            } catch (ReflectiveOperationException | RuntimeException e) {
+                plugin.getLogger().log(Level.FINE, "StressTestRTP: " + name + "(" + d
+                        + ") failed for " + p.getName(), e);
+            }
+        }
     }
 
     private List<Player> roster() {
@@ -1174,6 +1743,9 @@ public final class Runner {
      *  the offered rate be raised without going straight to unthrottled.
      *  Bounded to a sane range so a misconfiguration cannot stall a run. */
     private long perPlayerGapMs() {
+        // Ramp: its own gap (default 0) so the roster, not a cooldown, bounds
+        // offered load - 64 players x 1.5 s gap would cap at ~42 TP/s.
+        if (mode == Mode.RAMP) return rampPerPlayerGapMs;
         long ms = config.getLong("per-player-gap-ms", -1L);
         if (ms >= 0L) return Math.min(ms, 5000L);
         long ticks = config.getLong("per-player-gap-ticks", 3L);

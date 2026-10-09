@@ -139,6 +139,13 @@ queueGrowthWarnThreshold: 0
 # @default: false
 syncLoading: false
 
+# Teleport path on Paper. AUTO = same-tick teleport when the spot's chunk is
+# already loaded, else teleportAsync. ASYNC = always teleportAsync (one tick slower).
+# @type: string
+# @options: ["AUTO", "ASYNC"]
+# @default: "AUTO"
+teleportPath: "AUTO"
+
 # Re-read permissions every event instead of caching them.
 # @type: boolean
 # @default: false

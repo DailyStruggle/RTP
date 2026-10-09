@@ -438,7 +438,9 @@ public class MemoryTracker {
 
           for (Region sweepRegion : allRegions) {
             // Gate the sweep to prevent race conditions with asynchronous location generation
-            if (sweepRegion.inFlightCalculations.get() > 0) continue;
+            // Pending kept promotions hold tickets not yet in keptLocations; sweeping would drop them.
+            if (sweepRegion.inFlightCalculations.get() > 0
+                || sweepRegion.pendingKeptPromotions.get() > 0) continue;
 
             RTPWorld<?> sweepWorld = sweepRegion.getWorld();
             if (sweepWorld == null) continue;

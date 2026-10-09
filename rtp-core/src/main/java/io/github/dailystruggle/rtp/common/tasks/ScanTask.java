@@ -658,6 +658,9 @@ public class ScanTask extends RTPRunnable {
       // scanCompleted to avoid driving live-load chunk traffic while the
       // pre-generation crawler is still consuming tick-thread budget.
       region.scanCompleted = true;
+      // Scan-time page cache, coalescing and learned rejects no longer describe the fill/consume
+      // paths; let the probe-first governors re-learn (ADR-109).
+      io.github.dailystruggle.rtp.common.selection.region.ProbeFirstGovernor.reset(region.name);
       done.complete(true);
       super.setCancelled(true);
       isRunning.set(false);

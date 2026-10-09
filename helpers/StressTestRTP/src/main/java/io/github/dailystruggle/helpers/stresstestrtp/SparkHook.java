@@ -8,7 +8,9 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -78,11 +80,9 @@ public final class SparkHook {
      *  300 to rotate every 5 minutes.
      */
     public long rotateSeconds() {
-        // Default 60s: pairs with the default `spark.timeout-seconds: 90`
-        // (rotation must fire before spark's own auto-stop, otherwise the
-        // slice is uploaded to bytebin instead of saved to disk). Set to 0
-        // in config.yml to opt out.
-        return Math.max(0L, config.getLong("spark.rotate-seconds", 60L));
+        // Default 0 (disabled) to avoid profiler stop/save spikes mid-phase;
+        // profiles are saved on phase completion. Set to e.g. 300 to rotate every 5 minutes.
+        return Math.max(0L, config.getLong("spark.rotate-seconds", 0L));
     }
 
     /** Logged once per hook so a missing spark is visible instead of silent. */
@@ -151,26 +151,78 @@ public final class SparkHook {
         // against an idle server, so unfiltered profiling is the safer
         // default. Override in config.yml for spike-isolation runs.
         long onlyTicksOver = Math.max(0L, config.getLong("spark.only-ticks-over-ms", 0L));
-        // Without a selector spark samples the server thread only, missing
-        // chunk-system, scheduler and region threads.
-        String threads = config.getString("spark.threads", "*");
-        dispatch(buildStartCommand(timeout, onlyTicksOver, threads));
+        long intervalMs = Math.max(0L, config.getLong("spark.interval", config.getLong("spark.interval-ms", 0L)));
+        // Default to server thread + RTP-Anvil-IO pool to avoid sampling hundreds of background pool threads.
+        String threads = config.getString("spark.threads", DEFAULT_THREADS);
+        dispatch(buildStartCommand(timeout, onlyTicksOver, threads, intervalMs));
         inProfile = true;
         if (log != null) log.info("[StressTestRTP] spark profiler started for phase: " + sliceLabel);
     }
 
-    /** {@code spark profiler start} command line. {@code threads} null/blank
-     *  omits {@code --thread} (spark then samples the server thread only). */
+    /** {@code spark profiler start} command line without interval. */
     static String buildStartCommand(long timeoutSeconds, long onlyTicksOverMs, String threads) {
+        return buildStartCommand(timeoutSeconds, onlyTicksOverMs, threads, 0L);
+    }
+
+    /** Default {@code spark.threads}: the server thread and every {@code RTP-Anvil-IO-<n>} pool thread. */
+    static final String DEFAULT_THREADS = "Server thread,RTP-Anvil-IO-*";
+
+    /** {@code spark profiler start} command line. {@code threads} is a comma list of
+     *  thread names; null/blank omits {@code --thread} (spark then samples the server
+     *  thread only), a {@code *} entry samples every thread.
+     *
+     *  <p>Spark takes one name per {@code --thread} flag and re-joins space-split tokens,
+     *  so names with spaces need no quoting (quotes would become part of the name).
+     *  Exact names are resolved to thread IDs once at start, which misses pool threads
+     *  spawned later; any entry with a {@code *} glob therefore switches to
+     *  {@code --regex}, where spark re-matches names (full, case-insensitive) on every
+     *  dump. Exact entries are escaped in that mode so they still match only themselves. */
+    static String buildStartCommand(long timeoutSeconds, long onlyTicksOverMs, String threads, long intervalMs) {
         StringBuilder sb = new StringBuilder("spark profiler start --timeout ").append(timeoutSeconds);
         if (onlyTicksOverMs > 0L) {
             sb.append(" --only-ticks-over ").append(onlyTicksOverMs);
         }
-        String t = threads == null ? "" : threads.trim();
-        if (!t.isEmpty()) {
-            sb.append(" --thread ").append(t);
+        if (intervalMs > 0L) {
+            sb.append(" --interval ").append(intervalMs);
+        }
+        List<String> names = new ArrayList<>();
+        if (threads != null) {
+            for (String part : threads.split(",")) {
+                String n = part.trim().replaceAll("\\s+", " ");
+                if (!n.isEmpty() && !names.contains(n)) names.add(n);
+            }
+        }
+        if (names.contains("*")) {
+            return sb.append(" --thread *").toString();
+        }
+        boolean regex = false;
+        for (String n : names) {
+            if (n.indexOf('*') >= 0) {
+                regex = true;
+                break;
+            }
+        }
+        if (regex) sb.append(" --regex");
+        for (String n : names) {
+            sb.append(" --thread ").append(regex ? globToRegex(n) : n);
         }
         return sb.toString();
+    }
+
+    /** {@code *} to {@code .*}; every other regex metacharacter escaped. No {@code \Q..\E}:
+     *  spark splits on spaces, which would separate the quote markers. */
+    static String globToRegex(String glob) {
+        StringBuilder out = new StringBuilder(glob.length() + 8);
+        for (int i = 0; i < glob.length(); i++) {
+            char c = glob.charAt(i);
+            if (c == '*') {
+                out.append(".*");
+            } else {
+                if ("\\.[]{}()+?^$|".indexOf(c) >= 0) out.append('\\');
+                out.append(c);
+            }
+        }
+        return out.toString();
     }
 
     /** Stop the current spark profile, tagging the upload with the label.

@@ -2,6 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-04-18
+**Extended by:** [ADR-110](ADR-110-purpose-gated-live-loads.md) (speculative fill takes a native load only under a kept-queue pin)
 
 ## Context
 
@@ -180,6 +181,7 @@ Count-Bound-scheduled callback:
 - REQ-RTP-S-004 (no silent teleport failures) — `docs/dev/REQUIREMENTS.md section 3`.
 - REQ-RTP-S-005 (no main-thread chunk loading) — `docs/dev/REQUIREMENTS.md section 3`.
 - ADR-004 "Count-Bound Task Pipe on Folia".
+- ADR-005 Amendment 1 "Native Asynchronous Entity Teleportation (teleportAsync) and S-005 Arrival Tick Protection".
 - ADR-012 "Chunk Reservation Abstraction".
 - Implementation:
   - `rtp-api`: `RTPWorld.isChunkLoaded(int, int)`; `RTPWorld.setForceLoaded`

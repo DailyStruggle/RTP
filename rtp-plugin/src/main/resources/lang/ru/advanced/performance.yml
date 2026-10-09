@@ -164,6 +164,13 @@ maxHeapПроцент: 85.0
 # @default: false
 синхроннаяЗагрузка: false
 
+# Путь телепорта на Paper. AUTO = телепорт в том же тике, если целевой чанк уже загружен,
+# иначе teleportAsync. ASYNC = всегда teleportAsync (на один тик медленнее).
+# @type: string
+# @options: ["AUTO", "ASYNC"]
+# @default: "AUTO"
+путьТелепорта: "AUTO"
+
 # Разбор прав (запуск)
 # onEventParsing: Несовместим с широкими правами вида *.*.
 # Влияние: СРЕДНЕЕ (onEvent) / НИЗКОЕ (effect)

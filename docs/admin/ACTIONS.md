@@ -53,6 +53,8 @@ The `cancel` subcommand handles two distinct operational lifecycles:
 
 ### 3. Physical Trigger Management (`/rtp trigger`)
 
+> ⚠️ **Roadmap status:** The `/rtp trigger` runtime command surface and WorldEdit selection integration are tracked on the roadmap for an upcoming release. In the current release, physical triggers are configured directly via the `triggers:` block in action YAML definitions (see [Physical Triggers & Spatial Lobbies](#physical-triggers--spatial-lobbies) below).
+
 ```text
 /rtp trigger <create|remove|list> [args...]
 ```

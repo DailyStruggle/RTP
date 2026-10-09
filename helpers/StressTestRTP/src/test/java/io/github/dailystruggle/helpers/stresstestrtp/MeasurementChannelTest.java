@@ -58,6 +58,32 @@ class MeasurementChannelTest {
     }
 
     @Test
+    @DisplayName("Lily pads, carpets, snow and scaffolding are standable; thin feet blocks do not suffocate")
+    void thinAndTopFaceBlocksAreStandable() {
+        // Lily pad floor is non-solid but has a top face.
+        assertEquals(LandingInspector.Verdict.SAFE, LandingInspector.classify(
+                Material.LILY_PAD, Material.AIR, Material.AIR, true, true));
+        assertEquals(LandingInspector.Verdict.SAFE, LandingInspector.classify(
+                Material.SNOW, Material.AIR, Material.AIR, true, true));
+        assertEquals(LandingInspector.Verdict.SAFE, LandingInspector.classify(
+                Material.SCAFFOLDING, Material.AIR, Material.AIR, true, true));
+        // Carpet at feet (Y at its base): the server lifts the player onto it.
+        assertEquals(LandingInspector.Verdict.SAFE, LandingInspector.classify(
+                Material.MANGROVE_ROOTS, Material.MOSS_CARPET, Material.AIR, false, true));
+        assertEquals(LandingInspector.Verdict.SAFE, LandingInspector.classify(
+                Material.GRASS_BLOCK, Material.WHITE_CARPET, Material.AIR, false, true));
+        // Lily pad at feet over water.
+        assertEquals(LandingInspector.Verdict.SAFE, LandingInspector.classify(
+                Material.WATER, Material.LILY_PAD, Material.AIR, false, true));
+        // A full block at head still suffocates, carpet or not.
+        assertEquals(LandingInspector.Verdict.SUFFOCATING, LandingInspector.classify(
+                Material.STONE, Material.MOSS_CARPET, Material.STONE, false, false));
+        // A full block at feet still suffocates.
+        assertEquals(LandingInspector.Verdict.SUFFOCATING, LandingInspector.classify(
+                Material.STONE, Material.MANGROVE_ROOTS, Material.AIR, false, true));
+    }
+
+    @Test
     @DisplayName("Folia CPU scope matches region scheduler thread names only")
     void regionThreadNames() {
         assertTrue(CpuSampler.isRegionThreadName("Folia Region Scheduler Thread #3"));

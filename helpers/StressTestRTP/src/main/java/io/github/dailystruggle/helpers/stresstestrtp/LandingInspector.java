@@ -48,6 +48,12 @@ public final class LandingInspector {
             "SWEET_BERRY_BUSH", "POWDER_SNOW", "WITHER_ROSE", "POINTED_DRIPSTONE",
             "COBWEB", "END_PORTAL", "NETHER_PORTAL");
 
+    /** Non-solid blocks with a top collision face a player stands on. */
+    private static final Set<String> STANDABLE_NAMES = Set.of("LILY_PAD", "SNOW", "SCAFFOLDING");
+
+    /** Blocks under about 0.2 high: at feet the server lifts the player onto them. */
+    private static final Set<String> THIN_NAMES = Set.of("LILY_PAD");
+
     private LandingInspector() {}
 
     /** Inspects {@code loc} if the calling thread may read it. */
@@ -93,18 +99,33 @@ public final class LandingInspector {
     /**
      * Pure rule, ordered by severity: lava anywhere in the column, then
      * suffocation, water at feet or head, a hazard block, and finally a
-     * floor that cannot be stood on.
+     * floor that cannot be stood on. A thin block at feet (carpet, lily pad)
+     * is the floor the player stands on, not a suffocation hazard.
      */
     static Verdict classify(Material floor, Material feet, Material head,
                             boolean feetPassable, boolean headPassable) {
         if (isLava(floor) || isLava(feet) || isLava(head)) return Verdict.LAVA;
-        if (!feetPassable || !headPassable) {
+        boolean feetThin = isThin(feet);
+        if ((!feetPassable && !feetThin) || !headPassable) {
             if (!isWater(feet) && !isWater(head)) return Verdict.SUFFOCATING;
         }
         if (isWater(feet) || isWater(head)) return Verdict.WATER;
         if (isHazard(floor) || isHazard(feet) || isHazard(head)) return Verdict.HAZARD;
-        if (!floor.isSolid()) return isWater(floor) ? Verdict.WATER : Verdict.NO_FLOOR;
+        if (feetThin) return Verdict.SAFE;
+        if (!floor.isSolid() && !isStandable(floor)) {
+            return isWater(floor) ? Verdict.WATER : Verdict.NO_FLOOR;
+        }
         return Verdict.SAFE;
+    }
+
+    /** Carpets (any colour, moss, pale moss) and lily pads; matched by name for old APIs. */
+    static boolean isThin(Material m) {
+        String n = m.name();
+        return n.endsWith("_CARPET") || THIN_NAMES.contains(n);
+    }
+
+    static boolean isStandable(Material m) {
+        return isThin(m) || STANDABLE_NAMES.contains(m.name());
     }
 
     private static boolean isLava(Material m) {

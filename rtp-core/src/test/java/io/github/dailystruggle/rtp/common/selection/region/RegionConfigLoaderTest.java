@@ -343,7 +343,7 @@ public class RegionConfigLoaderTest {
         org.junit.jupiter.api.Assertions.assertNotNull(settings.shape());
         assertEquals("SQUARE", settings.shape().name);
         org.junit.jupiter.api.Assertions.assertNotNull(settings.vert());
-        assertEquals("linear", settings.vert().name);
+        assertEquals("LINEAR", settings.vert().name);
     }
 
     @org.junit.jupiter.api.Test

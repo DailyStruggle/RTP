@@ -146,6 +146,13 @@ sogliaAvvisoCrescitaCoda: 0
 # @default: false
 caricamentoSinc: false
 
+# Percorso di teletrasporto su Paper. AUTO = teletrasporto nello stesso tick se il chunk
+# di destinazione è già caricato, altrimenti teleportAsync. ASYNC = sempre teleportAsync (un tick più lento).
+# @type: string
+# @options: ["AUTO", "ASYNC"]
+# @default: "AUTO"
+percorsoTeletrasporto: "AUTO"
+
 # Ri-analizza i nodi di permesso ad ogni evento invece di metterli in cache.
 # @type: boolean
 # @default: false

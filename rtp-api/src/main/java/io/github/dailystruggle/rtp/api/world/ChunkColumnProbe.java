@@ -30,6 +30,8 @@ public interface ChunkColumnProbe extends io.github.dailystruggle.rtp.anvil.Chun
       @Override public String biomeAt(int y) { return delegate.biomeAt(y); }
       @Override public boolean isAirAt(int y) { return delegate.isAirAt(y); }
       @Override public boolean isAirAt(int lx, int lz, int y) { return delegate.isAirAt(lx, lz, y); }
+      @Override public long drainNanos() { return delegate.drainNanos(); }
+      @Override public int groupSize() { return delegate.groupSize(); }
     };
   }
 }

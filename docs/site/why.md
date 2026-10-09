@@ -123,3 +123,7 @@ BetterRTP has historically had some difficulty with an attempted queue system, a
 Like JakesRTP, RTP adds a location cache system, operating at a configurable rate (defined in `performance.yml`) and capped per-region. Unlike JakesRTP, selected chunks are force-loaded until used in order to achieve millisecond response times on commands - the cost of 10-100 extra chunks is less than one online player, which I consider acceptable. To resolve the possibility of changes to the chunk between selection and usage, a second safety check runs when the location is picked up from the cache.
 
 RTP also adds player queues, operating at cache rate, to prevent overlapping selection tasks by default. That means `/rtp` cannot easily be used to DDoS the server via chunk loading.
+
+### Verification and Shape Algorithms
+
+For visual unit tests running against real-world Anvil terrain, radial distance curves, nearest-neighbor distance distributions, and the dual-layer space-filling curve architecture, see [Shape Algorithm Verification](shape-algorithms.md).

@@ -163,6 +163,13 @@ maxHeapパーセント: 85.0
 # @default: false
 同期ロード: false
 
+# Paper でのテレポート経路。AUTO = 目的地のチャンクが読み込み済みなら同一ティックでテレポート、
+# それ以外は teleportAsync。ASYNC = 常に teleportAsync（1 ティック遅い）。
+# @type: string
+# @options: ["AUTO", "ASYNC"]
+# @default: "AUTO"
+テレポート経路: "AUTO"
+
 # 起動時パーミッション解析
 # onEventParsing: ワイルドカード権限 *.* と互換性がありません。
 # 影響: 中 (onEvent) / 低 (effect)

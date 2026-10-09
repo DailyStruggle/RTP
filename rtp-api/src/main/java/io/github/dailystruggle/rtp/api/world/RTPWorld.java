@@ -308,6 +308,34 @@ public abstract class RTPWorld<T> {
   }
 
   /**
+   * Non-loading variant of {@link #getChunkAt(int, int)} for speculative callers (ADR-110):
+   * resolves from a resident chunk or the persisted region file, never through a native
+   * chunk load or generation. Completes with the chunk key when {@link #getCachedChunk(long)}
+   * can serve it, or {@code null} when only a live load could answer.
+   *
+   * <p>Default: resident chunks only ({@link #isChunkLoaded} then {@link #getChunkAt}).
+   * Adapters with a region-file reader SHOULD override to include it.</p>
+   */
+  public CompletableFuture<Long> getChunkIfReadable(int cx, int cz) {
+    if (!isChunkLoaded(cx, cz)) return CompletableFuture.completedFuture(null);
+    return getChunkAt(cx, cz);
+  }
+
+  /**
+   * Resolve an {@link RTPChunk} without a native load (ADR-110): cached, then
+   * {@link #getChunkIfReadable}. Completes with {@code null} when only a live load could
+   * answer; never increments {@link #totalChunkLoads} for an absent chunk.
+   */
+  public CompletableFuture<RTPChunk<?>> getOrReadChunk(int cx, int cz) {
+    final long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+    RTPChunk<?> cached = getCachedChunk(key);
+    if (cached != null) {
+      return CompletableFuture.completedFuture(cached);
+    }
+    return getChunkIfReadable(cx, cz).thenApply(k -> (k != null) ? getCachedChunk(k) : null);
+  }
+
+  /**
    * Returns the number of chunks currently force-loaded by the plugin in this world.
    *
    * @return the number of force-loaded chunks
@@ -377,6 +405,24 @@ public abstract class RTPWorld<T> {
    */
   public boolean isChunkGenerated(int cx, int cz) {
     return true;
+  }
+
+  /**
+   * World save folder holding this dimension's {@code region/} directory (or its parent for
+   * {@code DIM-1}/{@code DIM1}), for off-tick Anvil reads (ADR-016). Must not block. Default
+   * {@code null}: no on-disk Anvil store, so batched backlog classification answers UNKNOWN.
+   */
+  public java.nio.file.Path anvilWorldFolder() {
+    return null;
+  }
+
+  /**
+   * Region subdirectory of this dimension under {@link #anvilWorldFolder()}: {@code ""} for the
+   * overworld, {@code "DIM-1"} / {@code "DIM1"} for vanilla nether / end, or a namespaced
+   * dimension path. Default {@code ""}.
+   */
+  public String anvilDimensionSubpath() {
+    return "";
   }
 
   /**

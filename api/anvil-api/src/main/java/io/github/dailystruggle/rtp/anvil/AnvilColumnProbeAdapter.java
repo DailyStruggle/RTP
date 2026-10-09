@@ -48,6 +48,8 @@ public final class AnvilColumnProbeAdapter implements ChunkColumnProbe {
   @Override public int chunkZ() { return chunkZ; }
   @Override public int minY()   { return probe.minY(); }
   @Override public int maxY()   { return probe.maxY(); }
+  @Override public long drainNanos() { return probe.drainNanos(); }
+  @Override public int groupSize() { return probe.groupSize(); }
 
   @Override
   public OptionalInt heightmapTopY() {

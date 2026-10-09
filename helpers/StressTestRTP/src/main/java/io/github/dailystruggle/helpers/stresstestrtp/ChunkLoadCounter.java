@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongFieldUpdater;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.logging.Level;
 
 /**
@@ -119,6 +120,8 @@ public final class ChunkLoadCounter implements Listener {
     /** Loads charged to a finished teleport's landing area during the current
      *  phase (see {@link Landing}). Disjoint from attributed and background. */
     private final AtomicLong phaseLandingLoads = new AtomicLong();
+    /** Time spent inside onChunkLoad across the current phase. */
+    private final LongAdder phaseListenerNanos = new LongAdder();
 
     /** Snapshots at the start of the current phase, for {@link #phaseTotal()}. */
     private volatile long phaseBaselineTotal = 0L;
@@ -271,19 +274,24 @@ public final class ChunkLoadCounter implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onChunkLoad(ChunkLoadEvent event) {
-        final int cx = event.getChunk().getX();
-        final int cz = event.getChunk().getZ();
+        long start = System.nanoTime();
+        try {
+            final int cx = event.getChunk().getX();
+            final int cz = event.getChunk().getZ();
 
-        // Foreground / background classification, done once per event and
-        // reused for both the phase counters and the per-attempt split. This
-        // is the health discriminator: the same load costs wall time on a
-        // chunk-system thread and tick budget on a tick thread. On Folia the
-        // question is region-scoped - "is this the region thread that owns the
-        // chunk that just loaded" - which TickThreadDetector answers via
-        // runtime detection only.
-        final boolean onTick = TickThreadDetector.ownsChunk(event.getWorld(), cx, cz);
-        syncAttributor.onLoad(cx, cz, onTick);
-        route(event.getWorld().getName(), cx, cz, onTick, event.getChunk());
+            // Foreground / background classification, done once per event and
+            // reused for both the phase counters and the per-attempt split. This
+            // is the health discriminator: the same load costs wall time on a
+            // chunk-system thread and tick budget on a tick thread. On Folia the
+            // question is region-scoped - "is this the region thread that owns the
+            // chunk that just loaded" - which TickThreadDetector answers via
+            // runtime detection only.
+            final boolean onTick = TickThreadDetector.ownsChunk(event.getWorld(), cx, cz);
+            syncAttributor.onLoad(cx, cz, onTick);
+            route(event.getWorld().getName(), cx, cz, onTick, event.getChunk());
+        } finally {
+            phaseListenerNanos.add(System.nanoTime() - start);
+        }
     }
 
     /** Attribution chain for one load, split from the event handler so it can
@@ -602,6 +610,7 @@ public final class ChunkLoadCounter implements Listener {
      *  in phase N+1 should report its full chunk-load cost on its CSV row. */
     public void resetPhase() {
         syncAttributor.resetPhase();
+        phaseListenerNanos.reset();
         phaseBaselineTotal = totalLoads.get();
         phaseBaselineBackground = phaseBackgroundLoads.get();
         phaseBaselineAttributed = phaseAttributedLoads.get();
@@ -683,5 +692,28 @@ public final class ChunkLoadCounter implements Listener {
      *  occupancy is never published without its peak. */
     public long phaseBinOccupancyMax() {
         return phaseBinOccupancyMax.get();
+    }
+
+    /** Nanoseconds spent inside onChunkLoad across the current phase. */
+    public long phaseListenerNanos() {
+        return phaseListenerNanos.sum();
+    }
+
+    /** Milliseconds spent inside onChunkLoad across the current phase. */
+    public long phaseListenerMs() {
+        return phaseListenerNanos.sum() / 1_000_000L;
+    }
+
+    /** Logs the listener's own CPU time spent handling ChunkLoadEvents during the phase. */
+    public void reportPhaseListenerTime(String phaseLabel) {
+        long nanos = phaseListenerNanos.sum();
+        long ms = nanos / 1_000_000L;
+        long loads = phaseTotal();
+        if (plugin != null && plugin.getLogger() != null) {
+            double usPerLoad = loads > 0 ? (double) nanos / (loads * 1000.0) : 0.0;
+            plugin.getLogger().info(String.format(java.util.Locale.ROOT,
+                    "[StressTestRTP] ChunkLoadCounter listener time for phase '%s': %d ms across %d chunk loads (%.2f \u00b5s/load)",
+                    phaseLabel, ms, loads, usPerLoad));
+        }
     }
 }
