@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.proxy.common.spi.RedeemOutcome;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReleaseReason;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.spi.Subscription;
+import io.github.dailystruggle.rtp.proxy.common.transport.CanonicalEnvelopes;
 import io.github.dailystruggle.rtp.proxy.common.transport.codec.BackendHeartbeatCodec;
 
 import javax.sql.DataSource;
@@ -240,7 +241,8 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
         // attempting the CAS update, because the row-count of the UPDATE alone
         // cannot tell those apart (all yield 0 affected rows).
         String selectSql = """
-                SELECT server_id, player_id, expires_at_ms, state, released_at_ms
+                SELECT server_id, player_id, expires_at_ms, state, released_at_ms,
+                       created_at_ms, hmac, region_key
                 FROM rtp_network_tokens
                 WHERE token_id = ?
                 """;
@@ -250,6 +252,9 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
             String rowPlayer;
             long rowExpires;
             String rowState;
+            long rowCreated;
+            String rowHmac;
+            String rowRegion;
             try (PreparedStatement ps = c.prepareStatement(selectSql)) {
                 ps.setString(1, tokenId);
                 try (ResultSet rs = ps.executeQuery()) {
@@ -258,6 +263,9 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
                     rowPlayer = rs.getString("player_id");
                     rowExpires = rs.getLong("expires_at_ms");
                     rowState = rs.getString("state");
+                    rowCreated = rs.getLong("created_at_ms");
+                    rowHmac = rs.getString("hmac");
+                    rowRegion = rs.getString("region_key");
                 }
             }
             if (rowServer == null || !rowServer.equals(expectedServerId)) {
@@ -275,11 +283,27 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
             if (!"CLAIMED".equals(rowState) && !"PENDING".equals(rowState)) {
                 return RedeemOutcome.BAD_STATE;
             }
+            // Signed mode: verify the stored token HMAC before consuming and
+            // pin the verified hmac into the CAS so a row rewritten between
+            // SELECT and UPDATE affects 0 rows. Fail closed on NULL hmac.
+            if (verifier != null) {
+                if (rowHmac == null || rowHmac.isEmpty()
+                        || !CanonicalEnvelopes.verifyToken(verifier, schemaVersion,
+                                tokenId, rowServer, rowPlayer,
+                                Long.toString(rowExpires), Long.toString(rowCreated),
+                                rowState, rowRegion, rowHmac)) {
+                    LOG.log(Level.WARNING,
+                            "SqlNetworkStateBinding.redeem: HMAC verification failed for token "
+                                    + tokenPrefix(tokenId) + "; refusing to consume (REQ-RTP-S-004)");
+                    return RedeemOutcome.HMAC_INVALID;
+                }
+            }
             // Row-count-atomic CAS: only the call that finds the row still in
             // (CLAIMED|PENDING) AND released_at_ms IS NULL transitions it; a
             // racing peer redeem or the TTL reaper that landed first leaves
             // released_at_ms non-null and this UPDATE affects 0 rows.
-            String updateSql = """
+            String updateSql = verifier == null
+                    ? """
                     UPDATE rtp_network_tokens
                     SET state = ?, released_at_ms = ?
                     WHERE token_id = ?
@@ -287,6 +311,16 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
                       AND player_id = ?
                       AND released_at_ms IS NULL
                       AND state IN ('CLAIMED','PENDING')
+                    """
+                    : """
+                    UPDATE rtp_network_tokens
+                    SET state = ?, released_at_ms = ?
+                    WHERE token_id = ?
+                      AND server_id = ?
+                      AND player_id = ?
+                      AND released_at_ms IS NULL
+                      AND state IN ('CLAIMED','PENDING')
+                      AND hmac = ?
                     """;
             try (PreparedStatement ps = c.prepareStatement(updateSql)) {
                 ps.setString(1, ReservationToken.State.CONSUMED.name());
@@ -294,12 +328,13 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
                 ps.setString(3, tokenId);
                 ps.setString(4, expectedServerId);
                 ps.setString(5, playerId.toString());
+                if (verifier != null) ps.setString(6, rowHmac);
                 int affected = ps.executeUpdate();
                 return affected == 1 ? RedeemOutcome.REDEEMED : RedeemOutcome.ALREADY_CONSUMED;
             }
         } catch (SQLException e) {
             LOG.log(Level.WARNING,
-                    "SqlNetworkStateBinding.redeem failed for token " + tokenId + ": " + e.getMessage(), e);
+                    "SqlNetworkStateBinding.redeem failed for token " + tokenPrefix(tokenId) + ": " + e.getMessage(), e);
             return RedeemOutcome.TRANSPORT_ERROR;
         }
     }
@@ -368,21 +403,15 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
                     }
                     long expires = rs.getLong("expires_at_ms");
                     long createdAt = rs.getLong("created_at_ms");
-                    if (verifier != null) {
-                        String storedHmac = rs.getString("hmac");
-                        if (storedHmac == null || storedHmac.isEmpty()
-                                || !verifier.verify(schemaVersion,
-                                        canonicalToken(tokenId, rowServerId, playerIdStr,
-                                                expires, createdAt, state),
-                                        storedHmac)) {
-                            LOG.log(Level.WARNING,
-                                    "listActiveForServerSync: HMAC verification failed for token "
-                                            + tokenId + "; dropping row (REQ-RTP-S-004)");
-                            continue;
-                        }
+                    String region = rs.getString("region_key");
+                    if (verifier != null && !verifyToken(tokenId, rowServerId, playerIdStr,
+                            expires, createdAt, state, region, rs.getString("hmac"))) {
+                        LOG.log(Level.WARNING,
+                                "listActiveForServerSync: HMAC verification failed for token "
+                                        + tokenPrefix(tokenId) + "; dropping row (REQ-RTP-S-004)");
+                        continue;
                     }
-                    out.add(new ReservationToken(tokenId, rowServerId, playerId, expires, state,
-                            rs.getString("region_key")));
+                    out.add(new ReservationToken(tokenId, rowServerId, playerId, expires, state, region));
                 }
             }
         } catch (SQLException e) {
@@ -392,6 +421,66 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
             return List.of();
         }
         return out;
+    }
+
+    @Override
+    public CompletableFuture<Void> setLastTeleportTime(UUID playerId, long epochMillis) {
+        Objects.requireNonNull(playerId, "playerId");
+        checkOpen();
+        return CompletableFuture.runAsync(() -> setLastTeleportTimeSync(playerId, epochMillis), executor);
+    }
+
+    private void setLastTeleportTimeSync(UUID playerId, long epochMillis) {
+        String sql;
+        switch (dialect) {
+            case MYSQL -> sql = """
+                    INSERT INTO rtp_network_last_teleport (player_id, last_teleport_ms)
+                    VALUES (?, ?)
+                    ON DUPLICATE KEY UPDATE last_teleport_ms = VALUES(last_teleport_ms)
+                    """;
+            case POSTGRES, SQLITE -> sql = """
+                    INSERT INTO rtp_network_last_teleport (player_id, last_teleport_ms)
+                    VALUES (?, ?)
+                    ON CONFLICT (player_id) DO UPDATE SET last_teleport_ms = EXCLUDED.last_teleport_ms
+                    """;
+            case H2, UNKNOWN -> sql = """
+                    MERGE INTO rtp_network_last_teleport (player_id, last_teleport_ms)
+                    KEY (player_id)
+                    VALUES (?, ?)
+                    """;
+            default -> throw new IllegalStateException("Unknown dialect: " + dialect);
+        }
+        try (Connection c = dataSource.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, playerId.toString());
+            ps.setLong(2, epochMillis);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("SqlNetworkStateBinding.setLastTeleportTime failed: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public CompletableFuture<Long> getLastTeleportTime(UUID playerId) {
+        Objects.requireNonNull(playerId, "playerId");
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> getLastTeleportTimeSync(playerId), executor);
+    }
+
+    private long getLastTeleportTimeSync(UUID playerId) {
+        String sql = "SELECT last_teleport_ms FROM rtp_network_last_teleport WHERE player_id = ?";
+        try (Connection c = dataSource.getConnection();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, playerId.toString());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getLong("last_teleport_ms");
+                }
+                return 0L;
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("SqlNetworkStateBinding.getLastTeleportTime failed: " + e.getMessage(), e);
+        }
     }
 
     @Override
@@ -652,11 +741,15 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
                 INSERT INTO rtp_network_tokens(token_id, server_id, player_id, expires_at_ms, state, created_at_ms, released_at_ms, hmac, region_key)
                 VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)
                 """;
-        // A3 envelope: sign over the canonical token payload (field order
-        // matches RedisNetworkStateBinding.canonicalToken).
-        String hmac = signOrEmpty(canonicalToken(
-                tokenId, serverId, playerId.toString(), expires, now,
-                ReservationToken.State.CLAIMED));
+        // Token envelope: shared CanonicalEnvelopes v2 payload (incl.
+        // regionKey), identical to the Redis binding. Delimiter-bearing
+        // fields throw IllegalArgumentException (fail closed).
+        if (!CanonicalEnvelopes.isSafeField(serverId) || !CanonicalEnvelopes.isSafeField(region)) {
+            throw new IllegalArgumentException("claim: serverId/regionKey contains a reserved delimiter character");
+        }
+        String hmac = verifier == null ? "" : CanonicalEnvelopes.signToken(verifier, schemaVersion,
+                tokenId, serverId, playerId.toString(), Long.toString(expires), Long.toString(now),
+                ReservationToken.State.CLAIMED.name(), region);
         try (Connection c = dataSource.getConnection();
              PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, tokenId);
@@ -748,18 +841,13 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
                 // (forged row, replayed claim, or state tampered from RELEASED
                 // back to CLAIMED) drops the row with a REQ-RTP-S-004 WARNING
                 // and returns Optional.empty().
-                if (verifier != null) {
-                    String storedHmac = rs.getString("hmac");
-                    if (storedHmac == null || storedHmac.isEmpty()
-                            || !verifier.verify(schemaVersion,
-                                    canonicalToken(tokenId, serverId, playerId.toString(),
-                                            expires, createdAt, state),
-                                    storedHmac)) {
-                        LOG.log(Level.WARNING,
-                                "findReservationSync: HMAC verification failed for token "
-                                        + tokenId + "; dropping row (REQ-RTP-S-004)");
-                        return Optional.empty();
-                    }
+                String region = rs.getString("region_key");
+                if (verifier != null && !verifyToken(tokenId, serverId, playerId.toString(),
+                        expires, createdAt, state, region, rs.getString("hmac"))) {
+                    LOG.log(Level.WARNING,
+                            "findReservationSync: HMAC verification failed for token "
+                                    + tokenPrefix(tokenId) + "; dropping row (REQ-RTP-S-004)");
+                    return Optional.empty();
                 }
                 return Optional.of(new ReservationToken(
                         tokenId,
@@ -767,7 +855,7 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
                         UUID.fromString(rs.getString("player_id")),
                         expires,
                         state,
-                        rs.getString("region_key")));
+                        region));
             }
         } catch (SQLException e) {
             throw new RuntimeException("SqlNetworkStateBinding.findReservation failed: " + e.getMessage(), e);
@@ -907,15 +995,21 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
         return BackendHeartbeatCodec.encode(r);
     }
 
-    private static String canonicalToken(String tokenId, String serverId, String playerId,
-                                         long expiresAtMs, long createdAtMs,
-                                         ReservationToken.State state) {
-        return "tokenId=" + tokenId
-                + "\nserverId=" + serverId
-                + "\nplayerId=" + playerId
-                + "\nexpiresAtMs=" + expiresAtMs
-                + "\ncreatedAtMs=" + createdAtMs
-                + "\nstate=" + state.name();
+    /** Token verify via the shared v2 canonical form; NULL / empty hmac fails closed. */
+    private boolean verifyToken(String tokenId, String serverId, String playerId,
+                                long expiresAtMs, long createdAtMs,
+                                ReservationToken.State state, String regionKey, String hmac) {
+        if (hmac == null || hmac.isEmpty()) return false;
+        return CanonicalEnvelopes.verifyToken(verifier, schemaVersion,
+                tokenId, serverId, playerId,
+                Long.toString(expiresAtMs), Long.toString(createdAtMs),
+                state.name(), regionKey, hmac);
+    }
+
+    /** First 8 chars of a token id; full ids stay out of logs. */
+    private static String tokenPrefix(String tokenId) {
+        if (tokenId == null) return "null";
+        return tokenId.length() <= 8 ? tokenId : tokenId.substring(0, 8);
     }
 
     private String signOrEmpty(String canonical) {

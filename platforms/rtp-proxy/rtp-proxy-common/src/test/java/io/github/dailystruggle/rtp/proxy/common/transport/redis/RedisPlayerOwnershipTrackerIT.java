@@ -1,13 +1,12 @@
 package io.github.dailystruggle.rtp.proxy.common.transport.redis;
 
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
 
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -30,16 +29,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @EnabledIf("io.github.dailystruggle.rtp.proxy.common.transport.redis.RedisTestContainer#dockerAvailable")
 class RedisPlayerOwnershipTrackerIT {
 
-    private JedisPool pool;
+    private RespPool pool;
     private RedisPlayerOwnershipTracker tracker;
 
-    private static void scrubKeyspace(JedisPool p) {
-        try (Jedis j = p.getResource()) {
-            Set<String> keys = j.keys("rtp:net:owner:*");
-            if (keys != null && !keys.isEmpty()) {
-                j.del(keys.toArray(new String[0]));
+    private static void scrubKeyspace(RespPool p) {
+        try (RespConnection j = p.getResource()) {
+            RespConnection.ScanResult res = j.scan("0", "rtp:net:owner:*", 100);
+            if (!res.getResult().isEmpty()) {
+                j.del(res.getResult().toArray(new String[0]));
             }
-        }
+        } catch (Exception ignored) {}
     }
 
     @BeforeEach

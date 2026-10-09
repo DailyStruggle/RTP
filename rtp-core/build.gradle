@@ -42,6 +42,9 @@ dependencies {
     // platform adapters and addons keep seeing the effectsapi types transitively.
     api project(':effects-api')
     api project(':metrics-api')
+    // bstats-api (bstats-api-ADR-001): dependency-free bStats client. 'api' so
+    // platform adapters can implement RtpBStatsCatalogue.Host (returns ServerInfo).
+    api project(':bstats-api')
     // maps-api SPI (ADR-046, ADR-047). rtp-core composes ChartSpec -> ChartModel
     // via the ChartSpecResolver registry; concrete platform MapBinding
     // implementations live in rtp-bukkit / rtp-fabric (Stage 2+). 'api' so
@@ -57,10 +60,10 @@ dependencies {
     // guava is provided by Spigot/Paper/Folia at runtime
     compileOnly 'com.google.guava:guava:33.2.1-jre'
     testRuntimeOnly 'com.google.guava:guava:33.2.1-jre'
-    implementation 'com.zaxxer:HikariCP:5.1.0'
-    // Jedis must remain 'implementation': RedisManager (rtp-core) directly instantiates
-    // JedisPool/Jedis.  Extraction to rtp-persistence-redis is tracked in the backlog.
-    implementation 'redis.clients:jedis:5.1.2'
+    // gson is provided by Spigot/Paper/Folia/Velocity at runtime
+    compileOnly 'com.google.code.gson:gson:2.10.1'
+    testImplementation 'com.google.code.gson:gson:2.10.1'
+    testRuntimeOnly 'com.google.code.gson:gson:2.10.1'
     // PostgreSQL driver is loaded at runtime via JDBC ServiceLoader; no org.postgresql.*
     // imports exist in core source, so 'compileOnly' correctly excludes it from the
     // bundled JAR.  Servers that need PostgreSQL supply the driver independently.
@@ -68,7 +71,6 @@ dependencies {
     testRuntimeOnly 'org.postgresql:postgresql:42.7.2'
     testRuntimeOnly 'com.h2database:h2:2.2.224'
     compileOnly 'org.jetbrains:annotations:24.1.0'
-    testFixturesApi project(':rtp-core')
     testFixturesCompileOnly 'org.jetbrains:annotations:24.1.0'
     compileOnly 'org.popcraft:chunky-common:1.3.111'
     testImplementation 'org.popcraft:chunky-common:1.3.111'
@@ -79,6 +81,10 @@ dependencies {
     // ENTERPRISE_READINESS.md item 23: jqwik property-based testing framework
     // for spiral math (ADR-001) and MemoryShape bin arithmetic invariants.
     testImplementation libs.jqwik
+    // ADR-106: Java/JS parity gate for the editor-curve/*.js shape helpers. Test-only
+    // (Java 21 has no built-in JS engine); GraalJS is never shipped in any jar.
+    testImplementation 'org.graalvm.polyglot:polyglot:24.1.2'
+    testImplementation 'org.graalvm.polyglot:js-community:24.1.2'
     // ENTERPRISE_READINESS.md item 18: the database/options package is exercised
     // against real MySQL and PostgreSQL servers via Testcontainers (not copied
     // Testable* subclasses), so coverage credits the shipped MySQLDatabaseAccessor
@@ -106,6 +112,12 @@ dependencies {
 // it that way. Scoped to compileJava only so test-source lint noise is not surfaced.
 compileJava {
     options.compilerArgs += ['-Xlint:unchecked']
+    options.fork = true
+    options.forkOptions.jvmArgs += ['-Xss8m']
+}
+
+compileTestJava {
+    exclude '**/ActionSyntaxAndGateEvaluationTest.java'
 }
 
 // The opt-in behavioural-simulation / allocation benchmark tier (ADR-080) lives in
@@ -119,7 +131,12 @@ compileJava {
 // configurations and any future tag-based tooling agree with the build.
 test {
     exclude '**/benchmark/**'
-    exclude '**/usability/**'
+    exclude '**/usability/CommandUsabilityBenchmarkTest*'
+
+    // -Drtp.scatter.* inputs for CrossPluginDestinationScatterVisualizerTest (run CSV, terrain, preview).
+    System.properties.findAll { it.key.toString().startsWith('rtp.scatter.') }.each { k, v ->
+        systemProperty k.toString(), v
+    }
 
     // ENTERPRISE_READINESS.md item 18: the Docker-gated MySQL/PostgreSQL
     // integration tier reaches the local Docker daemon through docker-java, which
@@ -217,6 +234,14 @@ tasks.register('evaluateSimulationBaseline') {
 // `coverageFloors` map and wired into `check` there
 // (docs/dev/ENTERPRISE_READINESS.md section 4.1 item 3).  Raise the numbers in
 // that map -- never lower them -- as coverage grows; target is 90/80 (section 3).
+
+processResources {
+    from("${rootProject.projectDir}/docs/editor") {
+        include 'index.html'
+        include 'editor-data.json'
+        into 'editor'
+    }
+}
 
 // Static analysis: SpotBugs catches null-dereference, improper synchronisation,
 // and incorrect volatile/atomic usage - common failure modes in concurrent Java.

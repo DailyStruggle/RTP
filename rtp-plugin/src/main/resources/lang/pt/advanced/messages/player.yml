@@ -6,6 +6,8 @@
 # Seção 2: Teletransporte
 # ###############################################################################
 jaTeletransportando: "&7[P0] ⚡ você já está se teletransportando!"
+jaEmSessao: "&c[P0] [player] já está em uma sessão de partida ativa."
+naoEmSessao: "&c[P0] Você não está em uma partida desta ação."
 
 # se o plugin está sendo recarregado no momento
 teletransporteNegadoRecarregando: "&7[P0] os teletransportes estão temporariamente desativados enquanto o plugin recarrega. Tente novamente em alguns instantes."
@@ -50,6 +52,10 @@ milissegundos: "ms"
 # o mundo não existe no bukkit
 # espaço reservado: [world] - o nome do mundo
 mundoInvalido: "&7[P0] não foi possível encontrar o mundo '[world]'"
+
+semLocalizacaoAnterior: "&c[P0] Nenhuma localização anterior de teleporte encontrada."
+
+retornoSucesso: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Retornou à localização anterior.</gradient>"
 
 # o plugin não tem o comando que o usuário solicitou
 # espaço reservado: [arg] - o argumento tentado

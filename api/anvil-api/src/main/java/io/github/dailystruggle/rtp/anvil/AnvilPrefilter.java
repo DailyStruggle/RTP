@@ -1,12 +1,16 @@
 package io.github.dailystruggle.rtp.anvil;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.UnaryOperator;
@@ -117,18 +121,31 @@ public final class AnvilPrefilter {
    * is {@code null} and the caller falls through to the live-load path. On
    * {@link Verdict#ACCEPT}, the view is the same one used to compute the verdict -
    * reusing it avoids a second region-file read.
+   *
+   * <p>Dispatches onto {@link AnvilIoPool#get()} by default to prevent blocking I/O
+   * starvation on {@link ForkJoinPool#commonPool()}.</p>
    */
   public static CompletableFuture<ProbeResult> probeDetailed(
       Path worldFolder, String dimensionSubpath, int cx, int cz,
       Set<String> rawUnsafeBlocks, UnaryOperator<String> reconciler) {
+    return probeDetailed(worldFolder, dimensionSubpath, cx, cz, rawUnsafeBlocks, reconciler, AnvilIoPool.get());
+  }
+
+  /**
+   * Asynchronously probe a chunk using the specified executor.
+   */
+  public static CompletableFuture<ProbeResult> probeDetailed(
+      Path worldFolder, String dimensionSubpath, int cx, int cz,
+      Set<String> rawUnsafeBlocks, UnaryOperator<String> reconciler, Executor executor) {
     if (worldFolder == null) {
       return CompletableFuture.completedFuture(new ProbeResult(Verdict.UNKNOWN, null));
     }
     final String dim = (dimensionSubpath == null) ? "" : dimensionSubpath;
     final UnaryOperator<String> r = (reconciler == null) ? DEFAULT_RECONCILER : reconciler;
+    final Executor exec = (executor == null) ? AnvilIoPool.get() : executor;
     return CompletableFuture.supplyAsync(
         () -> probeSyncDetailed(worldFolder, dim, cx, cz, rawUnsafeBlocks, r),
-        ForkJoinPool.commonPool());
+        exec);
   }
 
   /**
@@ -170,35 +187,168 @@ public final class AnvilPrefilter {
   public static ProbeResult probeSyncDetailed(
       Path worldFolder, String dimensionSubpath, int cx, int cz,
       Set<String> rawUnsafeBlocks, UnaryOperator<String> reconciler) {
+    try (RegionProbeSession s = openSession(worldFolder, dimensionSubpath, rawUnsafeBlocks, reconciler)) {
+      return s.probe(cx, cz);
+    }
+  }
+
+  /**
+   * Batched synchronous probe: one {@link RegionProbeSession} per region file, so every chunk
+   * stored in the same {@code r.X.Z.mca} shares one channel open and one location table. Verdicts
+   * are identical to {@link #probeSyncDetailed(Path, String, int, int, Set, UnaryOperator)} per
+   * chunk; failures are isolated per chunk and fail closed to {@link Verdict#UNKNOWN} (S-004).
+   * Blocking I/O: off the tick thread only (S-005).
+   *
+   * @return insertion-ordered verdict per distinct requested chunk (never {@code null})
+   */
+  public static Map<ChunkCoord, ProbeResult> probeBatchSyncDetailed(
+      Path worldFolder, String dimensionSubpath, List<ChunkCoord> chunks,
+      Set<String> rawUnsafeBlocks, UnaryOperator<String> reconciler) {
+    Map<ChunkCoord, ProbeResult> out = new LinkedHashMap<>();
+    if (chunks == null || chunks.isEmpty()) return out;
+    Map<Long, List<ChunkCoord>> byRegion = new LinkedHashMap<>();
+    for (ChunkCoord c : chunks) {
+      if (c == null) continue;
+      byRegion.computeIfAbsent(c.regionKey(), k -> new ArrayList<>()).add(c);
+    }
+    // Reconcile the unsafe set once for the whole batch.
     final UnaryOperator<String> r = (reconciler == null) ? DEFAULT_RECONCILER : reconciler;
     final Set<String> reconciledUnsafe = reconcileAll(rawUnsafeBlocks, r);
-    try {
-      RegionFileResolver.ResolvedRegion resolved = RegionFileResolver.resolve(worldFolder, dimensionSubpath, cx, cz);
+    for (List<ChunkCoord> group : byRegion.values()) {
+      try (RegionProbeSession s = new RegionProbeSession(worldFolder, dimensionSubpath, reconciledUnsafe, r)) {
+        for (ChunkCoord c : group) {
+          if (!out.containsKey(c)) out.put(c, s.probe(c.x(), c.z()));
+        }
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Opens a probe session: chunks of the same region file probed through it share one channel open
+   * (lazy, on the first chunk that needs the disk) and one byte-cache lease. Close it with
+   * try-with-resources; nothing stays open past {@link RegionProbeSession#close()}. One thread.
+   */
+  public static RegionProbeSession openSession(
+      Path worldFolder, String dimensionSubpath, Set<String> rawUnsafeBlocks, UnaryOperator<String> reconciler) {
+    final UnaryOperator<String> r = (reconciler == null) ? DEFAULT_RECONCILER : reconciler;
+    return new RegionProbeSession(worldFolder, dimensionSubpath, reconcileAll(rawUnsafeBlocks, r), r);
+  }
+
+  /** See {@link #openSession(Path, String, Set, UnaryOperator)}. */
+  public static final class RegionProbeSession implements AutoCloseable {
+    private final Path worldFolder;
+    private final String dim;
+    private final Set<String> reconciledUnsafe;
+    private final UnaryOperator<String> reconciler;
+    private long boundRegion;
+    private boolean bound;
+    private boolean resolveTried;
+    private RegionFileResolver.ResolvedRegion resolved;
+    private AnvilSectorReader.Session sectors;
+    private AnvilRegionByteCache.Lease lease;
+    private boolean leaseTried;
+
+    private RegionProbeSession(Path worldFolder, String dim, Set<String> reconciledUnsafe,
+                               UnaryOperator<String> reconciler) {
+      this.worldFolder = worldFolder;
+      this.dim = (dim == null) ? "" : dim;
+      this.reconciledUnsafe = reconciledUnsafe;
+      this.reconciler = reconciler;
+    }
+
+    /**
+     * Probe absolute chunk {@code (cx, cz)}. The session binds to the first chunk's region file;
+     * a chunk from another file is probed through a throwaway session (correct, not batched).
+     */
+    public ProbeResult probe(int cx, int cz) {
+      long region = ((long) (cx >> 5) << 32) | ((cz >> 5) & 0xFFFF_FFFFL);
+      if (bound && region != boundRegion) {
+        try (RegionProbeSession other = new RegionProbeSession(worldFolder, dim, reconciledUnsafe, reconciler)) {
+          return other.probe(cx, cz);
+        }
+      }
+      if (!bound) {
+        bound = true;
+        boundRegion = region;
+      }
+      return probeIn(this, worldFolder, dim, cx, cz, reconciledUnsafe, reconciler);
+    }
+
+    /** Region file of the bound region, resolved once per session; {@code null} when absent. */
+    private RegionFileResolver.ResolvedRegion resolve(int cx, int cz) {
+      if (!resolveTried) {
+        resolveTried = true;
+        // Memoized: no existence syscalls inside the revalidation window.
+        resolved = RegionFileResolver.resolveExisting(worldFolder, dim, cx, cz);
+      }
+      return resolved;
+    }
+
+    /** Decodes {@code (cx, cz)} through this session's channel or lease. */
+    private AnvilReader.ChunkEntry readEntry(int cx, int cz) throws IOException {
       Path regionFile = resolved.path();
-      if (!Files.isRegularFile(regionFile)) {
+      int rx = Math.floorMod(cx, 32);
+      int rz = Math.floorMod(cz, 32);
+      if (resolved.reader() == AnvilReader.INSTANCE) {
+        if (!leaseTried) {
+          leaseTried = true;
+          lease = residentLease(regionFile);
+        }
+        if (lease != null) {
+          return AnvilReader.readChunkEntry(lease.buffer(), lease.length(), rx, rz);
+        }
+        if (sectors == null) sectors = AnvilSectorReader.openSession(regionFile);
+        return sectors.readChunkEntry(cx, cz);
+      }
+      // Addon-registered formats: whole file under one lease for the session (layout is opaque).
+      if (!leaseTried) {
+        leaseTried = true;
+        lease = AnvilRegionByteCache.acquire(regionFile);
+      }
+      if (lease == null) throw new RegionUnreadableException();
+      return resolved.reader().readChunk(lease.buffer(), lease.length(), rx, rz);
+    }
+
+    @Override
+    public void close() {
+      AnvilRegionByteCache.Lease l = lease;
+      lease = null;
+      AnvilSectorReader.Session s = sectors;
+      sectors = null;
+      if (l != null) l.close();
+      if (s != null) {
+        try {
+          s.close();
+        } catch (IOException e) {
+          LOG.log(Level.FINE, "[RTP] Anvil probe session close failed: " + s.regionFile(), e);
+        }
+      }
+    }
+  }
+
+  private static ProbeResult probeIn(
+      RegionProbeSession session, Path worldFolder, String dimensionSubpath, int cx, int cz,
+      Set<String> reconciledUnsafe, UnaryOperator<String> r) {
+    try {
+      RegionFileResolver.ResolvedRegion resolved = session.resolve(cx, cz);
+      if (resolved == null) {
         // Chunk has never been generated and persisted; the live load path will generate
         // it if needed. The pre-filter cannot reject what does not exist on disk.
-        diagLog("UNKNOWN:no-region-file(" + regionFile + ")",
+        diagLog("UNKNOWN:no-region-file(" + RegionFileResolver.regionDirectoryFor(worldFolder, dimensionSubpath)
+                .resolve("r." + (cx >> 5) + "." + (cz >> 5) + ".mca") + ")",
             worldFolder, dimensionSubpath, cx, cz);
         return new ProbeResult(Verdict.UNKNOWN, null);
       }
-      // Route region-file reads through AnvilRegionByteCache so that ScanTask's
-      // up-to-50-in-flight probes per region collapse onto a single shared byte[]
-      // (LRU reuse + miss coalescing). Calling Files.readAllBytes directly here caused
-      // 50x transient 2-8 MB allocations on the ForkJoin common pool and OOM'd the heap.
-      byte[] regionBytes = AnvilRegionByteCache.get(regionFile);
-      if (regionBytes == null) {
-        // Either the file vanished between the isRegularFile check and the cache read,
-        // or the cache's readAllBytes failed. Treat as UNKNOWN and fall through to the
-        // live load path, same as the original IOException branch below.
+      AnvilReader.ChunkEntry entry;
+      try {
+        entry = session.readEntry(cx, cz);
+      } catch (RegionUnreadableException e) {
+        // File vanished or could not be read as a whole. Fall through to the live load path.
         diagLog("UNKNOWN:region-read-failed",
             worldFolder, dimensionSubpath, cx, cz);
         return new ProbeResult(Verdict.UNKNOWN, null);
       }
-      int rx = Math.floorMod(cx, 32);
-      int rz = Math.floorMod(cz, 32);
-
-      AnvilReader.ChunkEntry entry = resolved.reader().readChunk(regionBytes, rx, rz);
       if (entry == null) {
         // Location entry is zeroed - chunk slot unused in this region file.
         diagLog("UNKNOWN:empty-location-entry",
@@ -214,7 +364,7 @@ public final class AnvilPrefilter {
       }
 
       long[] packedHeightmap = AnvilReader.getMotionBlockingNoLeaves(entry.root);
-      if (packedHeightmap == null) {
+      if (packedHeightmap == null || packedHeightmap.length == 0) {
         diagLog("UNKNOWN:missing-heightmap(MOTION_BLOCKING_NO_LEAVES)",
             worldFolder, dimensionSubpath, cx, cz);
         return new ProbeResult(Verdict.UNKNOWN, null);
@@ -246,6 +396,14 @@ public final class AnvilPrefilter {
       // range). Use the lowest emitted section as the floor.
       int minHeight = view.minHeight();
 
+      // If any section has malformed data, fail closed to UNKNOWN rather than ACCEPT
+      for (PaletteSection s : view.sections()) {
+        if (s.hasMalformedData()) {
+          diagLog("UNKNOWN:malformed-palette", worldFolder, dimensionSubpath, cx, cz);
+          return new ProbeResult(Verdict.UNKNOWN, null);
+        }
+      }
+
       // Sample every (x, z) column in the chunk (256 columns). Reject on the first
       // unsafe surface. This is bounded: 256 column lookups, 3 blocks each = 768
       // palette resolves in the worst case, all off-thread.
@@ -257,6 +415,12 @@ public final class AnvilPrefilter {
           int rawHeight = readHeightmapEntry(packedHeightmap, lx, lz);
           if (rawHeight <= 0) continue; // Empty column - nothing to sample.
           int groundY = minHeight + rawHeight - 1;
+          if (isMalformed(view, lx, groundY, lz)
+              || isMalformed(view, lx, groundY + 1, lz)
+              || isMalformed(view, lx, groundY + 2, lz)) {
+            diagLog("UNKNOWN:malformed-palette-ground", worldFolder, dimensionSubpath, cx, cz);
+            return new ProbeResult(Verdict.UNKNOWN, null);
+          }
           if (isUnsafe(view, lx, groundY, lz, reconciledUnsafe, r)
               || isUnsafe(view, lx, groundY + 1, lz, reconciledUnsafe, r)
               || isUnsafe(view, lx, groundY + 2, lz, reconciledUnsafe, r)) {
@@ -292,6 +456,71 @@ public final class AnvilPrefilter {
           e);
       return new ProbeResult(Verdict.UNKNOWN, null);
     }
+  }
+
+  /** Whole-file read of a non-Anvil region failed (missing or unreadable). */
+  private static final class RegionUnreadableException extends IOException {
+    private static final long serialVersionUID = 1L;
+  }
+
+  /**
+   * Byte-cache lease for a whole file some sweep already loaded, validated against the
+   * location-table cache's in-window mtime. Never stats or reads; {@code null} otherwise.
+   */
+  static AnvilRegionByteCache.Lease residentLease(Path regionFile) {
+    AnvilRegionHeaderCache.Header header = AnvilRegionHeaderCache.fresh(regionFile);
+    return header == null ? null : AnvilRegionByteCache.acquireIfCached(regionFile, header.mtime());
+  }
+
+  /**
+   * Center-column probe of absolute chunk {@code (cx, cz)} for every platform adapter's
+   * {@code probeChunkColumn}. Reads only the chunk's own {@code .mca} sectors (ADR-016); returns
+   * {@code null} when no {@code .mca} exists, the slot is empty, or the region uses another
+   * format (the caller falls back to the live path). Blocking I/O: run on {@link AnvilIoPool}
+   * (S-005).
+   *
+   * @throws IOException on unreadable files or corrupt/unsupported payloads
+   */
+  public static ColumnProbe probeColumn(Path worldFolder, String dimensionSubpath, int cx, int cz,
+                                        int minY, int maxY) throws IOException {
+    if (worldFolder == null || minY > maxY) return null;
+    String dim = (dimensionSubpath == null) ? "" : dimensionSubpath;
+    RegionFileResolver.ResolvedRegion resolved = RegionFileResolver.resolveExisting(worldFolder, dim, cx, cz);
+    if (resolved == null || resolved.reader() != AnvilReader.INSTANCE) return null;
+    Path regionFile = resolved.path();
+    try (AnvilRegionByteCache.Lease lease = residentLease(regionFile)) {
+      if (lease != null) {
+        return AnvilReader.readColumnProbe(lease.buffer(), lease.length(),
+            Math.floorMod(cx, 32), Math.floorMod(cz, 32), minY, maxY);
+      }
+    }
+    return AnvilSectorReader.readColumnProbe(regionFile, cx, cz, minY, maxY);
+  }
+
+  private static final ColumnProbeCoalescer COLUMN_PROBES = new ColumnProbeCoalescer(AnvilIoPool.get());
+
+  /**
+   * Asynchronous {@link #probeColumn}: pending requests for the same region file are coalesced and
+   * served on {@link AnvilIoPool} through one channel open (group commit, at most 64 per group,
+   * no added delay). Answers equal
+   * {@link #probeColumn}; a failure completes only that request's future exceptionally (S-004).
+   * Performs no I/O on the calling thread (S-005); the future completes on a pool thread.
+   */
+  public static CompletableFuture<ColumnProbe> probeColumnAsync(
+      Path worldFolder, String dimensionSubpath, int cx, int cz, int minY, int maxY) {
+    if (worldFolder == null || minY > maxY) return CompletableFuture.completedFuture(null);
+    String dim = (dimensionSubpath == null) ? "" : dimensionSubpath;
+    return COLUMN_PROBES.submit(worldFolder, dim, cx, cz, minY, maxY);
+  }
+
+  /** Region-file groups drained by {@link #probeColumnAsync} (opens are at most this). */
+  public static long columnProbeGroups() {
+    return COLUMN_PROBES.groupsDrained();
+  }
+
+  /** Requests served by {@link #probeColumnAsync}; divided by {@link #columnProbeGroups()} = mean group size. */
+  public static long columnProbeRequests() {
+    return COLUMN_PROBES.requestsServed();
   }
 
   /**
@@ -358,5 +587,10 @@ public final class AnvilPrefilter {
     if (reconciledUnsafe == null || reconciledUnsafe.isEmpty()) return false;
     String n = reconciler.apply(blockId);
     return n != null && !n.isEmpty() && reconciledUnsafe.contains(n);
+  }
+
+  private static boolean isMalformed(AnvilChunkView view, int x, int worldY, int z) {
+    int sy = Math.floorDiv(worldY, 16);
+    return view.hasSection(sy) && view.blockIdAt(x, worldY, z) == null;
   }
 }

@@ -26,7 +26,8 @@ scanStatus: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunk
 # The bar's color is taken from the first legacy color code in this value:
 #   &c/&4 = red, &e/&6 = yellow, &a/&2 = green, &9/&1/&3/&b = blue,
 #   &5 = purple, &d = pink, &f/&7/&8/&0 = white. Defaults to green if none.
-# placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
+# placeholder: [scan_regions], [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_progress], [scan_eta]
+# [scan_landPercentage] = share of scanned locations that are valid land; [scan_progress] = percent of the scan completed.
 scanBossBar: "&aScanning [scan_regions]: [scan_chunks]/[scan_totalChunks] ([scan_landPercentage]% land) ETA [scan_eta]"
 
 # ###############################################################################
@@ -225,6 +226,7 @@ menuAdminPanelHint: "&7click an option below"
 
 # Section dividers on the admin panel. No placeholders.
 menuAdminPanelSectionConfig: "&8» &7configuration"
+menuAdminPanelSectionDocs: "&8» &7documentation & editor"
 menuAdminPanelSectionDiagnostics: "&8» &7diagnostics"
 menuAdminPanelSectionLifecycle: "&8» &7lifecycle"
 menuAdminPanelSectionBrowse: "&8» &7browse"
@@ -232,6 +234,10 @@ menuAdminPanelSectionBrowse: "&8» &7browse"
 # Admin-panel rows + hovers. No placeholders.
 menuAdminPanelRowConfig: "#5FB3B3▶ config editor"
 menuAdminPanelHoverConfig: "&7open the curated config selector"
+menuAdminPanelRowDocs: "#5FB3B3▶ documentation"
+menuAdminPanelHoverDocs: "&7open packed in-game documentation manuals"
+menuAdminPanelRowEditor: "#5FB3B3▶ web editor & manual"
+menuAdminPanelHoverEditor: "&7launch ephemeral web editor session with side-by-side docs"
 menuAdminPanelRowRegions: "#5FB3B3▶ regions"
 menuAdminPanelHoverRegions: "&7add, remove, or edit per-region configs"
 menuAdminPanelRowWorlds: "#5FB3B3▶ worlds"
@@ -488,6 +494,66 @@ multiconfigResultNameInvalid: "&cname '[name]' is not allowed; use letters, digi
 # Result message when an ADD collides with an existing entry name.
 # Placeholder: [name].
 multiconfigResultNameTaken: "&can entry named '[name]' already exists."
+
+# --- Documentation viewer and export (ADR-045, ADR-104) ---
+# Sent when a requested documentation topic cannot be found.
+# Placeholder: [topic]
+docsNotFound: "&c[RTP] Documentation topic '[topic]' not found. Use /rtp docs list to see available topics."
+
+# Sent when the documentation registry has no documents loaded.
+docsEmpty: "&c[RTP] No documentation topics are currently registered."
+
+# Sent when offline HTML documentation export completes successfully.
+# Placeholder: [path]
+docsExportSuccess: "&a[RTP] Documentation HTML bundle successfully exported to [path]."
+
+# Sent when offline HTML documentation export fails.
+# Placeholder: [reason]
+docsExportFailed: "&c[RTP] Failed to export documentation bundle: [reason]."
+
+# --- Web editor channel (ADR-106) ---
+# Clickable prompt sent to the operator who opened the editor session when a
+# browser asks to edit. Clicking runs /rtp editor trust nonce=<code>; only trust
+# it if your editor page shows the same code. Placeholders: [nonce], [fingerprint].
+editorTrustPrompt: "&e[P1] A web editor page asks for access with code &b[nonce]&e. If your page shows the same code, click here to trust this browser."
+
+# Hover text of the trust prompt. Placeholders: [nonce], [fingerprint].
+editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(key [fingerprint])"
+
+# Replies to /rtp editor trust. Placeholder: [nonce].
+editorTrustAccepted: "&a[P0] Browser trusted: the editor page with code [nonce] can now preview and Hot-Apply."
+editorTrustAlready: "&7[P0] The browser with code [nonce] was already trusted."
+editorTrustUnknown: "&c[P0] No open editor session issued code [nonce]."
+editorTrustExpired: "&c[P0] Code [nonce] has expired. Reload the editor page to get a new one."
+
+# Sent when /rtp editor trust is run without a code. No placeholders.
+editorTrustUsage: "&c[P0] Usage: /rtp editor trust nonce=<code shown by the editor page>"
+
+# Editor channel notices for the session's operator. [reason] - why the channel
+# closed; [minutes] - the session lifetime. Set a value to "" to silence it.
+editorChannelOpened: "&a[P0] Web editor channel open. Trust your browser when asked to enable previews and Hot-Apply."
+editorChannelLost: "&e[P1] Web editor channel lost: [reason]. The page keeps working from its snapshot."
+editorChannelExpired: "&7[P0] Web editor channel expired after [minutes] minutes. Run the editor command again to resume."
+
+# Sent when /rtp editor trust is refused after 5 wrong codes in one minute. No placeholders.
+editorTrustRateLimited: "&c[P0] Too many wrong editor trust codes. Wait a minute, then try again."
+
+# Sent when /rtp editor untrust has no valid key. No placeholders.
+editorUntrustUsage: "&c[P0] Usage: /rtp editor untrust key=<fingerprint prefix, at least 4 characters | all>"
+
+# Replies to /rtp editor untrust. [count] - browsers untrusted; [key] - the prefix given;
+# [reason] - why the trusted list could not be written.
+editorUntrustRemoved: "&a[P0] Untrusted [count] web editor browser(s); they must be trusted again to preview or Hot-Apply."
+
+editorUntrustNone: "&7[P0] No trusted editor browser matches [key]."
+
+editorUntrustFailed: "&c[P0] Could not update the trusted editor list: [reason]"
+
+# Sent when a byte-store payload for /rtp editor apply has no sha256 checksum. No placeholders.
+editorApplyDigestMissing: "&c[P0] The editor payload has no sha256 checksum, so it was not applied. Commit again from an up-to-date editor page."
+
+# Sent when the offline apply file (editor/<token>.json) cannot be read. Placeholder: [reason].
+editorApplyFileUnreadable: "&e[P1] The offline apply file could not be read ([reason]); trying the byte store."
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

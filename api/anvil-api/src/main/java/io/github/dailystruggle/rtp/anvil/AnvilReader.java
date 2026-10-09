@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.InflaterInputStream;
-import net.jpountz.lz4.LZ4FrameInputStream;
 
 /**
  * Read-only Anvil region-file parser used by the pre-filter (ADR-016).
@@ -25,10 +24,12 @@ import net.jpountz.lz4.LZ4FrameInputStream;
  * <p><b>Compression support.</b> Per observed fixtures across 1.20.4 / 1.21.5 / 26.1 (data
  * versions 3465 / 4671 / 4788), vanilla servers ship Anvil chunks as Minecraft compression
  * mode {@code 2} (zlib-wrapped Deflate). Mode {@code 1} (gzip) is supported for forward
- * compatibility. Mode {@code 3} (uncompressed) is supported. Mode {@code 4} (LZ4) and the
- * {@code 0x80}-or'd "external" variants are rejected with {@link UnsupportedAnvilFormatException}
- * so the pre-filter returns {@link Verdict#UNKNOWN} and the live load path takes over - this
- * is the deliberate safe fallback for formats we have not yet validated against real data.
+ * compatibility. Mode {@code 3} (uncompressed) is supported. Mode {@code 4} (LZ4, written when
+ * {@code region-file-compression=lz4}) is lz4-java's {@code LZ4BlockOutputStream} stream format,
+ * not the LZ4 frame format, decoded in-house by {@link Lz4BlockDecoder}. Unknown modes and the
+ * {@code 0x80}-or'd "external" variants are rejected with
+ * {@link UnsupportedAnvilFormatException} so the pre-filter returns
+ * {@link Verdict#UNKNOWN} and the live load path takes over.
  *
  * <p>All methods are thread-safe: the class is stateless and operates on caller-owned buffers.
  */
@@ -41,11 +42,20 @@ public final class AnvilReader implements RegionFileReader {
     /** Bit flag set on the compression byte when the chunk is stored in an external file. */
     private static final int EXTERNAL_FLAG = 0x80;
 
+    /** Maximum allowed decompressed payload size for a single chunk (32 MiB). */
+    public static final int MAX_DECOMPRESSED_CHUNK_BYTES = 32 * 1024 * 1024;
+
     private AnvilReader() {}
 
     @Override
     public boolean isChunkGenerated(byte[] regionBytes, int cx, int cz) {
-        if (regionBytes == null || regionBytes.length < SECTOR_SIZE * 2) {
+        return isChunkGenerated(regionBytes, regionBytes == null ? 0 : regionBytes.length, cx, cz);
+    }
+
+    /** As {@link #isChunkGenerated(byte[], int, int)} over {@code regionBytes[0, regionLength)}. */
+    @Override
+    public boolean isChunkGenerated(byte[] regionBytes, int regionLength, int cx, int cz) {
+        if (regionBytes == null || regionLength < SECTOR_SIZE * 2 || regionLength > regionBytes.length) {
             return false;
         }
         if (cx < 0 || cx > 31 || cz < 0 || cz > 31) {
@@ -58,7 +68,23 @@ public final class AnvilReader implements RegionFileReader {
                 ((regionBytes[locationEntryOffset + 1] & 0xFF) << 8)  |
                  (regionBytes[locationEntryOffset + 2] & 0xFF);
         int sectorCount = regionBytes[locationEntryOffset + 3] & 0xFF;
-        return sectorOffset != 0 && sectorCount != 0;
+        if (sectorOffset < 2 || sectorCount == 0) {
+            return false;
+        }
+        return readableRun(regionBytes, regionLength, (long) sectorOffset * SECTOR_SIZE, (long) sectorCount * SECTOR_SIZE) >= 0;
+    }
+
+    /**
+     * Readable length of the sector run {@code [start, start + budget)} in {@code buf}, or
+     * {@code -1}. The final sector is padded only on region close, so a tail run may end at EOF
+     * before its budget; it is accepted only when its length prefix proves the payload is whole.
+     */
+    static int readableRun(byte[] buf, int bufLen, long start, long budget) {
+        if (start + budget <= bufLen) return (int) budget;
+        if (start + 5 > bufLen) return -1;
+        int avail = (int) (bufLen - start);
+        int declared = ByteBuffer.wrap(buf, (int) start, 4).getInt();
+        return (declared >= 1 && 4L + declared <= avail) ? avail : -1;
     }
 
     /**
@@ -82,6 +108,11 @@ public final class AnvilReader implements RegionFileReader {
         return readChunkEntry(regionBytes, cx, cz);
     }
 
+    @Override
+    public ChunkEntry readChunk(byte[] regionBytes, int regionLength, int cx, int cz) throws IOException {
+        return readChunkEntry(regionBytes, regionLength, cx, cz);
+    }
+
     /**
      * Reads the chunk at region-local coordinates {@code (cx, cz)} from {@code regionBytes}.
      *
@@ -93,7 +124,15 @@ public final class AnvilReader implements RegionFileReader {
      * @throws IOException                     on malformed headers or NBT
      */
     public static ChunkEntry readChunkEntry(byte[] regionBytes, int cx, int cz) throws IOException {
-        RawChunk raw = readRawChunk(regionBytes, cx, cz);
+        return readChunkEntry(regionBytes, regionBytes == null ? 0 : regionBytes.length, cx, cz);
+    }
+
+    /**
+     * As {@link #readChunkEntry(byte[], int, int)} over {@code regionBytes[0, regionLength)}: a
+     * pooled buffer may be longer than the file, and bytes past {@code regionLength} are never read.
+     */
+    public static ChunkEntry readChunkEntry(byte[] regionBytes, int regionLength, int cx, int cz) throws IOException {
+        RawChunk raw = readRawChunk(regionBytes, regionLength, cx, cz);
         if (raw == null) return null;
         LinkedHashMap<String, Object> root = Nbt.readRootCompound(raw.nbtBytes);
         return new ChunkEntry(raw.compressionByte, raw.declaredLength, root);
@@ -105,9 +144,12 @@ public final class AnvilReader implements RegionFileReader {
      * by {@link #readChunk} and {@link #readColumnProbe} to avoid duplicating the
      * header-walk and decompression logic.
      */
-    private static RawChunk readRawChunk(byte[] regionBytes, int cx, int cz) throws IOException {
-        if (regionBytes == null || regionBytes.length < SECTOR_SIZE * 2) {
-            throw new CorruptRegionEntryException("Region buffer too short: " + (regionBytes == null ? 0 : regionBytes.length));
+    private static RawChunk readRawChunk(byte[] regionBytes, int regionLength, int cx, int cz) throws IOException {
+        if (regionBytes == null || regionLength < SECTOR_SIZE * 2) {
+            throw new CorruptRegionEntryException("Region buffer too short: " + (regionBytes == null ? 0 : regionLength));
+        }
+        if (regionLength > regionBytes.length) {
+            throw new IllegalArgumentException("regionLength " + regionLength + " exceeds buffer " + regionBytes.length);
         }
         if (cx < 0 || cx > 31 || cz < 0 || cz > 31) {
             throw new IllegalArgumentException("Region-local (cx,cz) out of range: (" + cx + "," + cz + ")");
@@ -120,20 +162,44 @@ public final class AnvilReader implements RegionFileReader {
                 ((regionBytes[locationEntryOffset + 1] & 0xFF) << 8)  |
                  (regionBytes[locationEntryOffset + 2] & 0xFF);
         int sectorCount = regionBytes[locationEntryOffset + 3] & 0xFF;
-        if (sectorOffset == 0 || sectorCount == 0) {
+        if (sectorOffset == 0 && sectorCount == 0) {
             return null;
+        }
+        if (sectorOffset < 2) {
+            throw new CorruptRegionEntryException("Chunk entry (" + cx + "," + cz + ") sector offset "
+                    + sectorOffset + " overlaps 8 KiB region header (< 2 sectors)");
+        }
+        if (sectorCount == 0) {
+            throw new CorruptRegionEntryException("Chunk entry (" + cx + "," + cz + ") has sector offset "
+                    + sectorOffset + " but zero sector count");
         }
 
         // long math: sectorOffset is 24-bit, so sectorOffset * SECTOR_SIZE overflows int on corrupt headers.
         long payloadStartLong = (long) sectorOffset * SECTOR_SIZE;
-        int payloadBudget = sectorCount * SECTOR_SIZE;
-        if (payloadStartLong + payloadBudget > regionBytes.length) {
+        long payloadBudgetLong = (long) sectorCount * SECTOR_SIZE;
+        int run = readableRun(regionBytes, regionLength, payloadStartLong, payloadBudgetLong);
+        if (run < 0) {
             throw new CorruptRegionEntryException("Chunk entry (" + cx + "," + cz + ") spans past end of file: start="
-                    + payloadStartLong + " budget=" + payloadBudget + " fileLen=" + regionBytes.length);
+                    + payloadStartLong + " budget=" + payloadBudgetLong + " fileLen=" + regionLength);
         }
-        int payloadStart = (int) payloadStartLong;
+        return decodeSectorPayload(regionBytes, regionLength, (int) payloadStartLong, run, cx, cz);
+    }
 
-        ByteBuffer bb = ByteBuffer.wrap(regionBytes, payloadStart, payloadBudget);
+    /**
+     * Decodes one chunk's sector run {@code buf[payloadStart, payloadStart + payloadBudget)}:
+     * 4-byte length prefix, compression byte, compressed NBT. Shared by the whole-file path
+     * ({@link #readRawChunk}) and the sector-only path ({@link #readChunkViewFromSectors}).
+     */
+    private static RawChunk decodeSectorPayload(byte[] buf, int bufLen, int payloadStart, int payloadBudget, int cx, int cz)
+            throws IOException {
+        if (bufLen > buf.length) {
+            throw new IllegalArgumentException("bufLen " + bufLen + " exceeds buffer " + buf.length);
+        }
+        if (payloadBudget < 5 || (long) payloadStart + payloadBudget > bufLen) {
+            throw new CorruptRegionEntryException("Chunk entry (" + cx + "," + cz + ") sector run too short: start="
+                    + payloadStart + " budget=" + payloadBudget + " bufLen=" + bufLen);
+        }
+        ByteBuffer bb = ByteBuffer.wrap(buf, payloadStart, payloadBudget);
         int declaredLength = bb.getInt();
         int compressionByte = bb.get() & 0xFF;
         if ((compressionByte & EXTERNAL_FLAG) != 0) {
@@ -146,8 +212,81 @@ public final class AnvilReader implements RegionFileReader {
         }
         int compressedLen = declaredLength - 1;
 
-        byte[] nbtBytes = decompress(regionBytes, payloadStart + 5, compressedLen, compressionByte);
+        byte[] nbtBytes = decompress(buf, payloadStart + 5, compressedLen, compressionByte);
         return new RawChunk(compressionByte, declaredLength, nbtBytes);
+    }
+
+    /**
+     * Decodes a single chunk from its own sector run rather than the whole region buffer.
+     * {@code sectorBytes} holds exactly the bytes at file offset {@code sectorOffset * 4096}
+     * spanning {@code sectorCount * 4096} (the location-table entry; shorter for an unpadded tail
+     * run ending at EOF, the length prefix is still bounds-checked), so callers can read one
+     * chunk positionally without loading the full {@code .mca}. Same compression support and
+     * corruption checks as {@link #readChunkView}.
+     *
+     * @param cx region-local chunk x, used only in diagnostics
+     * @param cz region-local chunk z, used only in diagnostics
+     * @throws UnsupportedAnvilFormatException if the compression mode is not supported
+     * @throws IOException                     on malformed payloads or NBT
+     */
+    public static AnvilChunkView readChunkViewFromSectors(byte[] sectorBytes, int cx, int cz) throws IOException {
+        if (sectorBytes == null) {
+            throw new CorruptRegionEntryException("Null sector buffer for chunk (" + cx + "," + cz + ")");
+        }
+        RawChunk raw = decodeSectorPayload(sectorBytes, sectorBytes.length, 0, sectorBytes.length, cx, cz);
+        return toView(Nbt.readRootCompound(raw.nbtBytes));
+    }
+
+    /**
+     * Decodes absolute chunk {@code (chunkX, chunkZ)} from {@code sectorBytes[0, length)}, its own
+     * sector run (see {@link #readChunkViewFromSectors}). The buffer may be a reused, longer scratch
+     * array; bytes past {@code length} are never read and the entry holds no reference to it.
+     *
+     * @throws CorruptRegionEntryException also when the root {@code xPos}/{@code zPos} name a
+     *     different chunk (a location table read before a re-save pointed at reused sectors)
+     */
+    public static ChunkEntry readChunkEntryFromSectors(byte[] sectorBytes, int length, int chunkX, int chunkZ)
+            throws IOException {
+        if (sectorBytes == null) {
+            throw new CorruptRegionEntryException("Null sector buffer for chunk (" + chunkX + "," + chunkZ + ")");
+        }
+        RawChunk raw = decodeSectorPayload(sectorBytes, length, 0, length, chunkX & 31, chunkZ & 31);
+        LinkedHashMap<String, Object> root = Nbt.readRootCompound(raw.nbtBytes);
+        verifyPosition(root, chunkX, chunkZ);
+        return new ChunkEntry(raw.compressionByte, raw.declaredLength, root);
+    }
+
+    /**
+     * {@link #readColumnProbe} for absolute chunk {@code (chunkX, chunkZ)} over its own sector run
+     * {@code sectorBytes[0, length)}. Same selective parse and answers, plus the position check of
+     * {@link #readChunkEntryFromSectors}; the probe holds no reference to the buffer.
+     */
+    public static ColumnProbe readColumnProbeFromSectors(byte[] sectorBytes, int length, int chunkX, int chunkZ,
+                                                         int minY, int maxY) throws IOException {
+        if (minY > maxY) {
+            throw new IllegalArgumentException("minY=" + minY + " must be <= maxY=" + maxY);
+        }
+        if (sectorBytes == null) {
+            throw new CorruptRegionEntryException("Null sector buffer for chunk (" + chunkX + "," + chunkZ + ")");
+        }
+        RawChunk raw = decodeSectorPayload(sectorBytes, length, 0, length, chunkX & 31, chunkZ & 31);
+        LinkedHashMap<String, Object> root = Nbt.readRootCompoundSelective(raw.nbtBytes, AnvilReader::columnProbeDecision);
+        verifyPosition(root, chunkX, chunkZ);
+        return columnProbeFrom(root, minY, maxY);
+    }
+
+    /**
+     * Rejects a decoded root whose {@code xPos}/{@code zPos} (1.18+ root layout) name another
+     * chunk. Absent fields pass: the data-version gate owns layout support.
+     */
+    static void verifyPosition(Map<String, Object> root, int chunkX, int chunkZ) throws CorruptRegionEntryException {
+        Object x = root.get("xPos");
+        Object z = root.get("zPos");
+        if (x instanceof Integer && z instanceof Integer
+                && ((Integer) x != chunkX || (Integer) z != chunkZ)) {
+            throw new CorruptRegionEntryException("Chunk position mismatch: expected (" + chunkX + "," + chunkZ
+                    + ") but sectors hold (" + x + "," + z + ")");
+        }
     }
 
     private static final class RawChunk {
@@ -176,8 +315,9 @@ public final class AnvilReader implements RegionFileReader {
                 System.arraycopy(src, off, copy, 0, len);
                 return copy;
             case 4:
-                wrapped = new LZ4FrameInputStream(new ByteArrayInputStream(src, off, len));
-                break;
+                // Vanilla RegionFileVersion.VERSION_LZ4 = LZ4BlockOutputStream ("LZ4Block" magic).
+                // In-house decoder: caps declared size before allocating, no JNI/Unsafe.
+                return Lz4BlockDecoder.decode(src, off, len, MAX_DECOMPRESSED_CHUNK_BYTES);
             default:
                 throw new UnsupportedAnvilFormatException("Unknown Anvil compression mode " + mode);
         }
@@ -185,7 +325,15 @@ public final class AnvilReader implements RegionFileReader {
              java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream(Math.max(1024, len * 4))) {
             byte[] buf = new byte[4096];
             int n;
-            while ((n = in.read(buf)) > 0) baos.write(buf, 0, n);
+            int totalDecompressed = 0;
+            while ((n = in.read(buf)) > 0) {
+                totalDecompressed += n;
+                if (totalDecompressed > MAX_DECOMPRESSED_CHUNK_BYTES) {
+                    throw new CorruptRegionEntryException("Decompressed chunk payload exceeded "
+                            + MAX_DECOMPRESSED_CHUNK_BYTES + " bytes");
+                }
+                baos.write(buf, 0, n);
+            }
             return baos.toByteArray();
         }
     }
@@ -236,6 +384,13 @@ public final class AnvilReader implements RegionFileReader {
         return toView(entry.root);
     }
 
+    /** As {@link #readChunkView(byte[], int, int)} over {@code regionBytes[0, regionLength)}. */
+    public static AnvilChunkView readChunkView(byte[] regionBytes, int regionLength, int cx, int cz) throws IOException {
+        ChunkEntry entry = readChunkEntry(regionBytes, regionLength, cx, cz);
+        if (entry == null) return null;
+        return toView(entry.root);
+    }
+
     // ----------------------------------------------------------- column probe (ADR-016)
 
     /**
@@ -257,15 +412,23 @@ public final class AnvilReader implements RegionFileReader {
      */
     public static ColumnProbe readColumnProbe(byte[] regionBytes, int cx, int cz, int minY, int maxY)
             throws IOException {
+        return readColumnProbe(regionBytes, regionBytes == null ? 0 : regionBytes.length, cx, cz, minY, maxY);
+    }
+
+    /** As {@link #readColumnProbe(byte[], int, int, int, int)} over {@code regionBytes[0, regionLength)}. */
+    public static ColumnProbe readColumnProbe(byte[] regionBytes, int regionLength, int cx, int cz, int minY, int maxY)
+            throws IOException {
         if (minY > maxY) {
             throw new IllegalArgumentException("minY=" + minY + " must be <= maxY=" + maxY);
         }
-        RawChunk raw = readRawChunk(regionBytes, cx, cz);
+        RawChunk raw = readRawChunk(regionBytes, regionLength, cx, cz);
         if (raw == null) return null;
+        return columnProbeFrom(Nbt.readRootCompoundSelective(raw.nbtBytes, AnvilReader::columnProbeDecision),
+                minY, maxY);
+    }
 
-        LinkedHashMap<String, Object> root = Nbt.readRootCompoundSelective(
-                raw.nbtBytes, AnvilReader::columnProbeDecision);
-
+    private static ColumnProbe columnProbeFrom(LinkedHashMap<String, Object> root, int minY, int maxY)
+            throws IOException {
         long[] heightmap = getMotionBlockingNoLeaves(root);
         Nbt.NbtList sections = getSections(root);
         List<PaletteSection> sectionsOut;
@@ -305,6 +468,8 @@ public final class AnvilReader implements RegionFileReader {
             if ("sections".equals(name) && type == Nbt.TAG_LIST) return Nbt.SelectiveFilter.Decision.RECURSE;
             if ("Heightmaps".equals(name) && type == Nbt.TAG_COMPOUND) return Nbt.SelectiveFilter.Decision.RECURSE;
             if ("DataVersion".equals(name)) return Nbt.SelectiveFilter.Decision.KEEP;
+            // Position guard for sector-only reads (verifyPosition).
+            if ("xPos".equals(name) || "zPos".equals(name)) return Nbt.SelectiveFilter.Decision.KEEP;
             return Nbt.SelectiveFilter.Decision.SKIP;
         }
         String top = path.get(0);

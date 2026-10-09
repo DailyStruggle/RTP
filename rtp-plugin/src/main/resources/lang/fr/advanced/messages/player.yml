@@ -7,6 +7,8 @@
 # ###############################################################################
 # lors de la téléportation, afficher ceci
 alreadyTeleporting: "&7[P0] ⚡ vous êtes déjà en téléportation !"
+alreadyInSession: "&c[P0] [player] est déjà dans une session de match active."
+notInSession: "&c[P0] Vous n'êtes dans aucun match de cette action."
 
 # si le plugin est en cours de rechargement
 teleportDeniedReloading: "&7[P0] les téléportations sont temporairement désactivées pendant le rechargement du plugin. Réessayez bientôt."
@@ -52,6 +54,10 @@ millis: "ms"
 # le monde n'existe pas dans bukkit
 # espace réservé : [world] - le nom du monde
 invalidWorld: "&7[P0] impossible de trouver le monde '[world]'"
+
+noBackLocation: "&c[P0] Aucun emplacement de téléportation précédent trouvé."
+
+backSuccess: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ De retour à l'emplacement précédent.</gradient>"
 
 # le plugin n'a pas la commande demandée par l'utilisateur
 # espace réservé : [arg] - l'argument tenté

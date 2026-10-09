@@ -364,8 +364,8 @@ public interface TreeCommand extends CommandsAPICommand {
      * Expand a single comma-separated value token. Tokens prefixed with
      * {@code reg:} are treated as Java {@link Pattern}s and expanded against
      * the parameter's caller-relevant value set; literal tokens are passed
-     * through unchanged. A malformed pattern falls back to a literal token so
-     * a typo does not abort the whole command.
+     * through unchanged. A malformed pattern, or one longer than 256 chars,
+     * falls back to a literal token so a typo does not abort the whole command.
      *
      * <p>Security invariant (commands-api-ADR-001 addendum 2026-05-06):
      * regex expansion <b>must</b> filter through the execute-time validator
@@ -377,10 +377,15 @@ public interface TreeCommand extends CommandsAPICommand {
      * authorisation contract. This is the same guarantee {@code RegexParameterSecurityTest}
      * pins (S-INJ-1 .. S-INJ-18).
      */
+    @SuppressWarnings("PMD.RegexCompiledPerCall") // caller-supplied reg: pattern; cannot be hoisted
     static Stream<String> expandRegexToken(String token, CommandParameter parameter, UUID callerId) {
         if (token == null) return Stream.empty();
         if (!token.startsWith("reg:")) return Stream.of(token);
         String patternSrc = token.substring("reg:".length());
+        // ReDoS hardening: console, command blocks and API callers bypass the 256-char chat limit.
+        // Over-long sources take the same literal fallback as malformed ones and are never compiled.
+        int maxPatternLength = 256;
+        if (patternSrc.length() > maxPatternLength) return Stream.of(token);
         Pattern pattern;
         try {
             pattern = Pattern.compile(patternSrc);

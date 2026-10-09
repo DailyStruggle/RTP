@@ -47,6 +47,10 @@ public final class VisualizationsSubmenuBuilder {
                 new KindRow("sparkline",
                         "&4\u25b6 Pipeline health &7- MSPT + heap sparkline",
                         "&7open a server-global MSPT and heap sparkline"));
+        m.put(ChartSpec.Kind.SELECTION_HEATMAP,
+                new KindRow("heatmap",
+                        "&5\u25b6 Selection Heatmap &7- spatial dispersion density",
+                        "&7open a spatial dispersion heatmap per region"));
         KIND_ROWS = java.util.Collections.unmodifiableMap(m);
     }
 

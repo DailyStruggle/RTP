@@ -28,6 +28,46 @@ menuFiller: "GRAY_STAINED_GLASS_PANE"
 # Show the server-health (TPS / MSPT / players) tile.
 showDashboard: true
 
+# Show special scripted actions hub in GUI if LeafRTPActionAddon is present.
+showActions: true
+titleActionsMenu: "&6&lSpecial Teleports"
+titleActionsSelector: "&6&lSpecial Teleports..."
+iconActionsSelector: "NETHERITE_SWORD"
+iconActionDefault: "DIAMOND_SWORD"
+
+# Show operator control hub in GUI if player has operator permission.
+showOperatorTools: true
+permissionOperatorTools: "rtp.menu.admin"
+titleOperatorMenu: "&6&lOperator Control Hub"
+titleOperatorSelector: "&6&lOperator Tools..."
+iconOperatorSelector: "COMMAND_BLOCK"
+iconOperatorSetup: "NETHER_STAR"
+titleOperatorSetup: "&a&lSetup Wizard"
+iconOperatorImport: "HOPPER"
+titleOperatorImport: "&e&lImport Configs"
+iconOperatorConfig: "REPEATER"
+titleOperatorConfig: "&b&lConfig Editor"
+iconOperatorVisualizations: "FILLED_MAP"
+titleOperatorVisualizations: "&d&lVisualizations"
+iconOperatorStatus: "CLOCK"
+titleOperatorStatus: "&f&lStatus & Metrics"
+iconOperatorAdminBook: "WRITABLE_BOOK"
+titleOperatorAdminBook: "&6&lAdmin Book Panel"
+iconOperatorReload: "REDSTONE_TORCH"
+titleOperatorReload: "&c&lQuick Reload"
+
+# Group biomes into a dedicated paginated sub-menu from the main menu.
+groupBiomesIntoSubmenu: true
+titleBiomeMenu: "&1&lSelect Biome"
+titleBiomeSelector: "&a&lSelect Biome..."
+iconBiomeSelector: "OAK_SAPLING"
+iconPreviousPage: "ARROW"
+textPreviousPage: "&e[Previous Page]"
+iconNextPage: "ARROW"
+textNextPage: "&e[Next Page]"
+iconBackToMainMenu: "BARRIER"
+textBackToMainMenu: "&c[Back to Worlds]"
+
 # Per-target icon material names. An unknown name falls back to the renderer default.
 # These are the per-kind fallback blocks used when a region has no explicit entry in
 # the 'regionIcons' map below. They default to a representative surface block (grass for
@@ -49,6 +89,7 @@ regionIcons:
   # nether: "NETHERRACK"
   # end: "END_STONE"
   # backend-b:default: "NETHERRACK"
+
 # Environment -> block translation, applied to a cross-server destination when it has
 # no 'regionIcons' override above and its backend did not advertise a block of its own.
 # The destination backend advertises its world environment (NORMAL / NETHER / THE_END,
@@ -62,8 +103,45 @@ environmentIcons:
   # my_custom_dim: "AMETHYST_BLOCK"
 iconOnCooldown: "CLOCK"
 iconUnavailable: "BARRIER"
+iconInCombat: "BARRIER"
 iconNoFunds: "GOLD_NUGGET"
 iconDashboard: "PAPER"
+
+# When true, destinations that are not ready (on cooldown, in combat, no funds, locked)
+# display as BARRIER blocks (or iconUnavailable) at a glance.
+barrierOnUnavailable: true
+
+# Configurable hover lore templates per availability state.
+# Placeholders: {status}, {cooldown}, {delay}, {cost}, {target}, {world}, {region}
+loreReady:
+  - "&7Status: &aREADY"
+  - "&7Cost: &6{cost}"
+  - "&7Warmup: &e{delay}"
+  - ""
+  - "&aClick to teleport!"
+
+loreCooldown:
+  - "&7Status: &eON COOLDOWN"
+  - "&cCooldown remaining: &e{cooldown}"
+  - ""
+  - "&cCannot teleport right now."
+
+loreCombat:
+  - "&7Status: &cIN COMBAT"
+  - "&cCombat tag remaining: &e{cooldown}"
+  - ""
+  - "&cCannot teleport while in combat."
+
+loreNoFunds:
+  - "&7Status: &eINSUFFICIENT FUNDS"
+  - "&7Required: &6{cost}"
+  - ""
+  - "&cYou cannot afford this teleport."
+
+loreNoPermission:
+  - "&7Status: &cLOCKED"
+  - ""
+  - "&cYou lack permission for this region."
 
 # User-facing text. Supports '&' color codes.
 textReady: "&aClick to teleport!"

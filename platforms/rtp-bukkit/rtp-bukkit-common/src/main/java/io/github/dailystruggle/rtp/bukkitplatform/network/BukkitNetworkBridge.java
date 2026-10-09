@@ -4,6 +4,8 @@ import com.google.common.io.ByteArrayDataInput;
 import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;
 import io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge;
+import io.github.dailystruggle.rtp.common.network.pluginmessage.PluginMessageEnvelope;
+import io.github.dailystruggle.rtp.common.network.pluginmessage.ThrottledWarning;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -16,9 +18,13 @@ import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 /**
  * Bukkit/Paper/Folia implementation of the tier-1 (DB-free) plugin-message
@@ -40,6 +46,12 @@ import java.util.logging.Logger;
  * heartbeat retries on the next tick. Reads of {@code spigot.yml} /
  * {@code paper-global.yml} feed the cheap {@link #passiveProbe()} that arms the
  * {@code auto} resolver before any traffic is exchanged.</p>
+ *
+ * <p>Inbound messages arrive on a player connection and are untrusted (a
+ * modded client can inject them). Frames above
+ * {@link PluginMessageEnvelope#MAX_FRAME_BYTES} or with an out-of-range inner
+ * length are dropped before parsing; authenticity is enforced downstream by
+ * the binding's HMAC check.</p>
  */
 public final class BukkitNetworkBridge implements NetworkBridge {
 
@@ -47,6 +59,8 @@ public final class BukkitNetworkBridge implements NetworkBridge {
 
     /** The reserved proxy plugin-messaging channel (modern namespaced form). */
     public static final String CHANNEL = "bungeecord:main";
+    /** Legacy un-namespaced BungeeCord channel for Paper/Spigot legacy translation compatibility. */
+    public static final String LEGACY_CHANNEL = "BungeeCord";
     /** Custom {@code Forward} sub-channel carrying RTP heartbeat payloads. */
     public static final String FORWARD_SUBCHANNEL = "RTPNet";
 
@@ -65,9 +79,24 @@ public final class BukkitNetworkBridge implements NetworkBridge {
     private static final byte PROXY_SNAPSHOT_REQ = 2;
     /** Companion verb: companion replies with one cached heartbeat row. */
     private static final byte PROXY_SNAPSHOT_RSP = 3;
+    /** Separator of the proxy {@code GetServers} reply list. */
+    private static final Pattern PEER_LIST_SEPARATOR = Pattern.compile(", ");
+    /** Maximum validity window (ms) for an active topology request. */
+    public static final long TOPOLOGY_REQUEST_TTL_MS = 5000L;
+    /** Maximum number of peers parsed from a GetServers reply. */
+    public static final int MAX_TOPOLOGY_PEERS = 256;
+    /** Standard server name identifier validation. */
+    private static final Pattern SERVER_NAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_-]{1,64}$");
 
     private final Plugin plugin;
     private final boolean registered;
+    private final LongSupplier clock;
+    private final Listener listener;
+    private final ThrottledWarning rejectWarning;
+
+    private final AtomicLong topologyRequestTimestamp = new AtomicLong(0L);
+    private final AtomicBoolean pendingGetServer = new AtomicBoolean(false);
+    private final AtomicBoolean pendingGetServers = new AtomicBoolean(false);
 
     private volatile Consumer<byte[]> heartbeatSink;
     private volatile Consumer<Topology> topologySink;
@@ -76,19 +105,31 @@ public final class BukkitNetworkBridge implements NetworkBridge {
     private volatile String ownServerId;
 
     public BukkitNetworkBridge(Plugin plugin) {
+        this(plugin, System::currentTimeMillis);
+    }
+
+    public BukkitNetworkBridge(Plugin plugin, LongSupplier clock) {
         this.plugin = plugin;
+        this.clock = clock == null ? System::currentTimeMillis : clock;
+        this.rejectWarning = new ThrottledWarning(
+                LOG::warning, ThrottledWarning.DEFAULT_INTERVAL_MS, this.clock);
+        this.listener = new Listener();
         boolean ok = false;
         try {
-            Listener listener = new Listener();
-            plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, CHANNEL);
-            plugin.getServer().getMessenger()
-                    .registerIncomingPluginChannel(plugin, CHANNEL, listener);
-            // Proxy-cache companion channel (best-effort; the bungeecord:main
-            // tier still works if this fails to register).
-            plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, PROXY_CHANNEL);
-            plugin.getServer().getMessenger()
-                    .registerIncomingPluginChannel(plugin, PROXY_CHANNEL, listener);
-            ok = true;
+            if (plugin != null && plugin.getServer() != null && plugin.getServer().getMessenger() != null) {
+                plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, CHANNEL);
+                plugin.getServer().getMessenger()
+                        .registerIncomingPluginChannel(plugin, CHANNEL, listener);
+                plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, LEGACY_CHANNEL);
+                plugin.getServer().getMessenger()
+                        .registerIncomingPluginChannel(plugin, LEGACY_CHANNEL, listener);
+                // Proxy-cache companion channel (best-effort; the bungeecord:main
+                // tier still works if this fails to register).
+                plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, PROXY_CHANNEL);
+                plugin.getServer().getMessenger()
+                        .registerIncomingPluginChannel(plugin, PROXY_CHANNEL, listener);
+                ok = true;
+            }
         } catch (Throwable t) {
             LOG.log(Level.WARNING,
                     "[RTP] failed to register the '" + CHANNEL + "' plugin-messaging channel; "
@@ -113,6 +154,7 @@ public final class BukkitNetworkBridge implements NetworkBridge {
 
     @Override
     public void broadcastHeartbeat(byte[] payload) {
+        if (payload == null || payload.length > PluginMessageEnvelope.MAX_PAYLOAD_BYTES) return;
         Optional<UUID> carrier = anyOnlinePlayer();
         if (carrier.isEmpty()) {
             LOG.log(Level.FINE, "[RTP] no carrier player online; heartbeat gossip skipped this tick.");
@@ -145,7 +187,7 @@ public final class BukkitNetworkBridge implements NetworkBridge {
 
     @Override
     public void pushHeartbeatToProxy(byte[] payload) {
-        if (payload == null) return;
+        if (payload == null || payload.length > PluginMessageEnvelope.MAX_PAYLOAD_BYTES) return;
         Optional<UUID> carrier = anyOnlinePlayer();
         if (carrier.isEmpty()) {
             LOG.log(Level.FINE, "[RTP] no carrier player online; heartbeat push to proxy skipped.");
@@ -180,6 +222,10 @@ public final class BukkitNetworkBridge implements NetworkBridge {
             LOG.log(Level.FINE, "[RTP] no carrier player online; topology handshake deferred.");
             return;
         }
+        topologyRequestTimestamp.set(clock.getAsLong());
+        pendingGetServer.set(true);
+        pendingGetServers.set(true);
+
         ByteArrayDataOutput getServer = ByteStreams.newDataOutput();
         getServer.writeUTF("GetServer");
         dispatch(carrier.get(), getServer.toByteArray(), "GetServer");
@@ -187,6 +233,18 @@ public final class BukkitNetworkBridge implements NetworkBridge {
         ByteArrayDataOutput getServers = ByteStreams.newDataOutput();
         getServers.writeUTF("GetServers");
         dispatch(carrier.get(), getServers.toByteArray(), "GetServers");
+    }
+
+    /** Visible for tests: whether a topology request is currently pending and within TTL. */
+    boolean isTopologyRequestPending() {
+        long now = clock.getAsLong();
+        return (pendingGetServer.get() || pendingGetServers.get())
+                && (now - topologyRequestTimestamp.get() <= TOPOLOGY_REQUEST_TTL_MS);
+    }
+
+    /** Visible for tests: access listener directly without network netty binding. */
+    Listener getListener() {
+        return listener;
     }
 
     @Override
@@ -251,39 +309,73 @@ public final class BukkitNetworkBridge implements NetworkBridge {
                 return;
             }
             p.sendPluginMessage(plugin, channel, frame);
+            if (CHANNEL.equals(channel)) {
+                try {
+                    p.sendPluginMessage(plugin, LEGACY_CHANNEL, frame);
+                } catch (Throwable ignored) {}
+            }
         } catch (Throwable t) {
             LOG.log(Level.FINE, "[RTP] " + what + " send failed: " + t.getMessage());
         }
     }
 
     /** Incoming plugin-message handler for {@link #CHANNEL}. */
-    private final class Listener implements PluginMessageListener {
+    final class Listener implements PluginMessageListener {
         @Override
         public void onPluginMessageReceived(String channel, Player player, byte[] message) {
             if (message == null || message.length == 0) return;
+            if (message.length > PluginMessageEnvelope.MAX_FRAME_BYTES) {
+                rejectWarning.report("[RTP] dropped oversized plugin message on '" + channel + "' ("
+                        + message.length + " bytes > " + PluginMessageEnvelope.MAX_FRAME_BYTES
+                        + ") via " + (player == null ? "<none>" : player.getName()) + " (REQ-RTP-S-004).");
+                return;
+            }
             if (PROXY_CHANNEL.equals(channel)) {
                 onProxyChannel(message);
                 return;
             }
-            if (!CHANNEL.equals(channel)) return;
+            if (!CHANNEL.equals(channel) && !LEGACY_CHANNEL.equals(channel)) return;
             try {
                 ByteArrayDataInput in = ByteStreams.newDataInput(message);
                 String sub = in.readUTF();
                 switch (sub) {
                     case FORWARD_SUBCHANNEL -> {
-                        short len = in.readShort();
-                        byte[] payload = new byte[Math.max(0, (int) len)];
-                        in.readFully(payload);
+                        byte[] payload = readLengthPrefixed(in, channel);
                         Consumer<byte[]> sink = heartbeatSink;
-                        if (sink != null) sink.accept(payload);
+                        if (payload != null && sink != null) sink.accept(payload);
                     }
-                    case "GetServer" -> ownServerId = in.readUTF();
+                    case "GetServer" -> {
+                        long now = clock.getAsLong();
+                        if (!pendingGetServer.compareAndSet(true, false)
+                                || (now - topologyRequestTimestamp.get() > TOPOLOGY_REQUEST_TTL_MS)) {
+                            LOG.log(Level.FINE, "[RTP] dropped unsolicited or expired topology message 'GetServer'.");
+                            return;
+                        }
+                        String s = in.readUTF();
+                        if (s != null) {
+                            String trimmed = s.trim();
+                            if (SERVER_NAME_PATTERN.matcher(trimmed).matches()) {
+                                ownServerId = trimmed;
+                            } else {
+                                LOG.log(Level.FINE, "[RTP] dropped invalid GetServer name '" + s + "'.");
+                            }
+                        }
+                    }
                     case "GetServers" -> {
+                        long now = clock.getAsLong();
+                        if (!pendingGetServers.compareAndSet(true, false)
+                                || (now - topologyRequestTimestamp.get() > TOPOLOGY_REQUEST_TTL_MS)) {
+                            LOG.log(Level.FINE, "[RTP] dropped unsolicited or expired topology message 'GetServers'.");
+                            return;
+                        }
                         String csv = in.readUTF();
                         Set<String> peers = new LinkedHashSet<>();
-                        for (String name : csv.split(", ")) {
+                        for (String name : PEER_LIST_SEPARATOR.split(csv)) {
                             String trimmed = name.trim();
-                            if (!trimmed.isEmpty()) peers.add(trimmed);
+                            if (!trimmed.isEmpty() && SERVER_NAME_PATTERN.matcher(trimmed).matches()) {
+                                peers.add(trimmed);
+                                if (peers.size() >= MAX_TOPOLOGY_PEERS) break;
+                            }
                         }
                         Consumer<Topology> sink = topologySink;
                         if (sink != null) sink.accept(new Topology(ownServerId, peers));
@@ -309,9 +401,8 @@ public final class BukkitNetworkBridge implements NetworkBridge {
                 ByteArrayDataInput in = ByteStreams.newDataInput(message);
                 byte verb = in.readByte();
                 if (verb == PROXY_SNAPSHOT_RSP) {
-                    short len = in.readShort();
-                    byte[] payload = new byte[Math.max(0, (int) len)];
-                    in.readFully(payload);
+                    byte[] payload = readLengthPrefixed(in, PROXY_CHANNEL);
+                    if (payload == null) return;
                     Consumer<byte[]> sink = heartbeatSink;
                     LOG.log(Level.FINE, "[RTP] received proxy-cache snapshot row (" + payload.length
                             + " bytes); sink " + (sink != null ? "present" : "absent") + ".");
@@ -322,6 +413,19 @@ public final class BukkitNetworkBridge implements NetworkBridge {
             } catch (Throwable t) {
                 LOG.log(Level.FINE, "[RTP] dropping malformed proxy-cache message: " + t.getMessage());
             }
+        }
+
+        /** Read a {@code short}-prefixed payload; {@code null} (logged) when the length is out of range. */
+        private byte[] readLengthPrefixed(ByteArrayDataInput in, String channel) {
+            int len = in.readShort();
+            if (len <= 0 || len > PluginMessageEnvelope.MAX_PAYLOAD_BYTES) {
+                rejectWarning.report("[RTP] dropped plugin message on '" + channel
+                        + "' with invalid payload length " + len + " (REQ-RTP-S-004).");
+                return null;
+            }
+            byte[] payload = new byte[len];
+            in.readFully(payload);
+            return payload;
         }
     }
 }

@@ -2431,6 +2431,116 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     @Override public RTPCommandSender clone() { return new FabricConsoleSender(server); }
   }
 
+  /** Upper bound an off-thread caller waits for a captured command to run on the server thread. */
+  private static final long CAPTURE_TIMEOUT_SECONDS = 10L;
+
+  @Override
+  public boolean executeCommand(UUID senderId, String commandLine) {
+    if (commandLine == null || commandLine.isBlank()) return false;
+    MinecraftServer s = server;
+    if (s == null) return false;
+    if (!isPrimaryThread() && RTP.scheduler != null) {
+      // Command dispatch mutates single-threaded server state; queue it onto the server thread.
+      // Off-thread, true means "dispatched"; failures are logged by dispatchCommandNow.
+      RTP.scheduler.runTask(() -> dispatchCommandNow(s, senderId, commandLine));
+      return true;
+    }
+    return dispatchCommandNow(s, senderId, commandLine);
+  }
+
+  private boolean dispatchCommandNow(MinecraftServer s, UUID senderId, String commandLine) {
+    try {
+      if (senderId != null && !senderId.equals(RTPAPI.serverId)) {
+        RTPPlayer player = getPlayer(senderId);
+        if (player != null) {
+          player.performCommand(null, commandLine);
+          return true;
+        }
+      }
+      new FabricConsoleSender(s).performCommand(null, commandLine);
+      return true;
+    } catch (Throwable t) {
+      log(Level.WARNING, "[RTP][Fabric] executeCommand failed for '" + commandLine + "': " + t.getMessage(), t);
+      return false;
+    }
+  }
+
+  @Override
+  public boolean executeCommandWithCapture(String commandLine, java.util.function.Consumer<String> lineConsumer) {
+    if (commandLine == null || commandLine.isBlank()) return false;
+    MinecraftServer s = server;
+    if (s == null) return false;
+    if (!isPrimaryThread() && RTP.scheduler != null) {
+      // Callers consume the captured lines synchronously, so block on the server-thread run.
+      java.util.concurrent.atomic.AtomicBoolean timedOut = new java.util.concurrent.atomic.AtomicBoolean(false);
+      java.util.function.Consumer<String> guardedConsumer = sLine -> {
+        if (!timedOut.get() && lineConsumer != null) {
+          lineConsumer.accept(sLine);
+        }
+      };
+      java.util.concurrent.CompletableFuture<Boolean> done = new java.util.concurrent.CompletableFuture<>();
+      RTP.scheduler.runTask(() -> {
+        if (!timedOut.get()) {
+          done.complete(captureCommandNow(s, commandLine, guardedConsumer));
+        }
+      });
+      try {
+        return done.get(CAPTURE_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        timedOut.set(true);
+        Thread.currentThread().interrupt();
+        log(Level.WARNING, "[RTP][Fabric] executeCommandWithCapture interrupted for '" + commandLine + "'", e);
+        return false;
+      } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException e) {
+        timedOut.set(true);
+        log(Level.WARNING, "[RTP][Fabric] executeCommandWithCapture did not complete on the server thread for '"
+            + commandLine + "': " + e, e);
+        return false;
+      }
+    }
+    return captureCommandNow(s, commandLine, lineConsumer);
+  }
+
+  private boolean captureCommandNow(MinecraftServer s, String commandLine,
+                                    java.util.function.Consumer<String> lineConsumer) {
+    try {
+      RTPCommandSender capturingSender = new FabricCapturingConsoleSender(s, lineConsumer);
+      capturingSender.performCommand(null, commandLine);
+      return true;
+    } catch (Throwable t) {
+      log(Level.WARNING, "[RTP][Fabric] executeCommandWithCapture failed for '" + commandLine + "': " + t.getMessage(), t);
+      return false;
+    }
+  }
+
+  private static final class FabricCapturingConsoleSender implements RTPCommandSender {
+    private final @Nullable MinecraftServer server;
+    private final java.util.function.Consumer<String> lineConsumer;
+
+    FabricCapturingConsoleSender(@Nullable MinecraftServer server, java.util.function.Consumer<String> lineConsumer) {
+      this.server = server;
+      this.lineConsumer = lineConsumer;
+    }
+
+    @Override public UUID uuid() { return RTPAPI.serverId; }
+    @Override public String name() { return "Console"; }
+    @Override public boolean hasPermission(String permission) { return true; }
+    @Override public Set<String> getEffectivePermissions() {
+      return io.github.dailystruggle.rtp.fabric.player.FabricEffectivePermissionsResolver.resolveConsole();
+    }
+    @Override public long cooldown() { return 0L; }
+    @Override public long delay() { return 0L; }
+    @Override public void performCommand(@Nullable RTPPlayer player, String command) {
+      new FabricConsoleSender(server).performCommand(player, command);
+    }
+    @Override public void sendMessage(String message) {
+      if (message != null && lineConsumer != null) {
+        lineConsumer.accept(message);
+      }
+    }
+    @Override public RTPCommandSender clone() { return new FabricCapturingConsoleSender(server, lineConsumer); }
+  }
+
   // ---------------------------------------------------------------------------
   // Command registration SPI
   // ---------------------------------------------------------------------------
@@ -2457,5 +2567,58 @@ public final class FabricServerAccessor implements RTPServerAccessor {
             });
     io.github.dailystruggle.rtp.fabric.commands.FabricCommandRegistrar
         .registerRtpCommand(rootCommand, bridgeCtx, aliases);
+
+    MinecraftServer s = this.server;
+    if (s != null && rootCommand instanceof io.github.dailystruggle.commandsapi.common.CommandsAPICommand cmd) {
+      try {
+        com.mojang.brigadier.CommandDispatcher dispatcher = s.getCommands().getDispatcher();
+        io.github.dailystruggle.rtp.fabric.commands.RTPCmdFabric.register(dispatcher, cmd, bridgeCtx, aliases);
+        try {
+          Object playerList = s.getPlayerList();
+          java.lang.reflect.Method getPlayers = playerList.getClass().getMethod("getPlayers");
+          java.util.List<?> players = (java.util.List<?>) getPlayers.invoke(playerList);
+          java.lang.reflect.Method sendCommands = s.getCommands().getClass().getMethod("sendCommands", Class.forName("net.minecraft.server.level.ServerPlayer"));
+          for (Object p : players) {
+            sendCommands.invoke(s.getCommands(), p);
+          }
+        } catch (Throwable ignored) {
+        }
+      } catch (Throwable t) {
+        log(Level.WARNING, "[RTP][Fabric] Dynamic runtime command registration failed: " + t.getMessage());
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cartography MapBinding SPI (ADR-047 / REQ-RTP-MAP-006)
+  // ---------------------------------------------------------------------------
+
+  @Override
+  public void setupMapBinding() {
+    try {
+      io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter mapAdapter =
+          io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+      if (mapAdapter != null && mapAdapter.supportsMapCharts()) {
+        io.github.dailystruggle.rtp.fabric.maps.FabricMapBinding mapBinding =
+            new io.github.dailystruggle.rtp.fabric.maps.FabricMapBinding();
+        io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.setMapBinding(mapBinding);
+        getFabricPlayerLifecycleHook().onPlayerQuit(uuid ->
+            io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.firePlayerQuit(uuid));
+        RTP.log(Level.INFO,
+            "[RTP] Fabric map binding installed (FabricMapBinding, carrier="
+                + mapAdapter.mcVersion() + ").");
+      } else {
+        RTP.log(Level.INFO,
+            "[RTP] Fabric map binding NOT installed: version adapter "
+                + (mapAdapter == null ? "<none>" : mapAdapter.mcVersion())
+                + " does not support map charts; /rtp visualizations will report"
+                + " mapBindingMissing (NoopMapBinding active).");
+      }
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[RTP] onInitialize MapBinding install failed; MapDispatch will fall back"
+              + " to NoopMapBinding: " + t.getClass().getSimpleName() + ": "
+              + t.getMessage(), t);
+    }
   }
 }

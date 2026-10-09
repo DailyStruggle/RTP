@@ -221,6 +221,7 @@ menuAdminPanelHint: "&7click an option; destructive actions show a warning hover
 
 # Divisori di sezione nel pannello admin. Nessun segnaposto.
 menuAdminPanelSectionConfig: "&8--- &7configurazione &8---"
+menuAdminPanelSectionDocs: "&8--- &7documentazione ed editor &8---"
 menuAdminPanelSectionDiagnostics: "&8--- &7diagnostica &8---"
 menuAdminPanelSectionLifecycle: "&8--- &7ciclo di vita &8---"
 menuAdminPanelSectionBrowse: "&8--- &7sfoglia &8---"
@@ -228,6 +229,10 @@ menuAdminPanelSectionBrowse: "&8--- &7sfoglia &8---"
 # Righe del pannello admin + testi al passaggio del mouse. Nessun segnaposto.
 menuAdminPanelRowConfig: "&b▶ editor di configurazione"
 menuAdminPanelHoverConfig: "&7apri il selettore di configurazione curato"
+menuAdminPanelRowDocs: "#5FB3B3▶ documentazione"
+menuAdminPanelHoverDocs: "&7apri i manuali di documentazione integrati nel gioco"
+menuAdminPanelRowEditor: "#5FB3B3▶ editor web e manuale"
+menuAdminPanelHoverEditor: "&7avvia una sessione dell'editor web effimero con documentazione integrata"
 menuAdminPanelRowRegions: "#5FB3B3▶ regioni"
 menuAdminPanelHoverRegions: "&7aggiungi, rimuovi o modifica le configurazioni per regione"
 menuAdminPanelRowWorlds: "#5FB3B3▶ mondi"
@@ -484,5 +489,29 @@ multiconfigResultNameInvalid: "&cil nome '[name]' non è consentito; usa lettere
 # Segnaposto: [name].
 multiconfigResultNameTaken: "&cesiste già una voce chiamata '[name]'."
 
+docsNotFound: "&c[RTP] Argomento di documentazione '[topic]' non trovato. Usa /rtp docs list per visualizzare gli argomenti disponibili."
+docsEmpty: "&c[RTP] Nessun argomento di documentazione è attualmente registrato."
+docsExportSuccess: "&a[RTP] Pacchetto HTML della documentazione esportato con successo in [path]."
+docsExportFailed: "&c[RTP] Impossibile esportare il pacchetto della documentazione: [reason]."
+
 # NON MODIFICARE IL NUMERO DI VERSIONE
+# --- Web editor channel (ADR-106) ---
+editorTrustPrompt: "&e[P1] Una pagina dell'editor web chiede l'accesso con il codice &b[nonce]&e. Se la tua pagina mostra lo stesso codice, clicca qui per considerare attendibile questo browser."
+editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(chiave [fingerprint])"
+editorTrustAccepted: "&a[P0] Browser attendibile: la pagina dell'editor con il codice [nonce] ora può mostrare anteprime e usare Hot-Apply."
+editorTrustAlready: "&7[P0] Il browser con il codice [nonce] era già attendibile."
+editorTrustUnknown: "&c[P0] Nessuna sessione dell'editor aperta ha emesso il codice [nonce]."
+editorTrustExpired: "&c[P0] Il codice [nonce] è scaduto. Ricarica la pagina dell'editor per ottenerne uno nuovo."
+editorTrustUsage: "&c[P0] Uso: /rtp editor trust nonce=<codice mostrato dalla pagina dell'editor>"
+editorChannelOpened: "&a[P0] Canale dell'editor web aperto. Quando richiesto, considera attendibile il browser per attivare anteprime e Hot-Apply."
+editorChannelLost: "&e[P1] Canale dell'editor web perso: [reason]. La pagina continua a funzionare dalla sua istantanea."
+editorChannelExpired: "&7[P0] Il canale dell'editor web è scaduto dopo [minutes] minuti. Esegui di nuovo il comando dell'editor per riprendere."
+editorTrustRateLimited: "&c[P0] Troppi codici di fiducia dell'editor errati. Attendi un minuto e riprova."
+editorUntrustUsage: "&c[P0] Uso: /rtp editor untrust key=<prefisso dell'impronta, almeno 4 caratteri | all>"
+editorUntrustRemoved: "&a[P0] Fiducia revocata a [count] browser dell'editor web; dovranno essere di nuovo considerati attendibili per anteprime o Hot-Apply."
+editorUntrustNone: "&7[P0] Nessun browser attendibile dell'editor corrisponde a [key]."
+editorUntrustFailed: "&c[P0] Impossibile aggiornare l'elenco degli editor attendibili: [reason]"
+editorApplyDigestMissing: "&c[P0] Il payload dell'editor non ha un checksum sha256, quindi non è stato applicato. Conferma di nuovo da una pagina dell'editor aggiornata."
+editorApplyFileUnreadable: "&e[P1] Impossibile leggere il file di applicazione offline ([reason]); provo con l'archivio di byte."
+
 version: 1.0

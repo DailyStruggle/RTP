@@ -4,12 +4,14 @@ tmp/
 tmp_*/
 **/tmp/
 **/tmp_*/
+scripts/tmp/
 *.tmp
 temp_*
 build/
 *.bin
 *.uniqueid*
 *.bak*
+*.exec
 
 *.iml
 *.ipr
@@ -40,6 +42,11 @@ out/
 
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
+replay_pid*
+
+# Jazzer working corpus (regenerated every fuzz run). Crash reproducers that Jazzer
+# writes under src/test/resources/**/<Class>Inputs/ are regression seeds: commit them.
+.cifuzz-corpus/
 
 *~
 
@@ -177,6 +184,19 @@ __pycache__/
 # of .mca and never part of this repo. Absent -> the use-case test skips itself.
 /testdata-world/
 
+# Storefront pages built from docs/publishing/FRONT_PAGE.md by
+# scripts/release/build_front_pages.py (release.yml builds them before pushing).
+scripts/release/generated/
+
 # MkDocs generated static site output (built from docs/ into ./site by `mkdocs build`).
 # This is the generated artifact, NOT the tracked narrative source under docs/site/.
 /site/
+
+# Node.js dependencies and devstack client artifacts
+node_modules/
+package-lock.json
+
+# Staging/diagnostic charts at repository root or module root (charts belong in docs/assets/img or build/reports)
+/*.png
+rtp-core/*.png
+rtp-core/docs/

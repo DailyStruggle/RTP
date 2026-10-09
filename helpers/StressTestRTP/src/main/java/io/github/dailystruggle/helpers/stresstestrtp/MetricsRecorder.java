@@ -9,7 +9,9 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -42,7 +44,7 @@ public class MetricsRecorder {
          *  {@code BukkitScheduler.runTask} which defers to the next tick
          *  boundary (0-50 ms, avg ~25 ms); attributing that wait to the
          *  target plugin would inflate every measurement by up to one tick.
-         *  Set by {@link Runner#dispatchOne}. {@code -1} until the runnable
+         *  Set by {@code Runner#dispatchOne}. {@code -1} until the runnable
          *  fires; {@link #latencyMs()} falls back to {@link #dispatchEpochMs}
          *  in that window so an attempt that completes before the hop runs
          *  (impossible in practice, but defensive) still gets a finite
@@ -140,6 +142,17 @@ public class MetricsRecorder {
          *  read without its peak. {@code -1L} means NOT MEASURED. */
         public volatile long binOccupancyMax = -1L;
 
+        /** First external observation of this attempt's teleport
+         *  ({@code PlayerTeleportEvent} or the position watch), recorded on
+         *  EVERY arm including the direct one. This is the channel all arms
+         *  share, so {@code external_latency_ms} is the cross-plugin latency;
+         *  {@code latency_ms} on the direct arm is the plugin's own instant.
+         *  {@code -1L} when no external channel saw the teleport. */
+        public volatile long externalSeenEpochMs = -1L;
+        /** Landing column inspection ({@link LandingInspector}); null until
+         *  a completion channel with a location inspected it. */
+        public volatile LandingInspector.Landing landing = null;
+
         /** Observed tick-thread occupancy intervals for this attempt,
          *  summarised to count / total / max rather than retained as a list.
          *  Totals alone cannot validate queue discipline - a plugin that spends
@@ -156,6 +169,7 @@ public class MetricsRecorder {
         private long tickIntervalCount = 0L;
         private long tickIntervalTotalNs = 0L;
         private long tickIntervalMaxNs = 0L;
+        private final Object intervalLock = new Object();
 
         /**
          * Records one observed span of plugin work on a tick thread. Callers
@@ -170,7 +184,7 @@ public class MetricsRecorder {
         public void recordTickInterval(long startNs, long endNs) {
             long width = endNs - startNs;
             if (width <= 0L) return;
-            synchronized (this) {
+            synchronized (intervalLock) {
                 tickIntervalCount++;
                 tickIntervalTotalNs += width;
                 if (width > tickIntervalMaxNs) tickIntervalMaxNs = width;
@@ -178,19 +192,19 @@ public class MetricsRecorder {
         }
 
         public long tickIntervalCount() {
-            synchronized (this) {
+            synchronized (intervalLock) {
                 return tickIntervalCount;
             }
         }
 
         public long tickIntervalTotalNs() {
-            synchronized (this) {
+            synchronized (intervalLock) {
                 return tickIntervalTotalNs;
             }
         }
 
         public long tickIntervalMaxNs() {
-            synchronized (this) {
+            synchronized (intervalLock) {
                 return tickIntervalMaxNs;
             }
         }
@@ -226,6 +240,14 @@ public class MetricsRecorder {
             if (pluginPreTeleportEpochMs < 0 || pluginPostTeleportEpochMs < 0) return -1L;
             return Math.max(0L, pluginPostTeleportEpochMs - pluginPreTeleportEpochMs);
         }
+
+        /** Dispatch to the first external observation; see
+         *  {@link #externalSeenEpochMs}. */
+        long externalLatencyMs() {
+            if (externalSeenEpochMs <= 0) return -1L;
+            long base = commandDispatchedEpochMs > 0 ? commandDispatchedEpochMs : dispatchEpochMs;
+            return Math.max(0L, externalSeenEpochMs - base);
+        }
     }
 
     /** Observation channel that completed an attempt. Written literally. */
@@ -244,6 +266,21 @@ public class MetricsRecorder {
         NONE
     }
 
+    /**
+     * Ambient server baseline captured during the pre-phase recovery gap after settling.
+     */
+    public record IdleBaseline(
+            double msptP50,
+            double mainCpuCores,
+            double processCpuCores,
+            long durationMs
+    ) {
+        public static final IdleBaseline NONE = new IdleBaseline(-1.0, -1.0, -1.0, 0L);
+        public boolean available() {
+            return durationMs > 0L && (mainCpuCores >= 0.0 || processCpuCores >= 0.0 || msptP50 >= 0.0);
+        }
+    }
+
     public static final String CSV_HEADER =
             "attempt_id,player,world,target_label,dispatch_epoch_ms,teleport_epoch_ms,latency_ms,"
                     + "success,fail_reason,from_x,from_z,to_x,to_z,distance,"
@@ -260,7 +297,10 @@ public class MetricsRecorder {
                     // Which channel completed the row, the plugin's own
                     // teleport-call span when it exposes one, and the Folia
                     // region TPS where the dispatch landed.
-                    + "attribution_source,plugin_latency_ms,region_tps_5s_at_dispatch";
+                    + "attribution_source,plugin_latency_ms,region_tps_5s_at_dispatch,"
+                    // Shared-channel latency and the landing block column.
+                    + "external_latency_ms,to_world,to_y,landing_class,"
+                    + "landing_floor,landing_feet,landing_head";
 
     /** No-data sentinel documentation for the columns this recorder writes.
      *  Emitted to a sidecar {@code <stamp>-schema.txt} rather than as a
@@ -468,7 +508,62 @@ public class MetricsRecorder {
             + "  level at which it fired. The trigger is recorded; no behavioural response" + System.lineSeparator()
             + "  is inferred, modelled, or attributed from a match. A phase with the" + System.lineSeparator()
             + "  watcher active and no match writes 0, which IS a measurement; -1 means" + System.lineSeparator()
-            + "  the watcher was not wired. Full rows live in <stamp>-heap-triggers.csv." + System.lineSeparator();
+            + "  the watcher was not wired. Full rows live in <stamp>-heap-triggers.csv." + System.lineSeparator()
+            + "external_latency_ms: dispatch to the first EXTERNAL sighting of the teleport" + System.lineSeparator()
+            + "  (PlayerTeleportEvent or the position watch), recorded on every arm including" + System.lineSeparator()
+            + "  LeafRTP's. This is the column to compare across plugins; latency_ms on the" + System.lineSeparator()
+            + "  PLUGIN_EVENT arm is LeafRTP's own completion instant. A LeafRTP row is held up" + System.lineSeparator()
+            + "  to 1000 ms for the sighting; -1 means none arrived (common on Folia when" + System.lineSeparator()
+            + "  pinned-position-watch is off, since teleportAsync may not fire the event)." + System.lineSeparator()
+            + "fail_reason NOT_AT_DESTINATION: LeafRTP fired PostTeleportEvent but the player" + System.lineSeparator()
+            + "  was more than 3 blocks (XZ) from the task's destination, or in another world." + System.lineSeparator()
+            + "  The event fires whether or not the platform teleport succeeded." + System.lineSeparator()
+            + "to_world / to_y / landing_class / landing_floor / landing_feet / landing_head:" + System.lineSeparator()
+            + "  the block column at the landing, read by the harness with fixed criteria" + System.lineSeparator()
+            + "  (LandingInspector), never the plugin's own safety rules. landing_class is" + System.lineSeparator()
+            + "  SAFE|LAVA|WATER|SUFFOCATING|NO_FLOOR|HAZARD|VOID, or UNCHECKED_THREAD /" + System.lineSeparator()
+            + "  UNCHECKED_UNLOADED / UNCHECKED_NO_LOCATION when the harness could not read" + System.lineSeparator()
+            + "  it without loading a chunk or crossing a region. Empty on failed rows." + System.lineSeparator()
+            + "phases CSV main_thread_cpu_scope: what main_thread_cpu_ms summed. main-thread" + System.lineSeparator()
+            + "  on Spigot/Paper; folia-region-threads:N on Folia, the CPU of all N region" + System.lineSeparator()
+            + "  scheduler threads (summed per-thread deltas). Rows without this column read" + System.lineSeparator()
+            + "  ONE Folia thread and are not comparable." + System.lineSeparator()
+            + "phases CSV chunks_sync_requested / chunks_sync_by_plugin: chunk loads that a" + System.lineSeparator()
+            + "  plugin requested synchronously (with blocking frame), named from the ChunkLoadEvent" + System.lineSeparator()
+            + "  call stack. chunks_inline_promotions / chunks_inline_by_plugin: inline ticket" + System.lineSeparator()
+            + "  promotions on already-resident chunks that fired ChunkLoadEvent without blocking." + System.lineSeparator()
+            + "  -1 / empty unless chunks_sync_selftest is PASS: the harness loads one chunk" + System.lineSeparator()
+            + "  sync and one async at startup and requires the rule to name itself for the" + System.lineSeparator()
+            + "  first and nobody for the second. chunks_on_tick classifies by" + System.lineSeparator()
+            + "  firing thread, which Paper and Folia make near 100% for every plugin." + System.lineSeparator()
+            + "phases CSV chunks_inclusive_per_attempt (all loads / attempts) is the chunk" + System.lineSeparator()
+            + "  figure to publish across plugins. chunks_per_attempt charges on-tick loads to" + System.lineSeparator()
+            + "  the most recently dispatched attempt and is not comparable on Folia." + System.lineSeparator()
+            + "phases CSV cpu_*_ms: process CPU split by thread name, summed from per-thread" + System.lineSeparator()
+            + "  deltas (CpuSampler). server = tick thread; region = Folia region threads;" + System.lineSeparator()
+            + "  scheduler = Bukkit async workers, split per plugin in cpu_scheduler_by_plugin" + System.lineSeparator()
+            + "  from the name Paper gives a worker while it runs a task (charged to the plugin" + System.lineSeparator()
+            + "  named at sample time; (idle) = between tasks); async_scheduler = Paper/Folia" + System.lineSeparator()
+            + "  AsyncScheduler; chunk_system = chunk load/generation/IO workers; network =" + System.lineSeparator()
+            + "  Netty; other_java = the rest, top names in cpu_other_top. cpu_non_java_ms =" + System.lineSeparator()
+            + "  process CPU minus all of these: GC, JIT and VM threads (not Java threads) plus" + System.lineSeparator()
+            + "  the last interval of threads that exited between samples. cpu_gc_ms is the" + System.lineSeparator()
+            + "  JVM's GC-thread CPU counter (JDK 26+), a subset of non_java; -1 when absent." + System.lineSeparator()
+            + "  cpu_breakdown_samples = samples inside the phase (more = less exit loss)." + System.lineSeparator()
+            + "  The harness's own async work appears as StressTestRTP in by_plugin." + System.lineSeparator()
+            + "phases CSV chunks_landing_area: loads within viewDistance+1 chunks (Chebyshev)" + System.lineSeparator()
+            + "  of an account's last successful destination, from that teleport until the" + System.lineSeparator()
+            + "  same account's next dispatch (never time-based, so one account's teleports" + System.lineSeparator()
+            + "  cannot overlap). Checked before the most-recent-dispatch rule, and excluded" + System.lineSeparator()
+            + "  from chunks_loaded_attributed and chunks_loaded_background, so attributed +" + System.lineSeparator()
+            + "  landing_area + background = chunks_loaded. chunks_per_teleport =" + System.lineSeparator()
+            + "  (attributed + landing_area) / attempts: chunk loads charged to a teleport," + System.lineSeparator()
+            + "  independent of how long the plugin's teleports take." + System.lineSeparator()
+            + "phases CSV idle_mspt_p50, idle_main_cpu_cores, idle_process_cpu_cores: ambient" + System.lineSeparator()
+            + "  server baseline sampled during the pre-phase recovery gap after settling." + System.lineSeparator()
+            + "phases CSV net_main_cpu_ms, net_process_cpu_ms: gross CPU minus ambient baseline" + System.lineSeparator()
+            + "  rate multiplied by phase wall time (marginal cost of the plugin)." + System.lineSeparator()
+            + "phases CSV net_main_cpu_per_attempt, net_process_cpu_per_attempt: net CPU per attempt." + System.lineSeparator();
 
     public static final String PHASES_CSV_HEADER =
             "phase_label,start_epoch_ms,end_epoch_ms,wall_ms,attempts,successes,"
@@ -561,9 +656,35 @@ public class MetricsRecorder {
                     // is not wired or Flight Recorder is unavailable.
                     + "jfr_alloc_scope,jfr_alloc_samples,jfr_alloc_sampled_bytes_total,"
                     + "jfr_alloc_target_package,jfr_alloc_target_bytes,"
-                    + "jfr_alloc_target_bytes_per_attempt";
+                    + "jfr_alloc_target_bytes_per_attempt,"
+                    // What main_thread_cpu_ms summed, and synchronous chunk
+                    // loads named by requester (stack attribution, gated on
+                    // the startup self-test).
+                    + "main_thread_cpu_scope,"
+                    + "chunks_sync_requested,chunks_sync_by_plugin,chunks_sync_selftest,"
+                    + "chunks_inline_promotions,chunks_inline_by_plugin,"
+                    // Process CPU by thread group; -1 / empty when not measured.
+                    + "cpu_breakdown_samples,cpu_breakdown_threads,"
+                    + "cpu_server_thread_ms,cpu_region_threads_ms,cpu_scheduler_ms,"
+                    + "cpu_async_scheduler_ms,cpu_chunk_system_ms,cpu_network_ms,"
+                    + "cpu_other_java_ms,cpu_non_java_ms,cpu_gc_ms,"
+                    + "cpu_scheduler_by_plugin,cpu_other_top,"
+                    + "chunks_landing_area,chunks_landing_area_per_attempt,chunks_per_teleport,"
+                    + "idle_mspt_p50,idle_main_cpu_cores,idle_process_cpu_cores,"
+                    + "net_main_cpu_ms,net_process_cpu_ms,"
+                    + "net_main_cpu_per_attempt,net_process_cpu_per_attempt";
 
     private final Path csvPath;
+    /** Persistent per-attempt CSV writer. Rows arrive from event, region and
+     *  async-tick threads; reopening per row cost ~0.4 ms on the server
+     *  thread (Windows close). Guarded by {@link #rowLock}; opened lazily so a
+     *  write after {@link #close} reopens in append mode instead of failing. */
+    private final Object rowLock = new Object();
+    private BufferedWriter rowWriter;
+    private long lastRowFlushMs = 0L;
+    private int rowWriterOpens = 0;
+    /** Upper bound on unflushed rows' age: a crash loses at most this much. */
+    static final long ROW_FLUSH_MS = 1000L;
     private final Path phasesCsvPath;
     /** Sidecar holding a periodically-refreshed snapshot of the in-flight
      *  phase, so a mid-phase server crash (e.g. a competitor plugin stalling
@@ -585,6 +706,10 @@ public class MetricsRecorder {
 
     /** Optional CPU sampler for phase-aggregate CPU/TP measurement. May be null. */
     private volatile CpuSampler cpuSampler;
+    @SuppressWarnings("java:S3077") // Volatile reference publication for snapshot record
+    private volatile IdleBaseline pendingIdleBaseline;
+    @SuppressWarnings("java:S3077") // Volatile reference publication for snapshot record
+    private volatile IdleBaseline phaseIdleBaseline;
     /** Optional chunk-load counter (set by the plugin on enable). May be null -
      *  in which case per-attempt and per-phase chunk columns are written empty. */
     private volatile ChunkLoadCounter chunkCounter;
@@ -593,6 +718,8 @@ public class MetricsRecorder {
     private volatile long phaseStartEpochMs = -1L;
     private volatile long phaseStartProcessCpuNs = -1L;
     private volatile long phaseStartMainCpuNs = -1L;
+    @SuppressWarnings("java:S3077") // Volatile reference publication for snapshot record
+    private volatile CpuSampler.Breakdown phaseStartBreakdown;
     private volatile int phaseStartTotal = 0;
     private volatile int phaseStartSuccesses = 0;
 
@@ -748,6 +875,15 @@ public class MetricsRecorder {
 
     /** Wires the CPU sampler used by {@link #beginPhase}/{@link #endPhase}. */
     public void setCpuSampler(CpuSampler sampler) { this.cpuSampler = sampler; }
+    public CpuSampler cpuSampler() { return this.cpuSampler; }
+
+    public void setNextPhaseIdleBaseline(IdleBaseline baseline) {
+        this.pendingIdleBaseline = baseline;
+    }
+
+    public IdleBaseline phaseIdleBaseline() {
+        return this.phaseIdleBaseline;
+    }
 
     /** Wires the GC / tick-thread-allocation sampler. Optional: without it
      *  every GC and allocation column writes the -1 not-measured sentinel. */
@@ -862,6 +998,25 @@ public class MetricsRecorder {
     /** Completion with the observation channel stated. */
     public void onComplete(Attempt a, boolean success, String failReason,
                            double toX, double toZ, AttributionSource source) {
+        onComplete(a, success, failReason, toX, toZ, source, false);
+    }
+
+    /** How long a direct-arm row waits for the external channel before it is
+     *  written with {@code external_latency_ms=-1}. On Folia the external
+     *  channels land 1-2 ticks after the plugin's own completion. */
+    static final long EXTERNAL_WAIT_MS = 1000L;
+    /** Completed rows held for {@link #releaseDeferred}; value = deadline. */
+    private final ConcurrentHashMap<Attempt, Long> deferredRows = new ConcurrentHashMap<>();
+
+    /**
+     * Completion that may hold the CSV row back. With {@code deferRow} the
+     * counters, chunk attribution and slot release happen now, and only the
+     * row write waits until {@link #releaseDeferred} (the external channel
+     * saw the same teleport) or {@link #EXTERNAL_WAIT_MS} elapses.
+     */
+    public void onComplete(Attempt a, boolean success, String failReason,
+                           double toX, double toZ, AttributionSource source,
+                           boolean deferRow) {
         if (a.teleportEpochMs > 0) return; // already completed
         a.teleportEpochMs = System.currentTimeMillis();
         a.attributionSource = source == null ? AttributionSource.NONE : source;
@@ -885,8 +1040,39 @@ public class MetricsRecorder {
         inFlight.decrementAndGet();
         finished.add(a);
         if (recording) {
-            appendRow(a);
-            logCompletion(a);
+            if (deferRow) {
+                deferredRows.put(a, System.currentTimeMillis() + EXTERNAL_WAIT_MS);
+            } else {
+                appendRow(a);
+                logCompletion(a);
+            }
+        }
+    }
+
+    /** Writes a deferred row now. False if it was not (or no longer) held. */
+    public boolean releaseDeferred(Attempt a) {
+        if (a == null || deferredRows.remove(a) == null) return false;
+        appendRow(a);
+        logCompletion(a);
+        return true;
+    }
+
+    /** True while {@code a}'s row is held for the external channel. */
+    public boolean isDeferred(Attempt a) {
+        return a != null && deferredRows.containsKey(a);
+    }
+
+    /** Writes every held row whose wait has elapsed ({@code all}: every row). */
+    public void flushDeferred(boolean all) {
+        // Called every runner tick in every mode: drives the time-based flush.
+        if (csvPath != null) flushRowsIfDue();
+        if (deferredRows.isEmpty()) return;
+        long now = System.currentTimeMillis();
+        for (Map.Entry<Attempt, Long> e : deferredRows.entrySet()) {
+            if ((all || e.getValue() <= now) && deferredRows.remove(e.getKey(), e.getValue())) {
+                appendRow(e.getKey());
+                logCompletion(e.getKey());
+            }
         }
     }
 
@@ -944,6 +1130,7 @@ public class MetricsRecorder {
         // tick thread, at row-write time only.
         long tickCount = a.tickIntervalCount();
         accumulatePhaseTickIntervals(a);
+        LandingInspector.Landing landing = a.landing;
         String row = String.join(",",
                 a.attemptId.toString(),
                 csv(a.player),
@@ -987,15 +1174,99 @@ public class MetricsRecorder {
                 Long.toString(a.binOccupancyMax),
                 a.attributionSource.name(),
                 Long.toString(a.pluginLatencyMs()),
-                a.regionTps5sAtDispatch >= 0 ? fmt(a.regionTps5sAtDispatch) : "-1");
-        try (BufferedWriter w = Files.newBufferedWriter(csvPath, StandardCharsets.UTF_8,
-                StandardOpenOption.APPEND)) {
-            w.write(row);
-            w.newLine();
+                a.regionTps5sAtDispatch >= 0 ? fmt(a.regionTps5sAtDispatch) : "-1",
+                Long.toString(a.externalLatencyMs()),
+                landing == null ? "" : csv(landing.world()),
+                landing == null ? "" : coord(landing.y()),
+                landing == null ? "" : landing.verdict().name(),
+                landing == null ? "" : landing.floor(),
+                landing == null ? "" : landing.feet(),
+                landing == null ? "" : landing.head());
+        writeRow(row);
+    }
+
+    private void writeRow(String row) {
+        synchronized (rowLock) {
+            try {
+                if (rowWriter == null) {
+                    rowWriter = Files.newBufferedWriter(csvPath, StandardCharsets.UTF_8,
+                            StandardOpenOption.APPEND);
+                    rowWriterOpens++;
+                    lastRowFlushMs = System.currentTimeMillis();
+                }
+                rowWriter.write(row);
+                rowWriter.newLine();
+                long now = System.currentTimeMillis();
+                if (now - lastRowFlushMs >= ROW_FLUSH_MS) {
+                    rowWriter.flush();
+                    lastRowFlushMs = now;
+                }
+            } catch (IOException e) {
+                closeRowWriterQuietly();
+                // CSV write failures are diagnostic-only; the run continues.
+                // Logged at the plugin level via Runner's exception path.
+                throw new RuntimeException("CSV append failed: " + e.getMessage(), e);
+            }
+        }
+    }
+
+    /** Flushes buffered rows older than {@link #ROW_FLUSH_MS}; covers idle
+     *  stretches where no further row arrives to trigger the flush. */
+    private void flushRowsIfDue() {
+        synchronized (rowLock) {
+            if (rowWriter == null) return;
+            long now = System.currentTimeMillis();
+            if (now - lastRowFlushMs < ROW_FLUSH_MS) return;
+            flushRowsLocked(now);
+        }
+    }
+
+    /** Forces buffered per-attempt rows to disk. */
+    public void flushRows() {
+        synchronized (rowLock) {
+            if (rowWriter != null) flushRowsLocked(System.currentTimeMillis());
+        }
+    }
+
+    private void flushRowsLocked(long now) {
+        try {
+            rowWriter.flush();
+            lastRowFlushMs = now;
         } catch (IOException e) {
-            // CSV write failures are diagnostic-only; the run continues.
-            // Logged at the plugin level via Runner's exception path.
-            throw new RuntimeException("CSV append failed: " + e.getMessage(), e);
+            closeRowWriterQuietly();
+            throw new RuntimeException("CSV flush failed: " + e.getMessage(), e);
+        }
+    }
+
+    /** Flushes and closes the per-attempt CSV writer. Idempotent; a later row
+     *  reopens the file in append mode. */
+    public void close() {
+        synchronized (rowLock) {
+            if (rowWriter == null) return;
+            try {
+                rowWriter.close();
+            } catch (IOException e) {
+                throw new RuntimeException("CSV close failed: " + e.getMessage(), e);
+            } finally {
+                rowWriter = null;
+            }
+        }
+    }
+
+    private void closeRowWriterQuietly() {
+        if (rowWriter == null) return;
+        try {
+            rowWriter.close();
+        } catch (IOException ignored) {
+            // Already failing; the caller reports the original error.
+        }
+        rowWriter = null;
+    }
+
+    /** Number of times the per-attempt writer has been opened. Test hook. */
+    int rowWriterOpenCount() {
+        synchronized (rowLock) {
+            return rowWriterOpens;
         }
     }
 
@@ -1039,11 +1310,16 @@ public class MetricsRecorder {
     public void beginPhase(String label) {
         if (!recording) return;
         if (phaseLabel != null) endPhase(phaseLabel);
+        this.phaseIdleBaseline = this.pendingIdleBaseline;
+        this.pendingIdleBaseline = null;
         phaseLabel = label == null ? "" : label;
         phaseStartEpochMs = System.currentTimeMillis();
+        // LeafRTP arm only: load-gate counts at phase start, so the end line yields a delta.
+        LoadGateFlush.flush(phaseLabel + ":start");
         CpuSampler s = cpuSampler;
         phaseStartProcessCpuNs = s != null ? s.processCpuTimeNs() : -1L;
         phaseStartMainCpuNs = s != null ? s.mainThreadCpuTimeNs() : -1L;
+        phaseStartBreakdown = s != null ? s.sampleBreakdown() : null;
         phaseStartTotal = total.get();
         phaseStartSuccesses = successes.get();
         ChunkLoadCounter cc = chunkCounter;
@@ -1085,8 +1361,15 @@ public class MetricsRecorder {
      * advancing target's name) - the recorded label is whichever was active.
      */
     public void endPhase(@SuppressWarnings("unused") String label) {
+        // Held rows belong to the closing phase's classifier and CSV block.
+        flushDeferred(true);
+        if (csvPath != null) flushRows();
         if (!recording) return;
         if (phaseLabel == null) return;
+        ChunkLoadCounter cc = chunkCounter;
+        if (cc != null) {
+            cc.reportPhaseListenerTime(phaseLabel);
+        }
         long endEpoch = System.currentTimeMillis();
         // Stop and parse this phase's allocation recording exactly once, before
         // the row is built, so buildPhaseRow reads a real result. The full
@@ -1108,6 +1391,7 @@ public class MetricsRecorder {
                 }
             }
         }
+        LoadGateFlush.flush(phaseLabel + ":end");
         String row = buildPhaseRow(endEpoch);
         try (BufferedWriter w = Files.newBufferedWriter(phasesCsvPath, StandardCharsets.UTF_8,
                 StandardOpenOption.APPEND)) {
@@ -1128,18 +1412,21 @@ public class MetricsRecorder {
         phaseStartEpochMs = -1L;
         phaseStartProcessCpuNs = -1L;
         phaseStartMainCpuNs = -1L;
+        phaseStartBreakdown = null;
+        phaseIdleBaseline = null;
     }
 
     /**
      * Periodically snapshots the in-flight phase to {@link #partialPhaseCsvPath}
      * so a mid-phase server crash still leaves the latest partial aggregate of
-     * the phase that was running (the per-attempt and heap-series CSVs already
-     * flush per row, but the phase summary is only written by {@link #endPhase}
+     * the phase that was running (the per-attempt CSV flushes at least every
+     * {@link #ROW_FLUSH_MS}, but the phase summary is only written by {@link #endPhase}
      * at phase end). Safe to call every tick: self-throttled to at most once
      * per {@link #PARTIAL_PHASE_FLUSH_MS} and a no-op when no phase is active or
      * recording is disabled. Read-only with respect to phase/chunk state.
      */
     public void flushPartialPhase() {
+        flushDeferred(false);
         if (!recording) return;
         if (phaseLabel == null) return;
         long now = System.currentTimeMillis();
@@ -1169,6 +1456,10 @@ public class MetricsRecorder {
         CpuSampler s = cpuSampler;
         long endProcessCpu = s != null ? s.processCpuTimeNs() : -1L;
         long endMainCpu = s != null ? s.mainThreadCpuTimeNs() : -1L;
+        CpuSampler.Breakdown startBd = phaseStartBreakdown;
+        CpuSampler.Breakdown bd = (s != null && startBd != null)
+                ? s.sampleBreakdown().minus(startBd) : null;
+        if (bd != null && !bd.available) bd = null;
         long wallMs = Math.max(0L, endEpoch - phaseStartEpochMs);
         int attempts = Math.max(0, total.get() - phaseStartTotal);
         int succ = Math.max(0, successes.get() - phaseStartSuccesses);
@@ -1183,6 +1474,22 @@ public class MetricsRecorder {
         }
         double perTotal = (procCpuMs >= 0 && attempts > 0) ? (double) procCpuMs / attempts : -1.0;
         double perMain  = (mainCpuMs >= 0 && attempts > 0) ? (double) mainCpuMs / attempts : -1.0;
+
+        IdleBaseline idle = phaseIdleBaseline;
+        long ambientMainCpuMs = (idle != null && idle.mainCpuCores() >= 0.0)
+                ? Math.round(idle.mainCpuCores() * (double) wallMs) : -1L;
+        long ambientProcCpuMs = (idle != null && idle.processCpuCores() >= 0.0)
+                ? Math.round(idle.processCpuCores() * (double) wallMs) : -1L;
+
+        long netMainCpuMs = (mainCpuMs >= 0 && ambientMainCpuMs >= 0)
+                ? Math.max(0L, mainCpuMs - ambientMainCpuMs) : -1L;
+        long netProcCpuMs = (procCpuMs >= 0 && ambientProcCpuMs >= 0)
+                ? Math.max(0L, procCpuMs - ambientProcCpuMs) : -1L;
+
+        double netMainCpuPerAtt = (netMainCpuMs >= 0 && attempts > 0)
+                ? (double) netMainCpuMs / attempts : -1.0;
+        double netProcCpuPerAtt = (netProcCpuMs >= 0 && attempts > 0)
+                ? (double) netProcCpuMs / attempts : -1.0;
 
         ChunkLoadCounter cc = chunkCounter;
         long chunksLoaded = cc != null ? cc.phaseTotal() : -1L;
@@ -1204,6 +1511,11 @@ public class MetricsRecorder {
                 ? (double) chunksAttributed / attempts : -1.0;
         double chunksInclusivePerAtt = (chunksLoaded >= 0 && attempts > 0)
                 ? (double) chunksLoaded / attempts : -1.0;
+        long chunksLanding = cc != null ? cc.phaseLanding() : -1L;
+        double chunksLandingPerAtt = (chunksLanding >= 0 && attempts > 0)
+                ? (double) chunksLanding / attempts : -1.0;
+        double chunksPerTeleport = (chunksLanding >= 0 && chunksAttributed >= 0 && attempts > 0)
+                ? (double) (chunksAttributed + chunksLanding) / attempts : -1.0;
 
         // Chunk-load cost amendment. When a calibration value is set
         // (chunkLoadCostNs > 0, typically obtained from `/rtp test
@@ -1370,6 +1682,8 @@ public class MetricsRecorder {
         long tfWindowGc = tfReady ? tfp.windowCollections() : -1L;
         String tfReclaimLabel = tfReady ? tfp.reclaimLabel() : "";
 
+        SyncLoadAttributor sync = cc != null ? cc.syncAttributor() : null;
+
         String row = String.join(",",
                 csv(phaseLabel),
                 Long.toString(phaseStartEpochMs),
@@ -1505,8 +1819,41 @@ public class MetricsRecorder {
                 jfrTotalBytes >= 0 ? Long.toString(jfrTotalBytes) : "-1",
                 csv(jfrTargetPkg),
                 jfrTargetBytes >= 0 ? Long.toString(jfrTargetBytes) : "-1",
-                jfrTargetPerAtt >= 0 ? fmt(jfrTargetPerAtt) : "-1");
+                jfrTargetPerAtt >= 0 ? fmt(jfrTargetPerAtt) : "-1",
+                s != null ? s.mainThreadScope() : "",
+                Long.toString(sync != null ? sync.phaseSyncLoads() : -1L),
+                sync != null ? csv(sync.phaseByPluginSummary()) : "",
+                sync != null ? sync.selfTest().name() : SyncLoadAttributor.SelfTest.NOT_RUN.name(),
+                Long.toString(sync != null ? sync.phaseInlinePromotions() : -1L),
+                sync != null ? csv(sync.phaseInlineByPluginSummary()) : "",
+                Long.toString(bd != null ? bd.samples : -1L),
+                Integer.toString(bd != null ? bd.threads : -1),
+                cpuMs(bd, CpuSampler.Group.SERVER),
+                cpuMs(bd, CpuSampler.Group.REGION),
+                cpuMs(bd, CpuSampler.Group.SCHEDULER),
+                cpuMs(bd, CpuSampler.Group.ASYNC_SCHEDULER),
+                cpuMs(bd, CpuSampler.Group.CHUNK_SYSTEM),
+                cpuMs(bd, CpuSampler.Group.NETWORK),
+                cpuMs(bd, CpuSampler.Group.OTHER),
+                bd != null && bd.nonJavaNs() >= 0 ? Long.toString(bd.nonJavaNs() / 1_000_000L) : "-1",
+                bd != null && bd.gcNs >= 0 ? Long.toString(bd.gcNs / 1_000_000L) : "-1",
+                bd != null ? csv(CpuSampler.Breakdown.summary(bd.schedulerByPluginNs, 0)) : "",
+                bd != null ? csv(CpuSampler.Breakdown.summary(bd.otherByNameNs, 8)) : "",
+                chunksLanding >= 0 ? Long.toString(chunksLanding) : "",
+                chunksLandingPerAtt >= 0 ? fmt(chunksLandingPerAtt) : "",
+                chunksPerTeleport >= 0 ? fmt(chunksPerTeleport) : "",
+                idle != null && idle.msptP50() >= 0 ? fmt(idle.msptP50()) : "",
+                idle != null && idle.mainCpuCores() >= 0 ? fmt(idle.mainCpuCores()) : "",
+                idle != null && idle.processCpuCores() >= 0 ? fmt(idle.processCpuCores()) : "",
+                netMainCpuMs >= 0 ? Long.toString(netMainCpuMs) : "",
+                netProcCpuMs >= 0 ? Long.toString(netProcCpuMs) : "",
+                netMainCpuPerAtt >= 0 ? fmt(netMainCpuPerAtt) : "",
+                netProcCpuPerAtt >= 0 ? fmt(netProcCpuPerAtt) : "");
         return row;
+    }
+
+    private static String cpuMs(CpuSampler.Breakdown bd, CpuSampler.Group g) {
+        return bd != null ? Long.toString(bd.groupNs(g) / 1_000_000L) : "-1";
     }
 
     private static String csv(String s) {
@@ -1566,6 +1913,19 @@ public class MetricsRecorder {
             if (targetLabel != null && !targetLabel.equals(a.targetLabel)) continue;
             long l = a.latencyMs();
             if (l >= 0) out.add(l);
+        }
+        return out;
+    }
+
+    /** Finished attempts for {@code targetLabel} (null: all) dispatched in
+     *  {@code [fromEpochMs, toEpochMs)}. Includes warm-up attempts, which are
+     *  tracked even while {@link #isRecording()} is false. */
+    public List<Attempt> finishedDispatchedBetween(long fromEpochMs, long toEpochMs, String targetLabel) {
+        List<Attempt> out = new ArrayList<>();
+        for (Attempt a : finished) {
+            if (a.dispatchEpochMs < fromEpochMs || a.dispatchEpochMs >= toEpochMs) continue;
+            if (targetLabel != null && !targetLabel.equals(a.targetLabel)) continue;
+            out.add(a);
         }
         return out;
     }

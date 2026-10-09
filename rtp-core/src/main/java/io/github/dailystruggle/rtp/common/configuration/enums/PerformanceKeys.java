@@ -25,5 +25,6 @@ public enum PerformanceKeys {
   backlogGenerationStrategy,
   slowPipelineThresholdMs,
   queueGrowthWarnThreshold,
+  teleportPath,
   version
 }

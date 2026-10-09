@@ -19,6 +19,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongFieldUpdater;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.logging.Level;
 
 /**
@@ -58,6 +59,14 @@ import java.util.logging.Level;
  *       caller currently on the main thread that could have triggered a
  *       chunk load. With concurrency-cap = 1 this is exact; with concurrency
  *       &gt; 1 it is best-effort and biased toward the latest dispatcher.</li>
+ *   <li><b>Landing area.</b> Checked before step 2. A load within the
+ *       arrival ring ({@code viewDistance + 1}, Chebyshev) of an account's
+ *       last successful destination is charged to that teleport until the
+ *       same account's next dispatch, which closes the window. Paper loads a
+ *       player's view area after the teleport event, so without this the
+ *       arrival cost lands on whichever attempt happens to be in flight, or in
+ *       background when none is - making the per-attempt figure depend on how
+ *       long a plugin's teleports take.</li>
  *   <li><b>Background bucket.</b> Loads on chunk-system threads with no
  *       plugin-ticket match, or main-thread loads with zero in-flight
  *       attempts, fall here. The phase row records both the attributed sum
@@ -72,6 +81,12 @@ import java.util.logging.Level;
 public final class ChunkLoadCounter implements Listener {
 
     private final Plugin plugin;
+    /** Stack-based requester attribution; the on/off-tick split below is by
+     *  firing thread, which Paper and Folia make near-constant (see
+     *  {@link SyncLoadAttributor}). */
+    private final SyncLoadAttributor syncAttributor;
+
+    public SyncLoadAttributor syncAttributor() { return syncAttributor; }
 
     /** Monotonically-increasing total since plugin enable. Used for sanity
      *  checks and to compute background as {@code total - attributed}. */
@@ -102,6 +117,11 @@ public final class ChunkLoadCounter implements Listener {
     /** Loads observed off every tick thread during the current phase.
      *  Background work: costs wall time but not tick time. */
     private final AtomicLong phaseOffTickLoads = new AtomicLong();
+    /** Loads charged to a finished teleport's landing area during the current
+     *  phase (see {@link Landing}). Disjoint from attributed and background. */
+    private final AtomicLong phaseLandingLoads = new AtomicLong();
+    /** Time spent inside onChunkLoad across the current phase. */
+    private final LongAdder phaseListenerNanos = new LongAdder();
 
     /** Snapshots at the start of the current phase, for {@link #phaseTotal()}. */
     private volatile long phaseBaselineTotal = 0L;
@@ -112,6 +132,32 @@ public final class ChunkLoadCounter implements Listener {
     private volatile long phaseBaselineBinCandidates = 0L;
     private volatile long phaseBaselineOnTick = 0L;
     private volatile long phaseBaselineOffTick = 0L;
+    private volatile long phaseBaselineLanding = 0L;
+
+    /** Arrival area of one account's last successful teleport. Open from that
+     *  attempt's completion until the account's next dispatch or the next
+     *  phase reset; never time-based, so back-to-back teleports of one account
+     *  cannot overlap. {@code seq} breaks ties between overlapping areas of
+     *  different accounts in favour of the most recent landing. */
+    private static final class Landing {
+        final String world;
+        final int destX;
+        final int destZ;
+        final int radius;
+        final long seq;
+
+        Landing(String world, int destX, int destZ, int radius, long seq) {
+            this.world = world;
+            this.destX = destX;
+            this.destZ = destZ;
+            this.radius = radius;
+            this.seq = seq;
+        }
+    }
+
+    /** Open landing areas keyed by account name; at most one per account. */
+    private final ConcurrentHashMap<String, Landing> landings = new ConcurrentHashMap<>();
+    private final AtomicLong landingSeq = new AtomicLong();
 
     /** Effective render-distance (in chunks) used to size the post-teleport
      *  arrival ring that {@link #endAttempt} subtracts from the raw attributed
@@ -193,6 +239,7 @@ public final class ChunkLoadCounter implements Listener {
 
     public ChunkLoadCounter(Plugin plugin) {
         this.plugin = plugin;
+        this.syncAttributor = new SyncLoadAttributor(plugin);
     }
 
     public void register() {
@@ -227,19 +274,31 @@ public final class ChunkLoadCounter implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onChunkLoad(ChunkLoadEvent event) {
+        long start = System.nanoTime();
+        try {
+            final int cx = event.getChunk().getX();
+            final int cz = event.getChunk().getZ();
+
+            // Foreground / background classification, done once per event and
+            // reused for both the phase counters and the per-attempt split. This
+            // is the health discriminator: the same load costs wall time on a
+            // chunk-system thread and tick budget on a tick thread. On Folia the
+            // question is region-scoped - "is this the region thread that owns the
+            // chunk that just loaded" - which TickThreadDetector answers via
+            // runtime detection only.
+            final boolean onTick = TickThreadDetector.ownsChunk(event.getWorld(), cx, cz);
+            syncAttributor.onLoad(cx, cz, onTick);
+            route(event.getWorld().getName(), cx, cz, onTick, event.getChunk());
+        } finally {
+            phaseListenerNanos.add(System.nanoTime() - start);
+        }
+    }
+
+    /** Attribution chain for one load, split from the event handler so it can
+     *  be exercised without a server. {@code chunk} may be null when plugin
+     *  tickets are unsupported. */
+    void route(String worldName, int cx, int cz, boolean onTick, Chunk chunk) {
         totalLoads.incrementAndGet();
-
-        final int cx = event.getChunk().getX();
-        final int cz = event.getChunk().getZ();
-
-        // Foreground / background classification, done once per event and
-        // reused for both the phase counters and the per-attempt split. This
-        // is the health discriminator: the same load costs wall time on a
-        // chunk-system thread and tick budget on a tick thread. On Folia the
-        // question is region-scoped - "is this the region thread that owns the
-        // chunk that just loaded" - which TickThreadDetector answers via
-        // runtime detection only.
-        final boolean onTick = TickThreadDetector.ownsChunk(event.getWorld(), cx, cz);
         if (onTick) {
             phaseOnTickLoads.incrementAndGet();
         } else {
@@ -247,12 +306,19 @@ public final class ChunkLoadCounter implements Listener {
         }
 
         // Plugin-ticket attribution (Paper only).
-        if (pluginTicketsSupported) {
-            MetricsRecorder.Attempt a = attributeByPluginTicket(event.getChunk());
+        if (pluginTicketsSupported && chunk != null) {
+            MetricsRecorder.Attempt a = attributeByPluginTicket(chunk);
             if (a != null) {
                 bump(a, cx, cz, onTick);
                 return;
             }
+        }
+
+        // Landing area of a finished teleport whose account has not
+        // dispatched again.
+        if (!landings.isEmpty() && matchLanding(worldName, cx, cz) != null) {
+            phaseLandingLoads.incrementAndGet();
+            return;
         }
 
         // Main-thread temporal attribution.
@@ -306,6 +372,19 @@ public final class ChunkLoadCounter implements Listener {
             }
         }
         return null;
+    }
+
+    /** Most recent open landing area containing the chunk, or null. Iterates
+     *  at most one entry per roster account. */
+    private Landing matchLanding(String worldName, int cx, int cz) {
+        Landing best = null;
+        for (Landing l : landings.values()) {
+            if (l.world != null && worldName != null && !l.world.equals(worldName)) continue;
+            int cheb = Math.max(Math.abs(cx - l.destX), Math.abs(cz - l.destZ));
+            if (cheb > l.radius) continue;
+            if (best == null || l.seq > best.seq) best = l;
+        }
+        return best;
     }
 
     private void bump(MetricsRecorder.Attempt a, int chunkX, int chunkZ, boolean onTick) {
@@ -467,6 +546,8 @@ public final class ChunkLoadCounter implements Listener {
      *  attempt is a no-op. */
     public void beginAttempt(MetricsRecorder.Attempt a) {
         if (a == null) return;
+        // The account's next teleport closes its previous landing window.
+        if (a.player != null) landings.remove(a.player);
         if (attemptCounts.putIfAbsent(a.attemptId, new Tally()) == null) {
             inFlight.add(a);
         }
@@ -502,6 +583,20 @@ public final class ChunkLoadCounter implements Listener {
             }
         }
         inFlight.remove(a);
+        openLanding(a);
+    }
+
+    /** Opens the account's landing window for a successful attempt with a
+     *  known destination; any other outcome leaves no window open. */
+    private void openLanding(MetricsRecorder.Attempt a) {
+        if (a.player == null) return;
+        if (!a.success || (a.toX == 0.0 && a.toZ == 0.0)) {
+            landings.remove(a.player);
+            return;
+        }
+        landings.put(a.player, new Landing(a.world,
+                (int) Math.floor(a.toX / 16.0), (int) Math.floor(a.toZ / 16.0),
+                viewDistanceChunks() + 1, landingSeq.incrementAndGet()));
     }
 
     /** Monotonically-increasing global total since plugin enable. */
@@ -514,12 +609,17 @@ public final class ChunkLoadCounter implements Listener {
      *  correct: an attempt that started near the end of phase N and finishes
      *  in phase N+1 should report its full chunk-load cost on its CSV row. */
     public void resetPhase() {
+        syncAttributor.resetPhase();
+        phaseListenerNanos.reset();
         phaseBaselineTotal = totalLoads.get();
         phaseBaselineBackground = phaseBackgroundLoads.get();
         phaseBaselineAttributed = phaseAttributedLoads.get();
         phaseBaselineSelection = phaseSelectionLoads.get();
         phaseBaselineOnTick = phaseOnTickLoads.get();
         phaseBaselineOffTick = phaseOffTickLoads.get();
+        phaseBaselineLanding = phaseLandingLoads.get();
+        // Landing windows belong to the previous phase's teleports.
+        landings.clear();
         phaseBaselineRegionReads = phaseRegionReads.get();
         phaseBaselineBinCandidates = phaseBinCandidates.get();
         phaseBinOccupancyMax.set(0L);
@@ -537,10 +637,16 @@ public final class ChunkLoadCounter implements Listener {
         return Math.max(0L, phaseBackgroundLoads.get() - phaseBaselineBackground);
     }
 
+    /** Loads charged to a finished teleport's landing area, before that
+     *  account's next dispatch, since the last {@link #resetPhase()}. */
+    public long phaseLanding() {
+        return Math.max(0L, phaseLandingLoads.get() - phaseBaselineLanding);
+    }
+
     /** Loads attributed to one of the in-flight attempts since the last
-     *  {@link #resetPhase()}. {@code phaseAttributed() + phaseBackground()}
-     *  should equal {@link #phaseTotal()} modulo loads counted against
-     *  attempts that began before the phase reset. */
+     *  {@link #resetPhase()}. {@code phaseAttributed() + phaseLanding() +
+     *  phaseBackground()} should equal {@link #phaseTotal()} modulo loads
+     *  counted against attempts that began before the phase reset. */
     public long phaseAttributed() {
         return Math.max(0L, phaseAttributedLoads.get() - phaseBaselineAttributed);
     }
@@ -586,5 +692,28 @@ public final class ChunkLoadCounter implements Listener {
      *  occupancy is never published without its peak. */
     public long phaseBinOccupancyMax() {
         return phaseBinOccupancyMax.get();
+    }
+
+    /** Nanoseconds spent inside onChunkLoad across the current phase. */
+    public long phaseListenerNanos() {
+        return phaseListenerNanos.sum();
+    }
+
+    /** Milliseconds spent inside onChunkLoad across the current phase. */
+    public long phaseListenerMs() {
+        return phaseListenerNanos.sum() / 1_000_000L;
+    }
+
+    /** Logs the listener's own CPU time spent handling ChunkLoadEvents during the phase. */
+    public void reportPhaseListenerTime(String phaseLabel) {
+        long nanos = phaseListenerNanos.sum();
+        long ms = nanos / 1_000_000L;
+        long loads = phaseTotal();
+        if (plugin != null && plugin.getLogger() != null) {
+            double usPerLoad = loads > 0 ? (double) nanos / (loads * 1000.0) : 0.0;
+            plugin.getLogger().info(String.format(java.util.Locale.ROOT,
+                    "[StressTestRTP] ChunkLoadCounter listener time for phase '%s': %d ms across %d chunk loads (%.2f \u00b5s/load)",
+                    phaseLabel, ms, loads, usPerLoad));
+        }
     }
 }

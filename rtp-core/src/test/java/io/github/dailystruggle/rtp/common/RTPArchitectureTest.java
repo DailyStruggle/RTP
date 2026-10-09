@@ -70,6 +70,7 @@ public class RTPArchitectureTest {
                     .and().haveSimpleNameNotContaining("TestChunkTicketCmd")
                     .and().haveSimpleNameNotContaining("TestEventsCmd")
                     .and().haveSimpleNameNotContaining("NetworkModeBootstrap")
+                    .and().haveSimpleNameNotContaining("NetworkStateBinding")
                     .should().callMethodWhere(
                             target(owner(assignableTo(CompletableFuture.class)))
                                     .and(target(nameMatching("get|join")))

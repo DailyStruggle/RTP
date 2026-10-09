@@ -30,7 +30,7 @@ services:
     image: redis:7-alpine
     container_name: rtp-devstack-redis
     ports:
-      - "${REDIS_HOST_PORT:-6380}:6379"
+      - "127.0.0.1:${REDIS_HOST_PORT:-6380}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "PING"]
       interval: 2s
@@ -54,7 +54,7 @@ services:
       SKIP_CHOWN: "TRUE"
       RTP_NET_SECRET: ${RTP_NET_SECRET:?set RTP_NET_SECRET in .env}
     ports:
-      - "25577:25577"
+      - "127.0.0.1:25577:25577"
     volumes:
       # itzg/mc-proxy chowns every mounted path on boot; :ro single-file mounts
       # reject chown with exit 1 on Windows/Docker-Desktop. SKIP_CHOWN is honored
@@ -75,7 +75,7 @@ services:
       SKIP_CHOWN: "TRUE"
       RTP_NET_SECRET: ${RTP_NET_SECRET:?set RTP_NET_SECRET in .env}
     ports:
-      - "25578:25577"
+      - "127.0.0.1:25578:25577"
     volumes:
       - ./proxy-b/velocity.toml:/server/velocity.toml
       - ./shared/forwarding.secret:/server/forwarding.secret
@@ -388,22 +388,13 @@ services:
         condition: service_healthy
 
   backend-c:
-    # Folia 1.21.11. Third backend, running Folia under the same Velocity +
-    # Redis topology as backend-a (Paper) and backend-b (Folia). This service
-    # was previously a Fabric node; it has been switched to Folia so the
-    # acceptance harness runs entirely on the stable Bukkit/Paper-family
-    # platforms (no Fabric mod runtime required for this run).
-    #
-    # Same itzg image and Java 25 / 1.21.11 toolchain as backend-a/backend-b.
-    # Folia honors the same paper-global.yml velocity-forwarding patch, so
-    # PATCH_DEFINITIONS works unchanged. RTP-Pro ships rtp-folia shaded into the
-    # same plugin jar, so no jar swap is needed.
+    # Fabric 1.21.11. Third backend, running Fabric modded server
+    # with rtp-fabric and FabricProxy-Lite.
     image: itzg/minecraft-server:java25
     environment:
       EULA: "TRUE"
-      TYPE: FOLIA
+      TYPE: FABRIC
       VERSION: "1.21.11"
-      # Same 6G envelope as the other backends: world-gen plus RTP pre-fill.
       MEMORY: 6G
       ONLINE_MODE: "FALSE"
       OPS: ${OPS:-}
@@ -411,40 +402,57 @@ services:
       RUN_AS_UID: "0"
       RUN_AS_GID: "0"
       RTP_NET_SECRET: ${RTP_NET_SECRET:?set RTP_NET_SECRET in .env}
-      # See backend-a: PATCH_DEFINITIONS makes velocity.enabled=true survive the
-      # mc-image-helper template re-download on every boot.
-      PATCH_DEFINITIONS: /paper-patches
-      REPLACE_ENV_VARIABLES: "TRUE"
-      ENV_VARIABLE_PREFIX: "CFG_"
-      CFG_VELOCITY_FORWARDING_SECRET: ${CFG_VELOCITY_FORWARDING_SECRET:?set CFG_VELOCITY_FORWARDING_SECRET (harness does this automatically)}
+      FABRIC_PROXY_SECRET_FILE: /data/forwarding.secret
     user: "0:0"
-    # See backend-a: copy-not-mount entrypoint shim.
     entrypoint:
       - /bin/bash
       - -c
-      - 'mkdir -p /data/plugins/RTP/regions /data/plugins/RTP/advanced && cp -f /seed/network.yml /data/plugins/RTP/advanced/network.yml && cp -f /seed/logging.yml /data/plugins/RTP/advanced/logging.yml && (cp -f /seed/regions/*.yml /data/plugins/RTP/regions/ 2>/dev/null || true) && chown -R 1000:1000 /data/plugins/RTP && exec /start'
+      - 'mkdir -p /data/config/rtp/regions /data/config/rtp/advanced /data/config/rtp/addons && cp -f /seed/network.yml /data/config/rtp/advanced/network.yml && cp -f /seed/logging.yml /data/config/rtp/advanced/logging.yml && (cp -f /seed/regions/*.yml /data/config/rtp/regions/ 2>/dev/null || true) && (cp -f /seed/addons/*.yml /data/config/rtp/addons/ 2>/dev/null || true) && chown -R 1000:1000 /data/config && exec /start'
     volumes:
-      # See backend-a: per-backend plugins dir (shared host bind corrupts the
-      # .paper-remapped cache when both backends race on it).
-      - ./backend-c/plugins:/data/plugins
-      # Seed-only (read-only); copied into /data/plugins/RTP/network.yml at boot.
+      - ./backend-c/mods:/data/mods
       - ./backend-c/rtp-config/network.yml:/seed/network.yml:ro
-      # See backend-a: seed logging.yml (min_level: FINE).
       - ./backend-c/rtp-config/logging.yml:/seed/logging.yml:ro
-      # Seed-only (read-only): the single default region (End). See backend-a
-      # for the seed-copy contract; backend-c's default lands in the End to demo
-      # per-server load distribution + configurable displayName.
       - ./backend-c/rtp-config/regions:/seed/regions:ro
-      - ./shared/paper-patches:/paper-patches:ro
+      - ./backend-c/rtp-config/addons:/seed/addons:ro
       - ./shared/forwarding.secret:/data/forwarding.secret
-      # See backend-a: shared mc-image-helper download cache.
       - mc-image-cache:/data/.cache
-      # See backend-a: world dir as a host bind, not a named volume.
       - ./backend-c/world:/data/world
-      # Nether + End host binds for the pre-generated spawn-area chunks.
-      # backend-c's default region targets the End (world_the_end).
-      - ./backend-c/world_nether:/data/world_nether
-      - ./backend-c/world_the_end:/data/world_the_end
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  backend-d:
+    # NeoForge 1.21.1. Fourth backend, running NeoForge modded server
+    # with rtp-neoforge.
+    image: itzg/minecraft-server:java21
+    environment:
+      EULA: "TRUE"
+      TYPE: NEOFORGE
+      VERSION: "1.21.1"
+      MEMORY: 6G
+      ONLINE_MODE: "FALSE"
+      OPS: ${OPS:-}
+      OVERRIDE_OPS: "TRUE"
+      RUN_AS_UID: "0"
+      RUN_AS_GID: "0"
+      RTP_NET_SECRET: ${RTP_NET_SECRET:?set RTP_NET_SECRET in .env}
+      CFG_VELOCITY_FORWARDING_SECRET: ${CFG_VELOCITY_FORWARDING_SECRET:?set CFG_VELOCITY_FORWARDING_SECRET (harness does this automatically)}
+      JVM_XX_OPTS: "-XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+UnlockDiagnosticVMOptions -XX:G1SummarizeRSetStatsPeriod=0"
+      MAX_TICK_TIME: "180000"
+    user: "0:0"
+    entrypoint:
+      - /bin/bash
+      - -c
+      - 'mkdir -p /data/config/rtp/regions /data/config/rtp/advanced /data/config/rtp/addons && cp -f /seed/network.yml /data/config/rtp/advanced/network.yml && cp -f /seed/logging.yml /data/config/rtp/advanced/logging.yml && (cp -f /seed/regions/*.yml /data/config/rtp/regions/ 2>/dev/null || true) && (cp -f /seed/addons/*.yml /data/config/rtp/addons/ 2>/dev/null || true) && chown -R 1000:1000 /data/config && exec /start'
+    volumes:
+      - ./backend-d/mods:/data/mods
+      - ./backend-d/rtp-config/network.yml:/seed/network.yml:ro
+      - ./backend-d/rtp-config/logging.yml:/seed/logging.yml:ro
+      - ./backend-d/rtp-config/regions:/seed/regions:ro
+      - ./backend-d/rtp-config/addons:/seed/addons:ro
+      - ./shared/forwarding.secret:/data/forwarding.secret
+      - mc-image-cache:/data/.cache
+      - ./backend-d/world:/data/world
     depends_on:
       redis:
         condition: service_healthy

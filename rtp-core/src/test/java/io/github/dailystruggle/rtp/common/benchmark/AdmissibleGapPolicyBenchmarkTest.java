@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.Fai
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.tools.ChartOutputHelper;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
@@ -20,7 +21,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import javax.imageio.ImageIO;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
@@ -165,11 +165,7 @@ public class AdmissibleGapPolicyBenchmarkTest {
     }
 
     BufferedImage img = render(policies, runs, flat, weighted);
-    File reports = new File("build/reports/rtp-simulation/img");
-    if (reports.isDirectory() || reports.mkdirs()) {
-      ImageIO.write(img, "png", new File(reports, "admissible-gap-policy.png"));
-    }
-    ImageIO.write(img, "png", new File("../admissible_gap_policy_chart.png"));
+    ChartOutputHelper.writeChart(img, "rtp-simulation", "admissible_gap_policy_chart.png");
   }
 
   @Test

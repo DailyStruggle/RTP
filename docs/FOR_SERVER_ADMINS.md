@@ -9,7 +9,7 @@ If you install, configure, or maintain RTP on a Paper, Spigot, Folia, Fabric, or
 
 ## Minimum Operational Requirements
 
-RTP is engineered for zero main-thread tick impact and deterministic memory management. Pre-warmed destination queues, spatial rejection memory, and off-tick region file pre-filtering eliminate synchronous chunk loads and avoid the unbounded reroll loops that cause GC churn in naive implementations. Memory usage is bounded and tracked by an active ticket reaper.
+RTP is engineered for minimal main-thread tick impact and deterministic memory management. Pre-warmed destination queues, spatial rejection memory, and off-tick region file pre-filtering keep candidate checks off the tick thread and avoid the unbounded reroll loops that cause GC churn in naive implementations. On Paper and Folia, chunk loads go through the async API; on Spigot, a candidate the pre-filter cannot answer (ungenerated terrain, unknown data version) costs one on-tick chunk load. Memory usage is bounded and tracked by an active ticket reaper.
 
 - **Java 21+** (hard requirement).
 - **Predictable memory footprint.** `cacheCap` and `activeChunkCap` (in region files) are *absolute* per-region bounds. Cached entries are lightweight coordinate descriptors; destination chunks are kept in memory only while in the hot L1 queue. Total cache memory scales with configured region counts, not world radius. Spatial memory uses compressed bit-segments to record rejected terrain without storing chunk objects. RTP includes an active heap-pressure gate (`performance.yml` -> `maxHeapPercent`, default 85%) that throttles background pre-warming under memory pressure while pre-cached teleports continue serving instantly.
@@ -38,11 +38,11 @@ Answers to the most common questions: biome filtering, economy integration, clai
 Step-by-step upgrade instructions when moving between major versions.
 Read this before upgrading an existing server.
 
-### 6. [RUNBOOK.md](admin/RUNBOOK.md)
-Incident response for common operational problems: TPS drops, players landing in unsafe locations, plugin failing to enable, fill task stalls, and more.
-Each entry follows the pattern: **Symptom → Diagnosis → Resolution**.
+### 6. [RUNBOOK.md](admin/RUNBOOK.md) & [WEB_EDITOR_GUIDE.md](admin/WEB_EDITOR_GUIDE.md)
+Incident response for common operational problems and guide for the dual-screen visual web workspace (`/rtp editor`).
+Covers symptom diagnosis, 2D vector cartography editing, live staging diffs, and atomic commits.
 
-### 7. [HAZARDS.md](admin/HAZARDS.md)
+### 7. [HAZARDS.md](dev/HAZARDS.md)
 Hazard register with severity ratings and mitigations for risks inherent to the plugin's design (it also absorbs the former failure-mode catalog: detection signals and defined system responses).
 Companion to the Runbook — use this when you know *what* failed but not *why*, and for capacity planning and risk assessment before deploying in production.
 

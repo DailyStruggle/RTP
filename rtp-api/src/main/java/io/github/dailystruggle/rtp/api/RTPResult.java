@@ -63,6 +63,11 @@ public final class RTPResult {
      * {@code notEnoughMoney} guard for the addon-facing API.
      */
     INSUFFICIENT_FUNDS,
+    /**
+     * The player lacks the world, biome, region or server permission the target requires.
+     * Enforced for every API caller, with the same rules as {@code getTargetStatus}.
+     */
+    NO_PERMISSION,
     /** An unexpected error aborted the request; see {@link #message()}. */
     ERROR
   }

@@ -14,6 +14,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.SimpleMenuProvider;
 
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 /**
  * Fabric implementation of the platform-neutral {@link MenuRenderer} seam.
@@ -39,6 +40,9 @@ public final class FabricMenuRenderer implements MenuRenderer {
 
   /** Style key; matches the Bukkit chest renderer so {@code menuStyle: chest} works everywhere. */
   public static final String STYLE = "chest";
+
+  private static final Pattern COLOR_CODE = Pattern.compile("(?i)[&\u00a7](#[0-9a-f]{6}|x([&\u00a7][0-9a-f]){6}|[0-9a-fk-or])");
+  private static final Pattern LEFTOVER_TAGS = Pattern.compile("<[^>]+>");
 
   /**
    * Live server captured via Fabric lifecycle/tick events. This is the server
@@ -166,19 +170,23 @@ public final class FabricMenuRenderer implements MenuRenderer {
       return;
     }
     // Opening a menu touches the player entity and must run on the server thread.
-    RTP.log(java.util.logging.Level.INFO,
+    // Defer by 1 tick so that if open() was triggered from an active container
+    // click (sub-menu navigation / pagination), the current click packet finishes
+    // processing completely before the new container screen is opened.
+    RTP.log(java.util.logging.Level.FINE,
         "[RTP-GUI] Fabric renderer scheduling chest open for " + playerId);
-    RTP.scheduler.runTask(() -> {
+    RTP.scheduler.runTaskLater(() -> {
       ServerPlayer player = resolvePlayer(playerId);
       if (player == null) {
-        RTP.log(java.util.logging.Level.INFO,
+        RTP.log(java.util.logging.Level.FINE,
             "[RTP-GUI] Fabric renderer: could not resolve player at open time for " + playerId
-                + " (offline, or neither the player registry nor a bound server was available);"
-                + " falling back to a classic teleport so the command never silently no-ops");
-        fallbackTeleport(playerId);
+                + " (offline, or neither the player registry nor a bound server was available)");
+        if (model.isRoot()) {
+          fallbackTeleport(playerId);
+        }
         return;
       }
-      RTP.log(java.util.logging.Level.INFO,
+      RTP.log(java.util.logging.Level.FINE,
           "[RTP-GUI] Fabric renderer opening chest menu for " + playerId);
       try {
         MenuLayout layout = MenuLayout.compute(model);
@@ -187,16 +195,16 @@ public final class FabricMenuRenderer implements MenuRenderer {
                 (id, inv, p) -> new DestinationPickerMenu(id, inv, model, layout),
                 Component.literal(stripTitle(model.title()))));
       } catch (Throwable cannotOpen) {
-        // The menu could not be displayed (e.g. a screen/menu-type linkage
-        // failure on this runtime). Honour the MenuRenderer contract and fall
-        // back to the classic teleport rather than leaving the player with
-        // neither a menu nor a teleport.
         RTP.log(java.util.logging.Level.WARNING,
             "[RTP-GUI] Fabric renderer: opening the chest menu for " + playerId
-                + " threw; falling back to a classic teleport", cannotOpen);
-        fallbackTeleport(playerId);
+                + " threw" + (model.isRoot() ? "; falling back to a classic teleport" : ""), cannotOpen);
+        if (model.isRoot()) {
+          fallbackTeleport(playerId);
+        } else if (RTP.serverAccessor != null) {
+          RTP.serverAccessor.sendMessage(playerId, "&c[RTP] Could not open menu.");
+        }
       }
-    });
+    }, 1L);
   }
 
   /**
@@ -208,7 +216,21 @@ public final class FabricMenuRenderer implements MenuRenderer {
    */
   private static void fallbackTeleport(UUID playerId) {
     try {
-      RTPAPI.teleport(playerId, RtpTarget.defaultRegion());
+      RTPAPI.teleport(playerId, RtpTarget.defaultRegion())
+          .whenComplete((result, error) -> {
+            if (error != null) {
+              RTP.log(java.util.logging.Level.WARNING,
+                  "[RTP-GUI] Fabric renderer: fallback teleport for " + playerId + " failed", error);
+              if (RTP.serverAccessor != null) {
+                RTP.serverAccessor.sendMessage(playerId, "&c[RTP] Teleport failed: " + error.getMessage());
+              }
+            } else if (result != null && !result.isSuccess()) {
+              String msg = result.message() != null ? result.message() : (result.reason() != null ? result.reason().name() : "unknown");
+              if (RTP.serverAccessor != null) {
+                RTP.serverAccessor.sendMessage(playerId, "&c[RTP] Teleport failed: " + msg);
+              }
+            }
+          });
     } catch (Throwable noTeleport) {
       RTP.log(java.util.logging.Level.WARNING,
           "[RTP-GUI] Fabric renderer: classic-teleport fallback for " + playerId
@@ -220,6 +242,8 @@ public final class FabricMenuRenderer implements MenuRenderer {
     if (title == null || title.isEmpty()) {
       return "Random Teleport";
     }
-    return title.replaceAll("(?i)[&\u00a7][0-9a-fk-or]", "");
+    String expanded = io.github.dailystruggle.rtp.common.tools.MiniMessageColorExpander.expand(title);
+    String noColor = COLOR_CODE.matcher(expanded).replaceAll("");
+    return LEFTOVER_TAGS.matcher(noColor).replaceAll("");
   }
 }

@@ -151,6 +151,7 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
                 Integer.parseInt(resultSet.getString("originalX")),
                 Integer.parseInt(resultSet.getString("originalY")),
                 Integer.parseInt(resultSet.getString("originalZ")));
+        teleportData.originWorldName = resultSet.getString("originalWorldName");
         teleportData.cost = Double.parseDouble(resultSet.getString("cost"));
 
         RTP.getInstance().latestTeleportData.put(uuid, teleportData);

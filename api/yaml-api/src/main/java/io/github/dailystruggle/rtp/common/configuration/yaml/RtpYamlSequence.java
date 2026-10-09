@@ -4,14 +4,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Sequence node: an ordered list of child nodes (block-style only).
+ * Sequence node: an ordered list of child nodes.
  *
- * <p>Per ADR-025 the YAML subset is block-style only - flow sequences
- * ({@code [a, b, c]}) are rejected at parse time.</p>
+ * <p>Block style ({@code - item} per line) is the default. Single-line flow
+ * sequences ({@code [a, b, c]}, nestable) are accepted on parse for Chunky
+ * parity (ADR-034 polygon {@code vertices}); {@link #isFlowStyle()} records
+ * that so the writer can re-emit the compact form.</p>
  */
 public final class RtpYamlSequence extends RtpYamlNode {
 
     private final List<RtpYamlNode> items = new ArrayList<>();
+    private boolean flowStyle;
 
     public List<RtpYamlNode> items() {
         return items;
@@ -27,5 +30,19 @@ public final class RtpYamlSequence extends RtpYamlNode {
 
     public RtpYamlNode get(int i) {
         return items.get(i);
+    }
+
+    /** True when the sequence was read from (or should be written in) flow style {@code [a, b]}. */
+    public boolean isFlowStyle() {
+        return flowStyle;
+    }
+
+    /**
+     * Request flow-style emission. Advisory: the writer falls back to block
+     * style when an item cannot be represented inline (mappings, block
+     * comments, plain scalars containing flow indicators).
+     */
+    public void setFlowStyle(boolean flowStyle) {
+        this.flowStyle = flowStyle;
     }
 }

@@ -217,6 +217,7 @@ menuAdminPanelHint: "&7paw an option; chompy actions show a warning hover"
 
 # Section dividers on the admin panel. No placeholders.
 menuAdminPanelSectionConfig: "&8--- &7purr-ferences &8---"
+menuAdminPanelSectionDocs: "&8--- &7scrolls & editor &8---"
 menuAdminPanelSectionDiagnostics: "&8--- &7vet check &8---"
 menuAdminPanelSectionLifecycle: "&8--- &7nine lives &8---"
 menuAdminPanelSectionBrowse: "&8--- &7sniff around &8---"
@@ -224,6 +225,10 @@ menuAdminPanelSectionBrowse: "&8--- &7sniff around &8---"
 # Admin-panel rows + hovers. No placeholders.
 menuAdminPanelRowConfig: "&b▶ setup editor"
 menuAdminPanelHoverConfig: "&7open the curated setup picker"
+menuAdminPanelRowDocs: "#5FB3B3▶ cat scrolls"
+menuAdminPanelHoverDocs: "&7open packed in-game cat scrolls"
+menuAdminPanelRowEditor: "#5FB3B3▶ web scratching-board & scrolls"
+menuAdminPanelHoverEditor: "&7launch ephemeral web editor session with side-by-side scrolls"
 menuAdminPanelRowRegions: "#5FB3B3▶ territories"
 menuAdminPanelHoverRegions: "&7add, remove, or groom per-territory setups"
 menuAdminPanelRowWorlds: "#5FB3B3▶ boxes"
@@ -479,5 +484,29 @@ multiconfigResultNameInvalid: "&cname '[name]' is hiss-worthy; use letters, digi
 # Placeholder: [name].
 multiconfigResultNameTaken: "&can entry named '[name]' already lives here."
 
+docsNotFound: "&c[P0] Scroll topic '[topic]' not sniffed out. Paw /rtp docs list to see available scrolls."
+docsEmpty: "&c[P0] No scroll topics are currently registered in the den."
+docsExportSuccess: "&a[P0] Scroll HTML bundle safely batted to [path]."
+docsExportFailed: "&c[P0] Failed to bat out scroll bundle: [reason]."
+
 # Do not bite the version number, sacred catnip
+# --- Web editor channel (ADR-106) ---
+editorTrustPrompt: "&e[P1] Una pàgina de l'editor web demana accés amb el codi &b[nonce]&e. Si la teva pàgina mostra el mateix codi, fes clic aquí per confiar en aquest navegador."
+editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(clau [fingerprint])"
+editorTrustAccepted: "&a[P0] Navegador de confiança: la pàgina de l'editor amb el codi [nonce] ja pot previsualitzar i fer servir Hot-Apply."
+editorTrustAlready: "&7[P0] El navegador amb el codi [nonce] ja era de confiança."
+editorTrustUnknown: "&c[P0] Cap sessió oberta de l'editor ha emès el codi [nonce]."
+editorTrustExpired: "&c[P0] El codi [nonce] ha caducat. Torna a carregar la pàgina de l'editor per obtenir-ne un de nou."
+editorTrustUsage: "&c[P0] Ús: /rtp editor trust nonce=<codi que mostra la pàgina de l'editor>"
+editorChannelOpened: "&a[P0] Canal de l'editor web obert. Confia en el navegador quan se't demani per activar les previsualitzacions i Hot-Apply."
+editorChannelLost: "&e[P1] S'ha perdut el canal de l'editor web: [reason]. La pàgina continua funcionant amb la seva instantània."
+editorChannelExpired: "&7[P0] El canal de l'editor web ha caducat després de [minutes] minuts. Torna a executar l'ordre de l'editor per continuar."
+editorTrustRateLimited: "&c[P0] Massa codis de confiança de l'editor incorrectes. Espera un minut i torna-ho a provar."
+editorUntrustUsage: "&c[P0] Ús: /rtp editor untrust key=<prefix de l'empremta, almenys 4 caràcters | all>"
+editorUntrustRemoved: "&a[P0] S'ha retirat la confiança a [count] navegador(s) de l'editor web; caldrà tornar a confiar-hi per previsualitzar o fer Hot-Apply."
+editorUntrustNone: "&7[P0] Cap navegador de confiança de l'editor coincideix amb [key]."
+editorUntrustFailed: "&c[P0] No s'ha pogut actualitzar la llista d'editors de confiança: [reason]"
+editorApplyDigestMissing: "&c[P0] La càrrega de l'editor no té suma de verificació sha256 i no s'ha aplicat. Torna a confirmar des d'una pàgina de l'editor actualitzada."
+editorApplyFileUnreadable: "&e[P1] No s'ha pogut llegir el fitxer d'aplicació fora de línia ([reason]); s'intenta amb el magatzem de bytes."
+
 version: 1.0

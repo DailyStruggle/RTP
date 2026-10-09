@@ -77,7 +77,7 @@ Nested under the `defaults:` block. Holds global default templates and values th
 | `cacheCap` | Integer | `50` | Default region `cacheCap` (max pre-calculated safe locations). |
 | `backlogCacheCap` | Integer | `1000` (lite: `0`) | Default region `backlogCacheCap` (L3 backlog buffer; `0` disables). |
 | `activeChunkCap` | Integer | `10` | Default region `activeChunkCap` (chunks kept loaded for zero-latency). |
-| `spatialResolution` | Integer | `3` | Default region `spatialResolution` (bad-location tracking precision, 1-5). |
+| `spatialResolution` | Integer / String | `"auto"` | Default region `spatialResolution` (bad-location tracking precision, positive integer or `"auto"`). |
 | `requirePermission` | Boolean | `false` | Default `requirePermission` for regions/worlds. |
 
 > The type-bearing `shape`/`vert` settings inherit as a **whole named block**, while type-free scalars inherit individually. Other source files own their own defaults: e.g. a region's `price` can reference `@economy` to inherit from [economy.yml](ECONOMY.md).

@@ -35,4 +35,6 @@ jobs:
       - name: Build and analyze
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: ./gradlew build jacocoTestReport sonar -Pcoverage --info
+        # -PregexAnalysis runs the advisory pmdRegexMain scan (config/pmd/regex.xml)
+        # so its report is imported as external PMD issues (never fails the job).
+        run: ./gradlew build jacocoTestReport sonar -Pcoverage -PregexAnalysis

@@ -7,16 +7,14 @@ import io.github.dailystruggle.rtp.proxy.common.spi.ProxyHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.RedeemOutcome;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReleaseReason;
 import io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier;
+import io.github.dailystruggle.rtp.proxy.common.transport.CanonicalEnvelopes;
 import io.github.dailystruggle.rtp.proxy.common.transport.codec.BackendHeartbeatCodec;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.spi.Subscription;
-
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.JedisPoolConfig;
-import redis.clients.jedis.JedisPubSub;
-import redis.clients.jedis.params.ScanParams;
-import redis.clients.jedis.resps.ScanResult;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespProtocol;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPubSub;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -99,6 +97,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
     private static final String PROXY_KEY_PREFIX = "rtp:net:proxy:";
     private static final String TOKEN_KEY_PREFIX = "rtp:net:tok:";
     private static final String TOKEN_ACTIVE_PREFIX = "rtp:net:tokactive:";
+    private static final String LAST_TP_PREFIX = "rtp:lastTp:";
     private static final String BACKEND_CHANNEL = "rtp:net:backend";
 
     /**
@@ -115,7 +114,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
      */
     private static final long REAP_GRACE_SECONDS = 300L;
 
-    private final JedisPool pool;
+    private final RespPool pool;
     private final boolean ownsPool;
     private final long heartbeatIntervalMs;
     private final int ttlSeconds;
@@ -124,7 +123,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
     private final AtomicInteger threadCounter = new AtomicInteger();
     private final ExecutorService publisherExec;
     private final Thread subscriberThread;
-    private final JedisPubSub pubSub;
+    private final RespPubSub pubSub;
     private final RedisLuaScripts claimScript;
     private final RedisLuaScripts releaseScript;
     private final RedisLuaScripts reapScript;
@@ -167,25 +166,16 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
      * Pool-injection constructor. The caller retains ownership of the pool
      * unless explicitly closed.
      */
-    public RedisNetworkStateBinding(JedisPool pool, long heartbeatIntervalMs,
+    public RedisNetworkStateBinding(RespPool pool, long heartbeatIntervalMs,
                                     HmacVerifier verifier, int schemaVersion) {
         this(Objects.requireNonNull(pool, "pool"), false, heartbeatIntervalMs, verifier, schemaVersion);
     }
 
-    private static JedisPool buildPool(String host, int port, String password) {
-        JedisPoolConfig cfg = new JedisPoolConfig();
-        cfg.setMaxTotal(8);
-        cfg.setMaxIdle(4);
-        cfg.setMinIdle(1);
-        cfg.setTestOnBorrow(true);
-        if (password != null && !password.isEmpty()) {
-            return new JedisPool(cfg, host, port, 2000, password);
-        } else {
-            return new JedisPool(cfg, host, port, 2000);
-        }
+    private static RespPool buildPool(String host, int port, String password) {
+        return new RespPool(host, port, 2000, password, 8);
     }
 
-    private RedisNetworkStateBinding(JedisPool pool, boolean ownsPool, long heartbeatIntervalMs,
+    private RedisNetworkStateBinding(RespPool pool, boolean ownsPool, long heartbeatIntervalMs,
                                     HmacVerifier verifier, int schemaVersion) {
         this.pool = pool;
         this.ownsPool = ownsPool;
@@ -201,7 +191,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
 
         // Eagerly validate connectivity. A bad host should fail at open() time,
         // not silently in publish loops.
-        try (Jedis j = pool.getResource()) {
+        try (RespConnection j = pool.getResource()) {
             j.ping();
         } catch (Exception e) {
             if (ownsPool) pool.close();
@@ -234,7 +224,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
         };
         this.publisherExec = Executors.newFixedThreadPool(2, tf);
 
-        this.pubSub = new JedisPubSub() {
+        this.pubSub = new RespPubSub() {
             @Override
             public void onMessage(String channel, String message) {
                 if (!BACKEND_CHANNEL.equals(channel)) return;
@@ -259,8 +249,8 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
 
         this.subscriberThread = new Thread(() -> {
             while (open.get()) {
-                try (Jedis j = pool.getResource()) {
-                    j.subscribe(pubSub, BACKEND_CHANNEL);
+                try (RespConnection j = pool.getResource()) {
+                    pubSub.proceed(j, BACKEND_CHANNEL);
                 } catch (Throwable t) {
                     if (!open.get()) return;
                     LOG.log(Level.WARNING,
@@ -283,7 +273,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
         return CompletableFuture.runAsync(() -> {
             String key = PROXY_KEY_PREFIX + row.proxyId();
             Map<String, String> hash = encodeProxy(row);
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 j.hset(key, hash);
                 j.expire(key, ttlSeconds);
             } catch (Exception e) {
@@ -300,7 +290,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
             String key = BACKEND_KEY_PREFIX + row.serverId();
             String encoded = encodeBackend(row);
             Map<String, String> hash = parseFlat(encoded);
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 j.hset(key, hash);
                 j.expire(key, ttlSeconds);
                 j.publish(BACKEND_CHANNEL, encoded);
@@ -325,11 +315,10 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
 
     private NetworkSnapshot readSnapshotSync() {
         Map<String, BackendHeartbeat> backends = new LinkedHashMap<>();
-        try (Jedis j = pool.getResource()) {
-            String cursor = ScanParams.SCAN_POINTER_START;
-            ScanParams params = new ScanParams().match(BACKEND_KEY_PREFIX + "*").count(64);
+        try (RespConnection j = pool.getResource()) {
+            String cursor = "0";
             do {
-                ScanResult<String> res = j.scan(cursor, params);
+                RespConnection.ScanResult res = j.scan(cursor, BACKEND_KEY_PREFIX + "*", 64);
                 for (String key : res.getResult()) {
                     Map<String, String> hash = j.hgetAll(key);
                     if (hash == null || hash.isEmpty()) continue;
@@ -337,7 +326,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                     if (hb != null) backends.put(hb.serverId(), hb);
                 }
                 cursor = res.getCursor();
-            } while (!ScanParams.SCAN_POINTER_START.equals(cursor));
+            } while (!"0".equals(cursor));
         } catch (Exception e) {
             LOG.log(Level.WARNING, "readSnapshot failed: " + e.getMessage());
         }
@@ -391,28 +380,91 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
     private RedeemOutcome redeemSync(String tokenId, UUID playerId, String expectedServerId) {
         List<String> keys = List.of(TOKEN_KEY_PREFIX + tokenId, TOKEN_ACTIVE_PREFIX + playerId);
         long now = System.currentTimeMillis();
-        List<String> args = List.of(
-                tokenId,
-                playerId.toString(),
-                expectedServerId,
-                Long.toString(now),
-                Long.toString(now));
         Object raw;
-        try (Jedis j = pool.getResource()) {
+        try (RespConnection j = pool.getResource()) {
+            // Signed mode: Lua cannot compute HMAC-SHA-256, so Java reads and
+            // verifies the row first, then redeem.lua CASes on the verified
+            // hmac (ARGV[6]); a row rewritten between read and EVALSHA fails
+            // the CAS. Fail closed: unsigned / tampered rows are never consumed.
+            String expectedHmac = "";
+            if (verifier != null) {
+                Map<String, String> hash = j.hgetAll(TOKEN_KEY_PREFIX + tokenId);
+                RedeemOutcome pre = preVerifyRedeem(tokenId, playerId, expectedServerId, now, hash);
+                if (pre != null) return pre;
+                expectedHmac = hash.getOrDefault("hmac", "");
+            }
+            List<String> args = List.of(
+                    tokenId,
+                    playerId.toString(),
+                    expectedServerId,
+                    Long.toString(now),
+                    Long.toString(now),
+                    expectedHmac);
             raw = redeemScript.evalsha(j, keys, args);
         } catch (Exception e) {
             LOG.log(Level.WARNING, "RedisNetworkStateBinding.redeem failed: " + e.getMessage());
             return RedeemOutcome.TRANSPORT_ERROR;
         }
-        String result = raw == null ? "" : raw.toString();
+        String result = raw == null ? "" : (raw instanceof byte[] b ? RespProtocol.toUtf8(b) : raw.toString());
         try {
             return RedeemOutcome.valueOf(result);
         } catch (IllegalArgumentException ex) {
             LOG.log(Level.WARNING,
                     "RedisNetworkStateBinding.redeem: unrecognised Lua return '" + result
-                            + "' for token " + tokenId + " (REQ-RTP-S-004)");
+                            + "' for token " + tokenPrefix(tokenId) + " (REQ-RTP-S-004)");
             return RedeemOutcome.BAD_STATE;
         }
+    }
+
+    /**
+     * Java-side mirror of redeem.lua's classification plus HMAC verify.
+     * Returns a terminal outcome, or {@code null} when the row is a verified
+     * CLAIMED/PENDING token that may proceed to the Lua CAS.
+     */
+    private RedeemOutcome preVerifyRedeem(String tokenId, UUID playerId, String expectedServerId,
+                                          long now, Map<String, String> hash) {
+        if (hash == null || hash.isEmpty()) return RedeemOutcome.NOT_FOUND;
+        String rowServer = hash.get("serverId");
+        String rowPlayer = hash.get("playerId");
+        if (!expectedServerId.equals(rowServer) || !playerId.toString().equals(rowPlayer)) {
+            return RedeemOutcome.WRONG_SERVER;
+        }
+        String state = hash.getOrDefault("state", "");
+        if ("CONSUMED".equals(state) || "RELEASED".equals(state)) return RedeemOutcome.ALREADY_CONSUMED;
+        long expires;
+        try {
+            expires = Long.parseLong(hash.getOrDefault("expiresAtMs", "0"));
+        } catch (NumberFormatException ex) {
+            expires = -1L;
+        }
+        if (expires > 0 && expires <= now) return RedeemOutcome.EXPIRED;
+        if (!"CLAIMED".equals(state) && !"PENDING".equals(state)) return RedeemOutcome.BAD_STATE;
+        if (!verifyTokenHash(tokenId, hash, state)) {
+            LOG.log(Level.WARNING,
+                    "RedisNetworkStateBinding.redeem: HMAC verification failed for token "
+                            + tokenPrefix(tokenId) + "; refusing to consume (REQ-RTP-S-004)");
+            return RedeemOutcome.HMAC_INVALID;
+        }
+        return null;
+    }
+
+    /** Verify a token HASH against its stored hmac; caller guarantees {@code verifier != null}. */
+    private boolean verifyTokenHash(String tokenId, Map<String, String> hash, String state) {
+        return CanonicalEnvelopes.verifyToken(verifier, schemaVersion,
+                tokenId,
+                hash.getOrDefault("serverId", ""),
+                hash.getOrDefault("playerId", ""),
+                hash.getOrDefault("expiresAtMs", "0"),
+                hash.getOrDefault("createdAtMs", "0"),
+                state,
+                hash.get("regionKey"),
+                hash.getOrDefault("hmac", ""));
+    }
+
+    /** First 8 chars of a token id; full ids are bearer-like and stay out of logs. */
+    private static String tokenPrefix(String tokenId) {
+        if (tokenId == null) return "null";
+        return tokenId.length() <= 8 ? tokenId : tokenId.substring(0, 8);
     }
 
     @Override
@@ -446,11 +498,10 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
     private List<ReservationToken> listActiveForServerSync(String serverId) {
         long nowMs = System.currentTimeMillis();
         List<ReservationToken> out = new ArrayList<>();
-        try (Jedis j = pool.getResource()) {
-            String cursor = ScanParams.SCAN_POINTER_START;
-            ScanParams params = new ScanParams().match(TOKEN_KEY_PREFIX + "*").count(64);
+        try (RespConnection j = pool.getResource()) {
+            String cursor = "0";
             do {
-                ScanResult<String> res = j.scan(cursor, params);
+                RespConnection.ScanResult res = j.scan(cursor, TOKEN_KEY_PREFIX + "*", 64);
                 cursor = res.getCursor();
                 for (String key : res.getResult()) {
                     if (!key.startsWith(TOKEN_KEY_PREFIX)) continue;
@@ -484,24 +535,16 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                     } catch (IllegalArgumentException ex) {
                         continue;
                     }
-                    if (verifier != null) {
-                        String storedHmac = hash.getOrDefault("hmac", "");
-                        String canonical = canonicalToken(
-                                tokenId, rowServerId, playerIdStr,
-                                hash.getOrDefault("expiresAtMs", "0"),
-                                hash.getOrDefault("createdAtMs", "0"),
-                                state.name());
-                        if (!verifier.verify(schemaVersion, canonical, storedHmac)) {
-                            LOG.log(Level.WARNING,
-                                    "listActiveForServerSync: HMAC verification failed for token "
-                                            + tokenId + "; dropping row (REQ-RTP-S-004)");
-                            continue;
-                        }
+                    if (verifier != null && !verifyTokenHash(tokenId, hash, state.name())) {
+                        LOG.log(Level.WARNING,
+                                "listActiveForServerSync: HMAC verification failed for token "
+                                        + tokenPrefix(tokenId) + "; dropping row (REQ-RTP-S-004)");
+                        continue;
                     }
                     out.add(new ReservationToken(tokenId, rowServerId, playerId, expires, state,
                             hash.get("regionKey")));
                 }
-            } while (!ScanParams.SCAN_POINTER_START.equals(cursor));
+            } while (!"0".equals(cursor));
         } catch (Exception e) {
             LOG.log(Level.WARNING,
                     "RedisNetworkStateBinding.listActiveForServer failed: " + e.getMessage()
@@ -527,18 +570,19 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
         long logicalSecs = Math.max(1L, ttl.toSeconds());
         long ttlSecs = logicalSecs + REAP_GRACE_SECONDS;
         List<String> keys = List.of(TOKEN_KEY_PREFIX + tokenId, TOKEN_ACTIVE_PREFIX + playerId);
-        // A3 token envelope: Java pre-computes HMAC over the canonical token
-        // payload that claim.lua will HSET into the row. Sign the same byte
-        // sequence that findReservationSync rebuilds on read (terminal-state
-        // rows skip verify since they are filtered to Optional.empty()).
+        // Token envelope: Java pre-computes HMAC over the canonical token
+        // payload (incl. regionKey) that claim.lua will HSET into the row.
+        // Delimiter-bearing fields throw IllegalArgumentException (fail closed).
+        String region = (regionKey == null || regionKey.isEmpty()) ? "" : regionKey;
         String hmacHex = "";
         if (verifier != null) {
-            hmacHex = verifier.sign(schemaVersion,
-                    canonicalToken(tokenId, serverId, playerId.toString(),
-                            Long.toString(expires), Long.toString(now),
-                            ReservationToken.State.CLAIMED.name()));
+            hmacHex = CanonicalEnvelopes.signToken(verifier, schemaVersion,
+                    tokenId, serverId, playerId.toString(),
+                    Long.toString(expires), Long.toString(now),
+                    ReservationToken.State.CLAIMED.name(), region);
+        } else if (!CanonicalEnvelopes.isSafeField(serverId) || !CanonicalEnvelopes.isSafeField(region)) {
+            throw new IllegalArgumentException("claim: serverId/regionKey contains a reserved delimiter character");
         }
-        String region = (regionKey == null || regionKey.isEmpty()) ? "" : regionKey;
         List<String> args = List.of(
                 tokenId,
                 serverId,
@@ -549,7 +593,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                 hmacHex,
                 region);
         Object result;
-        try (Jedis j = pool.getResource()) {
+        try (RespConnection j = pool.getResource()) {
             result = claimScript.evalsha(j, keys, args);
         } catch (Exception e) {
             throw new RuntimeException("RedisNetworkStateBinding.claim failed: " + e.getMessage(), e);
@@ -573,7 +617,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                 terminal,
                 Long.toString(System.currentTimeMillis()),
                 TOKEN_ACTIVE_PREFIX);
-        try (Jedis j = pool.getResource()) {
+        try (RespConnection j = pool.getResource()) {
             releaseScript.evalsha(j, keys, args);
             // Idempotent: 0 return is a no-op (missing or already terminal).
         } catch (Exception e) {
@@ -593,7 +637,7 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                 TOKEN_ACTIVE_PREFIX,
                 "100");
         Object result;
-        try (Jedis j = pool.getResource()) {
+        try (RespConnection j = pool.getResource()) {
             result = reapScript.evalsha(j, List.of(), args);
         } catch (Exception e) {
             throw new RuntimeException("RedisNetworkStateBinding.reapExpired failed: " + e.getMessage(), e);
@@ -615,26 +659,21 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
     }
 
     private Optional<ReservationToken> findReservationSync(UUID playerId) {
-        try (Jedis j = pool.getResource()) {
-            // Phase B trace (2026-05-23): the destination backend's
-            // JoinTriggerSource.handleLookup observed "no reservation found"
-            // ~1s after the proxy successfully claimed a token (well within
-            // 30s TTL, boot reconcile already ran clean, reaper had nothing
-            // to reap). This INFO-level trace exposes the raw Redis state at
-            // the lookup instant so we can disambiguate (a) missing active
-            // index, (b) CONSUMED/RELEASED row, (c) expired row, and (d)
-            // HMAC mismatch dropping a valid row. Remove or downgrade to
-            // FINE once the root cause is identified.
+        try (RespConnection j = pool.getResource()) {
+            // Lookup trace at FINE: token id prefix + state only; never the
+            // full row (hmac / full token id stay out of logs).
             String activeKey = TOKEN_ACTIVE_PREFIX + playerId;
             String tokenId = j.get(activeKey);
-            LOG.log(Level.INFO,
-                    "[NETWORK][trace] findReservationSync: GET " + activeKey
-                            + " -> " + (tokenId == null ? "null" : tokenId));
+            if (LOG.isLoggable(Level.FINE)) {
+                LOG.log(Level.FINE, "[NETWORK][trace] findReservationSync: player " + playerId
+                        + " -> token " + (tokenId == null ? "null" : tokenPrefix(tokenId)));
+            }
             if (tokenId == null || tokenId.isEmpty()) return Optional.empty();
             Map<String, String> hash = j.hgetAll(TOKEN_KEY_PREFIX + tokenId);
-            LOG.log(Level.INFO,
-                    "[NETWORK][trace] findReservationSync: HGETALL " + TOKEN_KEY_PREFIX + tokenId
-                            + " -> " + (hash == null ? "null" : hash.toString()));
+            if (LOG.isLoggable(Level.FINE)) {
+                LOG.log(Level.FINE, "[NETWORK][trace] findReservationSync: token " + tokenPrefix(tokenId)
+                        + " state=" + (hash == null ? "missing" : hash.getOrDefault("state", "missing")));
+            }
             if (hash == null || hash.isEmpty()) return Optional.empty();
             String stateStr = hash.get("state");
             if (stateStr == null) return Optional.empty();
@@ -647,10 +686,6 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                 return Optional.empty();
             }
             if (state == ReservationToken.State.CONSUMED || state == ReservationToken.State.RELEASED) {
-                LOG.log(Level.INFO,
-                        "[NETWORK][trace] findReservationSync: row in terminal state " + state
-                                + " for player " + playerId + " token " + tokenId
-                                + "; returning empty");
                 return Optional.empty();
             }
             long expires;
@@ -660,30 +695,19 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
                 return Optional.empty();
             }
             if (expires > 0 && expires <= System.currentTimeMillis()) {
-                LOG.log(Level.INFO,
-                        "[NETWORK][trace] findReservationSync: row expired (expiresAtMs="
-                                + expires + " now=" + System.currentTimeMillis()
-                                + ") for player " + playerId + " token " + tokenId);
                 return Optional.empty();
             }
-            // A3 token envelope: verify HMAC on non-terminal rows. Sign covers
-            // the same canonical payload claimSync built pre-EVALSHA. A
-            // mismatch (forged row, replayed claim, or state tampered from
-            // RELEASED back to CLAIMED) drops the row with a REQ-RTP-S-004
-            // WARNING and returns Optional.empty().
+            // Token envelope: verify HMAC on non-terminal rows. A mismatch
+            // (forged row, tampered regionKey, state rewound to CLAIMED, or a
+            // pre-v2 signature) drops the row with a REQ-RTP-S-004 WARNING.
+            // playerId is pinned to the lookup key, not the row's own field.
             if (verifier != null) {
-                String storedHmac = hash.getOrDefault("hmac", "");
-                String canonical = canonicalToken(
-                        tokenId,
-                        hash.getOrDefault("serverId", ""),
-                        playerId.toString(),
-                        hash.getOrDefault("expiresAtMs", "0"),
-                        hash.getOrDefault("createdAtMs", "0"),
-                        state.name());
-                if (!verifier.verify(schemaVersion, canonical, storedHmac)) {
+                Map<String, String> pinned = new java.util.HashMap<>(hash);
+                pinned.put("playerId", playerId.toString());
+                if (!verifyTokenHash(tokenId, pinned, state.name())) {
                     LOG.log(Level.WARNING,
                             "findReservationSync: HMAC verification failed for token "
-                                    + tokenId + "; dropping row (REQ-RTP-S-004)");
+                                    + tokenPrefix(tokenId) + "; dropping row (REQ-RTP-S-004)");
                     return Optional.empty();
                 }
             }
@@ -697,6 +721,39 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
         } catch (Exception e) {
             throw new RuntimeException("RedisNetworkStateBinding.findReservation failed: " + e.getMessage(), e);
         }
+    }
+
+    @Override
+    public CompletableFuture<Void> setLastTeleportTime(UUID playerId, long epochMillis) {
+        Objects.requireNonNull(playerId, "playerId");
+        checkOpen();
+        return CompletableFuture.runAsync(() -> {
+            try (RespConnection jedis = pool.getResource()) {
+                jedis.set(LAST_TP_PREFIX + playerId, String.valueOf(epochMillis));
+            } catch (Exception e) {
+                LOG.log(Level.WARNING, "setLastTeleportTime failed: " + e.getMessage());
+            }
+        }, publisherExec);
+    }
+
+    @Override
+    public CompletableFuture<Long> getLastTeleportTime(UUID playerId) {
+        Objects.requireNonNull(playerId, "playerId");
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> {
+            try (RespConnection jedis = pool.getResource()) {
+                String val = jedis.get(LAST_TP_PREFIX + playerId);
+                if (val == null || val.isEmpty()) return 0L;
+                try {
+                    return Long.parseLong(val);
+                } catch (NumberFormatException e) {
+                    return 0L;
+                }
+            } catch (Exception e) {
+                LOG.log(Level.WARNING, "getLastTeleportTime failed: " + e.getMessage());
+                return 0L;
+            }
+        }, publisherExec);
     }
 
     @Override
@@ -804,26 +861,6 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
         return m;
     }
 
-    /**
-     * Canonical token payload used by the A3 HMAC envelope. The byte sequence
-     * is the same on claim-side (Java pre-computes the HMAC and passes it as
-     * ARGV[7] to {@code claim.lua}) and on read-side ({@code
-     * findReservationSync} rebuilds it from the HSET fields and verifies).
-     *
-     * <p>Field order is fixed and matches {@code claim.lua}'s {@code HSET}
-     * sequence: tokenId, serverId, playerId, expiresAtMs, createdAtMs, state.
-     * Adding a new signed field is a wire-format breaking change (requires a
-     * {@code FLUSHDB} on upgrade, same posture as the heartbeat envelope).</p>
-     */
-    private static String canonicalToken(String tokenId, String serverId, String playerId,
-                                         String expiresAtMs, String createdAtMs, String state) {
-        return "tokenId=" + tokenId
-                + "\nserverId=" + serverId
-                + "\nplayerId=" + playerId
-                + "\nexpiresAtMs=" + expiresAtMs
-                + "\ncreatedAtMs=" + createdAtMs
-                + "\nstate=" + state;
-    }
 
     private static String flatten(Map<String, String> hash) {
         StringBuilder sb = new StringBuilder(256);

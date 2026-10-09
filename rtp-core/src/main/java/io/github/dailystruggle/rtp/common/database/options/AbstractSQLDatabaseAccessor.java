@@ -153,12 +153,21 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
         Object originalZ = data.get(COL_ORIGINAL_Z);
         Object originalWorldName = data.get(COL_ORIGINAL_WORLD_NAME);
         if (originalX != null && originalY != null && originalZ != null && originalWorldName != null) {
+          teleportData.originWorldName = originalWorldName.toString();
           teleportData.originalCoords =
               new RTPCoords(
                   originalWorldName.toString(),
                   ((Number) originalX).intValue(),
                   ((Number) originalY).intValue(),
                   ((Number) originalZ).intValue());
+        }
+        Object originServerId = data.get("originServerId");
+        if (originServerId != null) {
+          teleportData.originServerId = originServerId.toString();
+        }
+        Object originWorldName = data.get("originWorldName");
+        if (originWorldName != null) {
+          teleportData.originWorldName = originWorldName.toString();
         }
         teleportData.completed = true;
         writeQueue.add(teleportData);
@@ -247,6 +256,9 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
         }
       } catch (SQLException e) {
         RTP.log(Level.WARNING, "Database connection error during flush", e);
+      } finally {
+        // Pooled backends (MySQL/PostgreSQL) recycle on close; shared SQLite/H2 no-op.
+        disconnect(connection);
       }
     }
   }
@@ -420,6 +432,7 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
                   resultSet.getInt(COL_ORIGINAL_X),
                   resultSet.getInt(COL_ORIGINAL_Y),
                   resultSet.getInt(COL_ORIGINAL_Z));
+          teleportData.originWorldName = resultSet.getString(COL_ORIGINAL_WORLD_NAME);
           teleportData.cost = resultSet.getDouble("cost");
 
           RTP.getInstance().latestTeleportData.put(uuid, teleportData);

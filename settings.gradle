@@ -149,6 +149,10 @@ include 'maps-api'
 // BukkitTpsSampler, FoliaMetricsBinding + FoliaRegionTpsSampler,
 // FabricMetricsBinding) stay in their respective platform adapters.
 include 'metrics-api'
+// bstats-api -- dependency-free bStats v2 client (bstats-api-ADR-001). Pure
+// Java, no RTP-module or platform dependency, so sibling plugins (backend or
+// proxy) can reuse it; hosts supply scheduler + logger through its SPI.
+include 'bstats-api'
 // anvil-api -- platform-neutral vanilla Anvil region-file decode / NBT
 // pre-filter (ADR-016). No RTP-module or platform dependency, so it groups
 // under api/ with the other non-rtp-exclusive modules. Renamed from the
@@ -172,6 +176,7 @@ if (!excludeJdk25) {
 project(':yaml-api').projectDir     = file('api/yaml-api')
 project(':maps-api').projectDir     = file('api/maps-api')
 project(':metrics-api').projectDir  = file('api/metrics-api')
+project(':bstats-api').projectDir   = file('api/bstats-api')
 project(':anvil-api').projectDir    = file('api/anvil-api')
 project(':tags-api').projectDir     = file('api/tags-api')
 
@@ -272,6 +277,11 @@ if (!excludeJdk25) {
 if (!excludeJdk25) {
     include 'rtp-fabric:rtp-fabric-v26_2_R1'
 }
+// v26_3_R1 -- MC 26.3 release. Same deobf regime as v26_1_R1/v26_2_R1
+// (Loom 1.15, JDK 25, no mappings). See rtp-fabric-ADR-015.
+if (!excludeJdk25) {
+    include 'rtp-fabric:rtp-fabric-v26_3_R1'
+}
 
 // Relocate the grouped platforms/ adapters on disk while keeping their flat
 // Gradle project paths (see the comment block above the platform include lines).
@@ -306,6 +316,7 @@ if (!excludeJdk25) {
     project(':rtp-fabric:rtp-fabric-common-unobf').projectDir = file('platforms/rtp-fabric/rtp-fabric-common-unobf')
     project(':rtp-fabric:rtp-fabric-v26_1_R1').projectDir     = file('platforms/rtp-fabric/rtp-fabric-v26_1_R1')
     project(':rtp-fabric:rtp-fabric-v26_2_R1').projectDir     = file('platforms/rtp-fabric/rtp-fabric-v26_2_R1')
+    project(':rtp-fabric:rtp-fabric-v26_3_R1').projectDir     = file('platforms/rtp-fabric/rtp-fabric-v26_3_R1')
 }
 
 // Multi-server proxy support — umbrella ADR-036 Accepted 2026-05-14.
@@ -368,10 +379,9 @@ if (!excludeNeoforge) {
 }
 
 include 'addons:LeafRTPCountdownAddon'
-// LeafRTPLinearAddon - provides .linear (ZStandard continuous region format) support
-// off-tick for servers running Leaves, Gale, or the Linear mod (ADR-077). Keeps zstd-jni
-// and its multi-platform native binaries out of the core jar to preserve lightweight footprint.
-include 'addons:LeafRTPLinearAddon'
+// Linear (.linear) region support is not built into anvil-api (ADR-077): a future
+// guarded reader ships as an addon registering a RegionFileReader with
+// RegionFormatRegistry.
 // LeafRTPRiftAddon - reference demo of effect registration. Registers a single
 // new effects-api prototype ("RIFT", a client-side "world deconstruction" warmup
 // animation) so it joins the built-in effects by name. Fully platform-neutral: the
@@ -385,23 +395,8 @@ include 'addons:LeafRTPRiftAddon'
 // verifiers. Single Bukkit-only module (every checker is org.bukkit.*-based);
 // self-gates on PlatformFamily.BUKKIT so it is a no-op on Fabric/NeoForge.
 include 'addons:LeafRTPClaimAddon'
-// LeafRTPGroupAddon - multi-entity subspace teleportation (supersedes the former
-// party addon). Excluded from the general build: not yet canonical and its module
-// build currently fails. Re-include once it is stabilized; a dedicated non-canonical
-// addon gating mechanism is planned to manage this and the retired party addon.
-// See leafrtp-group-addon-ADR-001.
-// include 'addons:LeafRTPGroupAddon'
-// LeafRTPTetherAddon - keep a player inside the RTP region they were teleported
-// into ("tether" = cross-platform region confinement). Uses RTP's own region
-// geometry + move signal instead of a WorldGuard trap, so it works on
-// Bukkit/Paper/Folia and Fabric/NeoForge with no third-party plugin.
-// Platform-neutral RTPAddon (ADR-057); config + lifecycle only at present -
-// enforcement depends on the proposed core move-event SPI (ADR-075, D-005
-// gated), so it loads as a safe no-op until that lands. Excluded from the
-// general build for now (enforcement not yet canonical); re-include once the
-// core move-event SPI lands, via the planned non-canonical addon gating
-// mechanism (see LeafRTPGroupAddon above). See its REQUIREMENTS/ADR.
-// include 'addons:LeafRTPTetherAddon'
+// LeafRTPActionAddon - platform-agnostic declarative scripted actions (ADR-093).
+include 'addons:LeafRTPActionAddon'
 // LeafRTPGuiAddon - DonutSMP-style destination picker, split on the project platform
 // model. rtp-gui-common is platform-neutral (menu model, config via RTP's
 // ConfigParser, the MenuRenderer render seam, and the teleport submit through
@@ -432,3 +427,5 @@ include 'helpers:PeriodicWorldSaver'
 // and competitor plugins under identical workloads to fill the front-page
 // comparison table. See helpers/StressTestRTP/README.md.
 include 'helpers:StressTestRTP'
+// Mock stub plugins for testing third-party item integrations (ItemsAdder, Oraxen, Nexo, HeadDatabase).
+include 'helpers:MockItemPlugins'

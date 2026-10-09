@@ -162,6 +162,9 @@ public final class SegmentedKeyRunTable {
   public static SegmentedKeyRunTable fromRuns(
       long[] starts, long[] lengths, int flatCount, long totalRange, long binSize, long fullCollapseTolerance) {
     if (binSize <= 0) throw new IllegalArgumentException("binSize must be > 0: " + binSize);
+    if (binSize > Integer.MAX_VALUE) {
+      throw new IllegalArgumentException("binSize exceeds Integer.MAX_VALUE: " + binSize);
+    }
     int numBins = (int) ((totalRange + binSize - 1) / binSize);
     if (numBins <= 0) numBins = 1;
 
@@ -272,7 +275,7 @@ public final class SegmentedKeyRunTable {
     long target = totalRange / 64L;
     if (target < 128L) target = 128L;
     if (target > 4096L) target = 4096L;
-    while (pow2 < target) {
+    while (pow2 < target && pow2 < (1L << 30)) {
       pow2 <<= 1;
     }
     return pow2;
@@ -326,6 +329,17 @@ public final class SegmentedKeyRunTable {
   }
 
   /**
+   * Helper returning the cumulative number of good chunks strictly before bin {@code b}.
+   */
+  private long dirGoodBefore(int b) {
+    if (b <= 0) return 0L;
+    long badBefore = dirBadPrefixSums[b - 1];
+    long rawKeyBefore = b * binSize;
+    if (rawKeyBefore > totalRange) rawKeyBefore = totalRange;
+    return rawKeyBefore - badBefore;
+  }
+
+  /**
    * Resolves a target in [0, totalGood) in ACCUMULATE mode using two-tier bad prefix sums.
    *
    * @param target raw good-space index in [0, totalRange - totalCovered)
@@ -335,48 +349,59 @@ public final class SegmentedKeyRunTable {
     long totalGood = totalRange - totalCovered;
     if (target < 0 || target >= totalGood) return -1L;
 
+    // Fast initial bin estimation
     int b = (int) (target / binSize);
     if (b >= numBins) b = numBins - 1;
 
-    long badBefore = (b > 0) ? dirBadPrefixSums[b - 1] : 0L;
-    long goodBefore = b * binSize - badBefore;
+    long goodBefore = dirGoodBefore(b);
+    Bin curBin = bins[b];
+    long binGood = curBin.binSize - curBin.coveredCells();
 
     if (target < goodBefore) {
       int low = 0;
       int high = b - 1;
       while (low <= high) {
         int mid = (low + high) >>> 1;
-        long bb = (mid > 0) ? dirBadPrefixSums[mid - 1] : 0L;
-        long gb = mid * binSize - bb;
-        if (gb <= target) {
+        long gb = dirGoodBefore(mid);
+        long mg = bins[mid].binSize - bins[mid].coveredCells();
+        if (target < gb) {
+          high = mid - 1;
+        } else if (mg > 0 && target < gb + mg) {
+          b = mid;
+          break;
+        } else {
+          // target >= gb + mg
           b = mid;
           low = mid + 1;
-        } else {
-          high = mid - 1;
         }
       }
-    } else {
-      Bin curBin = bins[b];
-      long binGood = curBin.binSize - curBin.coveredCells();
-      if (target >= goodBefore + binGood) {
-        int low = b + 1;
-        int high = numBins - 1;
-        while (low <= high) {
-          int mid = (low + high) >>> 1;
-          long bb = (mid > 0) ? dirBadPrefixSums[mid - 1] : 0L;
-          long gb = mid * binSize - bb;
-          if (gb <= target) {
-            b = mid;
-            low = mid + 1;
-          } else {
-            high = mid - 1;
-          }
+    } else if (target >= goodBefore + binGood) {
+      int low = b + 1;
+      int high = numBins - 1;
+      while (low <= high) {
+        int mid = (low + high) >>> 1;
+        long gb = dirGoodBefore(mid);
+        long mg = bins[mid].binSize - bins[mid].coveredCells();
+        if (target < gb) {
+          high = mid - 1;
+        } else if (mg > 0 && target < gb + mg) {
+          b = mid;
+          break;
+        } else {
+          // target >= gb + mg
+          b = mid;
+          low = mid + 1;
         }
       }
     }
 
-    badBefore = (b > 0) ? dirBadPrefixSums[b - 1] : 0L;
-    goodBefore = b * binSize - badBefore;
+    // Ensure bin b contains good cells (skip over consecutive 0-good bins if bisection stopped at one)
+    while (b < numBins && bins[b].binSize - bins[b].coveredCells() <= 0) {
+      b++;
+    }
+    if (b >= numBins) return -1L;
+
+    goodBefore = dirGoodBefore(b);
     int localTarget = (int) (target - goodBefore);
 
     int localOffset = bins[b].resolveLocalAccumulate(localTarget);

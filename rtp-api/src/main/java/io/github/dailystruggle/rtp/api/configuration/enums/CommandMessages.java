@@ -184,6 +184,16 @@ public enum CommandMessages {
   menuAdminPanelRowConfig,
   /** Hover text for the admin-panel config-editor row. No placeholders. */
   menuAdminPanelHoverConfig,
+  /** Admin-panel row: open packed documentation book viewer. No placeholders. */
+  menuAdminPanelRowDocs,
+  /** Hover text for the admin-panel docs row. No placeholders. */
+  menuAdminPanelHoverDocs,
+  /** Admin-panel row: launch ephemeral web editor session. No placeholders. */
+  menuAdminPanelRowEditor,
+  /** Hover text for the admin-panel editor row. No placeholders. */
+  menuAdminPanelHoverEditor,
+  /** Section divider above the Documentation & Editor block on the admin panel. */
+  menuAdminPanelSectionDocs,
   /** Admin-panel row: open the regions multi-config submenu. No placeholders. */
   menuAdminPanelRowRegions,
   /** Hover text for the admin-panel regions row. No placeholders. */
@@ -369,5 +379,50 @@ public enum CommandMessages {
   /** Result message when the proposed entry name is rejected by the sanitiser. {@code [name]} placeholder. */
   multiconfigResultNameInvalid,
   /** Result message when an ADD collides with an existing entry name. {@code [name]} placeholder. */
-  multiconfigResultNameTaken
+  multiconfigResultNameTaken,
+  // --- In-game documentation viewer and export (ADR-045, ADR-104) ---
+  /** Rejection sent when the requested documentation topic does not exist. {@code [topic]} placeholder. */
+  docsNotFound,
+  /** Message sent when the documentation registry is empty or has no topics loaded. No placeholders. */
+  docsEmpty,
+  /** Feedback message sent when HTML documentation bundle export succeeds. {@code [path]} placeholder. */
+  docsExportSuccess,
+  /** Feedback message sent when HTML documentation bundle export fails. {@code [reason]} placeholder. */
+  docsExportFailed,
+
+  // --- Signed web editor channel (ADR-106 §5) ---
+  /** Clickable prompt to the session's operator: an untrusted browser key said hello. {@code [nonce]}, {@code [fingerprint]}. */
+  editorTrustPrompt,
+  /** Hover text of the trust prompt. {@code [nonce]}, {@code [fingerprint]}. */
+  editorTrustPromptHover,
+  /** {@code /rtp editor trust} succeeded. {@code [nonce]}. */
+  editorTrustAccepted,
+  /** {@code /rtp editor trust}: the key was already trusted. {@code [nonce]}. */
+  editorTrustAlready,
+  /** {@code /rtp editor trust}: no open session issued this code. {@code [nonce]}. */
+  editorTrustUnknown,
+  /** {@code /rtp editor trust}: the code expired. {@code [nonce]}. */
+  editorTrustExpired,
+  /** {@code /rtp editor trust} without a code. No placeholders. */
+  editorTrustUsage,
+  /** The editor channel opened for a session. No placeholders. */
+  editorChannelOpened,
+  /** The editor channel closed unexpectedly. {@code [reason]}. */
+  editorChannelLost,
+  /** The editor channel reached its session lifetime. {@code [minutes]}. */
+  editorChannelExpired,
+  /** {@code /rtp editor trust} refused after too many wrong codes. No placeholders. */
+  editorTrustRateLimited,
+  /** {@code /rtp editor untrust} without a valid key. No placeholders. */
+  editorUntrustUsage,
+  /** {@code /rtp editor untrust} succeeded. {@code [count]}. */
+  editorUntrustRemoved,
+  /** {@code /rtp editor untrust}: no trusted browser matched. {@code [key]}. */
+  editorUntrustNone,
+  /** {@code /rtp editor untrust}: the trusted list could not be written. {@code [reason]}. */
+  editorUntrustFailed,
+  /** {@code /rtp editor apply}: the byte-store payload has no sha256 checksum. No placeholders. */
+  editorApplyDigestMissing,
+  /** {@code /rtp editor apply}: the offline apply file could not be read. {@code [reason]}. */
+  editorApplyFileUnreadable
 }

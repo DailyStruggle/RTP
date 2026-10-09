@@ -302,6 +302,10 @@ Recorded as a potential third-party interaction worth a deeper investigation whe
 
 The Gradle daemon caches the JVM it was started with. If the active JDK changes between sessions (e.g., Java 17 → Java 25), Gradle logs a daemon-context mismatch and starts a new daemon. This is normal; do **not** kill or restart the daemon manually.
 
+### `gradlew.bat` lock wrapper: never splice `%*` into PowerShell source (2026-10-05)
+
+The Windows lock wrapper once pasted `%*` into an inline `powershell -Command "..."` script. A quoted argument such as `--tests "*Foo*"` closed that string early, so PowerShell failed to parse and printed only `#< CLIXML`, with exit 1 and no Gradle output (it looked like an idle hang). The lock logic now lives in `gradle/rtp-gradle-lock.ps1`: `gradlew.bat` passes its arguments only as data (`RTP_GRADLE_RAW_ARGS`, set unquoted outside any parenthesized block), and the script re-runs `gradlew.bat` with `cmd /d /s /c --% ""%RTP_GRADLE_SELF%" %RTP_GRADLE_RAW_ARGS%"`, which keeps the original command line byte for byte. Call the native command at script level, not from a function: a function captures Gradle's output as its return value instead of letting it stream.
+
 ## 2026-05-02 - StressTestRTP spark profiles empty when --only-ticks-over is set
 
 Symptom: a stress run finishes, .sparkprofile files appear in plugins/spark/profiles/, but opening them on the spark viewer shows little/no Server Thread sample data - even though some ticks visibly exceeded the threshold in /spark tickmonitor.

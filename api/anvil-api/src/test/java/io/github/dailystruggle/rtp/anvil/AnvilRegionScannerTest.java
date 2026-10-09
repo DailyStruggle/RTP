@@ -108,6 +108,44 @@ class AnvilRegionScannerTest {
     }
 
     @Test
+    @DisplayName("Region files in an unregistered format are skipped, never decoded as Anvil")
+    void unregisteredFormatIsSkipped() throws IOException {
+        RegionFormatRegistry.reset();
+        Path world = Files.createDirectory(tmp.resolve("world"));
+        Path region = Files.createDirectory(world.resolve("region"));
+        writeSingleChunkRegionFile(region.resolve("r.0.0.mca"), List.of("minecraft:plains"));
+        // Valid Anvil bytes under .linear: a fallback to AnvilReader would leak this biome.
+        writeSingleChunkRegionFile(region.resolve("r.1.0.linear"), List.of("minecraft:desert"));
+
+        assertEquals(Set.of("minecraft:plains"), AnvilRegionScanner.scanBiomes(world, ""));
+    }
+
+    @Test
+    @DisplayName("Region files in an addon-registered format are scanned with that reader")
+    void registeredFormatIsScanned() throws IOException {
+        Path world = Files.createDirectory(tmp.resolve("world"));
+        Path region = Files.createDirectory(world.resolve("region"));
+        writeSingleChunkRegionFile(region.resolve("r.1.0.linear"), List.of("minecraft:desert"));
+        RegionFileReader delegating = new RegionFileReader() {
+            @Override
+            public AnvilReader.ChunkEntry readChunk(byte[] regionBytes, int rx, int rz) throws IOException {
+                return AnvilReader.INSTANCE.readChunk(regionBytes, rx, rz);
+            }
+
+            @Override
+            public boolean isChunkGenerated(byte[] regionBytes, int rx, int rz) {
+                return AnvilReader.INSTANCE.isChunkGenerated(regionBytes, rx, rz);
+            }
+        };
+        RegionFormatRegistry.register(".linear", delegating);
+        try {
+            assertEquals(Set.of("minecraft:desert"), AnvilRegionScanner.scanBiomes(world, ""));
+        } finally {
+            RegionFormatRegistry.reset();
+        }
+    }
+
+    @Test
     @DisplayName("Second call returns the cached instance when no region file has changed")
     void cacheHitWhenMtimeUnchanged() throws IOException {
         Path world = Files.createDirectory(tmp.resolve("world"));

@@ -27,8 +27,11 @@ $ErrorActionPreference = 'Stop'
 $devstack = $PSScriptRoot
 $repoRoot = Split-Path -Parent $devstack
 
-# Bukkit-family instances (all three backends run Paper/Folia).
-$targets = @('backend-a', 'backend-b', 'backend-c', 'lobby-a', 'lobby-b')
+# Bukkit-family instances (Paper/Folia backends and lobbies).
+$bukkitTargets = @('backend-a', 'backend-b', 'lobby-a', 'lobby-b')
+
+# Modded instances (Fabric on backend-c, NeoForge on backend-d).
+$modTargets = @('backend-c', 'backend-d')
 
 # plugin.yml declares name: LeafRTPGuiAddon, so any LeafRTPGuiAddon*.jar / rtp-gui-bukkit*.jar
 # is "ours" for the remove pass. Also purge legacy RTP_GuiAddon*.jar so deprecated
@@ -36,7 +39,7 @@ $targets = @('backend-a', 'backend-b', 'backend-c', 'lobby-a', 'lobby-b')
 $jarGlobs = @('LeafRTPGuiAddon*.jar', 'rtp-gui-bukkit*.jar', 'RTP_GuiAddon*.jar')
 
 if ($Remove) {
-    foreach ($t in $targets) {
+    foreach ($t in $bukkitTargets) {
         $pluginsDir = Join-Path $devstack "$t\plugins"
         if (-not (Test-Path $pluginsDir)) { continue }
         foreach ($glob in $jarGlobs) {
@@ -47,7 +50,18 @@ if ($Remove) {
                 }
         }
     }
-    Write-Host "LeafRTPGuiAddon removed from devstack Bukkit instances."
+    foreach ($t in $modTargets) {
+        $modsDir = Join-Path $devstack "$t\mods"
+        if (-not (Test-Path $modsDir)) { continue }
+        foreach ($glob in $jarGlobs) {
+            Get-ChildItem -Path $modsDir -Filter $glob -File -ErrorAction SilentlyContinue |
+                ForEach-Object {
+                    Remove-Item -Force $_.FullName
+                    Write-Host "removed $($_.FullName)"
+                }
+        }
+    }
+    Write-Host "LeafRTPGuiAddon removed from devstack instances."
     return
 }
 
@@ -69,7 +83,7 @@ if (-not $jar) {
     throw "Built jar not found under $libsDir. Run without -SkipBuild, or build the module first."
 }
 
-foreach ($t in $targets) {
+foreach ($t in $bukkitTargets) {
     $pluginsDir = Join-Path $devstack "$t\plugins"
     if (-not (Test-Path $pluginsDir)) {
         New-Item -ItemType Directory -Force -Path $pluginsDir | Out-Null
@@ -83,6 +97,33 @@ foreach ($t in $targets) {
     Write-Host "installed $($jar.Name) -> $t\plugins\LeafRTPGuiAddon.jar"
 }
 
+foreach ($t in $modTargets) {
+    $modsDir = Join-Path $devstack "$t\mods"
+    if (-not (Test-Path $modsDir)) {
+        New-Item -ItemType Directory -Force -Path $modsDir | Out-Null
+    }
+    foreach ($glob in $jarGlobs) {
+        Get-ChildItem -Path $modsDir -Filter $glob -File -ErrorAction SilentlyContinue |
+            ForEach-Object { Remove-Item -Force $_.FullName }
+    }
+    Copy-Item -Force $jar.FullName (Join-Path $modsDir 'LeafRTPGuiAddon.jar')
+    Write-Host "installed $($jar.Name) -> $t\mods\LeafRTPGuiAddon.jar"
+
+    # Stage guimenu.yml into rtp-config/addons if missing
+    $addonsDir = Join-Path $devstack "$t\rtp-config\addons"
+    if (-not (Test-Path $addonsDir)) {
+        New-Item -ItemType Directory -Force -Path $addonsDir | Out-Null
+    }
+    $cfgPath = Join-Path $addonsDir 'guimenu.yml'
+    if (-not (Test-Path $cfgPath)) {
+        $srcCfg = Join-Path $devstack 'lobby-a\plugins\RTP\addons\guimenu.yml'
+        if (Test-Path $srcCfg) {
+            Copy-Item -Force $srcCfg $cfgPath
+            Write-Host "staged guimenu.yml -> $t\rtp-config\addons\guimenu.yml"
+        }
+    }
+}
+
 Write-Host ""
 Write-Host "Done. Run 'docker compose up' (or restart the instances) to load it."
-Write-Host "guimenu.yml self-creates on first boot in each instance's plugins/RTP/ folder."
+Write-Host "guimenu.yml self-creates on first boot in each instance's config/rtp/ or plugins/RTP/ folder."

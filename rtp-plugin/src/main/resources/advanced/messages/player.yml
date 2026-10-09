@@ -24,10 +24,18 @@
 # when teleporting, say this
 alreadyTeleporting: "&7[P0] ⚡ you're already teleporting!"
 
+# when participant is already in an active session
+alreadyInSession: "&c[P0] [player] is already in an active match session."
+
+# when an action subcommand (e.g. leave) is used outside a match of that action
+notInSession: "&c[P0] You are not in a match for this action."
+
 # if the plugin is currently reloading
 teleportDeniedReloading: "&7[P0] teleports are temporarily disabled while the plugin reloads. Please try again shortly."
 delayMessage: "<gradient:#9D7CD8:#5FB3B3>[P0] ⚡ Teleporting in [delay]. Don't move</gradient>"
 chunkLoading: "&7[P0] ⚙ Loading chunks! please wait..."
+# placeholders: [attempts], [processingTime], <distance>, <distance_blocks>
+# example: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Teleported <distance> blocks away in [attempts] attempts, in [processingTime]</gradient>"
 teleportMessage: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Teleported in [attempts] attempts, in [processingTime]</gradient>"
 
 # if teleport is cancelled
@@ -70,6 +78,12 @@ notEnoughMoney: "&7[P0] you need at least $[money] for that."
 # world doesn't exist in bukkit
 # placeholder: [world] - the world name
 invalidWorld: "&7[P0] could not find world '[world]'"
+
+# no previous location saved for /rtp back
+noBackLocation: "&c[P0] No previous teleport location found."
+
+# successfully teleported back
+backSuccess: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Returned to previous location.</gradient>"
 
 # plugin doesn't have the command the user requested
 # placeholder: [arg] - the argument attempted

@@ -2,7 +2,10 @@ package io.github.dailystruggle.rtp.bukkitplatform.metrics;
 
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 
+import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.util.Map;
 
 /**
  * Reflective accessor for the spark public API
@@ -24,6 +27,7 @@ import java.lang.reflect.Method;
  *   DoubleAverageInfo#mean() -&gt; double
  *   StatisticWindow.TicksPerSecond: MINUTES_1 / MINUTES_5 / MINUTES_15
  *   StatisticWindow.MillisPerTick:  MINUTES_1
+ *   Spark#registerMetadataProvider(MetadataProvider)
  * </pre>
  *
  * <p>Each poll obtains the {@code Spark} instance lazily via
@@ -44,12 +48,18 @@ final class ReflectiveSparkStats implements SparkMetricsBinding.SparkStats {
     private final Object[] tpsWindows; // [1m, 5m, 15m]
     private final Object msptWindow;
 
+    private final Method registerMetadataMethod;
+    private final Class<?> metadataProviderClass;
+    private boolean metadataProviderRegistered = false;
+
     ReflectiveSparkStats() {
         boolean ok = false;
         Method providerGet0 = null, tpsMethod0 = null, msptMethod0 = null,
                 tpsPoll0 = null, msptPoll0 = null, meanMethod0 = null;
         Object[] tpsWindows0 = null;
         Object msptWindow0 = null;
+        Method registerMetadataMethod0 = null;
+        Class<?> metadataProviderClass0 = null;
         try {
             Class<?> providerClass = Class.forName("me.lucko.spark.api.SparkProvider");
             Class<?> sparkClass = Class.forName("me.lucko.spark.api.Spark");
@@ -80,6 +90,16 @@ final class ReflectiveSparkStats implements SparkMetricsBinding.SparkStats {
                     enumConst(tpsWindowEnum, "MINUTES_15"),
             };
             msptWindow0 = enumConst(msptWindowEnum, "MINUTES_1");
+
+            // Look for registerMetadataProvider on Spark interface/class
+            for (Method m : sparkClass.getMethods()) {
+                if ("registerMetadataProvider".equals(m.getName()) && m.getParameterCount() == 1) {
+                    registerMetadataMethod0 = m;
+                    metadataProviderClass0 = m.getParameterTypes()[0];
+                    break;
+                }
+            }
+
             ok = true;
         } catch (ClassNotFoundException | NoClassDefFoundError | NoSuchMethodException
                  | RuntimeException e) {
@@ -94,6 +114,66 @@ final class ReflectiveSparkStats implements SparkMetricsBinding.SparkStats {
         this.meanMethod = meanMethod0;
         this.tpsWindows = tpsWindows0;
         this.msptWindow = msptWindow0;
+        this.registerMetadataMethod = registerMetadataMethod0;
+        this.metadataProviderClass = metadataProviderClass0;
+
+        if (ok) {
+            registerMetadataProviderIfPossible();
+        }
+    }
+
+    private void registerMetadataProviderIfPossible() {
+        if (!available || metadataProviderRegistered || registerMetadataMethod == null
+                || metadataProviderClass == null || !metadataProviderClass.isInterface()) {
+            return;
+        }
+        try {
+            Object spark = providerGet.invoke(null);
+            if (spark == null) return;
+            Object proxy = createMetadataProviderProxy(metadataProviderClass);
+            registerMetadataMethod.invoke(spark, proxy);
+            metadataProviderRegistered = true;
+        } catch (Throwable ignored) {
+            // Self-heal on subsequent calls (e.g. if spark is still initializing)
+        }
+    }
+
+    /**
+     * Creates a dynamic proxy implementing spark's {@code MetadataProvider} interface
+     * (or any interface passed as the parameter to registerMetadataProvider).
+     *
+     * @param interfaceClass target interface
+     * @return proxy instance
+     */
+    static Object createMetadataProviderProxy(Class<?> interfaceClass) {
+        InvocationHandler handler = (proxy, method, args) -> {
+            String name = method.getName();
+            Class<?> returnType = method.getReturnType();
+            if ("equals".equals(name) && args != null && args.length == 1) {
+                return proxy == args[0];
+            }
+            if ("hashCode".equals(name) && (args == null || args.length == 0)) {
+                return System.identityHashCode(proxy);
+            }
+            if ("toString".equals(name) && (args == null || args.length == 0)) {
+                return "RTPSparkMetadataProviderProxy";
+            }
+            if (Map.class.isAssignableFrom(returnType)) {
+                return SparkMetricsBinding.collectTelemetry();
+            }
+            if (returnType.isPrimitive()) {
+                if (returnType == boolean.class) return false;
+                if (returnType == byte.class) return (byte) 0;
+                if (returnType == short.class) return (short) 0;
+                if (returnType == int.class) return 0;
+                if (returnType == long.class) return 0L;
+                if (returnType == float.class) return 0.0f;
+                if (returnType == double.class) return 0.0;
+                if (returnType == char.class) return '\0';
+            }
+            return null;
+        };
+        return Proxy.newProxyInstance(interfaceClass.getClassLoader(), new Class<?>[] { interfaceClass }, handler);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -114,6 +194,9 @@ final class ReflectiveSparkStats implements SparkMetricsBinding.SparkStats {
         try {
             Object spark = providerGet.invoke(null);
             if (spark == null) return MetricsSnapshot.UNSAMPLED;
+            if (!metadataProviderRegistered) {
+                registerMetadataProviderIfPossible();
+            }
             Object stat = tpsMethod.invoke(spark);
             if (stat == null) return MetricsSnapshot.UNSAMPLED;
             Object value = tpsPoll.invoke(stat, tpsWindows[windowIdx]);
@@ -130,6 +213,9 @@ final class ReflectiveSparkStats implements SparkMetricsBinding.SparkStats {
         try {
             Object spark = providerGet.invoke(null);
             if (spark == null) return MetricsSnapshot.UNSAMPLED;
+            if (!metadataProviderRegistered) {
+                registerMetadataProviderIfPossible();
+            }
             Object stat = msptMethod.invoke(spark);
             if (stat == null) return MetricsSnapshot.UNSAMPLED; // mspt unsupported on this platform
             Object info = msptPoll.invoke(stat, msptWindow);

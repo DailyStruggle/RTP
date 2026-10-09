@@ -44,6 +44,54 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    */
   private volatile long spatialResolution = 1L;
 
+  /**
+   * Immutable snapshot container for bad locations.
+   * Holding keys, prefix sums, causes, and expiries together guarantees atomic snapshot reads
+   * without torn array views across rebuild and absorb cycles.
+   */
+  public static final class BadLocationsSnapshot {
+    public static final BadLocationsSnapshot EMPTY =
+        new BadLocationsSnapshot(new long[0], new long[0], new byte[0], new long[0]);
+
+    public final long[] keys;
+    public final long[] sums;
+    public final byte[] causes;
+    public final long[] expiries;
+
+    public BadLocationsSnapshot(long[] keys, long[] sums, byte[] causes, long[] expiries) {
+      this.keys = (keys != null) ? keys : new long[0];
+      this.sums = (sums != null) ? sums : new long[0];
+      this.causes = (causes != null) ? causes : new byte[0];
+      this.expiries = (expiries != null) ? expiries : new long[0];
+    }
+  }
+
+  /**
+   * Immutable snapshot container for probationary locations (ADR-079).
+   */
+  public static final class ProbationLocationsSnapshot {
+    public static final ProbationLocationsSnapshot EMPTY =
+        new ProbationLocationsSnapshot(new long[0], new long[0], new byte[0], new long[0]);
+
+    public final long[] keys;
+    public final long[] sums;
+    public final byte[] causes;
+    public final long[] expiries;
+
+    public ProbationLocationsSnapshot(long[] keys, long[] sums, byte[] causes, long[] expiries) {
+      this.keys = (keys != null) ? keys : new long[0];
+      this.sums = (sums != null) ? sums : new long[0];
+      this.causes = (causes != null) ? causes : new byte[0];
+      this.expiries = (expiries != null) ? expiries : new long[0];
+    }
+  }
+
+  @SuppressWarnings("java:S3077") // Volatile publication of immutable snapshot
+  protected volatile BadLocationsSnapshot badLocationsSnapshot = BadLocationsSnapshot.EMPTY;
+
+  @SuppressWarnings("java:S3077") // Volatile publication of immutable snapshot
+  protected volatile ProbationLocationsSnapshot probationLocationsSnapshot = ProbationLocationsSnapshot.EMPTY;
+
   @SuppressWarnings("java:S3077") // Volatile publication of immutable array snapshots
   protected volatile long[] badKeysCache = new long[0];
   @SuppressWarnings("java:S3077") // Volatile publication of immutable array snapshots
@@ -77,6 +125,30 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   protected volatile byte[] probationCauseCache = new byte[0];
   @SuppressWarnings("java:S3077") // Volatile publication of immutable array snapshots
   protected volatile long[] probationExpiryCache = new long[0];
+
+  /**
+   * Atomically publishes the active bad-locations snapshot and keeps volatile mirror arrays in sync.
+   */
+  protected void publishBadLocations(long[] keys, long[] sums, byte[] causes, long[] expiries) {
+    BadLocationsSnapshot snap = new BadLocationsSnapshot(keys, sums, causes, expiries);
+    this.badLocationsSnapshot = snap;
+    this.badKeysCache = snap.keys;
+    this.badPrefixSumsCache = snap.sums;
+    this.badCauseCache = snap.causes;
+    this.badExpiryCache = snap.expiries;
+  }
+
+  /**
+   * Atomically publishes the probationary locations snapshot and keeps volatile mirror arrays in sync.
+   */
+  protected void publishProbationLocations(long[] keys, long[] sums, byte[] causes, long[] expiries) {
+    ProbationLocationsSnapshot snap = new ProbationLocationsSnapshot(keys, sums, causes, expiries);
+    this.probationLocationsSnapshot = snap;
+    this.probationKeysCache = snap.keys;
+    this.probationPrefixSumsCache = snap.sums;
+    this.probationCauseCache = snap.causes;
+    this.probationExpiryCache = snap.expiries;
+  }
 
   /** {@code FailTypes.misc} ordinal as a byte: the default / unknown cause. */
   protected static final byte MISC_CAUSE = (byte) LocationGenerator.FailTypes.misc.ordinal();
@@ -128,6 +200,82 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   public int getPointEdgeChunks() {
     return 1;
   }
+
+  /** Largest accepted curve helper source, in UTF-8 bytes (ADR-106 section 4.1). */
+  public static final int MAX_CURVE_HELPER_BYTES = 32 * 1024;
+
+  /** Classpath directory holding {@code <SimpleClassName>.js} curve helpers (ADR-106). */
+  public static final String CURVE_HELPER_DIR = "editor-curve/";
+
+  /**
+   * Per-class helper cache, absence included. {@link ClassValue} keeps the entry weakly tied to
+   * the class, so an unloaded add-on jar does not pin its helper source.
+   */
+  private static final ClassValue<Optional<String>> CURVE_HELPERS =
+      new ClassValue<>() {
+        @Override
+        protected Optional<String> computeValue(Class<?> type) {
+          return Optional.ofNullable(loadCurveHelper(type));
+        }
+      };
+
+  /**
+   * JavaScript curve helper for the hosted editor (ADR-106 section 4.2): one expression evaluating
+   * to {@code {range, locationToXZ, xzToLocation}}, taking the shape's settings as inputs.
+   *
+   * <p>Default: resource {@code editor-curve/<SimpleClassName>.js} from the shape class's own
+   * loader, else the nearest superclass's (stops at {@code MemoryShape}), so an add-on ships a
+   * helper by adding one resource. Sources over {@link #MAX_CURVE_HELPER_BYTES} are refused.
+   *
+   * @return helper source, or {@code null} when the shape has none
+   */
+  public String toJavaScript() {
+    return CURVE_HELPERS.get(getClass()).orElse(null);
+  }
+
+  /**
+   * Runtime values the curve reads that are not settings (ADR-106 section 4.1), for example the
+   * ratcheted point edge or the expanded radius. Values are numbers.
+   *
+   * @return state map; empty when the curve depends on settings alone
+   */
+  public Map<String, Object> curveState() {
+    return Map.of();
+  }
+
+  /**
+   * Resolve the helper for {@code type}, walking superclasses. A refused (oversized) source ends
+   * the walk: inheriting a parent's helper would silently draw the parent's curve instead.
+   */
+  static String loadCurveHelper(Class<?> type) {
+    for (Class<?> c = type;
+        c != null && c != MemoryShape.class && MemoryShape.class.isAssignableFrom(c);
+        c = c.getSuperclass()) {
+      // From the binary name, not getSimpleName(): that resolves the declaring class, which
+      // throws IllegalAccessError for a nested add-on class defined by a different loader.
+      String binary = c.getName();
+      String simple = binary.substring(Math.max(binary.lastIndexOf('.'), binary.lastIndexOf('$')) + 1);
+      if (simple.isEmpty() || Character.isDigit(simple.charAt(0))) continue; // anonymous / local: inherit
+      String resource = CURVE_HELPER_DIR + simple + ".js";
+      try (java.io.InputStream in = c.getResourceAsStream("/" + resource)) {
+        if (in == null) continue;
+        byte[] bytes = in.readNBytes(MAX_CURVE_HELPER_BYTES + 1);
+        if (bytes.length > MAX_CURVE_HELPER_BYTES) {
+          RTP.log(
+              Level.WARNING,
+              "[RTP] editor curve helper " + resource + " for " + type.getName()
+                  + " exceeds " + MAX_CURVE_HELPER_BYTES + " bytes; refused (ADR-106)");
+          return null;
+        }
+        return new String(bytes, StandardCharsets.UTF_8);
+      } catch (java.io.IOException e) {
+        RTP.log(Level.WARNING, "[RTP] failed to read editor curve helper " + resource, e);
+        return null;
+      }
+    }
+    return null;
+  }
+
   /**
    * Cross-biome union of the recorded biome runs, blocked so that a run costs 10 bytes resident
    * instead of the 24 a flat {@code long} key + {@code long} prefix sum + {@code short} id would.
@@ -731,8 +879,15 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @param rng the {@link Random} instance to use; pass {@code null} to restore
    *     {@link ThreadLocalRandom} behaviour.
    */
-  public final void setRng(Random rng) {
+  public void setRng(Random rng) {
     this.rng = rng;
+  }
+
+  /**
+   * Returns the explicitly injected RNG, or {@code null} if default behaviour is active.
+   */
+  public Random getRng() {
+    return this.rng;
   }
 
   /**
@@ -767,6 +922,43 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    */
   public void setSpatialResolution(long spatialResolution) {
     this.spatialResolution = Math.max(1L, spatialResolution);
+  }
+
+  public long resolveSpatialResolution(Object raw) {
+    if (raw == null) return resolveAutoSpatialResolution();
+    if (raw instanceof Number number) {
+      return Math.max(1L, number.longValue());
+    }
+    String s = raw.toString().trim();
+    if (s.equalsIgnoreCase("auto") || s.isEmpty()) {
+      return resolveAutoSpatialResolution();
+    }
+    try {
+      return Math.max(1L, Long.parseLong(s));
+    } catch (NumberFormatException e) {
+      return resolveAutoSpatialResolution();
+    }
+  }
+
+  /**
+   * Dynamically derives the optimal spatialResolution for this shape when configured as "auto".
+   * Scales with domain size up to the macro-tile / continental limit.
+   */
+  protected long resolveAutoSpatialResolution() {
+    long range = getRange();
+    if (range <= 0L) {
+      return 3L;
+    }
+    if (range < 1024L) {
+      return 1L;
+    }
+    if (range < 8192L) {
+      return 3L;
+    }
+    int p = getPointEdgeChunks();
+    long cap = Math.max(4L, (long) p);
+    long derived = 1L << (64 - Long.numberOfLeadingZeros(Math.max(1L, (long) Math.sqrt(range / 1024.0))));
+    return Math.max(1L, Math.min(cap, derived));
   }
 
   /**
@@ -960,7 +1152,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return true if known bad, false otherwise
    */
   public boolean isKnownBad(int x, int z) {
-    return isKnownBad((long) xzToLocation(x, z));
+    long loc = xzToLocation(x, z);
+    if (loc < 0 || loc >= getEffectiveRange()) return false;
+    return isKnownBad(loc);
   }
 
   /**
@@ -970,7 +1164,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return true if known bad, false otherwise
    */
   public boolean isKnownBad(MutableRTPCoords coords) {
-    return isKnownBad((long) xzToLocation(coords));
+    long loc = xzToLocation(coords);
+    if (loc < 0 || loc >= getEffectiveRange()) return false;
+    return isKnownBad(loc);
   }
 
   /**
@@ -995,8 +1191,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       return mirror.isBad(location);
     }
 
-    long[] sums = badPrefixSumsCache;
-    long[] keys = badKeysCache;
+    BadLocationsSnapshot snap = this.badLocationsSnapshot;
+    long[] sums = (snap.sums.length > 0) ? snap.sums : badPrefixSumsCache;
+    long[] keys = (snap.keys.length > 0) ? snap.keys : badKeysCache;
     if (keys.length == 0) return false;
 
     int floorIdx = floorRunIndex(keys, location);
@@ -1009,6 +1206,33 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       return location < (key + (sum - prevSum));
     }
     return false;
+  }
+
+  /**
+   * Check if a location is known to be an actual hazard (excluding uniquePlacement marks).
+   * Used by subspace child shapes to inherit base hazard memory without being starved by
+   * unique placement history around the anchor.
+   *
+   * @param x the x coordinate
+   * @param z the z coordinate
+   * @return true if known hazard, false otherwise
+   */
+  public boolean isKnownHazard(int x, int z) {
+    if (!isKnownBad(x, z)) return false;
+    int cause = causeAt(x, z);
+    return cause != LocationGenerator.FailTypes.uniquePlacement.ordinal();
+  }
+
+  /**
+   * Check if a 1D location index is known to be an actual hazard (excluding uniquePlacement marks).
+   *
+   * @param location the location value
+   * @return true if known hazard, false otherwise
+   */
+  public boolean isKnownHazard(long location) {
+    if (!isKnownBad(location)) return false;
+    int cause = causeAt(location);
+    return cause != LocationGenerator.FailTypes.uniquePlacement.ordinal();
   }
 
   /**
@@ -1032,14 +1256,19 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return {@link LocationGenerator.FailTypes} ordinal, or {@code -1} if not known bad
    */
   public int causeAt(long location) {
-    if (pendingBadLocations.get().containsKey(location)) return MISC_CAUSE & 0xFF;
+    Long pVal = pendingBadLocations.get().get(location);
+    if (pVal != null) return (int) (pVal & 0xFFL);
 
     ConcurrentHashMap<Long, Long> rebuilding = rebuildingBadLocations;
-    if (rebuilding != null && rebuilding.containsKey(location)) return MISC_CAUSE & 0xFF;
+    if (rebuilding != null) {
+      Long rVal = rebuilding.get(location);
+      if (rVal != null) return (int) (rVal & 0xFFL);
+    }
 
-    long[] sums = badPrefixSumsCache;
-    long[] keys = badKeysCache;
-    byte[] causes = badCauseCache;
+    BadLocationsSnapshot snap = this.badLocationsSnapshot;
+    long[] sums = (snap.sums.length > 0) ? snap.sums : badPrefixSumsCache;
+    long[] keys = (snap.keys.length > 0) ? snap.keys : badKeysCache;
+    byte[] causes = (snap.causes.length > 0) ? snap.causes : badCauseCache;
     if (keys.length == 0) return -1;
 
     int floorIdx = floorRunIndex(keys, location);
@@ -1081,7 +1310,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return fresh array copy; never {@code null}
    */
   public long[] badKeysSnapshot() {
-    long[] keys = badKeysCache;
+    BadLocationsSnapshot snap = badLocationsSnapshot;
+    long[] keys = (snap.keys.length > 0) ? snap.keys : badKeysCache;
     return Arrays.copyOf(keys, keys.length);
   }
 
@@ -1091,7 +1321,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return fresh array copy; never {@code null}
    */
   public long[] badPrefixSumsSnapshot() {
-    long[] sums = badPrefixSumsCache;
+    BadLocationsSnapshot snap = badLocationsSnapshot;
+    long[] sums = (snap.sums.length > 0) ? snap.sums : badPrefixSumsCache;
     return Arrays.copyOf(sums, sums.length);
   }
 
@@ -1104,32 +1335,38 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return a fresh array copy; never {@code null}, may be zero-length
    */
   public byte[] badCausesSnapshot() {
-    byte[] causes = badCauseCache;
+    BadLocationsSnapshot snap = badLocationsSnapshot;
+    byte[] causes = (snap.causes.length > 0) ? snap.causes : badCauseCache;
     return Arrays.copyOf(causes, causes.length);
   }
 
   public long[] badExpiriesSnapshot() {
-    long[] expiries = badExpiryCache;
+    BadLocationsSnapshot snap = badLocationsSnapshot;
+    long[] expiries = (snap.expiries.length > 0) ? snap.expiries : badExpiryCache;
     return Arrays.copyOf(expiries, expiries.length);
   }
 
   public long[] probationKeysSnapshot() {
-    long[] keys = probationKeysCache;
+    ProbationLocationsSnapshot snap = probationLocationsSnapshot;
+    long[] keys = (snap.keys.length > 0) ? snap.keys : probationKeysCache;
     return Arrays.copyOf(keys, keys.length);
   }
 
   public long[] probationPrefixSumsSnapshot() {
-    long[] sums = probationPrefixSumsCache;
+    ProbationLocationsSnapshot snap = probationLocationsSnapshot;
+    long[] sums = (snap.sums.length > 0) ? snap.sums : probationPrefixSumsCache;
     return Arrays.copyOf(sums, sums.length);
   }
 
   public byte[] probationCausesSnapshot() {
-    byte[] causes = probationCauseCache;
+    ProbationLocationsSnapshot snap = probationLocationsSnapshot;
+    byte[] causes = (snap.causes.length > 0) ? snap.causes : probationCauseCache;
     return Arrays.copyOf(causes, causes.length);
   }
 
   public long[] probationExpiriesSnapshot() {
-    long[] expiries = probationExpiryCache;
+    ProbationLocationsSnapshot snap = probationLocationsSnapshot;
+    long[] expiries = (snap.expiries.length > 0) ? snap.expiries : probationExpiryCache;
     return Arrays.copyOf(expiries, expiries.length);
   }
 
@@ -1161,15 +1398,17 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
     writeLock.lock();
     try {
-      sBadKeys = Arrays.copyOf(badKeysCache, badKeysCache.length);
-      sBadSums = Arrays.copyOf(badPrefixSumsCache, badPrefixSumsCache.length);
-      sBadCauses = Arrays.copyOf(badCauseCache, badCauseCache.length);
-      sBadExpiries = Arrays.copyOf(badExpiryCache, badExpiryCache.length);
+      BadLocationsSnapshot bSnap = this.badLocationsSnapshot;
+      sBadKeys = Arrays.copyOf(bSnap.keys, bSnap.keys.length);
+      sBadSums = Arrays.copyOf(bSnap.sums, bSnap.sums.length);
+      sBadCauses = Arrays.copyOf(bSnap.causes, bSnap.causes.length);
+      sBadExpiries = Arrays.copyOf(bSnap.expiries, bSnap.expiries.length);
 
-      sProbKeys = Arrays.copyOf(probationKeysCache, probationKeysCache.length);
-      sProbSums = Arrays.copyOf(probationPrefixSumsCache, probationPrefixSumsCache.length);
-      sProbCauses = Arrays.copyOf(probationCauseCache, probationCauseCache.length);
-      sProbExpiries = Arrays.copyOf(probationExpiryCache, probationExpiryCache.length);
+      ProbationLocationsSnapshot pSnap = this.probationLocationsSnapshot;
+      sProbKeys = Arrays.copyOf(pSnap.keys, pSnap.keys.length);
+      sProbSums = Arrays.copyOf(pSnap.sums, pSnap.sums.length);
+      sProbCauses = Arrays.copyOf(pSnap.causes, pSnap.causes.length);
+      sProbExpiries = Arrays.copyOf(pSnap.expiries, pSnap.expiries.length);
 
       boolean persistUnique = Boolean.parseBoolean(String.valueOf(paramByName("uniqueplacementspermanent", Boolean.FALSE)));
       byte uniqueCauseByte = (byte) LocationGenerator.FailTypes.uniquePlacement.ordinal();
@@ -1846,14 +2085,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                 // Apply under write lock
                 writeLock.lock();
                 try {
-                  badKeysCache = newBadKeys;
-                  badPrefixSumsCache = newBadSums;
-                  badCauseCache = newBadCauses;
-                  badExpiryCache = newBadExpiries;
-                  probationKeysCache = newProbKeys;
-                  probationPrefixSumsCache = newProbSums;
-                  probationCauseCache = newProbCauses;
-                  probationExpiryCache = newProbExpiries;
+                  publishBadLocations(newBadKeys, newBadSums, newBadCauses, newBadExpiries);
+                  publishProbationLocations(newProbKeys, newProbSums, newProbCauses, newProbExpiries);
                   // The biome table now loads into its published form directly, so no rebuild is
                   // needed before a union-backed read works. The recorded total therefore has to
                   // be set here too - previously only a rebuild ever computed it.
@@ -2035,8 +2268,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     if (location < 0L) return false;
     if (!isRebuilding.compareAndSet(false, true)) return false;
     try {
-      long[] keys = badKeysCache;
-      long[] sums = badPrefixSumsCache;
+      BadLocationsSnapshot snap = this.badLocationsSnapshot;
+      long[] keys = snap.keys;
+      long[] sums = snap.sums;
       int n = Math.min(keys.length, sums.length);
       if (n == 0) return false;
 
@@ -2060,12 +2294,14 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       if (idx + 1 < keys.length && keys[idx + 1] <= newEnd + nextAdmissible) return false;
 
       long delta = newEnd - end;
-      // writeLock excludes the snapshot readers that require a coherent view (save, load,
-      // learnedStateSummary); the lock-free readers are safe by the monotonic-suffix argument
-      // above.
+      // Copy-on-write snapshot update under writeLock ensures memory barrier visibility
+      // and atomicity for all readers.
       writeLock.lock();
       try {
-        for (int k = n - 1; k >= idx; k--) sums[k] += delta;
+        long[] newSums = Arrays.copyOf(sums, sums.length);
+        for (int k = n - 1; k >= idx; k--) newSums[k] += delta;
+        publishBadLocations(keys, newSums, snap.causes, snap.expiries);
+
         StrideGroupResidencyManager residency = residencyManager;
         if (residency != null) {
           for (long k = end; k < newEnd; k++) {
@@ -2336,14 +2572,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     writeLock.lock();
     try {
       scanStride.set(-1L);
-      badKeysCache = new long[0];
-      badPrefixSumsCache = new long[0];
-      badCauseCache = new byte[0];
-      badExpiryCache = new long[0];
-      probationKeysCache = new long[0];
-      probationPrefixSumsCache = new long[0];
-      probationCauseCache = new byte[0];
-      probationExpiryCache = new long[0];
+      publishBadLocations(new long[0], new long[0], new byte[0], new long[0]);
+      publishProbationLocations(new long[0], new long[0], new byte[0], new long[0]);
       pendingBadLocations.get().clear();
       rebuildingBadLocations = null;
       totalBadCount.set(0L);
@@ -2624,17 +2854,10 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return a fresh summary; never {@code null}
    */
   public LearnedStateSummary learnedStateSummary() {
-    long[] sBadKeys;
-    long[] sBadSums;
-    byte[] sBadCauses;
-    writeLock.lock();
-    try {
-      sBadKeys = Arrays.copyOf(badKeysCache, badKeysCache.length);
-      sBadSums = Arrays.copyOf(badPrefixSumsCache, badPrefixSumsCache.length);
-      sBadCauses = Arrays.copyOf(badCauseCache, badCauseCache.length);
-    } finally {
-      writeLock.unlock();
-    }
+    BadLocationsSnapshot snap = this.badLocationsSnapshot;
+    long[] sBadKeys = (snap.keys.length > 0) ? snap.keys : badKeysCache;
+    long[] sBadSums = (snap.sums.length > 0) ? snap.sums : badPrefixSumsCache;
+    byte[] sBadCauses = (snap.causes.length > 0) ? snap.causes : badCauseCache;
 
     long range = getRange();
     long badCount = getEffectiveBadCount();
@@ -3395,15 +3618,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
         currentBadSum = runningSum;
 
-        this.badKeysCache = newKeys;
-        this.badPrefixSumsCache = newSums;
-        this.badCauseCache = newCauses;
-        this.badExpiryCache = newExpiries;
-
-        this.probationKeysCache = newProbKeys;
-        this.probationPrefixSumsCache = newProbSums;
-        this.probationCauseCache = newProbCauses;
-        this.probationExpiryCache = newProbExpiries;
+        publishBadLocations(newKeys, newSums, newCauses, newExpiries);
+        publishProbationLocations(newProbKeys, newProbSums, newProbCauses, newProbExpiries);
 
         this.rebuildingBadLocations = null; // Clear the reference only after the arrays update
         this.badLocationsDirty = !pendingBadLocations.get().isEmpty();
@@ -3504,14 +3720,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @param def returned when {@code key} is {@code null} or holds no value
    * @return the configured value, or {@code def}
    */
-  @SuppressWarnings("PMD.PreferNonLockingExecution") // ADR-094: synchronized read of configuration EnumMap
   private Object paramByKey(E key, Object def) {
     if (key == null) return def;
-    EnumMap<E, Object> snapshot = data;
-    synchronized (snapshot) {
-      Object value = snapshot.get(key);
-      return value != null ? value : def;
-    }
+    // Lock-free: FactoryValue publishes {@code data} copy-on-write, so the map is immutable.
+    Object value = data.get(key);
+    return value != null ? value : def;
   }
 
   /**
@@ -3543,7 +3756,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   protected final boolean expand() {
     Object raw = paramByKey(knobs().expand, Boolean.FALSE);
     if (raw instanceof Boolean b) return b;
-    return Boolean.parseBoolean(raw.toString());
+    return Boolean.parseBoolean(String.valueOf(raw));
   }
 
   /**
@@ -3673,17 +3886,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     maybeFlushAndRebuild();
     coerceUnsupportedExpand();
 
-    // Snapshot both arrays together to avoid races with concurrent rebuilds where
-    // badKeysCache and badPrefixSumsCache may be observed at different lengths.
-    long[] keys = badKeysCache;
-    long[] sums = badPrefixSumsCache;
-    if (keys.length != sums.length) {
-      // Length mismatch indicates a concurrent rebuild was observed mid-update.
-      // Clamp to the shorter common length to keep indexing safe.
-      int common = Math.min(keys.length, sums.length);
-      if (keys.length != common) keys = Arrays.copyOf(keys, common);
-      if (sums.length != common) sums = Arrays.copyOf(sums, common);
-    }
+    // Snapshot bad locations atomically via BadLocationsSnapshot to guarantee
+    // readers observe consistent keys and prefix sums across concurrent rebuilds.
+    BadLocationsSnapshot snap = this.badLocationsSnapshot;
+    long[] keys = snap.keys;
+    long[] sums = snap.sums;
     long badSum = (sums.length > 0) ? sums[sums.length - 1] : 0L;
 
     String mode = mode();
@@ -3721,7 +3928,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     boolean badReady = false;
     if (badLocationsDirty) {
       int pending = pendingBadLocations.get().size();
-      int batch = Math.min(MAX_PENDING_BEFORE_REBUILD, Math.max(1, badKeysCache.length / 8));
+      int batch = Math.min(MAX_PENDING_BEFORE_REBUILD, Math.max(1, badLocationsSnapshot.keys.length / 8));
       badReady = pending == 0 || pending >= batch;
     }
 
@@ -3840,8 +4047,13 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       return -1;
     }
 
-    Object rawUnique = paramByKey(knobs().uniquePlacements, 0);
-    int uniqueRadius = uniquePlacementsRadius(rawUnique);
+    // uniquePlacements consumes area permanently. Without expand the range never grows back, so
+    // marking would exhaust the region (ACCUMULATE subtracts the marks from the range); it is
+    // therefore active only when expand is on and supported.
+    int uniqueRadius =
+        (supportsExpand() && expand())
+            ? uniquePlacementsRadius(paramByKey(knobs().uniquePlacements, 0))
+            : 0;
     if (uniqueRadius > 0) {
       // addBadChunkRadius: chunk-uniform (uniqueplacements knob) - within a chunk the per-column
       // selection order is deterministic, so re-rolling onto the same chunk produces the
@@ -3941,7 +4153,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   public long getEffectiveRange() {
     long range = getRange();
     if (supportsExpand() && expand()) {
-      long[] sums = badPrefixSumsCache;
+      long[] sums = badLocationsSnapshot.sums;
       long badSum = (sums.length > 0) ? sums[sums.length - 1] : 0L;
       range += badSum;
     }

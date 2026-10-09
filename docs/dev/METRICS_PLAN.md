@@ -443,7 +443,7 @@ platforms/rtp-fabric/    -- FabricMetricsBinding (server tick callbacks)
 ### Phase M2 — Folia + Fabric
 
 - [ ] `FoliaMetricsBinding` with the `max` / `mean` defaults from *Folia Aggregation* and the `metrics.folia.aggregation.*` config keys.
-- [ ] `FabricMetricsBinding` using the server tick callback chain wired in Step E2 of `MULTI_PLATFORM_PLAN.md`.
+- [ ] `FabricMetricsBinding` using the server tick callback chain wired in the Fabric adapter (`FabricScheduler`).
 - [ ] Per-platform smoke tests confirming `MetricsSnapshot` returns sane values on each runtime.
 - [ ] **Extend `InfoCmd`** with the per-region *Health — cache* table (L1/L2/login fills + status flag), the verbose Folia per-region TPS/MSPT table, and the *load-balancer inputs* sub-block (`cacheServeRateLast60s`, `coldServeRatio`, `pregenSaturation`, `sustainableRatePerMin`). Add the `/rtp info json` output path emitting the full `MetricsSnapshot` record.
 - [ ] **Real-time per-tick CPU budget** (per *Real-Time Per-Tick CPU Budget*): persist per-iteration WCET constants in `rtp-core/.../metrics/TickCpuWcet.java`; ship `tickCpuBudgetMsAnalytical` / `tickCpuMsP99` / `tickCpuMsP999` / `tickCpuOvershoots` catalogue rows; wire per-tick `nanoTime()` measurement around each `TickConsumer`; add the verbose `/rtp info` sub-block; land `TickCpuWcetRegressionTest`. Folia aggregation defaults to `max`. Gated on the dedicated ADR (`docs/adr/ADR-NNN-rtp-per-tick-cpu-budget-contract.md`) being ratified before the implementation PR lands.
@@ -681,13 +681,14 @@ Mapped to bStats v3 chart types (`SimplePie`, `AdvancedPie`, `DrilldownPie`, `Si
 - All bStats lambdas shall read pre-cached values from `Metrics.snapshot()` rather than invoking platform calls inline. Bucketisation happens once per snapshot, not once per chart fetch.
 - Submission cadence respects bStats defaults; do not add custom timers.
 - Chart IDs registered on bStats.org should be locked into a small constants class (`BStatsChartIds`) so a typo in one place doesn't silently break a chart.
-- The bStats integration ships in `rtp-plugin` (Bukkit family) and `rtp-fabric` (when bStats-Fabric is wired in Phase M2). Velocity / BungeeCord proxies get a separate, smaller bStats chart set in Phase M3 once the proxy adapter exists — the proxy chart set deliberately omits backend-shape charts to avoid fingerprinting backend pools.
+- No bStats library is bundled. The dependency-free v2 client lives in the reusable `:bstats-api` module ([bstats-api-ADR-001](../../api/bstats-api/docs/adr/bstats-api-ADR-001-dependency-free-client.md)): payload, endpoint (`/api/v2/data/<platform>`), jitter (3-6 min initial, 30 min period) and opt-out match the upstream `MetricsBase`, and `BStatsPlatform` maps neutral server facts onto the `bukkit` endpoint's wire fields. The existing shared `bStats/config.yml` / `config.txt` is read, never rewritten, so the server UUID and install counts carry over.
+- Every backend starts bStats through one entry point, `RtpBStats` in `rtp-core` `common.metrics.bstats`, which adapts `RTP.scheduler` / `RTP.log` and registers the single chart catalogue (`RtpBStatsCatalogue`). Platforms supply only a `Host` (platform label, chunk-load mode, server facts, optional addon whitelist): Bukkit uses `BukkitBStatsHost` (main-thread collection, async send); Fabric and NeoForge use the core-state default `Host.of(loader)`. All report to one service (`bukkit` endpoint, id 30865 full / 12277 lite), separable via the `platform` chart. Proxies (Velocity / BungeeCord) do not report to bStats: they have no server metrics, and the backends already report their own.
 
 #### Phasing
 
 - **Phase M1**: ship the *Configuration adoption* group (low effort, immediate insight).
 - **Phase M2**: add the *Runtime health* group once `Metrics.snapshot()` is live on Folia/Fabric.
-- **Phase M3**: add the *Feature-shape rollups* and the proxy-side chart set.
+- **Phase M3**: add the *Feature-shape rollups*.
 
 ---
 
@@ -707,7 +708,7 @@ Reviewed for implementer-sufficiency against `AGENTS.md`, `RULES.md`, and existi
 ## Cross-References
 
 - [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md) — primary downstream consumer (telemetry publisher).
-- [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) — Fabric Step E2 tick-callback hook is the basis for `FabricMetricsBinding`.
+- [rtp-fabric-ADR-002](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) — Fabric tick-callback hook (`FabricScheduler`) is the basis for `FabricMetricsBinding`.
 - [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md) — any platform-specific surprise from sampler implementation lands here.
 - [`AGENTS.md > Domain Analogies & Aliases`](../../.junie/AGENTS.md) — informal terms (`mspt`, `tps`, `the snapshot`) route here.
 

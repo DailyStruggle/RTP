@@ -56,4 +56,17 @@ class FireworkEffectParseTest {
         assertTrue(warnings.isEmpty(),
                 "6-digit hex must still parse as Color; got: " + warnings);
     }
+
+    @Test
+    void clampsUnboundedFireworkAndParticleCounts() {
+        FireworkEffect effect = new FireworkEffect(org.bukkit.FireworkEffect.Type.BALL, org.bukkit.Color.WHITE);
+        effect.setData("BALL", "5000", "1", "RED", "YELLOW",
+                "true", "true", "true", "0", "0", "0");
+        org.junit.jupiter.api.Assertions.assertEquals(8, effect.getData().get(FireworkEffect.FireworkKeys.NUMBER));
+
+        io.github.dailystruggle.effectsapi.common.effects.ParticleEffect particleEffect =
+                new io.github.dailystruggle.effectsapi.common.effects.ParticleEffect("FLAME");
+        particleEffect.setData("FLAME", "99999");
+        org.junit.jupiter.api.Assertions.assertEquals(256, particleEffect.getData().get(io.github.dailystruggle.effectsapi.common.effects.ParticleEffect.ParticleKeys.NUMBER));
+    }
 }

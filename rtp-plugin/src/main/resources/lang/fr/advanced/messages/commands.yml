@@ -217,6 +217,7 @@ menuAdminPanelHint: "&7click an option; destructive actions show a warning hover
 
 # Séparateurs de section sur le panneau d'administration. Aucun espace réservé.
 menuAdminPanelSectionConfig: "&8--- &7configuration &8---"
+menuAdminPanelSectionDocs: "&8--- &7documentation & éditeur &8---"
 menuAdminPanelSectionDiagnostics: "&8--- &7diagnostics &8---"
 menuAdminPanelSectionLifecycle: "&8--- &7cycle de vie &8---"
 menuAdminPanelSectionBrowse: "&8--- &7parcourir &8---"
@@ -224,6 +225,10 @@ menuAdminPanelSectionBrowse: "&8--- &7parcourir &8---"
 # Lignes du panneau d'administration + infobulles. Aucun espace réservé.
 menuAdminPanelRowConfig: "&b▶ éditeur de configuration"
 menuAdminPanelHoverConfig: "&7ouvrir le sélecteur de configuration organisé"
+menuAdminPanelRowDocs: "#5FB3B3▶ documentation"
+menuAdminPanelHoverDocs: "&7ouvrir les manuels de documentation intégrés en jeu"
+menuAdminPanelRowEditor: "#5FB3B3▶ éditeur web & manuel"
+menuAdminPanelHoverEditor: "&7lancer une session éphémère d'éditeur web avec documentation intégrée"
 menuAdminPanelRowRegions: "#5FB3B3▶ régions"
 menuAdminPanelHoverRegions: "&7ajouter, supprimer ou modifier les configs par région"
 menuAdminPanelRowWorlds: "#5FB3B3▶ mondes"
@@ -478,6 +483,30 @@ multiconfigResultNameInvalid: "&cle nom '[name]' n'est pas autorisé ; utilisez 
 # Message de résultat lorsqu'un AJOUT entre en conflit avec un nom d'entrée existant.
 # Espace réservé : [name].
 multiconfigResultNameTaken: "&cune entrée nommée '[name]' existe déjà."
+
+docsNotFound: "&c[RTP] Sujet de documentation '[topic]' introuvable. Utilisez /rtp docs list pour afficher les sujets disponibles."
+docsEmpty: "&c[RTP] Aucun sujet de documentation n'est actuellement enregistré."
+docsExportSuccess: "&a[RTP] Lot HTML de documentation exporté avec succès vers [path]."
+docsExportFailed: "&c[RTP] Échec de l'exportation du lot de documentation: [reason]."
+
+# --- Web editor channel (ADR-106) ---
+editorTrustPrompt: "&e[P1] Une page de l'éditeur web demande l'accès avec le code &b[nonce]&e. Si votre page affiche le même code, cliquez ici pour faire confiance à ce navigateur."
+editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(clé [fingerprint])"
+editorTrustAccepted: "&a[P0] Navigateur approuvé : la page de l'éditeur avec le code [nonce] peut maintenant prévisualiser et utiliser Hot-Apply."
+editorTrustAlready: "&7[P0] Le navigateur avec le code [nonce] était déjà approuvé."
+editorTrustUnknown: "&c[P0] Aucune session d'éditeur ouverte n'a émis le code [nonce]."
+editorTrustExpired: "&c[P0] Le code [nonce] a expiré. Rechargez la page de l'éditeur pour en obtenir un nouveau."
+editorTrustUsage: "&c[P0] Utilisation : /rtp editor trust nonce=<code affiché par la page de l'éditeur>"
+editorChannelOpened: "&a[P0] Canal de l'éditeur web ouvert. Approuvez votre navigateur lorsque cela vous est demandé pour activer les aperçus et Hot-Apply."
+editorChannelLost: "&e[P1] Canal de l'éditeur web perdu : [reason]. La page continue de fonctionner à partir de son instantané."
+editorChannelExpired: "&7[P0] Le canal de l'éditeur web a expiré après [minutes] minutes. Relancez la commande de l'éditeur pour reprendre."
+editorTrustRateLimited: "&c[P0] Trop de codes de confiance de l'éditeur erronés. Attends une minute, puis réessaie."
+editorUntrustUsage: "&c[P0] Utilisation : /rtp editor untrust key=<préfixe de l'empreinte, au moins 4 caractères | all>"
+editorUntrustRemoved: "&a[P0] Confiance retirée à [count] navigateur(s) de l'éditeur web ; ils devront être de nouveau approuvés pour prévisualiser ou utiliser Hot-Apply."
+editorUntrustNone: "&7[P0] Aucun navigateur approuvé de l'éditeur ne correspond à [key]."
+editorUntrustFailed: "&c[P0] Impossible de mettre à jour la liste des éditeurs approuvés : [reason]"
+editorApplyDigestMissing: "&c[P0] La charge de l'éditeur n'a pas de somme de contrôle sha256, elle n'a donc pas été appliquée. Valide à nouveau depuis une page de l'éditeur à jour."
+editorApplyFileUnreadable: "&e[P1] Le fichier d'application hors ligne est illisible ([reason]) ; tentative via le stockage d'octets."
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

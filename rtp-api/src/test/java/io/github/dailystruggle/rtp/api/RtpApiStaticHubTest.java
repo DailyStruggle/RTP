@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -283,5 +284,91 @@ class RtpApiStaticHubTest {
         20.0, 20.0, 20.0, 5.0, 10, 100, 100L, 200L, System.currentTimeMillis(), List.of(sample));
     RTPAPI.metricsSnapshotDelegate = () -> withRegions;
     assertEquals(List.of(sample), RTPAPI.getRegionSamples());
+  }
+
+  @Test
+  void testCheckPermissionAndActions() {
+    UUID pId = UUID.randomUUID();
+    // null player or empty permission
+    assertFalse(RTPAPI.checkPermission(null, "perm"));
+    assertFalse(RTPAPI.checkPermission(pId, null));
+    assertFalse(RTPAPI.checkPermission(pId, "  "));
+
+    // null server accessor returns false (fail closed: no core, no permission)
+    RTPAPI.serverAccessor = null;
+    assertFalse(RTPAPI.checkPermission(pId, "perm"));
+
+    // with server accessor
+    var mockSender = (io.github.dailystruggle.rtp.api.entity.RTPCommandSender) java.lang.reflect.Proxy.newProxyInstance(
+        getClass().getClassLoader(),
+        new Class<?>[]{io.github.dailystruggle.rtp.api.entity.RTPCommandSender.class},
+        (proxy, method, args) -> {
+          if (method.getName().equals("hasPermission")) {
+            return "perm.allowed".equals(args[0]);
+          }
+          if (method.isDefault()) return java.lang.reflect.InvocationHandler.invokeDefault(proxy, method, args);
+          return null;
+        });
+
+    RTPServerAccessor mockSa = (RTPServerAccessor) java.lang.reflect.Proxy.newProxyInstance(
+        getClass().getClassLoader(),
+        new Class<?>[]{RTPServerAccessor.class},
+        (proxy, method, args) -> {
+          if (method.getName().equals("getSender")) return mockSender;
+          return null;
+        });
+    RTPAPI.serverAccessor = mockSa;
+
+    assertTrue(RTPAPI.checkPermission(pId, "perm.allowed"));
+    assertFalse(RTPAPI.checkPermission(pId, "perm.denied"));
+
+    // test sender.isRtpAdmin() default method
+    assertFalse(mockSender.isRtpAdmin());
+
+    // test actions() and hasActions()
+    RTPAPI.actionService = null;
+    assertFalse(RTPAPI.hasActions());
+    assertThrows(IllegalStateException.class, RTPAPI::actions);
+
+    var mockAct = (io.github.dailystruggle.rtp.api.action.ActionService) java.lang.reflect.Proxy.newProxyInstance(
+        getClass().getClassLoader(),
+        new Class<?>[]{io.github.dailystruggle.rtp.api.action.ActionService.class},
+        (proxy, method, args) -> {
+          if (method.isDefault()) return java.lang.reflect.InvocationHandler.invokeDefault(proxy, method, args);
+          return null;
+        });
+    RTPAPI.actionService = mockAct;
+    assertTrue(RTPAPI.hasActions());
+    assertSame(mockAct, RTPAPI.actions());
+    assertFalse(mockAct.cancelParticipant(pId, "act"));
+    assertTrue(mockAct.getAction("none").isEmpty());
+  }
+
+  @Test
+  void testClaimBoundaryRegistryAndHooksDefaults() {
+    var reg = (io.github.dailystruggle.rtp.api.hooks.ClaimBoundaryRegistry) java.lang.reflect.Proxy.newProxyInstance(
+        getClass().getClassLoader(),
+        new Class<?>[]{io.github.dailystruggle.rtp.api.hooks.ClaimBoundaryRegistry.class},
+        (proxy, method, args) -> {
+          if (method.isDefault()) return java.lang.reflect.InvocationHandler.invokeDefault(proxy, method, args);
+          if (method.getName().equals("resolve") || method.getName().equals("resolveAt")) {
+            return java.util.Optional.empty();
+          }
+          return null;
+        });
+
+    UUID pId = UUID.randomUUID();
+    assertTrue(reg.resolve(pId, "world").isEmpty());
+    assertTrue(reg.resolveAt("world", 10, 20).isEmpty());
+
+    var hooks = (RTPHooks) java.lang.reflect.Proxy.newProxyInstance(
+        getClass().getClassLoader(),
+        new Class<?>[]{RTPHooks.class},
+        (proxy, method, args) -> {
+          if (method.isDefault()) return java.lang.reflect.InvocationHandler.invokeDefault(proxy, method, args);
+          return null;
+        });
+
+    assertThrows(UnsupportedOperationException.class, hooks::claimBoundaries);
   }
 }

@@ -64,14 +64,14 @@ public final class PrefabApplier {
             newTrees.put(e.getKey(), deepCopy(e.getValue()));
         }
 
-        // performance.yml
+        // advanced/performance.yml
         Map<String, Object> perfOverlay = prefab.performanceOverlay();
         if (!perfOverlay.isEmpty()) {
-            Map<String, Object> base = newTrees.computeIfAbsent("performance", k -> new LinkedHashMap<>());
+            Map<String, Object> base = newTrees.computeIfAbsent("advanced/performance", k -> new LinkedHashMap<>());
             List<Change> fileDiff = new ArrayList<>();
             mergeInto(base, perfOverlay, "", fileDiff);
             if (!fileDiff.isEmpty()) {
-                diff.put("performance", fileDiff);
+                diff.put("advanced/performance", fileDiff);
             }
         }
 
@@ -86,9 +86,9 @@ public final class PrefabApplier {
             }
         }
 
-        // regions/<id>.yml
+        // definitions/regions/<id>.yml
         for (Map.Entry<String, Map<String, Object>> reg : prefab.regionOverlays().entrySet()) {
-            String fileId = "regions/" + reg.getKey();
+            String fileId = "definitions/regions/" + reg.getKey();
             Map<String, Object> overlay = reg.getValue();
             if (overlay.isEmpty()) {
                 continue;
@@ -135,7 +135,10 @@ public final class PrefabApplier {
         Map<String, Map<String, Object>> currentRegions = new LinkedHashMap<>();
         for (Map.Entry<String, Map<String, Object>> e : currentTrees.entrySet()) {
             String key = e.getKey();
-            if (key.startsWith("regions/")) {
+            if (key.startsWith("definitions/regions/")) {
+                currentRegions.put(key.substring("definitions/regions/".length()), e.getValue());
+            } else if (key.startsWith("regions/")) {
+                // Support legacy key if present
                 currentRegions.put(key.substring("regions/".length()), e.getValue());
             }
         }
@@ -153,17 +156,17 @@ public final class PrefabApplier {
         );
         Result base = apply(currentTrees, effective);
 
-        // A synthesised per-world region (regions/<world>.yml with
-        // world: "<world>") is inert unless the matching worlds/<world>.yml
+        // A synthesised per-world region (definitions/regions/<world>.yml with
+        // world: "<world>") is inert unless the matching definitions/worlds/<world>.yml
         // points its "region" field at it. Mirror every synthesised region
-        // into a worlds/<world>.yml overlay that sets region: "<world>" so the
+        // into a definitions/worlds/<world>.yml overlay that sets region: "<world>" so the
         // world actually uses its own region rather than the shared default.
         // The merge is sparse and idempotent: a world file already pointing at
         // its own region yields no diff.
         Map<String, Map<String, Object>> newTrees = base.newTrees();
         Map<String, List<Change>> diff = new LinkedHashMap<>(base.perFileDiff());
         for (String world : expandedOverlays.keySet()) {
-            String fileId = "worlds/" + world;
+            String fileId = "definitions/worlds/" + world;
             Map<String, Object> overlay = new LinkedHashMap<>();
             overlay.put("region", world);
             Map<String, Object> worldBase = newTrees.computeIfAbsent(fileId, k -> new LinkedHashMap<>());

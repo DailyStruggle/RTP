@@ -2,6 +2,8 @@
 # Maps internal baseline keys (left) to user-visible key names (right)
 # used in player.yml. Co-located dotfile sibling (ADR-076).
 alreadyTeleporting: "已在传送"
+alreadyInSession: "已在会话中"
+notInSession: "不在会话中"
 teleportDeniedReloading: "传送被拒_重载中"
 delayMessage: "延迟消息"
 chunkLoading: "区块加载中"
@@ -15,6 +17,8 @@ noLocationsQueued: "队列中无可用位置"
 queueUpdate: "队列更新"
 notEnoughMoney: "余额不足"
 invalidWorld: "无效世界"
+noBackLocation: "无前次位置"
+backSuccess: "返回成功"
 badArg: "参数错误"
 invalidCommand: "无效命令"
 noPerms: "无权限"

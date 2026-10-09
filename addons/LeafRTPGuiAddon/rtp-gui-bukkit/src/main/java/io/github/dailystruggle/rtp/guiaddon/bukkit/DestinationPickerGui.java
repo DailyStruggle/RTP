@@ -2,6 +2,8 @@ package io.github.dailystruggle.rtp.guiaddon.bukkit;
 
 import io.github.dailystruggle.rtp.api.RtpTarget;
 import io.github.dailystruggle.rtp.common.tools.MiniMessageColorExpander;
+import io.github.dailystruggle.rtp.guiaddon.bukkit.item.BukkitCustomItemResolver;
+import io.github.dailystruggle.rtp.guiaddon.common.GuiMenuConfig;
 import io.github.dailystruggle.rtp.guiaddon.common.MenuEntry;
 import io.github.dailystruggle.rtp.guiaddon.common.MenuIcons;
 import io.github.dailystruggle.rtp.guiaddon.common.MenuLayout;
@@ -70,7 +72,7 @@ public final class DestinationPickerGui implements InventoryHolder {
     for (Map.Entry<Integer, MenuEntry> placed : layout.slotEntries().entrySet()) {
       int slot = placed.getKey();
       MenuEntry entry = placed.getValue();
-      gui.inventory.setItem(slot, icon(entry));
+      gui.inventory.setItem(slot, icon(entry, model));
       gui.slotTargets.put(slot, entry.target());
     }
 
@@ -100,11 +102,10 @@ public final class DestinationPickerGui implements InventoryHolder {
   // ----- presentation helpers -----
 
   private void applyFiller(MenuModel model) {
-    Material filler = material(model.fillerName(), Material.AIR);
-    if (filler == Material.AIR) {
+    ItemStack pane = BukkitCustomItemResolver.resolve(model.fillerName(), Material.AIR);
+    if (pane == null || pane.getType() == Material.AIR) {
       return;
     }
-    ItemStack pane = new ItemStack(filler);
     ItemMeta meta = pane.getItemMeta();
     if (meta != null) {
       meta.setDisplayName(" ");
@@ -112,13 +113,13 @@ public final class DestinationPickerGui implements InventoryHolder {
     }
     for (int i = 0; i < inventory.getSize(); i++) {
       if (inventory.getItem(i) == null) {
-        inventory.setItem(i, pane);
+        inventory.setItem(i, pane.clone());
       }
     }
   }
 
-  private static ItemStack icon(MenuEntry entry) {
-    ItemStack item = new ItemStack(material(entry.iconName(), Material.COMPASS));
+  private static ItemStack icon(MenuEntry entry, MenuModel model) {
+    ItemStack item = BukkitCustomItemResolver.resolve(entry.iconName(), Material.COMPASS);
     ItemMeta meta = item.getItemMeta();
     if (meta != null) {
       String name = entry.displayName();
@@ -126,14 +127,14 @@ public final class DestinationPickerGui implements InventoryHolder {
         name = "&b" + name;
       }
       meta.setDisplayName(colorize(name));
-      meta.setLore(translate(MenuIcons.entryLore(entry)));
+      meta.setLore(translate(MenuIcons.entryLore(entry, GuiMenuConfig.INSTANCE)));
       item.setItemMeta(meta);
     }
     return item;
   }
 
   private static ItemStack dashboardTile(MenuModel model) {
-    ItemStack item = new ItemStack(material(model.dashboardIconName(), Material.PAPER));
+    ItemStack item = BukkitCustomItemResolver.resolve(model.dashboardIconName(), Material.PAPER);
     ItemMeta meta = item.getItemMeta();
     if (meta != null) {
       meta.setDisplayName(colorize(MenuIcons.dashboardTitle()));

@@ -461,13 +461,23 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
               teleportData.time =
                   System.currentTimeMillis() - Math.abs(referenceTime - teleportData.time);
             Object originalWorldName = dataMap.get("originalWorldName");
-            if (originalWorldName != null)
+            if (originalWorldName != null) {
+              teleportData.originWorldName = originalWorldName.toString();
               teleportData.originalCoords =
                   new RTPCoords(
                       originalWorldName.toString(),
                       ((Number) dataMap.get("originalX")).intValue(),
                       ((Number) dataMap.get("originalY")).intValue(),
                       ((Number) dataMap.get("originalZ")).intValue());
+            }
+            Object originServerId = dataMap.get("originServerId");
+            if (originServerId != null) {
+              teleportData.originServerId = originServerId.toString();
+            }
+            Object originWorldName = dataMap.get("originWorldName");
+            if (originWorldName != null) {
+              teleportData.originWorldName = originWorldName.toString();
+            }
             Object selectedWorldName = dataMap.get("selectedWorldName");
             if (selectedWorldName != null)
               teleportData.selectedCoords =

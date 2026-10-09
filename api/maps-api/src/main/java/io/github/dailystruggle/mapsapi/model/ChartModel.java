@@ -13,5 +13,5 @@ package io.github.dailystruggle.mapsapi.model;
 public sealed interface ChartModel
         permits Heatmap2D, CategoryDistribution, TimeSeries, RegionCoverage,
                 RegionBadLocations, RegionBiomesRgb, MermaidChart, DualSparkline,
-                CompositeRegionModel {
+                CompositeRegionModel, RegionWalkPath, SelectionHeatmap {
 }

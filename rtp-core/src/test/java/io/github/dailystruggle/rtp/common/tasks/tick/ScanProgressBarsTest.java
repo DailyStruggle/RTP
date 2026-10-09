@@ -111,6 +111,39 @@ class ScanProgressBarsTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void update_landPercentageUsesScanTally_progressUsesChunkFraction() {
+        setBossBarTemplate("land=[scan_landPercentage] progress=[scan_progress]");
+
+        ScanTask task = new ScanTask(region, 0L);
+        task.latestAbsolutePos = 50L;
+        task.latestAbsoluteTotal = 200L;
+        task.latestLandPercentage = 87.5;
+        RTP.getInstance().scanTasks.put("scanbar_region", task);
+
+        java.util.concurrent.atomic.AtomicReference<Map<String, io.github.dailystruggle.rtp.api.server.ProgressBar>> captured =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        io.github.dailystruggle.rtp.api.server.RTPServerAccessor original = RTP.serverAccessor;
+        RTP.serverAccessor = new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(tempDir) {
+            @Override
+            public void updateProgressBars(Map<String, io.github.dailystruggle.rtp.api.server.ProgressBar> bars) {
+                captured.set(bars);
+            }
+        };
+        try {
+            ScanProgressBars.update();
+        } finally {
+            RTP.serverAccessor = original;
+        }
+
+        assertNotNull(captured.get(), "update() must push bars while a scan is active");
+        io.github.dailystruggle.rtp.api.server.ProgressBar bar = captured.get().get("scanbar_region");
+        assertNotNull(bar);
+        assertEquals("land=87.5 progress=25.0", bar.title());
+        assertEquals(0.25, bar.progress(), 1e-9);
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
     void clear_doesNotThrow() {
         assertDoesNotThrow(ScanProgressBars::clear);
     }

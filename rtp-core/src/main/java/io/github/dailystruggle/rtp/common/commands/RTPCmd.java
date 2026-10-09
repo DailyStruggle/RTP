@@ -17,6 +17,7 @@ import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import java.util.*;
@@ -227,14 +228,31 @@ public interface RTPCmd extends BaseRTPCmd {
 
       if (dt < 0) dt = Long.MAX_VALUE + dt;
 
-      if (!hasSubCommand && dt < sender.cooldown()) {
-        String msg = (String) RTP.configs.getConfigValue(PlayerMessages.cooldownMessage, "");
-        messageMethod.accept(msg);
-        RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.onCommand REJECT cooldown senderId=" + senderId
-                + " dtMs=" + dt + " cooldownMs=" + sender.cooldown());
-        return true;
-      } else if (senderData.completed) { // resolve command bugs preemptively
-        RTP.getInstance().processingPlayers.remove(senderId);
+      boolean hasTargetArg = false;
+      if (args != null) {
+        for (String a : args) {
+          if (a != null) {
+            String lower = a.toLowerCase(java.util.Locale.ROOT);
+            if (lower.startsWith("region=") || lower.startsWith("world=") || lower.startsWith("biome=")
+                || lower.startsWith("region:") || lower.startsWith("world:") || lower.startsWith("biome:")) {
+              hasTargetArg = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!hasSubCommand && !hasTargetArg) {
+        long cd = sender.cooldown();
+        if (dt < cd) {
+          String msg = (String) RTP.configs.getConfigValue(PlayerMessages.cooldownMessage, "");
+          messageMethod.accept(msg);
+          RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.onCommand REJECT cooldown senderId=" + senderId
+                  + " dtMs=" + dt + " cooldownMs=" + cd);
+          return true;
+        } else if (senderData.completed) { // resolve command bugs preemptively
+          RTP.getInstance().processingPlayers.remove(senderId);
+        }
       }
     }
 
@@ -564,7 +582,8 @@ public interface RTPCmd extends BaseRTPCmd {
         }
 
         if (toggleTargetPerms) {
-          long dt = System.currentTimeMillis() - data.time;
+          long lastTpTime = RTP.getEffectiveLastTeleportTime(player.uuid());
+          long dt = (lastTpTime > 0) ? (System.currentTimeMillis() - lastTpTime) : (System.currentTimeMillis() - data.time);
           if (dt < 0) dt = Long.MAX_VALUE + dt;
           if (dt < player.cooldown()) {
             RTP.serverAccessor.sendMessage(senderId, player.uuid(), PlayerMessages.cooldownMessage);
@@ -690,6 +709,32 @@ public interface RTPCmd extends BaseRTPCmd {
         if (doWBO) {
           region = region.clone();
           region.set(RegionKeys.shape, RTP.serverAccessor.getShape(rtpWorld.name()));
+        }
+      }
+
+      // Cooldown guard:
+      RTPCommandSender cooldownSubject = (toggleTargetPerms) ? player : sender;
+      RegionSettings regSettings = region.getSettings();
+      boolean hasRegionOverride = (regSettings != null && regSettings.cooldownMillis() != null && regSettings.cooldownMillis() >= 0);
+      long targetCooldown = RTP.getCooldown(cooldownSubject, regSettings);
+      if (targetCooldown > 0) {
+        long lastTpTime = hasRegionOverride
+            ? RTP.getLastRegionTeleportTime(player.uuid(), region.name)
+            : ((data != null && data.time > 0) ? data.time : RTP.getEffectiveLastTeleportTime(player.uuid()));
+        if (hasRegionOverride && lastTpTime <= 0L && data != null && data.completed && (data.targetRegion == null || region.name.equalsIgnoreCase(data.targetRegion.name))) {
+          lastTpTime = data.time;
+        }
+        if (lastTpTime > 0L) {
+          long dtReg = System.currentTimeMillis() - lastTpTime;
+          if (dtReg < 0) dtReg = Long.MAX_VALUE + dtReg;
+          if (dtReg < targetCooldown) {
+            String msg = (String) RTP.configs.getConfigValue(PlayerMessages.cooldownMessage, "");
+            if (messageMethod != null) messageMethod.accept(msg);
+            else RTP.serverAccessor.sendMessage(senderId, player.uuid(), msg);
+            RTP.getInstance().processingPlayers.remove(senderId);
+            RTP.getInstance().latestTeleportData.remove(player.uuid());
+            return true;
+          }
         }
       }
 
@@ -896,7 +941,7 @@ public interface RTPCmd extends BaseRTPCmd {
               + " biomes=" + biomes
               + " syncLoading=" + syncLoading);
 
-      long delay = (toggleTargetPerms) ? player.delay() : sender.delay();
+      long delay = RTP.getDelay((toggleTargetPerms) ? player : sender, region.getSettings());
       data.delay = delay;
       if (delay > 0) {
         String msg = RTP.configs.getConfigValue(PlayerMessages.delayMessage, "").toString();

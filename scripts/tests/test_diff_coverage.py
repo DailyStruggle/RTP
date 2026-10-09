@@ -52,7 +52,7 @@ class SonarExclusionTest(unittest.TestCase):
         self.assertTrue(is_sonar_excluded("platforms/rtp-neoforge/rtp-neoforge-common/src/main/java/Quux.java"))
 
     def test_addons_and_helpers_directories_excluded(self):
-        self.assertTrue(is_sonar_excluded("addons/LeafRTPGroupAddon/src/main/java/Group.java"))
+        self.assertTrue(is_sonar_excluded("addons/LeafRTPActionAddon/src/main/java/RTPActionAddon.java"))
         self.assertTrue(is_sonar_excluded("addons/LeafRTPLinearAddon/src/main/java/Linear.java"))
         self.assertTrue(is_sonar_excluded("helpers/StressTestRTP/src/main/java/Stress.java"))
 

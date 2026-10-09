@@ -68,7 +68,7 @@ public class NoteEffect extends Effect<NoteEffect.NoteKeys> {
 
     @Override
     public String toPermission() {
-        return this.data.get(NoteKeys.TYPE).toString().replaceAll("\\.*", "") +
-                this.data.get(NoteKeys.TONE).toString().replaceAll("\\.*", "");
+        return this.data.get(NoteKeys.TYPE).toString().replace(".", "") +
+                this.data.get(NoteKeys.TONE).toString().replace(".", "");
     }
 }

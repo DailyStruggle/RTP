@@ -28,6 +28,74 @@ public enum GuiMenuKeys {
   menuFiller,
   /** When true, show a server-health (TPS / MSPT / players) tile. */
   showDashboard,
+  /** When true, show special scripted actions hub in GUI if action service is loaded. */
+  showActions,
+  /** Title for the actions sub-menu. Supports '&amp;' color codes. */
+  titleActionsMenu,
+  /** Display title for the action selector button on the main menu. */
+  titleActionsSelector,
+  /** Icon material name for the action selector button on the main menu. */
+  iconActionsSelector,
+  /** Fallback icon material name for actions without an explicit icon. */
+  iconActionDefault,
+  /** When true, show operator tools button in GUI if player has permission. */
+  showOperatorTools,
+  /** Permission required to view/use the operator tools button. */
+  permissionOperatorTools,
+  /** Title for the operator tools sub-menu. Supports '&amp;' color codes. */
+  titleOperatorMenu,
+  /** Display title for the operator selector button on the main menu. */
+  titleOperatorSelector,
+  /** Icon material name for the operator selector button on the main menu. */
+  iconOperatorSelector,
+  /** Icon material name for the setup wizard button in the operator menu. */
+  iconOperatorSetup,
+  /** Icon material name for the import button in the operator menu. */
+  iconOperatorImport,
+  /** Icon material name for the config editor button in the operator menu. */
+  iconOperatorConfig,
+  /** Icon material name for the visualizations button in the operator menu. */
+  iconOperatorVisualizations,
+  /** Icon material name for the status/metrics button in the operator menu. */
+  iconOperatorStatus,
+  /** Icon material name for the master admin book button in the operator menu. */
+  iconOperatorAdminBook,
+  /** Icon material name for the quick reload button in the operator menu. */
+  iconOperatorReload,
+  /** When true, groups biomes into a dedicated paginated sub-menu from the main menu. */
+  groupBiomesIntoSubmenu,
+  /** Title for the biomes sub-menu. Supports '&amp;' color codes. */
+  titleBiomeMenu,
+  /** Display title for the biome selector button on the main menu. */
+  titleBiomeSelector,
+  /** Icon material name for the biome selector button on the main menu. */
+  iconBiomeSelector,
+  /** Icon material name for previous page button in paginated menus. */
+  iconPreviousPage,
+  /** Icon material name for next page button in paginated menus. */
+  iconNextPage,
+  /** Icon material name for back to main menu button in sub-menus. */
+  iconBackToMainMenu,
+  /** Text for previous page button in paginated menus. */
+  textPreviousPage,
+  /** Text for next page button in paginated menus. */
+  textNextPage,
+  /** Text for back to main menu button in sub-menus. */
+  textBackToMainMenu,
+  /** Display title for the setup wizard button in the operator menu. */
+  titleOperatorSetup,
+  /** Display title for the import button in the operator menu. */
+  titleOperatorImport,
+  /** Display title for the config editor button in the operator menu. */
+  titleOperatorConfig,
+  /** Display title for the visualizations button in the operator menu. */
+  titleOperatorVisualizations,
+  /** Display title for the status/metrics button in the operator menu. */
+  titleOperatorStatus,
+  /** Display title for the master admin book button in the operator menu. */
+  titleOperatorAdminBook,
+  /** Display title for the quick reload button in the operator menu. */
+  titleOperatorReload,
 
   /** Icon material name for the default-region target. */
   iconDefault,
@@ -35,6 +103,8 @@ public enum GuiMenuKeys {
   iconWorld,
   /** Icon material name for a named-region target. */
   iconRegion,
+  /** Icon material name for a biome target. */
+  iconBiome,
   /** Icon material name for a cross-server (network/peer) region target. */
   iconNetwork,
   /**
@@ -45,6 +115,11 @@ public enum GuiMenuKeys {
    * ({@link #iconRegion} / {@link #iconWorld} / {@link #iconNetwork}).
    */
   regionIcons,
+  /**
+   * Per-biome icon override map: a YAML mapping from a biome name (case-insensitive)
+   * to a material name.
+   */
+  biomeIcons,
   /**
    * Consumer-side environment-to-block translation map: a YAML mapping from a
    * world environment string (e.g. {@code NORMAL}, {@code NETHER},
@@ -59,10 +134,25 @@ public enum GuiMenuKeys {
   iconOnCooldown,
   /** Icon material name for an unavailable (no permission / disabled) target. */
   iconUnavailable,
+  /** Icon material name for a target blocked by PvP combat tag. */
+  iconInCombat,
   /** Icon material name for a target the player cannot afford. */
   iconNoFunds,
   /** Icon material name for the server-health dashboard tile. */
   iconDashboard,
+  /** When true, destinations that are not ready display as BARRIER blocks (or iconUnavailable). */
+  barrierOnUnavailable,
+
+  /** Configurable hover lore template lines for ready targets. */
+  loreReady,
+  /** Configurable hover lore template lines for targets on cooldown. */
+  loreCooldown,
+  /** Configurable hover lore template lines for targets in combat. */
+  loreCombat,
+  /** Configurable hover lore template lines for targets with insufficient funds. */
+  loreNoFunds,
+  /** Configurable hover lore template lines for targets locked by permission. */
+  loreNoPermission,
 
   /** Lore line shown on a ready target. */
   textReady,

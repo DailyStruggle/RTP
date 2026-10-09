@@ -91,6 +91,35 @@ class AnvilRegionByteCacheTest {
   }
 
   @Test
+  void lru_evictsWhenMemoryBudgetExceeded(@TempDir Path tmp) throws Exception {
+    long originalBudget = AnvilIoPool.getMemoryBudgetBytes();
+    try {
+      // 100 KiB budget
+      AnvilIoPool.setMemoryBudgetBytes(100 * 1024L);
+      // Write 3 files of 40 KiB each (total 120 KiB > 100 KiB)
+      Path f1 = tmp.resolve("r.1.0.mca");
+      Path f2 = tmp.resolve("r.2.0.mca");
+      Path f3 = tmp.resolve("r.3.0.mca");
+      byte[] payload = new byte[40 * 1024];
+      Files.write(f1, payload);
+      Files.write(f2, payload);
+      Files.write(f3, payload);
+
+      assertNotNull(AnvilRegionByteCache.get(f1));
+      assertNotNull(AnvilRegionByteCache.get(f2));
+      assertEquals(2, AnvilRegionByteCache.size());
+      assertEquals(80 * 1024L, AnvilRegionByteCache.cachedBytes());
+
+      // Reading f3 pushes total to 120 KiB, triggering eviction of f1
+      assertNotNull(AnvilRegionByteCache.get(f3));
+      assertTrue(AnvilRegionByteCache.size() <= 2, "must evict eldest to stay within budget");
+      assertTrue(AnvilRegionByteCache.cachedBytes() <= 100 * 1024L, "retained bytes must be <= budget");
+    } finally {
+      AnvilIoPool.setMemoryBudgetBytes(originalBudget);
+    }
+  }
+
+  @Test
   void bufferPool_reusesEvictedBuffers(@TempDir Path tmp) throws Exception {
     AnvilRegionByteCache.resetAll();
     // Create 20 region files of standard size (8 KiB)
@@ -101,30 +130,71 @@ class AnvilRegionByteCacheTest {
       payload[0] = (byte) i;
       Files.write(files[i], payload);
     }
-    // Read first 16: fills cache up to capacity
+    // Read first 16 under leases: fills cache up to capacity
     for (int i = 0; i < 16; i++) {
-      assertNotNull(AnvilRegionByteCache.get(files[i]));
+      try (AnvilRegionByteCache.Lease lease = AnvilRegionByteCache.acquire(files[i])) {
+        assertNotNull(lease);
+      }
     }
     assertEquals(16, AnvilRegionByteCache.size());
 
-    // Reading 17th file evicts the eldest, which is recycled into BUFFER_POOL
-    assertNotNull(AnvilRegionByteCache.get(files[16]));
-    // The evicted buffer should be recycled or reused
-    // Read remaining files: evicted buffers are continuously recycled and reused
-    for (int i = 17; i < 20; i++) {
-      assertNotNull(AnvilRegionByteCache.get(files[i]));
+    // Further files evict the eldest, whose unreferenced buffers are recycled and reused
+    for (int i = 16; i < 20; i++) {
+      try (AnvilRegionByteCache.Lease lease = AnvilRegionByteCache.acquire(files[i])) {
+        assertNotNull(lease);
+      }
     }
     assertEquals(16, AnvilRegionByteCache.size());
+    assertTrue(AnvilRegionByteCache.stats().poolReuses() > 0, "evicted buffers should be reused");
 
-    // Invalidate all puts cached buffers into the pool
+    // Invalidate all puts unreferenced lease-only buffers into the pool
     AnvilRegionByteCache.invalidateAll();
     assertEquals(0, AnvilRegionByteCache.size());
     assertTrue(AnvilRegionByteCache.bufferPoolSize() > 0, "buffer pool should contain recycled buffers");
 
-    // Re-reading a file reuses an existing pooled buffer instance
-    byte[] reused = AnvilRegionByteCache.get(files[0]);
-    assertNotNull(reused);
-    assertEquals(8192, reused.length, "pooled reuse must stay exact-length");
+    try (AnvilRegionByteCache.Lease reused = AnvilRegionByteCache.acquire(files[0])) {
+      assertNotNull(reused);
+      assertEquals(8192, reused.length(), "lease length is the real file length");
+      assertEquals(0, reused.buffer()[0]);
+    }
+  }
+
+  @Test
+  void legacyGetBuffers_areNeverRecycled(@TempDir Path tmp) throws Exception {
+    AnvilRegionByteCache.resetAll();
+    Path a = tmp.resolve("r.0.0.mca");
+    Files.write(a, new byte[] {1, 2, 3, 4});
+    byte[] escaped = AnvilRegionByteCache.get(a);
+    assertNotNull(escaped);
+    AnvilRegionByteCache.invalidateAll();
+    assertEquals(0, AnvilRegionByteCache.bufferPoolSize(),
+        "an array handed out without a lease has no release signal and must not be pooled");
+    assertEquals(1, escaped[0]);
+  }
+
+  @Test
+  void leasedBuffer_isNotRecycledUntilClosed(@TempDir Path tmp) throws Exception {
+    AnvilRegionByteCache.resetAll();
+    Path big = tmp.resolve("r.0.0.mca");
+    byte[] payload = new byte[64 * 1024];
+    payload[0] = 42;
+    Files.write(big, payload);
+    AnvilRegionByteCache.Lease held = AnvilRegionByteCache.acquire(big);
+    assertNotNull(held);
+    AnvilRegionByteCache.invalidateAll();
+    assertEquals(0, AnvilRegionByteCache.bufferPoolSize(), "an open lease pins its buffer");
+
+    // A same-sized file read while the lease is open must not land on the held buffer.
+    Path other = tmp.resolve("r.1.0.mca");
+    Files.write(other, new byte[64 * 1024]);
+    try (AnvilRegionByteCache.Lease second = AnvilRegionByteCache.acquire(other)) {
+      assertNotNull(second);
+      assertTrue(second.buffer() != held.buffer());
+    }
+    assertEquals(42, held.buffer()[0], "held bytes stay intact");
+    held.close();
+    held.close(); // idempotent
+    assertEquals(1, AnvilRegionByteCache.bufferPoolSize(), "buffer recycled on last close");
   }
 
   @Test
@@ -132,22 +202,33 @@ class AnvilRegionByteCacheTest {
     AnvilRegionByteCache.resetAll();
     // A large region file first, so its buffer lands in the pool on eviction/invalidation.
     Path large = tmp.resolve("r.0.0.mca");
-    Files.write(large, new byte[512 * 1024]);
-    assertNotNull(AnvilRegionByteCache.get(large));
+    byte[] largePayload = new byte[512 * 1024];
+    java.util.Arrays.fill(largePayload, (byte) 9);
+    Files.write(large, largePayload);
+    try (AnvilRegionByteCache.Lease lease = AnvilRegionByteCache.acquire(large)) {
+      assertNotNull(lease);
+    }
     AnvilRegionByteCache.invalidateAll();
     assertTrue(AnvilRegionByteCache.bufferPoolSize() > 0, "large buffer should have been pooled");
 
-    // A smaller region file must never be served on the oversized pooled buffer: its array
-    // length is the corruption guard's fileLen in AnvilReader, and the stale tail would
-    // otherwise belong to the large region file.
+    // A smaller file may land on the oversized pooled buffer; the lease length stays the real
+    // file length, so readers bounded by it never see the large file's stale tail.
     Path small = tmp.resolve("r.1.0.mca");
     byte[] smallPayload = new byte[8192];
     smallPayload[0] = 7;
     Files.write(small, smallPayload);
+    try (AnvilRegionByteCache.Lease lease = AnvilRegionByteCache.acquire(small)) {
+      assertNotNull(lease);
+      assertEquals(Files.size(small), lease.length(), "lease length must equal the real file length");
+      assertTrue(lease.buffer().length >= lease.length());
+      assertEquals(1L, AnvilRegionByteCache.stats().poolReuses(), "oversized pooled buffer reused");
+    }
+    // The legacy accessor still returns an exact-length array.
     byte[] bytes = AnvilRegionByteCache.get(small);
     assertNotNull(bytes);
-    assertEquals(Files.size(small), bytes.length, "cached array length must equal the real file length");
+    assertEquals(Files.size(small), bytes.length, "legacy array length must equal the real file length");
     assertEquals(Files.size(small), AnvilRegionByteCache.cachedLength(small));
     assertEquals(7, bytes[0]);
+    assertSame(bytes, AnvilRegionByteCache.get(small), "repeat legacy reads return the same array");
   }
 }

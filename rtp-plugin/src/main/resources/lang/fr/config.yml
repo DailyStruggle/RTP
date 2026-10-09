@@ -137,7 +137,7 @@ defaults:
   activeChunkCap: 10
 
   # Bad-spot tracking precision (1-5).
-  spatialResolution: 3
+  spatialResolution: "auto"
 
   # Whether regions/worlds need permission.
   requirePermission: false

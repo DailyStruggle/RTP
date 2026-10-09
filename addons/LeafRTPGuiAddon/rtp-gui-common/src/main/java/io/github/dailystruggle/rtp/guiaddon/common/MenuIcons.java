@@ -31,20 +31,191 @@ public final class MenuIcons {
    * @return an ordered, mutable list of lore lines; never {@code null}
    */
   public static List<String> entryLore(MenuEntry entry) {
+    return entryLore(entry, GuiMenuConfig.INSTANCE);
+  }
+
+  /**
+   * Lore lines for a destination entry with configurable call-to-action strings.
+   *
+   * @param entry the destination row
+   * @param readyText call to action text when ready
+   * @param unavailableText call to action text when unavailable
+   * @return an ordered, mutable list of lore lines; never {@code null}
+   */
+  public static List<String> entryLore(MenuEntry entry, String readyText, String unavailableText) {
+    return entryLore(entry, GuiMenuConfig.INSTANCE);
+  }
+
+  /**
+   * Lore lines for a destination entry evaluated against configurable lore templates.
+   *
+   * @param entry the destination row
+   * @param config the menu configuration view
+   * @return an ordered, mutable list of lore lines; never {@code null}
+   */
+  public static List<String> entryLore(MenuEntry entry, GuiMenuConfig config) {
     List<String> lore = new ArrayList<>();
+    if (entry.target() != null && entry.target().kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.ACTION) {
+      String name = entry.target().name();
+      if (name != null) {
+        switch (name) {
+          case "action:operator:setup":
+            lore.add("&7Interactive 5-stage setup wizard");
+            lore.add("&7Configure worlds, gameplay & profiles");
+            lore.add("");
+            lore.add("&aClick to launch wizard");
+            return lore;
+          case "action:operator:import":
+            lore.add("&7Import configs from foreign plugins");
+            lore.add("&7Auto-detects BetterRTP and others");
+            lore.add("");
+            lore.add("&aClick to scan & import");
+            return lore;
+          case "action:operator:config":
+            lore.add("&7Edit regions, boundaries & costs");
+            lore.add("");
+            lore.add("&aClick to open editor");
+            return lore;
+          case "action:operator:visualizations":
+            lore.add("&7Map visualizations of search space");
+            lore.add("&7Heatmaps, biomes & bad-location voids");
+            lore.add("");
+            lore.add("&aClick to open visualizations");
+            return lore;
+          case "action:operator:status":
+            lore.add("&7Real-time queues, memory & metrics");
+            lore.add("");
+            lore.add("&aClick to view status");
+            return lore;
+          case "action:operator:adminbook":
+            lore.add("&7Master administrative book panel");
+            lore.add("&7Full command tree & scan crawlers");
+            lore.add("");
+            lore.add("&aClick to open panel");
+            return lore;
+          case "action:operator:reload":
+            lore.add("&7Reload configuration from disk");
+            lore.add("");
+            lore.add("&aClick to reload");
+            return lore;
+          case "menu:operator":
+            lore.add("&7Operator management tools & setup");
+            lore.add("");
+            lore.add("&aClick to open hub");
+            return lore;
+          case "menu:main":
+            lore.add("&7Return to destination menu");
+            lore.add("");
+            lore.add("&aClick to return");
+            return lore;
+          default:
+            if (name.startsWith("menu:biomes:")) {
+              lore.add("&7Browse available destination biomes");
+              lore.add("");
+              lore.add("&aClick to view biomes");
+              return lore;
+            }
+            if (name.startsWith("menu:actions:")) {
+              lore.add("&7Browse special teleport actions");
+              lore.add("");
+              lore.add("&aClick to view actions");
+              return lore;
+            }
+            break;
+        }
+      }
+    }
+
+    if (config == null) config = GuiMenuConfig.INSTANCE;
     RtpTargetStatus.Availability availability = entry.availability();
-    lore.add("&7Status: " + statusColor(availability) + availability.name());
-    if (availability == RtpTargetStatus.Availability.ON_COOLDOWN
-        && entry.remainingCooldownMillis() > 0L) {
-      long secs = (entry.remainingCooldownMillis() + 999L) / 1000L;
-      lore.add("&7Cooldown: &e" + secs + "s");
+    List<String> template;
+    switch (availability) {
+      case READY:
+        template = config.loreReady();
+        break;
+      case ON_COOLDOWN:
+        template = config.loreCooldown();
+        break;
+      case IN_COMBAT:
+        template = config.loreCombat();
+        break;
+      case NO_FUNDS:
+        template = config.loreNoFunds();
+        break;
+      case NO_PERMISSION:
+      case DISABLED:
+      default:
+        template = config.loreNoPermission();
+        break;
     }
-    if (entry.cost() > 0.0) {
-      lore.add("&7Cost: &6" + entry.cost());
+
+    if (template != null) {
+      for (String line : template) {
+        lore.add(expandPlaceholders(line, entry));
+      }
     }
-    lore.add("");
-    lore.add(entry.ready() ? "&aClick to teleport!" : "&cUnavailable right now.");
     return lore;
+  }
+
+  /**
+   * Expands lore placeholders with concrete values from {@code entry}.
+   * Supports {status}, {cooldown}, {delay}, {cost}, {target}, {world}, {region}.
+   */
+  public static String expandPlaceholders(String line, MenuEntry entry) {
+    if (line == null || !line.contains("{")) return line;
+    RtpTargetStatus.Availability avail = entry.availability();
+    long cdMillis = (avail == RtpTargetStatus.Availability.IN_COMBAT)
+        ? entry.combatRemainingMillis()
+        : entry.remainingCooldownMillis();
+
+    String costStr;
+    if (entry.cost() <= 0.0) {
+      costStr = "Free";
+    } else if (entry.cost() == Math.floor(entry.cost())) {
+      costStr = String.format(java.util.Locale.ROOT, "%.0f", entry.cost());
+    } else {
+      costStr = String.valueOf(entry.cost());
+    }
+
+    String worldName = "";
+    String regionName = "";
+    if (entry.target() != null) {
+      if (entry.target().kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.WORLD) {
+        worldName = entry.target().name() != null ? entry.target().name() : "";
+      } else if (entry.target().kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.REGION) {
+        regionName = entry.target().name() != null ? entry.target().name() : "";
+      }
+    }
+
+    return line.replace("{status}", statusColor(avail) + avail.name())
+        .replace("{cooldown}", formatDuration(cdMillis))
+        .replace("{delay}", formatDuration(entry.delayMillis()))
+        .replace("{cost}", costStr)
+        .replace("{target}", entry.displayName() != null ? entry.displayName() : "")
+        .replace("{world}", worldName)
+        .replace("{region}", regionName);
+  }
+
+  /**
+   * Formats millisecond duration into concise human-readable units (e.g. 45s, 1m 30s, 2h).
+   */
+  public static String formatDuration(long millis) {
+    if (millis <= 0L) return "0s";
+    long totalSeconds = (millis + 999L) / 1000L;
+    if (totalSeconds < 60L) {
+      return totalSeconds + "s";
+    }
+    long minutes = totalSeconds / 60L;
+    long seconds = totalSeconds % 60L;
+    if (minutes < 60L) {
+      return (seconds > 0) ? (minutes + "m " + seconds + "s") : (minutes + "m");
+    }
+    long hours = minutes / 60L;
+    long remainingMinutes = minutes % 60L;
+    if (remainingMinutes > 0) {
+      return hours + "h " + remainingMinutes + "m";
+    }
+    return hours + "h";
   }
 
   /** Display label for the dashboard tile. */

@@ -13,6 +13,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
@@ -25,6 +26,10 @@ import org.jetbrains.annotations.Nullable;
  * @param <E> enum of configuration keys
  */
 public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements ConfigLoader {
+  private static final Pattern UNSAFE_NAME_CHARS = Pattern.compile("[:\\\\/*?\"<>|]");
+  private static final Pattern VERSION_LINE_INDENTED = Pattern.compile("(?i)\\s*+version\\s*+:.*+");
+  private static final Pattern VERSION_LINE = Pattern.compile("(?i)version\\s*:.*");
+
   /** The file database used by this parser */
   public final YamlFileDatabase fileDatabase;
 
@@ -201,7 +206,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
    */
   static String sanitizeName(String name) {
     if (name == null) return null;
-    return name.replaceAll("[:\\\\/*?\"<>|]", "_");
+    return UNSAFE_NAME_CHARS.matcher(name).replaceAll("_");
   }
 
   /**
@@ -687,7 +692,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     StringBuilder sb = new StringBuilder();
     for (String ln : lines) {
       String t = ln.stripTrailing();
-      if (t.matches("(?i)\\s*+version\\s*+:.*+")) continue;
+      if (VERSION_LINE_INDENTED.matcher(t).matches()) continue;
       sb.append(t).append('\n');
     }
     return sb.toString().trim();
@@ -803,7 +808,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       String[] lines = body.split("\n", -1);
       boolean replaced = false;
       for (int i = 0; i < lines.length; i++) {
-        if (lines[i].matches("(?i)version\\s*:.*")) {
+        if (VERSION_LINE.matcher(lines[i]).matches()) {
           lines[i] = "version: " + ver;
           replaced = true;
           break;
@@ -1063,7 +1068,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         RtpYamlConfig = cachedLookup.get().get(name);
       }
       if (RtpYamlConfig == null) {
-        data.clear();
+        replaceData(new EnumMap<>(myClass));
         return;
       }
     }
@@ -1100,15 +1105,18 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       //            loadResource( f );
     }
 
-    data.clear();
+    // Build off-side and publish once: lock-free readers must never see the
+    // emptied map a clear()+put() reload would expose mid-way.
+    EnumMap<E, Object> loaded = new EnumMap<>(myClass);
     for (E v : myClass.getEnumConstants()) {
       Object name = language_mapping.get(v.name());
       if (name == null) name = v.name();
       Object fromString = RtpYamlConfig.get(name.toString());
       if (fromString != null) {
-        data.put(v, fromString);
+        loaded.put(v, fromString);
       }
     }
+    replaceData(loaded);
 
     // Re-apply customizations recovered from the previous (foreign-locale) file.
     // Uses set() so the new file persists them under the active locale's key names.
@@ -1444,14 +1452,16 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         if (!source.exists()) {
           saveResourceFromJar(diff + File.separator + "default.yml", overwrite);
         }
-        if (!target.exists()) {
-          boolean newFile = target.createNewFile();
-          if (!newFile)
-            throw new IOException("failed to create new file - " + target.getAbsolutePath());
+        if (overwrite || !target.exists()) {
+          if (!target.exists()) {
+            boolean newFile = target.createNewFile();
+            if (!newFile)
+              throw new IOException("failed to create new file - " + target.getAbsolutePath());
+          }
+          if (source.exists()) {
+            Files.copy(source.toPath(), target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+          }
         }
-        FileOutputStream outputStream = new FileOutputStream(target.getPath());
-        Files.copy(source.toPath(), outputStream);
-        outputStream.close();
       }
     }
   }

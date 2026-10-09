@@ -210,6 +210,7 @@ menuAdminPanelHint: "&7click an option; destructive actions show a warning hover
 
 # 管理面板上的分区分隔符。无占位符。
 menuAdminPanelSectionConfig: "&8--- &7配置 &8---"
+menuAdminPanelSectionDocs: "&8--- &7文档与编辑器 &8---"
 menuAdminPanelSectionDiagnostics: "&8--- &7诊断 &8---"
 menuAdminPanelSectionLifecycle: "&8--- &7生命周期 &8---"
 menuAdminPanelSectionBrowse: "&8--- &7浏览 &8---"
@@ -217,6 +218,10 @@ menuAdminPanelSectionBrowse: "&8--- &7浏览 &8---"
 # 管理面板行 + 悬停文字。无占位符。
 menuAdminPanelRowConfig: "&b▶ 配置编辑器"
 menuAdminPanelHoverConfig: "&7打开精选配置选择器"
+menuAdminPanelRowDocs: "#5FB3B3▶ 文档"
+menuAdminPanelHoverDocs: "&7打开游戏内置的打包文档手册"
+menuAdminPanelRowEditor: "#5FB3B3▶ Web编辑器与手册"
+menuAdminPanelHoverEditor: "&7启动带有集成文档的临时Web编辑器会话"
 menuAdminPanelRowRegions: "#5FB3B3» 区域"
 menuAdminPanelHoverRegions: "&7添加、删除或编辑每区域配置"
 menuAdminPanelRowWorlds: "#5FB3B3▶ 世界"
@@ -463,6 +468,30 @@ multiconfigResultNameInvalid: "&c名称 '[name]' 不合法; 请使用字母、�
 # ADD 与现有条目名称冲突时的结果消息。
 # 占位符: [name]。
 multiconfigResultNameTaken: "&c已存在名为 '[name]' 的条目。"
+
+docsNotFound: "&c[RTP] 未找到文档主题 '[topic]'。请使用 /rtp docs list 查看可用主题。"
+docsEmpty: "&c[RTP] 当前未注册任何文档主题。"
+docsExportSuccess: "&a[RTP] 文档 HTML 离线包已成功导出至 [path]。"
+docsExportFailed: "&c[RTP] 导出文档离线包失败: [reason]。"
+
+# --- Web editor channel (ADR-106) ---
+editorTrustPrompt: "&e[P1] 一个网页编辑器页面正在以代码 &b[nonce]&e 请求访问。如果你的页面显示相同的代码，请点击此处信任该浏览器。"
+editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(密钥 [fingerprint])"
+editorTrustAccepted: "&a[P0] 已信任浏览器：代码为 [nonce] 的编辑器页面现在可以预览并使用 Hot-Apply。"
+editorTrustAlready: "&7[P0] 代码为 [nonce] 的浏览器已被信任。"
+editorTrustUnknown: "&c[P0] 没有已打开的编辑器会话发放过代码 [nonce]。"
+editorTrustExpired: "&c[P0] 代码 [nonce] 已过期。请重新加载编辑器页面以获取新代码。"
+editorTrustUsage: "&c[P0] 用法：/rtp editor trust nonce=<编辑器页面显示的代码>"
+editorChannelOpened: "&a[P0] 网页编辑器通道已打开。收到请求时信任你的浏览器即可启用预览和 Hot-Apply。"
+editorChannelLost: "&e[P1] 网页编辑器通道已断开：[reason]。页面将继续使用其快照工作。"
+editorChannelExpired: "&7[P0] 网页编辑器通道已在 [minutes] 分钟后过期。请重新运行编辑器命令以继续。"
+editorTrustRateLimited: "&c[P0] 编辑器信任码错误次数过多。请等待一分钟后再试。"
+editorUntrustUsage: "&c[P0] 用法：/rtp editor untrust key=<指纹前缀，至少 4 个字符 | all>"
+editorUntrustRemoved: "&a[P0] 已撤销 [count] 个网页编辑器浏览器的信任；需要重新信任后才能预览或 Hot-Apply。"
+editorUntrustNone: "&7[P0] 没有与 [key] 匹配的受信任编辑器浏览器。"
+editorUntrustFailed: "&c[P0] 无法更新受信任编辑器列表：[reason]"
+editorApplyDigestMissing: "&c[P0] 编辑器数据缺少 sha256 校验和，因此未应用。请从最新的编辑器页面重新提交。"
+editorApplyFileUnreadable: "&e[P1] 无法读取离线应用文件（[reason]）；改为尝试字节存储。"
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

@@ -158,10 +158,10 @@ class PrefabCommandTest {
                 java.nio.file.Files.createTempDirectory("rtp-prefab-nether-test").toFile();
         accessor = RTPTestSetup.install(pluginDir);
 
-        // Seed a regions/default.yml on disk with an overworld-flavoured vert,
+        // Seed a definitions/regions/default.yml on disk with an overworld-flavoured vert,
         // then reload so the live regions MultiConfigParser registers it - the
         // amender reads the live default as its template.
-        java.io.File regionsDir = new java.io.File(pluginDir, "regions");
+        java.io.File regionsDir = new java.io.File(new java.io.File(pluginDir, "definitions"), "regions");
         assertTrue(regionsDir.mkdirs() || regionsDir.isDirectory());
         java.nio.file.Files.writeString(new java.io.File(regionsDir, "default.yml").toPath(),
                 "world: \"world\"\n"
@@ -183,7 +183,7 @@ class PrefabCommandTest {
 
         PrefabNonceStore.ConsumeResult cr = store.consumeByCaller(caller, "multi-world");
         assertTrue(cr.ok(), "apply must mint a pending entry");
-        Map<String, Object> netherRegion = cr.entry().newTrees().get("regions/world_nether");
+        Map<String, Object> netherRegion = cr.entry().newTrees().get("definitions/regions/world_nether");
         assertNotNull(netherRegion, "a per-world region for the nether must be synthesised");
         Map<?, ?> vert = (Map<?, ?>) netherRegion.get("vert");
         assertNotNull(vert, "synthesised nether region must carry a vert block");
@@ -195,7 +195,7 @@ class PrefabCommandTest {
 
         // Diff consistency (option B): the preview diff itself must carry the
         // repaired vert.requireSkyLight=false, not the cloned overworld value.
-        List<PrefabApplier.Change> diff = cr.entry().perFileDiff().get("regions/world_nether");
+        List<PrefabApplier.Change> diff = cr.entry().perFileDiff().get("definitions/regions/world_nether");
         assertNotNull(diff, "the synthesised nether region must produce a diff");
         // For a brand-new region file the whole vert block lands as a single
         // wholesale "vert" change (the base has no vert to recurse into), so
@@ -227,7 +227,7 @@ class PrefabCommandTest {
         UUID caller = UUID.randomUUID();
         accessor.addPlayer(new MockRTPPlayer(caller, "admin", null));
         store.mint(caller, "low-performance",
-                java.util.Collections.singletonMap("performance",
+                java.util.Collections.singletonMap("advanced/performance",
                         List.of(new PrefabApplier.Change("queue.maxSize", null, 50))));
         PrefabConfirmCmd confirm = new PrefabConfirmCmd(null, store);
         Map<String, List<String>> params = new HashMap<>();
@@ -243,7 +243,7 @@ class PrefabCommandTest {
         UUID caller = UUID.randomUUID();
         accessor.addPlayer(new MockRTPPlayer(caller, "admin", null));
         store.mint(caller, "low-performance",
-                java.util.Collections.singletonMap("performance",
+                java.util.Collections.singletonMap("advanced/performance",
                         List.of(new PrefabApplier.Change("queue.maxSize", null, 50))));
 
         AtomicReference<io.github.dailystruggle.rtp.api.event.PrefabAppliedEvent> seen =
@@ -260,11 +260,11 @@ class PrefabCommandTest {
         assertNotNull(ev, "a successful confirm must fire a PrefabAppliedEvent");
         assertEquals("low-performance", ev.prefabId());
         assertEquals(caller, ev.callerId());
-        assertTrue(ev.writtenFiles().contains("performance"),
-                "performance.yml must be reported as written");
-        assertTrue(ev.changes().containsKey("performance"),
+        assertTrue(ev.writtenFiles().contains("advanced/performance"),
+                "advanced/performance.yml must be reported as written");
+        assertTrue(ev.changes().containsKey("advanced/performance"),
                 "the per-file change map must surface the performance diff");
-        assertEquals("queue.maxSize", ev.changes().get("performance").get(0).keyPath());
+        assertEquals("queue.maxSize", ev.changes().get("advanced/performance").get(0).keyPath());
     }
 
     @Test
@@ -346,6 +346,35 @@ class PrefabCommandTest {
         boolean result = confirm.onCommand(caller, new HashMap<>(), null);
         assertFalse(result);
         assertEquals(1, store.size(), "missing-id confirm must not consume the outstanding entry");
+    }
+
+    @Test
+    void confirm_nullCaller_rejected() {
+        PrefabNonceStore store = new PrefabNonceStore();
+        PrefabConfirmCmd confirm = new PrefabConfirmCmd(null, store);
+        assertFalse(confirm.onCommand(null, Map.of("id", List.of("low-performance")), null));
+    }
+
+    @Test
+    void confirm_withNextCommand_returnsTrue() {
+        PrefabNonceStore store = new PrefabNonceStore();
+        PrefabConfirmCmd confirm = new PrefabConfirmCmd(null, store);
+        assertTrue(confirm.onCommand(UUID.randomUUID(), Map.of(), confirm));
+    }
+
+    @Test
+    void confirm_withRealChangesAndExpandPerWorld() {
+        PrefabNonceStore store = new PrefabNonceStore();
+        UUID caller = UUID.randomUUID();
+        accessor.addPlayer(new MockRTPPlayer(caller, "admin", null));
+        // Mint multi-world
+        store.mint(caller, "multi-world", Map.of(
+            "definitions/regions/default", List.of(new PrefabApplier.Change("radius", 100, 200))
+        ));
+        PrefabConfirmCmd confirm = new PrefabConfirmCmd(null, store);
+        Map<String, List<String>> params = new HashMap<>();
+        params.put("id", List.of("multi-world"));
+        assertTrue(confirm.onCommand(caller, params, null));
     }
 
     // --- PrefabRollbackCmd ---------------------------------------------------

@@ -15,8 +15,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Predicate;
 
 /**
  * The proxy-side trigger
@@ -52,6 +54,16 @@ public final class TransportRequestTriggerSource {
     /** Bounded join window for stopping workers (CHECKLIST row E3). */
     public static final long SHUTDOWN_TIMEOUT_MS = 2_000L;
     private static final String NONE_LITERAL = "<none>";
+    /**
+     * How long this proxy keeps handing back an envelope whose player it does
+     * not hold before treating the entry as orphaned (backend crashed before its
+     * quit-cancel) and cancelling it. Measured on this proxy's clock.
+     */
+    public static final long DEFAULT_FOREIGN_GRACE_MS = 60_000L;
+    /** Pause after a hand-back so two proxies do not spin on one foreign head entry. */
+    private static final long REQUEUE_BACKOFF_MS = 100L;
+    /** Soft cap on {@link #foreignSince}; stale rows are pruned past it. */
+    private static final int MAX_TRACKED_FOREIGN = 4_096;
 
     private final NetworkRequestQueue queue;
     private final RtpDispatcher dispatcher;
@@ -66,6 +78,17 @@ public final class TransportRequestTriggerSource {
      * in-memory transports). See {@code rtp-proxy-ADR-016}.
      */
     private final String thisProxyId;
+    /**
+     * Optional local-presence gate ({@code ProxySender::isConnected} on the
+     * proxy). Dequeued {@code playerId}s come from a shared store; when this
+     * predicate is set, envelopes for players without a session on this
+     * proxy are never dispatched (see {@link #handleForeign}). {@code null}
+     * defers the check to the dispatcher.
+     */
+    private final Predicate<UUID> localPresence;
+    private final long foreignGraceMs;
+    /** correlationId -> first time this proxy popped it for a player it does not hold. */
+    private final ConcurrentHashMap<UUID, Long> foreignSince = new ConcurrentHashMap<>();
 
     private final List<Thread> workers = new ArrayList<>();
     private volatile boolean running;
@@ -109,6 +132,38 @@ public final class TransportRequestTriggerSource {
                                          Duration pollTimeout,
                                          Logger logger,
                                          String thisProxyId) {
+        this(queue, dispatcher, workerThreads, pollTimeout, logger, thisProxyId, null);
+    }
+
+    /**
+     * Presence-gated constructor. {@code localPresence} answers "does this
+     * proxy currently hold a session for the player?" (Velocity:
+     * {@code sender::isConnected}); {@code null} disables the gate here.
+     * Envelopes for players held elsewhere are handed back to a shared queue
+     * ({@link NetworkRequestQueue#requeue}) rather than cancelled.
+     */
+    public TransportRequestTriggerSource(NetworkRequestQueue queue,
+                                         RtpDispatcher dispatcher,
+                                         int workerThreads,
+                                         Duration pollTimeout,
+                                         Logger logger,
+                                         String thisProxyId,
+                                         Predicate<UUID> localPresence) {
+        this(queue, dispatcher, workerThreads, pollTimeout, logger, thisProxyId, localPresence,
+                DEFAULT_FOREIGN_GRACE_MS);
+    }
+
+    /** As the presence-gated constructor with an explicit orphan grace window (tests). */
+    TransportRequestTriggerSource(NetworkRequestQueue queue,
+                                  RtpDispatcher dispatcher,
+                                  int workerThreads,
+                                  Duration pollTimeout,
+                                  Logger logger,
+                                  String thisProxyId,
+                                  Predicate<UUID> localPresence,
+                                  long foreignGraceMs) {
+        this.localPresence = localPresence;
+        this.foreignGraceMs = Math.max(0L, foreignGraceMs);
         this.queue = Objects.requireNonNull(queue, "queue");
         this.dispatcher = Objects.requireNonNull(dispatcher, "dispatcher");
         this.workerThreads = Math.max(1, workerThreads);
@@ -269,6 +324,12 @@ public final class TransportRequestTriggerSource {
     private void dispatchEnvelope(NetworkRequestQueue.QueueEnvelope env) {
         UUID playerId = env.playerId();
         UUID correlationId = env.correlationId();
+        if (localPresence != null && !isLocal(playerId)) {
+            // Never dispatch a shared-store playerId this proxy does not hold.
+            handleForeign(env);
+            return;
+        }
+        foreignSince.remove(correlationId);
         // Phase B trace (2026-05-23): worker has popped an envelope from the
         // queue and is about to hand it to the dispatcher. Logged at INFO so
         // devstack repros can confirm the proxy actually received the
@@ -318,5 +379,100 @@ public final class TransportRequestTriggerSource {
             // Non-fatal outcomes are already emitted by the dispatcher's
             // StatusSink; we deliberately do not double-log.
         });
+    }
+
+    /**
+     * Envelope for a player without a session here. On a shared queue another
+     * proxy may hold the player (or an ownership tag lapsed), so cancelling would
+     * destroy their request: hand it back, and cancel only once it has stayed
+     * foreign past {@link #foreignGraceMs} (orphan: backends cancel on quit). A
+     * JVM-local queue has no other consumer, so the player is gone: cancel.
+     */
+    private void handleForeign(NetworkRequestQueue.QueueEnvelope env) {
+        UUID playerId = env.playerId();
+        UUID correlationId = env.correlationId();
+        if (!queue.supportsRequeue()) {
+            logger.info("RTP TransportRequestTriggerSource: player {} not connected to this proxy; "
+                    + "cancelling correlationId={}.", playerId, correlationId);
+            cancelQuietly(playerId, NetworkRequestQueue.CancelReason.PLAYER_DISCONNECT);
+            return;
+        }
+        long now = System.currentTimeMillis();
+        Long first = foreignSince.putIfAbsent(correlationId, now);
+        if (first != null && now - first >= foreignGraceMs) {
+            foreignSince.remove(correlationId);
+            logger.warn("RTP TransportRequestTriggerSource: player {} not connected to any proxy that "
+                            + "dequeued correlationId={} for {}ms; cancelling the orphaned request.",
+                    playerId, correlationId, now - first);
+            cancelQuietly(playerId, NetworkRequestQueue.CancelReason.TTL_EXPIRED);
+            return;
+        }
+        pruneForeign(now);
+        boolean requeued;
+        try {
+            requeued = Boolean.TRUE.equals(queue.requeue(env)
+                    .get(pollTimeout.toMillis() + 1_000L, TimeUnit.MILLISECONDS));
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            logger.warn("RTP TransportRequestTriggerSource: interrupted handing back correlationId={} "
+                    + "for player {}.", correlationId, playerId);
+            return;
+        } catch (Exception e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            logger.warn("RTP TransportRequestTriggerSource: hand-back of correlationId={} for player {} "
+                    + "failed; the request stays ROUTING until the backend re-enrols or cancels.",
+                    correlationId, playerId, cause);
+            return;
+        }
+        if (!requeued) {
+            foreignSince.remove(correlationId);
+            logger.debug("RTP TransportRequestTriggerSource: correlationId={} for player {} changed "
+                    + "since dequeue; nothing to hand back.", correlationId, playerId);
+            return;
+        }
+        logger.debug("RTP TransportRequestTriggerSource: player {} not on this proxy; handed back "
+                + "correlationId={}.", playerId, correlationId);
+        try {
+            Thread.sleep(REQUEUE_BACKOFF_MS);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void cancelQuietly(UUID playerId, NetworkRequestQueue.CancelReason reason) {
+        try {
+            queue.cancel(playerId, reason)
+                    .whenComplete((v, err) -> {
+                        if (err != null) {
+                            logger.warn("RTP TransportRequestTriggerSource: cancel failed for player {}: {}",
+                                    playerId, err.getMessage());
+                        }
+                    });
+        } catch (RuntimeException re) {
+            logger.warn("RTP TransportRequestTriggerSource: cancel threw for player {}: {}",
+                    playerId, re.getMessage());
+        }
+    }
+
+    private void pruneForeign(long now) {
+        if (foreignSince.size() <= MAX_TRACKED_FOREIGN) return;
+        long cutoff = now - Math.max(foreignGraceMs, 1L) * 2L;
+        foreignSince.values().removeIf(t -> t < cutoff);
+    }
+
+    /** Visible for tests: envelopes currently being handed back. */
+    int trackedForeignCount() {
+        return foreignSince.size();
+    }
+
+    /** Fail closed: a throwing presence predicate counts as "not local". */
+    private boolean isLocal(UUID playerId) {
+        try {
+            return localPresence.test(playerId);
+        } catch (RuntimeException re) {
+            logger.warn("RTP TransportRequestTriggerSource: presence check threw for player {}: {}",
+                    playerId, re.getMessage());
+            return false;
+        }
     }
 }

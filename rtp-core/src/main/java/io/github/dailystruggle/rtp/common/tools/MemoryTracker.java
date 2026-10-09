@@ -316,6 +316,14 @@ public class MemoryTracker {
                           }
                           return true;
                         }
+
+                        if (actualTask instanceof io.github.dailystruggle.rtp.api.action.ActionSession session) {
+                          log(Level.WARNING,
+                              "[RTP][GC] Force-disarming stalled ActionSession label={0} ageOverBudgetMs={1}",
+                              label, leakDuration);
+                          session.disarm();
+                          return true;
+                        }
                       }
                       return false;
                     });
@@ -386,6 +394,9 @@ public class MemoryTracker {
       long finalTotalLoads = totalLoads;
       long finalPluginForced = pluginForced;
       long finalTrackedTickets = trackedTickets;
+      // Post-arrival holds (REQ-RTP-S-005) are owned, time-bounded tickets, not orphans.
+      long arrivalHolds = io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask
+          .pendingArrivalReleaseCount();
       long finalTotalActiveChunkCap = totalActiveChunkCap;
       long finalTotalLocationQueueSize = totalLocationQueueSize;
       long finalTotalCacheCap = totalCacheCap;
@@ -403,7 +414,7 @@ public class MemoryTracker {
         }
 
         // Enforce the cap on expected tickets to reveal locAssChunks hoarding
-        long expectedTickets = Math.min(finalTrackedTickets, finalTotalActiveChunkCap);
+        long expectedTickets = Math.min(finalTrackedTickets, finalTotalActiveChunkCap) + arrivalHolds;
         long discrepancy = finalActiveTickets - expectedTickets;
 
         if (isSystemLoggingEnabled()) {
@@ -427,7 +438,9 @@ public class MemoryTracker {
 
           for (Region sweepRegion : allRegions) {
             // Gate the sweep to prevent race conditions with asynchronous location generation
-            if (sweepRegion.inFlightCalculations.get() > 0) continue;
+            // Pending kept promotions hold tickets not yet in keptLocations; sweeping would drop them.
+            if (sweepRegion.inFlightCalculations.get() > 0
+                || sweepRegion.pendingKeptPromotions.get() > 0) continue;
 
             RTPWorld<?> sweepWorld = sweepRegion.getWorld();
             if (sweepWorld == null) continue;
@@ -454,6 +467,14 @@ public class MemoryTracker {
                 keepAliveKeys.add(data.selectedCoords.getChunkKey());
               }
             }
+          }
+
+          // 3b. Keep chunks pinned by pending post-arrival holds (worlds already being swept)
+          for (java.util.Map.Entry<RTPWorld<?>, java.util.Set<Long>> hold
+              : io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask
+                  .arrivalHoldChunkKeys().entrySet()) {
+            java.util.Set<Long> keepAliveKeys = keepAliveByWorld.get(hold.getKey());
+            if (keepAliveKeys != null) keepAliveKeys.addAll(hold.getValue());
           }
 
           // 4. For each world, release any active chunk tickets not in the keep-alive set

@@ -41,6 +41,9 @@ import java.util.regex.Pattern;
  */
 public final class ConsoleWatcher {
 
+    private static final Pattern SECTION_CODE = Pattern.compile("(?i)\\u00A7[0-9A-FK-OR]");
+    private static final Pattern AMPERSAND_CODE = Pattern.compile("(?i)&[0-9A-FK-OR]");
+
     private final Plugin plugin;
     private final FileConfiguration config;
     private final Runner runner;
@@ -55,6 +58,8 @@ public final class ConsoleWatcher {
         loadPatterns();
     }
 
+    // Admin-supplied console-fail-patterns, compiled once per load (not per log line).
+    @SuppressWarnings("PMD.RegexCompiledPerCall")
     private void loadPatterns() {
         patterns.clear();
         List<String> raw = config.getStringList("console-fail-patterns");
@@ -126,8 +131,8 @@ public final class ConsoleWatcher {
                 if (msg.contains("[StressTestRTP]")) return;
                 // Strip basic Minecraft color/format codes so patterns match
                 // regardless of whether the target plugin coloured its reply.
-                String stripped = msg.replaceAll("(?i)\\u00A7[0-9A-FK-OR]", "")
-                                     .replaceAll("(?i)&[0-9A-FK-OR]", "");
+                String stripped = AMPERSAND_CODE.matcher(
+                        SECTION_CODE.matcher(msg).replaceAll("")).replaceAll("");
                 boolean matched = false;
                 for (Pattern p : patterns) {
                     if (p.matcher(stripped).find()) { matched = true; break; }

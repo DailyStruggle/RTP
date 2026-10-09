@@ -20,8 +20,8 @@ pipeline {
   stages {
     stage('Traceability Check') {
       steps {
-        sh 'chmod +x check_traceability.sh'
-        sh './check_traceability.sh'
+        sh 'chmod +x scripts/check_traceability.sh'
+        sh './scripts/check_traceability.sh'
       }
     }
 

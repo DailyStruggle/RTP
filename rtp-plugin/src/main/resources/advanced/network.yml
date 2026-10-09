@@ -17,6 +17,11 @@ network:
   # @default: "RTP_NET_SECRET"
   secretEnv: "RTP_NET_SECRET"
 
+  # true = run plugin-message / proxy-cache / auto without the secret. Clients can then fake server data.
+  # @type: boolean
+  # @default: false
+  allowUnsigned: false
+
 # Backing store for cross-process state.
 transport:
   # How servers share data.
@@ -64,6 +69,15 @@ routing:
   # @options: ["local", "auto", "always"]
   # @default: "local"
   mode: "local"
+
+  # Cross-server dispatch mechanism.
+  # direct-db = direct backend-to-backend dispatch over SQL/Redis with native proxy Connect (no proxy plugin needed).
+  # proxy-broker = enqueue to NetworkRequestQueue; proxy companion dequeues and routes.
+  # auto = auto-select proxy-broker if proxy companion detected or proxy-direct; direct-db if SQL/Redis without proxy companion.
+  # @type: enum
+  # @options: ["auto", "direct-db", "proxy-broker"]
+  # @default: "auto"
+  dispatchMode: "auto"
 
   # true = this server only sends players to other servers.
   # @type: boolean
@@ -285,6 +299,24 @@ loadBalancer:
         # @range: [0.1, 20]
         # @default: 9.0
         k: 9.0
+
+# Web editor (/rtp editor) services. Leave blank to use the built-in defaults.
+editor:
+  # Upload store for editor sessions. Default: https://bytebin.lucko.me
+  # @type: string
+  bytebinUrl: ""
+
+  # Live-update relay (bytesocks-compatible). Default: https://usersockets.luckperms.net
+  # Point this at your own bytesocks server to avoid depending on a public one.
+  # @type: string
+  relayUrl: ""
+
+  # Trusted web editor browsers (/rtp editor trust, /rtp editor untrust).
+  trust:
+    # Days a browser stays trusted after /rtp editor trust. 0 = never expires.
+    # @type: integer
+    # @default: 0
+    maxAgeDays: 0
 
 # Config schema version (do not edit).
 version: 1.1

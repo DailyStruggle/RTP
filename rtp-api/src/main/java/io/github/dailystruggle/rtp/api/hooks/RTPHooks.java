@@ -42,4 +42,16 @@ public interface RTPHooks {
   /** @return the arrival platform-creator registry; never {@code null}. */
   @PublicApi
   PlatformCreatorRegistry platformCreator();
+
+  /** @return the claim boundary provider registry; never {@code null}. */
+  @PublicApi
+  default ClaimBoundaryRegistry claimBoundaries() {
+    throw new UnsupportedOperationException();
+  }
+
+  /** @return the web editor extension registry (ADR-107); never {@code null}. */
+  @PublicApi
+  default EditorExtensionRegistry editorExtensions() {
+    throw new UnsupportedOperationException();
+  }
 }

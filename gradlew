@@ -67,33 +67,132 @@
 # Transparent concurrency serialization for concurrent LLM tasks / processes
 if [ "${RTP_GRADLE_LOCKED:-0}" != "1" ]; then
     export RTP_GRADLE_LOCKED=1
-    LOCK_DIR="${TMPDIR:-/tmp}/rtp_gradle_build.lock"
 
-    # Note: POSIX shells (dash/ash) only support single-digit file descriptors,
-    # so the lock is taken via flock's command form instead of "exec 200>file".
-    if command -v flock >/dev/null 2>&1; then
-        LOCK_FILE="${TMPDIR:-/tmp}/rtp_gradle_build.flock"
-        if [ -x "$0" ]; then
-            flock -w 600 "$LOCK_FILE" "$0" "$@"
-        else
-            flock -w 600 "$LOCK_FILE" sh "$0" "$@"
+    # Inspect arguments to extract module target if non-conflicting
+    TARGET_MODULE=""
+    NON_MODULE_TASKS=0
+    MULTIPLE_MODULES=0
+
+    for arg in "$@"; do
+        case "$arg" in
+            -*)
+                # Option/flag, ignore for target module determination
+                ;;
+            :*/*)
+                # Not a standard task notation
+                NON_MODULE_TASKS=1
+                ;;
+            :*)
+                # Extract top-level module: strip leading colon, take up to next colon
+                mod_trimmed="${arg#:}"
+                case "$mod_trimmed" in
+                    *:*)
+                        mod_name="${mod_trimmed%%:*}"
+                        if [ -z "$TARGET_MODULE" ]; then
+                            TARGET_MODULE="$mod_name"
+                        elif [ "$TARGET_MODULE" != "$mod_name" ]; then
+                            MULTIPLE_MODULES=1
+                        fi
+                        ;;
+                    *)
+                        # Root task specified as :task
+                        NON_MODULE_TASKS=1
+                        ;;
+                esac
+                ;;
+            *)
+                # Unscoped task (e.g. "build", "test", "spotlessApply")
+                NON_MODULE_TASKS=1
+                ;;
+        esac
+    done
+
+    LOCK_SUFFIX="build"
+    if [ -n "$TARGET_MODULE" ] && [ "$NON_MODULE_TASKS" -eq 0 ] && [ "$MULTIPLE_MODULES" -eq 0 ]; then
+        LOCK_SUFFIX="mod_${TARGET_MODULE}"
+        # A module whose build files reference another top-level project shares that project's build
+        # outputs with any concurrent run that also depends on it (e.g. :effects-api:remapJar under both
+        # :rtp-core and :rtp-plugin), so such runs take the global lock. gradle/rtp-gradle-lock.ps1
+        # locks the dependency closure instead; flock here has too few descriptors for that.
+        APP_DIR=$(cd "${0%/*}" 2>/dev/null && pwd -P) || APP_DIR=.
+        mod_dir=$(sed -n "s/^[[:space:]]*project([[:space:]]*['\"]:${TARGET_MODULE}['\"][[:space:]]*)\.projectDir[[:space:]]*=[[:space:]]*file([[:space:]]*['\"]\([^'\"]*\)['\"].*/\1/p" "$APP_DIR/settings.gradle" 2>/dev/null | head -n 1)
+        [ -n "$mod_dir" ] || mod_dir="$TARGET_MODULE"
+        if [ -d "$APP_DIR/$mod_dir" ] && find "$APP_DIR/$mod_dir" -name build -prune -o \( -name build.gradle -o -name build.gradle.kts \) \
+                -exec grep -ho "project([[:space:]]*\(path[[:space:]]*[:=][[:space:]]*\)\{0,1\}['\"]:[A-Za-z0-9_.:-]*" {} + 2>/dev/null \
+                | sed "s/.*['\"]://; s/:.*//" | grep -qvxF "$TARGET_MODULE"; then
+            LOCK_SUFFIX="build"
         fi
-        EXIT_CODE=$?
-        exit $EXIT_CODE
+    fi
+
+    # A module run takes its lock while holding the global lock; a global run holds the global lock
+    # and waits for every module lock to drain, so the two never overlap. Both take the global lock
+    # first, so they cannot deadlock. Single-digit descriptors only (dash/ash); the child gets none,
+    # so a forked daemon never inherits a lock.
+    LOCK_TMP="${TMPDIR:-/tmp}"
+    if [ -x "$0" ]; then set -- "$0" "$@"; else set -- sh "$0" "$@"; fi
+    if command -v flock >/dev/null 2>&1; then
+        exec 8>"$LOCK_TMP/rtp_gradle_build.flock"
+        if ! flock -w 600 8; then
+            echo "[gradlew] Timed out waiting for the global Gradle build lock." >&2
+            exit 1
+        fi
+        if [ "$LOCK_SUFFIX" != "build" ]; then
+            exec 9>"$LOCK_TMP/rtp_gradle_${LOCK_SUFFIX}.flock"
+            if ! flock -w 600 9; then
+                echo "[gradlew] Timed out waiting for Gradle lock (${LOCK_SUFFIX})." >&2
+                exit 1
+            fi
+            exec 8>&-
+        else
+            for mod_lock in "$LOCK_TMP"/rtp_gradle_mod_*.flock; do
+                [ -e "$mod_lock" ] || continue
+                if ! flock -w 600 "$mod_lock" true; then
+                    echo "[gradlew] Timed out waiting for module build ($mod_lock)." >&2
+                    exit 1
+                fi
+            done
+        fi
+        "$@" 8>&- 9>&-
+        exit $?
     else
+        GLOBAL_DIR="$LOCK_TMP/rtp_gradle_build.lock"
+        LOCK_DIR="$LOCK_TMP/rtp_gradle_${LOCK_SUFFIX}.lock"
         WAIT_SECONDS=0
         TIMEOUT=600
-        while ! mkdir "$LOCK_DIR" 2>/dev/null; do
+        while :; do
+            if mkdir "$GLOBAL_DIR" 2>/dev/null; then
+                if [ "$LOCK_SUFFIX" = "build" ]; then
+                    break
+                fi
+                if mkdir "$LOCK_DIR" 2>/dev/null; then
+                    rmdir "$GLOBAL_DIR" 2>/dev/null
+                    break
+                fi
+                rmdir "$GLOBAL_DIR" 2>/dev/null
+            fi
             if [ "$WAIT_SECONDS" -ge "$TIMEOUT" ]; then
                 echo "[gradlew] Timed out waiting for Gradle lock directory ($LOCK_DIR)." >&2
                 exit 1
             fi
             WAIT_SECONDS=$((WAIT_SECONDS + 5))
-            echo "[gradlew] Waiting for build lock... (${WAIT_SECONDS}s)" >&2
+            echo "[gradlew] Waiting for lock (${LOCK_SUFFIX})... (${WAIT_SECONDS}s)" >&2
             sleep 5
         done
         trap 'rmdir "$LOCK_DIR" 2>/dev/null' EXIT INT TERM HUP
-        "$0" "$@"
+        if [ "$LOCK_SUFFIX" = "build" ]; then
+            for mod_dir in "$LOCK_TMP"/rtp_gradle_mod_*.lock; do
+                while [ -d "$mod_dir" ]; do
+                    if [ "$WAIT_SECONDS" -ge "$TIMEOUT" ]; then
+                        echo "[gradlew] Timed out waiting for module build ($mod_dir)." >&2
+                        exit 1
+                    fi
+                    WAIT_SECONDS=$((WAIT_SECONDS + 5))
+                    echo "[gradlew] Waiting for module build to finish (${mod_dir##*/})... (${WAIT_SECONDS}s)" >&2
+                    sleep 5
+                done
+            done
+        fi
+        "$@"
         EXIT_CODE=$?
         rmdir "$LOCK_DIR" 2>/dev/null
         trap - EXIT INT TERM HUP

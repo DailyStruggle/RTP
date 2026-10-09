@@ -74,6 +74,14 @@ public class CircleOptimizedDualLayer extends AbstractDualLayerShape {
     return r;
   }
 
+  /** Adds {@code rEff}: it grows with the learned bad area under {@code expand}. */
+  @Override
+  public Map<String, Object> curveState() {
+    Map<String, Object> state = super.curveState();
+    state.put("rEff", getEffectiveRadius());
+    return state;
+  }
+
   /**
    * Returns the effective outer Chebyshev macro-ring index corresponding to the effective radius.
    *
@@ -536,11 +544,11 @@ public class CircleOptimizedDualLayer extends AbstractDualLayerShape {
     long totalTilesInRing = 4L * sideLen;
 
     // Pick tile and internal coordinate within ring K
-    long randomTileStep = SEED_SOURCE.nextLong(totalTilesInRing);
+    long randomTileStep = rng().nextLong(totalTilesInRing);
     long side = randomTileStep / sideLen;
     long sideStep = randomTileStep % sideLen;
 
-    long randomHilbert = SEED_SOURCE.nextLong(area);
+    long randomHilbert = rng().nextLong(area);
 
     long fullMacroIdx = 4L * (K - 1L) * (K - 1L) + side * (2L * K - 1L) + sideStep;
     long macroLoc = fullMacroIdx - 4L * lut.kInner * lut.kInner;

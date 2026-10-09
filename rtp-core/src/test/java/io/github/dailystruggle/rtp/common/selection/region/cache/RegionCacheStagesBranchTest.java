@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.LockSupport;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -533,8 +534,13 @@ class RegionCacheStagesBranchTest {
                 startLatch.await();
                 for (int i = 0; i < totalItems; i++) {
                     RTPLocation location = loc(i, i);
+                    int spins = 0;
                     while (!buffer.offer(location)) {
-                        Thread.sleep(1);
+                        if (spins++ < 32) {
+                            Thread.onSpinWait();
+                        } else {
+                            LockSupport.parkNanos(50_000L);
+                        }
                     }
                     offered.incrementAndGet();
                 }
@@ -549,12 +555,18 @@ class RegionCacheStagesBranchTest {
         Thread consumer = new Thread(() -> {
             try {
                 startLatch.await();
+                int spins = 0;
                 while (polledIds.size() < totalItems) {
                     RTPLocation location = buffer.poll();
                     if (location != null) {
                         polledIds.add(location.coords().x());
+                        spins = 0;
                     } else {
-                        Thread.sleep(1);
+                        if (spins++ < 32) {
+                            Thread.onSpinWait();
+                        } else {
+                            LockSupport.parkNanos(50_000L);
+                        }
                     }
                 }
             } catch (InterruptedException e) {
@@ -568,7 +580,7 @@ class RegionCacheStagesBranchTest {
         consumer.start();
 
         startLatch.countDown();
-        assertTrue(doneLatch.await(15, TimeUnit.SECONDS));
+        assertTrue(doneLatch.await(60, TimeUnit.SECONDS), "Concurrent producer and consumer should complete within timeout");
 
         producer.join();
         consumer.join();

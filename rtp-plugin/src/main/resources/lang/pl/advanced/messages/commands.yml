@@ -219,6 +219,7 @@ menuPanelAdminaWskazowka: "&7click an option; destructive actions show a warning
 
 # Separatory sekcji w panelu admina. Brak zmiennych.
 menuPanelAdminaSekcjaKonfig: "&8--- &7konfiguracja &8---"
+menuPanelAdminaSekcjaDokumentacja: "&8--- &7dokumentacja i edytor &8---"
 menuPanelAdminaSekcjaDiagnostyka: "&8--- &7diagnostyka &8---"
 menuPanelAdminaSekcjaCyklZycia: "&8--- &7cykl życia &8---"
 menuPanelAdminaSekcjaPrzegladaj: "&8--- &7przeglądaj &8---"
@@ -226,6 +227,10 @@ menuPanelAdminaSekcjaPrzegladaj: "&8--- &7przeglądaj &8---"
 # Wiersze panelu admina + podpowiedzi. Brak zmiennych.
 menuPanelAdminaWierszKonfig: "&b▶ edytor konfiguracji"
 menuPanelAdminaHoverKonfig: "&7otwórz wyselekcjonowany selektor konfiguracji"
+menuPanelAdminaWierszDokumentacja: "#5FB3B3▶ dokumentacja"
+menuPanelAdminaHoverDokumentacja: "&7otwórz spakowane podręczniki dokumentacji w grze"
+menuPanelAdminaWierszEdytor: "#5FB3B3▶ edytor www i podręcznik"
+menuPanelAdminaHoverEdytor: "&7uruchom sesję efemerycznego edytora www z dokumentacją"
 menuPanelAdminaWierszRegiony: "#5FB3B3▶ regiony"
 menuPanelAdminaHoverRegiony: "&7dodaj, usuń lub edytuj konfiguracje poszczególnych regionów"
 menuPanelAdminaWierszSwiaty: "#5FB3B3▶ światy"
@@ -482,6 +487,30 @@ multikonfigWynikNazwaNieprawidlowa: "&cnazwa '[name]' jest niedozwolona; użyj l
 # Komunikat wyniku, gdy DODANIE koliduje z istniejaca nazwa wpisu.
 # Zmienna: [name].
 multikonfigWynikNazwaZajeta: "&cwpis o nazwie '[name]' już istnieje."
+
+docsNotFound: "&c[RTP] Nie znaleziono tematu dokumentacji '[topic]'. Użyj /rtp docs list, aby zobaczyć dostępne tematy."
+docsEmpty: "&c[RTP] Obecnie nie ma zarejestrowanych tematów dokumentacji."
+docsExportSuccess: "&a[RTP] Pakiet HTML dokumentacji został pomyślnie wyeksportowany do [path]."
+docsExportFailed: "&c[RTP] Nie udało się wyeksportować pakietu dokumentacji: [reason]."
+
+# --- Web editor channel (ADR-106) ---
+editorTrustPrompt: "&e[P1] Strona edytora WWW prosi o dostęp z kodem &b[nonce]&e. Jeśli Twoja strona pokazuje ten sam kod, kliknij tutaj, aby zaufać tej przeglądarce."
+editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(klucz [fingerprint])"
+editorTrustAccepted: "&a[P0] Przeglądarka zaufana: strona edytora z kodem [nonce] może teraz pokazywać podglądy i używać Hot-Apply."
+editorTrustAlready: "&7[P0] Przeglądarka z kodem [nonce] była już zaufana."
+editorTrustUnknown: "&c[P0] Żadna otwarta sesja edytora nie wydała kodu [nonce]."
+editorTrustExpired: "&c[P0] Kod [nonce] wygasł. Odśwież stronę edytora, aby otrzymać nowy."
+editorTrustUsage: "&c[P0] Użycie: /rtp editor trust nonce=<kod pokazany przez stronę edytora>"
+editorChannelOpened: "&a[P0] Kanał edytora WWW otwarty. Zaufaj przeglądarce, gdy pojawi się prośba, aby włączyć podglądy i Hot-Apply."
+editorChannelLost: "&e[P1] Utracono kanał edytora WWW: [reason]. Strona nadal działa na podstawie migawki."
+editorChannelExpired: "&7[P0] Kanał edytora WWW wygasł po [minutes] minutach. Uruchom ponownie polecenie edytora, aby kontynuować."
+editorTrustRateLimited: "&c[P0] Zbyt wiele błędnych kodów zaufania edytora. Odczekaj minutę i spróbuj ponownie."
+editorUntrustUsage: "&c[P0] Użycie: /rtp editor untrust key=<początek odcisku klucza, co najmniej 4 znaki | all>"
+editorUntrustRemoved: "&a[P0] Cofnięto zaufanie dla przeglądarek edytora web: [count]; trzeba im ponownie zaufać, aby używać podglądu lub Hot-Apply."
+editorUntrustNone: "&7[P0] Żadna zaufana przeglądarka edytora nie pasuje do [key]."
+editorUntrustFailed: "&c[P0] Nie udało się zaktualizować listy zaufanych edytorów: [reason]"
+editorApplyDigestMissing: "&c[P0] Ładunek edytora nie ma sumy kontrolnej sha256, więc nie został zastosowany. Zatwierdź ponownie z aktualnej strony edytora."
+editorApplyFileUnreadable: "&e[P1] Nie udało się odczytać pliku zastosowania offline ([reason]); próba z magazynem bajtów."
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

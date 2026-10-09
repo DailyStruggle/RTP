@@ -1,32 +1,28 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
 import com.griefdefender.api.GriefDefender;
-import io.github.dailystruggle.rtp.common.RTP;
-import java.util.Objects;
-import java.util.logging.Level;
+import com.griefdefender.api.claim.Claim;
 
 /** Checker for GriefDefender claims */
 public class GriefDefenderChecker {
   private static boolean exists = true;
 
   public static Boolean isInClaim(io.github.dailystruggle.rtp.api.world.RTPCoords location) {
-    if (!exists) return false;
-    org.bukkit.World world = org.bukkit.Bukkit.getWorld(location.worldName());
-    if (world == null) return false;
-    return isInClaim(new org.bukkit.Location(world, location.x(), location.y(), location.z()));
+    if (!exists || location == null) return false;
+    org.bukkit.Location loc = ClaimLocationResolver.toLocation(location);
+    if (loc == null) return false;
+    return isInClaim(loc);
   }
 
   public static Boolean isInClaim(org.bukkit.Location location) {
     if (!exists) return false;
     try {
-      return !Objects.requireNonNull(GriefDefender.getCore().getClaimAt(location)).isWilderness();
+      Claim claim = GriefDefender.getCore().getClaimAt(location);
+      // Null when GriefDefender does not manage this world: no claims, not "in a claim".
+      if (claim == null) return false;
+      return !claim.isWilderness();
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.SEVERE,
-          "[RTP] Critical architectural incompatibility detected. Disabling GriefDefender integration for this session to prevent server instability.",
-          t);
+      return ClaimCheckFailure.handle("GriefDefender", t, () -> exists = false);
     }
-    return false;
   }
 }

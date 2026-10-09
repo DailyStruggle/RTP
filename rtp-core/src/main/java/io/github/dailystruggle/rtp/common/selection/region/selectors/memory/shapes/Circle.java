@@ -117,14 +117,16 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
     x = x - cx;
     z = z - cz;
 
-    double rotation = ((Math.atan(((double) z) / x) / (2 * Math.PI)) + 1) % 0.25;
-
-    if ((z < 0) && (x < 0)) {
-      rotation += 0.5;
-    } else if (z < 0) {
-      rotation += 0.75;
-    } else if (x < 0) {
-      rotation += 0.25;
+    double rotation = 0.0;
+    if (x != 0 || z != 0) {
+      rotation = ((Math.atan(((double) z) / x) / (2 * Math.PI)) + 1) % 0.25;
+      if ((z < 0) && (x < 0)) {
+        rotation += 0.5;
+      } else if (z < 0) {
+        rotation += 0.75;
+      } else if (x < 0) {
+        rotation += 0.25;
+      }
     }
 
     double radius = ((long) (Math.sqrt((double) x * x + (double) z * z)));
@@ -141,14 +143,16 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
     long x = coords.x - cx;
     long z = coords.z - cz;
 
-    double rotation = ((Math.atan(((double) z) / x) / (2 * Math.PI)) + 1) % 0.25;
-
-    if ((z < 0) && (x < 0)) {
-      rotation += 0.5;
-    } else if (z < 0) {
-      rotation += 0.75;
-    } else if (x < 0) {
-      rotation += 0.25;
+    double rotation = 0.0;
+    if (x != 0 || z != 0) {
+      rotation = ((Math.atan(((double) z) / x) / (2 * Math.PI)) + 1) % 0.25;
+      if ((z < 0) && (x < 0)) {
+        rotation += 0.5;
+      } else if (z < 0) {
+        rotation += 0.75;
+      } else if (x < 0) {
+        rotation += 0.25;
+      }
     }
 
     double radius = ((long) (Math.sqrt((double) x * x + (double) z * z)));

@@ -165,8 +165,15 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
         }
         MinecraftServer server = sl.getServer();
         final ChunkPos ticketPos = new ChunkPos(cx, cz);
+        if (server != null && !server.isSameThread()) {
+            // Ticket maps are server-thread state: add the temp ticket there, then request off-thread.
+            return server.submit(() -> tryAddTempLoadTicket(sl, ticketPos))
+                    .thenComposeAsync(added -> invokeGetChunkFuture(sl, cx, cz).whenComplete((handle, ex) -> {
+                        if (Boolean.TRUE.equals(added)) scheduleTempLoadTicketRemoval(sl, ticketPos);
+                    }), r -> RTP.scheduler.runTaskAsynchronously(r));
+        }
         final boolean ticketAdded = tryAddTempLoadTicket(sl, ticketPos);
-        if (server != null && server.isSameThread()) {
+        if (server != null) {
             CompletableFuture<RTPChunkHandle> out = new CompletableFuture<>();
             RTP.scheduler.runTaskAsynchronously(() ->
                     invokeGetChunkFuture(sl, cx, cz).whenComplete((handle, ex) -> {
@@ -362,6 +369,33 @@ public final class V26_2_R1FabricVersionAdapter implements FabricVersionAdapter 
     public @Nullable RTPPlayer createPlayer(Object serverPlayer) {
         if (!(serverPlayer instanceof ServerPlayer sp)) return null;
         return new V26_2_R1FabricRTPPlayer(sp);
+    }
+
+    /**
+     * Typed teleport via {@code ServerPlayer#teleport(TeleportTransition)}: one call covers
+     * same- and cross-dimension destinations and resets the server-side move check.
+     * Server thread only. Parity with the 1.21.5 / 1.21.11 adapters.
+     */
+    @Override
+    public boolean teleport(Object serverPlayer, Object serverLevel,
+                            double x, double y, double z, float yaw, float pitch) {
+        if (!(serverPlayer instanceof ServerPlayer sp)) return false;
+        if (!(serverLevel instanceof ServerLevel target)) return false;
+        try {
+            net.minecraft.world.level.portal.TeleportTransition transition =
+                    new net.minecraft.world.level.portal.TeleportTransition(
+                            target,
+                            new net.minecraft.world.phys.Vec3(x, y, z),
+                            net.minecraft.world.phys.Vec3.ZERO,
+                            yaw, pitch,
+                            net.minecraft.world.level.portal.TeleportTransition.DO_NOTHING);
+            sp.teleport(transition);
+            return true;
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING, "[RTP][Fabric 26.2.x] teleport failed: "
+                    + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return false;
+        }
     }
 
     @Override

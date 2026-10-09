@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.logging.Level;
 
@@ -99,16 +100,14 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
             changeCount += changes.size();
         }
 
-        File pluginDir = (RTP.serverAccessor == null) ? null : RTP.serverAccessor.getPluginDirectory();
-        if (pluginDir == null) {
-            RTP.log(Level.WARNING,
-                    "[prefab] confirm rejected NO_PLUGIN_DIR: caller=" + callerId
-                            + " prefab=" + entry.prefabId());
-            send(callerId, "&cConfirm failed: plugin directory unavailable (server not fully initialised).");
+        Optional<File> pluginDirOpt = PrefabDiskIO.resolvePluginDirectory(callerId, "confirm", entry.prefabId(),
+                "&cConfirm failed: plugin directory unavailable (server not fully initialised).");
+        if (pluginDirOpt.isEmpty()) {
             return false;
         }
+        File pluginDir = pluginDirOpt.get();
 
-        int retention = resolveBakRetention();
+        int retention = PrefabDiskIO.resolveBakRetention();
         // expandPerWorld prefabs synthesise a brand-new regions/<world>.yml per
         // loaded world. These are created through the same region-creation path
         // the /rtp config command uses (MultiConfigParser.addParser, which
@@ -117,7 +116,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
         // fallback in writeFile().
         boolean expandPerWorld = PrefabRegistry.byId(entry.prefabId())
                 .map(Prefab::expandPerWorld).orElse(false);
-        String defaultRegionFileId = "regions/" + MultiWorldExpander.DEFAULT_REGION_ID;
+        String defaultRegionFileId = "definitions/regions/" + MultiWorldExpander.DEFAULT_REGION_ID;
         List<String> writtenFiles = new ArrayList<>();
         List<String> writtenBaks = new ArrayList<>();
         for (Map.Entry<String, List<PrefabApplier.Change>> fe : entry.perFileDiff().entrySet()) {
@@ -213,7 +212,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
         send(callerId, "&aPrefab &f" + entry.prefabId() + "&a applied. Wrote "
                 + writtenFiles.size() + " file(s), " + changeCount + " change(s).");
         if (!writtenBaks.isEmpty()) {
-            send(callerId, "&7Backups: &f" + String.join(", ", writtenBaks));
+            send(callerId, PrefabDiskIO.formatBackupSummary(writtenBaks));
         }
         if (!installedSchematics.isEmpty()) {
             send(callerId, "&7Installed schematic(s): &f"
@@ -296,7 +295,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
         // Fallback: no live config system. Seed brand-new per-world regions from
         // the reference default so structural comments still survive.
         String templateFileId = (expandPerWorld
-                && fileId.startsWith("regions/")
+                && (fileId.startsWith("definitions/regions/") || fileId.startsWith("regions/"))
                 && !fileId.equals(defaultRegionFileId))
                 ? defaultRegionFileId : null;
         return PrefabDiskIO.writeWithBackup(pluginDir, fileId, newTree, changes, retention, templateFileId);
@@ -304,7 +303,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
 
     /**
      * Resolve the live {@link ConfigParser} backing a prefab file id, creating a
-     * brand-new region parser (and its on-disk {@code regions/<id>.yml} cloned
+     * brand-new region parser (and its on-disk {@code definitions/regions/<id>.yml} cloned
      * from {@code default.yml}) via {@link MultiConfigParser#addParser(String)}
      * when needed. Returns {@code null} when no parser can be resolved (the
      * caller then falls back to the tree-level writer).
@@ -313,20 +312,34 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
     @SuppressWarnings("unchecked")
     private static ConfigParser<?> resolveParser(String fileId) {
         try {
-            if (fileId.startsWith("regions/")) {
-                String entry = fileId.substring("regions/".length());
+            if (fileId.startsWith("definitions/regions/")) {
+                String entry = fileId.substring("definitions/regions/".length());
                 MultiConfigParser<RegionKeys> regions =
                         (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
                 if (regions == null) return null;
                 if (!regions.listParsers().contains(entry)) {
                     // Region-creation method (same as /rtp config regions add),
                     // but seeded explicitly from the synthesised prefab's
-                    // originating region (regions/default) rather than relying on
+                    // originating region (default) rather than relying on
                     // the implicit default fallback. This clones the originating
-                    // file's structure and comments onto regions/<entry>.yml.
+                    // file's structure and comments onto definitions/regions/<entry>.yml.
                     regions.addParser(entry, MultiWorldExpander.DEFAULT_REGION_ID);
                 }
                 return regions.getParser(entry);
+            }
+            if (fileId.startsWith("regions/")) {
+                String entry = fileId.substring("regions/".length());
+                MultiConfigParser<RegionKeys> regions =
+                        (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
+                if (regions == null) return null;
+                if (!regions.listParsers().contains(entry)) {
+                    regions.addParser(entry, MultiWorldExpander.DEFAULT_REGION_ID);
+                }
+                return regions.getParser(entry);
+            }
+            if (fileId.startsWith("definitions/worlds/")) {
+                String world = fileId.substring("definitions/worlds/".length());
+                return RTP.configs.getWorldParser(world);
             }
             if (fileId.startsWith("worlds/")) {
                 String world = fileId.substring("worlds/".length());
@@ -347,7 +360,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
     }
 
     /**
-     * Reads the {@code prefab.bakRetention} knob from {@code performance.yml} directly.
+     * Reads the {@code prefab.bakRetention} knob from {@code advanced/performance.yml} directly.
      * Falls back to {@link PrefabDiskIO#DEFAULT_BAK_RETENTION} on missing/invalid value.
      */
     @SuppressWarnings("unchecked")
@@ -356,7 +369,10 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
             if (RTP.serverAccessor == null) return PrefabDiskIO.DEFAULT_BAK_RETENTION;
             File pluginDir = RTP.serverAccessor.getPluginDirectory();
             if (pluginDir == null) return PrefabDiskIO.DEFAULT_BAK_RETENTION;
-            Map<String, Object> perf = PrefabDiskIO.readLive(pluginDir, "performance");
+            Map<String, Object> perf = PrefabDiskIO.readLive(pluginDir, "advanced/performance");
+            if (perf.isEmpty()) {
+                perf = PrefabDiskIO.readLive(pluginDir, "performance");
+            }
             Object prefabNode = perf.get("prefab");
             if (!(prefabNode instanceof Map<?, ?>)) return PrefabDiskIO.DEFAULT_BAK_RETENTION;
             Object raw = ((Map<String, Object>) prefabNode).get("bakRetention");

@@ -77,6 +77,26 @@ public class PolygonVerticesConfigTest {
   }
 
   @Test
+  @DisplayName("Unit suffixes (blocks 'b', chunks 'c', metric 'km') parse into chunk coordinates")
+  void unitSuffixes_parseToChunkCoordinates() {
+    Polygon polygon = new Polygon();
+    // 2000 blocks / 16 = 125 chunks; 3000 blocks / 16 = 188 (Math.round 187.5) chunks; 2km = 2000 blocks = 125 chunks
+    List<Object> vertices = new ArrayList<>(Arrays.asList(
+        Arrays.asList("2000b", "3200b"),
+        Arrays.asList("-2000b", "3200b"),
+        Arrays.asList("-125c", "-200c"),
+        Arrays.asList("2km", "-3200b")));
+
+    RegionConfigLoader.applyPolygonVertices(polygon, shapeMap(vertices));
+
+    assertEquals(4, polygon.getVertices().size());
+    assertArrayEquals(new int[] {125, 200}, polygon.getVertices().get(0));
+    assertArrayEquals(new int[] {-125, 200}, polygon.getVertices().get(1));
+    assertArrayEquals(new int[] {-125, -200}, polygon.getVertices().get(2));
+    assertArrayEquals(new int[] {125, -200}, polygon.getVertices().get(3));
+  }
+
+  @Test
   @DisplayName("Mapping forms (indexed list, and per-vertex x/z keys) parse")
   void mappingForms_installVertices() {
     Polygon polygon = new Polygon();

@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -17,7 +18,9 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -134,5 +137,70 @@ class AsyncTaskProcessingTest {
     void run_withZeroAvailableTime_doesNotThrow() {
         RTP.selectionAPI.permRegionLookup.put("regionA", newRegion("regionA"));
         assertDoesNotThrow(() -> new AsyncTaskProcessing(0L).run());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void run_withPerformanceConfig_executesRegionAndHandlesException() {
+        // Set up mock region that throws an exception during execute to test error handling
+        Region base = newRegion("throwingRegion");
+        Region throwingRegion = new Region("throwingRegion", base.getSettings()) {
+            @Override
+            public void execute(long allottedTime) {
+                throw new RuntimeException("simulated region execute error");
+            }
+        };
+        RTP.selectionAPI.permRegionLookup.put("throwingRegion", throwingRegion);
+
+        // Run pulse, verifying it catches the exception and logs it rather than crashing
+        assertDoesNotThrow(() -> new AsyncTaskProcessing(100_000L).run());
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    @DisplayName("REQ-RTP-S-004: a pulse that is still running makes later ticks skip instead of stacking")
+    void overlappingPulse_isSkipped_whilePreviousRuns() throws Exception {
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicInteger executions = new AtomicInteger();
+        Region base = newRegion("blockingRegion");
+        Region blocking = new Region("blockingRegion", base.getSettings()) {
+            @Override
+            public void execute(long allottedTime) {
+                executions.incrementAndGet();
+                entered.countDown();
+                try {
+                    release.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        };
+        RTP.selectionAPI.permRegionLookup.put("blockingRegion", blocking);
+
+        Thread first = new Thread(() -> new AsyncTaskProcessing(Long.MAX_VALUE).run(), "pulse-1");
+        first.start();
+        try {
+            assertTrue(entered.await(5, TimeUnit.SECONDS), "first pulse never reached the region");
+            assertTrue(AsyncTaskProcessing.isPulseActive());
+
+            boolean[] drained = {false};
+            RTP.getInstance().miscAsyncTasks.add(() -> drained[0] = true);
+            for (int i = 0; i < 5; i++) new AsyncTaskProcessing(Long.MAX_VALUE).run();
+
+            assertEquals(1, executions.get(), "overlapping ticks must not re-enter the region");
+            assertFalse(drained[0], "a skipped tick must not drain pipes");
+        } finally {
+            release.countDown();
+            first.join(5_000);
+        }
+        assertFalse(AsyncTaskProcessing.isPulseActive(), "guard must clear once the pulse ends");
+    }
+
+    @Test
+    @DisplayName("sparkFrameName tag returns rtp_async_task_drain")
+    void testSparkFrameName() {
+        AsyncTaskProcessing proc = new AsyncTaskProcessing(100L);
+        assertEquals("rtp_async_task_drain", proc.sparkFrameName());
     }
 }

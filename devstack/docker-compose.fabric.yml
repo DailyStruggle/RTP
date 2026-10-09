@@ -1,0 +1,41 @@
+# Fabric backend overlay for the rtp-proxy devstack.
+#
+# Layered on top of docker-compose.yml by `run-acceptance.ps1 -Fabric` via the
+# COMPOSE_FILE env var. This replaces Folia on backend-c with a Fabric 1.21.x
+# container running rtp-fabric, validating multi-platform backend parity
+# (Paper + Folia + Fabric) in the same acceptance topology.
+#
+# ADR reference: ADR-036, rtp-fabric-ADR-013.
+
+services:
+  backend-c:
+    image: itzg/minecraft-server:java25
+    environment:
+      EULA: "TRUE"
+      TYPE: FABRIC
+      VERSION: "1.21.11"
+      MEMORY: 6G
+      ONLINE_MODE: "FALSE"
+      OPS: ${OPS:-}
+      OVERRIDE_OPS: "TRUE"
+      RUN_AS_UID: "0"
+      RUN_AS_GID: "0"
+      RTP_NET_SECRET: ${RTP_NET_SECRET:?set RTP_NET_SECRET in .env}
+      FABRIC_PROXY_SECRET_FILE: /data/forwarding.secret
+    user: "0:0"
+    entrypoint:
+      - /bin/bash
+      - -c
+      - 'mkdir -p /data/config/rtp/regions /data/config/rtp/advanced /data/config/rtp/addons && cp -f /seed/network.yml /data/config/rtp/advanced/network.yml && cp -f /seed/logging.yml /data/config/rtp/advanced/logging.yml && (cp -f /seed/regions/*.yml /data/config/rtp/regions/ 2>/dev/null || true) && (cp -f /seed/addons/*.yml /data/config/rtp/addons/ 2>/dev/null || true) && chown -R 1000:1000 /data/config/rtp && exec /start'
+    volumes:
+      - ./backend-c/mods:/data/mods
+      - ./backend-c/rtp-config/network.yml:/seed/network.yml:ro
+      - ./backend-c/rtp-config/logging.yml:/seed/logging.yml:ro
+      - ./backend-c/rtp-config/regions:/seed/regions:ro
+      - ./backend-c/rtp-config/addons:/seed/addons:ro
+      - ./shared/forwarding.secret:/data/forwarding.secret
+      - mc-image-cache:/data/.cache
+      - ./backend-c/world:/data/world
+    depends_on:
+      redis:
+        condition: service_healthy

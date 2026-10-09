@@ -217,6 +217,7 @@ menuAdminPanelHint: "&7click an option; destructive actions show a warning hover
 
 # Разделители разделов на панели администратора. Без плейсхолдеров.
 menuAdminPanelSectionConfig: "&8--- &7конфигурация &8---"
+menuAdminPanelSectionDocs: "&8--- &7документация и редактор &8---"
 menuAdminPanelSectionDiagnostics: "&8--- &7диагностика &8---"
 menuAdminPanelSectionLifecycle: "&8--- &7жизненный цикл &8---"
 menuAdminPanelSectionBrowse: "&8--- &7обзор &8---"
@@ -224,6 +225,10 @@ menuAdminPanelSectionBrowse: "&8--- &7обзор &8---"
 # Строки панели администратора + подсказки при наведении. Без плейсхолдеров.
 menuAdminPanelRowConfig: "&b▶ редактор конфигурации"
 menuAdminPanelHoverConfig: "&7открыть подобранный селектор настроек"
+menuAdminPanelRowDocs: "#5FB3B3▶ документация"
+menuAdminPanelHoverDocs: "&7открыть встроенные руководства документации в игре"
+menuAdminPanelRowEditor: "#5FB3B3▶ веб-редактор и руководство"
+menuAdminPanelHoverEditor: "&7запустить сессию веб-редактора с интегрированной документацией"
 menuAdminPanelRowRegions: "#5FB3B3▶ регионы"
 menuAdminPanelHoverRegions: "&7добавить, удалить или изменить настройки по регионам"
 menuAdminPanelRowWorlds: "#5FB3B3▶ миры"
@@ -477,5 +482,29 @@ multiconfigResultNameInvalid: "&cимя '[name]' не разрешено; исп
 # Плейсхолдер: [name].
 multiconfigResultNameTaken: "&cзапись с именем '[name]' уже существует."
 
+docsNotFound: "&c[RTP] Тема документации '[topic]' не найдена. Используйте /rtp docs list для просмотра доступных тем."
+docsEmpty: "&c[RTP] В настоящее время нет зарегистрированных тем документации."
+docsExportSuccess: "&a[RTP] HTML-пакет документации успешно экспортирован в [path]."
+docsExportFailed: "&c[RTP] Не удалось экспортировать пакет документации: [reason]."
+
 # НЕ ИЗМЕНЯЙТЕ НОМЕР ВЕРСИИ
+# --- Web editor channel (ADR-106) ---
+editorTrustPrompt: "&e[P1] Страница веб-редактора запрашивает доступ с кодом &b[nonce]&e. Если ваша страница показывает тот же код, нажмите здесь, чтобы доверять этому браузеру."
+editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(ключ [fingerprint])"
+editorTrustAccepted: "&a[P0] Браузеру доверено: страница редактора с кодом [nonce] теперь может показывать предпросмотр и использовать Hot-Apply."
+editorTrustAlready: "&7[P0] Браузеру с кодом [nonce] уже доверено."
+editorTrustUnknown: "&c[P0] Ни одна открытая сессия редактора не выдавала код [nonce]."
+editorTrustExpired: "&c[P0] Срок действия кода [nonce] истёк. Перезагрузите страницу редактора, чтобы получить новый."
+editorTrustUsage: "&c[P0] Использование: /rtp editor trust nonce=<код со страницы редактора>"
+editorChannelOpened: "&a[P0] Канал веб-редактора открыт. Подтвердите доверие браузеру по запросу, чтобы включить предпросмотр и Hot-Apply."
+editorChannelLost: "&e[P1] Канал веб-редактора потерян: [reason]. Страница продолжает работать по своему снимку."
+editorChannelExpired: "&7[P0] Канал веб-редактора истёк через [minutes] мин. Снова выполните команду редактора, чтобы продолжить."
+editorTrustRateLimited: "&c[P0] Слишком много неверных кодов доверия редактора. Подождите минуту и попробуйте снова."
+editorUntrustUsage: "&c[P0] Использование: /rtp editor untrust key=<начало отпечатка, не менее 4 символов | all>"
+editorUntrustRemoved: "&a[P0] Доверие отозвано у браузеров веб-редактора: [count]. Чтобы снова использовать предпросмотр или Hot-Apply, им нужно доверять заново."
+editorUntrustNone: "&7[P0] Ни один доверенный браузер редактора не соответствует [key]."
+editorUntrustFailed: "&c[P0] Не удалось обновить список доверенных редакторов: [reason]"
+editorApplyDigestMissing: "&c[P0] В данных редактора нет контрольной суммы sha256, поэтому они не применены. Подтвердите изменения снова с актуальной страницы редактора."
+editorApplyFileUnreadable: "&e[P1] Не удалось прочитать файл офлайн-применения ([reason]); пробуем хранилище байтов."
+
 version: 1.0

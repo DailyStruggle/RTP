@@ -4,12 +4,15 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 /**
  * Runtime parser for {@code @…} directive lines in YAML block comments (ADR-064).
  * Surfaces finite domains ({@code @options}, {@code @source}) for menu value pickers.
  */
 public final class ConfigDirectives {
+
+    private static final Pattern LINE_BREAK = Pattern.compile("\\R");
 
     private static final ConfigDirectives EMPTY =
             new ConfigDirectives(null, Collections.emptyList(), null);
@@ -35,7 +38,7 @@ public final class ConfigDirectives {
         String type = null;
         List<String> options = Collections.emptyList();
         String source = null;
-        for (String line : comment.split("\\R", -1)) {
+        for (String line : LINE_BREAK.split(comment, -1)) {
             String s = line.stripLeading();
             if (s.startsWith("#")) {
                 s = s.substring(1).stripLeading();

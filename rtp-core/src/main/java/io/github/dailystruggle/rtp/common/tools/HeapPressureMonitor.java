@@ -65,6 +65,7 @@ public final class HeapPressureMonitor {
     long now = System.currentTimeMillis();
     long last = lastSampleMs.get();
     if (now - last >= SAMPLE_INTERVAL_MS && lastSampleMs.compareAndSet(last, now)) {
+      boolean wasUnderPressure = cachedUnderPressure;
       double threshold = thresholdFraction();
       if (threshold == Double.MAX_VALUE) {
         cachedUnderPressure = false;
@@ -82,16 +83,19 @@ public final class HeapPressureMonitor {
 
         // Ensure tenuredMax is at least totalMax if tenured pool max is unconstrained/undefined
         long effectiveTenuredMax = Math.max(tenuredMax, totalMax);
+        double tenuredFrac = (effectiveTenuredMax > 0L) ? ((double) tenuredUsed / (double) effectiveTenuredMax) : 0.0;
 
-        // If overall JVM has ample absolute headroom (>= 512 MiB), do not flag as under pressure
-        if (totalFree >= MIN_ABSOLUTE_HEADROOM_BYTES && totalMax >= 2L * MIN_ABSOLUTE_HEADROOM_BYTES) {
-          double fraction = (effectiveTenuredMax > 0L) ? ((double) tenuredUsed / (double) effectiveTenuredMax) : 0.0;
-          cachedUsedPercent = fraction * 100.0;
-          // Only trip if tenured/old generation itself is critically saturated (> threshold)
-          cachedUnderPressure = fraction >= threshold;
+        // When tenured/old generation pool is available, base pressure decision on tenured
+        // post-GC usage to prevent false pauses on uncollected ephemeral young-gen garbage
+        if (HeapSampler.getTenuredPool() != null) {
+          cachedUsedPercent = tenuredFrac * 100.0;
+          cachedUnderPressure = tenuredFrac >= threshold;
+        } else if (totalFree >= MIN_ABSOLUTE_HEADROOM_BYTES && totalMax >= 2L * MIN_ABSOLUTE_HEADROOM_BYTES) {
+          // If overall JVM has ample absolute headroom (>= 512 MiB), do not flag as under pressure
+          cachedUsedPercent = tenuredFrac * 100.0;
+          cachedUnderPressure = tenuredFrac >= threshold;
         } else {
-          // Constrained heap (< 512 MiB total free): evaluate both tenured and total heap
-          double tenuredFrac = (effectiveTenuredMax > 0L) ? ((double) tenuredUsed / (double) effectiveTenuredMax) : 0.0;
+          // Fallback on constrained heap with no distinct tenured pool
           double totalFrac = (totalMax > 0L) ? ((double) totalUsed / (double) totalMax) : 0.0;
           double effectiveFrac = Math.max(tenuredFrac, totalFrac);
           cachedUsedPercent = effectiveFrac * 100.0;
@@ -103,12 +107,21 @@ public final class HeapPressureMonitor {
           if (now - lastWarn >= WARN_INTERVAL_MS && lastWarnMs.compareAndSet(lastWarn, now)) {
             RTP.log(Level.WARNING,
                 String.format(
+                    java.util.Locale.ROOT,
                     "[RTP] Heap usage %.1f%% of max exceeds maxHeapPercent threshold %.1f%%; "
                         + "pausing background cache generation until memory is reclaimed. "
                         + "Lower cacheCap/activeChunkCap or raise the JVM -Xmx if this persists.",
                     cachedUsedPercent, threshold * 100.0));
           }
         }
+      }
+
+      if (wasUnderPressure && !cachedUnderPressure) {
+        RTP.log(Level.INFO,
+            String.format(
+                java.util.Locale.ROOT,
+                "[RTP] Heap pressure subsided (currently %.1f%% of max); resuming background cache generation.",
+                cachedUsedPercent));
       }
     }
     return cachedUnderPressure;

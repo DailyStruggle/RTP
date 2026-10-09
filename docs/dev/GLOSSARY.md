@@ -35,6 +35,34 @@ The words below have common meanings in Java, Minecraft, or software engineering
 | **Backend** | Any back-of-house server in generic web terminology | A *Minecraft server instance that hosts world data and runs the RTP teleport pipeline locally*, sitting behind a proxy in network mode. Not interchangeable with "the database" or "the rtp-core module". See *Backend* entry below. |
 | **Proxy** | A generic relay or stand-in | A *Velocity, BungeeCord, or Waterfall coordinator* that fronts one or more backends and dispatches `/rtp` requests across the network. Distinct from Bukkit's plugin-message "BungeeCord proxy" channel and from the GoF proxy pattern. See *Proxy* entry below. |
 | **Transport** | Any byte-level shipping channel | A *named binding for network-mode coordination state* (`RedisNetworkStateBinding`, `PostgresNetworkStateBinding`, `GenericSqlNetworkStateBinding`, `InMemoryNetworkStateBinding`). Not a Minecraft entity transport, vehicle, or plugin-message channel. See *Transport* entry below. |
+| **Linear** | The Linear issue tracker (team `LeafRTP`, issue IDs `RTP-<n>`) | The *Linear region file format* (`.linear`, ZSTD). Core does not read it; an addon may register a reader through the region-format SPI (ADR-077). Say "Linear tracker" for issues and "`.linear` region format" for files; tracker labels use `area:region-format-linear`. See *Linear Region Format* entry below. |
+
+---
+
+## 🏷 Domain Analogies & Informal Aliases
+
+Informal shorthand and developer nicknames frequently used in code reviews, discussions, and task prompts, mapped to their canonical symbols and architectural locations.
+
+| Informal alias | Canonical symbol / location | Notes |
+|----------------|-----------------------------|-------|
+| "fast cache" | `RegionQueueManager.fastLocations` (`ConcurrentHashMap<UUID, CompletableFuture<RTPLocation>>`) | Per-player prefilled future for already-online players. Not the general pool. |
+| "kept cache" / "hot queue" / "L1" | `RegionQueueManager.keptLocations` (`LockFreeLocationBuffer`) | General hot region pool with loaded `keep(true)` chunks. Polled by `/rtp`. |
+| "cold cache" / "cold queue" / "L2" | `RegionQueueManager.unkeptLocations` (`LockFreeLocationBuffer`) | Pre-verified locations with released chunks; re-loaded on promotion to L1. |
+| "backlog cache" / "L3" / "binned cache" | `RegionQueueManager.backlogLocations` (`BacklogLocationBuffer`); [ADR-028](../adr/ADR-028-l3-backlog-cache.md) | Unverified FIFO buffer screened one 32x32 bin per pulse. Not persisted to DB. |
+| "login cache" / "login reserve" | `RegionQueueManager.loginLocations` (ADR-023) | Default-world reserve for join-time RTP (`rtp.onevent.join`). |
+| "personal queue" / "personal bucket" | `RegionQueueManager.perPlayerLocationQueue` (ADR-043) | Per-UUID bucket opened under `rtp.personalqueue`. Distinct from waitlist `playerQueue`. |
+| "the pipeline" / "teleport pipeline" | `TeleportPipelineTask` (`rtp-core`) | Full per-attempt pipeline (shape -> chunk -> vert -> biome -> safety). Tracked in `MemoryTracker`. |
+| "memory tracker" / "active GC" | `MemoryTracker` (`rtp-core`); `docs/architecture/04-active-gc-sweep.md` | Tracks tickets and tasks; periodic active reaper. |
+| "scan" / "scan task" | `ScanTask` family + `ScanPauseCmd`; `docs/architecture/05-scan-task-crawler.md` | Safety pre-scanner persisting bad-location bitmaps in `MemoryShape`. Does NOT warm queues. |
+| "spiral" / "spiral math" | Archimedean spiral 1D mapping; [ADR-001](../adr/ADR-001-archimedean-spiral-1d-mapping.md) | Bounded distribution algorithm. |
+| "anvil" / "anvil prefilter" | `rtp-anvil` / `anvil-api` module; [ADR-016](../adr/ADR-016-anvil-subsystem.md), [ADR-077](../adr/ADR-077-multi-format-region-support.md) | NBT pre-filter reading Anvil (`.mca`) off-tick, plus any format an addon registers via `RegionFormatRegistry`. |
+| "claim plugin" / "claim integration" | Folded into plugin per [ADR-019](../adr/ADR-019-claim-plugin-integrations-folded-into-plugin.md); S-003 | No inline claim calls in pipeline/commands. |
+| "Brigadier bridge" | `BrigadierCommandAdapter` in `commands-api/` (commands-api-ADR-001) | Command bridge for Paper/Folia, Fabric, NeoForge, and Velocity. |
+| "cat locale" / `lang/cat/` | `rtp-plugin/src/main/resources/lang/cat/` | Internal Internet Cat dialect easter egg (NOT Catalan). Never document in public guides. |
+| "the lite jar" / "lite assembly" | See [ADR-024](../adr/ADR-024-rtp-lite-assembly-variant.md) | Trimmed assembly variant, not a separate codebase. |
+| "obf carrier" / "unobf carrier" | `rtp-fabric-common` vs `rtp-fabric-common-unobf` (ADR-009, effects-api-ADR-006) | Intermediary-remapped (1.20.x/1.21.x) vs Mojmap-unobfuscated (MC 26.x) carrier modules. |
+| "the proxy plan" / "network mode" | [`docs/dev/MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md); [ADR-036](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) | Multi-server cross-proxy architecture and reservation token pipeline. |
+| "devstack" / "proxy devstack" | [`platforms/rtp-proxy/devstack/`](../../platforms/rtp-proxy/devstack/) | Multi-server test stack (Redis + Velocity + Paper + Folia + Fabric). See `devstack/README.md`. |
 
 ---
 
@@ -143,7 +171,7 @@ The Bukkit/Spigot entry-point class. RTP's entry point lives in `rtp-plugin` (`R
 A third-party Minecraft plugin (e.g., GriefPrevention, WorldGuard, Towny) that marks areas of the world as claimed or restricted. RTP integrates with these via the claim-check hook in `rtp-api`.
 
 **Linear Region Format (`.linear`)**
-An alternative on-disk Minecraft region storage format introduced by high-performance server forks (such as Leaves and Gale) and modded environments. Replaces Mojang's 4 KiB sector-aligned Anvil layout with continuous ZStandard (`zstd`) streams to eliminate sector quantization padding, reduce world disk space by 30-60%, and accelerate sequential I/O. Decoded off-tick via `LinearRegionReader` under ADR-077.
+An alternative on-disk Minecraft region storage format introduced by high-performance server forks (such as Leaves and Gale) and modded environments. Replaces Mojang's 4 KiB sector-aligned Anvil layout with continuous ZStandard (`zstd`) streams to eliminate sector quantization padding, reduce world disk space by 30-60%, and accelerate sequential I/O. Core does not decode it (ADR-077): `.linear` files are ignored unless an addon registers a reader, and their chunks fall back to the platform's live async chunk load.
 
 **Lock-Free Read**
 A concurrency pattern where shared data is read without acquiring a mutex, typically using `volatile` fields, `ConcurrentHashMap`, or `EnumMap`. RTP requires lock-free reads on configuration data to avoid synchronization bottlenecks under high teleport load.

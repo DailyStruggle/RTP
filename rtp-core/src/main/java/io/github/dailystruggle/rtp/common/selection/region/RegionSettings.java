@@ -22,5 +22,26 @@ public record RegionSettings(
     double price,
     long spatialResolution,
     String override,
-    boolean detailedRegionInit
-) {}
+    boolean detailedRegionInit,
+    Long cooldownMillis,
+    Long delayMillis
+) {
+  public RegionSettings(
+      String name,
+      RTPWorld<?> world,
+      Shape<?> shape,
+      VerticalAdjustor<?> vert,
+      boolean worldBorderOverride,
+      boolean requirePermission,
+      long cacheCap,
+      long backlogCacheCap,
+      long networkReserveSize,
+      int activeChunkCap,
+      double price,
+      long spatialResolution,
+      String override,
+      boolean detailedRegionInit) {
+    this(name, world, shape, vert, worldBorderOverride, requirePermission, cacheCap, backlogCacheCap,
+        networkReserveSize, activeChunkCap, price, spatialResolution, override, detailedRegionInit, null, null);
+  }
+}

@@ -176,36 +176,26 @@ public final class RTPFabricMod implements ModInitializer {
 
             new FabricEventBridge(accessor).register();
 
-            // rtp-fabric-ADR-014: install the Fabric map binding so /rtp
-            // visualization charts render to a vanilla filled-map instead of
-            // bottoming out on NoopMapBinding. Mirrors RTPBukkitPlugin's BukkitMapBinding.
+            // rtp-fabric-ADR-014: install the Fabric map binding via the accessor layer
+            // so /rtp visualization charts render to a vanilla filled-map instead of
+            // bottoming out on NoopMapBinding.
+            accessor.setupMapBinding();
+
+            // bStats telemetry: shared entry point, default host from core state.
             try {
-                FabricVersionAdapter mapAdapter = FabricVersionAdapterRegistry.peek();
-                if (mapAdapter != null && mapAdapter.supportsMapCharts()) {
-                    io.github.dailystruggle.rtp.fabric.maps.FabricMapBinding mapBinding =
-                            new io.github.dailystruggle.rtp.fabric.maps.FabricMapBinding();
-                    io.github.dailystruggle.rtp.common.commands.maps.MapDispatch
-                            .setMapBinding(mapBinding);
-                    // REQ-RTP-MAP-003 - release per-viewer map state on disconnect
-                    // (parity with Bukkit's OnPlayerQuit -> MapDispatch.firePlayerQuit).
-                    accessor.getFabricPlayerLifecycleHook().onPlayerQuit(uuid ->
-                            io.github.dailystruggle.rtp.common.commands.maps.MapDispatch
-                                    .firePlayerQuit(uuid));
-                    RTP.log(Level.INFO,
-                            "[RTP] Fabric map binding installed (FabricMapBinding, carrier="
-                                    + mapAdapter.mcVersion() + ").");
-                } else {
-                    RTP.log(Level.INFO,
-                            "[RTP] Fabric map binding NOT installed: version adapter "
-                                    + (mapAdapter == null ? "<none>" : mapAdapter.mcVersion())
-                                    + " does not support map charts; /rtp visualizations will report"
-                                    + " mapBindingMissing (NoopMapBinding active).");
-                }
+                io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.start(
+                        io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStatsCatalogue.Host.of("fabric"),
+                        io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.SERVICE_ID, "full",
+                        accessor.getPluginDirectory());
             } catch (Throwable t) {
-                RTP.log(Level.WARNING,
-                        "[RTP] onInitialize MapBinding install failed; MapDispatch will fall back"
-                                + " to NoopMapBinding: " + t.getClass().getSimpleName() + ": "
-                                + t.getMessage(), t);
+                RTP.log(Level.FINE, "[RTP][fabric] bStats setup skipped or failed: " + t.getMessage());
+            }
+
+            // Wire mod-side land protection (OPAC, FTB Chunks per MULTI_PLATFORM_PLAN line 505)
+            try {
+                io.github.dailystruggle.rtp.fabric.claims.ModClaimIntegrations.registerAll();
+            } catch (Throwable t) {
+                RTP.log(Level.FINE, "[RTP] ModClaimIntegrations registration skipped: " + t.getMessage());
             }
 
             // ----------------------------------------------------------------
@@ -676,6 +666,8 @@ public final class RTPFabricMod implements ModInitializer {
                         "[RTP] FabricJarUtils.extractDocs dispatch failed: "
                                 + t.getClass().getSimpleName() + ": " + t.getMessage());
             }
+            io.github.dailystruggle.rtp.common.commands.docs.DocsRegistry
+                    .rebuildFromDataFolder(accessor.getPluginDirectory());
 
             RTP.log(Level.INFO,
                     "[RTP] Fabric entry point initialized — event bridge + /rtp Brigadier root registered.");
@@ -738,7 +730,7 @@ public final class RTPFabricMod implements ModInitializer {
         if (adapterFqn == null) {
             throw new IllegalStateException(
                     "No Fabric version adapter is mapped for running MC version '" + mcVersion
-                            + "'. Supported lines: 1.20.x, 1.21.x, 26.1.x, 26.2.x. See rtp-fabric-ADR-001.");
+                            + "'. Supported lines: 1.20.x, 1.21.x, 26.1.x, 26.2.x, 26.3.x. See rtp-fabric-ADR-001.");
         }
 
         try {
@@ -823,6 +815,11 @@ public final class RTPFabricMod implements ModInitializer {
             // 26.2 ships final (rtp-fabric-ADR-014). Java 25 bytecode - never
             // named on a Java 21 JVM, so never resolved there.
             return "io.github.dailystruggle.rtp.fabric.v26_2_R1.V26_2_R1FabricVersionAdapter";
+        }
+        if (mcVersion.startsWith("26.3")) {
+            // MC 26.3 line (rtp-fabric-ADR-015). Java 25 bytecode - never
+            // named on a Java 21 JVM, so never resolved there.
+            return "io.github.dailystruggle.rtp.fabric.v26_3_R1.V26_3_R1FabricVersionAdapter";
         }
         return null;
     }

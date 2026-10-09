@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 
+import io.github.dailystruggle.rtp.bukkitplatform.world.BukkitMaterialResolver;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
@@ -177,6 +178,20 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   @Override
   @RegionThread
   public CompletableFuture<Long> getChunkAt(int cx, int cz) {
+    return resolveChunkKey(cx, cz, true);
+  }
+
+  /**
+   * ADR-110: resident chunk or region-file view only; {@code null} where only a native load
+   * (or generation) could answer. Residency via {@link #isChunkLoaded}, which is safe off the
+   * owning region thread (an undeterminable query counts as not resident).
+   */
+  @Override
+  public CompletableFuture<Long> getChunkIfReadable(int cx, int cz) {
+    return resolveChunkKey(cx, cz, false);
+  }
+
+  private CompletableFuture<Long> resolveChunkKey(int cx, int cz, boolean allowLive) {
     // Probe-entry: do NOT bump totalChunkLoads here. The counter is incremented by
     // the live-load path (getChunkAtAsync) so RTPWorld.getOrLoadChunk's probe-then-live
     // composition counts each logical chunk-load attempt exactly once. See the Javadoc
@@ -210,10 +225,14 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
               return CompletableFuture.completedFuture(key);
             }
             // No view available (UNKNOWN) → Folia native async load is authoritative.
+            // The gate may pass for a resident chunk (off-region ThreadAccessException),
+            // so the read-only path still serves residents here.
+            if (!allowLive && !isChunkLoaded(cx, cz)) return CompletableFuture.completedFuture(null);
             return loadLiveChunk(cx, cz, key);
           });
     }
 
+    if (!allowLive && !isChunkLoaded(cx, cz)) return CompletableFuture.completedFuture(null);
     return loadLiveChunk(cx, cz, key);
   }
 
@@ -234,8 +253,8 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
    * Fast-path center-column probe for Folia. See
    * {@code BukkitRTPWorld#probeChunkColumn} for the shared contract.
    *
-   * <p>S-005 / Folia threading: all file I/O is dispatched to
-   * {@link java.util.concurrent.ForkJoinPool#commonPool()}, never to a region
+   * <p>S-005 / Folia threading: all file I/O is coalesced per region file onto
+   * {@link io.github.dailystruggle.rtp.anvil.AnvilIoPool}, never a region
    * thread. The applicability gate ({@link #shouldPrefilter}) already tolerates
    * the region-thread-restricted {@code world.isChunkLoaded} call by treating
    * a thrown {@code ThreadAccessException} as "continue into the probe", so
@@ -252,25 +271,12 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     final String dim = dimensionRegionSubpath(world);
     final int finalMinY = minY;
     final int finalMaxY = maxY;
-    // Dispatch onto AnvilIoPool rather than inline: inline dispatch serialized
-    // ~7ms of probe I/O onto the driver's single thread, capping throughput at
-    // ~140 cps (peak in-flight 11-12 vs cap 50). AnvilIoPool (dedicated
-    // blocking-I/O executor) lets the driver hand off in microseconds and run
-    // probes in parallel. S-005 preserved: AnvilIoPool threads are daemons with
-    // no region-thread affinity.
-    return CompletableFuture.supplyAsync(() -> {
+    // Coalesced on AnvilIoPool: pending probes for one r.X.Z.mca share one open (S-005: no
+    // I/O on the caller; pool threads are daemons with no region-thread affinity).
+    return io.github.dailystruggle.rtp.anvil.AnvilPrefilter.probeColumnAsync(
+        worldFolder, dim, cx, cz, finalMinY, finalMaxY).handle((probe, err) -> {
       try {
-        java.nio.file.Path regionFile =
-            io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(worldFolder, dim, cx, cz);
-        // Share raw region bytes across sibling-chunk probes in the same
-        // r.X.Z.mca via a 4-entry LRU, with mtime invalidation.
-        byte[] regionBytes = io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
-        if (regionBytes == null) return null;
-        int rx = Math.floorMod(cx, 32);
-        int rz = Math.floorMod(cz, 32);
-        io.github.dailystruggle.rtp.anvil.ColumnProbe probe =
-            io.github.dailystruggle.rtp.anvil.AnvilReader.readColumnProbe(
-                regionBytes, rx, rz, finalMinY, finalMaxY);
+        if (err != null) throw err;
         if (probe == null) return null;
         return io.github.dailystruggle.rtp.api.world.ChunkColumnProbe.of(
             new io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter(probe, cx, cz,
@@ -284,17 +290,17 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
                 + t.getClass().getSimpleName() + ": " + t.getMessage());
         return null;
       }
-    }, io.github.dailystruggle.rtp.anvil.AnvilIoPool.get());
+    });
   }
 
   /**
    * {@inheritDoc}
    *
    * <p>Folia mirror of {@code BukkitRTPWorld#readBiomesInRegionFile}: reads
-   * {@code r.<rcx>.<rcz>.mca} once via {@link
-   * io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache} on the
-   * {@link io.github.dailystruggle.rtp.anvil.AnvilIoPool}, decodes every chunk
-   * in the file, and samples the biome at chunk-local {@code (8, y, 8)}.
+   * {@code r.<rcx>.<rcz>.mca} once under a pooled-buffer lease via {@link
+   * io.github.dailystruggle.rtp.anvil.AnvilRegionSampler#readAllBiomes} on the
+   * {@link io.github.dailystruggle.rtp.anvil.AnvilIoPool} and samples each chunk's
+   * biome at chunk-local {@code (8, y, 8)}.
    * Canonicalises to the same uppercase, {@code minecraft:}-stripped form
    * {@code MemoryShape.addBiomeLocation} stores under, so
    * {@link io.github.dailystruggle.mapsapi.BiomeColorSource} dimension
@@ -311,37 +317,86 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
           io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(
               worldFolder, dim, rcx << 5, rcz << 5);
       if (regionFile == null) return java.util.Collections.emptyMap();
-      byte[] regionBytes =
-          io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
-      if (regionBytes == null) return java.util.Collections.emptyMap();
-      java.util.HashMap<Long, String> out = new java.util.HashMap<>(1024);
-      for (int rx = 0; rx < 32; rx++) {
-        for (int rz = 0; rz < 32; rz++) {
-          try {
-            io.github.dailystruggle.rtp.anvil.AnvilChunkView view =
-                io.github.dailystruggle.rtp.anvil.AnvilReader.readChunkView(
-                    regionBytes, rx, rz);
-            if (view == null) continue;
-            String raw = view.getBiomeAt(8, y, 8);
-            if (raw == null) continue;
-            String canonical = canonicaliseBiome(raw);
-            if (canonical == null || canonical.isEmpty()) continue;
-            int cx = (rcx << 5) | rx;
-            int cz = (rcz << 5) | rz;
-            long key = ((long) cx << 32) | (cz & 0xFFFF_FFFFL);
-            out.put(key, canonical);
-          } catch (Throwable ignored) {
-            // chunk not present / unreadable; skip silently.
-          }
-        }
-      }
-      return out;
+      return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.readAllBiomes(
+          regionFile, rcx, rcz, y, FoliaRTPWorld::canonicaliseBiome);
     } catch (Throwable t) {
       RTP.log(java.util.logging.Level.FINE,
           "[RTP] readBiomesInRegionFile failed for world=" + name
               + " region=(" + rcx + "," + rcz + "): "
               + t.getClass().getSimpleName() + ": " + t.getMessage());
       return java.util.Collections.emptyMap();
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Reads only the region header plus each requested chunk's sectors via {@link
+   * io.github.dailystruggle.rtp.anvil.AnvilRegionSampler} (ADR-104 section 4.6). S-005: blocking,
+   * off any region thread.
+   */
+  @Override
+  public java.util.Map<Long, String> sampleBiomesInRegionFile(
+      int rcx, int rcz, int y, int[] localIndices) {
+    if (world == null) return java.util.Collections.emptyMap();
+    try {
+      java.nio.file.Path regionFile =
+          io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(
+              world.getWorldFolder().toPath(), dimensionRegionSubpath(world), rcx << 5, rcz << 5);
+      if (regionFile == null) return java.util.Collections.emptyMap();
+      return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.sampleBiomesOrThrow(
+          regionFile, rcx, rcz, y, localIndices, FoliaRTPWorld::canonicaliseBiome);
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.FINE,
+          "[RTP] sampleBiomesInRegionFile failed for world=" + name
+              + " region=(" + rcx + "," + rcz + "): "
+              + t.getClass().getSimpleName() + ": " + t.getMessage());
+      return java.util.Collections.emptyMap();
+    }
+  }
+
+  @Override
+  public java.nio.file.Path anvilWorldFolder() {
+    try {
+      return (world == null) ? null : world.getWorldFolder().toPath();
+    } catch (Throwable ignored) {
+      return null;
+    }
+  }
+
+  @Override
+  public String anvilDimensionSubpath() {
+    return dimensionRegionSubpath(world);
+  }
+
+  /** {@inheritDoc} S-005: blocking stat, off any region thread. */
+  @Override
+  public long regionFileModifiedMillis(int rcx, int rcz) {
+    if (world == null) return -1L;
+    try {
+      return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.lastModifiedMillis(
+          io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(
+              world.getWorldFolder().toPath(), dimensionRegionSubpath(world), rcx << 5, rcz << 5));
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.FINE,
+          "[RTP] regionFileModifiedMillis failed for world=" + name
+              + " region=(" + rcx + "," + rcz + "): " + t.getMessage());
+      return -1L;
+    }
+  }
+
+  /** {@inheritDoc} Lists this dimension's region directory; S-005: off any region thread. */
+  @Override
+  public java.util.List<int[]> listRegionFiles() {
+    if (world == null) return null;
+    try {
+      return io.github.dailystruggle.rtp.anvil.RegionFileResolver.listAnvilRegionCoords(
+          io.github.dailystruggle.rtp.anvil.RegionFileResolver.regionDirectoryFor(
+              world.getWorldFolder().toPath(), dimensionRegionSubpath(world)));
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[RTP] listRegionFiles failed for world=" + name + ": " + t.getMessage(), t);
+      return null;
     }
   }
 
@@ -655,29 +710,9 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   @Override
-  @GlobalRegionThread
   public java.util.concurrent.CompletableFuture<Integer> getServerForceLoadedCount() {
-    java.util.concurrent.CompletableFuture<Integer> future = new java.util.concurrent.CompletableFuture<>();
-    io.github.dailystruggle.rtp.common.RTP.serverAccessor.getScheduler().runTask(() -> {
-      org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
-      if (plugin == null) {
-        future.complete(0);
-        return;
-      }
-
-      try {
-        int count = 0;
-        for (org.bukkit.Chunk chunk : world.getForceLoadedChunks()) {
-          if (chunk.getPluginChunkTickets().contains(plugin)) {
-            count++;
-          }
-        }
-        future.complete(count);
-      } catch (Exception e) {
-        future.complete(-1); // Fallback in case of unexpected global region failure
-      }
-    });
-    return future;
+    int count = chunkTickets.values().stream().mapToInt(java.util.concurrent.atomic.AtomicInteger::get).sum();
+    return java.util.concurrent.CompletableFuture.completedFuture(count);
   }
 
   @Override
@@ -918,14 +953,12 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
       int depth = safety.getNumber(SafetyKeys.platformDepth, 0).intValue();
       // ADR-060: optional block-restoration timeout (-1 disables, skips capture).
       final int restoreSeconds = safety.getNumber(SafetyKeys.platformRestoreSeconds, -1).intValue();
-      final Material materialFinal;
-      Material material;
-      try {
-        material = Material.valueOf(safety.getConfigValue(SafetyKeys.platformMaterial, "GLASS").toString().toUpperCase());
-      } catch (IllegalArgumentException e) {
-        material = Material.GLASS;
-      }
-      materialFinal = material;
+      Object rawMat = safety.getConfigValue(SafetyKeys.platformMaterial, "GLASS");
+      final Material materialFinal = BukkitMaterialResolver.resolve(
+          rawMat != null ? rawMat.toString() : "GLASS",
+          Material.GLASS,
+          "Platform material"
+      );
 
       final int lx = location.getBlockX();
       final int ly = location.getBlockY();

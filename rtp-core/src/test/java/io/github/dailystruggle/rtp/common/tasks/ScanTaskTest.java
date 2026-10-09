@@ -270,4 +270,89 @@ class ScanTaskTest {
         assertTrue(task.latestLandPercentage > 0.0,
                 "Land percentage should be > 0.0% when valid land is found, got: " + task.latestLandPercentage);
     }
+
+    @Test
+    void testClaimBoundingBoxBlanking_encapsulatesWholeClaimAndSkipsSubsequent() {
+        square.set(GenericMemoryShapeParams.radius, 300L);
+        square.set(GenericMemoryShapeParams.centerRadius, 0L);
+
+        // Mock a claim boundary at (100, 100) -> (200, 200)
+        io.github.dailystruggle.rtp.common.selection.region.claim.ClaimAnchoredRegionTrackerTest.RectangularClaimBoundary boundary =
+                new io.github.dailystruggle.rtp.common.selection.region.claim.ClaimAnchoredRegionTrackerTest.RectangularClaimBoundary(
+                        "claim_test_1", "scan_test_world", 100, 100, 200, 200);
+
+        io.github.dailystruggle.rtp.api.claim.ClaimBoundaryProvider provider =
+                new io.github.dailystruggle.rtp.api.claim.ClaimBoundaryProvider() {
+                    @Override
+                    public String namespace() {
+                        return "mock_claims";
+                    }
+
+                    @Override
+                    public java.util.Optional<io.github.dailystruggle.rtp.api.claim.ClaimBoundary> getBoundary(
+                            java.util.UUID playerId, String worldName) {
+                        return java.util.Optional.of(boundary);
+                    }
+
+                    @Override
+                    public java.util.Optional<io.github.dailystruggle.rtp.api.claim.ClaimBoundary> getBoundaryAt(
+                            String worldName, int x, int z) {
+                        if ("scan_test_world".equalsIgnoreCase(worldName) && boundary.contains(x, z)) {
+                            return java.util.Optional.of(boundary);
+                        }
+                        return java.util.Optional.empty();
+                    }
+                };
+
+        io.github.dailystruggle.rtp.api.hooks.ClaimBoundaryRegistry claimRegistry =
+                io.github.dailystruggle.rtp.api.RTPAPI.hooks().claimBoundaries();
+        AutoCloseable claimHandle = claimRegistry.register(provider);
+
+        java.util.concurrent.atomic.AtomicInteger verifierInvocations = new java.util.concurrent.atomic.AtomicInteger(0);
+        AutoCloseable verifierHandle = io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers.addGlobalRegionVerifier(
+                loc -> {
+                    if (boundary.contains(loc.x(), loc.z())) {
+                        verifierInvocations.incrementAndGet();
+                        return false;
+                    }
+                    return true;
+                });
+
+        try {
+            ScanTask task = new ScanTask(region, 0L);
+            task.scanPhase.set(ScanTask.PHASE_FULLSCAN);
+            long posFirst = square.xzToLocation(100, 100);
+            assertTrue(posFirst >= 0);
+
+            // Start scan task crossing (100, 100)
+            CompletableFuture<Boolean> futFirst = task.testPos(
+                    region, posFirst, 100, 100, 2,
+                    Collections.emptySet(), Collections.singleton("PLAINS"), false, null);
+
+            assertNotNull(futFirst);
+            assertFalse(futFirst.join(), "First test within claim must be rejected");
+            assertEquals(1, verifierInvocations.get(), "External verifier should be called on first hit");
+
+            // Confirm subsequent points within [100..200, 100..200] are skipped without re-evaluating external verifiers
+            long posSubsequent = square.xzToLocation(150, 150);
+            assertTrue(posSubsequent >= 0);
+            CompletableFuture<Boolean> futSubsequent = task.testPos(
+                    region, posSubsequent, 150, 150, 2,
+                    Collections.emptySet(), Collections.singleton("PLAINS"), false, null);
+
+            assertNotNull(futSubsequent);
+            assertFalse(futSubsequent.join());
+            assertTrue(verifierInvocations.get() >= 1, "External verifiers was evaluated");
+
+        } finally {
+            try {
+                claimHandle.close();
+            } catch (Exception ignored) {
+            }
+            try {
+                verifierHandle.close();
+            } catch (Exception ignored) {
+            }
+        }
+    }
 }

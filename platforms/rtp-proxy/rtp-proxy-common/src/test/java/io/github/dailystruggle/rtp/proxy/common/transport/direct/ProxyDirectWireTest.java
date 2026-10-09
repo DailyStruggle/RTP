@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.proxy.common.transport.direct;
 import io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -18,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ProxyDirectWireTest {
 
@@ -47,12 +49,6 @@ class ProxyDirectWireTest {
         DataInputStream dis = new DataInputStream(new ByteArrayInputStream(baos.toByteArray()));
         String read = ProxyDirectWire.readSignedPayload(dis, verifier);
         assertEquals("hello world", read);
-
-        // Without verifier
-        baos.reset();
-        ProxyDirectWire.writeSignedPayload(dos, "no verifier", null, 1);
-        dis = new DataInputStream(new ByteArrayInputStream(baos.toByteArray()));
-        assertEquals("no verifier", ProxyDirectWire.readSignedPayload(dis, null));
 
         // Tamper verification failure yields null
         baos.reset();
@@ -91,9 +87,70 @@ class ProxyDirectWireTest {
         assertThrows(IOException.class, () -> ProxyDirectWire.readList(disNeg, verifier));
 
         baos.reset();
-        dos.writeInt(100_001);
+        dos.writeInt(ProxyDirectWire.MAX_LIST_COUNT + 1);
         DataInputStream disBig = new DataInputStream(new ByteArrayInputStream(baos.toByteArray()));
         assertThrows(IOException.class, () -> ProxyDirectWire.readList(disBig, verifier));
+
+        // Writer enforces the same cap.
+        assertEquals(4096, ProxyDirectWire.MAX_LIST_COUNT);
+        java.util.List<String> oversized = java.util.Collections.nCopies(ProxyDirectWire.MAX_LIST_COUNT + 1, "x");
+        assertThrows(IOException.class, () -> ProxyDirectWire.writeList(dos, oversized, verifier, 1));
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-S-004: one HMAC-invalid row fails the whole list instead of a silent partial batch")
+    void list_tamperedRow_failsWholeList() throws Exception {
+        HmacVerifier verifier = HmacVerifier.forTesting(secret32(), 1, 1);
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DataOutputStream dos = new DataOutputStream(baos);
+        dos.writeInt(3);
+        ProxyDirectWire.writeSignedPayload(dos, "good-1", verifier, 1);
+        dos.writeInt(1);
+        dos.writeUTF("00".repeat(32));
+        dos.writeUTF("forged");
+        ProxyDirectWire.writeSignedPayload(dos, "good-2", verifier, 1);
+        dos.writeByte(42); // trailing byte: proves every frame was consumed
+
+        DataInputStream dis = new DataInputStream(new ByteArrayInputStream(baos.toByteArray()));
+        IOException ex = assertThrows(IOException.class, () -> ProxyDirectWire.readList(dis, verifier));
+        assertTrue(ex.getMessage().contains("1 of 3"), ex.getMessage());
+        assertEquals(42, dis.readByte());
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-PROXY-007: null verifier fails closed - unsigned writes throw, every read is rejected")
+    void nullVerifier_failsClosed() throws Exception {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DataOutputStream dos = new DataOutputStream(baos);
+        assertThrows(IllegalStateException.class,
+                () -> ProxyDirectWire.writeSignedPayload(dos, "x", null, 1));
+
+        // A legacy unsigned frame (empty HMAC) is rejected by a null verifier...
+        baos.reset();
+        dos.writeInt(1);
+        dos.writeUTF("");
+        dos.writeUTF("payload");
+        // ...and so is a correctly signed one: no verifier = no trust.
+        ProxyDirectWire.writeSignedPayload(dos, "signed", HmacVerifier.forTesting(secret32(), 1, 1), 1);
+        DataInputStream dis = new DataInputStream(new ByteArrayInputStream(baos.toByteArray()));
+        assertNull(ProxyDirectWire.readSignedPayload(dis, null));
+        assertNull(ProxyDirectWire.readSignedPayload(dis, null), "frame must be consumed even when rejected");
+
+        // A verifier also rejects the unsigned legacy frame.
+        baos.reset();
+        dos.writeInt(1);
+        dos.writeUTF("");
+        dos.writeUTF("payload");
+        dis = new DataInputStream(new ByteArrayInputStream(baos.toByteArray()));
+        assertNull(ProxyDirectWire.readSignedPayload(dis, HmacVerifier.forTesting(secret32(), 1, 1)));
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-PROXY-007: token ids are redacted to an 8-char prefix for logs")
+    void redactToken_prefixOnly() {
+        assertEquals("12345678...", ProxyDirectWire.redactToken("1234567890abcdef"));
+        assertEquals("short", ProxyDirectWire.redactToken("short"));
+        assertEquals("null", ProxyDirectWire.redactToken(null));
     }
 
     @Test

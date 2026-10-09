@@ -22,10 +22,11 @@ public final class GuiMenuConfig {
   /** Shared instance; all reads are live against the registered parser. */
   public static final GuiMenuConfig INSTANCE = new GuiMenuConfig();
 
-  private GuiMenuConfig() {}
+  GuiMenuConfig() {}
 
   @SuppressWarnings("unchecked")
   private ConfigParser<GuiMenuKeys> parser() {
+    if (RTP.configs == null) return null;
     return (ConfigParser<GuiMenuKeys>) RTP.configs.getParser(GuiMenuKeys.class);
   }
 
@@ -115,8 +116,232 @@ public final class GuiMenuConfig {
     return bool(GuiMenuKeys.showDashboard, true);
   }
 
+  public boolean showActions() {
+    return bool(GuiMenuKeys.showActions, true);
+  }
+
+  public String titleActionsMenu() {
+    return str(GuiMenuKeys.titleActionsMenu, "&6&lSpecial Teleports");
+  }
+
+  public String titleActionsSelector() {
+    return str(GuiMenuKeys.titleActionsSelector, "&6&lSpecial Teleports...");
+  }
+
+  public String iconActionsSelector() {
+    return str(GuiMenuKeys.iconActionsSelector, "NETHERITE_SWORD");
+  }
+
+  public String iconActionDefault() {
+    return str(GuiMenuKeys.iconActionDefault, "DIAMOND_SWORD");
+  }
+
+  public boolean showOperatorTools() {
+    return bool(GuiMenuKeys.showOperatorTools, true);
+  }
+
+  public String permissionOperatorTools() {
+    return str(GuiMenuKeys.permissionOperatorTools, "rtp.menu.admin");
+  }
+
+  public String titleOperatorMenu() {
+    return str(GuiMenuKeys.titleOperatorMenu, "&6&lOperator Control Hub");
+  }
+
+  public String titleOperatorSelector() {
+    return str(GuiMenuKeys.titleOperatorSelector, "&6&lOperator Tools...");
+  }
+
+  public String iconOperatorSelector() {
+    return str(GuiMenuKeys.iconOperatorSelector, "COMMAND_BLOCK");
+  }
+
+  public String iconOperatorSetup() {
+    return str(GuiMenuKeys.iconOperatorSetup, "NETHER_STAR");
+  }
+
+  public String iconOperatorImport() {
+    return str(GuiMenuKeys.iconOperatorImport, "HOPPER");
+  }
+
+  public String iconOperatorConfig() {
+    return str(GuiMenuKeys.iconOperatorConfig, "REPEATER");
+  }
+
+  public String iconOperatorVisualizations() {
+    return str(GuiMenuKeys.iconOperatorVisualizations, "FILLED_MAP");
+  }
+
+  public String iconOperatorStatus() {
+    return str(GuiMenuKeys.iconOperatorStatus, "CLOCK");
+  }
+
+  public String iconOperatorAdminBook() {
+    return str(GuiMenuKeys.iconOperatorAdminBook, "WRITABLE_BOOK");
+  }
+
+  public String iconOperatorReload() {
+    return str(GuiMenuKeys.iconOperatorReload, "REDSTONE_TORCH");
+  }
+
+  public boolean groupBiomesIntoSubmenu() {
+    return bool(GuiMenuKeys.groupBiomesIntoSubmenu, true);
+  }
+
+  public String titleBiomeMenu() {
+    return str(GuiMenuKeys.titleBiomeMenu, "&1&lSelect Biome");
+  }
+
+  public String titleBiomeSelector() {
+    return str(GuiMenuKeys.titleBiomeSelector, "&a&lSelect Biome...");
+  }
+
+  public String iconBiomeSelector() {
+    return str(GuiMenuKeys.iconBiomeSelector, "OAK_SAPLING");
+  }
+
+  public String iconPreviousPage() {
+    return str(GuiMenuKeys.iconPreviousPage, "ARROW");
+  }
+
+  public String iconNextPage() {
+    return str(GuiMenuKeys.iconNextPage, "ARROW");
+  }
+
+  public String iconBackToMainMenu() {
+    return str(GuiMenuKeys.iconBackToMainMenu, "BARRIER");
+  }
+
+  public String textPreviousPage() {
+    return str(GuiMenuKeys.textPreviousPage, "&e[Previous Page]");
+  }
+
+  public String textNextPage() {
+    return str(GuiMenuKeys.textNextPage, "&e[Next Page]");
+  }
+
+  public String textBackToMainMenu() {
+    return str(GuiMenuKeys.textBackToMainMenu, "&c[Back to Worlds]");
+  }
+
+  public String titleOperatorSetup() {
+    return str(GuiMenuKeys.titleOperatorSetup, "&a&lSetup Wizard");
+  }
+
+  public String titleOperatorImport() {
+    return str(GuiMenuKeys.titleOperatorImport, "&e&lImport Configs");
+  }
+
+  public String titleOperatorConfig() {
+    return str(GuiMenuKeys.titleOperatorConfig, "&b&lConfig Editor");
+  }
+
+  public String titleOperatorVisualizations() {
+    return str(GuiMenuKeys.titleOperatorVisualizations, "&d&lVisualizations");
+  }
+
+  public String titleOperatorStatus() {
+    return str(GuiMenuKeys.titleOperatorStatus, "&f&lStatus & Metrics");
+  }
+
+  public String titleOperatorAdminBook() {
+    return str(GuiMenuKeys.titleOperatorAdminBook, "&6&lAdmin Book Panel");
+  }
+
+  public String titleOperatorReload() {
+    return str(GuiMenuKeys.titleOperatorReload, "&c&lQuick Reload");
+  }
+
   public String dashboardIconName() {
     return str(GuiMenuKeys.iconDashboard, "PAPER");
+  }
+
+  public boolean barrierOnUnavailable() {
+    return bool(GuiMenuKeys.barrierOnUnavailable, true);
+  }
+
+  public String iconInCombat() {
+    return str(GuiMenuKeys.iconInCombat, "BARRIER");
+  }
+
+  public java.util.List<String> loreReady() {
+    return listStr(GuiMenuKeys.loreReady, defaultLoreReady());
+  }
+
+  public java.util.List<String> loreCooldown() {
+    return listStr(GuiMenuKeys.loreCooldown, defaultLoreCooldown());
+  }
+
+  public java.util.List<String> loreCombat() {
+    return listStr(GuiMenuKeys.loreCombat, defaultLoreCombat());
+  }
+
+  public java.util.List<String> loreNoFunds() {
+    return listStr(GuiMenuKeys.loreNoFunds, defaultLoreNoFunds());
+  }
+
+  public java.util.List<String> loreNoPermission() {
+    return listStr(GuiMenuKeys.loreNoPermission, defaultLoreNoPermission());
+  }
+
+  @SuppressWarnings("unchecked")
+  private java.util.List<String> listStr(GuiMenuKeys key, java.util.List<String> fallback) {
+    ConfigParser<GuiMenuKeys> p = parser();
+    if (p == null) return fallback;
+    Object v = p.getConfigValue(key, fallback);
+    if (v instanceof java.util.List<?> list) {
+      java.util.List<String> result = new java.util.ArrayList<>(list.size());
+      for (Object o : list) {
+        if (o != null) result.add(String.valueOf(o));
+      }
+      return result;
+    }
+    return fallback;
+  }
+
+  private static java.util.List<String> defaultLoreReady() {
+    return java.util.List.of(
+        "&7Status: &aREADY",
+        "&7Cost: &6{cost}",
+        "&7Warmup: &e{delay}",
+        "",
+        "&aClick to teleport!"
+    );
+  }
+
+  private static java.util.List<String> defaultLoreCooldown() {
+    return java.util.List.of(
+        "&7Status: &eON COOLDOWN",
+        "&cCooldown remaining: &e{cooldown}",
+        "",
+        "&cCannot teleport right now."
+    );
+  }
+
+  private static java.util.List<String> defaultLoreCombat() {
+    return java.util.List.of(
+        "&7Status: &cIN COMBAT",
+        "&cCombat tag remaining: &e{cooldown}",
+        "",
+        "&cCannot teleport while in combat."
+    );
+  }
+
+  private static java.util.List<String> defaultLoreNoFunds() {
+    return java.util.List.of(
+        "&7Status: &eINSUFFICIENT FUNDS",
+        "&7Required: &6{cost}",
+        "",
+        "&cYou cannot afford this teleport."
+    );
+  }
+
+  private static java.util.List<String> defaultLoreNoPermission() {
+    return java.util.List.of(
+        "&7Status: &cLOCKED",
+        "",
+        "&cYou lack permission for this region."
+    );
   }
 
   public String textReady() {
@@ -185,7 +410,15 @@ public final class GuiMenuConfig {
   private String iconName(RtpTarget target, RtpTargetStatus.Availability availability,
       String advertisedBlock, String environment) {
     if (availability != null) {
+      if (barrierOnUnavailable() && availability != RtpTargetStatus.Availability.READY) {
+        if (availability == RtpTargetStatus.Availability.IN_COMBAT) {
+          return iconInCombat();
+        }
+        return str(GuiMenuKeys.iconUnavailable, "BARRIER");
+      }
       switch (availability) {
+        case IN_COMBAT:
+          return iconInCombat();
         case ON_COOLDOWN:
           return str(GuiMenuKeys.iconOnCooldown, "CLOCK");
         case NO_FUNDS:
@@ -216,8 +449,20 @@ public final class GuiMenuConfig {
       return envBlock;
     }
     switch (kind) {
-      case WORLD:
+      case WORLD: {
+        if (target != null && target.name() != null) {
+          String wName = target.name().toUpperCase(java.util.Locale.ROOT);
+          if (wName.contains("NETHER")) return "NETHERRACK";
+          if (wName.contains("END")) return "END_STONE";
+        }
         return str(GuiMenuKeys.iconWorld, "GRASS_BLOCK");
+      }
+      case BIOME: {
+        String biomeOverride = biomeIconOverride(target);
+        if (biomeOverride != null) return biomeOverride;
+        String mappedBiome = defaultBiomeIcon(target != null ? target.name() : null);
+        return str(GuiMenuKeys.iconBiome, mappedBiome);
+      }
       case REGION:
         // Default to the most common overworld surface block (grass) rather than a
         // FILLED_MAP, which does not render in a vanilla client without a mod.
@@ -228,6 +473,69 @@ public final class GuiMenuConfig {
       default:
         return str(GuiMenuKeys.iconDefault, "COMPASS");
     }
+  }
+
+  /**
+   * Resolves the operator-configured per-biome icon override for {@code target}, if any.
+   *
+   * @param target the target
+   * @return material name override, or {@code null}
+   */
+  public String biomeIconOverride(RtpTarget target) {
+    if (target == null || target.name() == null) return null;
+    ConfigParser<GuiMenuKeys> p = parser();
+    if (p == null) return null;
+    java.util.Map<String, Object> overrides = p.getMap(GuiMenuKeys.biomeIcons);
+    if (overrides == null || overrides.isEmpty()) return null;
+    for (java.util.Map.Entry<String, Object> entry : overrides.entrySet()) {
+      if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(target.name()) && entry.getValue() != null) {
+        String s = String.valueOf(entry.getValue()).trim();
+        if (!s.isEmpty()) return s;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Default representative icons for vanilla and custom biomes (Saplings / Sand / Snow / etc.).
+   */
+  public static String defaultBiomeIcon(String biomeName) {
+    if (biomeName == null) return "OAK_SAPLING";
+    String upper = biomeName.toUpperCase(java.util.Locale.ROOT);
+    if (upper.contains("DESERT") || upper.contains("BEACH") || upper.contains("BADLANDS")) {
+      return "SAND";
+    }
+    if (upper.contains("SNOW") || upper.contains("ICE") || upper.contains("FROZEN") || upper.contains("GROVE")) {
+      return "SNOW_BLOCK";
+    }
+    if (upper.contains("NETHER") || upper.contains("CRIMSON") || upper.contains("WARPED") || upper.contains("SOUL")) {
+      return "NETHERRACK";
+    }
+    if (upper.contains("END")) {
+      return "END_STONE";
+    }
+    if (upper.contains("JUNGLE")) {
+      return "JUNGLE_SAPLING";
+    }
+    if (upper.contains("SPRUCE") || upper.contains("TAIGA")) {
+      return "SPRUCE_SAPLING";
+    }
+    if (upper.contains("BIRCH")) {
+      return "BIRCH_SAPLING";
+    }
+    if (upper.contains("CHERRY")) {
+      return "CHERRY_SAPLING";
+    }
+    if (upper.contains("DARK_OAK")) {
+      return "DARK_OAK_SAPLING";
+    }
+    if (upper.contains("SWAMP") || upper.contains("MANGROVE")) {
+      return "LILY_PAD";
+    }
+    if (upper.contains("OCEAN") || upper.contains("RIVER")) {
+      return "WATER_BUCKET";
+    }
+    return "OAK_SAPLING";
   }
 
   /**

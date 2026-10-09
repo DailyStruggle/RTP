@@ -49,4 +49,21 @@ class JfrAllocationProfilerTest {
 
         assertFalse(profiler.available());
     }
+
+    @Test
+    @DisplayName("ramp stage labels resolve to their target's tracked package")
+    void rampStageLabelMapsToTarget() {
+        assertEquals("rtp", JfrAllocationProfiler.baseLabel("rtp@ramp0-20tps"));
+        assertEquals("betterrtp", JfrAllocationProfiler.baseLabel("BetterRTP"));
+        assertEquals("", JfrAllocationProfiler.baseLabel(null));
+        JfrAllocationProfiler profiler = new JfrAllocationProfiler(
+                Logger.getLogger("test"),
+                false,
+                "300/s",
+                1024L * 1024L,
+                java.util.Map.of("rtp", "io.github.dailystruggle.rtp")
+        );
+        assertEquals("io.github.dailystruggle.rtp", profiler.targetPackageFor("rtp@ramp2-100tps"));
+        assertEquals("", profiler.targetPackageFor("ezrtp@ramp0-20tps"));
+    }
 }

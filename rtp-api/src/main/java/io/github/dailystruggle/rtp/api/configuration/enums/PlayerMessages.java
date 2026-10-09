@@ -12,6 +12,10 @@ public enum PlayerMessages {
   // --- Teleport lifecycle ---
   /** Sent when a player issues {@code /rtp} while a teleport is already in progress for them. */
   alreadyTeleporting,
+  /** Sent when a player issues an action or teleport while they or a participant are already in an active session. */
+  alreadyInSession,
+  /** Sent when a player runs an action subcommand (e.g. {@code leave}) without being in a session of that action. */
+  notInSession,
   /** Sent when a player issues {@code /rtp} while the plugin is reloading its configuration. */
   teleportDeniedReloading,
   /** Sent to the player during the countdown before the teleport fires. */
@@ -46,6 +50,10 @@ public enum PlayerMessages {
   notEnoughMoney,
   /** Sent when the specified world name does not match any loaded world. */
   invalidWorld,
+  /** Sent when a player issues {@code /rtp back} with no recorded prior teleport origin. */
+  noBackLocation,
+  /** Sent when a player successfully teleports back to their previous location. */
+  backSuccess,
   // --- Command argument / permission errors ---
   /** Sent when a command argument cannot be parsed or is out of range. */
   badArg,

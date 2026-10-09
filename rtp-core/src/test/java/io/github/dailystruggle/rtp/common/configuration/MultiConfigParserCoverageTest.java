@@ -209,4 +209,27 @@ class MultiConfigParserCoverageTest {
         );
         assertEquals("regions", var2.directory);
     }
+
+    @Test
+    @DisplayName("extractBundledResources is skipped if default.yml exists on disk")
+    void testExtractBundledResourcesSkippedIfDefaultExists() throws IOException {
+        File actionsDir = new File(pluginDir, "definitions" + File.separator + "actions");
+        actionsDir.mkdirs();
+
+        // Write default.yml on disk
+        Files.writeString(new File(actionsDir, "default.yml").toPath(), "version: \"1.0\"\n");
+
+        // Initialize MultiConfigParser pointing to a directory that has bundled jar files (e.g. definitions/actions)
+        new MultiConfigParser<>(
+                TestRegionKeys.class,
+                "actions",
+                "1.0",
+                pluginDir,
+                "definitions/actions"
+        );
+
+        // Since default.yml exists, other bundled files like 'scatter.yml', 'arena.yml' must NOT have been unpacked
+        File scatter = new File(actionsDir, "scatter.yml");
+        assertFalse(scatter.exists(), "scatter.yml should not be extracted when default.yml is already present");
+    }
 }

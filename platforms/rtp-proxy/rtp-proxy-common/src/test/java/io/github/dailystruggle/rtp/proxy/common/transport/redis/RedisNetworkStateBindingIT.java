@@ -8,18 +8,17 @@ import io.github.dailystruggle.rtp.proxy.common.spi.RedeemOutcome;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReleaseReason;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.spi.Subscription;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -49,12 +48,12 @@ class RedisNetworkStateBindingIT {
     private RedisNetworkStateBinding binding;
 
     private static void flush() {
-        try (JedisPool p = RedisTestContainer.newPool(); Jedis j = p.getResource()) {
-            Set<String> keys = j.keys("rtp:net:*");
-            if (keys != null && !keys.isEmpty()) {
-                j.del(keys.toArray(new String[0]));
+        try (RespPool p = RedisTestContainer.newPool(); RespConnection j = p.getResource()) {
+            RespConnection.ScanResult res = j.scan("0", "rtp:net:*", 100);
+            if (!res.getResult().isEmpty()) {
+                j.del(res.getResult().toArray(new String[0]));
             }
-        }
+        } catch (Exception ignored) {}
     }
 
     private static BackendHeartbeat backend(String id) {

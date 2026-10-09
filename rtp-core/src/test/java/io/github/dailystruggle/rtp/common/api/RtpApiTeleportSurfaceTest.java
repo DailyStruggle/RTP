@@ -162,4 +162,162 @@ class RtpApiTeleportSurfaceTest {
         assertTrue(RTPAPI.isWarmingUp(id));
         assertFalse(RTPAPI.isWarmingUp(UUID.randomUUID()));
     }
+
+    // ------------------------------------------------------------------
+    // Core RTPAPI.teleportDelegate live execution tests
+    // ------------------------------------------------------------------
+
+    @Test
+    @DisplayName("teleportDelegate offline player returns PLAYER_OFFLINE")
+    void teleportDelegate_offlinePlayer(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+        UUID offlineId = UUID.randomUUID();
+        CompletableFuture<RTPResult> future = RTPAPI.teleport(offlineId, RtpTarget.defaultRegion());
+        assertNotNull(future);
+        RTPResult res = future.get();
+        assertFalse(res.isSuccess());
+        assertEquals(RTPResult.Reason.PLAYER_OFFLINE, res.reason());
+    }
+
+    @Test
+    @DisplayName("teleportDelegate network mode target when disabled returns INVALID_TARGET")
+    void teleportDelegate_networkTargetWhenDisabled(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
+        UUID playerId = player.uuid();
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+
+        RtpTarget netTarget = RtpTarget.network("remoteServer", "default");
+        CompletableFuture<RTPResult> future = RTPAPI.teleport(playerId, netTarget);
+        assertNotNull(future);
+        RTPResult res = future.get();
+        assertFalse(res.isSuccess());
+        assertEquals(RTPResult.Reason.INVALID_TARGET, res.reason());
+    }
+
+    @Test
+    @DisplayName("teleportDelegate refuses a biome target without rtp.biome permission (NO_PERMISSION)")
+    void teleportDelegate_biomeWithoutPermission_returnsNoPermission(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
+        UUID playerId = player.uuid();
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+        player.setPermission("rtp.biome.plains", false);
+        player.setPermission("rtp.biome.PLAINS", false);
+        player.setPermission("rtp.biome.*", false);
+
+        RtpTarget biome = RtpTarget.biome("plains");
+        RTPResult res = RTPAPI.teleport(playerId, biome).get();
+        assertFalse(res.isSuccess());
+        assertEquals(RTPResult.Reason.NO_PERMISSION, res.reason());
+        assertFalse(RTP.getInstance().processingPlayers.contains(playerId),
+                "A refused request must not leave the player marked in-flight");
+        assertEquals(io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.NO_PERMISSION,
+                RTPAPI.getTargetStatus(playerId, biome).availability(),
+                "Status and teleport must agree on the permission gate");
+    }
+
+    @Test
+    @DisplayName("teleportDelegate refuses a network target without rtp.servers permission (NO_PERMISSION)")
+    void teleportDelegate_networkWithoutPermission_returnsNoPermission(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
+        UUID playerId = player.uuid();
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+        player.setPermission("rtp.servers.remoteServer", false);
+        player.setPermission("rtp.servers.*", false);
+
+        java.util.concurrent.atomic.AtomicBoolean routed = new java.util.concurrent.atomic.AtomicBoolean();
+        io.github.dailystruggle.rtp.api.network.NetworkCommandHook priorHook = RTP.networkCommandHook;
+        RTP.networkCommandHook = (pId, args) -> {
+            routed.set(true);
+            return io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.crossServer(
+                    UUID.randomUUID(), "default", "remoteServer");
+        };
+        try {
+            RTPResult res = RTPAPI.teleport(playerId, RtpTarget.network("remoteServer", "default")).get();
+            assertEquals(RTPResult.Reason.NO_PERMISSION, res.reason());
+            assertFalse(routed.get(), "A denied request must not be enrolled cross-server");
+        } finally {
+            RTP.networkCommandHook = priorHook;
+        }
+    }
+
+    @Test
+    @DisplayName("teleportDelegate coordinate target local server teleports successfully")
+    void teleportDelegate_coordinateTargetLocal(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
+        UUID playerId = player.uuid();
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+
+        RtpTarget coordTarget = RtpTarget.coordinate(null, "world", 100, 64, 200);
+        CompletableFuture<RTPResult> future = RTPAPI.teleport(playerId, coordTarget);
+        assertNotNull(future);
+        RTPResult res = future.get();
+        assertTrue(res.isSuccess());
+        assertNotNull(res.location());
+        assertEquals(100, res.location().x());
+        assertEquals(64, res.location().y());
+        assertEquals(200, res.location().z());
+    }
+
+    @Test
+    @DisplayName("teleportDelegate reloading guard returns RELOADING")
+    void teleportDelegate_reloadingGuard(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
+        UUID playerId = player.uuid();
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+
+        RTP.reloading.set(true);
+        try {
+            CompletableFuture<RTPResult> future = RTPAPI.teleport(playerId, RtpTarget.defaultRegion());
+            assertNotNull(future);
+            RTPResult res = future.get();
+            assertFalse(res.isSuccess());
+            assertEquals(RTPResult.Reason.RELOADING, res.reason());
+        } finally {
+            RTP.reloading.set(false);
+        }
+    }
+
+    @Test
+    @DisplayName("RTP-16: coordinate target with missing world fails closed as INVALID_TARGET without falling back")
+    void teleportDelegate_coordinateMissingWorld_failsInvalidTarget(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
+        UUID playerId = player.uuid();
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+
+        RtpTarget coordTarget = RtpTarget.coordinate(null, "unloaded_world_xyz", 100, 64, 200);
+        CompletableFuture<RTPResult> future = RTPAPI.teleport(playerId, coordTarget);
+        assertNotNull(future);
+        RTPResult res = future.get();
+        assertFalse(res.isSuccess(), "Teleport to missing world must fail");
+        assertEquals(RTPResult.Reason.INVALID_TARGET, res.reason());
+    }
+
+    @Test
+    @DisplayName("RTP-16: ACTION target fails closed as INVALID_TARGET")
+    void teleportDelegate_actionTarget_failsInvalidTarget(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) throws Exception {
+        io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer();
+        UUID playerId = player.uuid();
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+
+        RtpTarget actionTarget = RtpTarget.action("nav:biome_menu");
+        CompletableFuture<RTPResult> future = RTPAPI.teleport(playerId, actionTarget);
+        assertNotNull(future);
+        RTPResult res = future.get();
+        assertFalse(res.isSuccess(), "ACTION target must not execute a teleport");
+        assertEquals(RTPResult.Reason.INVALID_TARGET, res.reason());
+    }
 }

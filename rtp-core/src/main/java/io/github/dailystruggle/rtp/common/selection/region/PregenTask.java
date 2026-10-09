@@ -51,10 +51,49 @@ final class PregenTask implements Runnable {
     private long[] flatDrawKeys = null;
     private long[] flatDrawWidths = null;
 
+    // ADR-110: true while this attempt holds a pin slot (native loads allowed, result pinned).
+    private final java.util.concurrent.atomic.AtomicBoolean pinHeld = new java.util.concurrent.atomic.AtomicBoolean();
+
     PregenTask(PregenState state, CompletableFuture<GenerationResult> result, long initialAttempt) {
         this.state = state;
         this.result = result;
         this.i = initialAttempt;
+        result.whenComplete((r, ex) -> releasePin());
+    }
+
+    private boolean speculative() {
+        return state.purpose == LoadPurpose.SPECULATIVE;
+    }
+
+    /** Speculative and not yet pinned: resident chunks and region-file reads only (ADR-110). */
+    private boolean readOnly() {
+        return speculative() && !pinHeld.get();
+    }
+
+    private LiveLoadGate gate() {
+        Region r = state.region;
+        return LiveLoadGate.of((r == null) ? null : r.name);
+    }
+
+    /** Claims a pin slot bounded by the kept queue's capacity; idempotent per attempt. */
+    private boolean tryPin() {
+        if (pinHeld.get()) return true;
+        Region r = state.region;
+        if (r == null || r.queueManager == null) return false;
+        int cap;
+        try {
+            cap = (int) Math.min(Integer.MAX_VALUE, r.getSettings().activeChunkCap());
+        } catch (Throwable t) {
+            return false;
+        }
+        if (!gate().tryAcquirePin(() -> r.queueManager.keptLocations.size(), cap)) return false;
+        if (!pinHeld.compareAndSet(false, true)) gate().releasePin();
+        gate().onPinnedLoad();
+        return true;
+    }
+
+    private void releasePin() {
+        if (pinHeld.compareAndSet(true, false)) gate().releasePin();
     }
 
     /**
@@ -63,6 +102,7 @@ final class PregenTask implements Runnable {
      */
     private void rescheduleNextAttempt() {
         i++;
+        releasePin();
         if (result.isDone()) return;
         CfDiag.pregenReschedule.increment();
         if (inRunAttempt) {
@@ -601,15 +641,21 @@ final class PregenTask implements Runnable {
             }
         }
 
-        // --- probe-first fast path ---
-        // Probe-first fast path: reject early via ChunkColumnProbe if available.
-        if (tryProbeFirst(cx, cz, finalL)) {
-            // Probe rejected - a rescheduleNextAttempt has already been queued.
+        // --- probe-first fast path (ADR-109: measured cost decides whether the probe runs) ---
+        ProbeFirstGovernor gov = governor();
+        boolean probeFirst = gov == null || gov.shouldProbe(ProbeFirstGovernor.binKey(cx, cz));
+        if (probeFirst && tryProbeFirst(cx, cz, finalL, gov)) {
+            // Probe rejected (reschedule queued) or async continuation owns the attempt.
             return;
         }
 
         // --- full path via ADR-016 section 13.1 precedence chain (cached → anvil → live) ---
-        requestChunk(cx, cz, finalL, /*staleRetries*/ 0);
+        requestChunk(cx, cz, finalL, /*staleRetries*/ 0, gov, probeFirst);
+    }
+
+    private @org.jetbrains.annotations.Nullable ProbeFirstGovernor governor() {
+        Region r = state.region;
+        return (r == null) ? null : ProbeFirstGovernor.of(r.name, ProbeFirstGovernor.Path.FILL);
     }
 
     /**
@@ -619,7 +665,8 @@ final class PregenTask implements Runnable {
      * @return {@code true} if candidate was rejected and reschedule was queued;
      *         {@code false} on accept or unavailable probe.
      */
-    private boolean tryProbeFirst(int cx, int cz, long finalL) {
+    private boolean tryProbeFirst(int cx, int cz, long finalL,
+                                  @org.jetbrains.annotations.Nullable ProbeFirstGovernor gov) {
         io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor<?> vert =
                 state.vert;
         int minY = vert.minY();
@@ -627,6 +674,7 @@ final class PregenTask implements Runnable {
         if (minY >= maxY) return false;
 
         CompletableFuture<io.github.dailystruggle.rtp.api.world.ChunkColumnProbe> fut;
+        final long probeStart = System.nanoTime();
         try {
             // Widen probe window by one block below minY so that
             // LinearAdjustor/JumpAdjustor.adjustFromProbe (which consults the
@@ -653,31 +701,43 @@ final class PregenTask implements Runnable {
             } catch (Throwable ignored) {
                 return false;
             }
-            if (probe == null) return false;
-            return evaluateProbe(probe, cx, cz, finalL);
+            boolean rejected = probe != null && evaluateProbe(probe, cx, cz, finalL);
+            long probeNanos = System.nanoTime() - probeStart;
+            long drain = (probe != null) ? probe.drainNanos() : 0L;
+            long effectiveNanos = (drain > 0L) ? Math.min(drain, probeNanos) : probeNanos;
+            if (gov != null) gov.recordProbe(effectiveNanos, probe != null ? probe.groupSize() : 0, rejected);
+            return rejected;
         }
 
         // Async completion - dispatch the evaluation and return true to prevent the
         // caller from also invoking requestChunk. On UNKNOWN / accept, we re-enter
         // the full path from the callback via requestChunk; on reject we reschedule.
         fut.whenComplete((probe, ex) -> {
+            long probeNanos = System.nanoTime() - probeStart;
+            long drain = (probe != null) ? probe.drainNanos() : 0L;
+            long effectiveNanos = (drain > 0L) ? Math.min(drain, probeNanos) : probeNanos;
+            int group = (probe != null) ? probe.groupSize() : 0;
             if (ex != null) {
                 RTP.log(Level.FINE,
                         "[RTP] probeChunkColumn failed for world=" + state.world.name()
                                 + " chunk=(" + cx + "," + cz + "): "
                                 + ex.getClass().getSimpleName() + ": " + ex.getMessage());
-                continueInline(() -> requestChunk(cx, cz, finalL, /*staleRetries*/ 0));
+                if (gov != null) gov.recordProbe(effectiveNanos, group, false);
+                continueInline(() -> requestChunk(cx, cz, finalL, /*staleRetries*/ 0, gov, true));
                 return;
             }
             if (probe == null) {
-                continueInline(() -> requestChunk(cx, cz, finalL, /*staleRetries*/ 0));
+                if (gov != null) gov.recordProbe(effectiveNanos, group, false);
+                continueInline(() -> requestChunk(cx, cz, finalL, /*staleRetries*/ 0, gov, true));
                 return;
             }
-            if (evaluateProbe(probe, cx, cz, finalL)) {
+            boolean rejected = evaluateProbe(probe, cx, cz, finalL);
+            if (gov != null) gov.recordProbe(effectiveNanos, group, rejected);
+            if (rejected) {
                 // reject already queued rescheduleNextAttempt via evaluateProbe.
                 return;
             }
-            continueInline(() -> requestChunk(cx, cz, finalL, /*staleRetries*/ 0));
+            continueInline(() -> requestChunk(cx, cz, finalL, /*staleRetries*/ 0, gov, true));
         });
         return true;
     }
@@ -744,13 +804,48 @@ final class PregenTask implements Runnable {
      * a {@link ChunkReservation} and dispatch to the region-owning thread.
      */
     private void requestChunk(int cx, int cz, long finalL, int staleRetries) {
+        requestChunk(cx, cz, finalL, staleRetries, null, false);
+    }
+
+    /** As above; when {@code gov} is non-null the load's wall time feeds the ADR-109 governor. */
+    private void requestChunk(int cx, int cz, long finalL, int staleRetries,
+                              @org.jetbrains.annotations.Nullable ProbeFirstGovernor gov, boolean afterProbe) {
+        if (readOnly()) {
+            // ADR-110: speculative fill reads resident chunks / region files only. A native load
+            // happens only with a pin slot (result held until teleport); otherwise defer.
+            final long readStart = System.nanoTime();
+            state.world.getOrReadChunk(cx, cz).whenComplete((chunk, ex) -> {
+                if (ex == null && chunk != null) {
+                    gate().onReadResolved();
+                    if (gov != null) gov.recordLoad(afterProbe, System.nanoTime() - readStart);
+                    continueInline(() -> onChunkResolved(cx, cz, finalL, chunk, staleRetries));
+                    return;
+                }
+                if (tryPin()) {
+                    // Native-load time is not a region-file read: keep it out of ADR-109.
+                    continueInline(() -> loadChunk(cx, cz, finalL, staleRetries, null, afterProbe));
+                    return;
+                }
+                gate().onDeferredCenter();
+                recordOutcome("deferred/needsLive chunk=(" + cx + "," + cz + ")");
+                continueInline(this::rescheduleNextAttempt);
+            });
+            return;
+        }
+        loadChunk(cx, cz, finalL, staleRetries, speculative() ? null : gov, afterProbe);
+    }
+
+    private void loadChunk(int cx, int cz, long finalL, int staleRetries,
+                           @org.jetbrains.annotations.Nullable ProbeFirstGovernor gov, boolean afterProbe) {
         // Per-attempt chunk-load: per-chunk deadline lives in the world adapter
         // (it knows when the server is incapable of loading a particular chunk).
         // Letting the future complete naturally means slow loads still warm
         // rtpChunkCache for the next attempt; rejection on null/exception still
         // routes through the existing FailTypes.nullChunk attribution path.
+        final long loadStart = System.nanoTime();
         state.world.getOrLoadChunk(cx, cz, "PregenTask.requestChunk")
                 .whenComplete((chunk, ex) -> {
+                    if (gov != null && ex == null) gov.recordLoad(afterProbe, System.nanoTime() - loadStart);
                     if (ex != null) {
                         RTP.log(Level.WARNING,
                                 "[RTP] getOrLoadChunk failed for world=" + state.world.name()
@@ -955,7 +1050,18 @@ final class PregenTask implements Runnable {
 
         final String resBiome = currBiome;
 
-        // --- safetyCheck: load the (2r+1)² neighbour grid, then y-scan ---
+        loadSafetyNeighbours(cx, cz, finalL, finalX, finalY, finalZ, resBiome, chunk, reservation);
+    }
+
+    /**
+     * safetyCheck: load the (2r+1)² neighbour grid, then y-scan. ADR-110: while speculative and
+     * unpinned, neighbours resolve from resident chunks / region files only; a miss escalates to
+     * a pin slot (re-run with native loads) or defers the candidate.
+     */
+    private void loadSafetyNeighbours(int cx, int cz, long finalL, int finalX, int finalY, int finalZ,
+                                      String resBiome, RTPChunk<?> chunk,
+                                      @org.jetbrains.annotations.Nullable ChunkReservation reservation) {
+        final boolean readOnlyNow = readOnly();
         int safe = state.safetyRadius;
         int L = safe * 2 + 1;
         int centerChunkX = chunk.x();
@@ -972,7 +1078,9 @@ final class PregenTask implements Runnable {
                 int ncz = centerChunkZ + dz;
                 int idx = (dx + safe) * L + (dz + safe);
                 state.world.recordChunkLoadOrigin("PregenTask.safetyNeighbourGrid");
-                neighbourFutures.add(state.world.getChunkAt(ncx, ncz));
+                neighbourFutures.add(readOnlyNow
+                        ? state.world.getChunkIfReadable(ncx, ncz)
+                        : state.world.getChunkAt(ncx, ncz));
                 neighbourIdx.add(new int[]{idx});
             }
         }
@@ -1018,6 +1126,18 @@ final class PregenTask implements Runnable {
                             break;
                         }
                         localChunks[neighbourIdx.get(idxI)[0]] = nchunk;
+                    }
+                    if (!ok && readOnlyNow) {
+                        if (tryPin()) {
+                            continueInline(() -> loadSafetyNeighbours(
+                                    cx, cz, finalL, finalX, finalY, finalZ, resBiome, chunk, reservation));
+                            return;
+                        }
+                        gate().onDeferredNeighbour();
+                        recordOutcome("deferred/neighbourNeedsLive chunk=(" + cx + "," + cz + ")");
+                        closeIfPresent(reservation);
+                        continueInline(this::rescheduleNextAttempt);
+                        return;
                     }
                     if (!ok) {
                         if (state.verbose) {
@@ -1113,12 +1233,8 @@ final class PregenTask implements Runnable {
                         }
                         recordOutcome("safetyExternal[" + className + "] ex=" + (verEx == null ? "null" : verEx.getClass().getSimpleName()));
                         if (state.shape instanceof MemoryShape) {
-                            // addBadChunk: chunk-uniform - within a chunk the per-column
-                            // selection order is deterministic, so the twin spiral index picks
-                            // the same column and the verifier rejects it identically.
-                            long effectiveTtl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(
-                                    LocationGenerator.FailTypes.safetyExternal, failedClass);
-                            ((MemoryShape<?>) state.shape).addBadChunk(finalL, LocationGenerator.FailTypes.safetyExternal, effectiveTtl);
+                            io.github.dailystruggle.rtp.common.selection.region.claim.ClaimAnchoredRegionTracker
+                                    .encapsulateClaim((MemoryShape<?>) state.shape, state.world.name(), finalX, finalZ, failedClass);
                         }
                         closeIfPresent(reservation);
                         continueInline(this::rescheduleNextAttempt);
@@ -1140,6 +1256,14 @@ final class PregenTask implements Runnable {
         int radius = Math.max(state.safetyRadius, (int) viewDistanceRadius);
         int ccx = resCoords.x() >> 4;
         int ccz = resCoords.z() >> 4;
+        if (readOnly()) {
+            // ADR-110: an unpinned result would lose its ring to unload before use; the
+            // teleport-time preload (viewDistanceTeleport) loads it when a player is waiting.
+            if (radius > 0) gate().onRingSkipped();
+            closeIfPresent(reservation);
+            result.complete(new GenerationResult(resCoords, i, null));
+            return;
+        }
         List<CompletableFuture<Long>> chunks = new ArrayList<>();
         for (int x = -radius; x <= radius; x++) {
             for (int z = -radius; z <= radius; z++) {
@@ -1149,6 +1273,15 @@ final class PregenTask implements Runnable {
         }
         CfDiag.chunkSetPregenVerified.increment();
         ChunkSet verifiedChunks = new ChunkSet(state.world, ccx, ccz, chunks, new CompletableFuture<>());
+        if (speculative()) {
+            // ADR-110 pinned fill: take the kept-queue pin before dropping the per-iteration
+            // ticket (ref-counted, so the center never goes unticketed). The caller hands the
+            // reservation to the kept queue or closes it.
+            ChunkReservation pin = new ChunkReservation(verifiedChunks, state.world);
+            closeIfPresent(reservation);
+            result.complete(new GenerationResult(resCoords, i, verifiedChunks, pin));
+            return;
+        }
         // Close the per-iteration reservation; ownership of the verifiedChunks set
         // transfers via the returned GenerationResult (matches the prior contract).
         closeIfPresent(reservation);

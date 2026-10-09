@@ -17,7 +17,6 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -279,18 +278,27 @@ public class RegexParameterSecurityTest {
     }
 
     @Test
-    @DisplayName("S-INJ-15: very long pattern compiles or fails closed, never throws past expandRegexToken")
-    void veryLongPattern_doesNotPropagateException() {
-        StubParameter p = new StubParameter(setOf("foo"), (u, s) -> true);
+    @DisplayName("S-INJ-15: patterns over 256 chars are never compiled and fall back to the literal token")
+    void veryLongPattern_fallsBackToLiteral() {
+        String atCap = "a".repeat(256);
+        StubParameter p = new StubParameter(setOf("foo", atCap), (u, s) -> true);
+
+        // At the cap the pattern is still expanded.
+        assertEquals(List.of(atCap),
+                TreeCommand.expandRegexToken("reg:" + atCap, p, UUID.randomUUID()).collect(Collectors.toList()));
+
+        // One char over (and the classic a?^n a^n blow-up shape) -> literal token, no compile.
+        String overCap = "reg:" + "a".repeat(257);
+        assertEquals(List.of(overCap),
+                TreeCommand.expandRegexToken(overCap, p, UUID.randomUUID()).collect(Collectors.toList()));
+
         StringBuilder big = new StringBuilder("reg:");
         for (int i = 0; i < 5_000; i++) big.append("a?");
         big.append("a".repeat(5_000));
-        // A legal but huge pattern. Should compile and either match or not -
-        // the security contract is just "no exception escapes".
-        Stream<String> s = TreeCommand.expandRegexToken(big.toString(), p, UUID.randomUUID());
-        assertNotNull(s);
-        // Force evaluation
-        s.count();
+        String evil = big.toString();
+        assertTimeoutPreemptively(Duration.ofSeconds(3), () ->
+                assertEquals(List.of(evil),
+                        TreeCommand.expandRegexToken(evil, p, UUID.randomUUID()).collect(Collectors.toList())));
     }
 
     // ---------------------------------------------------------------------

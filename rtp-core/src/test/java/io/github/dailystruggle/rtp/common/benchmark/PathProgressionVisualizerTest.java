@@ -5,16 +5,15 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.tools.ChartOutputHelper;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import javax.imageio.ImageIO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -139,24 +138,8 @@ public class PathProgressionVisualizerTest {
 
     g.dispose();
 
-    File outReportsDir = new File("build/reports/path_progression");
-    if (!outReportsDir.exists()) outReportsDir.mkdirs();
-
-    ImageIO.write(img, "png", new File(outReportsDir, "sub_bin_zoom_path_chart.png"));
-    ImageIO.write(img, "png", new File("sub_bin_zoom_path_chart.png"));
-
-    File[] candidateDocsDirs = new File[] {
-      new File("docs/assets/img"),
-      new File("../docs/assets/img"),
-      new File("../../docs/assets/img")
-    };
-    for (File dir : candidateDocsDirs) {
-      if (dir.exists()) {
-        ImageIO.write(img, "png", new File(dir, "sub_bin_zoom_path_chart.png"));
-      }
-    }
-
-    System.out.println("[DEBUG_LOG] Successfully rendered sub-bin zoom chart to: " + new File("sub_bin_zoom_path_chart.png").getAbsolutePath());
+    ChartOutputHelper.writeChart(img, "path_progression", "sub_bin_zoom_path_chart.png");
+    System.out.println("[DEBUG_LOG] Successfully rendered sub-bin zoom chart to: " + ChartOutputHelper.getDocsAssetFile("sub_bin_zoom_path_chart.png").getAbsolutePath());
   }
 
   private void renderZoom32x32RegionChart() throws Exception {
@@ -235,32 +218,9 @@ public class PathProgressionVisualizerTest {
 
     g.dispose();
 
-    // Save image to multiple destinations
-    File outReportsDir = new File("build/reports/path_progression");
-    if (!outReportsDir.exists()) outReportsDir.mkdirs();
-
-    File chartFileReports = new File(outReportsDir, "region_32x32_zoom_path_chart.png");
-    File chartFileRoot = new File("../region_32x32_zoom_path_chart.png");
-    if (!chartFileRoot.getParentFile().exists()) {
-      chartFileRoot = new File("region_32x32_zoom_path_chart.png");
-    }
-
-    ImageIO.write(img, "png", chartFileReports);
-    ImageIO.write(img, "png", chartFileRoot);
-    ImageIO.write(img, "png", new File("region_32x32_zoom_path_chart.png"));
-
-    File[] candidateDocsDirs = new File[] {
-      new File("docs/assets/img"),
-      new File("../docs/assets/img"),
-      new File("../../docs/assets/img")
-    };
-    for (File dir : candidateDocsDirs) {
-      if (dir.exists()) {
-        ImageIO.write(img, "png", new File(dir, "region_32x32_zoom_path_chart.png"));
-      }
-    }
-
-    System.out.println("[DEBUG_LOG] Successfully rendered 32x32 zoom chart to: " + chartFileRoot.getAbsolutePath());
+    // Save image to canonical destinations
+    ChartOutputHelper.writeChart(img, "path_progression", "region_32x32_zoom_path_chart.png");
+    System.out.println("[DEBUG_LOG] Successfully rendered 32x32 zoom chart to: " + ChartOutputHelper.getDocsAssetFile("region_32x32_zoom_path_chart.png").getAbsolutePath());
   }
 
   private void render32x32RegionCell(Graphics2D g, int x, int y, int w, int h, int pVal, boolean isSquare) {
@@ -570,35 +530,9 @@ public class PathProgressionVisualizerTest {
 
     g.dispose();
 
-    // Save image to multiple destinations
-    File outReportsDir = new File("build/reports/path_progression");
-    if (!outReportsDir.exists()) outReportsDir.mkdirs();
-
-    File chartFileReports = new File(outReportsDir, "path_progression_radii_chart.png");
-    File chartFileRoot = new File("../path_progression_radii_chart.png");
-    if (!chartFileRoot.getParentFile().exists()) {
-      chartFileRoot = new File("path_progression_radii_chart.png");
-    }
-
-    ImageIO.write(img, "png", chartFileReports);
-    ImageIO.write(img, "png", chartFileRoot);
-    ImageIO.write(img, "png", new File("path_progression_radii_chart.png"));
-
-    // Ensure it always saves to docs/assets/img/ in the real project repo
-    File[] candidateDocsDirs = new File[] {
-      new File("docs/assets/img"),
-      new File("../docs/assets/img"),
-      new File("../../docs/assets/img")
-    };
-    for (File dir : candidateDocsDirs) {
-      if (dir.exists()) {
-        ImageIO.write(img, "png", new File(dir, "path_progression_radii_chart.png"));
-        System.out.println("[DEBUG_LOG] Wrote path_progression_radii_chart.png to: " + new File(dir, "path_progression_radii_chart.png").getAbsolutePath());
-      }
-    }
-
-    System.out.println("[DEBUG_LOG] Successfully rendered chart to: " + chartFileRoot.getAbsolutePath());
-    System.out.println("[DEBUG_LOG] Successfully rendered chart to: " + chartFileReports.getAbsolutePath());
+    // Save image to canonical destinations
+    ChartOutputHelper.writeChart(img, "path_progression", "path_progression_radii_chart.png");
+    System.out.println("[DEBUG_LOG] Successfully rendered chart to: " + ChartOutputHelper.getDocsAssetFile("path_progression_radii_chart.png").getAbsolutePath());
   }
 
   private void renderShapeCell(Graphics2D g, int x, int y, int w, int h, int r, boolean isSquare) {

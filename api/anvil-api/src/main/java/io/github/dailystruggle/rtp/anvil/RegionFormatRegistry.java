@@ -13,9 +13,10 @@ import java.util.logging.Logger;
 /**
  * Thread-safe registry of pluggable region-file formats and readers (ADR-077).
  *
- * <p>Supports standard Anvil ({@code .mca}) by default, and allows external addons
- * or runtime modules (such as Linear format via {@code LeafRTPLinearAddon}) to register
- * custom decoders either programmatically or through {@link ServiceLoader}.</p>
+ * <p>Only vanilla Anvil ({@code .mca}) is built in. Addons register other formats (e.g. a
+ * Linear {@code .linear} reader) programmatically via {@link #register} or through
+ * {@link ServiceLoader}; a format with no registered reader is never decoded, so its
+ * chunks fall through to the live load path.</p>
  */
 public final class RegionFormatRegistry {
 
@@ -24,7 +25,6 @@ public final class RegionFormatRegistry {
     private static final Map<String, RegionFileReader> REGISTRY = new ConcurrentHashMap<>();
 
     static {
-        // Register default vanilla Anvil format
         REGISTRY.put(".mca", AnvilReader.INSTANCE);
         // Discover any SPI providers on classpath
         loadServiceProviders();
@@ -104,7 +104,7 @@ public final class RegionFormatRegistry {
     }
 
     /**
-     * Resets the registry back to default (only built-in {@code .mca}) and re-polls ServiceLoader.
+     * Resets the registry back to the built-in {@code .mca} reader and re-polls ServiceLoader.
      */
     public static void reset() {
         REGISTRY.clear();

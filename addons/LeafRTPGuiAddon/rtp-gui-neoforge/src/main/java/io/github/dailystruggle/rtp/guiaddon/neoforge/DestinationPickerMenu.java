@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Server-side container menu that renders the RTP destination picker as a chest GUI
@@ -40,6 +41,9 @@ import java.util.Map;
  * inert so no icon can be withdrawn.
  */
 final class DestinationPickerMenu extends ChestMenu {
+
+  private static final Pattern COLOR_CODE = Pattern.compile("(?i)[&\u00a7](#[0-9a-f]{6}|x([&\u00a7][0-9a-f]){6}|[0-9a-fk-or])");
+  private static final Pattern LEFTOVER_TAGS = Pattern.compile("<[^>]+>");
 
   private final Map<Integer, MenuEntry> slotEntries;
   private final int topSlots;
@@ -74,7 +78,7 @@ final class DestinationPickerMenu extends ChestMenu {
     for (Map.Entry<Integer, MenuEntry> placed : layout.slotEntries().entrySet()) {
       MenuEntry entry = placed.getValue();
       container.setItem(placed.getKey(), icon(entry.iconName(), entry.displayName(),
-          MenuIcons.entryLore(entry)));
+          MenuIcons.entryLore(entry, model.readyText(), model.unavailableText())));
     }
 
     if (layout.hasDashboard()) {
@@ -92,7 +96,7 @@ final class DestinationPickerMenu extends ChestMenu {
     if (fillerName == null || fillerName.isBlank()) {
       return;
     }
-    Item fillerItem = resolveItem(fillerName);
+    Item fillerItem = resolveFillerItem(fillerName);
     if (fillerItem == Items.AIR) {
       return;
     }
@@ -103,6 +107,17 @@ final class DestinationPickerMenu extends ChestMenu {
         container.setItem(i, pane);
       }
     }
+  }
+
+  private static Item resolveFillerItem(String materialName) {
+    if (materialName == null || materialName.isBlank() || materialName.equalsIgnoreCase("AIR")) {
+      return Items.AIR;
+    }
+    Identifier id = Identifier.tryParse(materialName.trim().toLowerCase(Locale.ROOT));
+    if (id == null) {
+      return Items.AIR;
+    }
+    return BuiltInRegistries.ITEM.getOptional(id).orElse(Items.AIR);
   }
 
   private static ItemStack icon(String materialName, String displayName, List<String> lore) {
@@ -129,12 +144,14 @@ final class DestinationPickerMenu extends ChestMenu {
     return BuiltInRegistries.ITEM.getOptional(id).orElse(Items.COMPASS);
   }
 
-  /** Strips RTP/legacy {@code &x} and {@code §x} color codes for a plain label. */
+  /** Strips RTP/legacy {@code &x}, {@code §x}, hex, and MiniMessage color codes for a plain label. */
   private static String strip(String text) {
     if (text == null || text.isEmpty()) {
       return "";
     }
-    return text.replaceAll("(?i)[&\u00a7][0-9a-fk-or]", "");
+    String expanded = io.github.dailystruggle.rtp.common.tools.MiniMessageColorExpander.expand(text);
+    String noColor = COLOR_CODE.matcher(expanded).replaceAll("");
+    return LEFTOVER_TAGS.matcher(noColor).replaceAll("");
   }
 
   @Override
@@ -143,9 +160,9 @@ final class DestinationPickerMenu extends ChestMenu {
       MenuEntry entry = slotEntries.get(slotId);
       if (entry != null) {
         MenuActions.submit(player.getUUID(), entry.target());
-      }
-      if (player instanceof ServerPlayer serverPlayer) {
-        serverPlayer.closeContainer();
+        if (!MenuActions.isMenuNavigation(entry.target()) && player instanceof ServerPlayer serverPlayer) {
+          serverPlayer.closeContainer();
+        }
       }
     }
   }

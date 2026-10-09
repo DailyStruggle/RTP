@@ -9,8 +9,8 @@
 ## 1. Classification Definitions
 
 - **Tested:** Verified by continuous or scheduled automated CI pipelines (including the nightly multi-node devstack acceptance harness, dedicated carrier compilation/unit suites, or multi-release ArchUnit/mock gates). Regressions in tested environments block release.
-  - *Devstack Scheduled Acceptance (Nightly):* Paper, Folia, Fabric, and Velocity on Java 21 LTS (multi-node containerized integration with Redis, cross-server token flow, and lifecycle verification).
-  - *CI Build & Adapter Gates (Every Commit):* Compiles, tests, and enforces architectural invariants across all active carrier modules.
+  - *Devstack Scheduled Acceptance (Nightly):* Velocity (Java 25), Paper (1.21.11, Java 25), Folia (1.21.11, Java 25), Fabric (1.21.11, Java 25), and NeoForge (1.21.1, Java 21) across multi-node containerized integration with Redis, cross-server token flow, and lifecycle verification.
+  - *CI Build & Adapter Gates (Every Commit):* Compiles, tests, and enforces architectural invariants across all active carrier modules (Java 21 base bytecode, Java 25 experimental/unobf).
 - **Best-effort:** Compatible architecture or downstream fork sharing the execution path of a tested platform, but lacking dedicated automated end-to-end integration runs in CI on every commit/night. Community bug reports are accepted and addressed, but fixes are prioritized behind tested platforms.
 - **Unsupported:** Incompatible threading models, missing required platform APIs, unsupported Java versions (< 21), or platforms explicitly declared out of scope (e.g. legacy Forge <= 1.20.1, Sponge, Bedrock-native). Bug reports on unsupported platforms are closed without investigation.
 
@@ -36,8 +36,8 @@ RTP requires Java 21 or higher across all platforms and components (REQ-RTP-SYS-
 
 | Minecraft Version | Paper (+ forks) | Folia | Spigot | Fabric | NeoForge |
 |:---|:---:|:---:|:---:|:---:|:---:|
-| **MC 26.x (Snapshot / Experimental)** | **Best-effort** | **Best-effort** | **Best-effort** | **Tested** | **Best-effort** |
-| **MC 1.21.x** (1.21.0 - 1.21.4+) | **Tested** | **Tested** | **Best-effort** | **Tested** | **Best-effort** |
+| **MC 26.x (26.1, 26.2, 26.3+)** | **Best-effort** | **Best-effort** | **Best-effort** | **Tested** | **Best-effort** |
+| **MC 1.21.x** (1.21.0 - 1.21.4+) | **Tested** | **Tested** | **Best-effort** | **Tested** | **Tested** |
 | **MC 1.20.5 - 1.20.6** | **Tested** | **Tested** | **Best-effort** | **Tested** | **Unsupported** |
 | **MC 1.20.0 - 1.20.4** | **Tested** | **Tested** | **Best-effort** | **Tested** | **Unsupported** |
 | **MC 1.19.4 and older** | **Unsupported** | **Unsupported** | **Unsupported** | **Unsupported** | **Unsupported** |
@@ -45,10 +45,10 @@ RTP requires Java 21 or higher across all platforms and components (REQ-RTP-SYS-
 #### Platform-Specific Notes:
 - **Paper & Forks (Leaf, Leaves, Purpur, Pufferfish, Airplane, DivineMC):**
   - **Status:** **Tested** (Paper on 1.20.x, 1.21.x via automated build gates and nightly devstack); **Best-effort** (downstream forks and MC 26.x tracking).
-  - Uses native Paper asynchronous chunk loading (`World.getChunkAtAsync`). Linear (`.linear` / ZSTD) format supported via off-tick pre-filtering (ADR-077).
+  - Uses native Paper asynchronous chunk loading (`World.getChunkAtAsync`). Linear (`.linear` / ZSTD) worlds are supported through the live async chunk load path; core does not pre-filter `.linear` files unless an addon registers a reader (ADR-077).
 - **Folia:**
   - **Status:** **Tested** (1.20.x, 1.21.x via automated build gates, thread affinity ArchUnit rules, and nightly devstack).
-  - Operates strictly under Folia Region & Entity schedulers with Count-Bound task pipelines (ADR-004, ADR-015). Off-tick Anvil/Linear pre-filtering on common pool avoids cross-region hops.
+  - Operates strictly under Folia Region & Entity schedulers with Count-Bound task pipelines (ADR-004, ADR-015). Off-tick Anvil pre-filtering on common pool avoids cross-region hops.
 - **Spigot:**
   - **Status:** **Best-effort** (1.20.x, 1.21.x; compiles via `rtp-bukkit` adapter and unit tested, but lacks scheduled live multi-server devstack verification in CI).
   - Uses background Anvil (`.mca`) parser for off-tick candidate pre-filtering to prevent main-thread chunk load stalls (S-005).
@@ -56,7 +56,7 @@ RTP requires Java 21 or higher across all platforms and components (REQ-RTP-SYS-
   - **Status:** **Tested** (1.20.x, 1.21.x, 26.x via Loom carrier build suites, Java 25 toolchain gates, and nightly devstack).
   - First-class Loom-remapped obf and Mojmap-unobf carrier modules with native async chunk futures (`ServerLevel.getChunkSource().getChunkFuture`) and `FabricScheduler`.
 - **NeoForge:**
-  - **Status:** **Best-effort** (1.21.x, 26.x; compiles via `rtp-neoforge` ModDevGradle carrier and passes unit suites; scheduled live container acceptance is pending devstack phase 2).
+  - **Status:** **Tested** (1.21.1 via automated ModDevGradle carrier suites, and nightly acceptance devstack node on Java 21); **Best-effort** (26.x tracking).
   - Native ModDevGradle Mojmap runtime mod with `NeoForgeScheduler` and Brigadier command adapter (ADR-033). Legacy Forge (<= 1.20.1) is explicitly **Unsupported**.
 
 ---
@@ -93,5 +93,5 @@ Support classifications are backed by automated verification tiers:
 2. **ArchUnit Prohibition Enforcement:**
    - Verifies architectural boundaries: no platform leaks into `rtp-core` or `rtp-api`, zero main-thread synchronous chunk loading (S-005), and strict thread scheduling compliance.
 3. **Multi-Server Acceptance Devstack:**
-   - Boots multi-node Docker Compose network: 1 Redis + 2 Velocity proxies + 2 Paper backends + 1 Folia backend + 1 Fabric backend.
+   - Boots multi-node Docker Compose network: 1 Redis + 2 Velocity proxies + 2 Paper lobbies + 1 Paper backend + 1 Folia backend + 1 Fabric backend + 1 NeoForge backend.
    - Executes cross-server reservation token redemption, timeout reaping, and failover validation.

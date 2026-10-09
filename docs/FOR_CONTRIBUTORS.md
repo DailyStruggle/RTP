@@ -31,7 +31,7 @@ Every new feature or fix must trace to an existing requirement or introduce a ne
 
 ### 6. [TRACEABILITY.md](dev/TRACEABILITY.md)
 The requirement → design decision → implementing class → test matrix.
-The `check_traceability.sh` CI script fails if any `REQ-*` ID lacks a row here — add the row before pushing.
+The `scripts/check_traceability.sh` CI script fails if any `REQ-*` ID lacks a row here — add the row before pushing.
 
 ### 7. [STAKEHOLDERS.md](dev/STAKEHOLDERS.md)
 Actor definitions and their goals. Keeps requirements grounded in real user needs.
@@ -47,5 +47,5 @@ Read the relevant ADRs before changing anything the decisions describe.
 
 ## Reference Material
 
-- [HAZARDS.md](admin/HAZARDS.md) — hazard register (also the per-component failure catalog); consult when a change touches chunk loading, scheduling, or memory management, or when writing or reviewing error-handling code.
+- [HAZARDS.md](dev/HAZARDS.md) — hazard register (also the per-component failure catalog); consult when a change touches chunk loading, scheduling, or memory management, or when writing or reviewing error-handling code.
 - [CHANGELOG.md](https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md) — release history; follow the existing format when adding an Unreleased entry.

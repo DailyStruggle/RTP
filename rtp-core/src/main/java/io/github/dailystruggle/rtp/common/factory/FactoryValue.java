@@ -1,15 +1,16 @@
 package io.github.dailystruggle.rtp.common.factory;
 
-import java.util.function.Function;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import io.github.dailystruggle.rtp.common.search.FuzzySearchEngine;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 import org.jetbrains.annotations.NotNull;
-import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
 /**
  * this exists solely because java is so stubborn about constructors and generics. rather than
@@ -37,6 +38,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
   protected final EnumMap<E, String[]> desc;
 
   protected final Map<String, E> enumLookup;
+  /** Serializes writers only; readers never take it (copy-on-write, ADR-094). */
   private final Object dataLock = new Object();
 
   /** The name of this factory value (typically the config file name). */
@@ -46,12 +48,12 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
   public Map<String, Object> language_mapping = new ConcurrentHashMap<>();
   /** Maps locale-translated key names back to their canonical equivalents. */
   public Map<String, String> reverse_language_mapping = new ConcurrentHashMap<>();
-  // Volatile so {@link #setData(EnumMap)} can publish a fresh map by reference
-  // assignment and concurrent readers always observe either the old map intact
-  // or the new map intact - never a clear()+putAll() torn state. Reads that
-  // need a coherent snapshot (getData, toString, toYAML, getNumber cache-back)
-  // synchronize on the current map instance, which is correct as long as no
-  // mutator ever modifies the map after publishing it via setData.
+  // Copy-on-write: a map published here is never mutated again. Writers clone,
+  // modify and republish under dataLock; readers load the volatile reference and
+  // read it lock-free. Selection reads knobs several times per chunk from many
+  // async workers, so a read-side monitor serializes the whole pipeline.
+  // Subclasses may write {@code data} directly only before the instance is shared
+  // (constructors); afterwards they must go through set / setData / replaceData.
   protected volatile EnumMap<E, Object> data;
   private Set<String> keys = null;
 
@@ -74,14 +76,23 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
   }
 
   /**
-   * Returns a cloned snapshot of data under synchronization to prevent concurrent modification.
+   * Returns a mutable copy of the current (immutable, published) data map.
    *
    * @return cloned copy of data
    */
   @NotNull
   public EnumMap<E, Object> getData() {
+    return data.clone();
+  }
+
+  /**
+   * Publish {@code rebuilt} as the new data map. The caller must not mutate it afterwards.
+   *
+   * @param rebuilt fully-populated replacement map
+   */
+  protected final void replaceData(EnumMap<E, Object> rebuilt) {
     synchronized (dataLock) {
-      return data.clone();
+      this.data = rebuilt;
     }
   }
 
@@ -107,46 +118,83 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
           }
           rebuilt.put((E) key, value);
         });
-    // Atomic swap: publish the fully-built map by reference assignment so a
-    // concurrent reader either sees the old map (intact) or the new map
-    // (intact), never a clear()+putAll() in-between state. The {@code data}
-    // field is volatile (in-VM via the synchronized read sites that wrap
-    // every cache-back / iterate snapshot); subclasses populating
-    // {@code data.put(...)} in constructors run before publication, so the
-    // swap pattern is safe across the existing surface.
-    synchronized (dataLock) {
-      this.data = rebuilt;
-    }
+    replaceData(rebuilt);
   }
 
   /**
-   * Set data using a map of string keys and objects
+   * Set data using a map of string keys and objects. Property keys are resolved
+   * case-insensitively and typo-tolerantly with warning diagnostics.
    *
-   * @param data - data to apply. key is case-sensitive
+   * @param data - data to apply
    * @throws IllegalArgumentException - if the data is invalid
    */
   public void setData(final Map<String, Object> data) throws IllegalArgumentException {
-    // Build a fresh map off-side, then atomically swap. Mirrors the
-    // {@link #setData(EnumMap)} pattern: concurrent readers always see
-    // either the old map intact or the new map intact, never an
-    // intermediate state. Pre-existing entries in {@code this.data} are
-    // preserved by seeding {@code rebuilt} with the current snapshot
-    // (this overload is "merge", not "replace" - matches the prior
-    // {@code this.data.put(...)} semantics).
-    EnumMap<E, Object> rebuilt = new EnumMap<>(getData());
-    data.forEach(
-        (keyStr, value) -> {
-          if (keyStr == null) return;
-          if (value == null) return;
-
-          try {
-            E key = Enum.valueOf(myClass, keyStr);
-            rebuilt.put(key, value);
-          } catch (IllegalArgumentException ignored) {
-
-          }
-        });
+    // Merge, not replace: existing entries survive. Seeded under the writer lock so
+    // a concurrent set() is not lost between the snapshot and the publish.
     synchronized (dataLock) {
+      EnumMap<E, Object> rebuilt = this.data.clone();
+
+      // Build candidate map from myClass enum constants and the factory value "name" property
+      Map<String, Object> candidateMap = new LinkedHashMap<>();
+      boolean hasNameConstant = false;
+      for (E constant : myClass.getEnumConstants()) {
+        candidateMap.put(constant.name(), constant);
+        if (constant.name().equalsIgnoreCase("name")) {
+          hasNameConstant = true;
+        }
+      }
+      if (!hasNameConstant) {
+        candidateMap.put("name", "name");
+      }
+
+      data.forEach(
+          (keyStr, value) -> {
+            if (keyStr == null || value == null) return;
+
+            FuzzySearchEngine.FuzzyLookupResult<Object> lookup =
+                FuzzySearchEngine.resolveCandidate(keyStr, candidateMap);
+
+            if (lookup.isExact()) {
+              if (lookup.match() instanceof Enum<?> e && myClass.isInstance(e)) {
+                rebuilt.put(myClass.cast(e), value);
+              }
+              if ("name".equalsIgnoreCase(lookup.matchedKey())) {
+                if (this.name == null || !this.name.equalsIgnoreCase(String.valueOf(value))) {
+                  this.name = String.valueOf(value);
+                }
+              }
+            } else if (lookup.isPerceptible()) {
+              RTP.log(
+                  Level.WARNING,
+                  "[RTP] Property '"
+                      + keyStr
+                      + "' in "
+                      + myClass.getSimpleName()
+                      + " was not recognized, but closely matches '"
+                      + lookup.matchedKey()
+                      + "'. Autocorrecting to '"
+                      + lookup.matchedKey()
+                      + "'.");
+              if (lookup.match() instanceof Enum<?> e && myClass.isInstance(e)) {
+                rebuilt.put(myClass.cast(e), value);
+              }
+              if ("name".equalsIgnoreCase(lookup.matchedKey())) {
+                if (this.name == null || !this.name.equalsIgnoreCase(String.valueOf(value))) {
+                  this.name = String.valueOf(value);
+                }
+              }
+            } else {
+              RTP.log(
+                  Level.WARNING,
+                  "[RTP] Unrecognized property '"
+                      + keyStr
+                      + "' for "
+                      + myClass.getSimpleName()
+                      + " (valid properties: "
+                      + String.join(", ", lookup.availableCandidates())
+                      + "). Ignoring.");
+            }
+          });
       this.data = rebuilt;
     }
   }
@@ -185,7 +233,9 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     if (key == null) throw new IllegalArgumentException("null key");
     if (value == null) throw new IllegalArgumentException("null value");
     synchronized (dataLock) {
-      this.data.put(key, value);
+      EnumMap<E, Object> rebuilt = this.data.clone();
+      rebuilt.put(key, value);
+      this.data = rebuilt;
     }
   }
 
@@ -194,11 +244,9 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
   public FactoryValue<E> clone() {
     try {
       FactoryValue<E> clone = (FactoryValue<E>) super.clone();
-      // Snapshot under the same lock as getNumber's cache-back put, so the
-      // clone observes a coherent EnumMap rather than a partially-mutated one.
-      synchronized (dataLock) {
-        clone.data = data.clone();
-      }
+      // Published maps are immutable, so a plain clone is a coherent snapshot. The
+      // copy is private to the new instance until clone() returns.
+      clone.data = data.clone();
       for (Map.Entry<E, Object> entry : clone.data.entrySet()) {
         Object value = entry.getValue();
         if (value instanceof FactoryValue<?>) {
@@ -223,16 +271,10 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
    * @throws NumberFormatException if the value is not a number
    */
   public Number getNumber(E key, Number def) throws NumberFormatException {
-    // Snapshot {@code data} once: a concurrent {@link #setData(EnumMap)} may
-    // publish a new map between the read and the cache-back put, in which
-    // case we want both to target the same instance. {@code data} is volatile,
-    // so this load is the read-side of the publication.
-    EnumMap<E, Object> snapshot;
-    Object resObj;
-    synchronized (dataLock) {
-      snapshot = data;
-      resObj = snapshot.getOrDefault(key, def);
-    }
+    // Lock-free: one volatile load of an immutable map. Taking a monitor here
+    // serialized every selection worker on a single object (stress-test stall).
+    EnumMap<E, Object> snapshot = data;
+    Object resObj = snapshot.getOrDefault(key, def);
     // Hot path: already a Number - return without writing back. Pre-fix this
     // method called {@code data.put(key, res)} unconditionally on every read,
     // which (a) wasted a write per call after the first parse and (b) raced
@@ -250,11 +292,13 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
       // {@code uniquePlacements}) gets 1/0 rather than a thrown NaN.
       res = b ? 1 : 0;
     } else if (resObj instanceof String s) {
-      String coerced = s.replace(",", ".");
+      String coerced = s.replace(",", ".").trim();
       io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.ParsedDistance parsedDist =
           io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.parse(coerced, null);
       if (parsedDist != null && parsedDist.explicitUnit()) {
         res = parsedDist.toChunks();
+      } else if (coerced.equalsIgnoreCase("auto")) {
+        res = def;
       } else {
         try {
           res = Double.parseDouble(coerced);
@@ -275,15 +319,13 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     } else {
       throw new IllegalArgumentException("[RTP] " + key.name() + ":NaN");
     }
-    // Idempotent transition cache: any racing thread parses the same String
-    // to the same Number, so last-writer-wins is harmless. Cache back into
-    // the same map instance we read from (the snapshot) - if a concurrent
-    // {@link #setData(EnumMap)} has since swapped {@code data}, the put
-    // lands harmlessly in the now-orphaned old map; the next reader will
-    // load the new map via the volatile {@code data} field and parse again.
+    // One-time String -> Number transition, published copy-on-write. Skipped if a
+    // writer replaced the map since our read, so a stale parse never overwrites it.
     synchronized (dataLock) {
       if (this.data == snapshot) {
-        snapshot.put(key, res);
+        EnumMap<E, Object> rebuilt = snapshot.clone();
+        rebuilt.put(key, res);
+        this.data = rebuilt;
       }
     }
     return res;

@@ -4,7 +4,7 @@ The Folia-native, region-aware random teleport plugin for production Minecraft s
 
 **Supported:** Spigot, Paper, Folia 1.20+, Fabric 1.20+/1.21+ (all stable), NeoForge 1.21.1+.
 
-🔗 **[Get RTP Pro on BuiltByBit](https://builtbybit.com/resources/leafrtp-pro.105418/)** — supports continued development and unlocks the Pro feature set.
+🔗 **[Get RTP Pro on BuiltByBit](https://builtbybit.com/resources/leafrtp-pro.105418/)** — supports continued development and buys priority support and early-access builds. The code is the same MIT-licensed engine as the free build.
 
 [![Build](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml/badge.svg)](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml)
 [![Release](https://img.shields.io/github/v/release/DailyStruggle/RTP)](https://github.com/DailyStruggle/RTP/releases)
@@ -51,7 +51,7 @@ Legacy random-teleport plugins reroll random coordinates until one lands somewhe
 | Spigot | 1.20 | Baseline adapter |
 | Paper | 1.20 | Uses async chunk loading APIs |
 | Folia | 1.20 | Full regional-thread scheduling support |
-| Fabric | 1.20 | Native mod support - **first-class, stable**, tested regularly, at feature parity with the Bukkit family. Loom-remapped obf/unobf carriers cover 1.20.x, 1.21.x, and MC 26.x ([details](docs/dev/MULTI_PLATFORM_PLAN.md)) |
+| Fabric | 1.20 | Native mod support - **first-class, stable**, tested regularly, at feature parity with the Bukkit family. Loom-remapped obf/unobf carriers cover 1.20.x, 1.21.x, and MC 26.x ([details](platforms/rtp-fabric/README.md)) |
 | NeoForge | 1.21.1 | Native mod adapter, in-scope. Carriers for 1.21.1 and MC 26.x; the 26.x carrier loads and runs, with broader runtime testing ongoing ([details](docs/dev/NEOFORGE_NOTES.md)). |
 | Forge (legacy) | — | No native adapter. Use a Bukkit-compatibility launcher (e.g. **Arclight** or **Mohist**) and run the Spigot/Paper build. |
 
@@ -180,9 +180,8 @@ The short version:
 
 ## License
 
-RTP is dual-licensed (open-core; see [ADR-061](docs/adr/ADR-061-open-core-dual-licensing.md)):
+RTP is **MIT-licensed** ([`LICENSE`](LICENSE); see [ADR-108](docs/adr/ADR-108-all-mit-licensing-pro-as-support.md)): all source in this repository and both the free and Pro binaries may be used, modified, and redistributed, including commercially.
 
-- **MIT** ([`LICENSE-MIT`](LICENSE-MIT)): the `rtp-api` and `rtp-core` modules and the **RTP (lite)** binary distribution. These may be used, modified, and redistributed, including commercially.
-- **PolyForm Noncommercial 1.0.0** ([`LICENSE`](LICENSE)): all other source, i.e. the Pro-only features and the Pro plugin assembly. Provided for personal, noncommercial use only.
+Pro is a support tier, not a code licence: buying it gets priority support, early-access builds, and funds development ([ADR-100](docs/adr/ADR-100-superseding-adr-024-sla-and-support-tier.md)).
 
-Where a module or file ships its own `LICENSE` or SPDX header, that grant governs the file; otherwise the root PolyForm Noncommercial terms apply.
+Where a module or file ships its own `LICENSE` or SPDX header (e.g. the GPL-3.0-or-later NeoForge carriers), that grant governs the file. Releases published before 2026-10-05 keep the licence they shipped with.

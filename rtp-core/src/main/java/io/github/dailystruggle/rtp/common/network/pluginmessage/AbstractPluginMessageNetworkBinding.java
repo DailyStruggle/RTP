@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.common.network.pluginmessage;
 
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
@@ -7,9 +9,7 @@ import io.github.dailystruggle.rtp.proxy.common.spi.ProxyHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReleaseReason;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.spi.Subscription;
-import io.github.dailystruggle.rtp.proxy.common.transport.codec.BackendHeartbeatCodec;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -21,42 +21,104 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Common base for plugin-messaging based {@link NetworkTransport} implementations.
  * Handles heartbeat reception, in-memory snapshot aggregation, and non-durable tier stubs.
+ *
+ * <p>Inbound payloads are untrusted (a modded client can inject plugin
+ * messages on a player connection). With an {@link HmacVerifier} every row
+ * must be a valid signed {@link PluginMessageEnvelope}; unsigned / tampered /
+ * oversized rows are dropped with a throttled WARNING (REQ-RTP-S-004).
+ * {@link #lastSeen} is capped at {@link #MAX_TRACKED_SERVERS}.</p>
  */
 public abstract class AbstractPluginMessageNetworkBinding implements NetworkTransport {
 
-    private static final Logger LOG = Logger.getLogger(AbstractPluginMessageNetworkBinding.class.getName());
+    /** Upper bound on distinct server ids held in {@link #lastSeen}. */
+    public static final int MAX_TRACKED_SERVERS = 1024;
+    /** Maximum clock skew tolerance (ms) when validating inbound heartbeat timestamps. */
+    public static final long SKEW_TOLERANCE_MS = 5000L;
 
     protected final NetworkBridge bridge;
     protected final long staleTimeoutMillis;
     protected final LongSupplier clock;
+    protected final HmacVerifier verifier;
     protected final AtomicBoolean open = new AtomicBoolean(true);
 
     protected final Map<String, Entry> lastSeen = new ConcurrentHashMap<>();
     protected final CopyOnWriteArrayList<Sub> subscribers = new CopyOnWriteArrayList<>();
 
+    private final java.util.concurrent.atomic.AtomicLong outboundSeq = new java.util.concurrent.atomic.AtomicLong(0);
+    private final Object admitLock = new Object();
+    private final ThrottledWarning rejectedWarning;
+    private final ThrottledWarning capWarning;
+    private final ThrottledWarning outboundWarning;
+
     protected AbstractPluginMessageNetworkBinding(NetworkBridge bridge, long staleTimeoutMillis, LongSupplier clock) {
+        this(bridge, staleTimeoutMillis, clock, null);
+    }
+
+    protected AbstractPluginMessageNetworkBinding(NetworkBridge bridge, long staleTimeoutMillis,
+                                                  LongSupplier clock, HmacVerifier verifier) {
         this.bridge = java.util.Objects.requireNonNull(bridge, "bridge");
         this.staleTimeoutMillis = staleTimeoutMillis > 0 ? staleTimeoutMillis : 1_500L;
         this.clock = java.util.Objects.requireNonNull(clock, "clock");
+        this.verifier = verifier;
+        this.rejectedWarning = new ThrottledWarning(
+                m -> RTP.log(Level.WARNING, m), ThrottledWarning.DEFAULT_INTERVAL_MS, clock);
+        this.capWarning = new ThrottledWarning(
+                m -> RTP.log(Level.WARNING, m), ThrottledWarning.DEFAULT_INTERVAL_MS, clock);
+        this.outboundWarning = new ThrottledWarning(
+                m -> RTP.log(Level.WARNING, m), ThrottledWarning.DEFAULT_INTERVAL_MS, clock);
+        if (verifier == null) {
+            RTP.log(Level.WARNING, "[RTP] " + getClass().getSimpleName()
+                    + " running UNSIGNED: inbound plugin-message heartbeats are not authenticated"
+                    + " and can be forged by clients. Set network.secretEnv (RTP_NET_SECRET) on"
+                    + " every backend and the proxy.");
+        }
         bridge.registerInbound(this::onInbound);
+    }
+
+    /** Encode {@code row} for the wire (signed when a verifier is configured); {@code null} if oversized. */
+    protected byte[] encodeOutbound(BackendHeartbeat row) {
+        long sentAt = clock.getAsLong();
+        long seq = outboundSeq.incrementAndGet();
+        byte[] payload = PluginMessageEnvelope.seal(row, verifier, sentAt, seq);
+        if (payload == null) {
+            outboundWarning.report("[RTP] outbound heartbeat for '" + row.serverId()
+                    + "' exceeds " + PluginMessageEnvelope.MAX_PAYLOAD_BYTES
+                    + " bytes; not sent (trim regions / metadata).");
+        }
+        return payload;
     }
 
     protected void onInbound(byte[] payload) {
         if (payload == null || payload.length == 0) return;
-        BackendHeartbeat hb;
+        PluginMessageEnvelope.Result result;
         try {
-            hb = BackendHeartbeatCodec.decode(new String(payload, StandardCharsets.UTF_8));
+            result = PluginMessageEnvelope.open(payload, verifier);
         } catch (Throwable t) {
-            LOG.log(Level.FINE, "[RTP] dropping malformed inbound heartbeat: " + t.getMessage());
+            result = new PluginMessageEnvelope.Result(null, PluginMessageEnvelope.Rejection.MALFORMED);
+        }
+        if (!result.accepted()) {
+            rejectedWarning.report("[RTP] dropped inbound plugin-message heartbeat ("
+                    + result.rejection() + ", " + payload.length + " bytes)"
+                    + (verifier != null ? "; HMAC required" : "") + " (REQ-RTP-S-004).");
             return;
         }
-        if (hb == null) return;
-        lastSeen.put(hb.serverId(), new Entry(hb, clock.getAsLong()));
+        BackendHeartbeat hb = result.heartbeat();
+        long now = clock.getAsLong();
+        PluginMessageEnvelope.Rejection reject = admitDetailed(hb, result.sentAtMs(), result.seq(), now);
+        if (reject != null) {
+            if (reject == PluginMessageEnvelope.Rejection.LIMITS) {
+                capWarning.report("[RTP] plugin-message peer table full (" + MAX_TRACKED_SERVERS
+                        + " live servers); refusing new server id.");
+            } else {
+                rejectedWarning.report("[RTP] dropped inbound plugin-message heartbeat from '"
+                        + hb.serverId() + "' (" + reject + ") (REQ-RTP-S-004).");
+            }
+            return;
+        }
         for (Sub s : subscribers) {
             if (!s.closed.get()) {
                 try {
@@ -112,17 +174,56 @@ public abstract class AbstractPluginMessageNetworkBinding implements NetworkTran
         lastSeen.clear();
     }
 
+    /**
+     * Store {@code hb}; existing ids refresh in place, new ids are admitted
+     * only below {@link #MAX_TRACKED_SERVERS} after evicting stale entries.
+     */
+    public PluginMessageEnvelope.Rejection admitDetailed(BackendHeartbeat hb, long sentAtMs, long seq, long now) {
+        String id = hb.serverId();
+        synchronized (admitLock) {
+            Entry prev = lastSeen.get(id);
+            if (sentAtMs != 0L || seq != 0L) {
+                long delta = Math.abs(now - sentAtMs);
+                if (delta > staleTimeoutMillis + SKEW_TOLERANCE_MS) {
+                    return PluginMessageEnvelope.Rejection.STALE;
+                }
+                if (prev != null) {
+                    if (seq <= prev.lastSeq() && sentAtMs <= prev.sentAtMs()) {
+                        return PluginMessageEnvelope.Rejection.REPLAY;
+                    }
+                }
+            }
+            if (prev == null && lastSeen.size() >= MAX_TRACKED_SERVERS) {
+                lastSeen.entrySet().removeIf(e -> now - e.getValue().seenAtMs() > staleTimeoutMillis);
+                if (lastSeen.size() >= MAX_TRACKED_SERVERS) {
+                    return PluginMessageEnvelope.Rejection.LIMITS;
+                }
+            }
+            lastSeen.put(id, new Entry(hb, now, sentAtMs, seq));
+            return null;
+        }
+    }
+
+    private boolean admit(BackendHeartbeat hb, long now) {
+        return admitDetailed(hb, 0L, 0L, now) == null;
+    }
+
+    /** Visible for tests: total tracked ids (live + not-yet-evicted stale). */
+    public int trackedPeerCount() {
+        return lastSeen.size();
+    }
+
     /** Visible for tests: live (non-stale) peer count at call time. */
     public int livePeerCount() {
         long now = clock.getAsLong();
         int n = 0;
         for (Entry e : lastSeen.values()) {
-            if (now - e.seenAtMs <= staleTimeoutMillis) n++;
+            if (now - e.seenAtMs() <= staleTimeoutMillis) n++;
         }
         return n;
     }
 
-    protected record Entry(BackendHeartbeat heartbeat, long seenAtMs) {
+    protected record Entry(BackendHeartbeat heartbeat, long seenAtMs, long sentAtMs, long lastSeq) {
     }
 
     protected final class Sub implements Subscription {

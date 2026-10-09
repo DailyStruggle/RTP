@@ -3,12 +3,14 @@ package io.github.dailystruggle.rtp.common;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
+import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
@@ -22,6 +24,7 @@ import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.*;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
@@ -35,6 +38,7 @@ import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tools.ChunkyChecker;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
+import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 
@@ -98,9 +102,29 @@ public class RTP {
    * closed (structured {@link io.github.dailystruggle.rtp.api.group.GroupPlacementResult.Reason})
    * when the region/world is not resolvable, so it is safe to reference before core is fully wired.
    */
-  public static final io.github.dailystruggle.rtp.api.group.GroupPlacementService
+  public static volatile io.github.dailystruggle.rtp.api.group.GroupPlacementService
       groupPlacementService =
           new io.github.dailystruggle.rtp.common.selection.region.GroupPlacementDispatcher();
+
+  /**
+   * Process-wide entry point for declarative scripted actions (ADR-093).
+   * Initialized by LeafRTPActionAddon when loaded; null when omitted.
+   */
+  public static volatile io.github.dailystruggle.rtp.common.action.ActionManager
+      actionManager = null;
+
+  /**
+   * Background task pre-warming candidate placements for registered actions (ADR-097).
+   * Initialized by LeafRTPActionAddon when loaded; null when omitted.
+   */
+  public static volatile io.github.dailystruggle.rtp.common.action.ActionCacheWarmTask
+      actionCacheWarmTask = null;
+
+  /**
+   * Process-wide manager for physical world triggers (portals, pressure plates, step-in zones) (ADR-093).
+   */
+  public static final io.github.dailystruggle.rtp.common.trigger.PhysicalTriggerManager
+      triggerManager = new io.github.dailystruggle.rtp.common.trigger.PhysicalTriggerManager();
 
   /**
    * Pre-dispatch hook to decide whether {@code /rtp} is served locally,
@@ -161,6 +185,21 @@ public class RTP {
   public static TreeCommand baseCommand;
   public static AtomicBoolean reloading = new AtomicBoolean(false);
 
+  /**
+   * Reload all plugin configurations and regions.
+   *
+   * @return true if reload succeeded
+   */
+  public static boolean reload() {
+    reloading.set(true);
+    try {
+      if (configs == null) return false;
+      return configs.reload();
+    } finally {
+      reloading.set(false);
+    }
+  }
+
   public static final Set<UUID> deathEffectInFlight = ConcurrentHashMap.newKeySet();
   public static final Map<UUID, io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask> pendingDeathTeleports = new ConcurrentHashMap<>();
 
@@ -180,6 +219,9 @@ public class RTP {
     factoryMap.put(factoryNames.singleConfig, new Factory<ConfigParser<?>>());
     factoryMap.put(factoryNames.multiConfig, new Factory<MultiConfigParser<?>>());
 
+    registerDefaultShapes();
+    registerDefaultVerticalAdjustors();
+
     // --- INJECT IMPLEMENTATIONS INTO THE API ---
     // Two-tier API model: custom Shape / VerticalAdjustor registration is an
     // implementation-tier extension served by the typed RTP.addShape(Shape) /
@@ -192,6 +234,8 @@ public class RTP {
     // internals. See docs/dev/EXTERNAL_HOOKS.md.
     io.github.dailystruggle.rtp.api.RTPAPI.hooks =
         new io.github.dailystruggle.rtp.common.hooks.DefaultRTPHooks();
+
+    triggerManager.start();
 
     // First-class teleport entry point for addons: trigger an RTP for an online
     // player and complete a future with the outcome, without reaching into core
@@ -216,15 +260,28 @@ public class RTP {
         // cleanup the command path performs) so the alreadyTeleporting guard below
         // does not misfire on a finished teleport.
         TeleportData priorData = getInstance().latestTeleportData.get(uuid);
-        if (priorData != null) {
-          long dt = System.currentTimeMillis() - priorData.time;
+        Region reqRegion = null;
+        if (target != null && target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.REGION) {
+          reqRegion = selectionAPI.getRegion(target.name());
+        }
+        RegionSettings regSettings = (reqRegion != null) ? reqRegion.getSettings() : null;
+        boolean hasRegionOverride = (regSettings != null && regSettings.cooldownMillis() != null && regSettings.cooldownMillis() >= 0);
+        long cooldown = getCooldown(player, regSettings);
+        long lastTpTime = hasRegionOverride
+            ? getLastRegionTeleportTime(uuid, reqRegion.name)
+            : getEffectiveLastTeleportTime(uuid);
+        if (hasRegionOverride && lastTpTime <= 0 && priorData != null && priorData.targetRegion != null && reqRegion.name.equalsIgnoreCase(priorData.targetRegion.name)) {
+          lastTpTime = priorData.time;
+        }
+        if (lastTpTime > 0 && cooldown > 0) {
+          long dt = System.currentTimeMillis() - lastTpTime;
           if (dt < 0) dt = Long.MAX_VALUE + dt;
-          if (dt < player.cooldown()) {
+          if (dt < cooldown) {
             future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
                 io.github.dailystruggle.rtp.api.RTPResult.Reason.COOLDOWN,
                 "Teleport is on cooldown for this player"));
             return future;
-          } else if (priorData.completed) {
+          } else if (priorData != null && priorData.completed) {
             getInstance().processingPlayers.remove(uuid);
           }
         }
@@ -285,6 +342,12 @@ public class RTP {
         if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.NETWORK) {
           String serverId = target.serverId();
           String regionKey = target.name();
+          if (apiTargetPermissionDenied(player, target, null)) {
+            future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                io.github.dailystruggle.rtp.api.RTPResult.Reason.NO_PERMISSION,
+                getNoPermissionMessage(target)));
+            return future;
+          }
           io.github.dailystruggle.rtp.api.network.NetworkCommandHook hook = networkCommandHook;
           if (hook == null
               || hook == io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY) {
@@ -330,6 +393,98 @@ public class RTP {
           return future;
         }
 
+        // ACTION target is a UI navigation descriptor, not a teleport destination:
+        if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.ACTION) {
+          future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+              io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET,
+              "ACTION targets cannot be teleported to"));
+          return future;
+        }
+
+        // Coordinate target (e.g. /rtp back to exact coordinate on local or remote server):
+        if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.COORDINATE) {
+          if (apiTargetPermissionDenied(player, target, null)) {
+            future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                io.github.dailystruggle.rtp.api.RTPResult.Reason.NO_PERMISSION,
+                getNoPermissionMessage(target)));
+            return future;
+          }
+          String destServer = target.serverId();
+          String localServer = (io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE != null)
+              ? io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE.serverId() : null;
+          boolean isLocal = (destServer == null || destServer.isEmpty() || destServer.equalsIgnoreCase(localServer));
+          if (isLocal) {
+            String worldName = target.worldName();
+            RTPWorld<?> world = (worldName != null && !worldName.isBlank())
+                ? serverAccessor.getRTPWorld(worldName)
+                : null;
+            if (world == null) {
+              future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                  io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET,
+                  "World '" + worldName + "' not found"));
+              return future;
+            }
+            io.github.dailystruggle.rtp.api.world.RTPLocation loc =
+                new io.github.dailystruggle.rtp.api.world.RTPLocation(world, target.x(), target.y(), target.z());
+            getInstance().processingPlayers.add(uuid);
+            player.setLocation(loc).whenComplete((success, ex) -> {
+              getInstance().processingPlayers.remove(uuid);
+              if (ex != null || (success != null && !success)) {
+                future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                    io.github.dailystruggle.rtp.api.RTPResult.Reason.ERROR,
+                    ex != null ? ex.getMessage() : "Teleport to coordinate failed"));
+              } else {
+                future.complete(io.github.dailystruggle.rtp.api.RTPResult.success(loc));
+              }
+            });
+            return future;
+          } else {
+            // Remote server coordinate route: dispatch through NetworkCommandHook
+            io.github.dailystruggle.rtp.api.network.NetworkCommandHook hook = networkCommandHook;
+            if (hook == null || hook == io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY) {
+              future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                  io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET,
+                  "Network mode is not enabled on this server"));
+              return future;
+            }
+            java.util.Map<String, java.util.List<String>> netArgs = new java.util.HashMap<>();
+            netArgs.put("region", java.util.Collections.singletonList(destServer + ":default"));
+            netArgs.put("coords", java.util.Collections.singletonList(target.worldName() + ":" + target.x() + "," + target.y() + "," + target.z()));
+            io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult decision;
+            try {
+              decision = hook.route(uuid, netArgs);
+            } catch (Throwable t) {
+              future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                  io.github.dailystruggle.rtp.api.RTPResult.Reason.ERROR,
+                  "Cross-server routing failed: " + t.getMessage()));
+              return future;
+            }
+            if (decision instanceof io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.CrossServer cross) {
+              future.complete(io.github.dailystruggle.rtp.api.RTPResult.queued(
+                  "Queued for " + cross.serverHint().orElse(destServer) + " at " + target.worldName()));
+            } else if (decision instanceof io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.Reject reject) {
+              future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                  io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET,
+                  reject.placeholder() == null || reject.placeholder().isEmpty()
+                      ? "Destination unavailable" : reject.placeholder()));
+            } else {
+              future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+                  io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET,
+                  "Could not route to destination server " + destServer));
+            }
+            return future;
+          }
+        }
+
+        // Permission gate before resolution and any charge: same rules as getTargetStatus,
+        // so a GUI menu opened before a revoke (or any addon) cannot bypass it.
+        if (apiTargetPermissionDenied(player, target, null)) {
+          future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+              io.github.dailystruggle.rtp.api.RTPResult.Reason.NO_PERMISSION,
+              getNoPermissionMessage(target)));
+          return future;
+        }
+
         Region region;
         try {
           region = resolveApiRegion(target, player);
@@ -343,6 +498,14 @@ public class RTP {
           future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
               io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET,
               "Could not resolve a region/world for " + target));
+          return future;
+        }
+
+        // REGION's requirePermission is only known once resolved.
+        if (apiTargetPermissionDenied(player, target, region)) {
+          future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
+              io.github.dailystruggle.rtp.api.RTPResult.Reason.NO_PERMISSION,
+              getNoPermissionMessage(target)));
           return future;
         }
 
@@ -390,9 +553,14 @@ public class RTP {
         };
         getInstance().latestTeleportData.put(uuid, data);
 
+        java.util.Set<String> biomeFilter = null;
+        if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.BIOME) {
+          biomeFilter = java.util.Set.of(target.name());
+        }
+
         io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask task =
             new io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask(
-                new io.github.dailystruggle.rtp.api.selection.GenerationContext(player, player, null),
+                new io.github.dailystruggle.rtp.api.selection.GenerationContext(player, player, biomeFilter),
                 targetRegion);
         data.nextTask = task;
         getInstance().processingPlayers.add(uuid);
@@ -402,10 +570,9 @@ public class RTP {
         // kept-loaded, so no synchronous chunk I/O happens - S-005 safe), run
         // the pipeline inline instead of deferring to the next async scheduler
         // pulse. This makes a menu/GUI click teleport as immediately as the
-        // /rtp command does. The addon-facing API applies no biome filter, so
-        // the only gate is a ready cached location; any other case (empty
-        // cache, biome-filtered - N/A here) still runs asynchronously.
-        if (targetRegion.hasLocation(uuid)) {
+        // /rtp command does. When a biome filter is specified, bypass fast-path
+        // so pipeline evaluates biomes asynchronously.
+        if (biomeFilter == null && targetRegion.hasLocation(uuid)) {
           task.run();
         } else {
           scheduler.runTaskAsynchronously(task);
@@ -492,6 +659,101 @@ public class RTP {
           out.add(io.github.dailystruggle.rtp.api.RtpTarget.region(name));
         }
 
+        // Configured worlds: enumerate worlds and gate on `rtp.worlds.<world>` / `rtp.worlds.*`
+        // when requirePermission is enabled.
+        java.util.Set<String> worldCandidates = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        if (serverAccessor != null) {
+          try {
+            java.util.List<RTPWorld<?>> rtpWorlds = serverAccessor.getRTPWorlds();
+            if (rtpWorlds != null) {
+              for (RTPWorld<?> w : rtpWorlds) {
+                if (w != null && w.name() != null && !w.name().isBlank()) {
+                  worldCandidates.add(w.name());
+                }
+              }
+            }
+          } catch (Throwable ignored) {
+          }
+        }
+        if (configs != null && configs.multiConfigParserMap != null) {
+          MultiConfigParser<WorldKeys> worldMcp =
+              (MultiConfigParser<WorldKeys>) configs.multiConfigParserMap.get(WorldKeys.class);
+          if (worldMcp != null && worldMcp.configParserFactory != null) {
+            for (String key : worldMcp.configParserFactory.map.keySet()) {
+              if (key == null || key.isBlank()) continue;
+              String clean = key.endsWith(".YML") ? key.substring(0, key.length() - 4) : key;
+              if (clean.equalsIgnoreCase("default")) continue;
+              worldCandidates.add(clean);
+            }
+          }
+        }
+        for (String worldName : worldCandidates) {
+          if (worldName == null || worldName.isBlank()) continue;
+          boolean requirePerm = false;
+          if (configs != null && configs.multiConfigParserMap != null) {
+            MultiConfigParser<WorldKeys> worldMcp =
+                (MultiConfigParser<WorldKeys>) configs.multiConfigParserMap.get(WorldKeys.class);
+            if (worldMcp != null && worldMcp.configParserFactory != null && worldMcp.configParserFactory.contains(worldName)) {
+              ConfigParser<WorldKeys> wp = worldMcp.getParser(worldName);
+              if (wp != null) {
+                requirePerm = Boolean.parseBoolean(String.valueOf(wp.getConfigValue(WorldKeys.requirePermission, false)));
+              }
+            }
+          }
+          if (requirePerm && player != null
+              && !player.hasPermission("rtp.worlds." + worldName)
+              && !player.hasPermission("rtp.worlds.*")) {
+            continue;
+          }
+          out.add(io.github.dailystruggle.rtp.api.RtpTarget.world(worldName));
+        }
+
+        // Configured / observed biomes: enumerate allowed biomes and gate on
+        // `rtp.biome.<biome>` / `rtp.biome.*`.
+        java.util.Set<String> biomeCandidates = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys> biomesParser =
+            (configs != null) ? (ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys>)
+                configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys.class) : null;
+        if (biomesParser != null) {
+          Object configuredBiomes = biomesParser.getConfigValue(
+              io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys.biomes, null);
+          if (configuredBiomes instanceof java.util.Collection<?> col) {
+            for (Object obj : col) {
+              if (obj != null && !obj.toString().isBlank()) {
+                biomeCandidates.add(obj.toString().trim());
+              }
+            }
+          }
+          java.util.Map<String, Object> weights = biomesParser.getMap(
+              io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys.biomeWeights);
+          if (weights != null) {
+            for (String b : weights.keySet()) {
+              if (b != null && !b.isBlank()) {
+                biomeCandidates.add(b.trim());
+              }
+            }
+          }
+        }
+        // Also include observed biomes if available from spatial memory
+        try {
+          if (player != null) {
+            biomeCandidates.addAll(io.github.dailystruggle.rtp.common.commands.menu.BiomeMenuSource.observedBiomes(player.uuid()));
+          } else {
+            biomeCandidates.addAll(io.github.dailystruggle.rtp.common.commands.menu.BiomeMenuSource.observedBiomes(null));
+          }
+        } catch (Throwable ignored) {
+        }
+        for (String biomeName : biomeCandidates) {
+          if (biomeName == null || biomeName.isBlank()) continue;
+          if (player != null
+              && !player.hasPermission("rtp.biome." + biomeName.toLowerCase(Locale.ROOT))
+              && !player.hasPermission("rtp.biome." + biomeName.toUpperCase(Locale.ROOT))
+              && !player.hasPermission("rtp.biome.*")) {
+            continue;
+          }
+          out.add(io.github.dailystruggle.rtp.api.RtpTarget.biome(biomeName));
+        }
+
         // Network/peer regions (rtp-proxy-ADR-014): surface the live
         // `server:region` entries advertised across the network so a GUI / addon
         // can offer cross-server destinations alongside local ones. Permission
@@ -566,22 +828,7 @@ public class RTP {
         if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.NETWORK) {
           String serverId = target.serverId();
           String regionKey = target.name();
-          boolean peerRegionGated = false;
-          try {
-            io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap gateLive =
-                io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE;
-            if (gateLive != null && gateLive.peerRegionRegistry() != null) {
-              peerRegionGated = gateLive.peerRegionRegistry()
-                  .peerRegionRequiresPermission(serverId, regionKey);
-            }
-          } catch (Throwable ignored) {
-            // Defensive: a flaky network layer must not crash status reads.
-          }
-          if ((!player.hasPermission("rtp.servers." + serverId)
-                  && !player.hasPermission("rtp.servers.*"))
-              || (peerRegionGated
-                  && !player.hasPermission("rtp.regions." + regionKey)
-                  && !player.hasPermission("rtp.regions.*"))) {
+          if (apiTargetPermissionDenied(player, target, null)) {
             return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
                 io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.NO_PERMISSION, 0L, 0.0);
           }
@@ -615,40 +862,62 @@ public class RTP {
               0L, 0.0, iconBlock, environment, label);
         }
 
+        if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.ACTION) {
+          return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
+              io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.READY,
+              0L, 0.0, null, null, target.name());
+        }
+
+        if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.COORDINATE) {
+          boolean noPerm = apiTargetPermissionDenied(player, target, null);
+          return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
+              noPerm
+                  ? io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.NO_PERMISSION
+                  : io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.READY,
+              0L, 0.0, null, null, target.name());
+        }
+
+        // Check target permission first; REGION is gated after resolution below.
+        boolean noPerm = apiTargetPermissionDenied(player, target, null);
+
         Region region;
         try {
           region = resolveApiRegion(target, player);
         } catch (RuntimeException ex) {
-          return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
-              io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.DISABLED, 0L, 0.0);
+          region = null;
+        }
+        if (region == null || region.getWorld() == null) {
+          // Fall back to default region if resolveApiRegion did not find a region for world or biome
+          try {
+            if (player != null) {
+              region = selectionAPI.getRegion(player);
+            }
+            if (region == null || region.getWorld() == null) {
+              region = selectionAPI.getRegionOrDefault("default");
+            }
+            if (region == null || region.getWorld() == null) {
+              // Try selectionAPI.permRegionLookup
+              for (Region r : selectionAPI.permRegionLookup.values()) {
+                if (r != null && r.getWorld() != null) {
+                  region = r;
+                  break;
+                }
+              }
+            }
+          } catch (Throwable ignored) {
+          }
         }
         if (region == null || region.getWorld() == null) {
           return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
-              io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.DISABLED, 0L, 0.0);
+              noPerm
+                  ? io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.NO_PERMISSION
+                  : io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.DISABLED,
+              0L, 0.0,
+              null, null, target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.BIOME ? "Biome: " + target.name() : null);
         }
 
-        // Permission for the named target (mirrors SelectionAPI gating).
-        boolean noPerm = false;
-        switch (target.kind()) {
-          case REGION:
-            if (region.getSettings().requirePermission()
-                && !player.hasPermission("rtp.regions." + target.name())) {
-              noPerm = true;
-            }
-            break;
-          case WORLD: {
-            ConfigParser<WorldKeys> worldParser = configs.getWorldParser(target.name());
-            boolean requirePerm = worldParser != null
-                && Boolean.parseBoolean(
-                    worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
-            if (requirePerm && !player.hasPermission("rtp.worlds." + target.name())) {
-              noPerm = true;
-            }
-            break;
-          }
-          case DEFAULT:
-          default:
-            break;
+        if (!noPerm && apiTargetPermissionDenied(player, target, region)) {
+          noPerm = true;
         }
 
         // Cost: region price plus the configured economy base price, unless the
@@ -662,6 +931,9 @@ public class RTP {
               (ConfigParser<EconomyKeys>) configs.getParser(EconomyKeys.class);
           if (eco != null) {
             cost += eco.getNumber(EconomyKeys.price, 0.0).doubleValue();
+            if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.BIOME) {
+              cost += eco.getNumber(EconomyKeys.biomePrice, 0.0).doubleValue();
+            }
             floor = eco.getNumber(EconomyKeys.balanceFloor, 0.0).doubleValue();
           }
           if ((economy.bal(uuid) - cost) < floor) {
@@ -669,18 +941,47 @@ public class RTP {
           }
         }
 
-        // Remaining cooldown.
+        // Remaining cooldown for this target region.
         long remaining = 0L;
-        TeleportData d = getInstance().latestTeleportData.get(uuid);
-        if (d != null) {
-          long dt = System.currentTimeMillis() - d.time;
-          if (dt < 0) dt = 0L;
-          remaining = Math.max(0L, player.cooldown() - dt);
+        RegionSettings regSettings = region.getSettings();
+        boolean hasRegionOverride = (regSettings != null && regSettings.cooldownMillis() != null && regSettings.cooldownMillis() >= 0);
+        long targetCooldown = getCooldown(player, regSettings);
+        long lastTp = hasRegionOverride
+            ? getLastRegionTeleportTime(uuid, region.name)
+            : getEffectiveLastTeleportTime(uuid);
+        if (hasRegionOverride && lastTp <= 0L) {
+          TeleportData prior = getInstance().latestTeleportData.get(uuid);
+          if (prior != null && prior.targetRegion != null && region.name.equalsIgnoreCase(prior.targetRegion.name)) {
+            lastTp = prior.time;
+          }
         }
+        if (lastTp > 0L && targetCooldown > 0L) {
+          long dt = System.currentTimeMillis() - lastTp;
+          if (dt < 0) dt = 0L;
+          remaining = Math.max(0L, targetCooldown - dt);
+        }
+
+        // PvP Combat Gate check
+        boolean inCombat = false;
+        long combatRemaining = 0L;
+        try {
+          if (io.github.dailystruggle.rtp.common.pvp.PvPGate.isEnabled()
+              && (io.github.dailystruggle.rtp.common.pvp.PvPGate.isInCombat(uuid)
+                  || io.github.dailystruggle.rtp.common.pvp.PvPGate.evaluate(uuid) != io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.ALLOW)) {
+            inCombat = true;
+            combatRemaining = io.github.dailystruggle.rtp.common.pvp.PvPGate.combatRemainingMillis(uuid);
+            if (combatRemaining <= 0L) combatRemaining = 1000L;
+          }
+        } catch (Throwable ignored) {
+        }
+
+        long targetDelay = getDelay(player, regSettings);
 
         io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability availability;
         if (noPerm) {
           availability = io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.NO_PERMISSION;
+        } else if (inCombat) {
+          availability = io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.IN_COMBAT;
         } else if (remaining > 0L) {
           availability = io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.ON_COOLDOWN;
         } else if (noFunds) {
@@ -695,16 +996,26 @@ public class RTP {
         // supply the environment string here (custom-dimension friendly).
         String localEnv = null;
         String localLabel = null;
+        if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.BIOME) {
+          localLabel = "Biome: " + target.name();
+        }
         try {
           localEnv = region.getWorld().environment();
-          // Cosmetic display label from the region's configured displayName
-          // (falls back to the region name); the same value /rtp info uses.
-          localLabel = region.displayName();
+          if (localLabel == null && target.kind() != io.github.dailystruggle.rtp.api.RtpTarget.Kind.WORLD) {
+            // Cosmetic display label from the region's configured displayName
+            // when it differs from the fallback region name (matching RtpTargetStatus
+            // contract: "or null for default name").
+            String regionDisplayName = region.displayName();
+            if (regionDisplayName != null && !regionDisplayName.isEmpty()
+                && !regionDisplayName.equals(region.name)) {
+              localLabel = regionDisplayName;
+            }
+          }
         } catch (Throwable ignored) {
           // Defensive: env/label enrichment is a cosmetic hint and must never break status.
         }
         return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
-            availability, remaining, Math.max(0.0, cost), null, localEnv, localLabel);
+            availability, remaining, Math.max(0.0, cost), null, localEnv, localLabel, targetDelay, combatRemaining);
       } catch (RuntimeException ex) {
         log(Level.WARNING, "[RTP API] getTargetStatus failed: " + ex.getMessage(), ex);
         return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
@@ -776,6 +1087,93 @@ public class RTP {
     scheduler.runTaskAsynchronously(task);
   }
 
+  private static String getNoPermissionMessage(io.github.dailystruggle.rtp.api.RtpTarget target) {
+    if (configs != null) {
+      Object val = configs.getConfigValue(PlayerMessages.noPerms, null);
+      if (val instanceof String msg && !msg.isBlank()) {
+        return msg;
+      }
+    }
+    return "Missing permission for " + target;
+  }
+
+  /**
+   * Target permission gate shared by {@code RTPAPI.teleport} and {@code getTargetStatus}, so an
+   * addon or stale GUI cannot reach a target its status reports as {@code NO_PERMISSION}.
+   * Rules mirror {@code getAllowedTargets}: WORLD needs {@code rtp.worlds.<w>|*} only when the
+   * world sets requirePermission; BIOME needs {@code rtp.biome.<b>|*}; REGION needs
+   * {@code rtp.regions.<r>} when the region sets requirePermission (evaluated only once
+   * {@code region} is resolved); NETWORK needs {@code rtp.servers.<s>|*}, plus
+   * {@code rtp.regions.<r>|*} when the peer advertises the region as gated.
+   *
+   * @param player online player; {@code null} is denied
+   * @param target requested target; {@code null} is denied
+   * @param region resolved region for REGION targets, or {@code null} to defer that check
+   * @return {@code true} if the player lacks a permission the target requires
+   */
+  static boolean apiTargetPermissionDenied(
+      RTPPlayer player, io.github.dailystruggle.rtp.api.RtpTarget target, Region region) {
+    if (player == null || target == null) return true;
+    switch (target.kind()) {
+      case NETWORK: {
+        String serverId = target.serverId();
+        String regionKey = target.name();
+        boolean peerRegionGated = false;
+        try {
+          io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap live =
+              io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE;
+          if (live != null && live.peerRegionRegistry() != null) {
+            peerRegionGated = live.peerRegionRegistry().peerRegionRequiresPermission(serverId, regionKey);
+          }
+        } catch (Throwable ignored) {
+          // Defensive: a flaky network layer falls back to the server-level gate only.
+        }
+        return (!player.hasPermission("rtp.servers." + serverId)
+                && !player.hasPermission("rtp.servers.*"))
+            || (peerRegionGated
+                && !player.hasPermission("rtp.regions." + regionKey)
+                && !player.hasPermission("rtp.regions.*"));
+      }
+      case WORLD: {
+        if (configs == null) return false;
+        ConfigParser<WorldKeys> worldParser = configs.getWorldParser(target.name());
+        boolean requirePerm = worldParser != null
+            && Boolean.parseBoolean(
+                worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
+        return requirePerm
+            && !player.hasPermission("rtp.worlds." + target.name())
+            && !player.hasPermission("rtp.worlds.*");
+      }
+      case BIOME:
+        return !player.hasPermission("rtp.biome." + target.name().toLowerCase(Locale.ROOT))
+            && !player.hasPermission("rtp.biome." + target.name().toUpperCase(Locale.ROOT))
+            && !player.hasPermission("rtp.biome.*");
+      case REGION:
+        return region != null
+            && region.getSettings().requirePermission()
+            && !player.hasPermission("rtp.regions." + target.name());
+      case COORDINATE: {
+        String worldName = target.worldName();
+        if (worldName != null && !worldName.isBlank() && configs != null) {
+          ConfigParser<WorldKeys> worldParser = configs.getWorldParser(worldName);
+          boolean requirePerm = worldParser != null
+              && Boolean.parseBoolean(
+                  worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
+          if (requirePerm
+              && !player.hasPermission("rtp.worlds." + worldName)
+              && !player.hasPermission("rtp.worlds.*")) {
+            return true;
+          }
+        }
+        return false;
+      }
+      case ACTION:
+      case DEFAULT:
+      default:
+        return false;
+    }
+  }
+
   /**
    * Resolve an {@link io.github.dailystruggle.rtp.api.RtpTarget} to a concrete
    * {@link Region} for the public teleport API. A {@code null} player is allowed
@@ -797,6 +1195,22 @@ public class RTP {
             : worldParser.getConfigValue(WorldKeys.region, "default").toString();
         return selectionAPI.getRegionOrDefault(regionName);
       }
+      case BIOME: {
+        // Resolve the best region that observes or accommodates this biome
+        String best = io.github.dailystruggle.rtp.common.commands.menu.BiomeMenuSource.bestRegionForBiome(
+            player != null ? player.uuid() : null, target.name(), null);
+        if (best != null) {
+          Region r = selectionAPI.getRegion(best);
+          if (r != null) return r;
+        }
+        if (player != null) {
+          return selectionAPI.getRegion(player);
+        }
+        return selectionAPI.getRegionOrDefault("default");
+      }
+      case ACTION:
+      case COORDINATE:
+        throw new IllegalArgumentException(target.kind() + " targets cannot be resolved to a region");
       case DEFAULT:
       default:
         if (player == null) {
@@ -808,6 +1222,7 @@ public class RTP {
 
   public final ConcurrentHashMap<UUID, TeleportData> priorTeleportData = new ConcurrentHashMap<>();
   public final ConcurrentHashMap<UUID, TeleportData> latestTeleportData = new ConcurrentHashMap<>();
+
   /**
    * Per-player rolling usage-cap state backing the BetterRTP {@code LockAfter}
    * parity feature ({@code lockAfterUses} / {@code lockAfterResetSeconds}).
@@ -830,6 +1245,7 @@ public class RTP {
   public RTPTaskPipe cancelTasks;
   public final Map<String, ScanTask> scanTasks = new ConcurrentHashMap<>();
   public final ConcurrentHashMap<UUID, Long> invulnerablePlayers = new ConcurrentHashMap<>();
+  public final ConcurrentHashMap<UUID, Map<String, Long>> regionTeleportTimes = new ConcurrentHashMap<>();
   public final ConcurrentLinkedQueue<RTPChunk<?>> chunksToUnload = new ConcurrentLinkedQueue<>();
   public DatabaseAccessor<?> databaseAccessor;
   /**
@@ -838,6 +1254,148 @@ public class RTP {
    * class (ADR-024). Constructed reflectively below when network YAML enables a backend.
    */
   public io.github.dailystruggle.rtp.common.network.RTPNetworkManager networkManager;
+
+  /**
+   * Resolves the effective last teleport timestamp for a player across local and network storage.
+   * Takes {@code max(local, shared)} so network latency or clock skew never shortens the local view.
+   *
+   * @param uuid player UUID
+   * @return epoch milliseconds, or 0 if no teleport recorded
+   */
+  public static long getEffectiveLastTeleportTime(UUID uuid) {
+    if (uuid == null) return 0L;
+    long localTime = 0L;
+    RTP inst = instance;
+    if (inst != null) {
+      TeleportData localData = inst.latestTeleportData.get(uuid);
+      if (localData != null) {
+        localTime = localData.time;
+      }
+    }
+    long sharedTime = 0L;
+    try {
+      if (inst != null && inst.databaseAccessor instanceof AbstractSQLDatabaseAccessor sql) {
+        io.github.dailystruggle.rtp.common.network.NetworkStateBinding binding = sql.getNetworkStateBinding();
+        if (binding != null) {
+          sharedTime = binding.getLastTeleportTime(uuid);
+        }
+      }
+      if (sharedTime <= 0L && inst != null && inst.networkManager != null) {
+        sharedTime = inst.networkManager.getLastTeleportTime(uuid);
+      }
+    } catch (Throwable ignored) {
+      // Defensive: network read failure degrades safely to local time
+    }
+    return Math.max(localTime, sharedTime);
+  }
+
+  /**
+   * Updates the shared last teleport timestamp across the network transport.
+   *
+   * @param uuid player UUID
+   * @param epochMillis timestamp in milliseconds
+   */
+  public static void updateSharedLastTeleportTime(UUID uuid, long epochMillis) {
+    if (uuid == null) return;
+    RTP inst = instance;
+    if (inst == null) return;
+    try {
+      if (inst.databaseAccessor instanceof AbstractSQLDatabaseAccessor sql) {
+        io.github.dailystruggle.rtp.common.network.NetworkStateBinding binding = sql.getNetworkStateBinding();
+        if (binding != null) {
+          binding.setLastTeleportTime(uuid, epochMillis);
+        }
+      }
+      if (inst.networkManager != null) {
+        inst.networkManager.setLastTeleportTime(uuid, epochMillis);
+      }
+    } catch (Throwable t) {
+      log(Level.FINE, "[RTP] updateSharedLastTeleportTime failed: " + t.getMessage());
+    }
+  }
+
+  /**
+   * Resolves the timestamp of the player's last teleport to a specific region.
+   *
+   * @param uuid player UUID
+   * @param regionName target region name
+   * @return epoch milliseconds, or 0 if no teleport to this region recorded
+   */
+  public static long getLastRegionTeleportTime(UUID uuid, String regionName) {
+    if (uuid == null || regionName == null) return 0L;
+    RTP inst = instance;
+    if (inst == null) return 0L;
+    Map<String, Long> map = inst.regionTeleportTimes.get(uuid);
+    if (map == null) return 0L;
+    Long time = map.get(regionName.toLowerCase(Locale.ROOT));
+    return time != null ? time : 0L;
+  }
+
+  /**
+   * Records the timestamp of the player's last teleport to a specific region.
+   *
+   * @param uuid player UUID
+   * @param regionName target region name
+   * @param epochMillis timestamp in milliseconds
+   */
+  public static void setLastRegionTeleportTime(UUID uuid, String regionName, long epochMillis) {
+    if (uuid == null || regionName == null) return;
+    RTP inst = instance;
+    if (inst == null) return;
+    inst.regionTeleportTimes
+        .computeIfAbsent(uuid, k -> new ConcurrentHashMap<>())
+        .put(regionName.toLowerCase(Locale.ROOT), epochMillis);
+  }
+
+  /**
+   * Resolves effective last teleport time for a player, preferring region-specific if recorded.
+   */
+  public static long getEffectiveLastTeleportTime(UUID uuid, String regionName) {
+    if (uuid == null) return 0L;
+    if (regionName != null) {
+      long regTime = getLastRegionTeleportTime(uuid, regionName);
+      if (regTime > 0L) return regTime;
+    }
+    return getEffectiveLastTeleportTime(uuid);
+  }
+
+  /**
+   * Resolves warmup delay through the precedence hierarchy:
+   * permission bypass -> permission override -> region setting -> global config default.
+   */
+  public static long getDelay(RTPCommandSender sender, io.github.dailystruggle.rtp.common.selection.region.RegionSettings settings) {
+    if (sender == null) return 0L;
+    if (settings != null && settings.delayMillis() != null && settings.delayMillis() >= 0) {
+      if (sender.hasPermission("rtp.nodelay") || sender.hasPermission("rtp.noDelay")) {
+        return 0L;
+      }
+      int permOverride = ParsePermissions.getInt(sender, "rtp.delay.");
+      if (permOverride >= 0) {
+        return TimeUnit.SECONDS.toMillis(permOverride);
+      }
+      return settings.delayMillis();
+    }
+    return sender.delay();
+  }
+
+  /**
+   * Resolves cooldown through the precedence hierarchy:
+   * permission bypass -> permission override -> region setting -> global config default.
+   */
+  public static long getCooldown(RTPCommandSender sender, io.github.dailystruggle.rtp.common.selection.region.RegionSettings settings) {
+    if (sender == null) return 0L;
+    if (settings != null && settings.cooldownMillis() != null && settings.cooldownMillis() >= 0) {
+      if (sender.hasPermission("rtp.nocooldown") || sender.hasPermission("rtp.noCooldown")) {
+        return 0L;
+      }
+      int permOverride = ParsePermissions.getInt(sender, "rtp.cooldown.");
+      if (permOverride >= 0) {
+        return TimeUnit.SECONDS.toMillis(permOverride);
+      }
+      return settings.cooldownMillis();
+    }
+    return sender.cooldown();
+  }
 
   /**
    * Wraps the installed platform {@link #scheduler} in a profiling decorator
@@ -875,22 +1433,16 @@ public class RTP {
     RTPAPI.setServerAccessor(serverAccessor);
     instance = this;
 
-    addShape(new Circle());
-    addShape(new CircleOptimizedDualLayer());
-    addShape(new CircleOptimizedDualLayer("CIRCLE"));
-    addShape(new Ellipse());
-    addShape(new Square());
-    addShape(new SquareOptimizedDualLayer());
-    addShape(new SquareOptimizedDualLayer("SQUARE"));
-    addShape(new Rectangle());
-    addShape(new Circle_Normal());
-    addShape(new Square_Normal());
-    addShape(new Polygon());
-    addVerticalAdjustor(new LinearAdjustor(new ArrayList<>())); // todo: make this work
-    addVerticalAdjustor(new JumpAdjustor(new ArrayList<>()));
-    addVerticalAdjustor(new FixedAdjustor(new ArrayList<>()));
+    registerDefaultShapes();
+    registerDefaultVerticalAdjustors();
 
     configs = new Configs(serverAccessor.getPluginDirectory());
+
+    // Opt-in core backlog prefilter provider; addons that bind later replace it.
+    if (RTPAPI.hooks != null) {
+      io.github.dailystruggle.rtp.common.hooks.AnvilBatchPrefilterProvider.bindIfEnabled(
+          RTPAPI.hooks.anvilPrefilter());
+    }
 
     startupTasks.add(new RTPRunnable(() -> {
       ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) configs.getParser(ConfigKeys.class);
@@ -994,6 +1546,9 @@ public class RTP {
             if (pending != null) {
               pending.completeDeathTeleport(false);
             }
+            if (actionManager != null) {
+              actionManager.handlePlayerQuit(uuid);
+            }
           });
         } catch (Throwable t) {
           log(Level.FINE, "[RTP] player quit hook registration in RTP init skipped: " + t);
@@ -1019,7 +1574,7 @@ public class RTP {
         }
       }
       addons.loadAll();
-    }, 20));
+    }, 0));
 
   }
 
@@ -1150,15 +1705,60 @@ public class RTP {
     }
   }
 
+  public static void registerDefaultShapes() {
+    Factory<Shape<?>> shapeFactory = (Factory<Shape<?>>) factoryMap.get(factoryNames.shape);
+    if (shapeFactory == null) {
+      shapeFactory = new Factory<>();
+      factoryMap.put(factoryNames.shape, shapeFactory);
+    }
+    if (selectionAPI != null && selectionAPI.shapeFactory == null) {
+      selectionAPI.shapeFactory = shapeFactory;
+    }
+    addShape(new Circle());
+    addShape(new CircleOptimizedDualLayer());
+    addShape(new CircleOptimizedDualLayer("CIRCLE"));
+    addShape(new Ellipse());
+    addShape(new Square());
+    addShape(new SquareOptimizedDualLayer());
+    addShape(new SquareOptimizedDualLayer("SQUARE"));
+    addShape(new Rectangle());
+    addShape(new Circle_Normal());
+    addShape(new Square_Normal());
+    addShape(new Polygon());
+  }
+
+  public static void registerDefaultVerticalAdjustors() {
+    Factory<VerticalAdjustor<?>> vertFactory = (Factory<VerticalAdjustor<?>>) factoryMap.get(factoryNames.vert);
+    if (vertFactory == null) {
+      vertFactory = new Factory<>();
+      factoryMap.put(factoryNames.vert, vertFactory);
+    }
+    addVerticalAdjustor(new LinearAdjustor(new ArrayList<>()));
+    addVerticalAdjustor(new JumpAdjustor(new ArrayList<>()));
+    addVerticalAdjustor(new FixedAdjustor(new ArrayList<>()));
+  }
+
   @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the shape Factory under a raw value type
   public static void addShape(Shape<?> shape) {
-    ((Factory<Shape<?>>) factoryMap.get(factoryNames.shape)).add(shape.name, shape);
+    Factory<Shape<?>> shapeFactory = (Factory<Shape<?>>) factoryMap.get(factoryNames.shape);
+    if (shapeFactory == null) {
+      shapeFactory = new Factory<>();
+      factoryMap.put(factoryNames.shape, shapeFactory);
+    }
+    shapeFactory.add(shape.name, shape);
+    if (selectionAPI != null && selectionAPI.shapeFactory == null) {
+      selectionAPI.shapeFactory = shapeFactory;
+    }
   }
 
   @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the vert Factory under a raw value type
   public static void addVerticalAdjustor(VerticalAdjustor<?> verticalAdjustor) {
-    ((Factory<VerticalAdjustor<?>>) factoryMap.get(factoryNames.vert))
-        .add(verticalAdjustor.name, verticalAdjustor);
+    Factory<VerticalAdjustor<?>> vertFactory = (Factory<VerticalAdjustor<?>>) factoryMap.get(factoryNames.vert);
+    if (vertFactory == null) {
+      vertFactory = new Factory<>();
+      factoryMap.put(factoryNames.vert, vertFactory);
+    }
+    vertFactory.add(verticalAdjustor.name, verticalAdjustor);
   }
 
   public static RTP getInstance() {
@@ -1338,6 +1938,8 @@ public class RTP {
     // ADR-060: stop the emergency-platform restore reaper before the DB is flushed/closed so
     // it cannot touch a connection mid-shutdown. Persisted rows resume on next startup.
     io.github.dailystruggle.rtp.common.platform.PlatformRestoreManager.stopGlobal();
+    io.github.dailystruggle.rtp.common.commands.editor.EditorLiveFeed.stopActive("plugin disabled");
+    io.github.dailystruggle.rtp.common.commands.editor.EditorExtensions.unregisterAll();
 
     if (instance.databaseAccessor != null) {
       if (instance.databaseAccessor instanceof AbstractSQLDatabaseAccessor sqlDatabaseAccessor) {
@@ -1375,6 +1977,11 @@ public class RTP {
       scheduler.cancelTask(task);
     }
     trackedTasks.clear();
+
+    // Delayed arrival releases never run once the plugin is disabled (S-002).
+    int arrivalHolds =
+        io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask.flushArrivalReservations();
+    log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop flushArrivalReservations released=" + arrivalHolds);
 
     log(Level.FINE,
         "[SHUTDOWN_TRACE] RTP.stop permRegionLookup shutDown count="

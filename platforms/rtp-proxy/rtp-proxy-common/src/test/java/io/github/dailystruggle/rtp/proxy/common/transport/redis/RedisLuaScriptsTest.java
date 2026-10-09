@@ -119,6 +119,17 @@ final class RedisLuaScriptsTest {
     }
 
     @Test
+    @DisplayName("requeue.lua sidecar matches LF-normalized script bytes")
+    void requeueLuaSidecarMatches() {
+        RedisLuaScripts s = RedisLuaScripts.load("requeue");
+        assertTrue(s.body().contains("'ROUTING'"), "hand-back must be conditional on the dequeue state");
+        assertEquals(40, s.sha1().length());
+        assertTrue(s.sha1().matches("[0-9a-f]{40}"));
+        assertEquals("requeue", s.name());
+        assertTrue(s.body().indexOf('\r') < 0);
+    }
+
+    @Test
     @DisplayName("load() refuses unknown script names with a clear message")
     void loadMissingScriptFails() {
         IllegalStateException ex = assertThrows(IllegalStateException.class,

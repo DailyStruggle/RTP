@@ -200,23 +200,23 @@ To prevent player arrival clumping across massive borders while retaining 100% s
 ```mermaid
 %% Color legend: green=active phase candidate, blue=cryptographic mixing, yellow=phase progression, red=epoch transition
 flowchart TD
-    subgraph StrideConfig [Stride Derivation & Nyquist Bound]
-        InitDomain[Domain Size N / totalGood]:::data --> DeriveS[deriveAdaptiveStride<br/>S in 1, 4, 16, 64, 256]:::data
-        DeriveS --> NyquistCheck{Nyquist Bound Check<br/>S &le; binArea / 2 ?<br/>binArea = P^2}
-        NyquistCheck -- S > binArea/2 --> ClampS[Clamp Stride S = max 1, binArea / 2]:::data
-        NyquistCheck -- S &le; binArea/2 --> ValidS[Final Stride S & bits = log2 S]:::data
+    subgraph StrideConfig [Stride Derivation & Full-Bin Bound]
+        InitDomain[Domain Size N / totalGood]:::data --> DeriveS[deriveEffectiveStride<br/>resolution / uniquePlacements / adaptive]:::data
+        DeriveS --> BinCheck{Full-Bin Bound Check<br/>S &le; binArea ?<br/>binArea = P^2}
+        BinCheck -- S > binArea --> ClampS[Clamp Stride S = max 1, binArea]:::data
+        BinCheck -- S &le; binArea --> ValidS[Final Stride S & bits = log2 S]:::data
     end
 
     subgraph PhaseProgression [Dyadic Bit-Reversal Anti-Resonance]
         ValidS --> AdvCounter[Advance Monotonic Counter t<br/>t = selectionCounter.getAndIncrement]:::async
         AdvCounter --> EpochSlice[Epoch Slice: epoch = t / subsetCapacity<br/>subsetIdx = epoch mod S]:::data
         EpochSlice --> BitRev[Dyadic Bit-Reversal Bisection Sequence<br/>&phi; = reverse subsetIdx >>> 32 - bits]:::data
-        BitRev --> PhaseExhaustion["Exhaust all candidates in active phase &phi; before next rotation<br/>(Guarantees physical distance d &ge; &radic;S chunks)"]:::data
+        BitRev --> PhaseExhaustion["Exhaust all candidates in active phase &phi; before next rotation<br/>(S = P^2: d &ge; P chunks except at spiral ring corners)"]:::data
     end
 
     subgraph FeistelNetwork [4-Round Feistel Pseudorandom Permutation]
         PhaseExhaustion --> KeyDerive["Derive Round Key K_epoch<br/>feistelSalt ^ (epoch * 0x517CC1B727220A95L) ^ (&phi; * 0x9E3779B97F4A7C15L)"]:::async
-        KeyDerive --> Permute[Cycle-Walking Feistel Permutation<br/>Strict Bijection: 0 duplicate chunks across subset]:::async
+        KeyDerive --> Permute["Cycle-Walking ARX PRF Feistel (SipRound)<br/>Tiny-Domain Masking & Strict Bijection"]:::async
         Permute --> KeyCoord[Physical Hilbert Key = permutedK * S + &phi;]:::success
     end
 
@@ -374,4 +374,4 @@ Across varying world radii (measured via `ThreeWayScaleBenchmarkTest` on real te
   - `WorldBacklogBinIndex`: cross-region weak index mapping `RegionFileCoord` to candidate entries for `.mca` batch verification.
   - `Region.processBacklog()`: hysteresis-gated refill, one-bin-per-pulse Anvil pre-filtering, and head-blocking L2 promotion.
 - **Verification and Safety:**
-  - `AnvilRegionByteCache` / `anvil-api`: off-tick `.mca` and `.linear` NBT pre-filtering without server chunk tickets (`REQ-RTP-S-005`).
+  - `AnvilRegionByteCache` / `anvil-api`: off-tick `.mca` (and addon-registered format) NBT pre-filtering without server chunk tickets (`REQ-RTP-S-005`).

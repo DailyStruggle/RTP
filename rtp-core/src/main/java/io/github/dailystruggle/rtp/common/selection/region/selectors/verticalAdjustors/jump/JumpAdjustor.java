@@ -3,6 +3,8 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAd
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.IntegerParameter;
+import io.github.dailystruggle.rtp.api.safety.SafetyToken;
+import io.github.dailystruggle.rtp.api.safety.SafetyTokenParser;
 import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
@@ -76,7 +78,9 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
    * names. Bare materials are canonicalised; {@code #namespace:tag} tokens are
    * resolved through {@code tagSnapshot} (bare tag ids default to
    * {@code minecraft:}); {@code MATERIAL[prop=val]} state-predicated tokens are
-   * dropped because the probe path has no property map.
+   * dropped because the probe path has no property map. Set subtractions (e.g.
+   * {@code #minecraft:slabs - OAK_SLAB}) are respected by excluding subtracted
+   * materials from the resolved output.
    */
   private static void expandTokens(
       Object raw, Map<String, Set<String>> tagSnapshot, Set<String> sink) {
@@ -85,6 +89,44 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
       if (item == null) continue;
       String token = item.toString().trim();
       if (token.isEmpty()) continue;
+
+      SafetyTokenParser.ParseResult parseResult = SafetyTokenParser.parse(token);
+      if (!parseResult.accepted().isEmpty()) {
+        SafetyToken st = parseResult.accepted().get(0);
+        if (st.hasSubtractions()) {
+          Set<String> subtracted = new HashSet<>();
+          for (SafetyToken sub : st.subtractions()) {
+            if (sub.isPredicated()) continue; // cannot evaluate properties on probe path
+            if (sub.kind() == SafetyToken.Kind.MATERIAL) {
+              subtracted.add(canon(sub.identifier()));
+            } else if (sub.kind() == SafetyToken.Kind.TAG) {
+              Set<String> subMembers = tagSnapshot.get(sub.identifier());
+              if (subMembers != null) {
+                for (String sm : subMembers) {
+                  if (sm != null) subtracted.add(canon(sm));
+                }
+              }
+            }
+          }
+
+          if (st.kind() == SafetyToken.Kind.TAG && !st.isPredicated()) {
+            Set<String> members = tagSnapshot.get(st.identifier());
+            if (members != null) {
+              for (String m : members) {
+                if (m != null) {
+                  String c = canon(m);
+                  if (!subtracted.contains(c)) sink.add(c);
+                }
+              }
+            }
+          } else if (st.kind() == SafetyToken.Kind.MATERIAL && !st.isPredicated()) {
+            String c = canon(st.identifier());
+            if (!subtracted.contains(c)) sink.add(c);
+          }
+          continue;
+        }
+      }
+
       if (token.indexOf('[') >= 0) continue; // state-predicated - drop on probe path
       if (token.charAt(0) == '#') {
         String tagId = token.substring(1);
@@ -153,15 +195,19 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
     int minY = getNumber(JumpAdjustorKeys.minY, 0L).intValue();
     int step = getNumber(JumpAdjustorKeys.step, 0).intValue();
 
-    maxY = Math.min(maxY, chunk.getWorld().getMaxHeight());
+    io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = chunk.getWorld();
+    if (world == null) return false;
+    int worldMin = world.getMinHeight();
+    int worldMax = world.getMaxHeight();
+    maxY = Math.min(maxY, worldMax - 2);
+    minY = Math.max(minY, worldMin + 1);
+    if (minY > maxY) return false;
 
     boolean requireSkyLight;
     Object o = getData().getOrDefault(JumpAdjustorKeys.requireSkyLight, false);
     if (o instanceof Boolean) {
       requireSkyLight = (Boolean) o;
     } else requireSkyLight = Boolean.parseBoolean(o.toString());
-
-    int oldY = minY;
 
     // enforce valid inputs
     step = Math.max(step, 1);
@@ -171,7 +217,15 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
     Set<String> unsafeBlocks = snap.unsafeBlocks();
     int platformDepth = snap.platformDepth();
 
+    // Narrowing mutates the bounds; each test column starts from the configured window.
+    final int baseMinY = minY;
+    final int baseMaxY = maxY;
+
+    columns:
     for (int j = 0; j < testCoords.size(); j++) {
+      minY = baseMinY;
+      maxY = baseMaxY;
+      int oldY = minY;
       List<Integer> xz = testCoords.get(j);
       int x = xz.get(0);
       int z = xz.get(1);
@@ -198,14 +252,15 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
             maxY = i;
             break;
           }
-          if (i > maxY - it_len) return false;
+          // Coarse miss rejects this column only, not the whole chunk.
+          if (i > maxY - it_len) continue columns;
           oldY = i;
         }
       }
 
       // Final linear scan to maxY inclusively with a one-cell headroom cap.
       int scanTop = Math.min(maxY, chunk.getWorld().getMaxHeight() - 2);
-      for (int i = minY; i <= scanTop; i++) {
+      for (int i = Math.max(minY, chunk.getWorld().getMinHeight() + 1); i <= scanTop; i++) {
         int skylight = (!requireSkyLight || (i + 1) > columnSkyFloor) ? 15 : 0;
         if (!chunk.isAir(x, i - 1, z)
             && chunk.isAir(x, i, z)
@@ -235,7 +290,13 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
 
     int maxY = getNumber(JumpAdjustorKeys.maxY, 256L).intValue();
     int minY = getNumber(JumpAdjustorKeys.minY, 0L).intValue();
-    maxY = Math.min(maxY, chunk.getWorld().getMaxHeight());
+    io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = chunk.getWorld();
+    if (world == null) return null;
+    int worldMin = world.getMinHeight();
+    int worldMax = world.getMaxHeight();
+    maxY = Math.min(maxY, worldMax - 2);
+    minY = Math.max(minY, worldMin + 1);
+    if (minY > maxY) return null;
 
     boolean requireSkyLight;
     Object o = getData().getOrDefault(JumpAdjustorKeys.requireSkyLight, false);
@@ -255,7 +316,7 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
 
     // Inclusive scan to maxY with a one-cell headroom cap.
     int scanTop = Math.min(maxY, chunk.getWorld().getMaxHeight() - 2);
-    for (int i = minY; i <= scanTop; i++) {
+    for (int i = Math.max(minY, chunk.getWorld().getMinHeight() + 1); i <= scanTop; i++) {
       int skylight = (!requireSkyLight || (i + 1) > columnSkyFloor) ? 15 : 0;
       if (!chunk.isAir(x, i - 1, z)
           && chunk.isAir(x, i, z)

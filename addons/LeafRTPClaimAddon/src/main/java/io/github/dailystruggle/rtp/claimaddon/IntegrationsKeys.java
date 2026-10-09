@@ -29,6 +29,14 @@ public enum IntegrationsKeys {
   rerollCrashClaim,
   /** Whether to reroll if inside a HuskClaims claim */
   rerollHuskClaims,
+  /** Whether to reroll if inside a HuskTowns town claim */
+  rerollHuskTowns,
+  /** Whether to reroll if inside a PlotSquared plot or road */
+  rerollPlotSquared,
   /** Whether to reroll if inside KingdomsX claimed land */
   rerollKingdomsX,
+  /** Whether to reroll if inside an UltimateClaims claim */
+  rerollUltimateClaims,
+  /** Whether to reroll if inside a MinePlots plot or claim */
+  rerollMinePlots,
 }

@@ -2,10 +2,16 @@ package io.github.dailystruggle.rtp.proxy.common.config;
 
 import io.github.dailystruggle.rtp.proxy.common.RTPProxyAccessor;
 import io.github.dailystruggle.rtp.proxy.common.Role;
+import io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespEndpoint;
 
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Parsed, validated view of {@code network.yml}. Only the
@@ -28,18 +34,26 @@ import java.util.Objects;
  */
 public final class NetworkConfig {
 
+    private static final Logger LOG = Logger.getLogger(NetworkConfig.class.getName());
+
+    /** One-time guard for the "Redis password in YAML" WARNING. */
+    private static final AtomicBoolean YAML_PASSWORD_WARNED = new AtomicBoolean(false);
+
     private final boolean enabled;
     private final int schemaVersion;
     private final String serverId;
     private final String proxyId;
     private final Role role;
     private final String secretEnv;
+    private final boolean allowUnsigned;
     private final String transportType;
     private final long heartbeatIntervalMs;
     private final long heartbeatStaleAfterMs;
     private final String redisHost;
     private final int redisPort;
     private final String redisPassword;
+    private final boolean redisTls;
+    private final String redisUsername;
     private final long reservationReapIntervalMs;
     private final boolean waitlistEnabled;
     private final int waitlistMaxSize;
@@ -56,12 +70,15 @@ public final class NetworkConfig {
         this.proxyId = b.proxyId;
         this.role = Objects.requireNonNull(b.role, "role");
         this.secretEnv = b.secretEnv;
+        this.allowUnsigned = b.allowUnsigned;
         this.transportType = Objects.requireNonNull(b.transportType, "transportType");
         this.heartbeatIntervalMs = b.heartbeatIntervalMs;
         this.heartbeatStaleAfterMs = b.heartbeatStaleAfterMs;
         this.redisHost = b.redisHost;
         this.redisPort = b.redisPort;
         this.redisPassword = b.redisPassword;
+        this.redisTls = b.redisTls;
+        this.redisUsername = b.redisUsername;
         this.reservationReapIntervalMs = b.reservationReapIntervalMs;
         this.waitlistEnabled = b.waitlistEnabled;
         this.waitlistMaxSize = b.waitlistMaxSize;
@@ -78,12 +95,28 @@ public final class NetworkConfig {
     public String proxyId() { return proxyId; }
     public Role role() { return role; }
     public String secretEnv() { return secretEnv; }
+    /**
+     * {@code network.allowUnsigned} (default {@code false}): operator opt-in to
+     * accept unauthenticated {@code rtp:net} cache pushes when the secret is not
+     * a usable HMAC key. Mirrors the backend key of the same name
+     * (REQ-RTP-PROXY-007).
+     */
+    public boolean allowUnsigned() { return allowUnsigned; }
     public String transportType() { return transportType; }
     public long heartbeatIntervalMs() { return heartbeatIntervalMs; }
     public long heartbeatStaleAfterMs() { return heartbeatStaleAfterMs; }
+    /**
+     * Redis connection host. Bare host when plain + no ACL user; otherwise a
+     * secret-free {@code redis[s]://[user@]host:port} URL that
+     * {@code RespPool} understands, so TLS / username reach every binding.
+     */
     public String redisHost() { return redisHost; }
     public int redisPort() { return redisPort; }
+    /** Resolved password ({@code passwordEnv} first, YAML fallback). Never log. */
     public String redisPassword() { return redisPassword; }
+    public boolean redisTls() { return redisTls; }
+    /** Redis 6 ACL username, or {@code null}. */
+    public String redisUsername() { return redisUsername; }
 
     /**
      * Periodic sweep cadence for {@code ReservationTokenReaper}
@@ -130,12 +163,23 @@ public final class NetworkConfig {
      *   <li>If the resolved role is a proxy, {@code network.proxyId} must be
      *       a non-empty string.</li>
      *   <li>If {@code network.enabled: true} and {@code network.secretEnv}
-     *       names an unset environment variable, fail.</li>
+     *       is unset, not Base64, or decodes to fewer than
+     *       {@link HmacVerifier#MIN_SECRET_BYTES} bytes, fail (ADR-010).</li>
+     *   <li>{@code transport.redis}: {@code host} (bare or {@code redis[s]://}
+     *       URL), {@code port}, {@code tls}, {@code username},
+     *       {@code passwordEnv} (preferred), {@code password} (fallback,
+     *       one-time WARNING).</li>
      * </ul>
      * Other validation (closed-schema rejection of unknown keys, weight
      * ranges, schemaVersion negotiation) deferred to later phases.
      */
     public static NetworkConfig fromMap(Map<String, Object> root, RTPProxyAccessor accessor) {
+        return fromMap(root, accessor, System::getenv);
+    }
+
+    /** As {@link #fromMap(Map, RTPProxyAccessor)} with an injectable env lookup (Redis password). */
+    static NetworkConfig fromMap(Map<String, Object> root, RTPProxyAccessor accessor,
+                                 Function<String, String> env) {
         Objects.requireNonNull(root, "root");
         Objects.requireNonNull(accessor, "accessor");
 
@@ -149,6 +193,7 @@ public final class NetworkConfig {
         b.serverId      = asStringOrNull(network, "serverId");
         b.proxyId       = asStringOrNull(network, "proxyId");
         b.secretEnv     = asString(network, "secretEnv", "RTP_NET_SECRET");
+        b.allowUnsigned = asBool(network, "allowUnsigned", false);
 
         String roleStr = asString(network, "role", "auto").toLowerCase(Locale.ROOT);
         Role declared;
@@ -177,9 +222,7 @@ public final class NetworkConfig {
         b.heartbeatStaleAfterMs = asLong(heartbeat, "staleAfterMs", 5000L);
 
         Map<String, Object> redis = asMap(transport, "redis");
-        b.redisHost     = asString(redis, "host", "localhost");
-        b.redisPort     = asInt(redis, "port", 6379);
-        b.redisPassword = asStringOrNull(redis, "password");
+        parseRedis(redis, b, env);
 
         // REQ-RTP-NET-011: reservation token reaper cadence. Defaults to 30s;
         // non-positive values clamp to the default so a misconfigured zero/
@@ -226,17 +269,83 @@ public final class NetworkConfig {
             }
         }
 
-        // secretEnv check only when enabled.
+        // secretEnv check only when enabled. Signing transports get the full
+        // decode + >= 32-byte check so a weak secret fails here, closed, instead
+        // of surfacing later as a silent binding downgrade; JVM-local tiers keep
+        // the presence check (they never sign).
         if (b.enabled) {
-            String env = System.getenv(b.secretEnv);
-            if (env == null || env.isEmpty()) {
-                throw new NetworkConfigException(
-                        "network.secretEnv='" + b.secretEnv
-                                + "' is unset or empty in the environment; cannot enable network mode (REQ-RTP-PROXY-007).");
+            if (isSigningTransport(b.transportType, transport)) {
+                try (HmacVerifier probe = HmacVerifier.loadFromEnv(b.secretEnv, b.schemaVersion, b.schemaVersion)) {
+                    Objects.requireNonNull(probe);
+                } catch (NetworkConfigException e) {
+                    throw new NetworkConfigException(e.getMessage()
+                            + " Network mode disabled (REQ-RTP-PROXY-007).");
+                }
+            } else {
+                String secretValue = System.getenv(b.secretEnv);
+                if (secretValue == null || secretValue.isEmpty()) {
+                    throw new NetworkConfigException(
+                            "network.secretEnv='" + b.secretEnv
+                                    + "' is unset or empty in the environment; cannot enable network mode (REQ-RTP-PROXY-007).");
+                }
             }
         }
 
         return new NetworkConfig(b);
+    }
+
+    /** Transports whose payloads are HMAC-signed (need a real >= 32-byte secret). */
+    private static boolean isSigningTransport(String type, Map<String, Object> transport) {
+        String t = type == null ? "" : type.toLowerCase(Locale.ROOT);
+        if (t.equals("redis") || t.equals("sql") || t.equals("proxy-direct") || t.equals("proxydirect")) {
+            return true;
+        }
+        return asBool(asMap(transport, "direct"), "enabled", false);
+    }
+
+    /** Parse {@code transport.redis}; password never logged. */
+    private static void parseRedis(Map<String, Object> redis, Builder b, Function<String, String> env) {
+        String hostRaw = asString(redis, "host", "localhost");
+        boolean tlsFlag = asBool(redis, "tls", false);
+        boolean tlsDetected = tlsFlag || hostRaw.trim().toLowerCase(Locale.ROOT).startsWith("rediss://");
+        int defaultPort = tlsDetected ? 6380 : 6379;
+        int port = (redis != null && redis.get("port") != null) ? asInt(redis, "port", defaultPort) : defaultPort;
+        String username = asStringOrNull(redis, "username");
+        if (hostRaw.isBlank()) {
+            // Left for the redis-specific "host required" check below.
+            b.redisHost = "";
+            b.redisPort = port;
+            b.redisTls = tlsFlag;
+            b.redisUsername = username;
+        } else {
+            RespEndpoint ep;
+            try {
+                ep = RespEndpoint.parse(hostRaw, port);
+                boolean tls = ep.tls() || tlsFlag;
+                String user = ep.username() != null ? ep.username() : username;
+                ep = new RespEndpoint(ep.host(), ep.port(), tls, user);
+            } catch (IllegalArgumentException e) {
+                throw new NetworkConfigException("transport.redis.host: " + e.getMessage());
+            }
+            b.redisTls = ep.tls();
+            b.redisUsername = ep.username();
+            b.redisPort = ep.port();
+            b.redisHost = (ep.tls() || ep.username() != null) ? ep.toUri() : ep.host();
+        }
+
+        String passwordEnv = asStringOrNull(redis, "passwordEnv");
+        String fromEnv = passwordEnv == null ? null : env.apply(passwordEnv);
+        if (fromEnv != null && !fromEnv.isEmpty()) {
+            b.redisPassword = fromEnv;
+            return;
+        }
+        String yaml = asStringOrNull(redis, "password");
+        if (yaml != null && YAML_PASSWORD_WARNED.compareAndSet(false, true)) {
+            LOG.log(Level.WARNING, "transport.redis.password is set in YAML"
+                    + (passwordEnv != null ? " and env var '" + passwordEnv + "' is unset" : "")
+                    + "; prefer transport.redis.passwordEnv so the secret stays out of config files.");
+        }
+        b.redisPassword = yaml;
     }
 
     @SuppressWarnings("unchecked")
@@ -309,12 +418,15 @@ public final class NetworkConfig {
         String proxyId;
         Role role;
         String secretEnv;
+        boolean allowUnsigned;
         String transportType;
         long heartbeatIntervalMs;
         long heartbeatStaleAfterMs;
         String redisHost;
         int redisPort;
         String redisPassword;
+        boolean redisTls;
+        String redisUsername;
         long reservationReapIntervalMs;
         boolean waitlistEnabled;
         int waitlistMaxSize;

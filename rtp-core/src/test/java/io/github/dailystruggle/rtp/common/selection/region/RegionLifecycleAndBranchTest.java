@@ -30,6 +30,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -192,7 +193,9 @@ public class RegionLifecycleAndBranchTest {
 
     @Test
     void hydrateCacheFromDatabase_filtersMismatchedSeedAndDistributesLocations() {
-        Region region = new Region("hydrate_reg", createValidSettings("hydrate_reg", new Circle()));
+        Circle circle = new Circle();
+        circle.set(io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams.centerRadius, 0L);
+        Region region = new Region("hydrate_reg", createValidSettings("hydrate_reg", circle));
         long currentSeed = region.cacheKeyLong();
 
         List<DatabaseAccessor.StoredLocation> stored = new ArrayList<>();
@@ -515,8 +518,13 @@ public class RegionLifecycleAndBranchTest {
             processBacklogMethod.setAccessible(true);
 
             long budgetNanos = 100_000_000L;
-            long startNanos = System.nanoTime();
-            processBacklogMethod.invoke(region, budgetNanos, startNanos);
+            // The bin batch runs on AnvilIoPool and is applied by a later pulse: pulse until applied.
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            do {
+                processBacklogMethod.invoke(region, budgetNanos, System.nanoTime());
+                if (entries.stream().noneMatch(e -> e.validity() == BacklogLocationBuffer.Validity.UNVERIFIED)) break;
+                Thread.sleep(5L);
+            } while (System.nanoTime() < deadline);
 
             // Verified candidates must have validity INVALIDATED
             for (BacklogLocationBuffer.BacklogEntry e : entries) {

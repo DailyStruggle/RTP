@@ -207,6 +207,7 @@ menuAdminPanelHint: "&7click an option; destructive actions show a warning hover
 
 # 관리자 패널의 섹션 구분선. 자리표시자 없음.
 menuAdminPanelSectionConfig: "&8--- &7설정 &8---"
+menuAdminPanelSectionDocs: "&8--- &7문서 및 편집기 &8---"
 menuAdminPanelSectionDiagnostics: "&8--- &7진단 &8---"
 menuAdminPanelSectionLifecycle: "&8--- &7수명 주기 &8---"
 menuAdminPanelSectionBrowse: "&8--- &7탐색 &8---"
@@ -214,6 +215,10 @@ menuAdminPanelSectionBrowse: "&8--- &7탐색 &8---"
 # 관리자 패널 행 + 마우스 오버. 자리표시자 없음.
 menuAdminPanelRowConfig: "&b▶ 설정 편집기"
 menuAdminPanelHoverConfig: "&7선별된 설정 선택기를 엽니다"
+menuAdminPanelRowDocs: "#5FB3B3▶ 문서"
+menuAdminPanelHoverDocs: "&7게임 내 문서 매뉴얼을 엽니다"
+menuAdminPanelRowEditor: "#5FB3B3▶ 웹 편집기 및 매뉴얼"
+menuAdminPanelHoverEditor: "&7문서가 통합된 임시 웹 편집기 세션을 시작합니다"
 menuAdminPanelRowRegions: "#5FB3B3▶ 리전"
 menuAdminPanelHoverRegions: "&7리전별 설정 추가, 제거 또는 편집"
 menuAdminPanelRowWorlds: "#5FB3B3▶ 월드"
@@ -463,5 +468,29 @@ multiconfigResultNameInvalid: "&c이름 '[name]' 은(는) 허용되지 않습니
 # 자리표시자: [name].
 multiconfigResultNameTaken: "&c'[name]' (이)라는 이름의 항목이 이미 존재합니다."
 
+docsNotFound: "&c[RTP] 문서 주제 '[topic]'을(를) 찾을 수 없습니다. 사용 가능한 주제를 보려면 /rtp docs list를 사용하세요."
+docsEmpty: "&c[RTP] 현재 등록된 문서 주제가 없습니다."
+docsExportSuccess: "&a[RTP] 문서 HTML 번들을 [path]에 성공적으로 내보냈습니다."
+docsExportFailed: "&c[RTP] 문서 번들을 내보내지 못했습니다: [reason]."
+
 # 버전 번호는 변경하지 마세요
+# --- Web editor channel (ADR-106) ---
+editorTrustPrompt: "&e[P1] 웹 편집기 페이지가 코드 &b[nonce]&e(으)로 접근을 요청합니다. 페이지에 같은 코드가 보이면 여기를 클릭해 이 브라우저를 신뢰하세요."
+editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(키 [fingerprint])"
+editorTrustAccepted: "&a[P0] 브라우저 신뢰됨: 코드 [nonce]의 편집기 페이지에서 이제 미리보기와 Hot-Apply를 사용할 수 있습니다."
+editorTrustAlready: "&7[P0] 코드 [nonce]의 브라우저는 이미 신뢰되어 있습니다."
+editorTrustUnknown: "&c[P0] 코드 [nonce]을(를) 발급한 열린 편집기 세션이 없습니다."
+editorTrustExpired: "&c[P0] 코드 [nonce]이(가) 만료되었습니다. 편집기 페이지를 새로 고쳐 새 코드를 받으세요."
+editorTrustUsage: "&c[P0] 사용법: /rtp editor trust nonce=<편집기 페이지에 표시된 코드>"
+editorChannelOpened: "&a[P0] 웹 편집기 채널이 열렸습니다. 요청이 오면 브라우저를 신뢰해 미리보기와 Hot-Apply를 켜세요."
+editorChannelLost: "&e[P1] 웹 편집기 채널 연결 끊김: [reason]. 페이지는 스냅샷으로 계속 동작합니다."
+editorChannelExpired: "&7[P0] 웹 편집기 채널이 [minutes]분 후 만료되었습니다. 계속하려면 편집기 명령을 다시 실행하세요."
+editorTrustRateLimited: "&c[P0] 잘못된 에디터 신뢰 코드가 너무 많습니다. 1분 후에 다시 시도하세요."
+editorUntrustUsage: "&c[P0] 사용법: /rtp editor untrust key=<지문 접두사, 4자 이상 | all>"
+editorUntrustRemoved: "&a[P0] 웹 에디터 브라우저 [count]개의 신뢰를 해제했습니다. 미리보기나 Hot-Apply를 하려면 다시 신뢰해야 합니다."
+editorUntrustNone: "&7[P0] [key]와 일치하는 신뢰된 에디터 브라우저가 없습니다."
+editorUntrustFailed: "&c[P0] 신뢰된 에디터 목록을 업데이트할 수 없습니다: [reason]"
+editorApplyDigestMissing: "&c[P0] 에디터 페이로드에 sha256 체크섬이 없어 적용되지 않았습니다. 최신 에디터 페이지에서 다시 커밋하세요."
+editorApplyFileUnreadable: "&e[P1] 오프라인 적용 파일을 읽을 수 없습니다([reason]). 바이트 저장소를 시도합니다."
+
 version: 1.0

@@ -4,6 +4,7 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaContext;
+import io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap;
 import io.github.dailystruggle.rtp.common.server.DatabaseProcessing;
 import io.github.dailystruggle.rtp.common.tasks.ChunkUnloadProcessor;
 import io.github.dailystruggle.rtp.neoforge.commands.NeoForgeCommandRegistrar;
@@ -78,6 +79,13 @@ public final class RTPNeoForgeMod {
    * core load fails loud per S-006 rather than silently no-opping.
    */
   private NeoForgeServerAccessor accessor;
+
+  /**
+   * Network mode bootstrap (ADR-049 / REQ-RTP-NET-002). Manages heartbeat
+   * telemetry, Redis/SQL transport bindings, and reservation token redemption
+   * on join. Mirrors RTPBukkitPlugin and RTPFabricMod.
+   */
+  private final NetworkModeBootstrap networkBootstrap = new NetworkModeBootstrap();
 
   /**
    * Guards {@link #prepareCore()} so the server-independent core (accessor +
@@ -180,7 +188,7 @@ public final class RTPNeoForgeMod {
    * <p>Ordering note: {@code RTP.scheduler} must be assigned <b>before</b>
    * {@code new RTP()} because the rtp-core constructor self-schedules its
    * pipeline / DB-flush timers via {@code RTP.scheduler}; the
-   * {@link NeoForgeScheduler} merely queues those timers into its tick map
+   * {@code io.github.dailystruggle.rtp.neoforge.server.NeoForgeScheduler} merely queues those timers into its tick map
    * (drained once the server starts), so it is safe to use before bind.</p>
    */
   private void prepareCore() {
@@ -199,6 +207,29 @@ public final class RTPNeoForgeMod {
       if (RTP.getInstance() == null) {
         new RTP();
       }
+
+      // Read routing.lobbyMode from network.yml early (before
+      // the startupTasks drain constructs Region instances) so a pure
+      // cross-server lobby skips local region prefill. Defensive: any
+      // failure resolves to lobbyMode=false, preserving non-lobby
+      // behaviour. Mirrors RTPBukkitPlugin / RTPFabricMod.
+      try {
+        java.io.File earlyNetworkYml = NetworkModeBootstrap.ensureNetworkYml(
+            acc.getPluginDirectory(), RTPNeoForgeMod.class);
+        RTP.lobbyMode = NetworkModeBootstrap.readLobbyModeEarly(earlyNetworkYml);
+        if (RTP.lobbyMode) {
+          RTP.log(Level.INFO,
+              "[RTP][NeoForge] routing.lobbyMode=true -- local region processing"
+                  + " will be skipped; this backend acts as a pure"
+                  + " cross-server dispatcher.");
+        }
+      } catch (Throwable t) {
+        RTP.lobbyMode = false;
+        RTP.log(Level.FINE,
+            "[RTP][NeoForge] lobbyMode early-read failed; defaulting to false: "
+                + t.getMessage());
+      }
+
       corePrepared = true;
     }
   }
@@ -273,6 +304,23 @@ public final class RTPNeoForgeMod {
       }
     }
 
+    // Wire mod-side land protection (OPAC, FTB Chunks per MULTI_PLATFORM_PLAN line 505)
+    try {
+      io.github.dailystruggle.rtp.neoforge.claims.NeoForgeModClaimIntegrations.registerAll();
+    } catch (Throwable t) {
+      RTP.log(Level.FINE, "[RTP][NeoForge] ModClaimIntegrations registration skipped: " + t.getMessage());
+    }
+
+    // bStats telemetry: shared entry point, default host from core state.
+    try {
+      io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.start(
+          io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStatsCatalogue.Host.of("neoforge"),
+          io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.SERVICE_ID, "full",
+          acc.getPluginDirectory());
+    } catch (Throwable t) {
+      RTP.log(Level.FINE, "[RTP][NeoForge] bStats setup skipped or failed: " + t.getMessage());
+    }
+
     // Seed <configDir>/rtp/docs/ from the bundled docs/ tree inside the running
     // mod jar. Mirrors RTPBukkitPlugin's `JarUtils.extractDocs(...)` and
     // RTPFabricMod's `FabricJarUtils.extractDocs(...)` so the admin-facing
@@ -291,6 +339,8 @@ public final class RTPNeoForgeMod {
           "[RTP][NeoForge] NeoForgeJarUtils.extractDocs dispatch failed: "
               + t.getClass().getSimpleName() + ": " + t.getMessage());
     }
+    io.github.dailystruggle.rtp.common.commands.docs.DocsRegistry
+        .rebuildFromDataFolder(acc.getPluginDirectory());
 
     // N2.3 - register the game-bus event bridge (player join/quit, world
     // load/unload). Created here (not in the constructor) because it needs the
@@ -385,6 +435,30 @@ public final class RTPNeoForgeMod {
     // have been (re)built.
     bridge.initLoginReserveCache(server);
 
+    // ------------------------------------------------
+    // ADR-049 - boot backend-side network mode AFTER the DB is up
+    // (the SQL transport reuses the same accessor's DataSource). Strict
+    // REQ-RTP-NET-002 parity with RTPBukkitPlugin / RTPFabricMod: no-op
+    // when network.yml is absent or network.enabled=false.
+    // Failure here is logged but never aborts startup (network mode is
+    // strictly optional). After boot, register the join-time reservation-token
+    // redeem listener + the cross-server waitlist quit listener onto the
+    // NeoForgePlayerLifecycleHook so a Velocity-routed player arriving on
+    // this NeoForge backend redeems its reservation token exactly as on Paper/Fabric.
+    // ------------------------------------------------
+    try {
+      java.io.File networkYml = NetworkModeBootstrap.ensureNetworkYml(
+          acc.getPluginDirectory(), RTPNeoForgeMod.class);
+      networkBootstrap.boot(networkYml);
+      networkBootstrap.registerJoinTriggerSource();
+      networkBootstrap.registerWaitlistQuitListener();
+      RTP.log(Level.INFO, "[RTP][NeoForge] NetworkModeBootstrap initialized.");
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[RTP][NeoForge] network-mode boot failed; continuing without it: "
+              + t.getMessage(), t);
+    }
+
     RTP.log(Level.INFO,
         "[RTP][NeoForge] Core bound \u2014 accessor + scheduler + event bridge + database + "
             + "permissions + menu/book/map/metrics/backend sinks installed; "
@@ -468,6 +542,12 @@ public final class RTPNeoForgeMod {
     // tears down its tick loop (mirrors RTPBukkitPlugin.onDisable /
     // FabricEventBridge.onServerStopping). The final drain of pending mutations
     // is handled by rtp-core's RTPRunnable shutdown via RTP.stop().
+    try {
+      networkBootstrap.shutdown();
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING, "[RTP][NeoForge] networkBootstrap.shutdown failed: "
+          + t.getClass().getSimpleName() + ": " + t.getMessage());
+    }
     try {
       DatabaseProcessing.kill();
     } catch (Throwable t) {

@@ -625,23 +625,185 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
   @Override
   public boolean executeCommand(UUID senderId, String commandLine) {
     if (commandLine == null || commandLine.isBlank()) return false;
-    org.bukkit.command.CommandSender sender;
-    if (senderId == null || senderId.equals(RTPAPI.serverId)) {
-      sender = Bukkit.getConsoleSender();
-    } else {
-      sender = Bukkit.getPlayer(senderId);
-      if (sender == null) return false;
+    if (!(plugin instanceof org.bukkit.plugin.Plugin bukkitPlugin) || !bukkitPlugin.isEnabled()) {
+      return false;
     }
-    return Bukkit.dispatchCommand(sender, commandLine);
+    if (senderId == null || senderId.equals(RTPAPI.serverId)) {
+      if (Bukkit.isGlobalTickThread()) {
+        try {
+          return Bukkit.dispatchCommand(Bukkit.getConsoleSender(), commandLine);
+        } catch (Throwable t) {
+          log(Level.WARNING, "[RTP] Console command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+          return false;
+        }
+      } else {
+        Bukkit.getGlobalRegionScheduler().run(bukkitPlugin, task -> {
+          try {
+            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), commandLine);
+          } catch (Throwable t) {
+            log(Level.WARNING, "[RTP] Console command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+          }
+        });
+        return true;
+      }
+    } else {
+      Player player = Bukkit.getPlayer(senderId);
+      if (player == null || !player.isOnline()) return false;
+      if (Bukkit.isOwnedByCurrentRegion(player.getLocation())) {
+        try {
+          return Bukkit.dispatchCommand(player, commandLine);
+        } catch (Throwable t) {
+          log(Level.WARNING, "[RTP] Command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+          return false;
+        }
+      } else {
+        player.getScheduler().run(bukkitPlugin, task -> {
+          try {
+            Bukkit.dispatchCommand(player, commandLine);
+          } catch (Throwable t) {
+            log(Level.WARNING, "[RTP] Command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+          }
+        }, null);
+        return true;
+      }
+    }
+  }
+
+  @Override
+  public boolean executeCommandWithCapture(String commandLine, java.util.function.Consumer<String> lineConsumer) {
+    if (commandLine == null || commandLine.isBlank()) return false;
+    if (!(plugin instanceof org.bukkit.plugin.Plugin bukkitPlugin) || !bukkitPlugin.isEnabled()) {
+      return false;
+    }
+    org.bukkit.command.CommandSender console = Bukkit.getConsoleSender();
+    org.bukkit.command.CommandSender capturingSender = createCapturingConsoleSender(console, lineConsumer);
+    if (Bukkit.isGlobalTickThread()) {
+      try {
+        return Bukkit.dispatchCommand(capturingSender, commandLine);
+      } catch (Throwable t) {
+        log(Level.WARNING, "[RTP] Capturing console command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+        return false;
+      }
+    } else {
+      java.util.concurrent.CompletableFuture<Boolean> dispatchFuture = new java.util.concurrent.CompletableFuture<>();
+      Bukkit.getGlobalRegionScheduler().run(bukkitPlugin, task -> {
+        try {
+          dispatchFuture.complete(Bukkit.dispatchCommand(capturingSender, commandLine));
+        } catch (Throwable t) {
+          log(Level.WARNING, "[RTP] Capturing console command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+          dispatchFuture.completeExceptionally(t);
+        }
+      });
+      try {
+        return dispatchFuture.get(5, java.util.concurrent.TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        log(Level.WARNING, "[RTP] Async capturing command dispatch interrupted for '" + commandLine + "': " + e.getMessage(), e);
+        return false;
+      } catch (Throwable t) {
+        log(Level.WARNING, "[RTP] Async capturing command dispatch failed for '" + commandLine + "': " + t.getMessage(), t);
+        return false;
+      }
+    }
+  }
+
+  private org.bukkit.command.CommandSender createCapturingConsoleSender(
+      org.bukkit.command.CommandSender delegate, java.util.function.Consumer<String> lineConsumer) {
+    Class<?>[] interfaces = delegate.getClass().getInterfaces();
+    boolean hasSender = false;
+    for (Class<?> itf : interfaces) {
+      if (org.bukkit.command.CommandSender.class.isAssignableFrom(itf)) {
+        hasSender = true;
+        break;
+      }
+    }
+    Class<?>[] proxyInterfaces;
+    if (hasSender) {
+      proxyInterfaces = interfaces;
+    } else {
+      proxyInterfaces = new Class<?>[interfaces.length + 1];
+      System.arraycopy(interfaces, 0, proxyInterfaces, 0, interfaces.length);
+      proxyInterfaces[interfaces.length] = org.bukkit.command.ConsoleCommandSender.class;
+    }
+    return (org.bukkit.command.CommandSender) java.lang.reflect.Proxy.newProxyInstance(
+        delegate.getClass().getClassLoader(),
+        proxyInterfaces,
+        (proxy, method, args) -> {
+          String name = method.getName();
+          if ("sendMessage".equals(name) && args != null && args.length > 0) {
+            if (lineConsumer != null) {
+              for (Object arg : args) {
+                if (arg instanceof String s) {
+                  lineConsumer.accept(s);
+                } else if (arg instanceof String[] arr) {
+                  for (String s : arr) {
+                    if (s != null) lineConsumer.accept(s);
+                  }
+                } else if (arg != null) {
+                  try {
+                    java.lang.reflect.Method plainTextMethod = arg.getClass().getMethod("toPlainText");
+                    Object text = plainTextMethod.invoke(arg);
+                    if (text != null) lineConsumer.accept(text.toString());
+                  } catch (Throwable ignored) {
+                    lineConsumer.accept(arg.toString());
+                  }
+                }
+              }
+            }
+            return null;
+          }
+          if ("sendFeedback".equals(name) && args != null && args.length > 0) {
+            if (lineConsumer != null && args[0] != null) {
+              lineConsumer.accept(args[0].toString());
+            }
+            return null;
+          }
+          return method.invoke(delegate, args);
+        });
+  }
+
+  @Override
+  public Set<String> getScoreboardTags(UUID playerId) {
+    if (playerId == null) return Collections.emptySet();
+    try {
+      Player player = Bukkit.getPlayer(playerId);
+      if (player == null) return Collections.emptySet();
+      Set<String> tags = player.getScoreboardTags();
+      if (tags == null || tags.isEmpty()) return Collections.emptySet();
+      return Collections.unmodifiableSet(new HashSet<>(tags));
+    } catch (Throwable t) {
+      return Collections.emptySet();
+    }
   }
 
   // ---------------------------------------------------------------------------
   // Palette identifier normalization & reconciliation SPI
   // ---------------------------------------------------------------------------
 
+  /**
+   * Raw palette name to reconciled name. {@code Material.matchMaterial} compiles a regex per
+   * call and safety scans hit it per block name; the material set is fixed for the server's
+   * lifetime, so answers never go stale.
+   */
+  private final java.util.concurrent.ConcurrentHashMap<String, String> paletteIdentifierMemo =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
+  /** Bound on memoized names; palettes carry a few thousand distinct block ids at most. */
+  private static final int PALETTE_MEMO_MAX = 8192;
+
   @Override
   public String reconcilePaletteIdentifier(String raw) {
     if (raw == null) return null;
+    String memo = paletteIdentifierMemo.get(raw);
+    if (memo != null) return memo;
+    String reconciled = reconcilePaletteIdentifierUncached(raw);
+    if (reconciled != null && paletteIdentifierMemo.size() < PALETTE_MEMO_MAX) {
+      paletteIdentifierMemo.putIfAbsent(raw, reconciled);
+    }
+    return reconciled;
+  }
+
+  private static String reconcilePaletteIdentifierUncached(String raw) {
     try {
       org.bukkit.Material material = org.bukkit.Material.matchMaterial(raw);
       if (material != null) return material.name();
@@ -649,5 +811,24 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
       // Material lookup threw; fall back to normalizer
     }
     return io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(raw);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cartography MapBinding SPI (ADR-047 / REQ-RTP-MAP-006)
+  // ---------------------------------------------------------------------------
+
+  @Override
+  public void setupMapBinding() {
+    try {
+      io.github.dailystruggle.rtp.folia.maps.FoliaMapBinding binding =
+          new io.github.dailystruggle.rtp.folia.maps.FoliaMapBinding();
+      io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.setMapBinding(binding);
+      RTP.log(Level.FINE,
+          "[RTP] setupMapBinding installed " + binding.getClass().getSimpleName()
+              + " via MapDispatch");
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[RTP] setupMapBinding failed; MapDispatch will fall back to NoopMapBinding", t);
+    }
   }
 }

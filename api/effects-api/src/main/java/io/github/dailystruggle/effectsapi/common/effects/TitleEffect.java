@@ -48,7 +48,7 @@ public class TitleEffect extends Effect<TitleEffect.TitleKeys> {
 
     @Override
     public String toPermission() {
-        return data.get(TitleKeys.TITLE).toString().replaceAll("\\.*", "") +
-               data.get(TitleKeys.SUBTITLE).toString().replaceAll("\\.*", "");
+        return data.get(TitleKeys.TITLE).toString().replace(".", "") +
+               data.get(TitleKeys.SUBTITLE).toString().replace(".", "");
     }
 }

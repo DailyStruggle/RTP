@@ -11,6 +11,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Shared wire protocol for the {@code proxy-direct} transport tier
@@ -32,10 +35,11 @@ import java.util.UUID;
  * {@code transition}, {@code release}, {@code reapExpired}) are never sent here -
  * they run on the proxy against its own store.</p>
  *
- * <p>Payloads are HMAC-signed when a {@link HmacVerifier} is supplied
- * (rtp-proxy-ADR-010), unsigned otherwise. Verification failure yields
- * {@code null} from {@link #readSignedPayload}, never an exception - the caller
- * drops the row and logs at WARNING (REQ-RTP-S-004).</p>
+ * <p>Every payload is HMAC-signed (rtp-proxy-ADR-010); there is no unsigned
+ * mode. A {@code null} verifier fails closed: writers throw, readers reject
+ * every payload. Verification failure yields {@code null} from
+ * {@link #readSignedPayload}, never an exception - the caller drops the row
+ * and logs at WARNING (REQ-RTP-S-004); {@link #readList} fails the whole list.</p>
  *
  * <p>Pure I/O glue, no threading; the proxy listener thread and the backend's
  * scheduler-driven calls own their own sockets.</p>
@@ -94,7 +98,32 @@ public final class ProxyDirectWire {
     /** Field delimiter inside a single multi-field payload string. */
     public static final char FS = '\u0001';
 
+    /**
+     * Upper bound on rows in one count-framed list. Sized well above any real
+     * snapshot / batch (servers, queued players, active tokens per backend)
+     * while capping per-connection allocation from a hostile count.
+     */
+    public static final int MAX_LIST_COUNT = 4096;
+
+    /** Characters of a token id kept by {@link #redactToken}. */
+    public static final int TOKEN_LOG_PREFIX = 8;
+
+    private static final Logger LOG = Logger.getLogger(ProxyDirectWire.class.getName());
+    /** Minimum gap between rejected-list WARNINGs (tamper / secret-mismatch flood guard). */
+    private static final long REJECT_LOG_INTERVAL_MS = 10_000L;
+    private static final AtomicLong lastRejectLogMs = new AtomicLong(Long.MIN_VALUE);
+    private static final AtomicLong suppressedRejects = new AtomicLong();
+
     private ProxyDirectWire() {
+    }
+
+    /**
+     * Log-safe form of a reservation token id: first {@value #TOKEN_LOG_PREFIX}
+     * chars + ellipsis. A full id is a bearer value for redeem.
+     */
+    public static String redactToken(String tokenId) {
+        if (tokenId == null) return "null";
+        return tokenId.length() <= TOKEN_LOG_PREFIX ? tokenId : tokenId.substring(0, TOKEN_LOG_PREFIX) + "...";
     }
 
     // ---- opcode -----------------------------------------------------------
@@ -111,25 +140,34 @@ public final class ProxyDirectWire {
 
     // ---- single signed payload -------------------------------------------
 
-    /** Write one schema-tagged, optionally HMAC-signed payload string. */
+    /**
+     * Write one schema-tagged, HMAC-signed payload string.
+     *
+     * @throws IllegalStateException when {@code verifier} is null (no unsigned mode)
+     */
     public static void writeSignedPayload(DataOutputStream out, String payload,
                                           HmacVerifier verifier, int schemaVersion) throws IOException {
+        if (verifier == null) {
+            throw new IllegalStateException(
+                    "proxy-direct requires an HmacVerifier (network.secretEnv); refusing to send unsigned payload");
+        }
         String p = payload == null ? "" : payload;
         out.writeInt(schemaVersion);
-        out.writeUTF(verifier == null ? "" : verifier.sign(schemaVersion, p));
+        out.writeUTF(verifier.sign(schemaVersion, p));
         out.writeUTF(p);
     }
 
     /**
-     * Read one schema-tagged payload, verifying its HMAC when {@code verifier}
-     * is non-null. Returns {@code null} on a verification failure (caller drops
-     * + logs); throws only on a genuine stream/IO error.
+     * Read one schema-tagged payload and verify its HMAC. Returns {@code null}
+     * on verification failure or when {@code verifier} is null (fail closed:
+     * the frame is still consumed so stream framing stays intact); throws only
+     * on a genuine stream/IO error.
      */
     public static String readSignedPayload(DataInputStream in, HmacVerifier verifier) throws IOException {
         int schemaVersion = in.readInt();
         String hmacHex = in.readUTF();
         String payload = in.readUTF();
-        if (verifier != null && !verifier.verify(schemaVersion, payload, hmacHex)) {
+        if (verifier == null || !verifier.verify(schemaVersion, payload, hmacHex)) {
             return null;
         }
         return payload;
@@ -140,6 +178,10 @@ public final class ProxyDirectWire {
     /** Write a list response/request: a count followed by one signed payload per row. */
     public static void writeList(DataOutputStream out, List<String> payloads,
                                  HmacVerifier verifier, int schemaVersion) throws IOException {
+        if (payloads.size() > MAX_LIST_COUNT) {
+            throw new IOException("proxy-direct list too large: " + payloads.size()
+                    + " > " + MAX_LIST_COUNT);
+        }
         out.writeInt(payloads.size());
         for (String p : payloads) {
             writeSignedPayload(out, p, verifier, schemaVersion);
@@ -148,20 +190,44 @@ public final class ProxyDirectWire {
     }
 
     /**
-     * Read a count-framed list. Rows that fail HMAC verification are dropped
-     * (omitted from the returned list) rather than aborting the whole read.
+     * Read a count-framed list. Any row failing HMAC verification fails the
+     * whole list with an {@link IOException} (WARNING logged, throttled): a
+     * partial batch would otherwise pass as success (partial enrolment, missing
+     * status rows) and hide tampering or a secret mismatch (REQ-RTP-S-004).
+     * Every frame is consumed first so the error is not a framing artefact.
      */
     public static List<String> readList(DataInputStream in, HmacVerifier verifier) throws IOException {
         int count = in.readInt();
-        if (count < 0 || count > 100_000) {
+        if (count < 0 || count > MAX_LIST_COUNT) {
             throw new IOException("proxy-direct list count out of range: " + count);
         }
         List<String> out = new ArrayList<>(count);
+        int rejected = 0;
         for (int i = 0; i < count; i++) {
             String p = readSignedPayload(in, verifier);
             if (p != null) out.add(p);
+            else rejected++;
+        }
+        if (rejected > 0) {
+            String msg = "proxy-direct: " + rejected + " of " + count + " list row(s) failed HMAC "
+                    + "verification (tampering or network.secretEnv mismatch); rejecting the list";
+            logRejectedList(msg);
+            throw new IOException(msg);
         }
         return out;
+    }
+
+    private static void logRejectedList(String msg) {
+        long now = System.currentTimeMillis();
+        long last = lastRejectLogMs.get();
+        if ((last == Long.MIN_VALUE || now - last >= REJECT_LOG_INTERVAL_MS)
+                && lastRejectLogMs.compareAndSet(last, now)) {
+            long suppressed = suppressedRejects.getAndSet(0L);
+            LOG.log(Level.WARNING, msg + (suppressed > 0 ? " (" + suppressed + " similar suppressed)" : "")
+                    + " (REQ-RTP-S-004)");
+        } else {
+            suppressedRejects.incrementAndGet();
+        }
     }
 
     // Back-compat aliases retained for the heartbeat/snapshot exchange.
@@ -177,6 +243,22 @@ public final class ProxyDirectWire {
     @Deprecated
     public static List<String> readSnapshot(DataInputStream in, HmacVerifier verifier) throws IOException {
         return readList(in, verifier);
+    }
+
+    /**
+     * Split a multi-field payload on {@link #FS}, keeping trailing empty fields:
+     * identical to {@code payload.split(String.valueOf(FS), -1)} without the regex dispatch.
+     */
+    public static String[] splitFields(String payload) {
+        List<String> out = new ArrayList<>();
+        int from = 0;
+        int at;
+        while ((at = payload.indexOf(FS, from)) >= 0) {
+            out.add(payload.substring(from, at));
+            from = at + 1;
+        }
+        out.add(payload.substring(from));
+        return out.toArray(new String[0]);
     }
 
     // ---- structured record codecs ----------------------------------------
@@ -197,7 +279,7 @@ public final class ProxyDirectWire {
     /** Decode a token payload; {@code null}/empty -> {@code null} (no reservation). */
     public static ReservationToken decodeToken(String payload) {
         if (payload == null || payload.isEmpty()) return null;
-        String[] f = payload.split(String.valueOf(FS), -1);
+        String[] f = splitFields(payload);
         if (f.length < 6) return null;
         try {
             String regionKey = f[5].isEmpty() ? null : f[5];
@@ -226,7 +308,7 @@ public final class ProxyDirectWire {
     /** Decode an enrolment envelope; returns {@code null} when malformed. */
     public static NetworkRequestQueue.EnrolmentEnvelope decodeEnvelope(String payload) {
         if (payload == null || payload.isEmpty()) return null;
-        String[] f = payload.split(String.valueOf(FS), -1);
+        String[] f = splitFields(payload);
         if (f.length < 5) return null;
         try {
             Optional<String> regionKey = f[2].isEmpty() ? Optional.empty() : Optional.of(f[2]);
@@ -255,7 +337,7 @@ public final class ProxyDirectWire {
     /** Decode a queue-status payload; returns {@code null} when malformed. */
     public static NetworkRequestQueue.QueueStatus decodeStatus(String payload) {
         if (payload == null || payload.isEmpty()) return null;
-        String[] f = payload.split(String.valueOf(FS), -1);
+        String[] f = splitFields(payload);
         if (f.length < 6) return null;
         try {
             Optional<String> serverId = f[3].isEmpty() ? Optional.empty() : Optional.of(f[3]);

@@ -23,6 +23,8 @@ public final class ChartSpecResolvers {
     RESOLVERS.put(ChartSpec.Kind.REGION_BIOMES, new RegionBiomesResolver());
     RESOLVERS.put(ChartSpec.Kind.METRIC_SPARKLINE, new MetricSparklineResolver());
     RESOLVERS.put(ChartSpec.Kind.REGION_COMPOSITE, new RegionCompositeResolver());
+    RESOLVERS.put(ChartSpec.Kind.REGION_WALK_PATH, new RegionWalkPathResolver());
+    RESOLVERS.put(ChartSpec.Kind.SELECTION_HEATMAP, new SelectionHeatmapResolver());
   }
 
   private ChartSpecResolvers() {}
@@ -60,5 +62,7 @@ public final class ChartSpecResolvers {
     RESOLVERS.put(ChartSpec.Kind.REGION_BIOMES, new RegionBiomesResolver());
     RESOLVERS.put(ChartSpec.Kind.METRIC_SPARKLINE, new MetricSparklineResolver());
     RESOLVERS.put(ChartSpec.Kind.REGION_COMPOSITE, new RegionCompositeResolver());
+    RESOLVERS.put(ChartSpec.Kind.REGION_WALK_PATH, new RegionWalkPathResolver());
+    RESOLVERS.put(ChartSpec.Kind.SELECTION_HEATMAP, new SelectionHeatmapResolver());
   }
 }

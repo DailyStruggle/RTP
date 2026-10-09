@@ -137,4 +137,63 @@ class PlayerMoveDispatcherTest {
         assertThrows(NullPointerException.class,
                 () -> new PlayerMoveEvent(UUID.randomUUID(), null, 0, 0, 0, 0, 0, 0));
     }
+
+    @Test
+    void watchAllAndShouldSample() {
+        PlayerMoveDispatcher d = new PlayerMoveDispatcher();
+        UUID id = UUID.randomUUID();
+        assertFalse(d.shouldSample(id));
+        assertThrows(IllegalArgumentException.class, () -> d.watchAll(null));
+
+        AtomicInteger globalCount = new AtomicInteger();
+        AutoCloseable closeable = d.watchAll(e -> globalCount.incrementAndGet());
+        assertTrue(d.shouldSample(id));
+        assertTrue(d.hasWatchers());
+
+        d.fire(move(id));
+        assertEquals(1, globalCount.get());
+
+        try {
+            closeable.close();
+        } catch (Exception e) {
+            throw new AssertionError(e);
+        }
+        assertFalse(d.shouldSample(id));
+        d.fire(move(id));
+        assertEquals(1, globalCount.get());
+    }
+
+    @Test
+    void physicalTriggerSpecCoverage() {
+        io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec spec =
+            new io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec(
+                "p1", io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec.TriggerType.PORTAL,
+                "world", 10, 20, 30, 0, 10, 20, "arena", -5L);
+
+        assertEquals(0, spec.minX());
+        assertEquals(10, spec.maxX());
+        assertEquals(10, spec.minY());
+        assertEquals(20, spec.maxY());
+        assertEquals(20, spec.minZ());
+        assertEquals(30, spec.maxZ());
+        assertEquals(0L, spec.cooldownSeconds());
+
+        assertTrue(spec.contains("world", 5, 15, 25));
+        assertFalse(spec.contains("world", -1, 15, 25));
+        assertFalse(spec.contains("world", 15, 15, 25));
+        assertFalse(spec.contains("world", 5, 5, 25));
+        assertFalse(spec.contains("world", 5, 25, 25));
+        assertFalse(spec.contains("world", 5, 15, 10));
+        assertFalse(spec.contains("world", 5, 15, 35));
+        assertFalse(spec.contains("nether", 5, 15, 25));
+
+        assertThrows(NullPointerException.class, () -> new io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec(
+            null, io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec.TriggerType.PORTAL, "world", 0, 0, 0, 0, 0, 0, "act", 0));
+        assertThrows(NullPointerException.class, () -> new io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec(
+            "id", null, "world", 0, 0, 0, 0, 0, 0, "act", 0));
+        assertThrows(NullPointerException.class, () -> new io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec(
+            "id", io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec.TriggerType.PORTAL, null, 0, 0, 0, 0, 0, 0, "act", 0));
+        assertThrows(NullPointerException.class, () -> new io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec(
+            "id", io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec.TriggerType.PORTAL, "world", 0, 0, 0, 0, 0, 0, null, 0));
+    }
 }

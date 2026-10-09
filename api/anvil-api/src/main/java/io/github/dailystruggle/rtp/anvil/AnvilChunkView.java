@@ -73,6 +73,16 @@ public final class AnvilChunkView {
         return null;
     }
 
+    /**
+     * True iff this view contains an emitted section covering section Y {@code sy}.
+     */
+    public boolean hasSection(int sy) {
+        for (PaletteSection s : sections) {
+            if (s.sectionY() == sy) return true;
+        }
+        return false;
+    }
+
     // --- Typed queries (ADR-016) ---
 
     /**

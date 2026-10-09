@@ -14,5 +14,7 @@ public enum RegionKeys {
   price,
   spatialResolution,
   override,
+  cooldown,
+  delay,
   version
 }

@@ -9,6 +9,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -130,5 +131,51 @@ class SparkMetricsBindingTest {
         assertFalse(b.sparkEnabled());
         assertEquals(18.0, b.tps1m(), 1e-9);
         assertEquals(55.0, b.mspt(), 1e-9);
+    }
+
+    interface DummySparkMetadataProvider {
+        java.util.Map<String, Object> provide();
+    }
+
+    @Test
+    void telemetry_dataset_contains_all_required_keys_and_handles_gracefully() {
+        java.util.Map<String, Object> telemetry = SparkMetricsBinding.collectTelemetry();
+        assertNotNull(telemetry);
+
+        // Required MemoryTracker state keys
+        assertTrue(telemetry.containsKey("rtp.memory.tracked_entries_total"));
+        assertTrue(telemetry.containsKey("rtp.memory.active_tasks"));
+        assertTrue(telemetry.containsKey("rtp.memory.active_chunk_tickets"));
+        assertTrue(telemetry.containsKey("rtp.memory.ceiling_bytes"));
+
+        // Required Queue & Cache state keys
+        assertTrue(telemetry.containsKey("rtp.queue.l1_ready_count"));
+        assertTrue(telemetry.containsKey("rtp.queue.l2_cold_count"));
+        assertTrue(telemetry.containsKey("rtp.queue.l3_backlog_bins"));
+
+        // Required Teleport Pipeline keys
+        assertTrue(telemetry.containsKey("rtp.pipeline.pending_teleports"));
+        assertTrue(telemetry.containsKey("rtp.pipeline.avg_latency_ms"));
+        assertTrue(telemetry.containsKey("rtp.pipeline.slow_count"));
+    }
+
+    @Test
+    void metadata_provider_proxy_serializes_telemetry_dataset() {
+        Object proxy = ReflectiveSparkStats.createMetadataProviderProxy(DummySparkMetadataProvider.class);
+        assertNotNull(proxy);
+        assertTrue(proxy instanceof DummySparkMetadataProvider);
+
+        DummySparkMetadataProvider provider = (DummySparkMetadataProvider) proxy;
+        java.util.Map<String, Object> data = provider.provide();
+        assertNotNull(data);
+        assertTrue(data.containsKey("rtp.memory.tracked_entries_total"));
+        assertTrue(data.containsKey("rtp.queue.l1_ready_count"));
+        assertTrue(data.containsKey("rtp.pipeline.avg_latency_ms"));
+
+        // Common Object methods
+        assertEquals("RTPSparkMetadataProviderProxy", proxy.toString());
+        assertTrue(proxy.equals(proxy));
+        assertFalse(proxy.equals(null));
+        assertTrue(proxy.hashCode() != 0);
     }
 }

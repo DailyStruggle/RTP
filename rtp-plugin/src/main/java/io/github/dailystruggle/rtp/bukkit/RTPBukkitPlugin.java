@@ -19,7 +19,6 @@ import io.github.dailystruggle.rtp.bukkitplatform.server.AsyncTeleportProcessing
 import io.github.dailystruggle.rtp.common.server.DatabaseProcessing;
 import io.github.dailystruggle.rtp.bukkitplatform.server.SyncTeleportProcessing;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
-import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -32,7 +31,6 @@ import java.util.stream.Collectors;
 @SuppressWarnings("unused")
 public final class RTPBukkitPlugin extends JavaPlugin {
   private static RTPBukkitPlugin instance = null;
-  private static Metrics metrics;
   /** Backend-side network mode lifecycle holder; never null after onLoad. */
   private final NetworkModeBootstrap networkBootstrap = new NetworkModeBootstrap();
   public BukkitTask commandTimer = null;
@@ -112,14 +110,15 @@ public final class RTPBukkitPlugin extends JavaPlugin {
             new io.github.dailystruggle.rtp.bukkit.commands.test.BukkitTestUmbrellaScheduler(),
             null);
 
-    RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable ENTER -- initializing bStats Metrics(id=30865)");
-    metrics = new Metrics(this, 30865);
-    // Register the RTP cost-metrics chart catalogue. All chart lambdas read
-    // RTP.metrics.snapshot() and bucketise to keep submissions privacy-safe and
-    // low-cardinality.
-    io.github.dailystruggle.rtp.bukkit.metrics.RTPCostMetricsCharts.register(metrics, "full");
+    RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable ENTER -- initializing bStats (id=30865)");
+    // Shared bStats entry point (bstats-api client + RTP chart catalogue). All chart
+    // lambdas read RTP.metrics.snapshot() and bucketise to keep submissions
+    // privacy-safe and low-cardinality.
+    io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.start(
+        new io.github.dailystruggle.rtp.bukkit.metrics.BukkitBStatsHost(this),
+        io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.SERVICE_ID, "full", getDataFolder());
 
-    // Install the platform-appropriate MetricsBinding so /rtp info, RTPCostMetricsCharts,
+    // Install the platform-appropriate MetricsBinding so /rtp info, the bStats charts,
     // and every other Metrics.snapshot() consumer report live values instead of
     // UNSAMPLED sentinels. Best-effort; never aborts plugin enable.
     io.github.dailystruggle.rtp.bukkit.metrics.MetricsBindingDispatcher.install();
@@ -208,23 +207,10 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     // regions configured for a late-loaded world to never rebind.
     RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable setupBukkitEvents (synchronous)");
     setupBukkitEvents();
-    // Install the Bukkit-family MapBinding so MapDispatch (ADR-047 / REQ-RTP-MAP-006)
-    // can satisfy chart requests issued from /rtp info etc. Folia gets FoliaMapBinding
-    // (per-viewer EntityScheduler hop available for live charts); other backends get
-    // the plain BukkitMapBinding. Live binding is not yet enabled on either path.
-    try {
-      io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding binding =
-          isFolia()
-              ? new io.github.dailystruggle.rtp.folia.maps.FoliaMapBinding()
-              : new io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding();
-      io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.setMapBinding(binding);
-      RTP.log(java.util.logging.Level.FINE,
-          "[RTP] onEnable installed " + binding.getClass().getSimpleName()
-              + " via MapDispatch");
-    } catch (Throwable t) {
-      RTP.log(java.util.logging.Level.WARNING,
-          "[RTP] onEnable MapBinding install failed; MapDispatch will fall back to NoopMapBinding",
-          t);
+    // Install the platform-appropriate MapBinding via the accessor layer
+    // (ADR-047 / REQ-RTP-MAP-006) so MapDispatch can satisfy chart requests.
+    if (RTP.serverAccessor != null) {
+      RTP.serverAccessor.setupMapBinding();
     }
     // Install the Bukkit-family BiomeColorSource so the biomes visualisation
     // can ask the server for each biome's native cartography colour (rather
@@ -357,6 +343,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
     RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable JarUtils.extractDocs version=" + getDescription().getVersion());
     JarUtils.extractDocs(getDataFolder(), getDescription().getVersion());
+    io.github.dailystruggle.rtp.common.commands.docs.DocsRegistry.rebuildFromDataFolder(getDataFolder());
 
     // ADR-023 - Login Reserve Cache: snapshot max-players at startup, allocate
     // the buffer on the default-world region (Bukkit.getWorlds().get(0)), and
@@ -504,7 +491,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     } catch (NoClassDefFoundError ignored) {
     }
 
-    metrics = null;
+    io.github.dailystruggle.rtp.common.metrics.bstats.RtpBStats.shutdown();
 
     try {
       RTP.log(java.util.logging.Level.FINE, "[RTP] onDisable RTP.stop() invoking core shutdown");
@@ -599,6 +586,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
     Bukkit.getPluginManager().registerEvents(new OnPlayerDamage(), this);
     // ADR-055: feed the native PvP combat tracker for the optional combat gate.
     Bukkit.getPluginManager().registerEvents(new OnPlayerCombatTag(), this);
+    Bukkit.getPluginManager().registerEvents(new OnPlayerDeath(), this);
     Bukkit.getPluginManager().registerEvents(new OnPlayerJoin(), this);
     Bukkit.getPluginManager().registerEvents(new OnPlayerMove(), this);
     Bukkit.getPluginManager().registerEvents(new OnPlayerQuit(), this);
@@ -680,6 +668,17 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       RTP.log(
           java.util.logging.Level.WARNING,
           "[RTP] Failed to initialize combat-tag integrations; continuing with the native PvP tracker.",
+          t);
+    }
+
+    // Hologram & floating display integrations (DecentHolograms / HolographicDisplays / native TextDisplay).
+    try {
+      RTP.log(java.util.logging.Level.FINER, "[RTP] setupIntegrations invoking HologramIntegrations.setup");
+      io.github.dailystruggle.rtp.bukkit.tools.softdepends.hologram.HologramIntegrations.setup(this);
+    } catch (Throwable t) {
+      RTP.log(
+          java.util.logging.Level.WARNING,
+          "[RTP] Failed to initialize hologram integrations; continuing with virtual fallback.",
           t);
     }
     RTP.log(java.util.logging.Level.FINE, "[RTP] setupIntegrations EXIT");

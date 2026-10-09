@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -52,6 +53,7 @@ public class ClearCooldownCmd extends PlayerTargetedClearCmd {
     if (rtp != null) {
       all.addAll(rtp.latestTeleportData.keySet());
       all.addAll(rtp.priorTeleportData.keySet());
+      all.addAll(rtp.regionTeleportTimes.keySet());
     }
     int cleared = 0;
     for (UUID id : all) {
@@ -68,6 +70,7 @@ public class ClearCooldownCmd extends PlayerTargetedClearCmd {
 
     TeleportData latest = rtp.latestTeleportData.remove(uuid);
     TeleportData prior = rtp.priorTeleportData.remove(uuid);
+    Map<String, Long> regions = rtp.regionTeleportTimes.remove(uuid);
     TeleportData existing = (latest != null) ? latest : prior;
 
     if (existing != null && rtp.databaseAccessor != null) {
@@ -87,6 +90,6 @@ public class ClearCooldownCmd extends PlayerTargetedClearCmd {
             "[RTP] clear cooldown: failed to persist cleared cooldown for " + uuid + ": " + ex.getMessage());
       }
     }
-    return existing != null;
+    return existing != null || (regions != null && !regions.isEmpty());
   }
 }

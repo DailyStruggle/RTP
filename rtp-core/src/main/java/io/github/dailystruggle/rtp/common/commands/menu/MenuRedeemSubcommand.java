@@ -2764,7 +2764,8 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
 
     /**
      * Dispatch for {@link MenuAction.MultiConfigMutate} (ADD / REMOVE).
-     * Gates on {@link #CONFIG_VIEW_PERMISSION}; mutates parser and re-renders selector page.
+     * Gates on {@link #CONFIG_VIEW_PERMISSION} plus {@code rtp.config} (the node the CLI
+     * {@code SubConfigCmd} mutation requires); mutates parser and re-renders selector page.
      */
     boolean dispatchMultiConfigMutate(UUID senderId,
                                               MenuAction.MultiConfigMutate mutate,
@@ -2780,6 +2781,15 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             RTP.log(Level.WARNING,
                     "menu multiconfig-mutate denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
+            reject(senderId, CommandMessages.menuInvalid,
+                    "menu multiconfig-mutate rejected: permission denied", messageMethod);
+            return false;
+        }
+        // View-only staff may browse entries but never create or delete them.
+        if (!permissionGates.hasConfigEdit(senderId)) {
+            RTP.log(Level.WARNING,
+                    "menu multiconfig-mutate denied: " + senderId
+                            + " lacks " + MenuPermissionGates.CONFIG_EDIT_PERMISSION);
             reject(senderId, CommandMessages.menuInvalid,
                     "menu multiconfig-mutate rejected: permission denied", messageMethod);
             return false;
@@ -3072,7 +3082,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
                 ? messageMethod
                 : msg -> RTP.serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg, null);
         Predicate<String> permissionProbe = permissionProbeFactory.apply(senderId);
-        if (permissionProbe == null) permissionProbe = perm -> true;
+        if (permissionProbe == null) permissionProbe = perm -> false;
         try {
             rtpRoot.onCommand(senderId,
                     permissionProbe,

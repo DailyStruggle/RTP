@@ -1,20 +1,18 @@
 package io.github.dailystruggle.rtp.common.benchmark;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.tools.ChartOutputHelper;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import javax.imageio.ImageIO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -140,39 +138,12 @@ public class DownsamplingSideBySideBenchmarkTest {
     System.out.printf("[DEBUG_LOG] %s: Flat Arrays = %,d B | Pure Bitmask = %,d B | Roaring = %,d B (Reduction: %.1f%%)%n",
         memS256.name, memS256.flatArrayBytes, memS256.pureBitmaskBytes, memS256.roaringHybridBytes, memS256.memoryReductionPercent);
 
-    // Save to all repository and doc destinations
-    File[] targetFiles = new File[] {
-      new File("side_by_side_downsampling_comparison_chart.png"),
-      new File("../side_by_side_downsampling_comparison_chart.png"),
-      new File("docs/assets/img/side_by_side_downsampling_comparison_chart.png"),
-      new File("../docs/assets/img/side_by_side_downsampling_comparison_chart.png"),
-      new File("build/reports/player_distribution/side_by_side_downsampling_comparison_chart.png"),
-      new File("../build/reports/player_distribution/side_by_side_downsampling_comparison_chart.png")
-    };
-    for (File tf : targetFiles) {
-      if (tf.getParentFile() != null && !tf.getParentFile().exists()) {
-        continue;
-      }
-      renderSideBySideChart(R, uniqueRadiusRu, currentArrivals, arrivalsS64, arrivalsS256, proxCurrent, proxS64, proxS256, memCurrent, memS64, memS256, tf);
-      System.out.println("[DEBUG_LOG] Successfully rendered comparison chart to: " + tf.getAbsolutePath());
-    }
+    // Render and save to canonical doc and report destinations
+    BufferedImage sideBySideImg = renderSideBySideChart(R, uniqueRadiusRu, currentArrivals, arrivalsS64, arrivalsS256, proxCurrent, proxS64, proxS256, memCurrent, memS64, memS256);
+    ChartOutputHelper.writeChart(sideBySideImg, "player_distribution", "side_by_side_downsampling_comparison_chart.png");
+    ChartOutputHelper.writeChart(sideBySideImg, "player_distribution", "unique_placements_auto_comparison_chart.png");
 
-    File[] targetAutoFiles = new File[] {
-      new File("unique_placements_auto_comparison_chart.png"),
-      new File("../unique_placements_auto_comparison_chart.png"),
-      new File("docs/assets/img/unique_placements_auto_comparison_chart.png"),
-      new File("../docs/assets/img/unique_placements_auto_comparison_chart.png")
-    };
-    for (File tf : targetAutoFiles) {
-      if (tf.getParentFile() != null && !tf.getParentFile().exists()) {
-        continue;
-      }
-      renderSideBySideChart(R, uniqueRadiusRu, currentArrivals, arrivalsS64, arrivalsS256, proxCurrent, proxS64, proxS256, memCurrent, memS64, memS256, tf);
-    }
-
-    File chartFile = new File("side_by_side_downsampling_comparison_chart.png");
-    assertTrue(chartFile.exists(), "Chart file must be generated");
-    System.out.println("[DEBUG_LOG] Successfully rendered comparison chart to: " + chartFile.getAbsolutePath());
+    System.out.println("[DEBUG_LOG] Successfully rendered comparison charts to canonical destinations");
   }
 
   private static List<ChunkCoord> samplePoints(SquareOptimizedDualLayer shape, int count) {
@@ -313,15 +284,14 @@ public class DownsamplingSideBySideBenchmarkTest {
     );
   }
 
-  private static void renderSideBySideChart(
+  private static BufferedImage renderSideBySideChart(
       int R,
       int Ru,
       List<ChunkCoord> currentArrivals,
       List<ChunkCoord> downsampledArrivals,
       List<ChunkCoord> excludedArrivals,
       ProximityMetrics prox1, ProximityMetrics prox2, ProximityMetrics prox3,
-      MemoryModelMetrics mem1, MemoryModelMetrics mem2, MemoryModelMetrics mem3,
-      File outFile) throws Exception {
+      MemoryModelMetrics mem1, MemoryModelMetrics mem2, MemoryModelMetrics mem3) throws Exception {
 
     int mapDim = 380;
     int margin = 30;
@@ -371,7 +341,7 @@ public class DownsamplingSideBySideBenchmarkTest {
     renderMemoryPanel(g, margin, memY, totalWidth - margin * 2, mem1, mem2, mem3);
 
     g.dispose();
-    ImageIO.write(img, "PNG", outFile);
+    return img;
   }
 
   private static void renderSpatialPanel(

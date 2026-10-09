@@ -306,6 +306,25 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   @Override
+  public Integer getScoreboardScore(UUID playerId, String objective) {
+    if (playerId == null || objective == null || objective.isBlank()) return null;
+    try {
+      org.bukkit.scoreboard.ScoreboardManager sm = Bukkit.getScoreboardManager();
+      if (sm == null) return null;
+      org.bukkit.scoreboard.Scoreboard sb = sm.getMainScoreboard();
+      org.bukkit.scoreboard.Objective obj = sb.getObjective(objective);
+      if (obj == null) return null;
+      Player player = Bukkit.getPlayer(playerId);
+      String entry = (player != null) ? player.getName() : Bukkit.getOfflinePlayer(playerId).getName();
+      if (entry == null) return null;
+      org.bukkit.scoreboard.Score score = obj.getScore(entry);
+      return score.isScoreSet() ? score.getScore() : null;
+    } catch (Throwable t) {
+      return null;
+    }
+  }
+
+  @Override
   public void sendMessage(UUID target, Enum<?> msgType, String tag) {
     Object cv = RTP.configs.getConfigValue(msgType, "");
     String message = cv == null ? "" : cv.toString();
@@ -753,13 +772,13 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   /**
-   * Strips legacy {@code &x} color codes and {@code #RRGGBB} hex codes from a bar title
-   * (BossBar titles render as plain text on most clients) and truncates to Bukkit's
-   * 64-character title limit.
+   * Strips legacy {@code &x} / {@code §x} color codes and {@code #RRGGBB} / {@code &#RRGGBB} hex
+   * codes from a bar title (BossBar titles render as plain text on most clients) and truncates to
+   * Bukkit's 64-character title limit. Regex-free: runs on every bar update.
    */
   private static String sanitizeBarTitle(String title) {
     if (title == null) return "";
-    String out = title.replaceAll("&[0-9a-fA-FklmnorKLMNOR]", "").replaceAll("#[0-9a-fA-F]{6}", "");
+    String out = io.github.dailystruggle.rtp.common.text.LegacyColorStrip.strip(title);
     return out.length() > 64 ? out.substring(0, 64) : out;
   }
 
@@ -866,6 +885,23 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     }
   }
 
+  @Override
+  public java.util.Collection<io.github.dailystruggle.rtp.api.entity.RTPPlayer> getOnlinePlayers() {
+    try {
+      java.util.Collection<? extends Player> players = Bukkit.getOnlinePlayers();
+      if (players == null || players.isEmpty()) return Collections.emptyList();
+      java.util.List<io.github.dailystruggle.rtp.api.entity.RTPPlayer> list = new java.util.ArrayList<>(players.size());
+      for (Player p : players) {
+        if (p == null) continue;
+        io.github.dailystruggle.rtp.api.entity.RTPPlayer rp = getPlayer(p.getUniqueId());
+        if (rp != null) list.add(rp);
+      }
+      return Collections.unmodifiableList(list);
+    } catch (Throwable t) {
+      return Collections.emptyList();
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Command registration & execution SPI
   // ---------------------------------------------------------------------------
@@ -899,16 +935,529 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       sender = Bukkit.getPlayer(senderId);
       if (sender == null) return false;
     }
-    return Bukkit.dispatchCommand(sender, commandLine);
+    if (!Bukkit.isPrimaryThread() && plugin instanceof Plugin bp && bp.isEnabled()) {
+      java.util.concurrent.CompletableFuture<Boolean> f = new java.util.concurrent.CompletableFuture<>();
+      Bukkit.getScheduler().runTask(bp, () -> {
+        try {
+          f.complete(Bukkit.dispatchCommand(sender, commandLine));
+        } catch (Throwable t) {
+          f.completeExceptionally(t);
+        }
+      });
+      try {
+        return f.get(5, java.util.concurrent.TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return false;
+      } catch (Exception e) {
+        return false;
+      }
+    }
+    try {
+      return Bukkit.dispatchCommand(sender, commandLine);
+    } catch (Throwable t) {
+      log(Level.WARNING, "[RTP] Command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+      return false;
+    }
+  }
+
+  @Override
+  public boolean executeCommandWithCapture(String commandLine, java.util.function.Consumer<String> lineConsumer) {
+    if (commandLine == null || commandLine.isBlank()) return false;
+    CommandSender console = Bukkit.getConsoleSender();
+    if (console == null) return false;
+    java.util.concurrent.atomic.AtomicLong lastMessageTime = new java.util.concurrent.atomic.AtomicLong(0L);
+    java.util.function.Consumer<String> trackingConsumer = s -> {
+      lastMessageTime.set(System.currentTimeMillis());
+      if (lineConsumer != null) lineConsumer.accept(s);
+    };
+
+    boolean isLuckPermsCmd = commandLine.trim().toLowerCase(java.util.Locale.ROOT).startsWith("lp")
+        || commandLine.trim().toLowerCase(java.util.Locale.ROOT).startsWith("luckperms");
+
+    // Scoped log listener to capture providers (like LuckPerms) that route console output
+    // to their plugin logger or the root/server logger when executing from console.
+    java.util.logging.Handler logHandler = null;
+    java.util.logging.Logger rootLogger = null;
+    Object log4jAppender = null;
+    Object log4jRootLogger = null;
+    try {
+      rootLogger = java.util.logging.Logger.getLogger("");
+      logHandler = new java.util.logging.Handler() {
+        @Override
+        public void publish(java.util.logging.LogRecord record) {
+          if (record == null) return;
+          String loggerName = record.getLoggerName();
+          if (loggerName != null) {
+            String lowerLogger = loggerName.toLowerCase(java.util.Locale.ROOT);
+            if (isLuckPermsCmd && !lowerLogger.contains("luckperms")) {
+              return;
+            }
+            if (!isLuckPermsCmd && !lowerLogger.contains("luckperms") && !lowerLogger.contains("rtp")) {
+              return;
+            }
+          }
+          String msg = record.getMessage();
+          if (msg != null && !msg.isBlank()) {
+            trackingConsumer.accept(msg);
+          }
+        }
+        @Override public void flush() {
+          // No buffered log records to flush in transient command output listener
+        }
+        @Override public void close() throws SecurityException {
+          // No resource cleanup required for transient log handler
+        }
+      };
+      rootLogger.addHandler(logHandler);
+    } catch (Throwable ignored) {}
+
+    try {
+      Class<?> logManagerClass = Class.forName("org.apache.logging.log4j.LogManager");
+      Class<?> appenderInterface = Class.forName("org.apache.logging.log4j.core.Appender");
+      java.lang.reflect.Method getRootLoggerMethod = logManagerClass.getMethod("getRootLogger");
+      log4jRootLogger = getRootLoggerMethod.invoke(null);
+
+      log4jAppender = java.lang.reflect.Proxy.newProxyInstance(
+          appenderInterface.getClassLoader(),
+          new Class<?>[] { appenderInterface },
+          (proxy, method, args) -> {
+            String mName = method.getName();
+            if ("getName".equals(mName)) return "RTPCaptureAppender";
+            if ("isStarted".equals(mName)) return true;
+            if ("isStopped".equals(mName)) return false;
+            if ("append".equals(mName) && args != null && args.length > 0) {
+              Object event = args[0];
+              if (event != null) {
+                try {
+                  java.lang.reflect.Method getLoggerNameMethod = event.getClass().getMethod("getLoggerName");
+                  Object lNameObj = getLoggerNameMethod.invoke(event);
+                  if (lNameObj != null) {
+                    String lower = lNameObj.toString().toLowerCase(java.util.Locale.ROOT);
+                    if (isLuckPermsCmd && !lower.contains("luckperms")) {
+                      return null;
+                    }
+                    if (!isLuckPermsCmd && !lower.contains("luckperms") && !lower.contains("rtp")) {
+                      return null;
+                    }
+                  }
+                  java.lang.reflect.Method getMessageMethod = event.getClass().getMethod("getMessage");
+                  Object messageObj = getMessageMethod.invoke(event);
+                  if (messageObj != null) {
+                    java.lang.reflect.Method getFormattedMethod = messageObj.getClass().getMethod("getFormattedMessage");
+                    Object formatted = getFormattedMethod.invoke(messageObj);
+                    if (formatted != null) {
+                      trackingConsumer.accept(formatted.toString());
+                    }
+                  }
+                } catch (Throwable ignored) {}
+              }
+              return null;
+            }
+            return null;
+          });
+
+      java.lang.reflect.Method addAppenderMethod = log4jRootLogger.getClass().getMethod("addAppender", appenderInterface);
+      addAppenderMethod.invoke(log4jRootLogger, log4jAppender);
+    } catch (Throwable ignored) {}
+
+    CommandSender capturingSender = createCapturingConsoleSender(console, trackingConsumer);
+    boolean isPrimary = false;
+    try {
+      isPrimary = Bukkit.isPrimaryThread();
+    } catch (Throwable ignored) {}
+
+    try {
+      boolean dispatched;
+      if (!isPrimary && plugin instanceof Plugin bukkitPlugin && bukkitPlugin.isEnabled()) {
+        java.util.concurrent.CompletableFuture<Boolean> dispatchFuture = new java.util.concurrent.CompletableFuture<>();
+        Bukkit.getScheduler().runTask(bukkitPlugin, () -> {
+          try {
+            dispatchFuture.complete(Bukkit.dispatchCommand(capturingSender, commandLine));
+          } catch (Throwable t) {
+            dispatchFuture.completeExceptionally(t);
+          }
+        });
+        try {
+          dispatched = dispatchFuture.get(5, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          log(Level.WARNING, "[RTP] Async command dispatch interrupted for '" + commandLine + "': " + e.getMessage(), e);
+          return false;
+        } catch (Throwable t) {
+          log(Level.WARNING, "[RTP] Async command dispatch failed for '" + commandLine + "': " + t.getMessage(), t);
+          return false;
+        }
+      } else {
+        dispatched = Bukkit.dispatchCommand(capturingSender, commandLine);
+      }
+
+      if (dispatched && !isPrimary) {
+        // Providers like LuckPerms execute command callbacks on asynchronous worker threads.
+        // On async worker threads, wait up to 1000ms for initial response, and then debounce until output ceases.
+        long start = System.currentTimeMillis();
+        while (System.currentTimeMillis() - start < 1000 && lastMessageTime.get() == 0L) {
+          try {
+            Thread.sleep(50);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            break;
+          }
+        }
+        if (lastMessageTime.get() > 0L) {
+          while (System.currentTimeMillis() - lastMessageTime.get() < 250 && System.currentTimeMillis() - start < 3000) {
+            try {
+              Thread.sleep(50);
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              break;
+            }
+          }
+        }
+      }
+      return dispatched;
+    } catch (Throwable t) {
+      log(Level.WARNING, "[RTP] Capturing command execution threw exception for '" + commandLine + "': " + t.getMessage(), t);
+      return false;
+    } finally {
+      if (rootLogger != null && logHandler != null) {
+        try {
+          rootLogger.removeHandler(logHandler);
+        } catch (Throwable ignored) {}
+      }
+      if (log4jRootLogger != null && log4jAppender != null) {
+        try {
+          Class<?> appenderInterface = Class.forName("org.apache.logging.log4j.core.Appender");
+          java.lang.reflect.Method removeAppenderMethod = log4jRootLogger.getClass().getMethod("removeAppender", appenderInterface);
+          removeAppenderMethod.invoke(log4jRootLogger, log4jAppender);
+        } catch (Throwable ignored) {}
+      }
+    }
+  }
+
+  private CommandSender createCapturingConsoleSender(CommandSender delegate, java.util.function.Consumer<String> lineConsumer) {
+    Class<?>[] interfaces = delegate.getClass().getInterfaces();
+    boolean hasSender = false;
+    for (Class<?> itf : interfaces) {
+      if (org.bukkit.command.ConsoleCommandSender.class.isAssignableFrom(itf)) {
+        hasSender = true;
+        break;
+      }
+    }
+    Class<?>[] proxyInterfaces;
+    if (hasSender) {
+      proxyInterfaces = interfaces;
+    } else {
+      proxyInterfaces = new Class<?>[interfaces.length + 1];
+      System.arraycopy(interfaces, 0, proxyInterfaces, 0, interfaces.length);
+      proxyInterfaces[interfaces.length] = org.bukkit.command.ConsoleCommandSender.class;
+    }
+    return (CommandSender) java.lang.reflect.Proxy.newProxyInstance(
+        delegate.getClass().getClassLoader(),
+        proxyInterfaces,
+        (proxy, method, args) -> {
+          String name = method.getName();
+          if ("isOp".equals(name)) return true;
+          if ("hasPermission".equals(name)) return true;
+          if ("isPermissionSet".equals(name)) return true;
+          if ("sendMessage".equals(name) && args != null && args.length > 0) {
+            if (lineConsumer != null) {
+              for (Object arg : args) {
+                if (arg instanceof String s) {
+                  lineConsumer.accept(s);
+                } else if (arg instanceof String[] arr) {
+                  for (String s : arr) {
+                    if (s != null) lineConsumer.accept(s);
+                  }
+                } else if (arg != null) {
+                  String text = extractPlainTextFromComponent(arg);
+                  if (text != null && !text.isBlank()) {
+                    lineConsumer.accept(text);
+                  }
+                }
+              }
+            }
+            return null;
+          }
+          if ("sendFeedback".equals(name) && args != null && args.length > 0) {
+            if (lineConsumer != null && args[0] != null) {
+              lineConsumer.accept(args[0].toString());
+            }
+            return null;
+          }
+          return method.invoke(delegate, args);
+        });
+  }
+
+  private static String extractPlainTextFromComponent(Object comp) {
+    if (comp == null) return null;
+    try {
+      // 1. Spigot BaseComponent toPlainText()
+      java.lang.reflect.Method m = comp.getClass().getMethod("toPlainText");
+      return (String) m.invoke(comp);
+    } catch (Throwable ignored) {}
+
+    try {
+      // 2. Adventure PlainTextComponentSerializer.plainText().serialize(Component)
+      Class<?> serializerClass = Class.forName("net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer");
+      java.lang.reflect.Method plainTextGetter = serializerClass.getMethod("plainText");
+      Object instance = plainTextGetter.invoke(null);
+      Class<?> compClass = Class.forName("net.kyori.adventure.text.Component");
+      java.lang.reflect.Method serializeMethod = serializerClass.getMethod("serialize", compClass);
+      return (String) serializeMethod.invoke(instance, comp);
+    } catch (Throwable ignored) {}
+
+    return comp.toString();
+  }
+
+  @Override
+  public Set<String> getScoreboardTags(UUID playerId) {
+    if (playerId == null) return Collections.emptySet();
+    try {
+      Player player = Bukkit.getPlayer(playerId);
+      if (player == null) return Collections.emptySet();
+      Set<String> tags = player.getScoreboardTags();
+      if (tags == null || tags.isEmpty()) return Collections.emptySet();
+      return Collections.unmodifiableSet(new java.util.HashSet<>(tags));
+    } catch (Throwable t) {
+      return Collections.emptySet();
+    }
+  }
+
+  @Override
+  public boolean addScoreboardTag(UUID playerId, String tag) {
+    if (playerId == null || tag == null || tag.isBlank()) return false;
+    try {
+      Player player = Bukkit.getPlayer(playerId);
+      if (player == null) return false;
+      return player.addScoreboardTag(tag);
+    } catch (Throwable t) {
+      return false;
+    }
+  }
+
+  @Override
+  public boolean removeScoreboardTag(UUID playerId, String tag) {
+    if (playerId == null || tag == null || tag.isBlank()) return false;
+    try {
+      Player player = Bukkit.getPlayer(playerId);
+      if (player == null) return false;
+      return player.removeScoreboardTag(tag);
+    } catch (Throwable t) {
+      return false;
+    }
+  }
+
+  @Override
+  public void ensureScoreboardObjective(String objective, @Nullable String criteria) {
+    if (objective == null || objective.isBlank()) return;
+    try {
+      org.bukkit.scoreboard.ScoreboardManager mgr = Bukkit.getScoreboardManager();
+      if (mgr == null) return;
+      org.bukkit.scoreboard.Scoreboard board = mgr.getMainScoreboard();
+      if (board.getObjective(objective) == null) {
+        String crit = (criteria != null && !criteria.isBlank()) ? criteria : "dummy";
+        board.registerNewObjective(objective, crit, objective);
+      }
+    } catch (Throwable ignored) {
+      // Scoreboard objective registration failure ignored on legacy or mocked Bukkit implementations.
+    }
+  }
+
+  @Override
+  public void setScoreboardScore(UUID playerId, String objective, int score) {
+    if (playerId == null || objective == null || objective.isBlank()) return;
+    try {
+      org.bukkit.scoreboard.ScoreboardManager mgr = Bukkit.getScoreboardManager();
+      if (mgr == null) return;
+      org.bukkit.scoreboard.Scoreboard board = mgr.getMainScoreboard();
+      org.bukkit.scoreboard.Objective obj = board.getObjective(objective);
+      if (obj == null) {
+        obj = board.registerNewObjective(objective, "dummy", objective);
+      }
+      Player player = Bukkit.getPlayer(playerId);
+      String entry = (player != null) ? player.getName() : playerId.toString();
+      obj.getScore(entry).setScore(score);
+    } catch (Throwable ignored) {
+      // Scoreboard score update failure ignored on legacy or mocked Bukkit implementations.
+    }
+  }
+
+  @Override
+  public void resetScoreboardScore(UUID playerId, @Nullable String objective) {
+    if (playerId == null) return;
+    try {
+      org.bukkit.scoreboard.ScoreboardManager mgr = Bukkit.getScoreboardManager();
+      if (mgr == null) return;
+      org.bukkit.scoreboard.Scoreboard board = mgr.getMainScoreboard();
+      Player player = Bukkit.getPlayer(playerId);
+      String entry = (player != null) ? player.getName() : playerId.toString();
+      if (objective != null && !objective.isBlank()) {
+        org.bukkit.scoreboard.Objective obj = board.getObjective(objective);
+        if (obj != null) {
+          resetObjectiveScore(board, obj, entry);
+        }
+      } else {
+        board.resetScores(entry);
+      }
+    } catch (Throwable ignored) {
+      // Scoreboard score reset failure ignored on legacy or mocked Bukkit implementations.
+    }
+  }
+
+  /**
+   * Clears {@code entry} from {@code obj} only. {@code Scoreboard.resetScores(entry)} wipes the entry
+   * from every objective on the board (kill counters, datapack economies), so it is used only after
+   * snapshotting the entry's other scores, which are then restored. {@code Score.resetScore()} (1.20.4+)
+   * is preferred when present; the compile target (1.20.1) lacks it, hence reflection.
+   */
+  static void resetObjectiveScore(
+      org.bukkit.scoreboard.Scoreboard board, org.bukkit.scoreboard.Objective obj, String entry) {
+    org.bukkit.scoreboard.Score target = obj.getScore(entry);
+    if (!target.isScoreSet()) return;
+    try {
+      // Resolve on the API interface: CraftScore is package-private, so its own Method is not invokable.
+      java.lang.reflect.Method reset = org.bukkit.scoreboard.Score.class.getMethod("resetScore");
+      reset.invoke(target);
+      return;
+    } catch (ReflectiveOperationException | LinkageError ignored) {
+      // Pre-1.20.4 server: fall through to snapshot-and-restore.
+    }
+    Map<org.bukkit.scoreboard.Objective, Integer> others = new HashMap<>();
+    for (org.bukkit.scoreboard.Objective other : board.getObjectives()) {
+      if (other.getName().equals(obj.getName())) continue;
+      org.bukkit.scoreboard.Score s = other.getScore(entry);
+      if (s.isScoreSet()) others.put(other, s.getScore());
+    }
+    board.resetScores(entry);
+    for (Map.Entry<org.bukkit.scoreboard.Objective, Integer> e : others.entrySet()) {
+      e.getKey().getScore(entry).setScore(e.getValue());
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Per-player WorldBorder packet SPI (ADR-093 confinement visuals)
+  // ---------------------------------------------------------------------------
+
+  @Override
+  public void sendWorldBorder(UUID playerId, double centerX, double centerZ, double size) {
+    sendWorldBorder(playerId, centerX, centerZ, size, size, 0L);
+  }
+
+  @Override
+  public void sendWorldBorder(
+      UUID playerId, double centerX, double centerZ, double oldSize, double newSize, long shrinkSeconds) {
+    sendWorldBorder(playerId, centerX, centerZ, oldSize, newSize, shrinkSeconds, 0.0, 0.0);
+  }
+
+  @Override
+  public void sendWorldBorder(
+      UUID playerId,
+      double centerX,
+      double centerZ,
+      double oldSize,
+      double newSize,
+      long shrinkSeconds,
+      double damageAmount,
+      double damageBuffer) {
+    if (playerId == null) return;
+    try {
+      Player player = Bukkit.getPlayer(playerId);
+      if (player == null || !player.isOnline()) return;
+      org.bukkit.WorldBorder border = Bukkit.createWorldBorder();
+      border.setCenter(centerX, centerZ);
+      double start = Math.max(1.0, oldSize);
+      double end = Math.max(1.0, newSize);
+      border.setSize(start);
+      if (shrinkSeconds > 0L && Double.compare(start, end) != 0) {
+        border.setSize(end, shrinkSeconds);
+      }
+      if (damageAmount > 0.0) {
+        try {
+          border.setDamageAmount(damageAmount);
+          border.setDamageBuffer(damageBuffer);
+        } catch (Throwable ignored) {
+          // Methods setDamageAmount/setDamageBuffer may not exist on all Bukkit versions.
+        }
+      }
+      player.setWorldBorder(border);
+    } catch (Throwable t) {
+      log(Level.FINE, "[RTP] Failed to send per-player world border to " + playerId, t);
+    }
+  }
+
+  @Override
+  public void damagePlayer(UUID playerId, double amount) {
+    if (playerId == null || amount <= 0.0) return;
+    try {
+      Player player = Bukkit.getPlayer(playerId);
+      if (player == null || !player.isOnline()) return;
+      io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer = wrapPlayer(player);
+
+      io.github.dailystruggle.rtp.common.tasks.RTPRunnable damageTask =
+          new io.github.dailystruggle.rtp.common.tasks.RTPRunnable() {
+            @Override
+            public void run() {
+              try {
+                if (player.isOnline() && !player.isDead()) {
+                  player.damage(amount);
+                }
+              } catch (Throwable ignored) {
+                // Player damage may fail if player disconnected or became invalid.
+              }
+            }
+          };
+
+      if (io.github.dailystruggle.rtp.common.RTP.scheduler != null) {
+        io.github.dailystruggle.rtp.common.RTP.scheduler.runTaskForPlayer(rtpPlayer, damageTask, 0L);
+      } else {
+        damageTask.run();
+      }
+    } catch (Throwable t) {
+      log(Level.FINE, "[RTP] Failed to apply damage to player " + playerId, t);
+    }
+  }
+
+  @Override
+  public void resetWorldBorder(UUID playerId) {
+    if (playerId == null) return;
+    try {
+      Player player = Bukkit.getPlayer(playerId);
+      if (player == null || !player.isOnline()) return;
+      player.setWorldBorder(null);
+    } catch (Throwable t) {
+      log(Level.FINE, "[RTP] Failed to reset per-player world border for " + playerId, t);
+    }
   }
 
   // ---------------------------------------------------------------------------
   // Palette identifier normalization & reconciliation SPI
   // ---------------------------------------------------------------------------
 
+  /**
+   * Raw palette name to reconciled name. {@code Material.matchMaterial} compiles a regex per
+   * call and safety scans hit it per block name; the material set is fixed for the server's
+   * lifetime, so answers never go stale.
+   */
+  private final java.util.concurrent.ConcurrentHashMap<String, String> paletteIdentifierMemo =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
+  /** Bound on memoized names; palettes carry a few thousand distinct block ids at most. */
+  private static final int PALETTE_MEMO_MAX = 8192;
+
   @Override
   public String reconcilePaletteIdentifier(String raw) {
     if (raw == null) return null;
+    String memo = paletteIdentifierMemo.get(raw);
+    if (memo != null) return memo;
+    String reconciled = reconcilePaletteIdentifierUncached(raw);
+    if (reconciled != null && paletteIdentifierMemo.size() < PALETTE_MEMO_MAX) {
+      paletteIdentifierMemo.putIfAbsent(raw, reconciled);
+    }
+    return reconciled;
+  }
+
+  private static String reconcilePaletteIdentifierUncached(String raw) {
     try {
       Material material = Material.matchMaterial(raw);
       if (material != null) return material.name();
@@ -916,5 +1465,24 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       // Material lookup threw; fall back to normalizer
     }
     return io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(raw);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cartography MapBinding SPI (ADR-047 / REQ-RTP-MAP-006)
+  // ---------------------------------------------------------------------------
+
+  @Override
+  public void setupMapBinding() {
+    try {
+      io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding binding =
+          new io.github.dailystruggle.mapsapi.bukkit.BukkitMapBinding();
+      io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.setMapBinding(binding);
+      RTP.log(Level.FINE,
+          "[RTP] setupMapBinding installed " + binding.getClass().getSimpleName()
+              + " via MapDispatch");
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[RTP] setupMapBinding failed; MapDispatch will fall back to NoopMapBinding", t);
+    }
   }
 }

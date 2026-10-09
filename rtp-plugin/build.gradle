@@ -68,6 +68,14 @@ configurations {
             attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 25)
         }
     }
+    fabric263Bytecode {
+        canBeResolved = true
+        canBeConsumed = false
+        transitive = false
+        attributes {
+            attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 25)
+        }
+    }
     // Bytecode-only configuration for the JDK-25 / unobf-Loom-compiled
     // `rtp-fabric-common-unobf` carrier. Same variant-incompatibility
     // story as `fabric26Bytecode` above: the module's published variant
@@ -198,6 +206,10 @@ dependencies {
     // See rtp-fabric-ADR-014.
     fabric262Bytecode project(':rtp-fabric:rtp-fabric-v26_2_R1')
 
+    // MC 26.3 adapter. Resolved by FQN at runtime (RTPFabricMod#adapterFqnFor),
+    // merged post-remap like v26_2_R1. See rtp-fabric-ADR-015.
+    fabric263Bytecode project(':rtp-fabric:rtp-fabric-v26_3_R1')
+
     // Sibling to fabric26Bytecode above. The unobf carrier hosts the
     // Mojang-named NM-typed surfaces (FabricEffectsHandlerUnobf, the
     // *Unobf world/chunk/player wrappers) consumed by the 26.1+
@@ -304,8 +316,8 @@ dependencies {
     compileOnly 'com.github.sirblobman.combatlogx:api:11.7-SNAPSHOT'
     compileOnly('me.chancesd.pvpmanager:pvpmanager:4.0.8') { transitive = false }
 
-    implementation 'org.bstats:bstats-bukkit:3.0.3'
-    implementation 'xyz.tozymc.spigot:title-api:1.0'
+    // bStats: no third-party library; the in-tree :bstats-api client arrives
+    // transitively via rtp-core (bstats-api-ADR-001).
 
     // JDBC drivers (H2, SQLite, MySQL, PostgreSQL) are intentionally NOT bundled.
     // We cannot shade in every database dependency (size, license, native binaries),
@@ -317,33 +329,21 @@ dependencies {
 }
 
 tasks.register('copyDocs', Copy) {
-    // Ship only audience-A (server admin) docs. Addon-author material
-    // (`FOR_ADDON_DEVELOPERS.md`, `ADDON_QUICKSTART.md`, ...) is API/
-    // developer-facing, not operator runbook content, so it is NOT bundled
-    // in the released jar -- it stays available in the public repository and
-    // is linked from the bundled `MAP.md` via an absolute GitHub URL.
-    // Contributor-facing material (`docs/dev/**`, `docs/adr/**`,
-    // `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `FOR_CONTRIBUTORS.md`,
-    // SpigotMC `*.bbcode` listing sources, `DOCS_OPTIMIZATION_PLAN.md`, ...)
-    // is intentionally NOT bundled — it remains available in the public
-    // repository. The `docs/admin/**` tree stays in the jar so admins who
-    // unzip the release can read Quick Start, Configuration, etc., without
-    // needing GitHub access. The `docs/architecture/**` tree is contributor-
-    // facing internals and is NOT bundled (see the `from` block below).
-    // See CHANGELOG `[3.0.0-beta.2]`.
+    // Ship only essential operator-facing docs for offline reference.
+    // Deep developer/contributor material (`docs/dev/**`, `docs/adr/**`,
+    // `docs/architecture/**`, `docs/site/**`, test verifications, hazards catalogs)
+    // and internal catalogs (`MAP.md`) are NOT bundled in the released jar — they stay
+    // available on the documentation website and public repository.
+    // The operator docs (`docs/admin/**` excluding internal verification runbooks and
+    // hazards) are bundled so admins can access configuration references and quick starts
+    // without internet access.
     from(rootProject.file('docs')) {
-        // Top-level audience landing pages (the ones that actually live under docs/).
-        include 'MAP.md'
         include 'FOR_SERVER_ADMINS.md'
-        // Audience-A: operator-facing server-admin docs only.
         include 'admin/**'
-        // The `architecture/**` tree (per-attempt pipeline internals, chunk-
-        // ticket lifecycle, active-GC sweep, network model, etc.) is
-        // developer/contributor material, not operator runbook content. It is
-        // intentionally NOT bundled in the released jar (size: ~78KB) -- it
-        // stays available in the public repository for contributors. Admins
-        // who unzip the release still get the full `admin/**` operational set
-        // (Quick Start, Configuration, Commands, Hazards, Runbook, proxies...).
+        // Internal test runbooks and risk registers are developer docs, not operator guides:
+        exclude 'admin/HAZARDS.md'
+        exclude 'admin/proxies/*VERIFICATION.md'
+        exclude 'admin/REGION_FILE_READING.md'
     }
     from(rootProject.projectDir) {
         include 'LICENSE'
@@ -429,6 +429,17 @@ if (countdownAddonProject != null) {
     evaluationDependsOn(':addons:LeafRTPCountdownAddon')
     countdownAddonJarTask = countdownAddonProject.tasks.named('jar')
     countdownAddonJarProvider = countdownAddonJarTask.flatMap { it.archiveFile }
+}
+
+// Bundled declarative scripted actions addon (LeafRTPActionAddon).
+// Platform-neutral module, plain `jar` (ADR-093, ADR-057). Bundled and self-extracted.
+def actionAddonProject = findProject(':addons:LeafRTPActionAddon')
+def actionAddonJarTask = null
+def actionAddonJarProvider = null
+if (actionAddonProject != null) {
+    evaluationDependsOn(':addons:LeafRTPActionAddon')
+    actionAddonJarTask = actionAddonProject.tasks.named('jar')
+    actionAddonJarProvider = actionAddonJarTask.flatMap { it.archiveFile }
 }
 
 // Appends `srcJar` into `out` (a built RTP jar) as `bundled-addons/<destName>`,
@@ -559,18 +570,13 @@ shadowJar {
     // survive into the packaged jar.
     exclude 'docs/architecture/**'
 
-    relocate 'org.bstats', 'io.github.dailystruggle.rtp.bstats'
-    // commands-api and effects-api are RTP's public addon SPIs and ship
-    // UNRELOCATED: addons depend on them `compileOnly` and resolve
-    // io.github.dailystruggle.{commandsapi,effectsapi}.* from the plugin jar at
-    // runtime (e.g. AddonRegistry's ServiceLoader, and the reflective
-    // Class.forName("io.github.dailystruggle.effectsapi.common.EffectFactory")
-    // permission probe). Relocating them broke that link.
-    relocate 'com.zaxxer.hikari', 'io.github.dailystruggle.rtp.hikari'
-    // org.lz4:lz4-java exposes its API under net.jpountz.* (legacy package).
-    // Required at runtime by rtp-anvil for LZ4-compressed chunk decode.
-    // Relocate to avoid clashing with other plugins shading the same lib.
-    relocate 'net.jpountz', 'io.github.dailystruggle.rtp.lz4'
+    // Compile-time static analysis / annotation processor tooling (Folia thread check)
+    exclude 'META-INF/services/javax.annotation.processing.Processor'
+    exclude 'folia-thread-stubs.astub'
+
+    // Multi-release module descriptors (e.g. SnakeYAML 2.x) name pre-relocation packages
+    // and are meaningless inside a shaded plugin jar.
+    exclude 'META-INF/versions/*/module-info.class'
 
     // The JDK-25 v26_1_R1 adapter bytecode is INTENTIONALLY NOT merged here.
     //
@@ -588,10 +594,8 @@ shadowJar {
     // Solution: merge v26_1_R1 bytecode AFTER remapJar via the `mergeV26`
     // task below, so its classes survive intact.
     //
-    // NOTE: shadowJar's `minimize()` is deliberately NOT used here. The heavy
-    // shaded libs are either reflectively driven (Jedis pub/sub, lz4 Safe/
-    // Unsafe variant selection) or relocated into our own namespace (Hikari,
-    // bstats), and every published RTP module exposes an addon-facing API plus
+    // NOTE: shadowJar's `minimize()` is deliberately NOT used here. Every
+    // published RTP module exposes an addon-facing API plus
     // descriptor-loaded platform entry points (RTPFabricMod, the Velocity main,
     // plugin.yml main) that static reachability analysis cannot see. Under
     // those constraints minimize() would trim only a few KB of genuinely-unused
@@ -966,12 +970,14 @@ ext.mergeNeoForgeBytecodeIntoJar = { File out, String editionLabel, List<File> c
 remapJar {
     dependsOn ':rtp-fabric:rtp-fabric-v26_1_R1:jar'
     dependsOn ':rtp-fabric:rtp-fabric-v26_2_R1:jar'
+    dependsOn ':rtp-fabric:rtp-fabric-v26_3_R1:jar'
     dependsOn ':rtp-fabric:rtp-fabric-common-unobf:jar'
     // Resolve carrier jars and capture the merge closure at configuration
     // time so doLast does not invoke Task.project at execution time
     // (deprecated in Gradle 9, fatal in Gradle 10).
     def v26Jar = project.configurations.fabric26Bytecode
     def v262Jar = project.configurations.fabric262Bytecode
+    def v263Jar = project.configurations.fabric263Bytecode
     def commonUnobfJar = project.configurations.fabricCommonUnobfBytecode
     def effectsUnobfJar = project.configurations.effectsApiFabricUnobfBytecode
     def mergeFn = project.ext.mergeFabricUnobfBytecodeIntoJar
@@ -984,7 +990,7 @@ remapJar {
     // stays UP-TO-DATE, its doLast never re-runs, and the shipped jar keeps
     // stale carrier bytecode. Declare the carrier configurations as inputs so
     // any carrier change re-triggers the remap+merge.
-    inputs.files(v26Jar, v262Jar, commonUnobfJar, effectsUnobfJar)
+    inputs.files(v26Jar, v262Jar, v263Jar, commonUnobfJar, effectsUnobfJar)
             .withPropertyName('fabricUnobfCarrierBytecode')
     // NeoForge merge (unified single-jar): resolve the NeoForge carrier jars and
     // the merge closure at configuration time. Present only when the NeoForge
@@ -1026,6 +1032,10 @@ remapJar {
     if (countdownAddonJarTask != null) dependsOn countdownAddonJarTask
     def countdownAddonJarFile = countdownAddonJarProvider == null ? null : countdownAddonJarProvider.get().asFile
     if (countdownAddonJarFile != null) inputs.file(countdownAddonJarFile).withPropertyName('bundledCountdownAddonJar')
+    // Bundled action addon jar (parity with the GUI/claim/countdown addons above).
+    if (actionAddonJarTask != null) dependsOn actionAddonJarTask
+    def actionAddonJarFile = actionAddonJarProvider == null ? null : actionAddonJarProvider.get().asFile
+    if (actionAddonJarFile != null) inputs.file(actionAddonJarFile).withPropertyName('bundledActionAddonJar')
     doLast {
         mergeFn(remapJar.archiveFile.get().asFile, 'Pro',
                 v26Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
@@ -1034,6 +1044,9 @@ remapJar {
         // check), so only the v26_2_R1 adapter classes are added.
         mergeFn(remapJar.archiveFile.get().asFile, 'Pro (26.2)',
                 v262Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
+        // Third pass merges the 26.3 adapter.
+        mergeFn(remapJar.archiveFile.get().asFile, 'Pro (26.3)',
+                v263Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
         // Final pass merges the NeoForge platform carriers + neoforge.mods.toml
         // so the same LeafRTP-Pro jar loads on NeoForge too. Skipped entirely
         // when NeoForge was excluded from the build graph.
@@ -1053,6 +1066,10 @@ remapJar {
         // Append the bundled reference/event-hook demo addon jar the same way.
         if (countdownAddonJarFile != null) {
             injectAddonFn(remapJar.archiveFile.get().asFile, countdownAddonJarFile, 'LeafRTPCountdownAddon.jar')
+        }
+        // Append the bundled action addon jar the same way.
+        if (actionAddonJarFile != null) {
+            injectAddonFn(remapJar.archiveFile.get().asFile, actionAddonJarFile, 'LeafRTPActionAddon.jar')
         }
     }
 }
@@ -1172,9 +1189,8 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
         // from the Pro source set for config/locale parity -- lite no longer
         // ships reduced overlays of them.
     }
-    // The lite binary is MIT-licensed (ADR-061): ship the MIT text as the
-    // in-jar LICENSE, not the repo-root PolyForm Noncommercial LICENSE (which
-    // governs the Pro-only source). Renamed in-jar to `LICENSE` so existing
+    // Both binaries are MIT-licensed (ADR-108); the lite jar ships LICENSE-MIT
+    // (identical to the root LICENSE) renamed to `LICENSE` so existing
     // consumers/tooling still find it at the conventional path.
     from(rootProject.file('LICENSE-MIT')) {
         rename { 'LICENSE' }
@@ -1216,20 +1232,13 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
             !(dep.group == 'org.spongepowered') &&
             !(dep.group == 'org.slf4j') &&
             !(dep.group == 'net.minecrell') &&
-            // ADR-024 specific: SQL/Redis drivers.
-            !(dep.group == 'com.h2database') &&
-            !(dep.group == 'org.xerial' && dep.name == 'sqlite-jdbc') &&
-            !(dep.group == 'mysql') &&
-            !(dep.group == 'org.postgresql') &&
-            !(dep.group == 'redis.clients') &&
-            !(dep.group == 'com.zaxxer') &&
-            // Loom/Mojang networking transitives -- not used by lite runtime.
+            // SQL/Redis persistence drivers and accessors are retained in lite
+            // for complete backend parity (retroactive early-access graduation).
             !(dep.group == 'org.apache.httpcomponents') &&
-            // org.lz4:lz4-java is REQUIRED at runtime by rtp-anvil's chunk
-            // decompression path (compression mode 4 in r.X.Z.mca). rtp-anvil
-            // is intentionally kept in lite, so its lz4 transitive must be too.
-            // Stripping it caused NoClassDefFoundError: net/jpountz/lz4/LZ4FrameInputStream
-            // on every Anvil probe of an LZ4-compressed chunk. Relocated below.
+            // lz4-java arrives as a Loom-listed Minecraft library. RTP decodes LZ4
+            // in-house (ADR-016 section 15) and must not ship it.
+            !(dep.group == 'org.lz4') &&
+            !(dep.group == 'at.yawk.lz4') &&
             !(dep.group == 'org.jline') &&
             !(dep.group == 'org.json') &&
             !(dep.group == 'com.mojang')
@@ -1257,36 +1266,29 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
         exclude(dependency('net.fabricmc:fabric-loader'))
         exclude(dependency('net.fabricmc.fabric-api:.*'))
         exclude(dependency('net.fabricmc:.*'))
-        // ADR-024:
+        // Mojang/Loom logging/console strips
         exclude(dependency('net.minecrell:.*'))
-        exclude(dependency('com.h2database:.*'))
-        exclude(dependency('org.xerial:sqlite-jdbc'))
-        exclude(dependency('mysql:.*'))
-        exclude(dependency('org.postgresql:.*'))
-        exclude(dependency('redis.clients:.*'))
-        exclude(dependency('com.zaxxer:.*'))
         exclude(dependency('org.apache.httpcomponents:.*'))
-        // org.lz4:lz4-java retained -- see comment in configurations filter above.
+        exclude(dependency('org.lz4:.*'))
+        exclude(dependency('at.yawk.lz4:.*'))
         exclude(dependency('org.jline:.*'))
         exclude(dependency('org.json:.*'))
     }
 
-    // Class-level excludes -- ADR-024 drops list (as amended 2026-05-07: Fabric retained in lite).
+    // Class-level excludes -- ADR-024 drops list (as amended by ADR-100 technical parity).
     // NOTE: rtp-anvil is INTENTIONALLY KEPT in lite (ADR-024 reversal: performance parity
     // with Pro for benchmark comparisons; BukkitRTPWorld hard-references AnvilProbeSupport).
-    // NOTE: Fabric (RTPFabricMod + rtp-fabric-common classes) is INTENTIONALLY KEPT in lite
-    // as of the 2026-05-07 ADR-024 amendment. Lite still ships no JDBC drivers, so Fabric+lite
-    // falls through FabricDatabaseHandler.setupDatabase to YamlFileDatabase (loud warning).
-    exclude 'io/github/dailystruggle/rtp/tags/**'
-    exclude 'io/github/dailystruggle/rtp/folia/**'
-    exclude 'io/github/dailystruggle/rtp/folia_*/**'
+    // NOTE: Fabric, Folia, SQL, Redis, and the safety tag/predicate grammar (rtp-api
+    // SafetyTokenParser + rtp-core SafetyTokenExpander) are INTENTIONALLY KEPT in lite
+    // per ADR-100 / ADR-108 parity. `:tags-api` is a dependency of neither jar.
     // Networking/CLI transitives pulled in by Loom -- unused at runtime in lite.
     exclude 'org/apache/http/**'
     exclude 'org/apache/commons/**'
     exclude 'org/jline/**'
     exclude 'org/json/**'
-    // net/jpountz/** retained -- rtp-anvil needs LZ4FrameInputStream at runtime.
-    // Relocated to io.github.dailystruggle.rtp.lz4 below.
+    // lz4-java classes and JNI binaries (see dependency filter above).
+    exclude 'net/jpountz/**'
+    exclude '**/liblz4-java.*'
     exclude 'mozilla/**'
     exclude 'flightrecorder-config.jfc'
     // ADR-024 Phase B audit: Mojang/MC asset stubs and version manifest leak past
@@ -1309,33 +1311,11 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     exclude 'org/jetbrains/annotations/**'
     exclude 'org/intellij/lang/annotations/**'
     exclude 'META-INF/maven/**'
-    exclude 'io/github/dailystruggle/rtp/common/database/options/H2*.class'
-    exclude 'io/github/dailystruggle/rtp/common/database/options/SQLite*.class'
-    exclude 'io/github/dailystruggle/rtp/common/database/options/MySQL*.class'
-    exclude 'io/github/dailystruggle/rtp/common/database/options/Postgre*.class'
-    // AbstractSQLDatabaseAccessor is INTENTIONALLY KEPT in lite: RTP.java references it via
-    // `instanceof` in a scheduled flush task. Excluding it caused NoClassDefFoundError at
-    // runtime. The concrete H2/SQLite/MySQL/Postgres subclasses remain excluded, so the
-    // instanceof check is always false in lite.
-    exclude 'io/github/dailystruggle/rtp/common/network/Redis*.class'
-    // ADR-024 2026-06-12 amendment (plugin-message tier-1 default): the durable
-    // Redis/SQL NetworkTransport bindings live in rtp-proxy-common's transport
-    // subpackages and are pulled in transitively via rtp-core. They stay Pro --
-    // drop the whole redis/ and sql/ transport subtrees from lite. The
-    // plugin-message tier (common/network/pluginmessage/**), the shared codec,
-    // the in-memory binding, NetworkBindings, and ReservationTokenReaper are
-    // intentionally KEPT (the plugin-message binding rides them; no driver).
-    // NetworkModeBootstrap (rtp-core) imports RedisNetworkStateBinding directly,
-    // but lite defaults to transport.type=auto/plugin-message so the redis/sql
-    // code paths are never linked at runtime -- same lazy-link pattern as the
-    // excluded H2/SQLite/MySQL/Postgres concrete database options above.
-    exclude 'io/github/dailystruggle/rtp/proxy/common/transport/redis/**'
-    exclude 'io/github/dailystruggle/rtp/proxy/common/transport/sql/**'
-    exclude 'io/github/dailystruggle/rtp/common/selection/region/LoginCacheTask.class'
-    // HikariCP -- pulled in transitively but only used by SQL accessors which lite drops.
-    exclude 'com/zaxxer/hikari/**'
-    exclude 'io/github/dailystruggle/rtp/hikari/**'
-    exclude 'META-INF/maven/com.zaxxer/**'
+
+    // Multi-release module descriptors -- see the matching note in the Pro shadowJar.
+    exclude 'META-INF/versions/*/module-info.class'
+    // Concrete SQL database options, LoginCacheTask, and Redis transport are INTENTIONALLY KEPT in lite
+    // for full storage, parity, and feature completeness (ADR-100).
     // Resources dropped from lite.
     // lang/** and language.yml are INTENTIONALLY KEPT in lite as of 2026-05-11
     // (ADR-024 language-options amendment): multilingual support / locale switching
@@ -1385,14 +1365,9 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     // (plugin.yml, performance.yml, config.yml, ...).
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
-    // Same relocations as full, minus H2 (not shaded).
-    relocate 'org.bstats', 'io.github.dailystruggle.rtp.bstats'
-    // commands-api and effects-api are RTP's public addon SPIs and ship
-    // unrelocated so addons (compileOnly against them) link at runtime. See the
-    // matching note in the Pro shadowJar relocate block above.
-    // org.lz4:lz4-java exposes its API under net.jpountz.* (legacy package).
-    // Relocate to avoid clashing with any other plugin shading the same lib.
-    relocate 'net.jpountz', 'io.github.dailystruggle.rtp.lz4'
+    // No relocations: no third-party library is shaded. commands-api and
+    // effects-api are RTP's public addon SPIs and ship unrelocated so addons
+    // (compileOnly against them) link at runtime.
 
     // Lite ships the same operator docs as Pro; copyDocs (a processResources
     // dependency) stages them into the main resources output that this jar
@@ -1416,6 +1391,7 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
     dependsOn tasks.named('shadowLiteJar')
     dependsOn ':rtp-fabric:rtp-fabric-v26_1_R1:jar'
     dependsOn ':rtp-fabric:rtp-fabric-v26_2_R1:jar'
+    dependsOn ':rtp-fabric:rtp-fabric-v26_3_R1:jar'
     dependsOn ':rtp-fabric:rtp-fabric-common-unobf:jar'
     dependsOn ':effects-api:effects-api-fabric-unobf:jar'
 
@@ -1429,6 +1405,7 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
     // (deprecated in Gradle 9, fatal in Gradle 10).
     def v26Jar = project.configurations.fabric26Bytecode
     def v262Jar = project.configurations.fabric262Bytecode
+    def v263Jar = project.configurations.fabric263Bytecode
     def commonUnobfJar = project.configurations.fabricCommonUnobfBytecode
     def effectsUnobfJar = project.configurations.effectsApiFabricUnobfBytecode
     def mergeFn = project.ext.mergeFabricUnobfBytecodeIntoJar
@@ -1436,7 +1413,7 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
     // doLast and are not part of inputFile (shadowLiteJar). Declare them as
     // inputs so a carrier-only change re-triggers the remap+merge instead of
     // leaving stale carrier bytecode in an UP-TO-DATE lite jar.
-    inputs.files(v26Jar, v262Jar, commonUnobfJar, effectsUnobfJar)
+    inputs.files(v26Jar, v262Jar, v263Jar, commonUnobfJar, effectsUnobfJar)
             .withPropertyName('fabricUnobfCarrierBytecode')
     // NeoForge merge for the lite jar (same rationale as Pro's remapJar): the
     // single LeafRTP jar must also carry META-INF/neoforge.mods.toml + the
@@ -1479,6 +1456,10 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
     if (countdownAddonJarTask != null) dependsOn countdownAddonJarTask
     def countdownAddonJarFile = countdownAddonJarProvider == null ? null : countdownAddonJarProvider.get().asFile
     if (countdownAddonJarFile != null) inputs.file(countdownAddonJarFile).withPropertyName('bundledCountdownAddonJar')
+    // Bundled action addon jar (parity with Pro's remapJar).
+    if (actionAddonJarTask != null) dependsOn actionAddonJarTask
+    def actionAddonJarFile = actionAddonJarProvider == null ? null : actionAddonJarProvider.get().asFile
+    if (actionAddonJarFile != null) inputs.file(actionAddonJarFile).withPropertyName('bundledActionAddonJar')
 
     doLast {
         mergeFn(remapLiteJar.archiveFile.get().asFile, 'lite',
@@ -1487,6 +1468,9 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
         // present from the first pass are skipped). See rtp-fabric-ADR-014.
         mergeFn(remapLiteJar.archiveFile.get().asFile, 'lite (26.2)',
                 v262Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
+        // Third pass merges the 26.3 adapter. See rtp-fabric-ADR-015.
+        mergeFn(remapLiteJar.archiveFile.get().asFile, 'lite (26.3)',
+                v263Jar.singleFile, commonUnobfJar.singleFile, effectsUnobfJar.singleFile)
         // Final pass merges the NeoForge platform carriers + neoforge.mods.toml
         // so the same LeafRTP (lite) jar loads on NeoForge too. Skipped entirely
         // when NeoForge was excluded from the build graph.
@@ -1507,12 +1491,16 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
         if (countdownAddonJarFile != null) {
             injectAddonFn(remapLiteJar.archiveFile.get().asFile, countdownAddonJarFile, 'LeafRTPCountdownAddon.jar')
         }
+        // Append the bundled action addon jar the same way.
+        if (actionAddonJarFile != null) {
+            injectAddonFn(remapLiteJar.archiveFile.get().asFile, actionAddonJarFile, 'LeafRTPActionAddon.jar')
+        }
     }
 }
 
 tasks.register('liteJarStructureCheck') {
     group = 'verification'
-    description = 'Asserts that the RTP (lite) JAR contains no forbidden entries (ADR-024).'
+    description = 'Asserts that the RTP (lite) JAR contains no forbidden entries (ADR-024 / ADR-100).'
     dependsOn tasks.named('remapLiteJar')
 
     doLast {
@@ -1521,28 +1509,13 @@ tasks.register('liteJarStructureCheck') {
             throw new GradleException("ADR-024 structure check: lite JAR not found at ${jarFile}")
         }
         def forbidden = [
-            // anvil intentionally retained in lite (see shadowLiteJar comment).
-            ~'^io/github/dailystruggle/rtp/tags/.*$',
-            ~'^io/github/dailystruggle/rtp/folia/.*$',
-            ~'^io/github/dailystruggle/rtp/folia_.*$',
+            // anvil and the safety tag/predicate grammar intentionally retained in lite
+            // (see shadowLiteJar comment).
+            // Folia intentionally retained in lite as of ADR-100 technical parity.
             // Fabric (rtp/fabric/**) intentionally retained in lite as of the 2026-05-07
             // ADR-024 amendment -- see shadowLiteJar comment.
             ~'^io/github/dailystruggle/rtp/bukkit/RTPBukkitPlugin\\$?.*\\.class$',
-            ~'^io/github/dailystruggle/rtp/common/database/options/H2.*\\.class$',
-            ~'^io/github/dailystruggle/rtp/common/database/options/SQLite.*\\.class$',
-            ~'^io/github/dailystruggle/rtp/common/database/options/MySQL.*\\.class$',
-            ~'^io/github/dailystruggle/rtp/common/database/options/Postgre.*\\.class$',
-            ~'^io/github/dailystruggle/rtp/common/network/Redis.*\\.class$',
-            // ADR-024 2026-06-12 amendment: durable Redis/SQL NetworkTransport
-            // bindings stay Pro; assert the whole redis/ and sql/ transport
-            // subtrees are absent from lite. The plugin-message tier, the shared
-            // codec, and the in-memory binding are permitted (asserted present
-            // below).
-            ~'^io/github/dailystruggle/rtp/proxy/common/transport/redis/.*$',
-            ~'^io/github/dailystruggle/rtp/proxy/common/transport/sql/.*$',
-            ~'^com/zaxxer/hikari/.*$',
-            ~'^io/github/dailystruggle/rtp/hikari/.*$',
-            ~'^io/github/dailystruggle/rtp/common/selection/region/LoginCacheTask\\.class$',
+            // SQL accessors, MiniConnectionPool, LoginCacheTask, and Redis transports are now retained in lite (ADR-100 parity).
             // lang/** and language.yml intentionally present in lite as of the
             // 2026-05-11 ADR-024 language-options amendment -- see shadowLiteJar comment.
             // economy.yml intentionally present in lite as of the 2026-06-01
@@ -1555,10 +1528,6 @@ tasks.register('liteJarStructureCheck') {
             // amendment -- lite ships the same operator docs as Pro.
             ~'^README\\.md$',
             ~'^CHANGELOG\\.md$',
-            ~'^org/h2/.*$',
-            ~'^org/sqlite/.*$',
-            ~'^com/mysql/.*$',
-            ~'^org/postgresql/.*$',
             ~'^redis/clients/.*$',
             // ADR-024 Phase B audit: assert no Mojang asset stubs / Loom leftovers.
             ~'^version\\.json$',
@@ -1624,24 +1593,24 @@ tasks.register('liteJarStructureCheck') {
                 missingRequired.sort().join('\n  '))
         }
 
-        // ADR-061: the lite binary is MIT-licensed. Assert the in-jar LICENSE
-        // is the MIT text and NOT the repo-root PolyForm Noncommercial license
-        // (which governs the Pro-only source).
+        // ADR-108: the lite binary is MIT-licensed. Assert the in-jar LICENSE is
+        // the MIT text; the PolyForm guard catches a regression to the pre-ADR-108
+        // open-core LICENSE (ADR-061, superseded).
         new java.util.zip.ZipFile(jarFile).withCloseable { zip ->
             def license = zip.getEntry('LICENSE')
             if (license == null) {
-                throw new GradleException("ADR-061 license check: LICENSE missing from lite JAR")
+                throw new GradleException("ADR-108 license check: LICENSE missing from lite JAR")
             }
             def licenseText = zip.getInputStream(license).getText('UTF-8')
             if (!licenseText.contains('MIT License')) {
                 throw new GradleException(
-                    "ADR-061 license check: lite JAR LICENSE is not the MIT text. " +
+                    "ADR-108 license check: lite JAR LICENSE is not the MIT text. " +
                     "Expected the MIT license (LICENSE-MIT), got:\n  " +
                     licenseText.readLines().take(3).join('\n  '))
             }
             if (licenseText.contains('PolyForm Noncommercial')) {
                 throw new GradleException(
-                    "ADR-061 license check: lite JAR LICENSE contains the PolyForm " +
+                    "ADR-108 license check: lite JAR LICENSE contains the PolyForm " +
                     "Noncommercial text. The lite binary must ship the MIT license only.")
             }
         }

@@ -88,22 +88,36 @@ public class BukkitRTPPlayer implements RTPPlayer {
     return new BukkitRTPPlayer(player);
   }
 
-  /**
-   * Class-probe for Folia. Cached: the runtime platform never changes mid-process. Lives here
-   * (not in the rtp-plugin {@code BukkitServerProvider}) because this Spigot-classpath module
-   * cannot reference it, and the basic Folia path in the free build needs an async teleport.
-   */
-  private static final boolean IS_FOLIA;
+  private static volatile java.lang.reflect.Method cachedTeleportAsync;
+  private static volatile boolean teleportAsyncResolved = false;
 
-  static {
-    boolean folia;
-    try {
-      Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
-      folia = true;
-    } catch (ClassNotFoundException e) {
-      folia = false;
+  private static java.lang.reflect.Method getTeleportAsyncMethod(Player p) {
+    if (!teleportAsyncResolved) {
+      synchronized (BukkitRTPPlayer.class) {
+        if (!teleportAsyncResolved) {
+          java.lang.reflect.Method m = null;
+          try {
+            m = p.getClass().getMethod("teleportAsync", Location.class);
+          } catch (Throwable t) {
+            try {
+              m = Player.class.getMethod("teleportAsync", Location.class);
+            } catch (Throwable ignored) {
+              m = null;
+            }
+          }
+          cachedTeleportAsync = m;
+          teleportAsyncResolved = true;
+        }
+      }
     }
-    IS_FOLIA = folia;
+    return cachedTeleportAsync;
+  }
+
+  static void resetTeleportAsyncResolutionForTesting() {
+    synchronized (BukkitRTPPlayer.class) {
+      cachedTeleportAsync = null;
+      teleportAsyncResolved = false;
+    }
   }
 
   @Override
@@ -112,20 +126,28 @@ public class BukkitRTPPlayer implements RTPPlayer {
     double x = to.x() + 0.5;
     double y = to.y();
     double z = to.z() + 0.5;
-    Location location = new Location(world, x, y, z);
+    Location current = player.getLocation();
+    Location location =
+        new Location(
+            world,
+            x,
+            y,
+            z,
+            current != null ? current.getYaw() : 0f,
+            current != null ? current.getPitch() : 0f);
 
     CompletableFuture<Boolean> future = new CompletableFuture<>();
 
-    // Basic Folia path (free build, ADR-024 / ADR-061): a synchronous player.teleport() throws
-    // on Folia because the RTP destination is almost always in a region other than the one this
-    // thread owns. paper-api's Entity#teleportAsync is callable from any thread and performs the
-    // cross-region hop itself, so route through it reflectively (this module compiles against the
-    // Spigot API, which lacks teleportAsync). The tuned rtp-folia adapter (Pro) uses the
-    // first-class FoliaRTPPlayer teleport path instead.
-    if (IS_FOLIA) {
+    // Async teleport path (Paper / Folia / Purpur): Paper and Folia provide Entity#teleportAsync(Location),
+    // which loads the target chunk asynchronously and avoids synchronous chunk loads (S-005) or cross-region
+    // exceptions on Folia. We route through it reflectively here because this module compiles against the
+    // Spigot API (which lacks teleportAsync at compile time). On pure Spigot / CraftBukkit where teleportAsync
+    // is absent, we fall back to synchronous player.teleport(Location) on the main thread.
+    java.lang.reflect.Method asyncMethod = getTeleportAsyncMethod(player);
+    if (asyncMethod != null) {
+      if (tryDirectTeleport(location, to.x(), to.z(), future)) return future;
       try {
-        Object result =
-            player.getClass().getMethod("teleportAsync", Location.class).invoke(player, location);
+        Object result = asyncMethod.invoke(player, location);
         if (result instanceof CompletableFuture) {
           @SuppressWarnings("unchecked")
           CompletableFuture<Boolean> async = (CompletableFuture<Boolean>) result;
@@ -151,6 +173,26 @@ public class BukkitRTPPlayer implements RTPPlayer {
     Runnable tpTask = () -> future.complete(player.teleport(location));
     RTP.scheduler.runTask(tpTask);
     return future;
+  }
+
+  /**
+   * Same-tick teleport when {@link TeleportPathSelector} allows it, saving the tick that
+   * {@code teleportAsync} spends in Paper's main-thread queue. Completes {@code future} with the
+   * teleport result and returns true; returns false (future untouched) when the async path must run,
+   * including after an inline throw (logged, S-004).
+   */
+  protected boolean tryDirectTeleport(
+      Location location, int blockX, int blockZ, CompletableFuture<Boolean> future) {
+    if (!TeleportPathSelector.canTeleportDirect(location.getWorld(), blockX, blockZ)) return false;
+    boolean success;
+    try {
+      success = player.teleport(location);
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING, "[RTP] direct teleport threw, falling back to teleportAsync", t);
+      return false;
+    }
+    future.complete(success);
+    return true;
   }
 
   @Override
@@ -279,12 +321,13 @@ public class BukkitRTPPlayer implements RTPPlayer {
   }
 
   /**
-   * Strips legacy {@code &x} color codes and {@code #RRGGBB} hex codes from a bar title (boss-bar
-   * titles render as plain text on most clients) and truncates to Bukkit's 64-character limit.
+   * Strips legacy {@code &x} / {@code §x} color codes and {@code #RRGGBB} / {@code &#RRGGBB} hex codes
+   * from a bar title (boss-bar titles render as plain text on most clients) and truncates to Bukkit's
+   * 64-character limit. Regex-free: runs on every bar update.
    */
   private static String sanitizeBarTitle(String title) {
     if (title == null) return "";
-    String out = title.replaceAll("&[0-9a-fA-FklmnorKLMNOR]", "").replaceAll("#[0-9a-fA-F]{6}", "");
+    String out = io.github.dailystruggle.rtp.common.text.LegacyColorStrip.strip(title);
     return out.length() > 64 ? out.substring(0, 64) : out;
   }
 

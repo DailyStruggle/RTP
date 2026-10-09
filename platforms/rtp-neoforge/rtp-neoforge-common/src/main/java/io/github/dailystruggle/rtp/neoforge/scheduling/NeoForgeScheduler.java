@@ -52,10 +52,26 @@ public class NeoForgeScheduler implements RTPScheduler {
     }
   });
 
+  /**
+   * Wall-clock scheduled executor for asynchronous timers (e.g. heartbeat publishing).
+   * Runs independently of server ticks so paused servers with no players continue
+   * publishing state across the network (RTP-3).
+   */
+  private static final java.util.concurrent.ScheduledExecutorService ASYNC_TIMER_EXECUTOR =
+      Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
+        private final AtomicInteger n = new AtomicInteger(1);
+        @Override public Thread newThread(Runnable r) {
+          Thread t = new Thread(r, "RTP-NeoForge-AsyncTimer-" + n.getAndIncrement());
+          t.setDaemon(true);
+          return t;
+        }
+      });
+
   private volatile MinecraftServer server;
 
   private final AtomicInteger nextTaskId = new AtomicInteger(1);
   private final ConcurrentHashMap<Integer, ScheduledEntry> scheduled = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<Integer, java.util.concurrent.ScheduledFuture<?>> asyncTimers = new ConcurrentHashMap<>();
 
   /**
    * Pre-start buffer. Tasks submitted before {@link #setServer(MinecraftServer)}
@@ -81,6 +97,10 @@ public class NeoForgeScheduler implements RTPScheduler {
   /** Clears the server reference. Called from {@code ServerStoppingEvent}. */
   public void clearServer() {
     this.server = null;
+    for (var f : asyncTimers.values()) {
+      try { f.cancel(false); } catch (Throwable ignored) {}
+    }
+    this.asyncTimers.clear();
     this.scheduled.clear();
     this.preStartQueue.clear();
   }
@@ -131,7 +151,19 @@ public class NeoForgeScheduler implements RTPScheduler {
 
   @Override
   public Object runTaskTimerAsynchronously(Runnable task, long delay, long period) {
-    return scheduleTimer(() -> ASYNC_EXECUTOR.execute(task), delay, period);
+    int id = nextTaskId.getAndIncrement();
+    long delayMs = Math.max(0L, delay * 50L);
+    long periodMs = Math.max(50L, period * 50L);
+    java.util.concurrent.ScheduledFuture<?> future = ASYNC_TIMER_EXECUTOR.scheduleAtFixedRate(() -> {
+      try {
+        ASYNC_EXECUTOR.execute(task);
+      } catch (Throwable t) {
+        RTP.log(java.util.logging.Level.WARNING,
+            "[NeoForgeScheduler] async timer task dispatch failed", t);
+      }
+    }, delayMs, periodMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+    asyncTimers.put(id, future);
+    return id;
   }
 
   // ----------------------------------------------------------------- sync ---
@@ -184,6 +216,8 @@ public class NeoForgeScheduler implements RTPScheduler {
   @Override
   public void cancelTask(Object task) {
     if (task instanceof Integer id) {
+      java.util.concurrent.ScheduledFuture<?> f = asyncTimers.remove(id);
+      if (f != null) f.cancel(false);
       ScheduledEntry e = scheduled.get(id);
       if (e != null) e.cancelled = true;
     }

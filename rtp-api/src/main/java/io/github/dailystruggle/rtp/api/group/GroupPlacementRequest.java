@@ -22,16 +22,21 @@ public final class GroupPlacementRequest {
   private final String regionName;
   private final GroupProfileSpec profileSpec;
   private final List<UUID> participants;
+  private final AnchorSource anchorSource;
 
   private GroupPlacementRequest(
-      String regionName, GroupProfileSpec profileSpec, List<UUID> participants) {
+      String regionName,
+      GroupProfileSpec profileSpec,
+      List<UUID> participants,
+      AnchorSource anchorSource) {
     this.regionName = regionName;
     this.profileSpec = profileSpec;
     this.participants = Collections.unmodifiableList(new ArrayList<>(participants));
+    this.anchorSource = (anchorSource != null) ? anchorSource : AnchorSource.regionQueue();
   }
 
   /**
-   * Builds a request from the supplied placement parameters.
+   * Builds a request from the supplied placement parameters using the default region queue anchor source.
    *
    * @param regionName target region name; must not be {@code null} or blank
    * @param profileSpec required placement parameters; must not be {@code null}
@@ -43,10 +48,30 @@ public final class GroupPlacementRequest {
    */
   public static GroupPlacementRequest of(
       String regionName, GroupProfileSpec profileSpec, List<UUID> participants) {
+    return of(regionName, profileSpec, participants, AnchorSource.regionQueue());
+  }
+
+  /**
+   * Builds a request from the supplied placement parameters with a custom anchor source.
+   *
+   * @param regionName target region name; must not be {@code null} or blank
+   * @param profileSpec required placement parameters; must not be {@code null}
+   * @param participants ordered participant UUIDs; must be non-null and non-empty
+   * @param anchorSource the anchor source strategy (defaults to regionQueue if {@code null})
+   * @return an immutable request
+   * @throws IllegalArgumentException if {@code regionName} is null/blank or {@code participants}
+   *     is null/empty
+   * @throws NullPointerException if {@code profileSpec} is {@code null}
+   */
+  public static GroupPlacementRequest of(
+      String regionName,
+      GroupProfileSpec profileSpec,
+      List<UUID> participants,
+      AnchorSource anchorSource) {
     requireText(regionName, "regionName");
     Objects.requireNonNull(profileSpec, "profileSpec must not be null");
     requireParticipants(participants);
-    return new GroupPlacementRequest(regionName, profileSpec, participants);
+    return new GroupPlacementRequest(regionName, profileSpec, participants, anchorSource);
   }
 
   private static void requireText(String value, String field) {
@@ -59,8 +84,10 @@ public final class GroupPlacementRequest {
     if (participants == null || participants.isEmpty()) {
       throw new IllegalArgumentException("participants must not be null or empty");
     }
-    if (participants.contains(null)) {
-      throw new IllegalArgumentException("participants must not contain null entries");
+    for (UUID u : participants) {
+      if (u == null) {
+        throw new IllegalArgumentException("participants must not contain null entries");
+      }
     }
   }
 
@@ -92,10 +119,18 @@ public final class GroupPlacementRequest {
     return participants.size();
   }
 
+  /**
+   * @return the anchor source strategy; never {@code null}
+   */
+  public AnchorSource anchorSource() {
+    return anchorSource;
+  }
+
   @Override
   public String toString() {
     return "GroupPlacementRequest[region=" + regionName
         + ", profile=" + profileSpec
-        + ", participants=" + participants.size() + ']';
+        + ", participants=" + participants.size()
+        + ", anchorSource=" + anchorSource + ']';
   }
 }

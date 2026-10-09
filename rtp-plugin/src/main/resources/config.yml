@@ -12,7 +12,6 @@
 #   regions/      - per-region settings
 #   worlds/       - per-world settings
 #   advanced/     - tuning you usually do not need (performance, database, logging, metrics, network, biomes, blocks)
-#   lang/         - bundled translations
 #   addons/       - config for optional add-ons (countdown, GUI menu, claim integrations)
 
 # Seconds to wait before teleporting. 0 = right away. Supports duration units (e.g. 2s, 40t, 1500ms).
@@ -125,8 +124,8 @@ defaults:
   # Max chunks kept loaded for instant teleports.
   activeChunkCap: 10
 
-  # Bad-spot tracking precision (1-5).
-  spatialResolution: 3
+  # Bad-spot tracking precision (any positive integer, or "auto").
+  spatialResolution: "auto"
 
   # Whether regions/worlds need permission.
   requirePermission: false

@@ -1,8 +1,6 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import java.lang.reflect.Method;
-import java.util.logging.Level;
 
 /**
  * Checker for Factions territory via the FactionsBridge abstraction layer.
@@ -24,10 +22,10 @@ public class FactionsBridgeChecker {
    * @return true if in a claim, false otherwise
    */
   public static Boolean isInClaim(io.github.dailystruggle.rtp.api.world.RTPCoords location) {
-    if (!exists) return false;
-    org.bukkit.World world = org.bukkit.Bukkit.getWorld(location.worldName());
-    if (world == null) return false;
-    return isInClaim(new org.bukkit.Location(world, location.x(), location.y(), location.z()));
+    if (!exists || location == null) return false;
+    org.bukkit.Location loc = ClaimLocationResolver.toLocation(location);
+    if (loc == null) return false;
+    return isInClaim(loc);
   }
 
   /**
@@ -49,12 +47,7 @@ public class FactionsBridgeChecker {
       // "in a claim" means the land belongs to a real (non-wilderness) faction.
       return !Boolean.TRUE.equals(wilderness);
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.SEVERE,
-          "[RTP] Critical architectural incompatibility detected. Disabling FactionsBridge integration for this session to prevent server instability.",
-          t);
+      return ClaimCheckFailure.handle("FactionsBridge", t, () -> exists = false);
     }
-    return false;
   }
 }

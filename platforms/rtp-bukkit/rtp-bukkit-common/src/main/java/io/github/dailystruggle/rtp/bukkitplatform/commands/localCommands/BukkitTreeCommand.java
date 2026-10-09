@@ -42,7 +42,35 @@ public abstract class BukkitTreeCommand extends BukkitCommand implements TreeCom
             name.insert(0, p.name() + " ");
             p = p.parent();
         }
-        PluginCommand command = Bukkit.getPluginCommand(name.toString());
+        PluginCommand command = null;
+        if (plugin instanceof org.bukkit.plugin.java.JavaPlugin jp) {
+            try {
+                command = jp.getCommand(name.toString());
+                if (command != null && command.getPlugin() != plugin) {
+                    command = null;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        if (command == null) {
+            try {
+                command = Bukkit.getPluginCommand(name.toString());
+                if (command != null && plugin != null && command.getPlugin() != plugin) {
+                    command = null;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        if (command == null && plugin != null) {
+            try {
+                String prefix = plugin.getName().toLowerCase(java.util.Locale.ROOT);
+                command = Bukkit.getPluginCommand(prefix + ":" + name.toString().toLowerCase(java.util.Locale.ROOT));
+                if (command != null && command.getPlugin() != plugin) {
+                    command = null;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
         if(command!=null) {
             command.setExecutor(this);
             command.setTabCompleter(this);

@@ -5,25 +5,34 @@ import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
 import io.github.dailystruggle.rtp.proxy.common.spi.RedeemOutcome;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
+import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectAllowlist;
+import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectTlsConfig;
 import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWire;
 import org.slf4j.Logger;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 /**
  * Proxy-side TCP listener for the {@code proxy-direct} transport tier
@@ -48,15 +57,40 @@ import java.util.function.Supplier;
  * <p>A frame that fails HMAC verification is dropped with a WARNING; the handler
  * still returns a benign empty response so the backend's read does not hang
  * (S-004: never silently swallow, never abort the whole listener).</p>
+ *
+ * <p>Fail-closed exposure rules, enforced in {@link #start()}: an HMAC verifier
+ * is mandatory (no unsigned mode); the default bind is loopback; a non-loopback
+ * bind needs TLS or an explicit {@code tls: false} (startup WARNING). Clients
+ * outside the optional allowlist are closed before any byte is read.</p>
  */
 public final class ProxyDirectListener {
 
     /** Bounded wait for a transport/queue future inside an RPC handler. */
     private static final long RPC_AWAIT_MS = 2_000L;
 
+    /** Default bind: loopback only; operators opt in to wider exposure. */
+    public static final String DEFAULT_BIND_HOST = "127.0.0.1";
+
+    /** Minimum gap between allowlist-rejection WARNINGs (scanner flood guard). */
+    private static final long REJECT_LOG_INTERVAL_MS = 10_000L;
+
+    private static final Pattern LINE_BREAK = Pattern.compile("\\R");
+
+    /**
+     * Concurrent RPC connections across all clients. Each holds one worker for at
+     * most the 3s read timeout plus {@link #RPC_AWAIT_MS}; past the cap new
+     * sockets are closed unread, so a connection flood cannot exhaust threads/FDs.
+     */
+    static final int MAX_CONCURRENT_CONNECTIONS = 64;
+
+    /** Concurrent connections per client address, so one host cannot take every slot. */
+    static final int MAX_CONNECTIONS_PER_ADDRESS = 16;
+
     private final String bindHost;
     private final int port;
     private final HmacVerifier verifier;
+    private final ProxyDirectTlsConfig tls;
+    private final ProxyDirectAllowlist allowlist;
     private final int schemaVersion;
     private final Consumer<String> onPush;
     private final Supplier<List<String>> snapshotRows;
@@ -68,6 +102,11 @@ public final class ProxyDirectListener {
     private volatile ServerSocket serverSocket;
     private volatile Thread acceptThread;
     private volatile ExecutorService workers;
+    private final AtomicLong lastRejectLogMs = new AtomicLong(0L);
+    private final AtomicLong suppressedRejects = new AtomicLong(0L);
+    private final ConcurrentHashMap<InetAddress, Integer> perAddress = new ConcurrentHashMap<>();
+    private final AtomicLong lastCapLogMs = new AtomicLong(0L);
+    private final AtomicLong suppressedCapRejects = new AtomicLong(0L);
 
     /**
      * Discovery-only ctor (heartbeat/snapshot only; no reservation or queue
@@ -84,8 +123,8 @@ public final class ProxyDirectListener {
     }
 
     /**
-     * Full ctor: heartbeat/snapshot plus RPC dispatch against the proxy's
-     * {@code transport} and {@code requestQueue}. Either may be {@code null}
+     * RPC ctor without TLS / allowlist (loopback or explicit plain only).
+     * Either {@code transport} or {@code requestQueue} may be {@code null}
      * (the corresponding RPCs degrade to a benign empty result).
      */
     public ProxyDirectListener(String bindHost, int port,
@@ -95,9 +134,29 @@ public final class ProxyDirectListener {
                                NetworkTransport transport,
                                NetworkRequestQueue requestQueue,
                                Logger logger) {
-        this.bindHost = (bindHost == null || bindHost.isBlank()) ? "0.0.0.0" : bindHost.trim();
+        this(bindHost, port, verifier, schemaVersion, onPush, snapshotRows,
+                transport, requestQueue, ProxyDirectTlsConfig.unset(),
+                ProxyDirectAllowlist.allowAll(), logger);
+    }
+
+    /**
+     * Full ctor: heartbeat/snapshot plus RPC dispatch, with TLS and client
+     * allowlist. {@code tls} / {@code allowlist} null = unset / allow-all.
+     */
+    public ProxyDirectListener(String bindHost, int port,
+                               HmacVerifier verifier, int schemaVersion,
+                               Consumer<String> onPush,
+                               Supplier<List<String>> snapshotRows,
+                               NetworkTransport transport,
+                               NetworkRequestQueue requestQueue,
+                               ProxyDirectTlsConfig tls,
+                               ProxyDirectAllowlist allowlist,
+                               Logger logger) {
+        this.bindHost = (bindHost == null || bindHost.isBlank()) ? DEFAULT_BIND_HOST : bindHost.trim();
         this.port = port;
         this.verifier = verifier;
+        this.tls = tls == null ? ProxyDirectTlsConfig.unset() : tls;
+        this.allowlist = allowlist == null ? ProxyDirectAllowlist.allowAll() : allowlist;
         this.schemaVersion = schemaVersion;
         this.onPush = Objects.requireNonNull(onPush, "onPush");
         this.snapshotRows = Objects.requireNonNull(snapshotRows, "snapshotRows");
@@ -106,28 +165,53 @@ public final class ProxyDirectListener {
         this.logger = Objects.requireNonNull(logger, "logger");
     }
 
-    /** Bind the socket and start accepting. Throws on bind failure (caller logs + degrades). */
+    /**
+     * Bind the socket and start accepting. Throws on bind failure or on an
+     * unsafe configuration (no verifier; non-loopback plain TCP without an
+     * explicit {@code tls: false}); caller logs + degrades.
+     */
     public void start() throws Exception {
+        if (verifier == null) {
+            throw new IllegalStateException("proxy-direct listener requires an HMAC secret "
+                    + "(network.secretEnv, >= 32 bytes Base64); refusing to start unsigned.");
+        }
+        boolean loopback = isLoopback(bindHost);
+        if (!tls.enabled() && !loopback) {
+            if (!tls.explicitlyDisabled()) {
+                throw new IllegalStateException("proxy-direct bindHost '" + bindHost
+                        + "' is not loopback: set transport.direct.tls: true (with keystore) or "
+                        + "tls: false to accept plain TCP explicitly.");
+            }
+            logger.warn("RTP proxy-direct: PLAIN TCP on non-loopback {}:{} (transport.direct.tls: false). "
+                    + "Payloads are HMAC-authenticated but NOT encrypted; enable TLS and/or restrict "
+                    + "transport.direct.allowedClients.", bindHost, port);
+        }
         if (!running.compareAndSet(false, true)) return;
-        ServerSocket ss = new ServerSocket();
+        ServerSocket ss = null;
         try {
+            ss = tls.enabled() ? tls.createServerSocket() : new ServerSocket();
             ss.setReuseAddress(true);
             ss.bind(new InetSocketAddress(bindHost, port));
             this.serverSocket = ss;
-            this.workers = Executors.newCachedThreadPool(r -> {
-                Thread t = new Thread(r, "rtp-proxy-direct-worker");
-                t.setDaemon(true);
-                return t;
-            });
+            // Bounded: no queue, so saturation rejects instead of buffering sockets.
+            ThreadPoolExecutor pool = new ThreadPoolExecutor(
+                    0, MAX_CONCURRENT_CONNECTIONS, 30L, TimeUnit.SECONDS, new SynchronousQueue<>(), r -> {
+                        Thread t = new Thread(r, "rtp-proxy-direct-worker");
+                        t.setDaemon(true);
+                        return t;
+                    }, new ThreadPoolExecutor.AbortPolicy());
+            this.workers = pool;
             Thread accept = new Thread(this::acceptLoop, "rtp-proxy-direct-accept");
             accept.setDaemon(true);
             this.acceptThread = accept;
             accept.start();
-            logger.info("RTP proxy-direct listener bound on {}:{} ({}).",
-                    bindHost, port, verifier != null ? "HMAC-signed" : "unsigned");
+            logger.info("RTP proxy-direct listener bound on {}:{} (HMAC-signed, {}, {}).",
+                    bindHost, ss.getLocalPort(),
+                    tls.enabled() ? (tls.requireClientAuth() ? "TLS+client-cert" : "TLS") : "plain TCP",
+                    allowlist.isEmpty() ? "no client allowlist" : "allowlist of " + allowlist.size());
         } catch (Exception e) {
             try {
-                ss.close();
+                if (ss != null) ss.close();
             } catch (Exception ignored) {
                 // Ignore exception on close during rollback
             }
@@ -148,11 +232,60 @@ public final class ProxyDirectListener {
                 }
                 continue;
             }
+            if (!allowlist.permits(socket.getInetAddress())) {
+                logRejectedClient(socket);
+                try { socket.close(); } catch (Exception ignored) { }
+                continue;
+            }
             ExecutorService pool = this.workers;
-            if (pool != null) {
-                pool.submit(() -> handle(socket));
+            if (pool == null) {
+                try { socket.close(); } catch (Exception ignored) { }
+                continue;
+            }
+            InetAddress addr = socket.getInetAddress();
+            if (perAddress.merge(addr, 1, Integer::sum) > MAX_CONNECTIONS_PER_ADDRESS) {
+                releaseSlot(addr);
+                rejectOverCap(socket, "per-address limit " + MAX_CONNECTIONS_PER_ADDRESS);
+                continue;
+            }
+            try {
+                pool.execute(() -> {
+                    try {
+                        handle(socket);
+                    } finally {
+                        releaseSlot(addr);
+                    }
+                });
+            } catch (RejectedExecutionException ree) {
+                releaseSlot(addr);
+                rejectOverCap(socket, "connection limit " + MAX_CONCURRENT_CONNECTIONS);
             }
         }
+    }
+
+    /** Atomic per key, so a concurrent acquire never lands on a removed counter. */
+    private void releaseSlot(InetAddress addr) {
+        perAddress.computeIfPresent(addr, (k, n) -> n <= 1 ? null : n - 1);
+    }
+
+    /** Close an over-cap socket unread; WARNING throttled like allowlist rejects. */
+    private void rejectOverCap(Socket socket, String limit) {
+        java.net.SocketAddress remote = socket.getRemoteSocketAddress();
+        try { socket.close(); } catch (Exception ignored) { }
+        long now = System.currentTimeMillis();
+        long last = lastCapLogMs.get();
+        if (now - last >= REJECT_LOG_INTERVAL_MS && lastCapLogMs.compareAndSet(last, now)) {
+            long suppressed = suppressedCapRejects.getAndSet(0L);
+            logger.warn("RTP proxy-direct: closed connection from {} ({} reached){}.", remote, limit,
+                    suppressed > 0 ? "; " + suppressed + " similar rejection(s) suppressed" : "");
+        } else {
+            suppressedCapRejects.incrementAndGet();
+        }
+    }
+
+    /** Visible for tests: tracked client addresses with an open connection. */
+    int trackedAddressCount() {
+        return perAddress.size();
     }
 
     private void handle(Socket socket) {
@@ -276,7 +409,7 @@ public final class ProxyDirectListener {
                               java.net.SocketAddress remote) throws Exception {
         String payload = ProxyDirectWire.readSignedPayload(in, verifier);
         if (payload != null && requestQueue != null) {
-            String[] f = payload.split(String.valueOf(ProxyDirectWire.FS), -1);
+            String[] f = ProxyDirectWire.splitFields(payload);
             try {
                 UUID id = UUID.fromString(f[0]);
                 NetworkRequestQueue.CancelReason reason = NetworkRequestQueue.CancelReason.EXPLICIT_REQUEST;
@@ -326,13 +459,13 @@ public final class ProxyDirectListener {
         String payload = ProxyDirectWire.readSignedPayload(in, verifier);
         RedeemOutcome outcome = RedeemOutcome.NOT_FOUND;
         if (payload != null && transport != null) {
-            String[] f = payload.split(String.valueOf(ProxyDirectWire.FS), -1);
+            String[] f = ProxyDirectWire.splitFields(payload);
             if (f.length >= 3) {
                 try {
                     UUID id = UUID.fromString(f[1]);
                     outcome = transport.redeem(f[0], id, f[2]).get(RPC_AWAIT_MS, TimeUnit.MILLISECONDS);
-                    logger.info("RTP proxy-direct: redeem token={} player={} server={} -> {}.",
-                            f[0], f[1], f[2], outcome);
+                    logger.debug("RTP proxy-direct: redeem token={} player={} server={} -> {}.",
+                            ProxyDirectWire.redactToken(f[0]), f[1], f[2], outcome);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
                     logger.warn("RTP proxy-direct: redeem interrupted: {}", ie.getMessage());
@@ -375,9 +508,32 @@ public final class ProxyDirectListener {
      */
     private static String summarisePayload(String payload) {
         if (payload == null || payload.isBlank()) return "empty payload";
-        String firstLine = payload.split("\\R", 2)[0];
+        String firstLine = LINE_BREAK.split(payload, 2)[0];
         if (firstLine.length() > 200) firstLine = firstLine.substring(0, 200) + "...";
         return "payload=" + firstLine;
+    }
+
+    /** Rate-limited WARNING for an allowlist rejection; counts suppressed lines. */
+    private void logRejectedClient(Socket socket) {
+        long now = System.currentTimeMillis();
+        long last = lastRejectLogMs.get();
+        if (now - last >= REJECT_LOG_INTERVAL_MS && lastRejectLogMs.compareAndSet(last, now)) {
+            long suppressed = suppressedRejects.getAndSet(0L);
+            logger.warn("RTP proxy-direct: rejected connection from {} (not in transport.direct.allowedClients){}.",
+                    socket.getRemoteSocketAddress(),
+                    suppressed > 0 ? "; " + suppressed + " further rejection(s) suppressed" : "");
+        } else {
+            suppressedRejects.incrementAndGet();
+        }
+    }
+
+    /** True when {@code host} resolves to a loopback address; unresolvable = false. */
+    static boolean isLoopback(String host) {
+        try {
+            return InetAddress.getByName(host).isLoopbackAddress();
+        } catch (UnknownHostException | RuntimeException e) {
+            return false;
+        }
     }
 
     /** Stop accepting, close the socket, and shut the worker pool down. Idempotent. */

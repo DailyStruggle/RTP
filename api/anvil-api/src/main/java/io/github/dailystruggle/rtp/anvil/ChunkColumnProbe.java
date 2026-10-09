@@ -84,6 +84,22 @@ public interface ChunkColumnProbe {
   }
 
   /**
+   * Average active drain duration in nanoseconds per chunk for the coalesced group this probe belonged to,
+   * or 0 if not measured / uncoalesced.
+   */
+  default long drainNanos() {
+    return 0L;
+  }
+
+  /**
+   * Requests served by the coalesced drain this probe belonged to, or 0 if uncoalesced.
+   * One drain pays one region-file open, so {@link #drainNanos()} amortises it over this many chunks.
+   */
+  default int groupSize() {
+    return 0;
+  }
+
+  /**
    * Returns whether block at chunk-local column {@code (localX, localZ)} at {@code y} is air.
    *
    * @param localX chunk-local X in {@code [0..15]}

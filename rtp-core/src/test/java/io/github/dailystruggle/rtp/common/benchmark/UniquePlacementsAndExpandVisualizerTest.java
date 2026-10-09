@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.benchmark;
 
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.tools.ChartOutputHelper;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
@@ -15,7 +16,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import javax.imageio.ImageIO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -209,22 +209,11 @@ public class UniquePlacementsAndExpandVisualizerTest {
 
     g.dispose();
 
-    // 5. Save chart to Root, docs/assets/img/, and test server debug path
-    File rootOut = new File("../unique_placements_expand_progression_chart.png");
-    if (!rootOut.getParentFile().exists()) rootOut = new File("unique_placements_expand_progression_chart.png");
-    File docsOut = new File("../docs/assets/img/unique_placements_expand_progression_chart.png");
-    if (!docsOut.getParentFile().exists()) docsOut = new File("docs/assets/img/unique_placements_expand_progression_chart.png");
-    File serverOut = new File("C:\\GameServers\\Minecraft\\testServer\\RTP-Folia\\26.1\\plugins\\RTP\\database\\regionData\\debug\\unique_placements_expand_progression_chart.png");
+    // 5. Save chart to canonical docs and reports
+    ChartOutputHelper.writeChart(img, "player_distribution", "unique_placements_expand_progression_chart.png");
 
-    ImageIO.write(img, "PNG", rootOut);
-    docsOut.getParentFile().mkdirs();
-    ImageIO.write(img, "PNG", docsOut);
-    if (serverOut.getParentFile().exists()) {
-      ImageIO.write(img, "PNG", serverOut);
-    }
-
-    System.out.printf("[DEBUG_LOG] Chart saved successfully to: %s (%,d KB)%n",
-        rootOut.getAbsolutePath(), rootOut.length() / 1024);
+    System.out.printf("[DEBUG_LOG] Chart saved successfully to canonical destination: %s%n",
+        ChartOutputHelper.getDocsAssetFile("unique_placements_expand_progression_chart.png").getAbsolutePath());
     org.junit.jupiter.api.Assertions.assertFalse(allLandingPoints.isEmpty());
   }
 

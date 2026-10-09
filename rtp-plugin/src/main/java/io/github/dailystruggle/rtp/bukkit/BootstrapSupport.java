@@ -96,6 +96,11 @@ public final class BootstrapSupport {
         mainCommand.addSubCommand(new BukkitTestCmd(mainCommand));
         RTP.baseCommand = mainCommand;
 
+        // Synchronize and register action commands now that baseCommand is bound
+        if (RTP.actionManager != null) {
+            RTP.actionManager.registerAllCommands();
+        }
+
         // commands-api owns the Bukkit registration concern (commands-api-ADR-003):
         // the neutral root does not subclass a Bukkit command type. The registrar
         // binds /rtp and /wild and delegates the legacy String[] command path back

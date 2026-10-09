@@ -7,7 +7,7 @@
 **Context:**
 - [ADR-016](ADR-016-anvil-subsystem.md) — Anvil Read-Only Subsystem (Prefilter, Backed Chunk View, Shared Module).
 - [ADR-046](ADR-046-maps-api-module.md) — `maps-api` Module for Runtime Cartography Chart Generation.
-- [ADR-077](ADR-077-multi-format-region-support.md) — Multi-Format Region Support: Linear (ZSTD) and Pluggable Region Readers.
+- [ADR-077](ADR-077-multi-format-region-support.md) — Multi-Format Region Support: Pluggable Region Readers (Linear via Addon).
 - [ADR-085](ADR-085-spiral-addressed-hilbert-key-space.md) — Spiral-Addressed Hilbert Key Space for Learned State.
 - [`maps-api-ADR-001`](../../api/maps-api/docs/adr/maps-api-ADR-001-bootstrap.md) — Module Bootstrap, Package Layout, and Palette Policy.
 
@@ -45,7 +45,7 @@ For 2D raster web map engines (such as Pl3xMap's Leaflet tile layer and Dynmap's
 - **Zero-Chunk-Load Pipeline:** When the browser requests tile `(z, x, y)`:
   1. The tile bounds are converted to world chunk bounds $[cx_{\min}..cx_{\max}, cz_{\min}..cz_{\max}]$.
   2. For chunks already evaluated: The safety verdict and biome are resolved in memory via `MemoryShape.isBadLocation(k)` in **$O(\log N)$ binary search time ($208\text{ ns}$ per chunk)**.
-  3. For unverified chunks: The tile provider queries `anvil-api` / `RegionFileReader` (ADR-016 / ADR-077) off-tick directly from `.mca` / `.linear` files on disk, bypassing the server's chunk loading pipeline entirely (**Zero main-thread blocking, S-005 compliant**).
+  3. For unverified chunks: The tile provider queries `anvil-api` / `RegionFileReader` (ADR-016 / ADR-077) off-tick directly from `.mca` / `.linear` files on disk, bypassing the server's chunk loading pipeline entirely (**Zero main-thread blocking, S-005 compliant**). (2026-10-06: Linear reader withdrawn from core, see ADR-077; `.linear` files are read only when an addon registers a reader.)
   4. The raster image is painted into an off-main buffer using `maps-api`'s `HeatmapRenderer` and streamed directly to the browser as PNG/WebP bytes.
 
 ### 2b. Vector Volume and Marker Sets (BlueMap / Dynmap / Pl3xMap)

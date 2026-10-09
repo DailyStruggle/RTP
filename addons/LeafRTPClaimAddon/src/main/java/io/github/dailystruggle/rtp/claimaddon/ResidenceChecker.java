@@ -1,9 +1,7 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.util.logging.Level;
 
 /**
  * Checker for Residence claims.
@@ -26,10 +24,10 @@ public class ResidenceChecker {
    * @return true if in a claim, false otherwise
    */
   public static Boolean isInClaim(io.github.dailystruggle.rtp.api.world.RTPCoords location) {
-    if (!exists) return false;
-    org.bukkit.World world = org.bukkit.Bukkit.getWorld(location.worldName());
-    if (world == null) return false;
-    return isInClaim(new org.bukkit.Location(world, location.x(), location.y(), location.z()));
+    if (!exists || location == null) return false;
+    org.bukkit.Location loc = ClaimLocationResolver.toLocation(location);
+    if (loc == null) return false;
+    return isInClaim(loc);
   }
 
   /**
@@ -59,12 +57,7 @@ public class ResidenceChecker {
       // "in a claim" means a ClaimedResidence covers this location.
       return residence != null;
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.SEVERE,
-          "[RTP] Critical architectural incompatibility detected. Disabling Residence integration for this session to prevent server instability.",
-          t);
+      return ClaimCheckFailure.handle("Residence", t, () -> exists = false);
     }
-    return false;
   }
 }

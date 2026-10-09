@@ -134,7 +134,7 @@ Normal-distribution variants replace `weight` with explicit statistical paramete
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `vertices` | List of `[x, z]` pairs | — | Boundary vertices in traversal order, in the same format Chunky uses. At least 3, not all collinear, no self-intersections. Invalid or self-intersecting vertices trigger a warning and fall back to the bounding square. See [REGIONS.md](REGIONS.md#polygon). |
+| `vertices` | List of `[x, z]` pairs | — | Boundary vertices in traversal order, in the same format Chunky uses: one pair per list item, e.g. `- [-125c, 187c]` / `- [2000b, 3000b]`, or inline `vertices: [[-125c, 187c], [2000b, 3000b], [10, -4]]`. Each coordinate takes a spatial suffix (`b` blocks, `c` chunks, ...); a coordinate **without a suffix is in chunks**. At least 3, not all collinear, no self-intersections. Invalid or self-intersecting vertices trigger a warning and fall back to the bounding square. See [REGIONS.md](REGIONS.md#polygon). |
 | `weight` | Double | `1.0` | Distribution weight across the vertex bounding box. |
 
 `expand` is not part of the polygon surface and is ignored: the boundary is admin-authored, so growing it would push landings outside it.

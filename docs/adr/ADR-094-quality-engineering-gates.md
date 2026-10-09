@@ -177,12 +177,37 @@ configuration and is deliberately **not** folded into this amendment; it is prop
 separately under rule D-005 and, once landed, recorded here or in the follow-up ADR
 that this ADR already anticipates for the remote quality-gate half.
 
+## Amendment: advisory regex-hygiene scan (2026-10-06)
+
+Avoidable regex use (per-call `Pattern` compilation, `String#replaceAll` /
+`replaceFirst` / `matches`, regex-path `String#split`, and regex text concatenated
+without `Pattern.quote`) is flagged by a second, **advisory** PMD ruleset,
+[`config/pmd/regex.xml`](../../config/pmd/regex.xml), run by the `pmdRegexMain`
+task on production sources.
+
+1. **Advisory, not gating.** `pmdRegexMain` sets `ignoreFailures = true`; it runs
+   under `-PstaticAnalysis` (alongside the gating `pmdMain`/`pmdTest`) or alone under
+   `-PregexAnalysis`. The existing call sites would otherwise fail the gate on day
+   one; individual rules move into `ruleset.xml` once their findings are triaged.
+2. **SonarCloud surface.** SonarCloud cannot load custom Java rule plugins, so
+   project-specific PMD rules reach it as external issues through
+   `sonar.java.pmd.reportPaths` (set per subproject when either flag is present);
+   `.github/workflows/sonar.yml` passes `-PregexAnalysis`. Built-in Sonar rules
+   `java:S4248` and `java:S5361` cover the same ground natively.
+3. **IDE surface.** `.sonarlint/connectedMode.json` shares the SonarQube for IDE
+   binding, so the bound quality profile (including built-in quick fixes) applies
+   in the editor. External PMD issues are server-side only; locally, run
+   `.\gradlew.bat :<module>:pmdRegexMain -PregexAnalysis` or point an IDE PMD plugin
+   at `config/pmd/regex.xml`.
+
 ## References
 
 - [`build.gradle`](../../build.gradle) — root `subprojects` block: tier exclusion,
   opt-in JaCoCo (`-Pcoverage`), opt-in PMD (`-PstaticAnalysis`).
 - [`config/pmd/ruleset.xml`](../../config/pmd/ruleset.xml) — curated + appendable
   starter ruleset, including the `PreferNonLockingExecution` custom XPath rule.
+- [`config/pmd/regex.xml`](../../config/pmd/regex.xml) — advisory regex-hygiene
+  ruleset run by `pmdRegexMain` (`-PregexAnalysis`).
 - [`scripts/diff-coverage.py`](../../scripts/diff-coverage.py) — server-less
   changed-line coverage gate.
 - [`scripts/bench-tests.py`](../../scripts/bench-tests.py) — per-suite wall-time

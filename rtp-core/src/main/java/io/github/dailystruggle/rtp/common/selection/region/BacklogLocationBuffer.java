@@ -49,6 +49,11 @@ public final class BacklogLocationBuffer {
      */
     @SuppressWarnings("unused")
     private Object pinnedBinList;
+    /**
+     * Reject sink of the region that staged this entry. World bins are shared across regions,
+     * so the verifying region may not own the entry; rejections route here to teach the owner.
+     */
+    private volatile java.util.function.Consumer<BacklogEntry> ownerOnReject;
 
     BacklogEntry(RTPLocation location) {
       this.location = Objects.requireNonNull(location, "location");
@@ -94,10 +99,29 @@ public final class BacklogLocationBuffer {
     public void setValidity(Validity next) {
       this.validity = Objects.requireNonNull(next, "validity");
     }
+
+    /** Sets the owning region's reject sink; {@code null} clears it. */
+    public void setOwnerOnReject(java.util.function.Consumer<BacklogEntry> sink) {
+      this.ownerOnReject = sink;
+    }
+
+    /** @return the owning region's reject sink, or {@code null} when unset */
+    public java.util.function.Consumer<BacklogEntry> ownerOnReject() {
+      return ownerOnReject;
+    }
   }
 
   private final int capacity;
   private final AtomicReference<BacklogEntry[]> state = new AtomicReference<>(EMPTY);
+  private java.util.Random rng = null;
+
+  public void setRng(java.util.Random rng) {
+    this.rng = rng;
+  }
+
+  protected java.util.Random rng() {
+    return rng != null ? rng : java.util.concurrent.ThreadLocalRandom.current();
+  }
 
   /**
    * Constructs a new buffer with the given maximum capacity.
@@ -178,7 +202,7 @@ public final class BacklogLocationBuffer {
     if (maxN < 0) throw new IllegalArgumentException("maxN must be non-negative: " + maxN);
     if (maxN == 0) return Collections.emptyList();
 
-    java.util.concurrent.ThreadLocalRandom rng = java.util.concurrent.ThreadLocalRandom.current();
+    java.util.Random activeRng = rng();
     for (int retry = 0; retry < MAX_CAS_RETRIES; retry++) {
       BacklogEntry[] curr = state.get();
       if (curr.length == 0) return Collections.emptyList();
@@ -196,7 +220,7 @@ public final class BacklogLocationBuffer {
       int toTake = Math.min(maxN, validatedIndices.size());
       // Fisher-Yates partial shuffle of candidate indices
       for (int i = 0; i < toTake; i++) {
-        int swapIdx = i + rng.nextInt(validatedIndices.size() - i);
+        int swapIdx = i + activeRng.nextInt(validatedIndices.size() - i);
         int temp = validatedIndices.get(i);
         validatedIndices.set(i, validatedIndices.get(swapIdx));
         validatedIndices.set(swapIdx, temp);
@@ -282,9 +306,20 @@ public final class BacklogLocationBuffer {
    * @return the oldest unverified entry, or {@code null} if none
    */
   public BacklogEntry peekOldestUnverified() {
+    return peekOldestUnverified(null);
+  }
+
+  /**
+   * Oldest {@link Validity#UNVERIFIED} entry not rejected by {@code skip}; lets the batched backlog
+   * verifier pass over entries whose region-file bin is already in flight.
+   *
+   * @param skip entries to pass over, or {@code null} for none
+   * @return the oldest eligible unverified entry, or {@code null} if none
+   */
+  public BacklogEntry peekOldestUnverified(java.util.function.Predicate<BacklogEntry> skip) {
     BacklogEntry[] curr = state.get();
     for (BacklogEntry e : curr) {
-      if (e != null && e.validity() == Validity.UNVERIFIED) return e;
+      if (e != null && e.validity() == Validity.UNVERIFIED && (skip == null || !skip.test(e))) return e;
     }
     return null;
   }

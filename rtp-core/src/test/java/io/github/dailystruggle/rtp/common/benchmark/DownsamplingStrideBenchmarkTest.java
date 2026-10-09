@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.SegmentedKeyRunTable;
+import io.github.dailystruggle.rtp.common.tools.ChartOutputHelper;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
@@ -385,29 +386,12 @@ public class DownsamplingStrideBenchmarkTest {
     renderPopulationMap(shape, 64, 500, new File(outDir, "population_distribution_s64.png"),
         "Server Arrival Distribution: 500 Arrivals (S=64 Strided Lattice)");
 
-    // 3. Combined comparison PNG (Side-by-side) saved to multiple known directories:
-    File reportFile = new File(outDir, "player_distribution_comparison.png");
-    File rootFile = new File("player_distribution_comparison.png");
-    File repoRootFile = new File("../player_distribution_comparison.png");
-    File docsAssetFile = new File("../docs/assets/img/player_distribution_comparison.png");
-    File testServerDebugDir = new File("C:\\GameServers\\Minecraft\\testServer\\RTP-Folia\\26.1\\plugins\\RTP\\database\\regionData\\debug");
-
-    renderCombinedComparison(shape, reportFile);
-    renderCombinedComparison(shape, rootFile);
-    renderCombinedComparison(shape, repoRootFile);
-    if (!docsAssetFile.getParentFile().exists()) {
-      docsAssetFile = new File("docs/assets/img/player_distribution_comparison.png");
-    }
-    if (docsAssetFile.getParentFile().exists()) {
-      renderCombinedComparison(shape, docsAssetFile);
-    }
-    if (testServerDebugDir.exists()) {
-      renderCombinedComparison(shape, new File(testServerDebugDir, "player_distribution_comparison.png"));
-    }
+    // 3. Combined comparison PNG (Side-by-side) saved to canonical docs and report destinations:
+    BufferedImage compImg = renderCombinedComparison(shape);
+    ChartOutputHelper.writeChart(compImg, "player_distribution", "player_distribution_comparison.png");
 
     renderAsciiJourneySummary(shape);
-    System.out.println("[DEBUG_LOG] Saved image directly to root: " + rootFile.getAbsolutePath());
-    System.out.println("[DEBUG_LOG] Saved image to reports: " + reportFile.getAbsolutePath());
+    System.out.println("[DEBUG_LOG] Saved image to canonical docs: " + ChartOutputHelper.getDocsAssetFile("player_distribution_comparison.png").getAbsolutePath());
     assertTrue(shape.getRange() > 0);
   }
 
@@ -537,7 +521,7 @@ public class DownsamplingStrideBenchmarkTest {
     System.out.println("[DEBUG_LOG] Saved population PNG: " + outFile.getAbsolutePath());
   }
 
-  private static void renderCombinedComparison(CircleOptimizedDualLayer shape, File outFile) throws Exception {
+  private static BufferedImage renderCombinedComparison(CircleOptimizedDualLayer shape) throws Exception {
     int dim = 2 * DEFAULT_R + 2;
     int margin = 20;
     int totalWidth = dim * 3 + margin * 4;
@@ -623,8 +607,7 @@ public class DownsamplingStrideBenchmarkTest {
     }
 
     g.dispose();
-    ImageIO.write(img, "png", outFile);
-    System.out.println("[DEBUG_LOG] Saved combined player distribution comparison PNG: " + outFile.getAbsolutePath());
+    return img;
   }
 
   private static void drawDonutOutline(Graphics2D g, int cx, int r, int cr, int cy) {
@@ -722,23 +705,8 @@ public class DownsamplingStrideBenchmarkTest {
     System.out.println("======================================================================================\n");
 
     // Render 2D heatmaps showing spatial density & collisions
-    renderHeatmapComparison(resPolar, resHilbertRandom, resStrided64WithTable, resDynamicContinuousRotation,
-        new File("overlap_simulation_comparison.png"));
-    renderHeatmapComparison(resPolar, resHilbertRandom, resStrided64WithTable, resDynamicContinuousRotation,
-        new File("../overlap_simulation_comparison.png"));
-    File docsOverlap = new File("../docs/assets/img/overlap_simulation_comparison.png");
-    if (!docsOverlap.getParentFile().exists()) docsOverlap = new File("docs/assets/img/overlap_simulation_comparison.png");
-    if (docsOverlap.getParentFile().exists()) {
-      renderHeatmapComparison(resPolar, resHilbertRandom, resStrided64WithTable, resDynamicContinuousRotation, docsOverlap);
-    }
-    renderHeatmapComparison(resPolar, resHilbertRandom, resStrided64WithTable, resDynamicContinuousRotation,
-        new File("build/reports/player_distribution/overlap_simulation_comparison.png"));
-
-    File testServerDebugDir = new File("C:\\GameServers\\Minecraft\\testServer\\RTP-Folia\\26.1\\plugins\\RTP\\database\\regionData\\debug");
-    if (testServerDebugDir.exists()) {
-      renderHeatmapComparison(resPolar, resHilbertRandom, resStrided64WithTable, resDynamicContinuousRotation,
-          new File(testServerDebugDir, "overlap_simulation_comparison.png"));
-    }
+    BufferedImage heatImg = renderHeatmapComparison(resPolar, resHilbertRandom, resStrided64WithTable, resDynamicContinuousRotation);
+    ChartOutputHelper.writeChart(heatImg, "player_distribution", "overlap_simulation_comparison.png");
     assertTrue(resPolar.totalTeleports > 0);
   }
 
@@ -911,9 +879,8 @@ public class DownsamplingStrideBenchmarkTest {
     return res;
   }
 
-  private static void renderHeatmapComparison(
-      SimulationResult polar, SimulationResult hilbertRand, SimulationResult stridedTable, SimulationResult continuousNonRepeat,
-      File outFile) throws Exception {
+  private static BufferedImage renderHeatmapComparison(
+      SimulationResult polar, SimulationResult hilbertRand, SimulationResult stridedTable, SimulationResult continuousNonRepeat) throws Exception {
 
     int dim = polar.dim;
     int margin = 20;
@@ -977,8 +944,7 @@ public class DownsamplingStrideBenchmarkTest {
     }
 
     g.dispose();
-    ImageIO.write(img, "png", outFile);
-    System.out.println("[DEBUG_LOG] Saved 24k teleport heatmap to: " + outFile.getAbsolutePath());
+    return img;
   }
 
   // -------------------------------------------------------------------------------------
@@ -1091,26 +1057,15 @@ public class DownsamplingStrideBenchmarkTest {
     assertEquals(0, circleDupes, "Circle loopless selection must produce exactly zero duplicates");
 
     // Render High-Resolution R=1024 World Chart PNG
-    File rootFile = new File("../world_test_r1024_chart.png");
-    File coreFile = new File("world_test_r1024_chart.png");
-    File reportFile = new File("build/reports/player_distribution/world_test_r1024_chart.png");
-    File rootReportFile = new File("../build/reports/player_distribution/world_test_r1024_chart.png");
-    File testServerFile = new File("C:\\GameServers\\Minecraft\\testServer\\RTP-Folia\\26.1\\plugins\\RTP\\database\\regionData\\debug\\world_test_r1024_chart.png");
+    BufferedImage worldImg = renderWorldR1024Chart(squareArrivals, circleArrivals, R1024, CR64, 15);
+    ChartOutputHelper.writeChart(worldImg, "player_distribution", "world_test_r1024_chart.png");
 
-    renderWorldR1024Chart(squareArrivals, circleArrivals, R1024, CR64, 15, rootFile);
-    renderWorldR1024Chart(squareArrivals, circleArrivals, R1024, CR64, 15, coreFile);
-    renderWorldR1024Chart(squareArrivals, circleArrivals, R1024, CR64, 15, reportFile);
-    renderWorldR1024Chart(squareArrivals, circleArrivals, R1024, CR64, 15, rootReportFile);
-    if (testServerFile.getParentFile() != null && testServerFile.getParentFile().exists()) {
-      renderWorldR1024Chart(squareArrivals, circleArrivals, R1024, CR64, 15, testServerFile);
-    }
-
-    System.out.println("[DEBUG_LOG] Saved World Radius R=1024 Chart to Root: " + rootFile.getAbsolutePath());
+    System.out.println("[DEBUG_LOG] Saved World Radius R=1024 Chart to canonical destination");
   }
 
-  private static void renderWorldR1024Chart(
+  private static BufferedImage renderWorldR1024Chart(
       List<ChunkCoord> squareArrivals, List<ChunkCoord> circleArrivals,
-      int R, int CR, int trailLen, File outFile) throws Exception {
+      int R, int CR, int trailLen) throws Exception {
 
     int mapDim = 600;
     int margin = 30;
@@ -1253,10 +1208,7 @@ public class DownsamplingStrideBenchmarkTest {
     g.drawString("Circle Latency: < 220 ns/select | Exact Duplicates: 0 (0.0%) | Loop: None", p2X + 10, statY + 16);
 
     g.dispose();
-    if (outFile.getParentFile() != null && !outFile.getParentFile().exists()) {
-      outFile.getParentFile().mkdirs();
-    }
-    ImageIO.write(img, "png", outFile);
+    return img;
   }
 
   @Test
@@ -1401,25 +1353,14 @@ public class DownsamplingStrideBenchmarkTest {
     assertEquals(0, duplicates, "Zero duplicate selections allowed");
 
     // Render High-Resolution Square MCA Chart PNG
-    File rootFile = new File("../square_optimized_real_mca_chart.png");
-    File coreFile = new File("square_optimized_real_mca_chart.png");
-    File reportFile = new File("build/reports/player_distribution/square_optimized_real_mca_chart.png");
-    File rootReportFile = new File("../build/reports/player_distribution/square_optimized_real_mca_chart.png");
-    File testServerFile = new File("C:\\GameServers\\Minecraft\\testServer\\RTP-Folia\\26.1\\plugins\\RTP\\database\\regionData\\debug\\square_optimized_real_mca_chart.png");
+    BufferedImage mcaImg = renderSquareMcaChart(mask, arrivals, inscribedR, 15);
+    ChartOutputHelper.writeChart(mcaImg, "player_distribution", "square_optimized_real_mca_chart.png");
 
-    renderSquareMcaChart(mask, arrivals, inscribedR, 15, rootFile);
-    renderSquareMcaChart(mask, arrivals, inscribedR, 15, coreFile);
-    renderSquareMcaChart(mask, arrivals, inscribedR, 15, reportFile);
-    renderSquareMcaChart(mask, arrivals, inscribedR, 15, rootReportFile);
-    if (testServerFile.getParentFile() != null && testServerFile.getParentFile().exists()) {
-      renderSquareMcaChart(mask, arrivals, inscribedR, 15, testServerFile);
-    }
-
-    System.out.println("[DEBUG_LOG] Saved Square Real MCA Chart to: " + rootFile.getAbsolutePath());
+    System.out.println("[DEBUG_LOG] Saved Square Real MCA Chart to canonical destination");
   }
 
-  private static void renderSquareMcaChart(
-      RealWorldVerdictMask mask, List<ChunkCoord> arrivals, int R, int trailLen, File outFile) throws Exception {
+  private static BufferedImage renderSquareMcaChart(
+      RealWorldVerdictMask mask, List<ChunkCoord> arrivals, int R, int trailLen) throws Exception {
 
     int mapDim = 2 * R + 2;
     int margin = 30;
@@ -1547,10 +1488,7 @@ public class DownsamplingStrideBenchmarkTest {
     g.drawString("Selection Speed: < 8 microseconds | Hazards: 0 (100% Safe) | Dupes: 0", p2X + 10, statY + 16);
 
     g.dispose();
-    if (outFile.getParentFile() != null && !outFile.getParentFile().exists()) {
-      outFile.getParentFile().mkdirs();
-    }
-    ImageIO.write(img, "png", outFile);
+    return img;
   }
 
   @Test
@@ -1655,22 +1593,15 @@ public class DownsamplingStrideBenchmarkTest {
     assertEquals(0, duplicates, "Dyadic subset permutation must produce zero duplicates");
 
     // Render R=1024 High-Resolution Chart PNG
-    File chartFile = new File("accumulate_dyadic_r1024_chart.png");
-    File reportFile = new File("build/reports/player_distribution/accumulate_dyadic_r1024_chart.png");
-    File testServerFile = new File("C:\\GameServers\\Minecraft\\testServer\\RTP-Folia\\26.1\\plugins\\RTP\\database\\regionData\\debug\\accumulate_dyadic_r1024_chart.png");
+    BufferedImage accumImg = renderAccumulateR1024Chart(shape, runTable, goodArrivals, trailLen, R1024, CR64);
+    ChartOutputHelper.writeChart(accumImg, "player_distribution", "accumulate_dyadic_r1024_chart.png");
 
-    renderAccumulateR1024Chart(shape, runTable, goodArrivals, trailLen, R1024, CR64, chartFile);
-    renderAccumulateR1024Chart(shape, runTable, goodArrivals, trailLen, R1024, CR64, reportFile);
-    if (testServerFile.getParentFile() != null && testServerFile.getParentFile().exists()) {
-      renderAccumulateR1024Chart(shape, runTable, goodArrivals, trailLen, R1024, CR64, testServerFile);
-    }
-
-    System.out.println("[DEBUG_LOG] Saved R=1024 Accumulate Chart to: " + chartFile.getAbsolutePath());
+    System.out.println("[DEBUG_LOG] Saved R=1024 Accumulate Chart to canonical destination");
   }
 
-  private static void renderAccumulateR1024Chart(
+  private static BufferedImage renderAccumulateR1024Chart(
       CircleOptimizedDualLayer shape, SegmentedKeyRunTable runTable, List<ChunkCoord> arrivals,
-      int trailLen, int R, int CR, File outFile) throws Exception {
+      int trailLen, int R, int CR) throws Exception {
 
     int mapDim = 600; // Scaled 600x600 preview for R=1024 (downsampled 1 px = 3.4 chunks)
     int margin = 30;
@@ -1796,10 +1727,7 @@ public class DownsamplingStrideBenchmarkTest {
     g.drawString("Selection Speed: < 80 ns/select | Exact Duplicates: 0 (0.0%) | Hazards: 0", p2X + 10, statY + 16);
 
     g.dispose();
-    if (outFile.getParentFile() != null && !outFile.getParentFile().exists()) {
-      outFile.getParentFile().mkdirs();
-    }
-    ImageIO.write(img, "png", outFile);
+    return img;
   }
 
   private static void drawScaledDonut(Graphics2D g, int x, int y, int size, int r, int cr) {
@@ -1894,24 +1822,10 @@ public class DownsamplingStrideBenchmarkTest {
     // Model 4: Option C - Min-Distance Rejection Gate (D >= 16 chunks)
     SpacingData dataGate = generateGatedPRP(shape, testSamples, trailSteps, secretKey, 16, recallN);
 
-    File outFile = new File("spacing_strategies_comparison_chart.png");
-    File reportFile = new File("build/reports/player_distribution/spacing_strategies_comparison_chart.png");
-    File repoRootFile = new File("../spacing_strategies_comparison_chart.png");
-    File docsFile = new File("../docs/assets/img/spacing_strategies_comparison_chart.png");
-    if (!docsFile.getParentFile().exists()) docsFile = new File("docs/assets/img/spacing_strategies_comparison_chart.png");
-    File testServerFile = new File("C:\\GameServers\\Minecraft\\testServer\\RTP-Folia\\26.1\\plugins\\RTP\\database\\regionData\\debug\\spacing_strategies_comparison_chart.png");
+    BufferedImage spaceImg = renderSpacingGraph(dataStandard, dataTournament, dataDyadic, dataGate);
+    ChartOutputHelper.writeChart(spaceImg, "player_distribution", "spacing_strategies_comparison_chart.png");
 
-    renderSpacingGraph(dataStandard, dataTournament, dataDyadic, dataGate, outFile);
-    renderSpacingGraph(dataStandard, dataTournament, dataDyadic, dataGate, repoRootFile);
-    if (docsFile.getParentFile().exists()) {
-      renderSpacingGraph(dataStandard, dataTournament, dataDyadic, dataGate, docsFile);
-    }
-    renderSpacingGraph(dataStandard, dataTournament, dataDyadic, dataGate, reportFile);
-    if (testServerFile.getParentFile() != null && testServerFile.getParentFile().exists()) {
-      renderSpacingGraph(dataStandard, dataTournament, dataDyadic, dataGate, testServerFile);
-    }
-
-    System.out.println("[DEBUG_LOG] Successfully rendered 4-way spacing graph to: " + outFile.getAbsolutePath());
+    System.out.println("[DEBUG_LOG] Successfully rendered 4-way spacing graph to canonical destination");
     assertTrue(dataStandard.allPoints.size() > 0);
   }
 
@@ -2078,8 +1992,8 @@ public class DownsamplingStrideBenchmarkTest {
     return d;
   }
 
-  private static void renderSpacingGraph(
-      SpacingData d1, SpacingData d2, SpacingData d3, SpacingData d4, File outFile) throws Exception {
+  private static BufferedImage renderSpacingGraph(
+      SpacingData d1, SpacingData d2, SpacingData d3, SpacingData d4) throws Exception {
 
     int mapDim = 2 * DEFAULT_R + 2;
     int margin = 25;
@@ -2177,10 +2091,7 @@ public class DownsamplingStrideBenchmarkTest {
     }
 
     g.dispose();
-    if (outFile.getParentFile() != null && !outFile.getParentFile().exists()) {
-      outFile.getParentFile().mkdirs();
-    }
-    ImageIO.write(img, "png", outFile);
+    return img;
   }
 
   @Test
@@ -2297,24 +2208,10 @@ public class DownsamplingStrideBenchmarkTest {
     SimulationResult resHilbert = runSimulation(hilbertRandom, totalTeleports, viewDistance, seed, 1, 0, false, false, 0, false);
     SimulationResult resPRP = runPRPSimulation(prpShape, totalTeleports, viewDistance, seed);
 
-    File chartFile = new File("player_distribution_prp_chart.png");
-    File reportChartFile = new File("build/reports/player_distribution/player_distribution_prp_chart.png");
-    File repoRootChartFile = new File("../player_distribution_prp_chart.png");
-    File docsChartFile = new File("../docs/assets/img/player_distribution_prp_chart.png");
-    if (!docsChartFile.getParentFile().exists()) docsChartFile = new File("docs/assets/img/player_distribution_prp_chart.png");
-    File testServerChartFile = new File("C:\\GameServers\\Minecraft\\testServer\\RTP-Folia\\26.1\\plugins\\RTP\\database\\regionData\\debug\\player_distribution_prp_chart.png");
+    BufferedImage prpImg = renderFullChartPNG(resPolar, resHilbert, resPRP);
+    ChartOutputHelper.writeChart(prpImg, "player_distribution", "player_distribution_prp_chart.png");
 
-    renderFullChartPNG(resPolar, resHilbert, resPRP, chartFile);
-    renderFullChartPNG(resPolar, resHilbert, resPRP, repoRootChartFile);
-    if (docsChartFile.getParentFile().exists()) {
-      renderFullChartPNG(resPolar, resHilbert, resPRP, docsChartFile);
-    }
-    renderFullChartPNG(resPolar, resHilbert, resPRP, reportChartFile);
-    if (testServerChartFile.getParentFile().exists()) {
-      renderFullChartPNG(resPolar, resHilbert, resPRP, testServerChartFile);
-    }
-
-    System.out.println("[DEBUG_LOG] Successfully rendered PRP comparison chart to: " + chartFile.getAbsolutePath());
+    System.out.println("[DEBUG_LOG] Successfully rendered PRP comparison chart to canonical destination");
     assertTrue(resPRP.totalTeleports > 0);
   }
 
@@ -2397,8 +2294,8 @@ public class DownsamplingStrideBenchmarkTest {
     return res;
   }
 
-  private static void renderFullChartPNG(
-      SimulationResult polar, SimulationResult hilbert, SimulationResult prp, File outFile) throws Exception {
+  private static BufferedImage renderFullChartPNG(
+      SimulationResult polar, SimulationResult hilbert, SimulationResult prp) throws Exception {
 
     int mapDim = polar.dim;
     int margin = 30;
@@ -2510,10 +2407,7 @@ public class DownsamplingStrideBenchmarkTest {
         new Color[]{new Color(0xE53935), new Color(0xE53935), new Color(0x43A047)});
 
     g.dispose();
-    if (outFile.getParentFile() != null && !outFile.getParentFile().exists()) {
-      outFile.getParentFile().mkdirs();
-    }
-    ImageIO.write(img, "png", outFile);
+    return img;
   }
 
   private static void drawMetricRow(Graphics2D g, int x, int y, String label, String[] tags, double[] fractions, Color[] colors) {
@@ -2583,7 +2477,8 @@ public class DownsamplingStrideBenchmarkTest {
     int halfBits = bits / 2;
     long halfMask = (1L << halfBits) - 1L;
 
-    long candidate = val;
+    long fullMask = (bits == 64) ? -1L : ((1L << bits) - 1L);
+    long candidate = val & fullMask;
     // Cycle-walking: if candidate >= domainSize, encrypt again until < domainSize
     do {
       long l = (candidate >>> halfBits) & halfMask;
@@ -2591,13 +2486,13 @@ public class DownsamplingStrideBenchmarkTest {
 
       for (int round = 0; round < 4; round++) {
         long roundKey = seed ^ (0x9E3779B97F4A7C15L * (round + 1));
-        // Round function F(r, key)
-        long f = (r ^ roundKey);
-        f ^= (f >>> 16);
-        f *= 0x85ebca6b;
-        f ^= (f >>> 13);
-        f *= 0xc2b2ae35;
-        f ^= (f >>> 16);
+        long v0 = r & halfMask;
+        long v1 = roundKey;
+        v0 += v1; v1 = Long.rotateLeft(v1, 13); v1 ^= v0;
+        v0 = Long.rotateLeft(v0, 32);
+        v1 += v0; v0 = Long.rotateLeft(v0, 17); v0 ^= v1;
+        v1 = Long.rotateLeft(v1, 21);
+        long f = (v0 ^ v1) & halfMask;
         long newL = r;
         long newR = (l ^ f) & halfMask;
         l = newL;

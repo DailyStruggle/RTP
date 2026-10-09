@@ -2,19 +2,12 @@
 
 First-class runtime verification fixture for the cross-server `/rtp` slice
 (CHECKLIST-cross-server-rtp.md L3). Boots 1 Redis + 2 Velocity proxies + 2
-Paper lobbies + 3 backends (Paper / Folia / Folia) on a
+Paper lobbies + 4 backends (Paper / Folia / Fabric / NeoForge) on a
 single docker-compose network and exercises the round-trip, kill-mid-flight,
 and kill-switch scenarios.
 
-The backends are: `backend-a` runs Paper, while `backend-b` and `backend-c`
-run Folia. Mixing Paper and Folia exercises both scheduler families, so a
-Paper-compiles-but-Folia-blows-up regression surfaces here rather than in a
-user report. Every `/rtp` round-trip routes through the `BackendSelector`
+The backends are: `backend-a` runs Paper, `backend-b` runs Folia, `backend-c` runs Fabric, and `backend-d` runs NeoForge. Mixing Paper, Folia, Fabric, and NeoForge exercises all four platform scheduler and modding runtime families simultaneously, so platform regressions surface here immediately rather than in production. Every `/rtp` round-trip routes through the `BackendSelector`
 against these platform adapters at once.
-
-> `backend-c` previously ran Fabric to exercise the `rtp-fabric` adapter; it
-> has been switched to Folia for this run so the stack boots entirely on the
-> Bukkit/Paper-family platforms (no Fabric mod runtime required).
 
 ## Topology
 
@@ -26,7 +19,10 @@ client ---> | proxy-a   |---+--->| lobby-a   |---+--->| backend-a | (Paper)
                             |                    |    | backend-b | (Folia)
             +-----------+   +--->+-----------+   |    +-----------+
 client ---> | proxy-b   |------->| lobby-b   |---+--->+-----------+
-            +-----------+        +-----------+        | backend-c | (Folia)
+            +-----------+        +-----------+   |    | backend-c | (Fabric)
+                                                 |    +-----------+
+                                                 +--->+-----------+
+                                                      | backend-d | (NeoForge)
                                                       +-----------+
                                        \                  /
                                         +---> redis <----+
@@ -172,14 +168,9 @@ cd devstack
 .\run-acceptance.ps1 -Lite -Scenario roundtrip
 ```
 
-1. Connect a client to `localhost:25577` (proxy-a). You land on `backend-a`.
-2. Run `/server backend-b` then `/server backend-c` once each. This matters on
-   the lite tier specifically: a backend can only emit its heartbeat / complete
-   auto-detection once a player connection exists on it (plugin messages cannot
-   flow on a player-empty backend), so visiting each backend seeds availability
-   gossip. A freshly-idled Fabric/NeoForge backend self-pauses after ~60 s with
-   no players, so its availability reverts to unknown until someone hops back.
-3. From the client, run `/rtp` (or the cross-server region form) and observe the
+1. Connect a client to `localhost:25577` (proxy-a). You land on `lobby-a` (or `backend-a`).
+2. Under `proxy-direct` transport (rtp-proxy-ADR-017), backends dial the proxy companion's TCP port at boot to register their regions automatically—no manual player visits or server hopping required.
+3. From the client, run `/rtp` (or the cross-server region form `/rtp region=<server>:<region>`) and observe the
    player being moved to another backend and teleported there.
 4. Confirm in the destination backend's log window that it ran its local
    teleport pipeline on arrival.

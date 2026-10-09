@@ -16,6 +16,11 @@ network:
   # @default: "RTP_NET_SECRET"
   secretEnv: "RTP_NET_SECRET"
 
+  # true = run plugin-message / proxy-cache / auto without the secret. Clients can then fake server data.
+  # @type: boolean
+  # @default: false
+  allowUnsigned: false
+
 # Backing store for cross-process state.
 transport:
   # Armazenamento de apoio do transporte.
@@ -284,5 +289,23 @@ loadBalancer:
         # @range: [0.1, 20]
         # @default: 9.0
         k: 9.0
+
+# Serviços do editor web (/rtp editor). Deixe em branco para usar os valores padrão.
+editor:
+  # Upload store for editor sessions. Default: https://bytebin.lucko.me
+  # @type: string
+  bytebinUrl: ""
+
+  # Live-update relay (bytesocks-compatible). Default: https://usersockets.luckperms.net
+  # Point this at your own bytesocks server to avoid depending on a public one.
+  # @type: string
+  relayUrl: ""
+
+  # Trusted web editor browsers (/rtp editor trust, /rtp editor untrust).
+  trust:
+    # Days a browser stays trusted after /rtp editor trust. 0 = never expires.
+    # @type: integer
+    # @default: 0
+    maxAgeDays: 0
 
 version: 1.1

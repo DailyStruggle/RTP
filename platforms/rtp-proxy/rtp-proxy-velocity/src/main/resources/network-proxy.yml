@@ -24,10 +24,11 @@ network:
   # network.yml; do not set that value here.
   role: auto
 
-  # Environment variable holding the shared HMAC secret. Required when
-  # `enabled: true` AND `transport.type: redis`; SQL binding currently
-  # treats the env var as optional (DB connection auth + TLS is the
-  # security boundary - rtp-proxy-ADR-011 Q1).
+  # Environment variable holding the shared HMAC secret.
+  # Value: Base64 of at least 32 random bytes (`openssl rand -base64 32`).
+  # Required when `enabled: true` with `transport.type: redis` or `sql`, or
+  # when the proxy-direct listener is on. A missing, non-Base64, or short
+  # secret disables network mode with an ERROR - there is no unsigned mode.
   secretEnv: RTP_NET_SECRET
 
   # ADR-015 / REQ-RTP-NET-015: shared cross-proxy wait-list. When enabled,
@@ -89,9 +90,60 @@ transport:
     # Default Redis port. Override if your deployment uses a non-standard one.
     port: 6379
 
-    # Optional. Leave empty / omitted for unauthenticated Redis (dev/test);
-    # set when Redis ACL or `requirepass` is configured.
+    # Encrypt the Redis connection with TLS (hostname-verified).
+    # Uses the JVM default trust store (`-Djavax.net.ssl.trustStore=...` for a
+    # private CA). Equivalent to writing `host: rediss://<host>`.
+    tls: false
+
+    # Redis 6+ ACL username. Empty = legacy `AUTH <password>`.
+    # When set, the proxy sends `AUTH <username> <password>`.
+    username: ""
+
+    # Environment variable holding the Redis password (preferred).
+    # Checked first; falls back to `password` below when unset.
+    passwordEnv: "RTP_REDIS_PASSWORD"
+
+    # Redis password in plain YAML. Empty = none.
+    # Prefer `passwordEnv`; a non-empty value here logs a one-time WARNING.
+    # The password is never logged.
     password: ""
+  # Proxy-direct listener: backends dial this proxy over TCP (rtp-proxy-ADR-017).
+  # Enabled by `enabled: true` here or by `transport.type: proxy-direct`.
+  # Always requires `network.secretEnv`; every frame is HMAC-signed.
+  direct:
+    # Turn the proxy-direct listener on.
+    enabled: false
+
+    # TCP port backends connect to (their `transport.proxies` entries).
+    port: 25599
+
+    # Address to listen on. Default loopback (same-host backends only).
+    # Any other address requires `tls: true`, or an explicit `tls: false`
+    # to accept plain TCP (logged as a startup WARNING).
+    bindHost: "127.0.0.1"
+
+    # Client IPs / CIDR blocks allowed to connect. Empty = any.
+    # IP literals only (no hostnames), e.g. ["10.0.0.0/24", "192.168.1.20"].
+    # A malformed entry keeps the listener off.
+    allowedClients: []
+
+    # Serve TLS on the listener. Leave unset to allow loopback-only plain TCP.
+    # true = TLS with `keystore`; false = explicit plain TCP on any bindHost.
+    # tls: true
+
+    # PKCS12 keystore with this proxy's certificate + key (TLS only).
+    keystore: ""
+
+    # Environment variable holding the keystore password.
+    # Falls back to `keystorePassword` (YAML, logs a WARNING) when unset.
+    keystorePasswordEnv: "RTP_DIRECT_KEYSTORE_PASSWORD"
+
+    # PKCS12 truststore of backend client certificates (TLS only).
+    # Set = mutual TLS: backends must present a trusted client cert.
+    truststore: ""
+
+    # Environment variable holding the truststore password.
+    truststorePasswordEnv: "RTP_DIRECT_TRUSTSTORE_PASSWORD"
 heartbeat:
   # How often this proxy publishes its state row. 1000ms is the default
   # used by both proxy-side and backend-side publishers; peers must

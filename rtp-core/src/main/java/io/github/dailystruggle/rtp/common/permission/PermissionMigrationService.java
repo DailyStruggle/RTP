@@ -1,0 +1,782 @@
+package io.github.dailystruggle.rtp.common.permission;
+
+import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporter;
+import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporterRegistry;
+import io.github.dailystruggle.rtp.common.importer.schema.GenericSchemaImporter;
+import io.github.dailystruggle.rtp.common.importer.schema.PluginImportSchema;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.io.File;
+import java.nio.file.Files;
+import java.util.*;
+import java.util.logging.Level;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Service for scanning, mapping, and migrating permissions non-destructively
+ * from competitor plugins (BetterRTP, JustRTP, EzRTP, JakesRTP) to LeafRTP node conventions
+ * by directly querying permission providers using configurable command templates.
+ */
+public class PermissionMigrationService {
+
+    public static final String DEFAULT_GROUP_LIST_TEMPLATE = "lp listgroups";
+    public static final String DEFAULT_GROUP_GET_TEMPLATE = "lp group [group] permission info";
+    public static final String DEFAULT_GROUP_SET_TEMPLATE = "lp group [group] permission set [permission] [value] [contexts]";
+    public static final String DEFAULT_GROUP_UNSET_TEMPLATE = "lp group [group] permission unset [permission] [contexts]";
+    public static final String DEFAULT_USER_LIST_TEMPLATE = "lp listusers";
+    public static final String DEFAULT_USER_GET_TEMPLATE = "lp user [user] permission info";
+    public static final String DEFAULT_USER_SET_TEMPLATE = "lp user [user] permission set [permission] [value] [contexts]";
+    public static final String DEFAULT_USER_UNSET_TEMPLATE = "lp user [user] permission unset [permission] [contexts]";
+
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+    private static final Pattern GROUP_TOKEN_SEPARATORS = Pattern.compile("[,;\\s]+");
+    private static final Pattern CONTEXT_SEPARATORS = Pattern.compile("[,;]+");
+    private static final Pattern TOKEN_PUNCTUATION = Pattern.compile("[()\\[\\]{}:,\"]");
+    private static final Pattern COLOR_CODES = Pattern.compile("[§&][0-9a-fk-orA-FK-OR]");
+    private static final Pattern ANSI_ESCAPES = Pattern.compile("\u001B\\[[;?0-9]*[a-zA-Z]");
+    private static final Pattern SHORTHAND_FLAG = Pattern.compile("^[a-z]\\s++.*+");
+
+    private String groupListTemplate = DEFAULT_GROUP_LIST_TEMPLATE;
+    private String groupGetTemplate = DEFAULT_GROUP_GET_TEMPLATE;
+    private String groupSetTemplate = DEFAULT_GROUP_SET_TEMPLATE;
+    private String groupUnsetTemplate = DEFAULT_GROUP_UNSET_TEMPLATE;
+    private String userListTemplate = DEFAULT_USER_LIST_TEMPLATE;
+    private String userGetTemplate = DEFAULT_USER_GET_TEMPLATE;
+    private String userSetTemplate = DEFAULT_USER_SET_TEMPLATE;
+    private String userUnsetTemplate = DEFAULT_USER_UNSET_TEMPLATE;
+
+    public PermissionMigrationService() {
+        loadTemplatesFromConfig();
+    }
+
+    /**
+     * Attempts to read command templates from integrations.yml if present.
+     */
+    public void loadTemplatesFromConfig() {
+        File pluginDir = null;
+        if (RTP.configs != null && RTP.configs.pluginDirectory != null) {
+            pluginDir = RTP.configs.pluginDirectory;
+        } else if (RTP.serverAccessor != null) {
+            pluginDir = RTP.serverAccessor.getPluginDirectory();
+        }
+
+        if (pluginDir == null) return;
+
+        File[] candidateFiles = new File[]{
+                new File(new File(pluginDir, "addons"), "integrations.yml"),
+                new File(pluginDir, "integrations.yml")
+        };
+
+        for (File candidate : candidateFiles) {
+            if (candidate.isFile()) {
+                try {
+                    String content = Files.readString(candidate.toPath());
+                    RtpYamlConfig yaml = RtpYamlConfig.parse(content);
+                    String gl = yaml.getString("permissions.command_templates.group_list");
+                    String gg = yaml.getString("permissions.command_templates.group_get");
+                    String gs = yaml.getString("permissions.command_templates.group_set");
+                    String gu = yaml.getString("permissions.command_templates.group_unset");
+                    String ul = yaml.getString("permissions.command_templates.user_list");
+                    String ug = yaml.getString("permissions.command_templates.user_get");
+                    String us = yaml.getString("permissions.command_templates.user_set");
+                    String uu = yaml.getString("permissions.command_templates.user_unset");
+
+                    if (gl != null && !gl.isBlank()) this.groupListTemplate = gl;
+                    if (gg != null && !gg.isBlank()) this.groupGetTemplate = gg;
+                    if (gs != null && !gs.isBlank()) this.groupSetTemplate = gs;
+                    if (gu != null && !gu.isBlank()) this.groupUnsetTemplate = gu;
+                    if (ul != null && !ul.isBlank()) this.userListTemplate = ul;
+                    if (ug != null && !ug.isBlank()) this.userGetTemplate = ug;
+                    if (us != null && !us.isBlank()) this.userSetTemplate = us;
+                    if (uu != null && !uu.isBlank()) this.userUnsetTemplate = uu;
+                    break;
+                } catch (Exception e) {
+                    RTP.log(Level.WARNING, "[RTP] Failed to load permissions templates from " + candidate, e);
+                }
+            }
+        }
+    }
+
+    public String getGroupListTemplate() {
+        return groupListTemplate;
+    }
+
+    public void setGroupListTemplate(String groupListTemplate) {
+        this.groupListTemplate = groupListTemplate;
+    }
+
+    public String getGroupGetTemplate() {
+        return groupGetTemplate;
+    }
+
+    public void setGroupGetTemplate(String groupGetTemplate) {
+        this.groupGetTemplate = groupGetTemplate;
+    }
+
+    public String getGroupSetTemplate() {
+        return groupSetTemplate;
+    }
+
+    public void setGroupSetTemplate(String groupSetTemplate) {
+        this.groupSetTemplate = groupSetTemplate;
+    }
+
+    public String getGroupUnsetTemplate() {
+        return groupUnsetTemplate;
+    }
+
+    public void setGroupUnsetTemplate(String groupUnsetTemplate) {
+        this.groupUnsetTemplate = groupUnsetTemplate;
+    }
+
+    public String getUserListTemplate() {
+        return userListTemplate;
+    }
+
+    public void setUserListTemplate(String userListTemplate) {
+        this.userListTemplate = userListTemplate;
+    }
+
+    public String getUserGetTemplate() {
+        return userGetTemplate;
+    }
+
+    public void setUserGetTemplate(String userGetTemplate) {
+        this.userGetTemplate = userGetTemplate;
+    }
+
+    public String getUserSetTemplate() {
+        return userSetTemplate;
+    }
+
+    public void setUserSetTemplate(String userSetTemplate) {
+        this.userSetTemplate = userSetTemplate;
+    }
+
+    public String getUserUnsetTemplate() {
+        return userUnsetTemplate;
+    }
+
+    public void setUserUnsetTemplate(String userUnsetTemplate) {
+        this.userUnsetTemplate = userUnsetTemplate;
+    }
+
+    /**
+     * Map a single competitor permission node to the corresponding LeafRTP node(s).
+     */
+    @NotNull
+    public List<String> mapPermission(@Nullable String sourcePermission) {
+        List<String> schema = mapSchemaPermission(sourcePermission);
+        return schema.isEmpty() ? mapGenericPermission(sourcePermission) : schema;
+    }
+
+    /** Explicit per-plugin equivalences declared by registered import schemas. */
+    @NotNull
+    List<String> mapSchemaPermission(@Nullable String sourcePermission) {
+        if (sourcePermission == null || sourcePermission.isBlank()) {
+            return Collections.emptyList();
+        }
+
+        String lower = sourcePermission.trim().toLowerCase(Locale.ROOT);
+        List<String> mapped = new ArrayList<>();
+
+        // Schema-defined dynamic plugin mappings (if any registered)
+        for (ForeignConfigImporter importer : ForeignConfigImporterRegistry.getAllImporters()) {
+            if (importer instanceof GenericSchemaImporter gsi) {
+                PluginImportSchema schema = gsi.getSchema();
+                for (Map.Entry<String, String> eq : schema.permissionEquivalences().entrySet()) {
+                    String pattern = eq.getKey().toLowerCase(Locale.ROOT);
+                    String target = eq.getValue();
+                    if (pattern.contains("{world}")) {
+                        String prefix = pattern.substring(0, pattern.indexOf("{world}"));
+                        String post = pattern.substring(pattern.indexOf("{world}") + "{world}".length());
+                        if (lower.startsWith(prefix) && lower.endsWith(post) && lower.length() >= (prefix.length() + post.length())) {
+                            String worldVar = lower.substring(prefix.length(), lower.length() - post.length());
+                            mapped.add(target.replace("{world}", worldVar));
+                        }
+                    } else if (lower.equals(pattern)) {
+                        mapped.add(target);
+                    }
+                }
+            }
+        }
+        return Collections.unmodifiableList(mapped);
+    }
+
+    /** Suffix-based mapping for any {@code <plugin>.<suffix>} node; callers scope which prefixes reach it. */
+    @NotNull
+    List<String> mapGenericPermission(@Nullable String sourcePermission) {
+        if (sourcePermission == null || sourcePermission.isBlank()) {
+            return Collections.emptyList();
+        }
+
+        String lower = sourcePermission.trim().toLowerCase(Locale.ROOT);
+        List<String> mapped = new ArrayList<>();
+
+        // Generic permission suffix resolution:
+        // Any RTP plugin permission node is structured as <plugin>.<action/target>
+        int firstDot = lower.indexOf('.');
+        if (firstDot > 0 && firstDot < lower.length() - 1) {
+            String suffix = lower.substring(firstDot + 1);
+
+            switch (suffix) {
+                case "*":
+                    mapped.add("rtp.*");
+                    break;
+                case "use":
+                case "rtp":
+                case "teleport":
+                case "usebyname":
+                    mapped.add("rtp.use");
+                    break;
+                case "world":
+                    mapped.add("rtp.world");
+                    break;
+                case "world.*":
+                case "worlds.*":
+                    mapped.add("rtp.worlds.*");
+                    break;
+                case "biome":
+                    if (lower.startsWith("justrtp.")) {
+                        mapped.add("rtp.biome");
+                    } else {
+                        mapped.add("rtp.biome.*");
+                    }
+                    break;
+                case "biome.*":
+                case "biomes.*":
+                    mapped.add("rtp.biome.*");
+                    break;
+                case "bypass.cooldown":
+                case "cooldown.bypass":
+                case "nocooldown":
+                    mapped.add("rtp.noCooldown");
+                    break;
+                case "bypass.delay":
+                case "delay.bypass":
+                case "nodelay":
+                case "nowarmup":
+                case "bypass.warmup":
+                    mapped.add("rtp.noDelay");
+                    break;
+                case "bypass.economy":
+                case "bypass.cost":
+                case "cost.bypass":
+                case "bypass.hunger":
+                case "free":
+                    mapped.add("rtp.free");
+                    break;
+                case "player":
+                case "other":
+                case "others":
+                case "forcertp":
+                    mapped.add("rtp.other");
+                    break;
+                case "rtpondeath":
+                    mapped.add("rtp.onEvent.respawn");
+                    break;
+                case "reload":
+                    mapped.add("rtp.reload");
+                    break;
+                case "admin":
+                case "permpack.admin":
+                    mapped.add("rtp.admin");
+                    break;
+                default:
+                    if (suffix.startsWith("world.")) {
+                        String worldName = suffix.substring("world.".length());
+                        mapped.add("rtp.worlds." + worldName);
+                    } else if (suffix.startsWith("worlds.")) {
+                        String worldName = suffix.substring("worlds.".length());
+                        mapped.add("rtp.worlds." + worldName);
+                    } else if (suffix.startsWith("gui.world.")) {
+                        String worldName = suffix.substring("gui.world.".length());
+                        mapped.add("rtp.worlds." + worldName);
+                    } else if (suffix.startsWith("gui.paid.")) {
+                        String worldName = suffix.substring("gui.paid.".length());
+                        mapped.add("rtp.worlds." + worldName);
+                    } else if (suffix.startsWith("biome.")) {
+                        String biomeName = suffix.substring("biome.".length());
+                        mapped.add("rtp.biome." + biomeName);
+                    } else if (suffix.startsWith("use.")) {
+                        String target = suffix.substring("use.".length());
+                        mapped.add("rtp.regions." + target);
+                    } else if (suffix.startsWith("profile.")) {
+                        String profile = suffix.substring("profile.".length());
+                        mapped.add("rtp.regions." + profile);
+                    } else if (suffix.startsWith("bypass.cooldown.") || suffix.startsWith("nocooldown.")) {
+                        mapped.add("rtp.noCooldown");
+                    } else if (suffix.startsWith("bypass.delay.") || suffix.startsWith("nowarmup.")) {
+                        mapped.add("rtp.noDelay");
+                    }
+                    break;
+            }
+        }
+
+        return Collections.unmodifiableList(mapped);
+    }
+
+    /**
+     * String-parse the output lines of a group list command (e.g. {@code lp listgroups}).
+     * Handles formats like:
+     * - "Groups: default, admin, vip, moderator"
+     * - "- default"
+     * - "> default"
+     * - "default (weight: 10)"
+     *
+     * @param lines raw string output lines
+     * @return list of parsed group names
+     */
+    @NotNull
+    public List<String> parseGroupListOutput(@Nullable Collection<String> lines) {
+        if (lines == null || lines.isEmpty()) return Collections.emptyList();
+        Set<String> groups = new LinkedHashSet<>();
+
+        for (String raw : lines) {
+            if (raw == null) continue;
+            String line = cleanAnsiAndColors(raw).trim();
+            if (line.isEmpty()) continue;
+
+            // Strip plugin prefixes like "[LP]" or "[LuckPerms]"
+            if (line.startsWith("[") && line.contains("]")) {
+                line = line.substring(line.indexOf(']') + 1).trim();
+            }
+
+            // LuckPerms typical: "Groups: default, vip, admin" (but skip header row "Groups: (name, weight, tracks)")
+            if (line.toLowerCase(Locale.ROOT).startsWith("groups:") || line.toLowerCase(Locale.ROOT).startsWith("groups -")) {
+                int idx = line.indexOf(':');
+                if (idx < 0) idx = line.indexOf('-');
+                String rest = line.substring(idx + 1).trim();
+                // If it is a header row like "(name, weight, tracks)", skip it
+                if (rest.startsWith("(") && rest.contains("weight")) {
+                    continue;
+                }
+                for (String token : GROUP_TOKEN_SEPARATORS.split(rest)) {
+                    token = cleanToken(token);
+                    if (!token.isEmpty()) groups.add(token);
+                }
+            } else if (line.startsWith("-") || line.startsWith("*") || line.startsWith(">")) {
+                String token = line.substring(1).trim();
+                // If token contains weight or metadata in parens e.g. "vip (weight: 10)", take first word
+                if (token.contains("(")) {
+                    token = token.substring(0, token.indexOf('(')).trim();
+                }
+                // If token contains hyphen-separated metadata like "-  default - 0", split and take first non-empty word
+                if (token.contains(" - ")) {
+                    String[] parts = token.split(" - ");
+                    for (String part : parts) {
+                        String clean = cleanToken(part);
+                        if (!clean.isEmpty()) {
+                            token = clean;
+                            break;
+                        }
+                    }
+                }
+                token = cleanToken(token);
+                if (!token.isEmpty()) groups.add(token);
+            }
+        }
+
+        return new ArrayList<>(groups);
+    }
+
+    private static final Pattern GROUP_NAME_PATTERN = Pattern.compile("^[A-Za-z0-9_-]+$");
+
+    private static String cleanToken(String token) {
+        if (token == null) return "";
+        // Remove trailing or leading parenthesis, brackets, quotes
+        token = TOKEN_PUNCTUATION.matcher(token).replaceAll("").trim();
+        // Skip metadata phrases
+        if (token.equalsIgnoreCase("weight") || token.equalsIgnoreCase("inherited")
+                || token.equalsIgnoreCase("group") || token.equalsIgnoreCase("name")
+                || token.equalsIgnoreCase("tracks") || token.equalsIgnoreCase("displayname")) {
+            return "";
+        }
+        if (!GROUP_NAME_PATTERN.matcher(token).matches()) {
+            return "";
+        }
+        return token;
+    }
+
+    private static String cleanAnsiAndColors(String s) {
+        if (s == null) return "";
+        // Strip Minecraft color codes (§x or &x)
+        String c = COLOR_CODES.matcher(s).replaceAll("");
+        // Strip ANSI escapes
+        return ANSI_ESCAPES.matcher(c).replaceAll("");
+    }
+
+    /**
+     * Represents a single parsed permission node with its value and context qualifier string.
+     */
+    public static class ParsedNode {
+        private final String permission;
+        private final boolean value;
+        private final String contexts; // e.g. "world=world_nether server=survival"
+
+        public ParsedNode(String permission, boolean value, String contexts) {
+            this.permission = permission;
+            this.value = value;
+            this.contexts = contexts != null ? contexts.trim() : "";
+        }
+
+        public String getPermission() {
+            return permission;
+        }
+
+        public boolean getValue() {
+            return value;
+        }
+
+        public String getContexts() {
+            return contexts;
+        }
+    }
+
+    private static final Pattern LP_NODE_PATTERN = Pattern.compile(
+            "([a-zA-Z0-9_.-]+)\\s*(?:\\((true|false)\\))?\\s*(?:[\\(\\[]([^\\]\\)]+)[\\)\\]])?"
+    );
+
+    /**
+     * String-parse permission info output lines from a provider (e.g. {@code lp group <group> permission info}).
+     * Extracts permission node, boolean value, and any attached contexts.
+     */
+    @NotNull
+    public List<ParsedNode> parsePermissionInfoOutput(@Nullable Collection<String> lines) {
+        if (lines == null || lines.isEmpty()) return Collections.emptyList();
+        List<ParsedNode> result = new ArrayList<>();
+
+        for (String raw : lines) {
+            if (raw == null) continue;
+            String line = cleanAnsiAndColors(raw).trim();
+            if (line.isEmpty() || line.toLowerCase(Locale.ROOT).startsWith("page") || line.toLowerCase(Locale.ROOT).startsWith("showing")) {
+                continue;
+            }
+
+            // Skip plugin headers like "[LP] default's Permissions:" or "Permissions:"
+            if (line.endsWith(":") || line.toLowerCase(Locale.ROOT).contains("'s permissions") || line.toLowerCase(Locale.ROOT).contains("'s nodes")) {
+                continue;
+            }
+
+            // Remove leading list bullets (+, -, >, *)
+            if (line.startsWith("+") || line.startsWith("-") || line.startsWith(">") || line.startsWith("*")) {
+                line = line.substring(1).trim();
+            }
+
+            // Remove LuckPerms shorthand flags like "d " or "g " if present
+            if (SHORTHAND_FLAG.matcher(line).matches()) {
+                line = line.substring(2).trim();
+            }
+
+            Matcher matcher = LP_NODE_PATTERN.matcher(line);
+            if (matcher.find()) {
+                String node = matcher.group(1);
+                if (node == null || node.equalsIgnoreCase("nodes") || node.equalsIgnoreCase("permission") || node.equalsIgnoreCase("permissions")) {
+                    continue;
+                }
+
+                boolean val = true;
+                String valStr = matcher.group(2);
+                if (valStr != null) {
+                    val = Boolean.parseBoolean(valStr);
+                }
+
+                String contextsRaw = matcher.group(3);
+                String contextsFormatted = "";
+                if (contextsRaw != null && !contextsRaw.isBlank()) {
+                    // Turn "world=nether, server=survival" or "world=nether server=survival" into "world=nether server=survival"
+                    StringBuilder ctxBuilder = new StringBuilder();
+                    for (String part : CONTEXT_SEPARATORS.split(contextsRaw)) {
+                        part = part.trim();
+                        if (!part.isEmpty() && part.contains("=")) {
+                            if (ctxBuilder.length() > 0) ctxBuilder.append(" ");
+                            ctxBuilder.append(part);
+                        }
+                    }
+                    contextsFormatted = ctxBuilder.toString();
+                }
+
+                result.add(new ParsedNode(node, val, contextsFormatted));
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Build command for setting a user permission.
+     */
+    public String formatUserSet(String user, String permission, boolean value, String contexts) {
+        String ctx = (contexts != null && !contexts.isBlank()) ? " " + contexts.trim() : "";
+        return collapseWhitespace(userSetTemplate
+                .replace("[user]", user)
+                .replace("[permission]", permission)
+                .replace("[value]", String.valueOf(value))
+                .replace("[contexts]", ctx));
+    }
+
+    /**
+     * Build command for unsetting a user permission.
+     */
+    public String formatUserUnset(String user, String permission, String contexts) {
+        String ctx = (contexts != null && !contexts.isBlank()) ? " " + contexts.trim() : "";
+        return collapseWhitespace(userUnsetTemplate
+                .replace("[user]", user)
+                .replace("[permission]", permission)
+                .replace("[contexts]", ctx));
+    }
+
+    /**
+     * Build command for setting a group permission.
+     */
+    public String formatGroupSet(String group, String permission, boolean value, String contexts) {
+        if (group == null || !GROUP_NAME_PATTERN.matcher(group).matches()) {
+            throw new IllegalArgumentException("Invalid group name: " + group);
+        }
+        String ctx = (contexts != null && !contexts.isBlank()) ? " " + contexts.trim() : "";
+        return collapseWhitespace(groupSetTemplate
+                .replace("[group]", group)
+                .replace("[permission]", permission)
+                .replace("[value]", String.valueOf(value))
+                .replace("[contexts]", ctx));
+    }
+
+    /**
+     * Build command for unsetting a group permission.
+     */
+    public String formatGroupUnset(String group, String permission, String contexts) {
+        if (group == null || !GROUP_NAME_PATTERN.matcher(group).matches()) {
+            throw new IllegalArgumentException("Invalid group name: " + group);
+        }
+        String ctx = (contexts != null && !contexts.isBlank()) ? " " + contexts.trim() : "";
+        return collapseWhitespace(groupUnsetTemplate
+                .replace("[group]", group)
+                .replace("[permission]", permission)
+                .replace("[contexts]", ctx));
+    }
+
+    private static String collapseWhitespace(String s) {
+        return WHITESPACE.matcher(s).replaceAll(" ").trim();
+    }
+
+    public String formatGroupGet(String group) {
+        if (group == null || !GROUP_NAME_PATTERN.matcher(group).matches()) {
+            throw new IllegalArgumentException("Invalid group name: " + group);
+        }
+        return groupGetTemplate.replace("[group]", group).trim();
+    }
+
+    public String formatUserGet(String user) {
+        return userGetTemplate.replace("[user]", user).trim();
+    }
+
+    /**
+     * Result of a permission migration inspection or execution.
+     */
+    public static class MigrationPlan {
+        private final List<PermissionEntry> mappedEntries = new ArrayList<>();
+        private final List<String> generatedCommands = new ArrayList<>();
+        private final List<String> executedCommands = new ArrayList<>();
+        private final List<String> errors = new ArrayList<>();
+        private final List<String> skippedPrivileged = new ArrayList<>();
+        private final boolean applied;
+
+        public MigrationPlan(boolean applied) {
+            this.applied = applied;
+        }
+
+        /** {@code source -> target} mappings withheld because the target is broad and no source was named. */
+        public List<String> getSkippedPrivileged() {
+            return Collections.unmodifiableList(skippedPrivileged);
+        }
+
+        public void addEntry(PermissionEntry entry, String command) {
+            mappedEntries.add(entry);
+            generatedCommands.add(command);
+        }
+
+        public List<PermissionEntry> getMappedEntries() {
+            return Collections.unmodifiableList(mappedEntries);
+        }
+
+        public List<String> getGeneratedCommands() {
+            return Collections.unmodifiableList(generatedCommands);
+        }
+
+        public List<String> getExecutedCommands() {
+            return executedCommands;
+        }
+
+        public List<String> getErrors() {
+            return errors;
+        }
+
+        public boolean isApplied() {
+            return applied;
+        }
+    }
+
+    public static class PermissionEntry {
+        private final String targetType; // "user" or "group"
+        private final String targetName; // username or group name
+        private final String sourcePermission;
+        private final String targetPermission;
+        private final boolean value;
+        private final String contexts;
+
+        public PermissionEntry(String targetType, String targetName, String sourcePermission, String targetPermission, boolean value, String contexts) {
+            this.targetType = targetType;
+            this.targetName = targetName;
+            this.sourcePermission = sourcePermission;
+            this.targetPermission = targetPermission;
+            this.value = value;
+            this.contexts = contexts != null ? contexts.trim() : "";
+        }
+
+        public String getTargetType() {
+            return targetType;
+        }
+
+        public String getTargetName() {
+            return targetName;
+        }
+
+        public String getSourcePermission() {
+            return sourcePermission;
+        }
+
+        public String getTargetPermission() {
+            return targetPermission;
+        }
+
+        public boolean getValue() {
+            return value;
+        }
+
+        public String getContexts() {
+            return contexts;
+        }
+    }
+
+    /** Broad RTP targets only ever produced when the operator names {@code source=} explicitly. */
+    static final Set<String> PRIVILEGED_TARGETS = Set.of("rtp.*", "rtp.admin", "rtp.reload");
+
+    static boolean isAllSources(@Nullable String sourceFilter) {
+        return sourceFilter != null && (sourceFilter.trim().equalsIgnoreCase("all") || sourceFilter.trim().equals("*"));
+    }
+
+    static boolean isNamedSource(@Nullable String sourceFilter) {
+        return sourceFilter != null && !sourceFilter.isBlank() && !isAllSources(sourceFilter);
+    }
+
+    /**
+     * Scans parsed nodes for a given group or user and plans non-destructive append-only migrations.
+     * Preserves world-specific and server-specific contexts.
+     * Note: competitor nodes are NEVER unset.
+     *
+     * @param targetType "user" or "group"
+     * @param targetName identifier
+     * @param parsedNodes parsed nodes held by the target
+     * @param sourceFilter optional filter (e.g. "betterrtp", "justrtp", "ezrtp"); without one, sources are
+     *                     derived from the plugin folders ({@link PermissionSourceResolver})
+     * @param apply whether to execute generated commands
+     * @return MigrationPlan detailing mapped entries and commands
+     */
+    public MigrationPlan planMigration(String targetType,
+                                      String targetName,
+                                      Collection<ParsedNode> parsedNodes,
+                                      @Nullable String sourceFilter,
+                                      boolean apply) {
+        Collection<String> derived = isNamedSource(sourceFilter) || isAllSources(sourceFilter)
+                ? Collections.emptySet()
+                : PermissionSourceResolver.deriveSources(PermissionSourceResolver.resolvePluginsDir());
+        return planMigration(targetType, targetName, parsedNodes, sourceFilter, derived, apply);
+    }
+
+    /**
+     * Same as {@link #planMigration(String, String, Collection, String, boolean)} with the derived sources supplied.
+     *
+     * <p>Scoping: a named {@code sourceFilter} keeps only nodes with that prefix and maps every suffix.
+     * {@code all} / {@code *} maps any prefix. Without a filter, schema equivalences map any node and the
+     * generic suffix mapper only nodes whose prefix matches {@code derivedSources}. Unless a source is
+     * named, broad targets ({@link #PRIVILEGED_TARGETS}) are withheld: another plugin's {@code foo.*} or
+     * {@code foo.admin} must never become RTP wildcard or admin by inference.
+     */
+    public MigrationPlan planMigration(String targetType,
+                                      String targetName,
+                                      Collection<ParsedNode> parsedNodes,
+                                      @Nullable String sourceFilter,
+                                      @Nullable Collection<String> derivedSources,
+                                      boolean apply) {
+        MigrationPlan plan = new MigrationPlan(apply);
+        boolean named = isNamedSource(sourceFilter);
+        boolean all = isAllSources(sourceFilter);
+        if (parsedNodes == null || parsedNodes.isEmpty()) {
+            return plan;
+        }
+
+        Set<String> existing = new HashSet<>();
+        for (ParsedNode node : parsedNodes) {
+            if (node != null && node.getPermission() != null) {
+                existing.add(node.getPermission().toLowerCase(Locale.ROOT));
+            }
+        }
+
+        for (ParsedNode node : parsedNodes) {
+            if (node == null || node.getPermission() == null) continue;
+            String lower = node.getPermission().trim().toLowerCase(Locale.ROOT);
+
+            if (named) {
+                String sFilter = sourceFilter.trim().toLowerCase(Locale.ROOT);
+                if (!lower.startsWith(sFilter)) {
+                    continue;
+                }
+            }
+
+            List<String> targetNodes = mapSchemaPermission(lower);
+            if (targetNodes.isEmpty() && (named || all
+                    || PermissionSourceResolver.matchesSource(lower, derivedSources))) {
+                targetNodes = mapGenericPermission(lower);
+            }
+            for (String targetNode : targetNodes) {
+                if (!named && PRIVILEGED_TARGETS.contains(targetNode.toLowerCase(Locale.ROOT))) {
+                    plan.skippedPrivileged.add(node.getPermission() + " -> " + targetNode);
+                    continue;
+                }
+                // If the target permission is not already explicitly present, schedule append-only set
+                if (!existing.contains(targetNode.toLowerCase(Locale.ROOT))) {
+                    String cmd;
+                    if ("group".equalsIgnoreCase(targetType)) {
+                        cmd = formatGroupSet(targetName, targetNode, node.getValue(), node.getContexts());
+                    } else {
+                        cmd = formatUserSet(targetName, targetNode, node.getValue(), node.getContexts());
+                    }
+                    PermissionEntry entry = new PermissionEntry(targetType, targetName, node.getPermission(), targetNode, node.getValue(), node.getContexts());
+                    plan.addEntry(entry, cmd);
+                }
+            }
+        }
+
+        if (apply) {
+            UUID consoleId = RTPAPI.serverId;
+            for (String cmd : plan.getGeneratedCommands()) {
+                boolean ok = false;
+                if (RTP.serverAccessor != null) {
+                    ok = RTP.serverAccessor.executeCommand(consoleId, cmd);
+                }
+                if (ok) {
+                    plan.executedCommands.add(cmd);
+                } else {
+                    plan.errors.add("Failed to dispatch: " + cmd);
+                }
+            }
+        }
+
+        return plan;
+    }
+}

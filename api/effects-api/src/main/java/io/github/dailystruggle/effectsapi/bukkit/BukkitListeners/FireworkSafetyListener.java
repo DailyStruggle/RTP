@@ -1,6 +1,5 @@
 package io.github.dailystruggle.effectsapi.bukkit.BukkitListeners;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Firework;
@@ -32,7 +31,8 @@ public class FireworkSafetyListener implements Listener {
     }
 
     public static void addFirework(Integer fireworkId, Integer numExplosions, Boolean isSafe) {
-        fireworkDetonations.put(fireworkId, new FireworkDetonation(fireworkId, numExplosions, isSafe));
+        int clamped = (numExplosions == null) ? 1 : Math.max(1, Math.min(8, numExplosions));
+        fireworkDetonations.put(fireworkId, new FireworkDetonation(fireworkId, clamped, isSafe));
     }
 
     //multiply explosions rather than fireworks, for fewer moving parts
@@ -50,11 +50,11 @@ public class FireworkSafetyListener implements Listener {
                 safeEntities.add(entity.getEntityId());
             }
 
-            Bukkit.getScheduler().runTaskLater(caller, () -> {
+            io.github.dailystruggle.effectsapi.bukkit.BukkitHandles.runDelayed(caller, 1L, () -> {
                 for (Entity entity : entities) {
                     safeEntities.remove(entity.getEntityId());
                 }
-            }, 1);
+            });
         }
 
         fireworkDetonations.remove(fireworkId); //remove from map to prevent recursion

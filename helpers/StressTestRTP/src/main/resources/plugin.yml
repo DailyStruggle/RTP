@@ -16,6 +16,7 @@ commands:
       /rtpstress status                         - rolling p50/p95/p99, TPS, MSPT, heap
       /rtpstress burst [n]                      - fire n concurrent dispatches once (default 10, for "TPS under 10x burst")
       /rtpstress sequence [perSec] [gapSec] [concurrency] - run each target-commands entry in turn, with a recovery gap between targets
+      /rtpstress ramp <target> [stageSec]       - fixed-rate offered-load stages against one target; finds its stress point (stop ends it)
       /rtpstress reset-cold                     - clear caches between cold-start measurements (best-effort)
       /rtpstress export                         - flush CSV and write summary.txt
       /rtpstress probe-footprint                - re-run the one-ticket chunk footprint probe (idle server only)

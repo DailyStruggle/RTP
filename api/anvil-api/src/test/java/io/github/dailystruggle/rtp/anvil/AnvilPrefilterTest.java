@@ -150,31 +150,29 @@ class AnvilPrefilterTest {
   }
 
   @Test
-  @DisplayName("Prefilter reads region bytes via AnvilRegionByteCache (OOM regression, 2026-04-23)")
-  void prefilterRoutesThroughRegionByteCache(@TempDir Path worldFolder) throws IOException {
-    // Regression guard for the 2026-04-23 OOM: AnvilPrefilter.probeSyncDetailed used
-    // to call Files.readAllBytes directly, bypassing the 16-entry LRU cache and the
-    // miss-coalescing path. Under ScanTask's 50-in-flight workload this let 50
-    // concurrent probes each allocate the same 2-8 MB .mca byte[], triggering
-    // "Retried waiting for GCLocker too often" and OOM on the ForkJoin common pool.
-    // This test asserts the prefilter now shares the same cache as
-    // BukkitRTPWorld / FoliaRTPWorld: a second probe of the same chunk must register
-    // as a cache hit.
+  @DisplayName("REQ-RTP-S-005: .mca prefilter reads only the location table and the chunk's sectors")
+  void prefilterReadsOnlyChunkSectors(@TempDir Path worldFolder) throws IOException {
+    // OOM guard (2026-04-23) and whole-file-read regression: a probe must never allocate the
+    // whole multi-MB .mca. It reads the 4 KiB location table once per window, then only the
+    // target chunk's sector run.
     writeSyntheticRegion(worldFolder, 0, 0, stoneAtOriginRoot());
+    Path regionFile = worldFolder.resolve("region").resolve("r.0.0.mca");
     AnvilRegionByteCache.invalidateAll();
-    AnvilRegionByteCache.resetStats();
+    AnvilRegionHeaderCache.invalidateAll();
+    AnvilRegionHeaderCache.resetStats();
+    AnvilSectorReader.resetStats();
     Verdict first = AnvilPrefilter.probeSync(
         worldFolder, "", 0, 0, Set.of("LAVA"));
     Verdict second = AnvilPrefilter.probeSync(
         worldFolder, "", 0, 0, Set.of("LAVA"));
     assertEquals(Verdict.ACCEPT, first);
     assertEquals(Verdict.ACCEPT, second);
-    AnvilRegionByteCache.Stats stats = AnvilRegionByteCache.stats();
-    assertTrue(stats.misses() >= 1,
-        "first probe should register as a cache miss; stats=" + stats);
-    assertTrue(stats.hits() >= 1,
-        "second probe of same region should register as a cache hit (proves "
-            + "prefilter is not bypassing AnvilRegionByteCache); stats=" + stats);
+    assertEquals(0, AnvilRegionByteCache.size(), "single-chunk probes must not load whole region files");
+    assertEquals(1L, AnvilRegionHeaderCache.misses(), "location table read once");
+    assertTrue(AnvilRegionHeaderCache.hits() >= 1, "second probe reuses the cached location table");
+    assertEquals(2L, AnvilSectorReader.chunkReads());
+    assertTrue(AnvilSectorReader.sectorBytesRead() < 2L * Files.size(regionFile),
+        "sector bytes read must stay below the whole-file size");
   }
 
   @Test

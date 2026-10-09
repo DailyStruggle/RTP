@@ -74,6 +74,7 @@ public class FixedAdjustor extends VerticalAdjustor<FixedAdjustorKeys> {
 
   @Override
   public @Nullable RTPCoords adjust(@NotNull RTPChunk chunk) {
+    if (chunk.getWorld() == null) return null;
     MutableRTPCoords output = new MutableRTPCoords(chunk.getWorld().name(), 0, 0, 0);
     if (adjust(chunk, output)) return output.toImmutable();
     return null;
@@ -81,6 +82,7 @@ public class FixedAdjustor extends VerticalAdjustor<FixedAdjustorKeys> {
 
   @Override
   public boolean adjust(@NotNull RTPChunk chunk, @NotNull MutableRTPCoords output) {
+    if (chunk.getWorld() == null) return false;
     int y = getNumber(FixedAdjustorKeys.y, 64L).intValue();
 
     // Clamp to the world's vertical bounds - a configured Y outside the

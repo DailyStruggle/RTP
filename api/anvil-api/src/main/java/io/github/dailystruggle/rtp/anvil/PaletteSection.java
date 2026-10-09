@@ -43,23 +43,40 @@ public record PaletteSection(int sectionY, List<String> palette, long[] data) {
 
     /**
      * Returns the raw palette identifier at section-local coordinates {@code (lx, ly, lz)},
-     * each in {@code 0..15}.
+     * each in {@code 0..15}, or {@code null} if the palette data is missing or malformed.
      *
-     * @return the identifier string (e.g. {@code "minecraft:lava"}); never {@code null}
+     * @return the identifier string (e.g. {@code "minecraft:lava"}), or {@code null} if malformed
      * @throws IndexOutOfBoundsException if any coord is outside {@code 0..15}
      */
     public String blockIdAt(int lx, int ly, int lz) {
-        if (palette.size() == 1 || data == null || data.length == 0) {
+        if (palette.size() == 1) {
             return palette.get(0);
+        }
+        if (data == null || data.length == 0) {
+            return null;
         }
         int idx = PackedPaletteDecoder.entryIndex(lx, ly, lz);
+        int bits = PackedPaletteDecoder.bitsPerEntry(palette.size());
+        int entriesPerLong = 64 / bits;
+        int longIdx = idx / entriesPerLong;
+        if (longIdx < 0 || longIdx >= data.length) {
+            return null;
+        }
         int paletteIdx = PackedPaletteDecoder.decode(data, palette.size(), idx);
         if (paletteIdx < 0 || paletteIdx >= palette.size()) {
-            // Defensive: corrupted index bits. Fall back to palette[0] rather than throw
-            // so the pre-filter stays on the UNKNOWN path for malformed chunks.
-            return palette.get(0);
+            return null;
         }
         return palette.get(paletteIdx);
+    }
+
+    /** True if this section contains malformed or truncated palette data. */
+    public boolean hasMalformedData() {
+        if (palette.size() <= 1) return false;
+        if (data == null || data.length == 0) return true;
+        int bits = PackedPaletteDecoder.bitsPerEntry(palette.size());
+        int entriesPerLong = 64 / bits;
+        int requiredLongs = (4096 + entriesPerLong - 1) / entriesPerLong;
+        return data.length < requiredLongs;
     }
 
     @Override

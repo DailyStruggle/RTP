@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.api.safety;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -30,17 +31,28 @@ public final class CompiledUnsafeSet {
   private final Map<String, List<StatePredicate>> materialStatePredicates;
   private final Map<String, List<StatePredicate>> tagStatePredicates;
   private final List<StatePredicate> wildcardStatePredicates;
+  private final List<SafetyToken> rawTokens;
 
   private CompiledUnsafeSet(Set<String> plainMaterials,
                             Set<String> plainTags,
                             Map<String, List<StatePredicate>> materialStatePredicates,
                             Map<String, List<StatePredicate>> tagStatePredicates,
                             List<StatePredicate> wildcardStatePredicates) {
+    this(plainMaterials, plainTags, materialStatePredicates, tagStatePredicates, wildcardStatePredicates, Collections.emptyList());
+  }
+
+  private CompiledUnsafeSet(Set<String> plainMaterials,
+                            Set<String> plainTags,
+                            Map<String, List<StatePredicate>> materialStatePredicates,
+                            Map<String, List<StatePredicate>> tagStatePredicates,
+                            List<StatePredicate> wildcardStatePredicates,
+                            List<SafetyToken> rawTokens) {
     this.plainMaterials = plainMaterials;
     this.plainTags = plainTags;
     this.materialStatePredicates = materialStatePredicates;
     this.tagStatePredicates = tagStatePredicates;
     this.wildcardStatePredicates = wildcardStatePredicates;
+    this.rawTokens = rawTokens == null ? Collections.emptyList() : Collections.unmodifiableList(new ArrayList<>(rawTokens));
   }
 
   /**
@@ -59,6 +71,21 @@ public final class CompiledUnsafeSet {
 
     for (SafetyToken tok : tokens) {
       if (tok == null) continue;
+      // If a plain material has subtractions that match itself unconditionally, skip it.
+      if (tok.kind() == SafetyToken.Kind.MATERIAL && !tok.isPredicated() && tok.hasSubtractions()) {
+        boolean selfSubtracted = false;
+        for (SafetyToken sub : tok.subtractions()) {
+          if (sub.kind() == SafetyToken.Kind.MATERIAL && !sub.isPredicated()
+              && canonicalise(sub.identifier()).equals(canonicalise(tok.identifier()))) {
+            selfSubtracted = true;
+            break;
+          }
+        }
+        if (selfSubtracted) {
+          continue;
+        }
+      }
+
       switch (tok.kind()) {
         case MATERIAL:
           if (tok.isWildcard()) {
@@ -91,7 +118,8 @@ public final class CompiledUnsafeSet {
         Collections.unmodifiableSet(plainTags),
         freezeValues(materialStates),
         freezeValues(tagStates),
-        Collections.unmodifiableList(wildcardStates));
+        Collections.unmodifiableList(wildcardStates),
+        new ArrayList<>(tokens));
   }
 
   private static Map<String, List<StatePredicate>> freezeValues(
@@ -141,12 +169,62 @@ public final class CompiledUnsafeSet {
       }
     }
 
+    // Apply subtractions from raw tokens if any
+    for (SafetyToken tok : rawTokens) {
+      if (tok == null || !tok.hasSubtractions()) continue;
+      // Gather subtracted materials and tags
+      Set<String> subtractedMats = new HashSet<>();
+      for (SafetyToken sub : tok.subtractions()) {
+        if (sub.kind() == SafetyToken.Kind.MATERIAL) {
+          subtractedMats.add(canonicalise(sub.identifier()));
+        } else if (sub.kind() == SafetyToken.Kind.TAG) {
+          Set<String> subMembers = tagSnapshot.get(sub.identifier());
+          if (subMembers != null) {
+            for (String sm : subMembers) {
+              subtractedMats.add(canonicalise(sm));
+            }
+          }
+        }
+      }
+
+      if (tok.kind() == SafetyToken.Kind.TAG) {
+        Set<String> members = tagSnapshot.get(tok.identifier());
+        if (members != null) {
+          for (String m : members) {
+            String cm = canonicalise(m);
+            if (subtractedMats.contains(cm)) {
+              if (!tok.isPredicated()) {
+                expandedPlainMaterials.remove(cm);
+              }
+              expandedMatPreds.remove(cm);
+            }
+          }
+        }
+      } else if (tok.kind() == SafetyToken.Kind.MATERIAL) {
+        String cm = canonicalise(tok.identifier());
+        if (subtractedMats.contains(cm)) {
+          if (!tok.isPredicated()) {
+            expandedPlainMaterials.remove(cm);
+          }
+          expandedMatPreds.remove(cm);
+        }
+      }
+    }
+
     return new CompiledUnsafeSet(
         Collections.unmodifiableSet(expandedPlainMaterials),
         Collections.emptySet(),
         freezeValues(expandedMatPreds),
         Collections.emptyMap(),
         wildcardStatePredicates);
+  }
+
+  private static String canonicalise(String raw) {
+    if (raw == null) return "";
+    String trimmed = raw.trim();
+    int colon = trimmed.indexOf(':');
+    String local = (colon >= 0) ? trimmed.substring(colon + 1) : trimmed;
+    return local.toUpperCase(Locale.ROOT);
   }
 
   // ---------------------------------------------------------------------------
@@ -233,7 +311,7 @@ public final class CompiledUnsafeSet {
     // 2. Plain tag membership.
     if (!plainTags.isEmpty() && liveTagMembership != null && !liveTagMembership.isEmpty()) {
       for (String tag : liveTagMembership) {
-        if (plainTags.contains(tag)) return true;
+        if (plainTags.contains(tag) && !isSubtractedFromTag(tag, materialName, liveTagMembership, liveProperties)) return true;
       }
     }
 
@@ -245,8 +323,10 @@ public final class CompiledUnsafeSet {
     if (!tagStatePredicates.isEmpty()
         && liveTagMembership != null && !liveTagMembership.isEmpty()) {
       for (String tag : liveTagMembership) {
-        List<StatePredicate> tagPreds = tagStatePredicates.get(tag);
-        if (tagPreds != null && matchesAny(tagPreds, liveProperties)) return true;
+        if (!isSubtractedFromTag(tag, materialName, liveTagMembership, liveProperties)) {
+          List<StatePredicate> tagPreds = tagStatePredicates.get(tag);
+          if (tagPreds != null && matchesAny(tagPreds, liveProperties)) return true;
+        }
       }
     }
 
@@ -256,6 +336,30 @@ public final class CompiledUnsafeSet {
       return true;
     }
 
+    return false;
+  }
+
+  private boolean isSubtractedFromTag(String tag, String materialName,
+                                      Collection<String> liveTagMembership,
+                                      Map<String, String> liveProperties) {
+    if (rawTokens.isEmpty()) return false;
+    for (SafetyToken tok : rawTokens) {
+      if (tok != null && tok.kind() == SafetyToken.Kind.TAG && tok.identifier().equals(tag) && tok.hasSubtractions()) {
+        for (SafetyToken sub : tok.subtractions()) {
+          if (sub == null) continue;
+          if (sub.kind() == SafetyToken.Kind.MATERIAL
+              && canonicalise(sub.identifier()).equals(canonicalise(materialName))
+              && (!sub.isPredicated() || matchesAny(sub.predicates(), liveProperties))) {
+            return true;
+          } else if (sub.kind() == SafetyToken.Kind.TAG
+              && liveTagMembership != null
+              && liveTagMembership.contains(sub.identifier())
+              && (!sub.isPredicated() || matchesAny(sub.predicates(), liveProperties))) {
+            return true;
+          }
+        }
+      }
+    }
     return false;
   }
 
