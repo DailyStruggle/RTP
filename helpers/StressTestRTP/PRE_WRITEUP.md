@@ -614,6 +614,41 @@ Findings:
 4. **EzRTP regional thread violation and account lockout.** EzRTP calls `getHighestBlockYAt` on coordinates outside the current region's bounds. Folia throws `IllegalStateException: Thread failed main thread check: Cannot retrieve chunk asynchronously`. EzRTP fails to clear its `activeAttempt` state on exception, rendering that player permanently incapable of using `/rtp` until a plugin restart.
 5. **Persistent EzRTP water landings.** EzRTP placed players on water surfaces in 10.9 % of all successful teleports (154 landings), matching the ~10.4-10.8 % water rate seen across Paper Test A and Test B.
 
+### 5.10 Paper 26.2 Linux open-loop ramp - 2026-10-09 overnight (Test C, partial)
+
+First open-loop stress-point data (method in section 8.1). Rig: AMD Threadripper 7970X, NVMe, Ubuntu 24.04, Paper 26.2, OpenJDK 25, `-Xmx16G`, default G1. Roster: 48 offline-mode Mineflayer bots (`devstack/clients/bench-swarm.js`) on a separate Windows machine over the network, non-op, granted each plugin's use node plus its queue/cooldown/delay bypass (`rtp.unqueued` for LeafRTP, `ezrtp.forcertp` + `ezrtp.queue.bypass` for EzRTP). Server `view-distance=4`, `simulation-distance=2`, and the harness caps each bot's server-side view and simulation distance to 2 during a ramp (`ramp.player-view-distance`), so every plugin pays the same landing-area load. Broadcast message and per-teleport success logging off, spark off. Stage 120 s for the flat 100 TP/s runs and 60 s per ladder stage, 30 s unrecorded warm-up, 5 s attempt timeout. EzRTP config is the same 1,024-16,384 block circle as sections 5.7-5.9; LeafRTP's region file was carried over from the same setup but was not re-read for this write-up.
+
+**Validity.** The overnight driver (`scripts/bench_overnight.py`) ran 39 ramps. Only 5 measured the intended plugin. The driver isolated each target by renaming the other RTP jars while the server was down, but the new JVM had already scanned `plugins/` by then, so each session loaded the previous target's jar set. Server logs confirm the loaded set per session; every ramp listed below ran with its target enabled. The other 34 rows (BetterRTP, HuskHomes, justRTP, JakesRTP, and LeafRTP/EzRTP ramps that ran in the wrong session) are 0-success rows against a server without that plugin and are discarded, not counted as failures. Fix for the next run: rename the jars before sending `restart`.
+
+| Run | Plugins loaded | Target | Offered | Achieved | Successes / attempts | Timeouts | Harness shed | Latency p50 / p95 / p99 | MSPT p50 / p95 | TPS min | Heap peak | Verdict |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `20261009-044336` | all six | LeafRTP | 100 | 96.2 TP/s | 11,548 / 11,548 | 0 | 446 | 129 / 701 / 967 ms | 69.4 / 121.8 ms | 7.3 | 16,226 MB | FAIL `MSPT_P95` |
+| `20261009-054148` | LeafRTP only | LeafRTP | 100 | 98.7 TP/s | 11,843 / 11,843 | 0 | 154 | 63 / 547 / 778 ms | 50.0 / 103.3 ms | 8.6 | 16,351 MB | FAIL `MSPT_P95` |
+| `20261009-070736` | LeafRTP only | LeafRTP | 100 | 97.7 TP/s | 11,722 / 11,722 | 0 | 272 | 86 / 662 / 948 ms | 93.2 / 111.1 ms | 7.5 | 16,266 MB | FAIL `MSPT_P95` |
+| `20261009-051201` | EzRTP only | EzRTP | 5 | 4.98 TP/s | 299 / 299 | 0 | 0 | 156 / 505 / 908 ms | 22.5 / 23.7 ms | 20.0 | 12,997 MB | PASS |
+| | | | 10 | 7.15 TP/s | 429 / 599 | 170 (28.4 %) | 0 | 2,710 / 4,059 / 4,813 ms | 24.9 / 26.4 ms | 19.9 | 13,331 MB | FAIL achieved, failure rate |
+| | | | 20 | 8.18 TP/s | 491 / 788 | 297 (37.7 %) | 411 | 3,505 / 3,651 / 4,415 ms | 25.3 / 29.2 ms | 16.6 | 13,046 MB | FAIL achieved, failure rate, `HARNESS_SATURATED` |
+| `20261009-063819` | EzRTP only | EzRTP | 5 | 4.98 TP/s | 299 / 299 | 0 | 0 | 155 / 607 / 918 ms | 22.1 / 23.3 ms | 20.0 | 13,364 MB | PASS |
+| | | | 10 | 7.72 TP/s | 463 / 599 | 136 (22.7 %) | 0 | 2,261 / 4,109 / 4,809 ms | 25.5 / 27.4 ms | 20.0 | 13,276 MB | FAIL achieved, failure rate |
+| | | | 20 | 8.30 TP/s | 498 / 788 | 290 (36.8 %) | 411 | 3,505 / 3,558 / 4,357 ms | 25.5 / 29.3 ms | 19.9 | 13,169 MB | FAIL achieved, failure rate, `HARNESS_SATURATED` |
+
+Offered and achieved are TP/s. Achieved = successful teleports / stage seconds. Latency is dispatch to arrival over completed attempts. No errors and no console-visible busy rejections were recorded in any row.
+
+Findings:
+
+1. **LeafRTP at 100 TP/s offered: 35,113 of 35,113 teleports succeeded across three 2-minute runs, and the server stayed up.** Achieved 96.2-98.7 TP/s (all above the 95 % line); the stages failed only the MSPT p95 <= 50 ms criterion (103-122 ms), with TPS dipping to 7.3-8.6. So the tick budget ran out before LeafRTP's pipeline did. 100 TP/s is past LeafRTP's stress point on this rig; no valid LeafRTP ladder ran, so where between 5 and 100 TP/s the 50 ms line sits is not measured. The run with all six plugins loaded (`044336`) carried the other plugins' background work (EzRTP's biome cache warm-up and pre-cache among it) and was the slowest of the three.
+2. **LeafRTP latency at 100 TP/s is mostly queueing outside the pipeline.** 154-446 dispatch slots per run found no idle bot (48-bot roster), and every command waits for a tick that takes ~100 ms. A 16-bot ramp on the same rig earlier that night measured LeafRTP's own dispatch-to-teleport time at p50 3 ms / p95 5 ms in its 100 TP/s stage, with the rest spent before the command reached LeafRTP; that run was stopped by hand and is not tabulated.
+3. **LeafRTP cost at 100 TP/s (`054148`):** 7.7 ms main-thread CPU and 94 ms process CPU per teleport; chunk-system threads used 588 s CPU against 91 s on the main thread; ~8.9 chunks loaded per teleport (landing area included); GC time 5.9 % of wall. No idle baseline was recorded (see below), so these are gross, not net.
+4. **EzRTP stress point: 5 TP/s, reproduced in both runs.** Asked for 10 and 20 TP/s it completed 7.2-8.3 TP/s, timed out 23-38 % of attempts, and its p50 latency rose to 2.3-3.5 s, while MSPT p95 stayed at 26-29 ms. Its limit is its own pipeline, not server load. This matches its 7.91 TP/s closed-loop ceiling on the 3900X (section 5.7). The 20 TP/s stages are also `HARNESS_SATURATED` (all 48 bots waiting on slow attempts), which does not change the verdict since the 10 TP/s stage had already failed with no shed slots.
+5. **Heap reached the 16 GB ceiling in all three LeafRTP runs** (16.2-16.4 GB peak) and stayed near 13 GB for EzRTP's lower rates. Peak heap is the `-Xmx` ceiling under G1 (caveat 11), but whether this is retention at 100 TP/s or G1 deferring collection has not been separated; check post-GC troughs before claiming either.
+
+Gaps in this run's data (backfill later):
+
+- `net_*` / `idle_*` columns are empty: the ramp idle baseline did not record on the server (deployed jar or config predates it, or the window was not saved). Costs above are gross.
+- Sync-load attribution self-test reported `FAIL_TICKET`, so `chunks_sync_*` is `-1`. That result is a finding about the server (ticket promotion counted as a blocking load), not a broken self-test, but it leaves the column empty.
+- EzRTP's timeouts were not cross-checked against the swarm's `busy_chat` count. A player-only busy reply would surface as a timeout (section 8.1 known limit).
+- n=3 for LeafRTP (one with every plugin loaded) and n=2 for EzRTP. BetterRTP, HuskHomes, justRTP and JakesRTP have no valid Test C result.
+
 ---
 
 ## 6. Recorded test parameters
@@ -996,10 +1031,12 @@ Method work and status for the 4,096-attempt benchmark series:
 7. Set the base `chunk-load-cost-us` per platform if chunk-amended CPU modeling is desired (section 6 calibration note).
 8. Configure `residency-target-plugin` per arm if isolated per-plugin ticket counts are desired in multi-target sequence CSVs.
 9. **[DONE] Arrival-block safety audit:** Integrated into Test A and Test B runs via `MetricsRecorder` (`landing_floor`, `landing_feet`, `landing_head`, `landing_class`) across Paper and Folia. Successfully identified EzRTP depositing ~10.9 % of arrivals into water surfaces, and HuskHomes/JakesRTP void/noFloor landings.
-10. **[NEXT] Test C (Stress point ramp - Paper 26.2, Linux):** `/rtpstress ramp <target>` per
-    contender, server restart between targets, roster of 64 offline-mode bots from
+10. **[PARTIAL] Test C (Stress point ramp - Paper 26.2, Linux):** `/rtpstress ramp <target>` per
+    contender, server restart between targets, roster of 48 offline-mode bots from
     `devstack/clients/bench-swarm.js` (`connection-throttle: -1`), cooldowns disabled. Definition in
-    section 8.1.
+    section 8.1. Overnight 2026-10-09: valid for LeafRTP (flat 100 TP/s, n=3) and EzRTP (ladder,
+    n=2) only; results and the jar-isolation ordering bug in section 5.10. Remaining: BetterRTP,
+    HuskHomes, justRTP, JakesRTP, and a LeafRTP ladder.
 
 ### 8.1 Stress point definition (Test C)
 
@@ -1039,9 +1076,11 @@ Must appear in the public write-up.
 **Rig and load**
 
 1. **Single-server, single-machine** rig; not a multi-server / proxy setup.
-2. **Three real online accounts**, not hundreds of players. Absolute numbers are
-   a floor; with 50 real players everything degrades but the *ranking* should
-   hold. Fake-player infrastructure (`helpers/StressTestRTPBots`) is future work.
+2. **Three real online accounts** in the closed-loop runs (sections 5.1-5.9), not
+   hundreds of players. Absolute numbers are a floor; with 50 real players
+   everything degrades but the *ranking* should hold. The open-loop ramp (section
+   5.10) uses 48 idle Mineflayer bots with server view distance capped at 2: real
+   connections and chunk sends, but not 48 players moving and building.
 3. **Cooldowns and countdowns disabled** everywhere - pipeline throughput, not
    anti-spam or UX policy.
 4. **All plugins forced to the same outer radius** (4096 blocks in section 5's

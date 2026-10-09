@@ -75,6 +75,16 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** Every profiled run since the selector default was added has produced no samples; `thread_cpu_top` in the summary is empty. Runs remain valid as unprofiled benchmarks.
 - **Suggested next step:** Fix pending bench verification: `buildStartCommand` emits one `--thread` per entry (unquoted; quotes would become part of the name) and adds `--regex` when an entry has a `*` glob, since spark resolves exact names to thread IDs once at start and would miss pool threads spawned later. Default is now `Server thread,RTP-Anvil-IO-*`; covered by `SparkHookTest`. Remove this entry once a saved profile shows non-zero thread nodes for both threads.
 
+### 2026-10-09 — StressTestRTP ramp idle baseline records CPU as -1, so net_* cost columns stay empty
+
+- **Severity:** Medium
+- **Status:** Open
+- **Discovered during:** preparing the weekend Test C driver run (server logs `2026-10-09-65..67`)
+- **Location:** `helpers/StressTestRTP/.../Runner.java` ramp idle window (the shared idle-baseline calculation) and the CPU sampler it reads
+- **Symptom / hypothesis:** The idle window runs and logs `ramp idle baseline: MSPT p50=22.19 ms, main CPU=-1.000 cores, proc CPU=-1.000 cores (over 15.0s)`. MSPT is captured but both CPU figures are -1, so every stage's `net_*` / `idle_*` CPU columns in `-phases.csv` are empty. Likely the CPU sampler is not started (or has no window boundary) before the ramp's first phase, so the idle window has no samples.
+- **Impact:** Ramp CPU-per-teleport is gross only; the front page and PRE_WRITEUP section 5.10 cannot quote net cost per plugin.
+- **Suggested next step:** Check whether `CpuSampler` is started or marked at the idle window's start in ramp mode (sequence mode samples between phases); backfill from the per-stage gross CPU minus a separately recorded idle run if the raw samples exist.
+
 ### 2026-10-06 — ACCUMULATE repeats used chunks; landing spacing loosens on dense learned bad area
 
 - **Severity:** Medium

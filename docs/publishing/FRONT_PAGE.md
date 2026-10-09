@@ -99,8 +99,9 @@ On Paper all candidate checking runs off the tick thread. On Folia, candidates a
 
 ### The short version
 
-- [**Zero lag spikes**](https://dailystruggle.github.io/RTP/admin/configuration/PERFORMANCE/): Pre-checks disk files off-tick before loading chunks.
+- [**Zero lag spikes**](https://dailystruggle.github.io/RTP/admin/configuration/PERFORMANCE/): 0 ticks over 50 ms at 5 teleports a second; disk files are pre-checked off-tick before any chunk loads.
 - [**Instant teleports**](https://dailystruggle.github.io/RTP/site/why/#background-processing-and-memory): 6 ms median from `/rtp` to arrival on Paper, served from pre-verified candidate queues.
+- [**Holds 100 teleports a second**](#performance): 35,113 of 35,113 succeeded across three 2-minute runs on Linux; the server slowed but stayed up.
 - [**Even player spread**](https://dailystruggle.github.io/RTP/site/why/): Zero duplicate landings in 4,096 runs without tracking player coordinates.
 - [**Persistent memory**](https://dailystruggle.github.io/RTP/admin/configuration/TTL/): Remembers oceans, lava, and claims across server restarts.
 - [**One-command import**](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-competitor-plugins-betterrtp-justrtp-ezrtp-jakesrtp): Auto-translates BetterRTP, EzRTP, and JustRTP configs.
@@ -226,7 +227,7 @@ Built-in templates turn random teleportation into portals and events without ext
 
 ## Performance
 
-An rtp plugin's cost hides inside server API calls, and a profiler files it under generic chunk functions. The public harness in [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP) attributes it back to the plugin. Rig: Ryzen 9 3900X for every row. Each other plugin ran on the latest version it supported at the time of the run, with cooldowns, delays and countdowns zeroed and its queue on at its default size where it has one. LeafRTP ran at its recommended settings.
+An rtp plugin's cost hides inside server API calls, and a profiler files it under generic chunk functions. The public harness in [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP) attributes it back to the plugin. Rig: Ryzen 9 3900X for every row of the first table; the open-loop stress test further down ran on a second, Linux rig. Each other plugin ran on the latest version it supported at the time of the run, with cooldowns, delays and countdowns zeroed and its queue on at its default size where it has one. LeafRTP ran at its recommended settings.
 
 <!-- only: bbb -->
 Both LeafRTP downloads are built from the same code, and the LeafRTP rows apply to either.
@@ -249,11 +250,28 @@ Peak throughput is measured under unpaced burst saturation (Paper Test A: `20261
 | EzRTP | 7.91 TP/s | 171 / 923 ms | 25.7 / 49.4 ms | 0 | 261 s (0.29 cores) | 142 (random: 129) | 4.1 blocks | Fails (1,415 successes, 949 timeouts; 10.9% water) |
 | JustRTP | 4.43 TP/s | 345 / 2,729 ms | 23.4 / 36.3 ms | 0 | 395 s (0.37 cores) | 129 (random: 85) | 4.0 blocks | Degraded (2.25 of 5 TP/s offered, 31 timeouts) |
 
-- **Max tested throughput:** LeafRTP finished all 4,096 teleports in 97 seconds (42.15 TP/s) with requests sent back to back. Read that as a floor, not a ceiling: the 3-client harness ran out before LeafRTP did. The next highest was JakesRTP at 23.20 TP/s.
+- **Max tested throughput:** LeafRTP finished all 4,096 teleports in 97 seconds (42.15 TP/s) with requests sent back to back. Read that as a floor, not a ceiling: the 3-client harness ran out before LeafRTP did. The next highest was JakesRTP at 23.20 TP/s. With 48 bots on the Linux rig below, LeafRTP completed 96-99 TP/s against 100 offered.
 - **Main-thread CPU vs. rate:** Main-thread CPU is reported as total CPU consumed across the entire 4,096-teleport phase. Expressing main-thread CPU "per teleport" is rate-dependent because background server tick work accumulates over elapsed wall time (at 42 TP/s saturation, LeafRTP consumed only 9.9 ms per teleport, whereas at 5 TP/s steady pacing it reflects ~0.26 continuous core utilization). Total phase CPU and MSPT accurately reflect real server workload.
 - **Latency & lag spikes:** At 5 TP/s, LeafRTP answered from its pre-verified queue at a 6 ms median, dispatch to arrival, and no tick went over 50 ms. In the same run BetterRTP logged 329 ticks over 50 ms (max 166.6 ms) and JakesRTP 271 (max 92.1 ms).
 - **Spacing:** In the paced run each other plugin landed 105-142 pairs of arrivals within 48 blocks of each other, more than a random scatter over the same land gives (82-129), with nearest pairs of 2.2-4.5 blocks. LeafRTP had **0 pairs within 48 blocks** against 81 expected at random, and its closest two arrivals were 70.0 blocks apart.
 - **Folia** (`20261008-052141`, same 5 TP/s pacing): LeafRTP completed 4,096 of 4,096 and HuskHomes 4,095 of 4,096. BetterRTP threw `Cannot retrieve chunk asynchronously` on 6 of 6 warm-up attempts and was dropped from the run. EzRTP threw the same exception from `getHighestBlockYAt` on region threads; after that, 2 of the 3 test clients stayed stuck in an active attempt for the rest of the phase, which hit the 1,800 s cap with 1,415 successes and 949 timeouts.
+
+**Open-loop stress test, Linux (Paper 26.2, Threadripper 7970X, Ubuntu, Java 25, 16 GB heap, 48 bot accounts):**
+
+The runs above wait for each teleport before sending the next, so a slow plugin is never asked for more than it can answer. Here the harness sends `/rtp` at a fixed rate per stage whether or not earlier ones have finished. A stage passes if at least 95% of the offered rate completes, MSPT p95 stays at or under 50 ms, and at most 1% of attempts time out or error. The stress point is the highest stage that passes.
+
+| Plugin | Offered | Achieved | Failed | Latency p50 / p99 | MSPT p95 | Min TPS | Result | Run |
+|---|---|---|---|---|---|---|---|---|
+| **LeafRTP** | 100 TP/s | **98.7 TP/s** | **0 / 11,843** | 63 / 778 ms | 103.3 ms | 8.6 | Fails MSPT only | `20261009-054148` |
+| **LeafRTP** | 100 TP/s | **97.7 TP/s** | **0 / 11,722** | 86 / 948 ms | 111.1 ms | 7.5 | Fails MSPT only | `20261009-070736` |
+| LeafRTP, all six plugins loaded | 100 TP/s | 96.2 TP/s | 0 / 11,548 | 129 / 967 ms | 121.8 ms | 7.3 | Fails MSPT only | `20261009-044336` |
+| EzRTP | 5 TP/s | 4.98 TP/s | 0 / 299 (both runs) | 155-156 / 908-918 ms | 23.3-23.7 ms | 20.0 | Passes (stress point) | `20261009-051201`, `-063819` |
+| EzRTP | 10 TP/s | 7.2-7.7 TP/s | 23-28% timed out | 2,261-2,710 / 4,809-4,813 ms | 26.4-27.4 ms | 19.9-20.0 | Fails | same two runs |
+| EzRTP | 20 TP/s | 8.2-8.3 TP/s | 37-38% timed out | 3,505 / 4,357-4,415 ms | 29.2-29.3 ms | 16.6-19.9 | Fails | same two runs |
+
+- **LeafRTP at 100 TP/s:** no failed teleports in 35,113 and the server stayed up. What ran out first was the tick budget, not the plugin: MSPT p95 went to 103-122 ms and TPS dipped to 7-9. So 100 TP/s is past LeafRTP's stress point on this rig, and I haven't yet measured where between 5 and 100 the 50 ms line sits. Latency here includes waiting for a free bot and for a ~100 ms tick before the command reaches LeafRTP.
+- **EzRTP** passed 5 TP/s in both runs. Asked for 10 or 20 it completed about 8 TP/s and timed out on 23-38% of attempts while MSPT stayed under 30 ms, so its limit is its own pipeline, not server load. That matches its 7.91 TP/s ceiling on the 3900X.
+- **BetterRTP, HuskHomes, JustRTP and JakesRTP** have no Linux result yet. A bug in my overnight driver loaded the wrong plugin set for their runs, so those rows measured a server without the plugin and I threw them out. They'll be added after a rerun.
 
 Full benchmark tables (including chunk I/O diagnostics, process CPU, JFR memory allocations, and historical runs) are in [`RESULTS.md`](https://github.com/dailystruggle/RTP/blob/V3/helpers/StressTestRTP/RESULTS.md), and complete architectural analysis is in the [harness notes](https://github.com/dailystruggle/RTP/blob/V3/helpers/StressTestRTP/PRE_WRITEUP.md).
 
@@ -268,7 +286,7 @@ The region-file check needs terrain that already exists; a chunk that has never 
 *Where each plugin landed 4,096 players in the Paper 26.2 run (`20261008-003310`), every one set to the same 1,024 to 16,384 block circle around 0,0. The green box under each panel is the LeafRTP region shape that gives the same distance-from-center spread, so any of these distributions is a config change in LeafRTP, not a different plugin. Each config is replayed through LeafRTP's own shape code over the same terrain: LeafRTP and BetterRTP match CIRCLE, EzRTP and HuskHomes match CIRCLE_NORMAL, and JustRTP and JakesRTP match the spiral power curve.*
 
 
-**Caveats.** 3 clients with up to 4 teleports in flight is a small load; LeafRTP's throughput figures are where the harness stopped, and more clients may push every plugin's figure higher. The Folia watchdog count reproduced across two runs; everything else is n=1. Hardware, view distance, world state (how much of it is unsafe, whether it's pregenerated) and other plugins will move the numbers. The other plugins update often; if a number here is out of date, open a GitHub issue with a repro or a doc link and I'll correct it. Each plugin ran at its defaults, which is what most servers actually run. The harness measures dispatch-to-arrival latency, per-attempt cost, and success rate as defined above; it does not measure claim-plugin compatibility or safety rules.
+**Caveats.** The 3900X table used 3 clients with up to 4 teleports in flight, which is a small load; LeafRTP's 42.15 TP/s there is where that harness stopped. The Linux stress test used 48 idle bots with server view distance capped at 2: real connections and chunk sends, but not 48 players moving and building. It is n=3 for LeafRTP (one run with every plugin loaded) and n=2 for EzRTP, and its CPU-per-teleport columns lack an idle baseline, so I don't quote them here. Heap reached the 16 GB limit in all three LeafRTP 100 TP/s runs; I haven't yet separated retention from G1 simply not collecting until it has to. The Folia watchdog count reproduced across two runs; everything else in the 3900X table is n=1. Hardware, view distance, world state (how much of it is unsafe, whether it's pregenerated) and other plugins will move the numbers. The other plugins update often; if a number here is out of date, open a GitHub issue with a repro or a doc link and I'll correct it. Each plugin ran at its defaults, which is what most servers actually run. The harness measures dispatch-to-arrival latency, per-attempt cost, and success rate as defined above; it does not measure claim-plugin compatibility or safety rules.
 
 Full methodology, per-run analyses, and the runs not shown here (equalized-radius Folia, pinned-heap GC profiling, the wide-radius single-plugin run): [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP). Video of `/rtp` on a custom world generator: [youtu.be/V0NyNK9JydM](https://youtu.be/V0NyNK9JydM).
 

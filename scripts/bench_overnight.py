@@ -17,7 +17,7 @@ spigot.yml settings.restart-script pointing at a start script; the bot swarm
 
 Example:
   python scripts/bench_overnight.py --server-dir \\\\100.111.32.47\\UbuntuShare\\26.2 ^
-      --host 100.111.32.47 --until 09:00
+      --host 100.111.32.47 --until "2026-10-12 08:00"
   python scripts/bench_overnight.py ... --dry-run
 """
 from __future__ import annotations
@@ -27,6 +27,7 @@ import csv
 import datetime as dt
 import os
 import re
+import shutil
 import socket
 import struct
 import sys
@@ -38,8 +39,12 @@ DEFAULT_TARGETS = "rtp,betterrtp,huskhomes,justrtp,jakesrtp,ezrtp"
 # server is down, so no competitor's background work (pre-caches, queues) runs
 # during another plugin's ramp.
 DEFAULT_JARS = "rtp=LeafRTP,betterrtp=BetterRTP,huskhomes=HuskHomes,justrtp=justRTP,jakesrtp=JakesRTP,ezrtp=EzRTP"
+# target label -> plugin name as listed by the server's `plugins` command; checked after
+# every restart so a ramp never runs against the wrong plugin set.
+DEFAULT_NAMES = "rtp=RTP,betterrtp=BetterRTP,huskhomes=HuskHomes,justrtp=JustRTP,jakesrtp=JakesRTP,ezrtp=EzRTP"
 OFF_SUFFIX = ".off"
-DEFAULT_ROUNDS = ["100@120", "5,10,20,40,80,160,320@60", "100@120", "5,10,20,40,80,160,320@60"]
+# Ladder first: it yields the stress point; flat 100 is the headline comparison.
+DEFAULT_ROUNDS = ["5,10,20,40,80,160,320@60", "100@120"]
 
 LOG_FH = None
 
@@ -145,6 +150,11 @@ class Driver:
                 t, _, prefix = pair.partition("=")
                 if t.strip() and prefix.strip():
                     self.jars[t.strip().lower()] = prefix.strip().lower()
+        self.names: dict[str, str] = {}
+        for pair in getattr(a, "names", DEFAULT_NAMES).split(","):
+            t, _, name = pair.partition("=")
+            if t.strip() and name.strip():
+                self.names[t.strip().lower()] = name.strip()
 
     def plugins_dir(self) -> str:
         return os.path.join(self.a.server_dir, "plugins")
@@ -217,7 +227,30 @@ class Driver:
             time.sleep(10)
         return n
 
-    def restart(self, next_target: str | None = None) -> bool:
+    def loaded_plugins(self) -> set[str] | None:
+        r = self.try_cmd("plugins")
+        if r is None:
+            return None
+        names: set[str] = set()
+        for line in r.splitlines():
+            line = line.strip()
+            if line.startswith("-"):
+                names.update(n.strip() for n in line[1:].split(",") if n.strip())
+        return names
+
+    def jar_set_ok(self, target: str) -> tuple[bool, str]:
+        """Target's plugin loaded and, with isolation, no other RTP plugin loaded."""
+        loaded = self.loaded_plugins()
+        if loaded is None:
+            return False, "plugins: no reply"
+        rtp_loaded = sorted(n for t, n in self.names.items() if n in loaded and (not self.jars or t in self.jars))
+        want = self.names.get(target.lower())
+        if want is None:
+            return True, ",".join(rtp_loaded)
+        ok = want in loaded and (not self.jars or rtp_loaded == [want])
+        return ok, ",".join(rtp_loaded)
+
+    def restart_once(self) -> bool:
         log("restart: sending 'restart'")
         try:
             self.cmd("restart", timeout=15)
@@ -226,15 +259,32 @@ class Driver:
         if not self.wait_down(self.a.shutdown_wait_s):
             log(f"restart: server still answering after {self.a.shutdown_wait_s}s; continuing without restart")
             return False
-        # RCON closes early in shutdown; the new JVM loads plugins minutes later.
-        if self.jars and next_target is not None and not self.set_jars(next_target):
-            log(f"restart: jar for {next_target} could not be enabled")
         log("restart: server down, waiting for it to come back")
         if not self.wait_up(self.a.startup_wait_s):
             log(f"restart: server did not return within {self.a.startup_wait_s}s")
             return False
         log("restart: server back")
         return True
+
+    def restart(self, next_target: str | None = None) -> bool:
+        # Rename BEFORE stopping: start.sh execs the next JVM ~2 s after the old one exits,
+        # before RCON polling notices the outage. The running server keeps its already-open
+        # jars (Linux rename semantics), so its shutdown is unaffected.
+        if self.jars and next_target is not None and not self.set_jars(next_target):
+            log(f"restart: jar for {next_target} could not be enabled")
+            return False
+        for attempt in range(1, self.a.restart_retries + 2):
+            if not self.restart_once():
+                return False
+            if next_target is None:
+                return True
+            ok, loaded = self.jar_set_ok(next_target)
+            log(f"restart: loaded RTP plugins=[{loaded}] for target {next_target} -> {'ok' if ok else 'WRONG'}")
+            if ok:
+                return True
+            if attempt <= self.a.restart_retries:
+                log(f"restart: wrong plugin set; restarting again ({attempt}/{self.a.restart_retries})")
+        return False
 
     def targets_on_server(self) -> list[str] | None:
         r = self.cmd("rtpstress ramp __list_targets__")
@@ -294,12 +344,19 @@ def main() -> int:
     p.add_argument("--password", default=os.environ.get("RCON_PASSWORD"))
     p.add_argument("--targets", default=DEFAULT_TARGETS, help="comma-separated target-commands labels")
     p.add_argument("--round", dest="rounds", action="append",
-                   help="'rates@stageSeconds', repeatable; default: flat 100@120 and full ladder, twice each")
-    p.add_argument("--until", help="HH:MM local; repeat the round list until then (no new ramp starts after it)")
+                   help="'rates@stageSeconds', repeatable; default: full ladder @60, then flat 100@120")
+    p.add_argument("--until", help="'HH:MM' (next occurrence) or 'YYYY-MM-DD HH:MM' local; repeat the round "
+                                    "list until then (no new ramp starts after it)")
+    p.add_argument("--hours", type=float, help="alternative to --until: stop starting ramps after this many hours")
     p.add_argument("--no-restart", action="store_true", help="do not restart between targets")
     p.add_argument("--no-isolate", dest="isolate", action="store_false",
                    help="keep every RTP plugin jar enabled for every ramp (default: only the target's)")
     p.add_argument("--jars", default=DEFAULT_JARS, help="target=jarPrefix pairs used by isolation")
+    p.add_argument("--names", default=DEFAULT_NAMES, help="target=pluginName pairs checked after each restart")
+    p.add_argument("--restart-retries", type=int, default=2, help="extra restarts when the wrong plugin set loads")
+    p.add_argument("--restart-estimate-s", type=int, default=600, help="restart time used by the estimate only")
+    p.add_argument("--min-free-gb", type=float, default=20.0,
+                   help="stop starting ramps when the server dir has less free space (world grows every ramp)")
     p.add_argument("--min-players", type=int, default=32)
     p.add_argument("--player-wait-s", type=int, default=600)
     p.add_argument("--settle-s", type=int, default=60)
@@ -331,12 +388,18 @@ def main() -> int:
     rounds = [parse_round(r) for r in (a.rounds or DEFAULT_ROUNDS)]
     targets = [t.strip() for t in a.targets.split(",") if t.strip()]
     until = None
-    if a.until:
+    now = dt.datetime.now()
+    if a.until and len(a.until.strip()) > 5:
+        until = dt.datetime.fromisoformat(a.until.strip())
+        if until <= now:
+            p.error(f"--until {a.until} is in the past")
+    elif a.until:
         hh, mm = (int(x) for x in a.until.split(":"))
-        now = dt.datetime.now()
         until = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
         if until <= now:
             until += dt.timedelta(days=1)
+    elif a.hours:
+        until = now + dt.timedelta(hours=a.hours)
 
     os.makedirs(a.out_dir, exist_ok=True)
     stamp = f"{dt.datetime.now():%Y%m%d-%H%M%S}"
@@ -344,13 +407,18 @@ def main() -> int:
     LOG_FH = open(os.path.join(a.out_dir, f"overnight-{stamp}.log"), "a", encoding="utf-8")
     drv = Driver(a, a.host, port, password)
 
-    restart_overhead = 0 if a.no_restart else 300
+    restart_overhead = 0 if a.no_restart else a.restart_estimate_s
     one_pass = sum(len(targets) * (drv.ramp_budget_s(r, s) - a.margin_s + a.settle_s + restart_overhead)
                    for r, s in rounds)
     log(f"plan: targets={targets} rounds={rounds} restart={not a.no_restart} "
         f"until={until:%Y-%m-%d %H:%M}" if until else
         f"plan: targets={targets} rounds={rounds} restart={not a.no_restart} until=once")
     log(f"estimated one pass ~{one_pass / 3600:.1f} h (upper bound per ramp; ladders usually stop early)")
+    if until:
+        window = (until - dt.datetime.now()).total_seconds()
+        log(f"window {window / 3600:.1f} h -> at least {window / one_pass:.1f} passes")
+    if a.server_dir:
+        log(f"free space in server dir: {free_gb(a.server_dir):.0f} GB (stop below {a.min_free_gb:.0f} GB)")
     if drv.jars:
         for t in targets:
             found = drv.jar_files(drv.jars.get(t.lower(), "\0"))
@@ -363,6 +431,13 @@ def main() -> int:
         if drv.jars:
             log("restoring all plugin jars (takes effect on next start)")
             drv.set_jars(None)
+
+
+def free_gb(path: str) -> float:
+    try:
+        return shutil.disk_usage(path).free / 2**30
+    except OSError:
+        return float("inf")
 
 
 def run(a, drv, targets, rounds, until, stamp) -> int:
@@ -385,7 +460,7 @@ def run(a, drv, targets, rounds, until, stamp) -> int:
     with open(manifest_path, "w", newline="", encoding="utf-8") as mf:
         w = csv.writer(mf)
         w.writerow(["pass", "round", "order", "target", "rates", "stage_seconds", "start", "end",
-                    "outcome", "restarted_before", "last_status"])
+                    "outcome", "restarted_before", "loaded_rtp_plugins", "last_status"])
         mf.flush()
         # Clean slate before the first ramp and an early proof the restart path works.
         restarted = False if a.no_restart else drv.restart(targets[0])
@@ -405,22 +480,28 @@ def run(a, drv, targets, rounds, until, stamp) -> int:
                     if until and dt.datetime.now() >= until:
                         log("reached --until; done")
                         return 0
+                    if a.server_dir and free_gb(a.server_dir) < a.min_free_gb:
+                        log(f"free space {free_gb(a.server_dir):.0f} GB < {a.min_free_gb:.0f} GB; stopping")
+                        return 4
                     if ti > 0 or ri > 0 or pass_no > 1:
                         restarted = False if a.no_restart else drv.restart(target)
                     log(f"pass {pass_no} round {ri + 1}/{len(rounds)} [{rates}@{secs}s] target {target}")
                     t0 = dt.datetime.now()
-                    if drv.jars and not restarted:
-                        # Previous target's jar set may still be live; its command may not exist.
-                        outcome, last = "skipped-restart-failed", ""
+                    set_ok, loaded = drv.jar_set_ok(target)
+                    if drv.jars and not (restarted and set_ok):
+                        # Wrong jar set live: the ramp would measure a server without the target.
+                        outcome, last = ("skipped-wrong-plugins" if restarted else "skipped-restart-failed"), ""
                         if not drv.wait_up(drv.a.startup_wait_s):
                             outcome = "crashed-down"
+                    elif not set_ok:
+                        outcome, last = "skipped-target-not-loaded", ""
                     else:
                         outcome, last = drv.run_ramp(target, rates, secs)
                     t1 = dt.datetime.now()
                     log(f"{target}: {outcome} | {last}")
                     w.writerow([pass_no, ri + 1, ti + 1, target, rates, secs,
                                 t0.isoformat(timespec="seconds"), t1.isoformat(timespec="seconds"),
-                                outcome, restarted, last])
+                                outcome, restarted, loaded, last])
                     mf.flush()
                     if outcome == "crashed-down":
                         log("server did not come back; stopping")
