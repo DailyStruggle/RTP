@@ -53,6 +53,7 @@ public class SelectionAPI {
 
   public SelectionAPI() {
     if (RTP.factoryMap != null) {
+      @SuppressWarnings("unchecked")
       Factory<Shape<?>> sf = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
       if (sf != null) {
         this.shapeFactory = sf;
@@ -62,7 +63,9 @@ public class SelectionAPI {
 
   public Factory<Shape<?>> getShapeFactory() {
     if (shapeFactory == null && RTP.factoryMap != null) {
-      shapeFactory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+      @SuppressWarnings("unchecked")
+      Factory<Shape<?>> sf = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+      shapeFactory = sf;
     }
     return shapeFactory;
   }

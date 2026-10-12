@@ -119,7 +119,7 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
       return;
     }
 
-    // get full table
+    // get table
     String sql = "SELECT senderId, time, selectedWorldName, selectedX, selectedY, selectedZ, "
         + "originalWorldName, originalX, originalY, originalZ, cost FROM rtp_teleport_data";
 
@@ -137,6 +137,8 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
         UUID uuid = UUID.fromString(uuidStr);
 
         TeleportData teleportData = new TeleportData();
+        teleportData.sender = new io.github.dailystruggle.rtp.common.playerData.PureDataRTPCommandSender(
+            uuid, uuidStr, 0, 0, java.util.Collections.emptySet());
         teleportData.completed = true;
         teleportData.time = Long.parseLong(resultSet.getString("time"));
         teleportData.selectedCoords =
@@ -154,7 +156,9 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
         teleportData.originWorldName = resultSet.getString("originalWorldName");
         teleportData.cost = Double.parseDouble(resultSet.getString("cost"));
 
-        RTP.getInstance().latestTeleportData.put(uuid, teleportData);
+        if (RTP.getInstance() != null && RTP.getInstance().latestTeleportData != null) {
+          RTP.getInstance().latestTeleportData.put(uuid, teleportData, teleportData.time);
+        }
       }
     } catch (SQLException throwables) {
       RTP.log(Level.WARNING, "Failed to load cached locations from SQLite", throwables);

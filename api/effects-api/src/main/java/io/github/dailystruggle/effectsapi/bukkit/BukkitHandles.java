@@ -248,7 +248,9 @@ public final class BukkitHandles implements HandleProvider {
 
         @Override
         public void applyPotionEffect(Object type, int duration, int amplifier, boolean ambient, boolean particles, boolean icon) {
-            player.addPotionEffect(new org.bukkit.potion.PotionEffect((org.bukkit.potion.PotionEffectType) type, duration, amplifier, ambient, particles, icon));
+            if (player.isValid() && !player.isDead()) {
+                player.addPotionEffect(new org.bukkit.potion.PotionEffect((org.bukkit.potion.PotionEffectType) type, duration, amplifier, ambient, particles, icon));
+            }
         }
 
         @Override

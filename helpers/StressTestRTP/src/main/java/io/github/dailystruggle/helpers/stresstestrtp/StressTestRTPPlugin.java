@@ -47,6 +47,8 @@ public final class StressTestRTPPlugin extends JavaPlugin {
     private DirectTeleportProbe directProbe;
     private RegionTpsSampler regionTpsSampler;
     private JfrAllocationProfiler jfrProfiler;
+    private LeakProbe leakProbe;
+    private HarnessTeleporter harnessTeleporter;
 
     @Override
     public void onEnable() {
@@ -221,6 +223,16 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         heapPressureWatcher = new HeapPressureWatcher(this, getConfig(), sampler);
         heapPressureWatcher.start();
 
+        // Player-churn retention probe: join/quit accounting always on (two
+        // counters and a UUID set); the full-GC histogram only runs on an
+        // explicit /rtpstress leakcheck, never on a timer.
+        leakProbe = new LeakProbe(this,
+                getDataFolder().toPath().resolve(getConfig().getString("output-subdir", "runs")),
+                getConfig().getString("leak.auto-op-prefix", ""));
+        leakProbe.register();
+        harnessTeleporter = new HarnessTeleporter(this, getConfig().getInt("leak.direct-radius", 10000));
+        leakProbe.setTeleporter(harnessTeleporter);
+
         PluginCommand cmd = getCommand("rtpstress");
         if (cmd != null) {
             StressCommand sc = new StressCommand(this);
@@ -250,6 +262,7 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         if (residencySampler != null) residencySampler.unregister();
         if (ticketFootprintProbe != null) ticketFootprintProbe.stop();
         if (heapPressureWatcher != null) heapPressureWatcher.stop();
+        if (leakProbe != null) leakProbe.unregister();
         if (sampler != null) { sampler.stopHeapSeries(); sampler.stop(); }
         if (cpuSampler != null) cpuSampler.stopBreakdownTimer();
     }
@@ -430,6 +443,9 @@ public final class StressTestRTPPlugin extends JavaPlugin {
     }
 
     public Runner runner() { return runner; }
+    public LeakProbe leakProbe() { return leakProbe; }
+
+    HarnessTeleporter harnessTeleporter() { return harnessTeleporter; }
     public TpsMsptHeapSampler sampler() { return sampler; }
     public TicketFootprintProbe ticketFootprintProbe() { return ticketFootprintProbe; }
     public MetricsRecorder recorder() { return recorder; }
@@ -565,6 +581,20 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         @Override public long chunkLoadCostNs() {
             MetricsRecorder r = plugin.recorder();
             return r != null ? r.chunkLoadCostNs() : super.chunkLoadCostNs();
+        }
+        @Override public CpuSampler cpuSampler() {
+            MetricsRecorder r = plugin.recorder();
+            return r != null ? r.cpuSampler() : super.cpuSampler();
+        }
+        @Override public void setCpuSampler(CpuSampler sampler) {
+            super.setCpuSampler(sampler);
+            MetricsRecorder r = plugin.recorder();
+            if (r != null) r.setCpuSampler(sampler);
+        }
+        @Override public void setNextPhaseIdleBaseline(IdleBaseline baseline) {
+            super.setNextPhaseIdleBaseline(baseline);
+            MetricsRecorder r = plugin.recorder();
+            if (r != null) r.setNextPhaseIdleBaseline(baseline);
         }
     }
 

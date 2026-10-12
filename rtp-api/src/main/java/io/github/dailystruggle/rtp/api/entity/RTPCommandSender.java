@@ -80,6 +80,33 @@ public interface RTPCommandSender extends Cloneable {
   void performCommand(@Nullable RTPPlayer player, String command);
 
   /**
+   * Returns whether this sender holds only self-contained pure data and has no live platform handle.
+   *
+   * @return {@code true} if detached from live platform objects, {@code false} otherwise
+   */
+  default boolean isSelfContained() {
+    return false;
+  }
+
+  /**
+   * Converts this sender into a pure-data snapshot detached from live platform handles.
+   *
+   * @return a pure-data snapshot of this sender
+   */
+  default RTPCommandSender toPureData() {
+    return this;
+  }
+
+  /**
+   * Resolves the underlying live platform sender if online or available, or {@code null}.
+   *
+   * @return the platform sender object, or {@code null} if offline or unavailable
+   */
+  default @Nullable Object getLiveSender() {
+    return null;
+  }
+
+  /**
    * Creates a clone of this command sender.
    *
    * @return a new {@link RTPCommandSender} instance

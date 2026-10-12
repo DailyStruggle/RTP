@@ -32,6 +32,9 @@ public class TeleportData implements Cloneable {
   /** The target region for the teleport. */
   public Region targetRegion;
 
+  /** The target region name for the teleport. */
+  public String targetRegionName = null;
+
   /** The timestamp (in milliseconds) when the command was initiated. */
   public long time = System.currentTimeMillis();
 
@@ -101,6 +104,7 @@ public class TeleportData implements Cloneable {
       clone.distance = distance;
       clone.distanceFromCenter = distanceFromCenter;
       clone.targetRegion = targetRegion;
+      clone.targetRegionName = (targetRegionName != null) ? targetRegionName : (targetRegion != null ? targetRegion.name : null);
       clone.time = time;
       clone.cost = cost;
       clone.completed = completed;

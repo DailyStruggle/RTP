@@ -153,7 +153,7 @@ public class PhysicalTriggerManager implements AutoCloseable {
   }
 
   /**
-   * Ticks active batch triggers and wave accumulators (ADR-093 / Section 2.2 & 2.3).
+   * Ticks active batch triggers and wave accumulators (ADR-093).
    * Can be called directly by scheduler or test suites.
    */
   public void tickWaveAccumulator() {

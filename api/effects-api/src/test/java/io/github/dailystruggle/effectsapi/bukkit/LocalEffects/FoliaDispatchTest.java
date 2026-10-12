@@ -120,6 +120,8 @@ class FoliaDispatchTest {
         };
 
         Player player = mock(Player.class);
+        when(player.isValid()).thenReturn(true);
+        when(player.isDead()).thenReturn(false);
         org.bukkit.potion.PotionEffect pe =
                 new org.bukkit.potion.PotionEffect(PotionEffectType.BLINDNESS, 20, 0, false, true, true);
 
@@ -161,6 +163,36 @@ class FoliaDispatchTest {
 
         assertTrue(dispatcherCalled.get(),
                 "Dispatcher seam must be consulted before any fallback path");
+    }
+
+    @Test
+    @DisplayName("PotionEffect does not add potion effect if player is invalid or dead")
+    void potionEffectSkippedWhenPlayerInvalidOrDead() {
+        AtomicBoolean dispatched = new AtomicBoolean(false);
+
+        BukkitPotionDispatch.entityDispatcher = (player, caller, task) -> {
+            dispatched.set(true);
+            task.run();
+            return true;
+        };
+
+        Player invalidPlayer = mock(Player.class);
+        when(invalidPlayer.isValid()).thenReturn(false);
+        when(invalidPlayer.isDead()).thenReturn(false);
+
+        org.bukkit.potion.PotionEffect pe =
+                new org.bukkit.potion.PotionEffect(PotionEffectType.BLINDNESS, 20, 0, false, true, true);
+
+        BukkitPotionDispatch.applyOnEntityThread(invalidPlayer, pe);
+        assertTrue(dispatched.get());
+        verify(invalidPlayer, never()).addPotionEffect(any());
+
+        Player deadPlayer = mock(Player.class);
+        when(deadPlayer.isValid()).thenReturn(true);
+        when(deadPlayer.isDead()).thenReturn(true);
+
+        BukkitPotionDispatch.applyOnEntityThread(deadPlayer, pe);
+        verify(deadPlayer, never()).addPotionEffect(any());
     }
 
     @Test

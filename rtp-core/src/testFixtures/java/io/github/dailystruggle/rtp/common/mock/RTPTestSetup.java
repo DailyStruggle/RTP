@@ -50,6 +50,7 @@ public final class RTPTestSetup {
         // left by shutdown-path tests.
         io.github.dailystruggle.rtp.common.RTP rtpInstance = RTP.getInstance();
         if (rtpInstance != null) {
+            rtpInstance.databaseAccessor = null;
             rtpInstance.cancelTasks = (io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe();
             rtpInstance.miscSyncTasks = (io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe();
             rtpInstance.miscAsyncTasks = (io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe();
@@ -111,6 +112,9 @@ public final class RTPTestSetup {
                     }
                 }
             }
+        }
+        if (RTP.getInstance() != null) {
+            RTP.getInstance().databaseAccessor = null;
         }
         RTP.configs = null;
         RTP.serverAccessor = null;

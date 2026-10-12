@@ -957,6 +957,25 @@ public final class Runner {
         // Close the per-run heap-pressure series so the file is flushed and
         // no idle-server samples bleed into the run's data after it ends.
         sampler.stopHeapSeries();
+        releaseRosterRefs();
+    }
+
+    /**
+     * Drops the reusable roster buffer's {@code Player} references once no run
+     * is live. Otherwise the last tick's roster stays strongly reachable after
+     * those players quit, and a churn leak check would charge the harness's
+     * own retention to the plugin under test. Returns false if a tick body
+     * still owns the buffer.
+     */
+    public boolean releaseRosterRefs() {
+        if (running.get()) return false;
+        if (!ticking.compareAndSet(false, true)) return false;
+        try {
+            rosterBuffer.clear();
+            return true;
+        } finally {
+            ticking.set(false);
+        }
     }
 
     /** Async tick: ~10 Hz. Reaps timeouts then dispatches up to the concurrency cap. */
@@ -1498,7 +1517,7 @@ public final class Runner {
         // every permission and bypasses player-side gates (useful for
         // measuring raw pipeline cost without permission checks, or for
         // commands like `essentials:sudo` that *must* run from console).
-        final boolean asPlayer = config.getBoolean("dispatch-as-player", true);
+        final boolean asPlayer = chosen.dispatchAsPlayer(config.getBoolean("dispatch-as-player", true));
         final boolean watchPinned = Sched.isFolia()
                 && config.getBoolean("folia.pinned-position-watch", true);
         final int distanceCap = mode == Mode.RAMP
@@ -1530,6 +1549,10 @@ public final class Runner {
                     // because the probe / console-watcher / timeout already
                     // cover the fail paths.
                     target.performCommand(cmd);
+                } else if (Sched.isFolia()) {
+                    // Folia only allows console dispatch on the global region thread; the
+                    // command then hops to the player itself.
+                    Sched.runGlobal(plugin, () -> Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), cmd));
                 } else {
                     Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), cmd);
                 }

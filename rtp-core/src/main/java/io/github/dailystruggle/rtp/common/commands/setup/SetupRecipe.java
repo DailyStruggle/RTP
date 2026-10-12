@@ -19,7 +19,7 @@ import java.util.Objects;
 
 /**
  * Compiles {@link SetupSession} answers into an ordered pipeline of sparse {@link Prefab} overlays
- * (Contract 8: Recipe & Prefab Chaining).
+ * (Contract 8: Recipe and Prefab Chaining).
  */
 public final class SetupRecipe {
 
@@ -41,7 +41,7 @@ public final class SetupRecipe {
      * 1. Topology (Single world default / MultiWorld expansion with dimension vert overrides)
      * 2. Gameplay Style (Survival, Skyblock, OneBlock, Arena)
      * 3. Performance Profile (Low, High, Folia)
-     * 4. Addons & Effects overlay
+     * 4. Addons and Effects overlay
      */
     public static List<Prefab> compileRecipe(SetupSession session, List<String> worldNames) {
         Objects.requireNonNull(session, "session");

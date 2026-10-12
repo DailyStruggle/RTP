@@ -80,7 +80,7 @@ dependencies {
     testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
     // ENTERPRISE_READINESS.md item 23: jqwik property-based testing framework
     // for spiral math (ADR-001) and MemoryShape bin arithmetic invariants.
-    testImplementation libs.jqwik
+    testImplementation rootProject.libs.jqwik
     // ADR-106: Java/JS parity gate for the editor-curve/*.js shape helpers. Test-only
     // (Java 21 has no built-in JS engine); GraalJS is never shipped in any jar.
     testImplementation 'org.graalvm.polyglot:polyglot:24.1.2'
@@ -91,8 +91,8 @@ dependencies {
     // and PostgreSQLDatabaseAccessor. The container-backed tests are Docker-gated
     // (SqlTestContainers.dockerAvailable) so a routine build on a box without a
     // Docker daemon skips them cleanly rather than failing.
-    testImplementation platform(libs.testcontainers.bom)
-    testImplementation libs.testcontainers.junit
+    testImplementation platform(rootProject.libs.testcontainers.bom)
+    testImplementation rootProject.libs.testcontainers.junit
     testImplementation 'org.testcontainers:mysql'
     testImplementation 'org.testcontainers:postgresql'
     // JDBC drivers for the container-backed tier. PostgreSQL is already declared
@@ -314,8 +314,8 @@ if (project.hasProperty('mutation')) {
     pitest {
         // Pin the engine + JUnit 5 discovery plugin from the version catalog so
         // the mutation floor is measured against a known, reproducible PIT.
-        pitestVersion = libs.versions.pitest.get()
-        junit5PluginVersion = libs.versions.pitestJunit5.get()
+        pitestVersion = rootProject.libs.versions.pitest.get()
+        junit5PluginVersion = rootProject.libs.versions.pitestJunit5.get()
 
         targetClasses = safetyPackages
         // Restrict the driving tests to all safety packages so cross-package

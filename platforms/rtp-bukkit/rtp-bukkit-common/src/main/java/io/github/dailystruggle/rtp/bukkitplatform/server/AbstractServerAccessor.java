@@ -291,7 +291,11 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   public @NotNull RTPCommandSender getSender(UUID uuid) {
     if (uuid.equals(RTPAPI.serverId)) return new BukkitRTPCommandSender(Bukkit.getConsoleSender());
     Player player = Bukkit.getPlayer(uuid);
-    if (player == null) return new BukkitRTPCommandSender(Bukkit.getConsoleSender());
+    if (player == null) {
+      OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(uuid);
+      String name = (offlinePlayer != null && offlinePlayer.getName() != null) ? offlinePlayer.getName() : uuid.toString();
+      return new BukkitRTPCommandSender(uuid, name, 0, 0, java.util.Collections.emptySet());
+    }
     return wrapPlayer(player);
   }
 

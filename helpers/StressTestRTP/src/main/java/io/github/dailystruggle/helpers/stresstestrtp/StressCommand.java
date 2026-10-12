@@ -23,7 +23,7 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBS = Arrays.asList(
             "start", "stop", "status", "burst", "sequence", "ramp", "reset-cold", "export",
-            "probe-footprint");
+            "probe-footprint", "leakcheck", "churn", "tp");
 
     private final StressTestRTPPlugin plugin;
 
@@ -49,6 +49,9 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
                 case "reset-cold": return doResetCold(sender);
                 case "export":  return doExport(sender);
                 case "probe-footprint": return doProbeFootprint(sender);
+                case "leakcheck": return doLeakCheck(sender, args);
+                case "churn": return doChurn(sender, args);
+                case "tp": return doTp(sender, args);
                 default:
                     sender.sendMessage("StressTestRTP: unknown subcommand. Try: " + SUBS);
                     return true;
@@ -253,6 +256,97 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("StressTestRTP: ticket-footprint probe scheduled; result lands in "
                 + "plugins/StressTestRTP/ticket-footprint.txt and the console within ~"
                 + (TicketFootprintProbe.MAX_LOAD_WAIT_TICKS / 20L) + " s.");
+        return true;
+    }
+
+    /** {@code /rtpstress leakcheck [label] [force] [dump] [quick]} or {@code /rtpstress leakcheck status}.
+     *  Refused mid-run without {@code force}: the full GC it performs would
+     *  land inside the measured window as a multi-second stop-the-world pause.
+     *  {@code dump} also writes a live-objects heap dump beside the histogram;
+     *  {@code quick} skips NMT and the thread census/dump (exact counts only). */
+    @SuppressWarnings("java:S3516")
+    private boolean doLeakCheck(CommandSender sender, String[] args) {
+        LeakProbe leak = plugin.leakProbe();
+        if (leak == null) {
+            sender.sendMessage("StressTestRTP: leak probe unavailable.");
+            return true;
+        }
+        String label = args.length >= 2 ? args[1] : "checkpoint";
+        if ("status".equalsIgnoreCase(label)) {
+            sender.sendMessage("StressTestRTP: " + leak.status());
+            return true;
+        }
+        boolean force = false;
+        boolean dump = false;
+        boolean quick = false;
+        for (int i = 2; i < args.length; i++) {
+            if ("force".equalsIgnoreCase(args[i])) force = true;
+            else if ("dump".equalsIgnoreCase(args[i])) dump = true;
+            else if ("quick".equalsIgnoreCase(args[i])) quick = true;
+        }
+        if (plugin.runner().isRunning() && !force) {
+            sender.sendMessage("StressTestRTP: refusing leakcheck during a run (full GC would pause the "
+                    + "measured window); /rtpstress stop first or append 'force'.");
+            return true;
+        }
+        plugin.runner().releaseRosterRefs();
+        if (!leak.checkpoint(label, new LeakProbe.Options(dump, quick),
+                msg -> Sched.runGlobal(plugin, () -> sender.sendMessage("StressTestRTP: " + msg)))) {
+            sender.sendMessage("StressTestRTP: a leakcheck is already running; poll /rtpstress leakcheck status.");
+            return true;
+        }
+        sender.sendMessage("StressTestRTP: leakcheck '" + label + "' started (full GC + class histogram"
+                + (quick ? ", quick" : "") + (dump ? " + heap dump" : "")
+                + "); poll /rtpstress leakcheck status, rows land in "
+                + "runs/leak.csv and runs/leak-metrics.csv.");
+        return true;
+    }
+
+    /** {@code /rtpstress tp <player>}: plugin-free random teleport, the
+     *  {@code direct} leak control's target command. A failure is logged as a
+     *  WARNING and reaches the run as a timeout (no teleport event fires). */
+    @SuppressWarnings("java:S3516")
+    private boolean doTp(CommandSender sender, String[] args) {
+        HarnessTeleporter t = plugin.harnessTeleporter();
+        if (t == null || !t.available()) {
+            sender.sendMessage("StressTestRTP: direct teleport unavailable (needs Paper async chunk API).");
+            return true;
+        }
+        if (args.length < 2) {
+            sender.sendMessage("StressTestRTP: usage /rtpstress tp <player>");
+            return true;
+        }
+        org.bukkit.entity.Player p = Bukkit.getPlayerExact(args[1]);
+        if (p == null) {
+            sender.sendMessage("StressTestRTP: tp: no online player '" + args[1] + "'.");
+            return true;
+        }
+        t.teleport(p, reason -> plugin.getLogger().warning("[StressTestRTP] direct tp " + p.getName()
+                + " failed: " + reason));
+        return true;
+    }
+
+    /** {@code /rtpstress churn [n|all] [namePrefix]}: kicks players so the
+     *  bot swarm reconnects them as new sessions. Refused mid-run: departures
+     *  inside a measured stage would read as plugin timeouts. */
+    @SuppressWarnings("java:S3516")
+    private boolean doChurn(CommandSender sender, String[] args) {
+        LeakProbe leak = plugin.leakProbe();
+        if (leak == null) {
+            sender.sendMessage("StressTestRTP: leak probe unavailable.");
+            return true;
+        }
+        if (plugin.runner().isRunning()) {
+            sender.sendMessage("StressTestRTP: refusing churn during a run; /rtpstress stop first.");
+            return true;
+        }
+        int n = args.length >= 2 && !"all".equalsIgnoreCase(args[1]) ? safeInt(args[1], 0) : 0;
+        String prefix = args.length >= 3 ? args[2]
+                : plugin.getConfig().getString("leak.churn-name-prefix", "");
+        int kicked = leak.churn(n, prefix);
+        sender.sendMessage("StressTestRTP: churn kicked " + kicked + " player(s)"
+                + (prefix == null || prefix.isEmpty() ? "" : " matching '" + prefix + "*'")
+                + "; reason '" + LeakProbe.CHURN_KICK_REASON + "'.");
         return true;
     }
 

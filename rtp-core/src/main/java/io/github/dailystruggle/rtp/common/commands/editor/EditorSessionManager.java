@@ -64,7 +64,7 @@ public final class EditorSessionManager {
     /**
      * Generates a new ephemeral session token for a configuration snapshot payload.
      *
-     * @param jsonPayload serialized configuration & documentation JSON payload
+     * @param jsonPayload serialized configuration and documentation JSON payload
      * @return 32-character hex token
      */
     public String createSession(String jsonPayload) {
@@ -1372,7 +1372,7 @@ public final class EditorSessionManager {
 
     /**
      * Atomically applies the configuration payload:
-     * 1. Validates AST & integrity.
+     * 1. Validates AST and integrity.
      * 2. Creates dirty file .bak copy for any existing target file on disk.
      * 3. Writes updated configurations to disk and updates in-memory database lookup.
      * 4. Triggers atomic hot-reload.

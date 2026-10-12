@@ -28,9 +28,9 @@ dependencies {
     // against a real Redis via Testcontainers (not mocks). The container-backed
     // tests are Docker-gated (RedisTestContainer.dockerAvailable) so a routine
     // build on a box without Docker skips them cleanly rather than failing.
-    testImplementation platform(libs.testcontainers.bom)
-    testImplementation libs.testcontainers.junit
-    testImplementation libs.jazzer.junit
+    testImplementation platform(rootProject.libs.testcontainers.bom)
+    testImplementation rootProject.libs.testcontainers.junit
+    testImplementation rootProject.libs.jazzer.junit
 }
 
 // The Testcontainers-backed transport/redis tier talks to the local Docker
@@ -72,8 +72,8 @@ if (project.hasProperty('mutation')) {
             defaultProxyPackages
 
     pitest {
-        pitestVersion = libs.versions.pitest.get()
-        junit5PluginVersion = libs.versions.pitestJunit5.get()
+        pitestVersion = rootProject.libs.versions.pitest.get()
+        junit5PluginVersion = rootProject.libs.versions.pitestJunit5.get()
 
         targetClasses = targetPkgs
         targetTests = ['io.github.dailystruggle.rtp.proxy.common.*']

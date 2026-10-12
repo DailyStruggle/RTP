@@ -294,6 +294,17 @@ Implications for anyone running stress tests:
 
 Recorded as a potential third-party interaction worth a deeper investigation when stress-testing priorities allow; an `EXTERNAL_HOOKS.md` row is **not** warranted yet because RTP adds no reflection or soft-depend for EssentialsX — the interference is purely runtime event ordering when `/tpr` is dispatched on Spigot.
 
+### Leak fuzzing: what a verdict does and does not mean (2026-10-11)
+
+Full methodology and findings: [`helpers/StressTestRTP/LEAK_FUZZING.md`](../../helpers/StressTestRTP/LEAK_FUZZING.md).
+
+- **A cached record that holds a live `Player` is a leak for as long as the cache lives.** LeafRTP's last-teleport cache (cooldowns, `/rtp back`) held the sender; the cleanup-time `toPureData()` copy re-attached on the next permission or message call, `clone()` copied the live player, and Folia never detached. Detaching at one exit path is not enough: hold the player only through a `WeakReference` so no path can pin it (3.3.0 fix).
+- **Score against a control from the same run.** `direct` (no plugin) is what separates vanilla structure-template and chunk growth from the plugin's. A target run without it counts everything the server does against the plugin.
+- **Use growth per repetition, not a long idle wait.** A cache that fills once and a leak both show `+N` after one episode; only the slope over repeated runs separates them. A 240 s wait cost about 5 minutes per episode and per shrink probe.
+- **INCONCLUSIVE and PASS are budget statements.** BetterRTP's confirmed leak came out INCONCLUSIVE when a tool bug rejected every rung above 8 bots, and PASS in an 8-episode screening run because the race reproduces only some of the time.
+- **Check the units behind a score.** Counts the control cannot have (a plugin's own live instances) default to a noise of 1 object, so 1 KB of objects produced "3 of 3" candidates and scores of +700/min while live bytes matched the control.
+- **The histogram says what is retained, not who holds it.** Take the heap dump before any restart; reading the plugin's bytecode along the shrunk reproducer is a fast cross-check of the GC root path.
+
 ---
 
 ## Build & Environment

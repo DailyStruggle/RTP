@@ -36,13 +36,22 @@ public class PaperRTPPlayer extends BukkitRTPPlayer {
     super(player);
   }
 
+  private PaperRTPPlayer(PaperRTPPlayer other) {
+    super(other);
+  }
+
   @Override
   public CompletableFuture<Boolean> setLocation(RTPLocation to) {
     World world = ((BukkitRTPWorld) to.world()).world();
     double x = to.x() + 0.5;
     double y = to.y();
     double z = to.z() + 0.5;
-    Location current = player().getLocation();
+    Player player = liveOrLast();
+    if (player == null) {
+      RTP.log(Level.WARNING, "[RTP] teleport target " + name() + " (" + uuid() + ") is offline");
+      return CompletableFuture.completedFuture(false);
+    }
+    Location current = player.getLocation();
     Location location =
         new Location(
             world,
@@ -55,7 +64,7 @@ public class PaperRTPPlayer extends BukkitRTPPlayer {
     CompletableFuture<Boolean> future = new CompletableFuture<>();
     if (tryDirectTeleport(location, to.x(), to.z(), future)) return future;
     try {
-      player()
+      player
           .teleportAsync(location)
           .whenComplete(
               (success, throwable) -> {
@@ -69,7 +78,7 @@ public class PaperRTPPlayer extends BukkitRTPPlayer {
     } catch (Throwable t) {
       // S-004: never silently swallow a teleport failure. Fall back to sync teleport on the scheduler.
       RTP.log(Level.WARNING, "[RTP] teleportAsync threw unexpectedly, falling back to sync teleport", t);
-      Runnable tpTask = () -> future.complete(player().teleport(location));
+      Runnable tpTask = () -> future.complete(player.teleport(location));
       RTP.scheduler.runTask(tpTask);
     }
     return future;
@@ -77,26 +86,31 @@ public class PaperRTPPlayer extends BukkitRTPPlayer {
 
   @Override
   public int getViewDistance() {
-    return player().getViewDistance();
+    Player p = player();
+    return p != null ? p.getViewDistance() : -1;
   }
 
   @Override
   public void setViewDistance(int viewDistance) {
-    player().setViewDistance(viewDistance);
+    Player p = player();
+    if (p != null) p.setViewDistance(viewDistance);
   }
 
   @Override
   public int getSendViewDistance() {
-    return player().getSendViewDistance();
+    Player p = player();
+    return p != null ? p.getSendViewDistance() : -1;
   }
 
   @Override
   public void setSendViewDistance(int viewDistance) {
-    player().setSendViewDistance(viewDistance);
+    Player p = player();
+    if (p != null) p.setSendViewDistance(viewDistance);
   }
 
+  /** Shares the weak handle; never copies the live {@link Player} strongly. */
   @Override
   public RTPCommandSender clone() {
-    return new PaperRTPPlayer(player());
+    return new PaperRTPPlayer(this);
   }
 }

@@ -16,8 +16,9 @@ class AnvilRegionFuzzTest {
 
         try {
             AnvilReader.readChunkView(data, 0, 0);
-        } catch (IOException | IllegalArgumentException expected) {
-            // Expected safe fail-closed behavior for malformed region data
+        } catch (IOException | IllegalArgumentException | UnsupportedAnvilFormatException expected) {
+            // Expected safe fail-closed behavior for malformed region data; the unsupported-format
+            // type is package-internal and mapped to Verdict.UNKNOWN by the prefilter
         }
     }
 
@@ -30,8 +31,9 @@ class AnvilRegionFuzzTest {
 
         try {
             AnvilReader.readColumnProbe(data, 0, 0, -64, 320);
-        } catch (IOException | IllegalArgumentException expected) {
-            // Expected safe fail-closed behavior for malformed region data
+        } catch (IOException | IllegalArgumentException | UnsupportedAnvilFormatException expected) {
+            // Expected safe fail-closed behavior for malformed region data; the unsupported-format
+            // type is package-internal and mapped to Verdict.UNKNOWN by the prefilter
         }
     }
 

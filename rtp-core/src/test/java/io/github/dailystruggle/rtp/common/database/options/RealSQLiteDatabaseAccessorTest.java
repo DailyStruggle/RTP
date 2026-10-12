@@ -292,6 +292,37 @@ class RealSQLiteDatabaseAccessorTest {
     }
 
     @Test
+    void purgeStaleTeleportData_removesRecordsOlderThanRetentionWindow() throws Exception {
+        UUID oldPlayer = UUID.randomUUID();
+        TeleportData oldTd = teleportData();
+        oldTd.time = System.currentTimeMillis() - 100_000L;
+        oldTd.sender = new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(oldPlayer, "OldPlayer", new io.github.dailystruggle.rtp.api.world.RTPLocation(null, 1, 2, 3));
+        db.cacheValue(oldTd);
+
+        UUID freshPlayer = UUID.randomUUID();
+        TeleportData freshTd = teleportData();
+        freshTd.time = System.currentTimeMillis();
+        freshTd.sender = new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(freshPlayer, "FreshPlayer", new io.github.dailystruggle.rtp.api.world.RTPLocation(null, 1, 2, 3));
+        db.cacheValue(freshTd);
+        db.flush();
+
+        // Purge records older than 50 seconds (50,000 ms)
+        db.purgeStaleTeleportData(50_000L);
+
+        Connection conn = db.getConnection();
+        try (Statement st = conn.createStatement()) {
+            try (java.sql.ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM rtp_teleport_data WHERE senderId = '" + oldPlayer + "'")) {
+                assertTrue(rs.next());
+                assertEquals(0, rs.getInt(1));
+            }
+            try (java.sql.ResultSet rs = st.executeQuery("SELECT COUNT(*) FROM rtp_teleport_data WHERE senderId = '" + freshPlayer + "'")) {
+                assertTrue(rs.next());
+                assertEquals(1, rs.getInt(1));
+            }
+        }
+    }
+
+    @Test
     void write_typeAlterationsAndValidations() throws Exception {
         Connection conn = db.getConnection();
         assertThrows(IllegalStateException.class, () -> db.write(conn, "test_table", null));

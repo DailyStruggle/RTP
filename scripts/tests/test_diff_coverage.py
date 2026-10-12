@@ -38,7 +38,7 @@ class SonarExclusionTest(unittest.TestCase):
     def test_global_test_filename_patterns_excluded(self):
         self.assertTrue(is_sonar_excluded("rtp-core/src/main/java/io/github/dailystruggle/rtp/RTPTestHelper.java"))
         self.assertTrue(is_sonar_excluded("rtp-core/src/main/java/io/github/dailystruggle/rtp/SpiralBenchmark.java"))
-        self.assertTrue(is_sonar_excluded("rtp-core/src/main/java/io/github/dailystruggle/rtp/benchmark/Runner.java"))
+        self.assertTrue(is_sonar_excluded("rtp-core/src/main/java/io/github/dailystruggle/rtp/benchmark/RunnerBenchmark.java"))
 
     def test_global_mock_and_testing_directories_excluded(self):
         self.assertTrue(is_sonar_excluded("rtp-core/src/main/java/io/github/dailystruggle/rtp/mock/MockServer.java"))

@@ -14,5 +14,5 @@ dependencies {
     // lz4-java is a test-only reference encoder/decoder for differential tests of the
     // in-house Lz4BlockDecoder (mode 4). Never on the runtime classpath.
     testImplementation 'at.yawk.lz4:lz4-java:1.11.1'
-    testImplementation libs.jazzer.junit
+    testImplementation rootProject.libs.jazzer.junit
 }

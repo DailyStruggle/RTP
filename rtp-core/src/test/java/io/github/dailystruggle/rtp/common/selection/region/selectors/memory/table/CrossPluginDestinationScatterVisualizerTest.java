@@ -32,8 +32,12 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle_Normal;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import java.io.FileWriter;
+import java.io.PrintWriter;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.NormalDistributionParams;
 import io.github.dailystruggle.rtp.common.tools.ChartOutputHelper;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -93,7 +97,11 @@ public class CrossPluginDestinationScatterVisualizerTest {
   record Point2D(long x, long z) {}
 
   /** One successful teleport and the harness's block check of where it landed. */
-  record Landing(Point2D p, String landingClass) {}
+  record Landing(Point2D p, String landingClass, double rawX, double rawZ) {
+    Landing(Point2D p, String landingClass) {
+      this(p, landingClass, p.x, p.z);
+    }
+  }
 
   /** Ring a plugin actually landed in, in blocks; differs from the configured ring when a plugin-side cap applied. */
   record Bounds(double inner, double outer) {
@@ -233,7 +241,61 @@ public class CrossPluginDestinationScatterVisualizerTest {
       if (previousAccessor == null) RTP.serverAccessor = null;
     }
 
-    renderChart(stats, outcomeMap, runOf, !missing.isEmpty());
+    boolean previewOnly = !missing.isEmpty() || Boolean.getBoolean("rtp.scatter.preview");
+    renderChart(stats, outcomeMap, runOf, previewOnly);
+  }
+
+  @Test
+  @DisplayName("Landings preserve double coordinates for chunk mapping and round only for duplicates")
+  void landingsPreserveDoubleCoordinatesForChunkMapping() throws Exception {
+    File tempCsv = File.createTempFile("scatter_test", ".csv");
+    tempCsv.deleteOnExit();
+    try {
+      try (PrintWriter pw = new PrintWriter(new FileWriter(tempCsv))) {
+        pw.println("target_label,success,to_x,to_z,landing_class");
+        // 15.5: rounds to 16, but floor(15.5 / 16) is chunk 0
+        // -0.5: rounds to 0, but floor(-0.5 / 16) is chunk -1
+        pw.println("rtp,true,15.5,15.5,SAFE");
+        pw.println("rtp,true,-0.5,-0.5,SAFE");
+        // duplicate block coords: 15.6 rounds to 16, same block as 15.5
+        pw.println("rtp,true,15.6,15.6,SAFE");
+      }
+      Map<String, List<Landing>> map = readLandings(tempCsv);
+      List<Landing> rtpLandings = map.get("rtp");
+      assertEquals(3, rtpLandings.size());
+
+      Landing l0 = rtpLandings.get(0);
+      assertEquals(15.5, l0.rawX());
+      assertEquals(15.5, l0.rawZ());
+      assertEquals(16L, l0.p().x());
+      assertEquals(16L, l0.p().z());
+
+      assertEquals(0, (int) Math.floor(l0.rawX() / 16.0));
+      assertEquals(-1, (int) Math.floor(rtpLandings.get(1).rawX() / 16.0));
+
+      Stats stats = computeStats(PLUGINS.get(0), rtpLandings, null);
+      // 15.5 and 15.6 round to block (16, 16), so 1 duplicate block
+      assertEquals(1, stats.duplicates());
+      assertEquals(2, stats.unique());
+      // Chunk mapping: 15.5 and 15.6 are both in chunk (0, 0), -0.5 is in chunk (-1, -1).
+      // Total 2 distinct chunks out of 3 landings -> chunksReused = 1
+      assertEquals(1, stats.chunksReused());
+    } finally {
+      tempCsv.delete();
+    }
+  }
+
+  @Test
+  @DisplayName("Preview flag forces previewOnly even when missing is empty")
+  void previewFlagForcesPreviewOnly() {
+    List<String> missing = List.of();
+    System.setProperty("rtp.scatter.preview", "true");
+    try {
+      boolean previewOnly = !missing.isEmpty() || Boolean.getBoolean("rtp.scatter.preview");
+      assertTrue(previewOnly);
+    } finally {
+      System.clearProperty("rtp.scatter.preview");
+    }
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -313,7 +375,7 @@ public class CrossPluginDestinationScatterVisualizerTest {
           // (0, 0) is the harness's placeholder for a teleport with no destination.
           if (Double.isNaN(x) || Double.isNaN(z) || (Math.abs(x) < 0.1 && Math.abs(z) < 0.1)) continue;
           String cls = classIdx >= 0 && cols.length > classIdx ? cols[classIdx].trim() : "";
-          bucket.add(new Landing(new Point2D(Math.round(x), Math.round(z)), cls));
+          bucket.add(new Landing(new Point2D(Math.round(x), Math.round(z)), cls, x, z));
         } catch (NumberFormatException ignored) {
           // Malformed coordinate cell: not a landing.
         }
@@ -351,8 +413,8 @@ public class CrossPluginDestinationScatterVisualizerTest {
    * <p>{@code areaBlocks} is the effective possible area, {@code (sum w)^2 / sum w^2} chunks:
    * the area a uniform scatter of the same concentration would cover.
    */
-  private static PossibleArea possibleArea(List<Point2D> pts, LosslessChunkOutcomeMap map, Bounds b, Random rng) {
-    int n = pts.size();
+  private static PossibleArea possibleArea(List<Landing> landed, LosslessChunkOutcomeMap map, Bounds b, Random rng) {
+    int n = landed.size();
     int classes = 8;
     int rc = LosslessChunkOutcomeMap.RADIUS_CHUNKS;
     long[] chunksByCell = new long[classes * RINGS];
@@ -367,9 +429,9 @@ public class CrossPluginDestinationScatterVisualizerTest {
         ringChunks++;
       }
     }
-    for (Point2D p : pts) {
-      int cx = (int) Math.floorDiv(p.x, 16L);
-      int cz = (int) Math.floorDiv(p.z, 16L);
+    for (Landing l : landed) {
+      int cx = (int) Math.floor(l.rawX() / 16.0);
+      int cz = (int) Math.floor(l.rawZ() / 16.0);
       int cls = map == null ? 0 : map.getOutcome(cx, cz) & 7;
       double r = Math.hypot(cx * 16.0 + 8.0, cz * 16.0 + 8.0);
       landingsByCell[cls * RINGS + ringOf(b.areaFraction(r), RINGS)]++;
@@ -545,8 +607,10 @@ public class CrossPluginDestinationScatterVisualizerTest {
     // The keyed shuffle never revisits a chunk within a cycle, so a reused chunk is the spacing
     // guarantee failing; nearby-but-distinct chunks are not covered while expand is off.
     Set<Long> chunks = new HashSet<>();
-    for (Point2D p : pts) {
-      chunks.add(((long) Math.floorDiv(p.x, 16L) << 32) ^ (Math.floorDiv(p.z, 16L) & 0xFFFFFFFFL));
+    for (Landing l : landed) {
+      long cx = (long) Math.floor(l.rawX() / 16.0);
+      long cz = (long) Math.floor(l.rawZ() / 16.0);
+      chunks.add((cx << 32) ^ (cz & 0xFFFFFFFFL));
     }
     int chunksReused = n - chunks.size();
 
@@ -583,7 +647,7 @@ public class CrossPluginDestinationScatterVisualizerTest {
     Bounds bounds = observedBounds(minR, maxR);
     LandModel land = landModel(map, bounds);
 
-    PossibleArea possible = possibleArea(pts, map, bounds, new Random(SIM_SEED ^ (spec.label().hashCode() * 31L)));
+    PossibleArea possible = possibleArea(landed, map, bounds, new Random(SIM_SEED ^ (spec.label().hashCode() * 31L)));
     double expectedNn = possible.meanNn();
     double expectedNearPairs = possible.nearPairs();
     double[] ox = new double[n];

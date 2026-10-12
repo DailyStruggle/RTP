@@ -41,12 +41,15 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
 
     private final UUID uuid;
     private final String name;
-    private volatile @Nullable ServerPlayer handle;
+    // Weak: a cached copy of this wrapper (teleport history, cooldown records) must never pin a
+    // quit player's ServerPlayer graph. The server's player list keeps it alive while online.
+    private volatile java.lang.ref.WeakReference<ServerPlayer> handleRef =
+            new java.lang.ref.WeakReference<>(null);
 
     public V26_1_R1FabricRTPPlayer(ServerPlayer player) {
         this.uuid = player.getUUID();
         this.name = resolveName(player);
-        this.handle = player;
+        this.handleRef = new java.lang.ref.WeakReference<>(player);
     }
 
     private static String resolveName(ServerPlayer player) {
@@ -62,15 +65,15 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
     }
 
     public void rebind(ServerPlayer player) {
-        this.handle = player;
+        this.handleRef = new java.lang.ref.WeakReference<>(player);
     }
 
     public void unbind() {
-        this.handle = null;
+        this.handleRef = new java.lang.ref.WeakReference<>(null);
     }
 
     public @Nullable ServerPlayer handle() {
-        return handle;
+        return handleRef.get();
     }
 
     /**
@@ -83,7 +86,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
      */
     @Override
     public boolean openBookMenu(io.github.dailystruggle.rtp.fabric.menu.FabricBookSpec spec) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || !isOnline() || spec == null) return false;
         io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
                 io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
@@ -106,7 +109,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
                 io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
         if (adapter == null || !adapter.supportsMapCharts()) return false;
         RTP.scheduler.runTask(() -> {
-            ServerPlayer p = handle;
+            ServerPlayer p = handleRef.get();
             if (p == null) return; // viewer went offline before the hop
             adapter.renderMapChart(p, chartKey, argb, locked, deliverItem);
         });
@@ -125,7 +128,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
 
     @Override
     public boolean hasPermission(String permission) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null) return false;
         if (permission == null || permission.isEmpty()) return true;
 
@@ -189,7 +192,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
     @Override
     public Set<String> getEffectivePermissions() {
         // rtp-fabric-ADR-011: LuckPerms-Fabric primary + closed-namespace registry probe.
-        if (handle == null) return Collections.emptySet();
+        if (handleRef.get() == null) return Collections.emptySet();
         boolean isOp = hasPermission("rtp.reload");
         return io.github.dailystruggle.rtp.fabric.player.FabricEffectivePermissionsResolver
                 .resolve(uuid, isOp, this::hasPermission);
@@ -217,7 +220,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
     }
 
     public void sendComponent(Component component) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || component == null) return;
         try {
             if (p.connection != null) {
@@ -241,7 +244,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
      * dropped, mirroring Bukkit's {@code Player.sendTitle} semantics.
      */
     public void sendTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null) return;
         if ((title == null || title.isEmpty()) && (subtitle == null || subtitle.isEmpty())) return;
         try {
@@ -267,7 +270,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
      * {@code FabricRTPPlayerUnobf#sendActionbar}. Empty / null is silently dropped.
      */
     public void sendActionbar(String message) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null) return;
         if (message == null || message.isEmpty()) return;
         try {
@@ -285,7 +288,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
 
     @Override
     public void performCommand(@Nullable RTPPlayer player, String command) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || command == null) return;
         if (p.level() instanceof ServerLevel lvl) {
             MinecraftServer srv = lvl.getServer();
@@ -306,14 +309,14 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
 
     @Override
     public RTPCommandSender clone() {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null) return new DetachedClone(uuid, name);
         return new V26_1_R1FabricRTPPlayer(p);
     }
 
     @Override
     public CompletableFuture<Boolean> setLocation(RTPLocation to) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || to == null) return CompletableFuture.completedFuture(false);
         RTPWorld<?> rtpWorld = to.world();
         // V26 worlds extend RTPWorld<ServerLevel> directly (NOT common's
@@ -339,7 +342,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
         final double ty = to.getBlockY();
         final double tz = to.getBlockZ() + 0.5;
         return srv.submit(() -> {
-            ServerPlayer cur = handle;
+            ServerPlayer cur = handleRef.get();
             if (cur == null || cur.isRemoved()) return false;
             return performTeleport(cur, target, tx, ty, tz, cur.getYRot(), cur.getXRot());
         });
@@ -350,7 +353,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
         // BetterRTP SetAsRespawn parity (26.x). Anchors the respawn point on the
         // server thread via reflective setRespawnPosition (the MC 26.x RespawnConfig
         // form is resolved at runtime). S-004: failures are logged, never swallowed.
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || to == null) return;
         RTPWorld<?> rtpWorld = to.world();
         ServerLevel target;
@@ -371,7 +374,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
         final int bz = to.getBlockZ();
         final ServerLevel targetFinal = target;
         srv.submit(() -> {
-            ServerPlayer cur = handle;
+            ServerPlayer cur = handleRef.get();
             if (cur == null || cur.isRemoved()) return Boolean.FALSE;
             anchorRespawn(cur, targetFinal, bx, by, bz);
             return Boolean.TRUE;
@@ -488,7 +491,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
 
     @Override
     public RTPLocation getLocation() {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null) return null;
         if (!(p.level() instanceof ServerLevel level)) return null;
         // On MC 26.1.2 (verified via javap on the deobf jar) the accessor is
@@ -510,7 +513,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
 
     @Override
     public boolean isOnline() {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         return p != null && !p.isRemoved();
     }
 
@@ -524,7 +527,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
 
     @Override
     public String getClientBlock(RTPLocation location) {
-        if (location == null || handle == null) return null;
+        if (location == null || handleRef.get() == null) return null;
         ServerLevel level = resolveLevel(location);
         if (level == null) return null;
         int x = location.x(), y = location.y(), z = location.z();
@@ -546,7 +549,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
     @Override
     public void sendClientBlockChange(RTPLocation location, String blockData) {
         if (location == null || blockData == null) return;
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || p.connection == null) return;
         ServerLevel level = resolveLevel(location);
         if (level == null) return;

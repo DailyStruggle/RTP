@@ -35,7 +35,11 @@ public final class BukkitPotionDispatch {
             Object scheduler = player.getClass().getMethod("getScheduler").invoke(player);
             scheduler.getClass()
                     .getMethod("run", org.bukkit.plugin.Plugin.class, Consumer.class, Runnable.class)
-                    .invoke(scheduler, caller, null, task);
+                    .invoke(scheduler, caller, (Consumer<Object>) st -> {
+                        if (player.isValid() && !player.isDead()) {
+                            task.run();
+                        }
+                    }, null);
             return true;
         } catch (Throwable ignored) {
             return false;
@@ -59,7 +63,11 @@ public final class BukkitPotionDispatch {
             caller = null;
         }
 
-        if (entityDispatcher.dispatch(player, caller, () -> player.addPotionEffect(pe))) {
+        if (entityDispatcher.dispatch(player, caller, () -> {
+            if (player.isValid() && !player.isDead()) {
+                player.addPotionEffect(pe);
+            }
+        })) {
             return;
         }
 
@@ -68,9 +76,15 @@ public final class BukkitPotionDispatch {
         }
 
         if (!org.bukkit.Bukkit.isPrimaryThread()) {
-            org.bukkit.Bukkit.getScheduler().runTask(caller, () -> player.addPotionEffect(pe));
+            org.bukkit.Bukkit.getScheduler().runTask(caller, () -> {
+                if (player.isValid() && !player.isDead()) {
+                    player.addPotionEffect(pe);
+                }
+            });
             return;
         }
-        player.addPotionEffect(pe);
+        if (player.isValid() && !player.isDead()) {
+            player.addPotionEffect(pe);
+        }
     }
 }

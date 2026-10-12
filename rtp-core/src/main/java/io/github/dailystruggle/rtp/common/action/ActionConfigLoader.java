@@ -552,6 +552,7 @@ public final class ActionConfigLoader {
     }
   }
 
+  @SuppressWarnings("unchecked")
   private static ActionDefinition.ConfinementSpec parseConfinement(Map<String, Object> map) {
     if (map == null || map.isEmpty()) {
       return ActionDefinition.ConfinementSpec.DEFAULT;

@@ -154,8 +154,8 @@ public final class DestinationPickerGui implements InventoryHolder {
 
   /**
    * Colorizes text for Bukkit/Paper menus: expands MiniMessage markup, translates
-   * hex color codes (&#rrggbb and #rrggbb into §x§r§r§g§g§b§b), and converts legacy
-   * '&' color/formatting codes to section symbols.
+   * hex color codes ({@code &#rrggbb} and {@code #rrggbb} into {@code §x§r§r§g§g§b§b}), and converts legacy
+   * {@code '&'} color/formatting codes to section symbols.
    */
   public static String colorize(String text) {
     if (text == null || text.isEmpty()) {

@@ -379,6 +379,32 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
     }
   }
 
+  /**
+   * Purge stale teleport records from the database that exceed the retention window.
+   *
+   * @param retentionMs retention period in milliseconds
+   */
+  public void purgeStaleTeleportData(long retentionMs) {
+    if (retentionMs <= 0) return;
+    Connection connection = connect();
+    if (connection == null) return;
+    try {
+      long threshold = System.currentTimeMillis() - retentionMs;
+      String sql = "DELETE FROM rtp_teleport_data WHERE time < ?";
+      try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        statement.setLong(1, threshold);
+        int deleted = statement.executeUpdate();
+        if (deleted > 0 && isSystemDatabaseLoggingEnabled()) {
+          RTP.log(Level.INFO, "Purged " + deleted + " stale teleport records from the database.");
+        }
+      }
+    } catch (SQLException e) {
+      // Table might not exist yet
+    } finally {
+      disconnect(connection);
+    }
+  }
+
   @Nullable
   @Override
   public Connection connect() {
@@ -408,34 +434,39 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
     try {
       String sql = "SELECT senderId, time, selectedWorldName, selectedX, selectedY, selectedZ, "
           + "originalWorldName, originalX, originalY, originalZ, cost FROM rtp_teleport_data";
-      try (PreparedStatement statement = connection.prepareStatement(sql);
-          ResultSet resultSet = statement.executeQuery()) {
+      try (PreparedStatement statement = connection.prepareStatement(sql)) {
+        try (ResultSet resultSet = statement.executeQuery()) {
 
-        while (resultSet.next()) {
-          String uuidStr = resultSet.getString("senderId");
-          if (uuidStr == null) continue;
+          while (resultSet.next()) {
+            String uuidStr = resultSet.getString("senderId");
+            if (uuidStr == null) continue;
 
-          UUID uuid = UUID.fromString(uuidStr);
+            UUID uuid = UUID.fromString(uuidStr);
 
-          TeleportData teleportData = new TeleportData();
-          teleportData.completed = true;
-          teleportData.time = resultSet.getLong("time");
-          teleportData.selectedCoords =
-              new RTPCoords(
-                  resultSet.getString(COL_SELECTED_WORLD_NAME),
-                  resultSet.getInt(COL_SELECTED_X),
-                  resultSet.getInt(COL_SELECTED_Y),
-                  resultSet.getInt(COL_SELECTED_Z));
-          teleportData.originalCoords =
-              new RTPCoords(
-                  resultSet.getString(COL_ORIGINAL_WORLD_NAME),
-                  resultSet.getInt(COL_ORIGINAL_X),
-                  resultSet.getInt(COL_ORIGINAL_Y),
-                  resultSet.getInt(COL_ORIGINAL_Z));
-          teleportData.originWorldName = resultSet.getString(COL_ORIGINAL_WORLD_NAME);
-          teleportData.cost = resultSet.getDouble("cost");
+            TeleportData teleportData = new TeleportData();
+            teleportData.sender = new io.github.dailystruggle.rtp.common.playerData.PureDataRTPCommandSender(
+                uuid, uuidStr, 0, 0, java.util.Collections.emptySet());
+            teleportData.completed = true;
+            teleportData.time = resultSet.getLong("time");
+            teleportData.selectedCoords =
+                new RTPCoords(
+                    resultSet.getString(COL_SELECTED_WORLD_NAME),
+                    resultSet.getInt(COL_SELECTED_X),
+                    resultSet.getInt(COL_SELECTED_Y),
+                    resultSet.getInt(COL_SELECTED_Z));
+            teleportData.originalCoords =
+                new RTPCoords(
+                    resultSet.getString(COL_ORIGINAL_WORLD_NAME),
+                    resultSet.getInt(COL_ORIGINAL_X),
+                    resultSet.getInt(COL_ORIGINAL_Y),
+                    resultSet.getInt(COL_ORIGINAL_Z));
+            teleportData.originWorldName = resultSet.getString(COL_ORIGINAL_WORLD_NAME);
+            teleportData.cost = resultSet.getDouble("cost");
 
-          RTP.getInstance().latestTeleportData.put(uuid, teleportData);
+            if (RTP.getInstance() != null && RTP.getInstance().latestTeleportData != null) {
+              RTP.getInstance().latestTeleportData.put(uuid, teleportData, teleportData.time);
+            }
+          }
         }
       }
     } catch (SQLException e) {
