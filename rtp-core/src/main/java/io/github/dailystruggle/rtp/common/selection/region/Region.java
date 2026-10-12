@@ -152,7 +152,9 @@ public class Region extends FactoryValue<RegionKeys> {
     if (this.shape == null) {
       Factory<Shape<?>> sf = (RTP.selectionAPI != null) ? RTP.selectionAPI.getShapeFactory() : null;
       if (sf == null && RTP.factoryMap != null) {
-        sf = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+        @SuppressWarnings("unchecked")
+        Factory<Shape<?>> casted = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+        sf = casted;
       }
       if (sf != null) {
         this.shape = (Shape<?>) sf.get("SQUARE");
@@ -166,7 +168,9 @@ public class Region extends FactoryValue<RegionKeys> {
     if (vert == null) {
       Factory<VerticalAdjustor<?>> vf = null;
       if (RTP.factoryMap != null) {
-        vf = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
+        @SuppressWarnings("unchecked")
+        Factory<VerticalAdjustor<?>> casted = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
+        vf = casted;
       }
       if (vf != null) {
         vert = (VerticalAdjustor<?>) vf.get("LINEAR");

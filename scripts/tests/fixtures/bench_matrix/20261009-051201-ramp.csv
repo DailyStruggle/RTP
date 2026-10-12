@@ -1,0 +1,4 @@
+target,stage_index,offered_tps,stage_seconds,attempts,successes,timeouts,errors,busy_rejections,harness_shed,achieved_tps,achieved_fraction,fail_fraction,latency_p50_ms,latency_p95_ms,latency_p99_ms,mspt_p50,mspt_p95,mspt_samples,tps_min,heap_peak_mb,roster_size,peak_in_flight,aborted,complete,verdict,fail_criteria,start_epoch_ms,end_epoch_ms
+ezrtp,0,5.000,60.000,299,299,0,0,0,0,4.983,0.9967,0.0000,156,505,908,22.511,23.749,595,19.984,12997,48,5,false,true,PASS,,1791522786891,1791522846891
+ezrtp,1,10.000,60.000,599,429,170,0,0,0,7.150,0.7150,0.2838,2710,4059,4813,24.930,26.385,595,19.850,13331,48,41,false,true,FAIL,ACHIEVED_BELOW_OFFERED+FAILURE_RATE,1791522851941,1791522911941
+ezrtp,2,20.000,60.000,788,491,297,0,0,411,8.183,0.4092,0.3769,3505,3651,4415,25.319,29.163,594,16.640,13046,48,48,false,true,FAIL,ACHIEVED_BELOW_OFFERED+HARNESS_SATURATED+FAILURE_RATE,1791522921541,1791522981541

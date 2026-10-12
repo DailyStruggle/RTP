@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       duration:
-        description: 'Duration for fuzzing each target (e.g. 1m, 5m, 15m)'
+        description: 'Duration for fuzzing each target method (e.g. 1m, 5m, 15m)'
         required: false
         default: '5m'
         type: string
@@ -23,12 +23,22 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - name: anvil-regions
+          # Jazzer runs one @FuzzTest per invocation, so each method is its own job.
+          - name: anvil-chunk-view
             project: ':anvil-api:test'
-            testClass: 'io.github.dailystruggle.rtp.anvil.AnvilRegionFuzzTest'
+            test: 'io.github.dailystruggle.rtp.anvil.AnvilRegionFuzzTest.fuzzReadChunkView'
+          - name: anvil-column-probe
+            project: ':anvil-api:test'
+            test: 'io.github.dailystruggle.rtp.anvil.AnvilRegionFuzzTest.fuzzReadColumnProbe'
+          - name: anvil-lz4
+            project: ':anvil-api:test'
+            test: 'io.github.dailystruggle.rtp.anvil.AnvilRegionFuzzTest.fuzzLz4BlockDecoder'
+          - name: anvil-nbt
+            project: ':anvil-api:test'
+            test: 'io.github.dailystruggle.rtp.anvil.AnvilRegionFuzzTest.fuzzNbtReaders'
           - name: resp-protocol
             project: ':rtp-proxy:rtp-proxy-common:test'
-            testClass: 'io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespProtocolFuzzTest'
+            test: 'io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespProtocolFuzzTest.fuzzReadReply'
 
     steps:
       - name: Check out repository
@@ -54,9 +64,9 @@ jobs:
             exit 1
           fi
           echo "Executing fuzz testing for ${{ matrix.target.name }} with duration ${DURATION}..."
+          export JAZZER_MAX_DURATION="${DURATION}"
           ./gradlew ${{ matrix.target.project }} \
-            --tests "${{ matrix.target.testClass }}" \
-            -Djazzer.duration="${DURATION}" \
+            --tests "${{ matrix.target.test }}" \
             --no-daemon
 
       - name: Archive Fuzz Crash Artifacts

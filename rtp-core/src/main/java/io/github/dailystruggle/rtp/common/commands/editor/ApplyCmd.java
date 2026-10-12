@@ -18,7 +18,7 @@ import java.util.logging.Level;
  * Subcommand verb {@code /rtp editor apply <token>} (ADR-104).
  *
  * <p>Fetches configuration updates from the byte-store transport by token,
- * verifies SHA-256 integrity, runs AST & geometry validation, creates {@code .bak} copies
+ * verifies SHA-256 integrity, runs AST and geometry validation, creates {@code .bak} copies
  * of dirty files, and executes an atomic in-memory swap and hot reload.
  *
  * <p>Conforms to S-004 (no silent swallows on invalid token / payload failure),

@@ -72,7 +72,7 @@ subprojects {
 
     java {
         toolchain {
-            languageVersion = JavaLanguageVersion.of(Integer.parseInt(libs.versions.javaToolchain.get()))
+            languageVersion = JavaLanguageVersion.of(Integer.parseInt(rootProject.libs.versions.javaToolchain.get()))
         }
         // `-sources` / `-javadoc` jars are intentionally NOT produced: the build
         // only ships the executable artifacts. The addon-API publish closure
@@ -100,17 +100,17 @@ subprojects {
 
     dependencies {
         // Shared versions are centralized in gradle/libs.versions.toml.
-        compileOnly libs.jetbrains.annotations
+        compileOnly rootProject.libs.jetbrains.annotations
         // Checker Framework qualifier annotations (compile-time only; not shipped in JARs).
         // The Resource Leak Checker reads @MustCall, @Owning, and @EnsuresCalledMethods
         // from this artifact during annotation processing.
-        compileOnly libs.checker.qual
-        testCompileOnly libs.checker.qual
-        testImplementation platform(libs.junit.bom)
-        testImplementation libs.junit.jupiter
-        testImplementation libs.mockito.core
-        testImplementation libs.jetbrains.annotations
-        testRuntimeOnly libs.junit.platform.launcher
+        compileOnly rootProject.libs.checker.qual
+        testCompileOnly rootProject.libs.checker.qual
+        testImplementation platform(rootProject.libs.junit.bom)
+        testImplementation rootProject.libs.junit.jupiter
+        testImplementation rootProject.libs.mockito.core
+        testImplementation rootProject.libs.jetbrains.annotations
+        testRuntimeOnly rootProject.libs.junit.platform.launcher
     }
 
     // Verbose test output (per-test start/pass lines + full stdout/stderr streaming)
@@ -163,6 +163,13 @@ subprojects {
         // Re-run when the tier toggle flips so cached results from the other
         // tier are not silently reused.
         inputs.property 'fullTests', fullTests
+        // Jazzer fuzz mode (JAZZER_FUZZ) is read from the environment of the forked
+        // test JVM; without these a cached result would be reused and nothing fuzzed.
+        inputs.property 'jazzerFuzz', System.getenv('JAZZER_FUZZ') ?: ''
+        inputs.property 'jazzerMaxDuration', System.getenv('JAZZER_MAX_DURATION') ?: ''
+        if (System.getenv('JAZZER_FUZZ')) {
+            outputs.upToDateWhen { false }
+        }
         testLogging {
             events = (verboseTests ? ['started', 'passed', 'skipped', 'failed'] : ['skipped', 'failed'])
             showStandardStreams = verboseTests
@@ -176,7 +183,7 @@ subprojects {
     // instrumentation agent and dual-format report are pure overhead for local
     // dev); CI runs coverage with `-Pcoverage`.
     apply plugin: 'jacoco'
-    jacoco { toolVersion = libs.versions.jacoco.get() }
+    jacoco { toolVersion = rootProject.libs.versions.jacoco.get() }
     if (project.hasProperty('coverage')) {
         def isPlatformOrAddonProject = project.projectDir.canonicalPath.contains(File.separator + 'platforms' + File.separator) ||
                 project.projectDir.canonicalPath.contains(File.separator + 'addons' + File.separator) ||
@@ -318,7 +325,7 @@ subprojects {
     if (pmdGate || project.hasProperty('regexAnalysis')) {
         apply plugin: 'pmd'
         pmd {
-            toolVersion = libs.versions.pmd.get()
+            toolVersion = rootProject.libs.versions.pmd.get()
             // The starter ruleset is the single source of truth; disable PMD's
             // built-in default set so only our curated/appended rules run.
             ruleSetFiles = rootProject.files('config/pmd/ruleset.xml')

@@ -676,6 +676,7 @@ public class RTP {
           }
         }
         if (configs != null && configs.multiConfigParserMap != null) {
+          @SuppressWarnings("unchecked")
           MultiConfigParser<WorldKeys> worldMcp =
               (MultiConfigParser<WorldKeys>) configs.multiConfigParserMap.get(WorldKeys.class);
           if (worldMcp != null && worldMcp.configParserFactory != null) {
@@ -691,6 +692,7 @@ public class RTP {
           if (worldName == null || worldName.isBlank()) continue;
           boolean requirePerm = false;
           if (configs != null && configs.multiConfigParserMap != null) {
+            @SuppressWarnings("unchecked")
             MultiConfigParser<WorldKeys> worldMcp =
                 (MultiConfigParser<WorldKeys>) configs.multiConfigParserMap.get(WorldKeys.class);
             if (worldMcp != null && worldMcp.configParserFactory != null && worldMcp.configParserFactory.contains(worldName)) {
@@ -711,6 +713,7 @@ public class RTP {
         // Configured / observed biomes: enumerate allowed biomes and gate on
         // `rtp.biome.<biome>` / `rtp.biome.*`.
         java.util.Set<String> biomeCandidates = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        @SuppressWarnings("unchecked")
         ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys> biomesParser =
             (configs != null) ? (ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys>)
                 configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys.class) : null;
@@ -1220,8 +1223,11 @@ public class RTP {
     }
   }
 
-  public final ConcurrentHashMap<UUID, TeleportData> priorTeleportData = new ConcurrentHashMap<>();
-  public final ConcurrentHashMap<UUID, TeleportData> latestTeleportData = new ConcurrentHashMap<>();
+  public final io.github.dailystruggle.rtp.common.playerData.TimeBinnedCache<UUID, TeleportData> priorTeleportData =
+      new io.github.dailystruggle.rtp.common.playerData.TimeBinnedCache<>(60_000L, 120_000L);
+  public final io.github.dailystruggle.rtp.common.playerData.TimeBinnedCache<UUID, TeleportData> latestTeleportData =
+      new io.github.dailystruggle.rtp.common.playerData.TimeBinnedCache<>(60_000L, 120_000L);
+  public io.github.dailystruggle.rtp.common.playerData.FileBinStore fileBinStore;
 
   /**
    * Per-player rolling usage-cap state backing the BetterRTP {@code LockAfter}
@@ -1520,6 +1526,24 @@ public class RTP {
         60,
         60));
 
+    updateRetentionWindow();
+
+    // Periodic binned cleaner for memory, disk file bins, and shared database
+    trackedTasks.add(scheduler.runTaskTimerAsynchronously(
+        () -> {
+          long now = System.currentTimeMillis();
+          latestTeleportData.purgeExpired(now);
+          priorTeleportData.purgeExpired(now);
+          if (fileBinStore != null) {
+            fileBinStore.purgeExpired(now);
+          }
+          if (databaseAccessor instanceof AbstractSQLDatabaseAccessor sql) {
+            sql.purgeStaleTeleportData(latestTeleportData.getRetentionMs());
+          }
+        },
+        1200L,
+        1200L));
+
     long syncTime = TimeUnit.MILLISECONDS.toNanos(5);
     trackedTasks.add(scheduler.runTaskTimer(new io.github.dailystruggle.rtp.common.tasks.tick.SyncTaskProcessing(syncTime), 1, 1));
 
@@ -1576,6 +1600,36 @@ public class RTP {
       addons.loadAll();
     }, 0));
 
+  }
+
+  /**
+   * Recalculates the binned retention window and bucket duration from the configured teleport cooldown.
+   * Derives retention as a multiple (2x) of the teleport cooldown without requiring manual operator knobs.
+   */
+  public void updateRetentionWindow() {
+    long cdMillis = 60_000L;
+    if (configs != null) {
+      ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) configs.getParser(ConfigKeys.class);
+      if (configParser != null) {
+        Object val = configParser.getConfigValue(ConfigKeys.teleportCooldown, 0);
+        long parsed = ConfigParser.parseDurationMillis(val, 0L);
+        if (parsed > 0) cdMillis = parsed;
+      }
+    }
+    long retentionMs = Math.max(cdMillis * 2L, 60_000L);
+    long binWidthMs = Math.min(Math.max(cdMillis, 30_000L), 300_000L);
+
+    latestTeleportData.setRetentionMs(retentionMs);
+    priorTeleportData.setRetentionMs(retentionMs);
+
+    File baseDir = (serverAccessor != null)
+        ? new File(serverAccessor.getPluginDirectory(), "data" + File.separator + "bins")
+        : new File("plugins/RTP/data/bins");
+    if (this.fileBinStore == null) {
+      this.fileBinStore = new io.github.dailystruggle.rtp.common.playerData.FileBinStore(baseDir, binWidthMs, retentionMs);
+    } else {
+      this.fileBinStore.setRetentionMs(retentionMs);
+    }
   }
 
   /**
@@ -1705,6 +1759,7 @@ public class RTP {
     }
   }
 
+  @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the shape Factory under a raw value type
   public static void registerDefaultShapes() {
     Factory<Shape<?>> shapeFactory = (Factory<Shape<?>>) factoryMap.get(factoryNames.shape);
     if (shapeFactory == null) {
@@ -1727,6 +1782,7 @@ public class RTP {
     addShape(new Polygon());
   }
 
+  @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the vert Factory under a raw value type
   public static void registerDefaultVerticalAdjustors() {
     Factory<VerticalAdjustor<?>> vertFactory = (Factory<VerticalAdjustor<?>>) factoryMap.get(factoryNames.vert);
     if (vertFactory == null) {
@@ -2002,8 +2058,11 @@ public class RTP {
 
     if (instance.databaseAccessor != null) {
       log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop databaseAccessor.stop.set(true) + close()");
-      instance.databaseAccessor.stop.set(true);
+      if (instance.databaseAccessor.stop != null) {
+        instance.databaseAccessor.stop.set(true);
+      }
       instance.databaseAccessor.close();
+      instance.databaseAccessor = null;
     }
 
     instance.latestTeleportData.forEach(

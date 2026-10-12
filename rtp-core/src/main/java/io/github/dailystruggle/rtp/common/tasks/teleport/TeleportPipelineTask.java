@@ -1427,6 +1427,13 @@ public final class TeleportPipelineTask extends RTPRunnable {
     // No-op for teleports not initiated through the public API.
     if (this.teleportData != null) {
       this.teleportData.fireOnComplete();
+      this.teleportData.onComplete = null;
+      if (this.teleportData.sender != null) {
+        this.teleportData.sender = this.teleportData.sender.toPureData();
+      }
+      if (this.teleportData.targetRegion != null) {
+        this.teleportData.targetRegionName = this.teleportData.targetRegion.name;
+      }
     }
     try {
       // Explicitly untrack the data to prevent false positive leak alerts

@@ -28,7 +28,7 @@ public final class GateExpressionParser {
   /**
    * Tests whether {@code actualValue} satisfies the gate expression {@code expr}.
    *
-   * @param expr        the expression string (e.g. "< 2", "1..5", ">= 30s", ">= 1m30s")
+   * @param expr        the expression string (e.g. {@code "< 2"}, {@code "1..5"}, {@code ">= 30s"}, {@code ">= 1m30s"})
    * @param actualValue the actual numeric value (in base units, e.g. seconds for time, blocks for distance)
    * @return true if satisfied, false otherwise
    */

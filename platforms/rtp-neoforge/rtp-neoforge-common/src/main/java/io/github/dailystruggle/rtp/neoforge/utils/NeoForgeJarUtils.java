@@ -29,8 +29,8 @@ import java.util.logging.Level;
  * for {@code /rtp} (REQ-RTP-S-004: visible failure, no silent swallow; the mod
  * continues to run without extracted docs).
  *
- * @see io.github.dailystruggle.rtp.bukkit.utils.JarUtils
- * @see io.github.dailystruggle.rtp.fabric.utils.FabricJarUtils
+ * @see "io.github.dailystruggle.rtp.bukkit.utils.JarUtils"
+ * @see "io.github.dailystruggle.rtp.fabric.utils.FabricJarUtils"
  */
 public final class NeoForgeJarUtils {
 

@@ -191,6 +191,7 @@ class BukkitMapBindingTest {
         assertNotNull(view);
         org.bukkit.map.MapRenderer liveRenderer = view.getRenderers().get(0);
 
+        @SuppressWarnings("removal")
         org.bukkit.map.MapCanvas dummyCanvas = new org.bukkit.map.MapCanvas() {
             private final byte[] buf = new byte[128 * 128];
             @Override public org.bukkit.map.MapView getMapView() { return view; }

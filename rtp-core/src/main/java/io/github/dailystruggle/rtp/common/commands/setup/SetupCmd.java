@@ -14,7 +14,7 @@ import java.util.UUID;
  * The {@code setup} subtree under {@code /rtp admin}.
  * Provides an interactive 5-stage setup wizard for configuring worlds, gameplay templates,
  * performance profiles, and addon/effect toggles via Book Menu or Console CLI prompts.
- * (ADR-038 Contract 8 & 9).
+ * (ADR-038 Contract 8 and 9).
  */
 public class SetupCmd extends BaseRTPCmdImpl {
 

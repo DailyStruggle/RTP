@@ -32,6 +32,7 @@ import org.mockito.Mockito;
 
 public class FoliaSchedulerGovernanceTest {
 
+  @SuppressWarnings("removal")
   private static final Plugin STUB_PLUGIN = new Plugin() {
     @Override public void onDisable() {}
     @Override public void onEnable() {}

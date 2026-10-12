@@ -20,6 +20,9 @@ commands:
       /rtpstress reset-cold                     - clear caches between cold-start measurements (best-effort)
       /rtpstress export                         - flush CSV and write summary.txt
       /rtpstress probe-footprint                - re-run the one-ticket chunk footprint probe (idle server only)
+      /rtpstress leakcheck [label|status] [force] [dump] [quick] - full GC + histogram + native/thread/plugin census (runs/leak.csv, leak-metrics.csv); dump adds an HPROF; quick skips NMT and thread dumps
+      /rtpstress churn [n|all] [namePrefix]     - kick players so the bot swarm reconnects them as new sessions
+      /rtpstress tp <player>                    - plugin-free random teleport (target command of the `direct` leak control)
     permission: stresstestrtp.admin
     aliases: [rtps]
 

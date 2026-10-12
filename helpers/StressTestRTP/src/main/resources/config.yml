@@ -16,15 +16,21 @@ allow-timed-multi-target: false
 
 # Target commands benchmarked round-robin or sequentially.
 # {player} is replaced with the target player name.
+# Optional per-entry `sender: console|player` overrides dispatch-as-player for that target only.
 # @type: list<string>
 target-commands:
   # RTP / RTP-Pro (this project).
   - label: "rtp"
     command: "rtp:rtp"
 
-  # BetterRTP (SuperRonanCraft).
+  # BetterRTP (SuperRonanCraft). Console form: the player-dispatched
+  # `betterrtp:betterrtp` produced zero teleports on Paper 26.2 with no error.
+  # Uncomment `betterrtp-player` to reproduce that result.
   - label: "betterrtp"
-    command: "betterrtp:betterrtp"
+    command: "betterrtp:betterrtp player {player}"
+    sender: console
+  # - label: "betterrtp-player"
+  #   command: "betterrtp:betterrtp"
 
   # HuskHomes.
   - label: "huskhomes"
@@ -33,6 +39,13 @@ target-commands:
   # EzRTP.
   - label: "ezrtp"
     command: "ezrtp:forcertp {player} world"
+
+  # Leak control: harness-only random teleport, no RTP plugin code (Paper/Folia).
+  # Uncomment for scripts/bench_leakcheck.py target `direct` (all RTP jars disabled).
+  # Left out by default so `sequence` head-to-heads do not gain a non-plugin arm.
+  # - label: "direct"
+  #   command: "rtpstress tp {player}"
+  #   sender: console
 
   # Demoted competitors (uncomment to benchmark):
   # - label: "jakesrtp"
@@ -505,3 +518,22 @@ spark:
   # @type: string
   # @default: ""
   plugin-folder: ""
+
+# Leak checkpoints (/rtpstress leakcheck, churn, tp). Rows: runs/leak.csv, runs/leak-metrics.csv.
+leak:
+  # Op players whose name starts with this on join and deop them on quit (renamed churn bots). Empty disables.
+  # @type: string
+  # @default: ""
+  auto-op-prefix: ""
+
+  # Default name prefix for /rtpstress churn when none is given. Empty kicks everyone.
+  # @type: string
+  # @default: ""
+  churn-name-prefix: ""
+
+  # Half-width of the square around 0,0 that /rtpstress tp picks destinations in.
+  # @type: integer
+  # @range: [16, null]
+  # @unit: blocks
+  # @default: 10000
+  direct-radius: 10000

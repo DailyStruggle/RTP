@@ -229,12 +229,15 @@ public final class JfrAllocationProfiler {
         if (dump == null || !Files.exists(dump)) {
             return Result.unavailable();
         }
-        List<RecordedEvent> events = RecordingFile.readAllEvents(dump);
+        List<RecordedEvent> events = new ArrayList<>(RecordingFile.readAllEvents(dump));
+        events.sort((x, y) -> x.getStartTime().compareTo(y.getStartTime()));
+        ThreadBaseline baseline = new ThreadBaseline();
         for (RecordedEvent e : events) {
             String type = e.getEventType().getName();
             if (!"jdk.ObjectAllocationSample".equals(type)) continue;
             long weight = eventWeight(e);
             if (weight <= 0) weight = 0;
+            if (!baseline.accept(threadId(e))) continue;
             samples++;
             totalBytes += weight;
             RecordedStackTrace st = e.getStackTrace();
@@ -274,6 +277,34 @@ public final class JfrAllocationProfiler {
             if (e.hasField("allocationSize")) return e.getLong("allocationSize");
         } catch (Throwable ignored) { /* fall through */ }
         return 0L;
+    }
+
+    private static long threadId(RecordedEvent e) {
+        try {
+            if (e.getThread() != null) return e.getThread().getJavaThreadId();
+        } catch (Throwable ignored) { /* fall through */ }
+        return -1L;
+    }
+
+    /**
+     * Drops each thread's first sample in a recording.
+     *
+     * <p>Why: the JVM computes a sample's weight as the thread's allocated bytes
+     * since that thread's previous sample, and that per-thread mark survives
+     * across recordings. The first sample of a long-lived thread in a new
+     * recording therefore carries everything it allocated while no recording
+     * ran, so per-phase totals grew with server uptime (~133 GB per ramp on
+     * the bench) instead of with phase allocation. Dropping it under-counts by
+     * one inter-sample interval per thread, negligible at the default throttle.
+     */
+    static final class ThreadBaseline {
+        private final java.util.Set<Long> seen = new java.util.HashSet<>();
+
+        /** True when the sample's weight belongs to this recording. Samples
+         *  without a thread (id -1) carry no cross-recording mark and count. */
+        boolean accept(long threadId) {
+            return threadId < 0 || !seen.add(threadId);
+        }
     }
 
     /** First tracked plugin label whose package owns a frame, top of stack

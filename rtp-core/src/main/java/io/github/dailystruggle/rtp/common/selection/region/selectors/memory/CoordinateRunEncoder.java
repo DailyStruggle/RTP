@@ -19,7 +19,7 @@ import java.util.Objects;
  *
  * <p>Maps 2D world coordinates within bounding extents into an order-{@code k} Hilbert curve
  * grid (dimension {@code N = 2^k}), sorting spatial clusters contiguously to achieve high
- * run-length compression ratios (<5 KB for typical regional bad-location snapshots).
+ * run-length compression ratios (&lt;5 KB for typical regional bad-location snapshots).
  *
  * <p>All operations are 100% computational over in-memory coordinate bitmasks with zero
  * chunk I/O (S-005).
@@ -256,7 +256,7 @@ public final class CoordinateRunEncoder {
      * @param minZ bounding extents
      * @param maxX bounding extents
      * @param maxZ bounding extents
-     * @param order Hilbert order where gridSize == 1 << order
+     * @param order Hilbert order where {@code gridSize == 1 << order}
      */
     public static EncodedPayload encodeMask(
             boolean[][] mask,

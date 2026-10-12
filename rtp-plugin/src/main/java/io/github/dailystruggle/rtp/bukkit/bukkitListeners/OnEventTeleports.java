@@ -18,7 +18,6 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -37,7 +36,7 @@ import org.bukkit.event.player.*;
 
 public class OnEventTeleports implements Listener {
   private final ConcurrentSkipListSet<UUID> respawningPlayers = new ConcurrentSkipListSet<>();
-  private final Map<UUID, Double> playerMoveDistances = new HashMap<>();
+  private final Map<UUID, Double> playerMoveDistances = new ConcurrentHashMap<>();
 
   private static boolean checkPerms(Player player, String... permissions) {
     return ParsePermissions.hasPerm(
@@ -428,5 +427,12 @@ public class OnEventTeleports implements Listener {
         RTP.log(Level.INFO, "#0080FF[RTP] teleporting player:" + player + " on teleport");
       RTP.scheduler.runTaskLater(() -> teleportAction(player), 5L);
     }
+  }
+
+  @EventHandler(priority = EventPriority.MONITOR)
+  public void onPlayerQuit(PlayerQuitEvent event) {
+    UUID uuid = event.getPlayer().getUniqueId();
+    playerMoveDistances.remove(uuid);
+    respawningPlayers.remove(uuid);
   }
 }

@@ -132,6 +132,43 @@ class FoliaRTPPlayerSetLocationTest {
     assertEquals(true, new FoliaRTPPlayer(player).setLocation(destination).get(1, TimeUnit.SECONDS));
   }
 
+  @Test
+  @DisplayName("scheduleOnSelf executes task only when player is valid and alive")
+  void scheduleOnSelfGuardsInvalidOrDeadPlayer() {
+    Plugin plugin = (Plugin) RTP.getInstance().getPlugin();
+    when(plugin.isEnabled()).thenReturn(true);
+
+    java.util.concurrent.atomic.AtomicReference<Consumer<ScheduledTask>> capturedTask = new java.util.concurrent.atomic.AtomicReference<>();
+    ScheduledTask handle = mock(ScheduledTask.class);
+    doAnswer(inv -> {
+      capturedTask.set(inv.getArgument(1));
+      return handle;
+    }).when(entityScheduler).runDelayed(any(Plugin.class), any(), any(), org.mockito.ArgumentMatchers.anyLong());
+
+    java.util.concurrent.atomic.AtomicInteger runCount = new java.util.concurrent.atomic.AtomicInteger(0);
+    FoliaRTPPlayer foliaPlayer = new FoliaRTPPlayer(player);
+    boolean scheduled = foliaPlayer.scheduleOnSelf(runCount::incrementAndGet, null, 1);
+    assertTrue(scheduled);
+
+    // Case 1: Player invalid
+    when(player.isValid()).thenReturn(false);
+    when(player.isDead()).thenReturn(false);
+    capturedTask.get().accept(handle);
+    assertEquals(0, runCount.get(), "task must not execute when player is invalid");
+
+    // Case 2: Player dead
+    when(player.isValid()).thenReturn(true);
+    when(player.isDead()).thenReturn(true);
+    capturedTask.get().accept(handle);
+    assertEquals(0, runCount.get(), "task must not execute when player is dead");
+
+    // Case 3: Player valid and alive
+    when(player.isValid()).thenReturn(true);
+    when(player.isDead()).thenReturn(false);
+    capturedTask.get().accept(handle);
+    assertEquals(1, runCount.get(), "task must execute when player is valid and alive");
+  }
+
   private void runEntityTasksInline() {
     ScheduledTask handle = mock(ScheduledTask.class);
     doAnswer(inv -> {

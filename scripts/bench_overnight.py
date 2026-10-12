@@ -144,6 +144,7 @@ def parse_round(spec: str) -> tuple[str, int]:
 class Driver:
     def __init__(self, a: argparse.Namespace, host: str, port: int, password: str):
         self.a, self.host, self.port, self.password = a, host, port, password
+        self.ramp_active = False  # a ramp this process started may still run server-side
         self.jars: dict[str, str] = {}
         if a.isolate:
             for pair in a.jars.split(","):
@@ -251,9 +252,13 @@ class Driver:
         return ok, ",".join(rtp_loaded)
 
     def restart_once(self) -> bool:
-        log("restart: sending 'restart'")
+        rc = getattr(self.a, "restart_command", "restart") or "restart"
+        log(f"restart: sending '{rc}'")
         try:
-            self.cmd("restart", timeout=15)
+            reply = self.cmd(rc, timeout=15)
+            if "unknown or incomplete" in reply.lower():
+                log(f"restart: server does not know '{rc}' (Folia has no /restart: use --restart-command stop with a relaunch loop)")
+                return False
         except RconError:
             pass  # the connection often drops as the server stops
         if not self.wait_down(self.a.shutdown_wait_s):
@@ -298,6 +303,9 @@ class Driver:
         per_stage = secs + self.a.attempt_timeout_s + 1 + self.a.ramp_gap_s
         return self.a.ramp_idle_s + self.a.ramp_warmup_s + n * per_stage + self.a.margin_s
 
+    def ramp_started_hint(self, sent_at: float) -> None:
+        """Hook: the start reply was lost but the ramp is running; `sent_at` is when the command went out."""
+
     def run_ramp(self, target: str, rates: str, secs: int) -> tuple[str, str]:
         n = self.wait_players()
         if n < self.a.min_players:
@@ -305,6 +313,7 @@ class Driver:
         log(f"{target}: {n} players online; settling {self.a.settle_s}s")
         time.sleep(self.a.settle_s)
         start_cmd = f"rtpstress ramp {target} {secs} {rates}"
+        t_sent = time.time()
         r = self.try_cmd(start_cmd) or ""
         if "already in progress" in r:
             self.try_cmd("rtpstress stop")
@@ -312,7 +321,19 @@ class Driver:
             r = self.try_cmd(start_cmd) or ""
         log(f"{target}: > {start_cmd} | {r.strip()}")
         if "ramp started" not in r:
-            return "not-started", r.strip()
+            # an empty or lost reply does not mean the ramp did not start: ask the harness before giving up
+            time.sleep(5)
+            st = self.try_cmd("rtpstress status") or ""
+            if f"ramp target={target}" in st and "running=true" in st:
+                log(f"{target}: no start reply, but the harness reports the ramp running; continuing")
+                r = "ramp started (confirmed by status)"
+                self.ramp_started_hint(t_sent)
+            elif not r.strip():
+                r = self.try_cmd(start_cmd) or ""
+                log(f"{target}: retry > {start_cmd} | {r.strip()}")
+            if "ramp started" not in r:
+                return "not-started", r.strip()
+        self.ramp_active = True
         deadline = time.time() + self.ramp_budget_s(rates, secs)
         down_since = None
         last = ""
@@ -329,11 +350,25 @@ class Driver:
             down_since = None
             last = s.strip().replace("\n", " | ")
             if "running=false" in s or "no run yet" in s:
+                self.ramp_active = False
                 return "finished", last
             if time.time() > deadline:
                 log(f"{target}: over budget; sending stop")
-                self.try_cmd("rtpstress stop")
+                self.stop_ramp()
                 return "timed-out", last
+
+    def stop_ramp(self) -> None:
+        """Stop a ramp this process started. The server runs a ramp on its own,
+        so an interrupted script would otherwise leave it going until its
+        stages end and block the next run with 'already in progress'."""
+        if not self.ramp_active:
+            return
+        r = self.try_cmd("rtpstress stop")
+        if r is None:
+            log("cleanup: no reply to 'rtpstress stop'; run it by hand before the next run")
+            return
+        log(f"cleanup: rtpstress stop | {r.strip()}")
+        self.ramp_active = False
 
 
 def main() -> int:
@@ -363,6 +398,7 @@ def main() -> int:
     p.add_argument("--poll-s", type=int, default=20)
     p.add_argument("--shutdown-wait-s", type=int, default=1200, help="world save can take minutes")
     p.add_argument("--startup-wait-s", type=int, default=900)
+    p.add_argument("--restart-command", default="restart", help="console command that makes the server exit and relaunch")
     p.add_argument("--ramp-idle-s", type=int, default=30, help="ramp.idle-seconds, for the budget only")
     p.add_argument("--ramp-warmup-s", type=int, default=30, help="ramp.warmup-seconds, for the budget only")
     p.add_argument("--ramp-gap-s", type=int, default=5, help="ramp.gap-seconds, for the budget only")
@@ -428,6 +464,7 @@ def main() -> int:
     try:
         return run(a, drv, targets, rounds, until, stamp)
     finally:
+        drv.stop_ramp()
         if drv.jars:
             log("restoring all plugin jars (takes effect on next start)")
             drv.set_jars(None)

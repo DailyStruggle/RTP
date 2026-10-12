@@ -85,7 +85,7 @@ public final class AnvilSectorReader {
 
   /**
    * Read session over one region file: {@code regionFile}'s channel is opened on the first read
-   * that needs the disk and closed by {@link #close()}. Every chunk read through the session shares
+   * that needs the disk and closed by {@link Session#close()}. Every chunk read through the session shares
    * that channel and one location table; a corrupt run read through a cached table reloads the table
    * once through the same channel (no reopen). Per-chunk failures do not poison the session.
    *

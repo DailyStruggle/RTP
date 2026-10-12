@@ -36,9 +36,9 @@ import org.jetbrains.annotations.Nullable;
  *   <li>{@code sampleBiome()}: non-null biome sampling on default world.</li>
  *   <li>Menu permission/locale queries: {@code menuPermissionProbe}, {@code menuLocale}, {@code menuEffectivePermissions}.</li>
  *   <li>Version metadata: {@code getServerVersion}, {@code getPluginVersion}, {@code getPlatform}, {@code getPlatformFamily}, {@code getServerIntVersion}.</li>
- *   <li>World & border: {@code getRTPWorlds}, {@code getRTPWorld}, {@code getWorldBorder}, {@code shapePlatform}.</li>
+ *   <li>World and border: {@code getRTPWorlds}, {@code getRTPWorld}, {@code getWorldBorder}, {@code shapePlatform}.</li>
  *   <li>Messaging surface: {@code sendMessage} overloads, {@code sendMessageAndSuggest}, {@code sendMessageWithRunCommand}, {@code announce}.</li>
- *   <li>Subsystems & performance: {@code getTPS}, {@code getPluginDirectory}, {@code getScheduler}, {@code getLocationGenerator}, {@code executeCommand}.</li>
+ *   <li>Subsystems and performance: {@code getTPS}, {@code getPluginDirectory}, {@code getScheduler}, {@code getLocationGenerator}, {@code executeCommand}.</li>
  *   <li>JaCoCo flush trigger: attempts to invoke {@code org.jacoco.agent.rt.RT.getAgent().dump(false)} if attached.</li>
  * </ul>
  */

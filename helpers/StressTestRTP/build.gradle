@@ -45,9 +45,9 @@ dependencies {
     // runtime is exercised; the Spigot API is on the test classpath only so
     // the classes under test link.
     testImplementation 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
-    testImplementation platform(libs.junit.bom)
-    testImplementation libs.junit.jupiter
-    testRuntimeOnly libs.junit.platform.launcher
+    testImplementation platform(rootProject.libs.junit.bom)
+    testImplementation rootProject.libs.junit.jupiter
+    testRuntimeOnly rootProject.libs.junit.platform.launcher
 }
 
 test {

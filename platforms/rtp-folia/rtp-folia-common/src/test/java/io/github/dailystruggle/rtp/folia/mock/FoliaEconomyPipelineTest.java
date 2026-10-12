@@ -50,6 +50,7 @@ class FoliaEconomyPipelineTest {
     // -----------------------------------------------------------------------
     // Minimal no-op Plugin stub - only getLogger() is used by the mocks.
     // -----------------------------------------------------------------------
+    @SuppressWarnings("removal")
     private static final Plugin STUB_PLUGIN = new Plugin() {
         @Override public void onDisable() {}
         @Override public void onEnable() {}

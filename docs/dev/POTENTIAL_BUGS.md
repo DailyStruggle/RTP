@@ -43,18 +43,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 ## Open
 
 
-### 2026-10-06 — Arrived players sync-load their landing chunk on the main thread (Paper)
-
-- **Severity:** High
-- **Status:** In Progress
-- **Discovered during:** spark analysis of stress run `20261006-195124` (Paper 26.2, LeafRTP phase)
-- **Location:** `platforms/rtp-bukkit/rtp-bukkit-common/.../entity/BukkitRTPPlayer.java` `setLocation` (sync `player.teleport` path) and the arrival-chunk ticket lifetime in `TeleportPipelineTask` / `BukkitRTPWorld.setForceLoadedImpl`
-- **Symptom / hypothesis:** 14.1 s of the 115.7 s phase (about 3.4 ms per teleport) is the server thread parked in `ServerChunkCache.syncLoad`, reached from the arrived player's first tick (`LivingEntity.baseTick` > `Entity.isInWall` > `getChunk`). The landing chunk is not at FULL when the player first ticks: either the arrival ticket is released before the player's own ticket holds it, or `viewDistanceTeleport: 0` skips the pre-load. BetterRTP and EzRTP show about 0.1 ms per teleport on this path. The harness reports `chunks_sync_requested = 0` because `SyncLoadAttributor` only charges plugin-initiated loads.
-- **Impact:** S-005 violation on every cache-served teleport. It is the largest LeafRTP-attributable main-thread cost (more than LeafRTP's own 1.8 ms per teleport) and caps main-thread throughput.
-- **Suggested next step:** Cause: the pipeline released the arrival ticket in the teleport tick, and with `delay-chunk-unloads-by: 0s` the chunk unloaded before the player's first tick. Fix pending bench verification: `TeleportPipelineTask.holdArrivalReservation` keeps it for `ARRIVAL_HOLD_TICKS`. Remove this entry once a spark run shows the `isInWall > syncLoad` stack gone in the LeafRTP phase.
-- **Linear:** RTP-4
-
-
 ### 2026-10-08 — Probe governor's probe time includes coalescer queue wait
 
 - **Severity:** Medium
@@ -74,16 +62,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** The comma list is appended as a single `--thread Server thread,RTP-Anvil-IO`. Spark re-joins space-split tokens (the space is harmless) but takes the whole comma list as one name, so no thread matches. The `.sparkprofile` holds only server metadata (config, plugins, datapacks) and no thread samples. The pool threads are named `RTP-Anvil-IO-<n>`, so an exact name would not match them either.
 - **Impact:** Every profiled run since the selector default was added has produced no samples; `thread_cpu_top` in the summary is empty. Runs remain valid as unprofiled benchmarks.
 - **Suggested next step:** Fix pending bench verification: `buildStartCommand` emits one `--thread` per entry (unquoted; quotes would become part of the name) and adds `--regex` when an entry has a `*` glob, since spark resolves exact names to thread IDs once at start and would miss pool threads spawned later. Default is now `Server thread,RTP-Anvil-IO-*`; covered by `SparkHookTest`. Remove this entry once a saved profile shows non-zero thread nodes for both threads.
-
-### 2026-10-09 — StressTestRTP ramp idle baseline records CPU as -1, so net_* cost columns stay empty
-
-- **Severity:** Medium
-- **Status:** Open
-- **Discovered during:** preparing the weekend Test C driver run (server logs `2026-10-09-65..67`)
-- **Location:** `helpers/StressTestRTP/.../Runner.java` ramp idle window (the shared idle-baseline calculation) and the CPU sampler it reads
-- **Symptom / hypothesis:** The idle window runs and logs `ramp idle baseline: MSPT p50=22.19 ms, main CPU=-1.000 cores, proc CPU=-1.000 cores (over 15.0s)`. MSPT is captured but both CPU figures are -1, so every stage's `net_*` / `idle_*` CPU columns in `-phases.csv` are empty. Likely the CPU sampler is not started (or has no window boundary) before the ramp's first phase, so the idle window has no samples.
-- **Impact:** Ramp CPU-per-teleport is gross only; the front page and PRE_WRITEUP section 5.10 cannot quote net cost per plugin.
-- **Suggested next step:** Check whether `CpuSampler` is started or marked at the idle window's start in ramp mode (sequence mode samples between phases); backfill from the per-stage gross CPU minus a separately recorded idle run if the raw samples exist.
 
 ### 2026-10-06 — ACCUMULATE repeats used chunks; landing spacing loosens on dense learned bad area
 
@@ -105,16 +83,12 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 ### 2026-10-06 — Weekly Jazzer job fuzzes one Anvil target for 2 s and passes
 
 - **Severity:** Medium
-- **Status:** Open
+- **Status:** In Progress
 - **Discovered during:** v3.3.0 pre-release audit (Jazzer fuzz targets)
-- **Location:** `api/anvil-api/src/test/.../AnvilRegionFuzzTest.java` (four `@FuzzTest` methods); `.github/workflows/fuzzing.yml` ~46-55; root `build.gradle` `tasks.withType(Test)` ~147-172
-- **Symptom / hypothesis:**
-  - Jazzer 0.30.0 fuzzes one `@FuzzTest` per run ("Only one fuzz test can be run at a time"). A local `JAZZER_FUZZ=1` run of the class fuzzed `fuzzNbtReaders` for about 3 s and reported the LZ4, column-probe and chunk-view targets as SKIPPED; the task still passed.
-  - The workflow passes `-Djazzer.duration`, but the option is `jazzer.max_duration`, and Gradle `-D` sets a property on the Gradle JVM, not on the forked test JVM. Every target runs for the annotation's `maxDuration = "2s"`, not the advertised 5 minutes.
-  - `JAZZER_FUZZ` is not a `Test` task input, so a cached `:anvil-api:test` result can be reused and no fuzzing happens at all; a second local run did exactly that.
-  - No seed corpus or `<Class>Inputs/` regression files are committed, so the normal build runs each target on an empty input only.
-- **Impact:** The fuzzing badge gives false assurance: the LZ4 decoder and region view builders (ADR-016's "fuzzable" rationale for the in-house decoder) have effectively never been fuzzed in CI.
-- **Suggested next step:** One `@FuzzTest` per class (or one matrix entry per method with `--tests Class.method`); forward `jazzer.max_duration` with `systemProperty` and declare `JAZZER_FUZZ` as a task input (or `outputs.upToDateWhen { false }` in fuzz mode); seed corpora from the existing `.mca` test fixtures; commit any crash reproducers under `<Class>Inputs/`. The future Linear addon (ADR-077) shall carry its own fuzz target with a working setup.
+- **Location:** `.github/workflows/fuzzing.yml`; `api/anvil-api/src/test/.../AnvilRegionFuzzTest.java` and its `AnvilRegionFuzzTestInputs/` seeds; root `build.gradle` `tasks.withType(Test)`
+- **Symptom / hypothesis:** Jazzer 0.30.0 fuzzes one `@FuzzTest` per run, the old workflow set a property the forked test JVM never saw, and a cached `:anvil-api:test` result could skip fuzzing entirely.
+- **Impact:** The fuzzing badge gave false assurance until the workflow ran each target for its configured duration.
+- **Suggested next step:** Fix pending the first scheduled CI run: the workflow runs one job per `@FuzzTest` method with `JAZZER_MAX_DURATION`, the root `Test` config declares the Jazzer env vars as inputs and disables up-to-date checks in fuzz mode, and `fuzzReadChunkView` / `fuzzReadColumnProbe` carry real-region seeds (local 15 s runs of both passed). Remaining: seeds for the LZ4 and NBT targets (needs extracted payloads); crash reproducers go under `<Class>Inputs/`. Remove this entry once a CI run shows all five jobs fuzzing for the set duration.
 - **Linear:** RTP-21
 
 
@@ -178,17 +152,5 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** `platforms/rtp-neoforge/rtp-neoforge-common/build.gradle` contains several corrupted em dash sequences (double-encoded UTF-8). `scripts/check-mojibake.py` failed to detect this because `EXCLUDED_PATHS` contains `'build'`, and substring matching `if exc in rel_path:` unintentionally excludes any file named `build.gradle` or under a directory containing `build`.
 - **Impact:** Lingering encoding anomalies in Gradle files; reduced coverage of mojibake detection across Gradle build definitions in the repository.
 - **Suggested next step:** Replace the corrupted em dash sequences with clean em dashes or ASCII hyphens in `platforms/rtp-neoforge/rtp-neoforge-common/build.gradle`. Update `scripts/check-mojibake.py` to match directory components (`/build/` or Path parts) rather than simple substring matching.
-
-
-### 2026-10-08 — Scatter visualizer rounds landings before chunk mapping and overwrites published charts for any finished run
-
-- **Severity:** Low
-- **Status:** Open
-- **Discovered during:** Test B (`20261008-024412`) landing statistics for RESULTS.md / PRE_WRITEUP.md section 5.8
-- **Location:** `rtp-core/src/test/.../memory/table/CrossPluginDestinationScatterVisualizerTest.java` `readLandings` (~316, `Math.round(x)`) and `testRenderCrossPluginDestinationScatterChart` (~236, `previewOnly = !missing.isEmpty()`)
-- **Symptom / hypothesis:** Landings are rounded to the nearest block before `floorDiv(.., 16)`, so a block-centre coordinate such as 15.5 or -0.5 maps to the neighbouring chunk; Test B chunk-reuse counts differ from a `floor(block / 16)` count by 1-2 per plugin (BetterRTP 9 vs 7, JustRTP 6 vs 7). Separately, `-Drtp.scatter.csv` pinned to any fully finished run writes `docs/assets/img/cross_plugin_destinations_scatter_chart*.png`, even with `-Drtp.scatter.preview=true`, so reading stats for a second run replaces the published chart of the first.
-- **Impact:** "Chunks reused" columns in RESULTS.md (Test A) may be off by a few; analysing a non-published run silently overwrites the storefront scatter image unless it is backed up and restored.
-- **Suggested next step:** Keep the double coordinates for chunk mapping (`Math.floor(x / 16)`), round only for the duplicate check; make `rtp.scatter.preview=true` force report-only output regardless of `missing`.
-
 
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->

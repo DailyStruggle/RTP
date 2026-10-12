@@ -15,7 +15,7 @@ public final class OnPlayerQuit implements Listener {
   @EventHandler(priority = EventPriority.LOWEST)
   public void onPlayerQuit(PlayerQuitEvent event) {
     UUID uuid = event.getPlayer().getUniqueId();
-    if (RTP.getInstance().queuedPlayers.contains(uuid)) return;
+    RTP.getInstance().queuedPlayers.remove(uuid);
 
     TeleportPipelineTask pendingDeath = RTP.pendingDeathTeleports.remove(uuid);
     if (pendingDeath != null) {
@@ -30,15 +30,25 @@ public final class OnPlayerQuit implements Listener {
     io.github.dailystruggle.rtp.common.pvp.PvPGate.nativeTracker().clear(uuid);
 
     TeleportData data = RTP.getInstance().latestTeleportData.get(uuid);
-    if (data != null && !data.completed) {
-      if (data.nextTask instanceof TeleportPipelineTask task) {
-        task.setCancelled(true);
-        if (task.coords() != null) {
-          RTP.scheduler.runTask(
-                  task.region().getWorld(), task.coords().x() >> 4, task.coords().z() >> 4, task);
-        } else {
-          RTP.scheduler.runTask(task);
+    if (data != null) {
+      if (!data.completed) {
+        if (data.nextTask instanceof TeleportPipelineTask task) {
+          task.setCancelled(true);
+          if (task.coords() != null) {
+            RTP.scheduler.runTask(
+                    task.region().getWorld(), task.coords().x() >> 4, task.coords().z() >> 4, task);
+          } else {
+            RTP.scheduler.runTask(task);
+          }
         }
+      } else {
+        // Player completed teleport: offload to disk file bin and evict from local heap
+        if (RTP.getInstance().fileBinStore != null) {
+          RTP.getInstance().fileBinStore.save(data);
+        }
+        RTP.getInstance().latestTeleportData.remove(uuid);
+        RTP.getInstance().priorTeleportData.remove(uuid);
+        RTP.getInstance().regionTeleportTimes.remove(uuid);
       }
     }
 
@@ -74,10 +84,17 @@ public final class OnPlayerQuit implements Listener {
     // `perPlayerLocationQueue` without bound under churn. Idempotent,
     // best-effort, guarded - the quit listener must never throw.
     try {
-      for (io.github.dailystruggle.rtp.common.selection.region.Region region :
-          RTP.selectionAPI.permRegionLookup.values()) {
+      java.util.Collection<io.github.dailystruggle.rtp.common.selection.region.Region> regions =
+          new java.util.ArrayList<>(RTP.selectionAPI.permRegionLookup.values());
+      regions.addAll(RTP.selectionAPI.tempRegions.values());
+      for (io.github.dailystruggle.rtp.common.selection.region.Region region : regions) {
         try {
           region.closePersonalQueue(uuid);
+          java.util.concurrent.CompletableFuture<?> fastLoc =
+              region.queueManager.fastLocations.remove(uuid);
+          if (fastLoc != null && !fastLoc.isDone()) {
+            fastLoc.cancel(true);
+          }
         } catch (Throwable t) {
           RTP.log(java.util.logging.Level.WARNING,
               "[RTP] closePersonalQueue failed for " + uuid + " in region "

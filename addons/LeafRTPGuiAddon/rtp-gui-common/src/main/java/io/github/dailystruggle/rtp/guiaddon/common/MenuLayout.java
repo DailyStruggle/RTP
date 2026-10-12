@@ -50,7 +50,7 @@ public final class MenuLayout {
    *
    * <p>Primary destinations (regions/default) and submenus (actions/biome selectors)
    * are placed on distinct lines so they do not crowd each other. Within each row,
-   * items are evenly spaced if count <= 50% of the inner column width (1..3 items),
+   * items are evenly spaced if {@code count <= 50%} of the inner column width (1..3 items),
    * and packed contiguously centered if count > 50% (4..7 items).
    *
    * @param model the pre-resolved, platform-neutral menu contents

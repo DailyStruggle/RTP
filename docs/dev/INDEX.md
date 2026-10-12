@@ -55,6 +55,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Hazards and failure modes | [`HAZARDS.md`](HAZARDS.md) |
 | Failure detection and responses | [`HAZARDS.md#failure-modes`](HAZARDS.md#failure-modes) |
 | External hooks (claim verifiers, economy, placeholders, world border, anvil prefilter) | [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md) (ADR-026) |
+| Player archetypes, utility functions & valuation weights | [`PLAYER_TAXONOMY_VALUATION.md`](PLAYER_TAXONOMY_VALUATION.md) |
 | How and why AI tooling is used in this repository | [`AI_USAGE.md`](AI_USAGE.md) |
 
 ## Normative (read before writing code)
@@ -86,7 +87,9 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | [`METRICS_PLAN.md`](METRICS_PLAN.md) | Runtime metrics SPI (TPS/MSPT/heap/queue/pipeline); implementation eligible. |
 | [`ROADMAP.md`](ROADMAP.md) | Forward-looking work. |
 | [`STAKEHOLDERS.md`](STAKEHOLDERS.md) | Roles and review expectations. |
+| [`PLAYER_TAXONOMY_VALUATION.md`](PLAYER_TAXONOMY_VALUATION.md) | Player taxonomy, utility functions, site valuation weights, and behavioral benchmark models. |
 | [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md) | Dated engineering notes. |
+| [`../../helpers/StressTestRTP/LEAK_FUZZING.md`](../../helpers/StressTestRTP/LEAK_FUZZING.md) | Behaviour leak fuzzer (`scripts/bench_fuzz.py`): goals, methodology, reading a run, findings (BetterRTP, LeafRTP 3.3.0), limitations. |
 | [`SECURITY_AUDIT_v3.3.0.md`](SECURITY_AUDIT_v3.3.0.md) | v3.3.0 pre-release security and severe-bug audit: fixed, open, sound and uncovered areas. |
 
 > Plans that shipped or were superseded are removed; the ADR is the durable record. Pre-deletion state is recoverable from git.

@@ -213,7 +213,7 @@ public final class FuzzySearchEngine {
 
     /**
      * Concept key matcher used by permission derivation and heuristic importers:
-     * exact match, containment (for term length >= 5), or Levenshtein distance <= 2.
+     * exact match, containment (for term length {@code >= 5}), or Levenshtein distance {@code <= 2}.
      */
     public static boolean keyMatches(@Nullable String key, @Nullable String term) {
         if (key == null || term == null || key.isEmpty() || term.isEmpty()) return false;
@@ -225,7 +225,7 @@ public final class FuzzySearchEngine {
 
     /**
      * Folder/plugin name prefix matcher used by permission derivation:
-     * exact match, containment (for length >= 4), or Levenshtein distance <= 2 (for length >= 5).
+     * exact match, containment (for length {@code >= 4}), or Levenshtein distance {@code <= 2} (for length {@code >= 5}).
      */
     public static boolean nameMatches(@Nullable String a, @Nullable String b) {
         if (a == null || b == null || a.isEmpty() || b.isEmpty()) return false;
@@ -308,7 +308,7 @@ public final class FuzzySearchEngine {
      * or {@link LookupStatus#IMPERCEPTIBLE} (fallback).
      *
      * <p>A candidate is categorized as a perceptible typo when its Levenshtein distance is within
-     * the adaptive threshold (<=1 for length 3-4, <=2 for length >=5) and its score leads the
+     * the adaptive threshold ({@code <= 1} for length 3-4, {@code <= 2} for length {@code >= 5}) and its score leads the
      * runner-up candidate by an unambiguity margin of at least 20 points.
      *
      * @param rawInput raw configured string to resolve
