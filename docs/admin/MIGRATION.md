@@ -2,15 +2,17 @@
 
 **Current Plugin Version:** `@version@`
 
-Switching from another rtp plugin? Start with [Migrating from Competitor Plugins](#migrating-from-competitor-plugins-betterrtp-justrtp-ezrtp-jakesrtp) right below. Upgrading an existing RTP install? Skip to [Upgrading to 3.x](#upgrading-to-3x-current-release-330).
+Switching from another rtp plugin? Start with [Migrating from Another RTP Plugin](#migrating-from-another-rtp-plugin) right below. Upgrading an existing RTP install? Skip to [Upgrading to 3.x](#upgrading-to-3x-current-release-330).
 
 > 📎 For the **mechanics** of how RTP upgrades on-disk YAML files (what `.old1`/`.old2` files are, how your customizations are read into memory before the file is replaced, and how they are overlaid onto the new defaults), see [CONFIG_LIFECYCLE.md](configuration/CONFIG_LIFECYCLE.md).
 
 ---
 
-## Migrating from Competitor Plugins (BetterRTP, JustRTP, EzRTP, JakesRTP)
+## Migrating from Another RTP Plugin
 
 `/rtp config import` reads another rtp plugin's config files and writes the matching LeafRTP files: worlds, radii, shapes, cooldowns, delays, prices, database settings, effects, and portal zones. It never overwrites an existing file unless you pass `overwrite=true`, and it can copy your players' permissions too.
+
+The importer isn't a fixed list of plugins. It looks for any folder under `plugins/` that holds an rtp-style config (`config.yml`, `rtp.yml` or `settings.yml`, a `worlds/`, `regions/`, `zones/` or `rtpSettings/` folder, or YAML with radius, center or cooldown keys) and reads the layout it finds. BetterRTP, JustRTP, EzRTP and JakesRTP are the layouts it has tests or reference notes for; anything else is best effort, and every setting it can't map is listed as a warning. Point it at any folder with `path=<dir>`. Permission copying is narrower: it covers BetterRTP, JustRTP and EzRTP nodes only.
 
 **Short version:**
 
@@ -30,24 +32,25 @@ The old plugin doesn't need to be running; RTP reads its folder from disk.
 | **JustRTP** | `plugins/justRTP/config.yml`, `custom_locations.yml`, `rtp_zones.yml` | `regions/<world>.yml`, `regions/<id>.yml`, `definitions/actions/zone_<id>.yml`, `advanced/database.yml`, `definitions/effects/imported_justrtp_*.yml` |
 | **EzRTP** | `plugins/EzRTP/rtp.yml`, `config.yml`, `limits.yml` | `regions/<world>.yml`, `definitions/effects/imported_ezrtp_*.yml` |
 | **JakesRTP** | `plugins/JakesRTP/config.yml`, `rtpSettings/*.yml`, `distributions/*.yml` | `regions/<profile>_region.yml`, `worlds/<world>.yml`, `config.yml`, `performance.yml` |
+| **Any other rtp plugin** (best effort) | `config.yml`, `rtp.yml`, `settings.yml`, or YAML under `worlds/`, `regions/`, `locations/`, `zones/`, `settings/` | `regions/<world>.yml`, `config.yml`, `performance.yml`, effects and database where recognised; unmapped settings are listed as warnings |
 
 ---
 
 ### Step-by-Step Foreign Configuration Import
 
 #### Step 1: Pre-Import Verification
-1. Ensure the competitor plugin's configuration directory exists under your server's `plugins/` folder (e.g. `plugins/BetterRTP/`, `plugins/justRTP/`, or `plugins/EzRTP/`).
-2. The competitor plugin **does not need to be running or enabled**. RTP reads the files directly from disk.
+1. Ensure the old plugin's configuration directory exists under your server's `plugins/` folder (e.g. `plugins/BetterRTP/`, `plugins/justRTP/`, `plugins/EzRTP/`, or any other rtp plugin's folder).
+2. The old plugin **does not need to be running or enabled**. RTP reads the files directly from disk.
 3. If importing custom directory paths, verify the path is accessible.
 
 #### Step 2: Auto-Detection or Targeted Dry-Run
 Run the import command in dry-run mode (default, `overwrite=false`) to preview what files and configurations will be created or mapped:
 
-- **Auto-detection** (probes `plugins/` for competitor folders):
+- **Auto-detection** (probes up to 64 folders in `plugins/` for anything that looks like an rtp config):
   ```
   /rtp config import
   ```
-  *Note:* If multiple competitor folders are present, RTP lists the candidates and requests an explicit source name.
+  *Note:* If multiple candidate folders are present, RTP lists them and asks for an explicit source name.
 
 - **Explicit source preview:**
   ```
@@ -55,12 +58,15 @@ Run the import command in dry-run mode (default, `overwrite=false`) to preview w
   /rtp config import justrtp
   /rtp config import ezrtp
   /rtp config import jakesrtp
+  /rtp config import <any folder name under plugins/>
   ```
 
 - **Specifying an external or custom directory path:**
   ```
   /rtp config import betterrtp path=C:/backups/plugins/BetterRTP
+  /rtp config import path=C:/backups/plugins/SomeOtherRTP
   ```
+  Without a source name, `path=` is checked as a plugin folder first, then as a `plugins/` root to scan.
 
 #### Step 3: Review and Confirm (Apply Writes)
 By default, the importer writes only files that do not yet exist, preserving your existing configuration. To execute and allow overwriting or updating existing destination configs, supply `overwrite=true`:
@@ -198,7 +204,7 @@ lifecycle:
 
 ### Non-Destructive Permission Migration
 
-`/rtp config import` also migrates permissions, without removing anything. When importing configs, competitor permission nodes assigned to groups in your permissions provider (such as LuckPerms) are automatically mapped and applied (unless `permissions=false` is explicitly passed).
+`/rtp config import` also migrates permissions, without removing anything. When importing configs, BetterRTP, JustRTP and EzRTP permission nodes assigned to groups in your permissions provider (such as LuckPerms) are automatically mapped and applied (unless `permissions=false` is explicitly passed). Other plugins' nodes are not mapped; grant the `rtp.*` equivalents by hand.
 
 #### Command Syntax
 ```
@@ -206,11 +212,11 @@ lifecycle:
 /rtp config import permissions [source] [apply=true|false]
 ```
 - **Unified Import (`/rtp config import`)**:
-  - `[source]`: Competitor plugin to import (`betterrtp`, `justrtp`, `ezrtp`, `jakesrtp`), or omit to auto-detect.
+  - `[source]`: Plugin folder to import (`betterrtp`, `justrtp`, `ezrtp`, `jakesrtp`, or any other folder name under `plugins/`), or omit to auto-detect.
   - `[overwrite]`: When `true`, writes configuration files and applies permission changes to your permission provider. Defaults to `false` (dry-run preview for both config and permissions).
   - `[permissions]`: Defaults to `true`. Pass `permissions=false` or `--no-permissions` to skip permission migration.
 - **Standalone Permission Subcommand (`/rtp config import permissions`)**:
-  - `[source]`: Optional source filter (`betterrtp`, `justrtp`, `ezrtp`, or `jakesrtp`). If omitted, all supported competitor nodes are scanned.
+  - `[source]`: Optional source filter (`betterrtp`, `justrtp`, or `ezrtp`). If omitted, all three plugins' nodes are scanned.
   - `[apply]`: `false` (default) performs a non-destructive **DRY-RUN**, logging planned migrations. `true` executes the appropriate permission set commands directly through your server's command dispatcher.
 
 #### Permission Mapping Table

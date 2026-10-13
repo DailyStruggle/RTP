@@ -59,7 +59,7 @@ Listing metadata (for the marketplace form fields, not emitted):
   Paid BuiltByBit title:  "LeafRTP-Pro"   tagline: "Off-tick Random Teleportation engine"
   Free title:             "LeafRTP"       tagline: "Off-tick random teleport engine with spatial memory"
   (Modrinth's short description still reads "Fast Random Teleportation for everyone,
-   configurable and extensible" - update it there to match.)
+   configurable and extensible" - replace it there with the free tagline above.)
 
 Private / Author notes:
   - Run a future memory leak test using the behaviour leak fuzzer (`scripts/bench_fuzz.py`) across all candidate plugins on Folia/Paper to evaluate long-duration heap bounds and update the memory retention comparisons.
@@ -107,11 +107,12 @@ On Paper all candidate checking runs off the tick thread. On Folia, candidates a
 - [**Throughput**](#performance): 40 TP/s on Paper and 180 TP/s on Folia under nominal ticks, scaling to 249.7 TP/s peak on Folia.
 - [**Even player spread**](https://dailystruggle.github.io/RTP/site/why/): Zero duplicate landings in each 4,096-teleport Paper 26.2 run, with no player coordinates tracked.
 - [**Spatial memory**](https://dailystruggle.github.io/RTP/admin/configuration/TTL/): Biomes and rejected chunks (with cause and TTL) remembered across restarts at chunk resolution.
-- [**One-command import**](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-competitor-plugins-betterrtp-justrtp-ezrtp-jakesrtp): Auto-translates third-party configs and generates LuckPerms permission commands.
-- [**Web workspace**](https://dailystruggle.github.io/RTP/admin/WEB_EDITOR_GUIDE/): Edit region borders on a map, search configs by intent, and view live engine stats (`/rtp editor`).
+- [**Switch in one command**](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-another-rtp-plugin): `/rtp config import` reads any rtp-style config folder in `plugins/` (tested on BetterRTP, JustRTP and EzRTP), previews the result, and never overwrites without `overwrite=true`. Permission copy covers BetterRTP, JustRTP and EzRTP.
+- [**Web workspace**](https://dailystruggle.github.io/RTP/admin/WEB_EDITOR_GUIDE/): Edit region borders on a map, search configs by intent, and view live engine stats (`/rtp editor`). The hosted editor needs no inbound port.
 - [**One jar**](https://dailystruggle.github.io/RTP/admin/QUICK_START/): Runs on Paper, Folia, Spigot, Fabric, NeoForge, and Velocity.
 - [**Action engine**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Scriptable pipeline for step-in portals, party scatter, and 1v1 arena duels.
-- [**Claim checks**](https://dailystruggle.github.io/RTP/admin/CLAIM_PLUGIN_COMPATIBILITY/): Fail-closed claim checks, PvP damage cancel; the hosted web editor needs no inbound port.
+- [**Custom terrain**](#region-file-pre-filter): Candidates are read from the region files on disk, so Iris, Terra, datapack and upgraded worlds are checked as they actually are.
+- [**Claim checks**](https://dailystruggle.github.io/RTP/admin/CLAIM_PLUGIN_COMPATIBILITY/): 16 claim plugins on Bukkit / Paper / Folia plus FTB Chunks and Open Parties and Claims on Fabric / NeoForge, checked fail-closed off the teleport tick. Optional PvP combat-tag check.
 
 Benchmark comparisons and hardware metrics are in [Performance](#performance).
 
@@ -142,7 +143,7 @@ That's enough to run. If you want to tune it, my recommended order is: `/rtp adm
 - **Chat wizard:** `/rtp admin setup`
 - **Web workspace:** `/rtp editor` in your browser
 - **YAML files:** `plugins/RTP/` (`radius: 10km`, `teleportCooldown: 30s`)
-- **Switching from another rtp plugin:** `/rtp config import` previews the translated config and permissions; add `overwrite=true` to write them ([switching guide](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-competitor-plugins-betterrtp-justrtp-ezrtp-jakesrtp)).
+- **Switching from another rtp plugin:** `/rtp config import` finds the old plugin's folder in `plugins/` on its own (or point it anywhere with `path=<dir>`), then previews the translated config and permissions; add `overwrite=true` to write them ([switching guide](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-another-rtp-plugin)).
 
 (Advanced database, network proxy, and cache tuning: see the [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/).)
 
@@ -157,10 +158,12 @@ All configuration routes edit the same files, accept human units (`radius: 10km`
 - [**Web Workspace**](https://dailystruggle.github.io/RTP/admin/WEB_EDITOR_GUIDE/) (`/rtp editor`): Browser admin with no port forwarding. Drag region boundaries on a map and search YAML by intent with live setting docs beside each key. A diagnostics tab shows live tick, queue and latency stats.
 - [**In-Game Admin Book**](https://dailystruggle.github.io/RTP/admin/configuration/IN_GAME_CONFIG/#1-the-interactive-admin-panel-rtp-admin) (`/rtp admin`): Clickable operator book for inspecting queues and reloading configs in game.
 - [**Chat Wizard**](https://dailystruggle.github.io/RTP/admin/QUICK_START/#guided-setup-rtp-admin-setup) (`/rtp admin setup`): 60-second guided questionnaire sizing regions to world borders with automatic backups.
-- [**Config & Permission Import**](https://dailystruggle.github.io/RTP/admin/MIGRATION/) (`/rtp config import`): Translates worlds, radii, cooldowns, and generates dry-run LuckPerms commands from supported rtp configs.
+- [**Config & Permission Import**](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-another-rtp-plugin) (`/rtp config import`): Detects other rtp plugins' folders automatically, or takes any folder with `path=<dir>`. Maps worlds, radii, shapes, cooldowns, delays, prices, database, effects and portal zones; anything it can't map is listed as a warning. Dry-runs the LuckPerms commands for BetterRTP, JustRTP and EzRTP nodes.
 - [**Spatial Pregeneration**](https://dailystruggle.github.io/RTP/admin/configuration/TTL/) (`/rtp scan`): Checks region files off-tick ahead of time, recording biomes, invalidity causes, and claims at chunk resolution.
 - [**Live Visualizations**](https://dailystruggle.github.io/RTP/admin/configuration/IN_GAME_CONFIG/#c-diagnostics--monitoring) (`/rtp visualization`): Renders boundaries, biome layouts, and candidate heatmaps onto held in-game maps.
 - [**Engine Diagnostics**](https://dailystruggle.github.io/RTP/admin/QUICK_START/#diagnostics-rtp-info) (`/rtp info`): Live queue depth, latency percentiles, and per-region generation rates.
+- **Bundled docs** (`/rtp docs`): The admin docs ship inside the jar and read in game; `/rtp docs export` writes an offline HTML copy.
+- **11 languages** (`/rtp config language <locale>`): Config files and messages in German, Spanish, French, Italian, Japanese, Korean, Dutch, Polish, Portuguese, Russian and Chinese. Some keys are still in English; translations are welcome.
 
 ![Web editor: region map](../assets/img/web_editor_cartography.png)
 
@@ -460,8 +463,9 @@ Switching between the free download and this one is a jar swap. Config, data fil
 | `/rtp info` | Operator diagnostics | `rtp.info` |
 | `/rtp reload [file]` | Reload all configuration, or one file | `rtp.reload` |
 | `/rtp config <file> view\|set <k>=<v>` | View or set a config key, then reload | `rtp.config` |
-| `/rtp config import [source] [path=<dir>] [overwrite=true]` | Translate another rtp plugin's config; never overwrites without `overwrite=true` | `rtp.config` |
+| `/rtp config import [source] [path=<dir>] [overwrite=true]` | Translate another rtp plugin's config (auto-detected, or any folder via `path=`); never overwrites without `overwrite=true` | `rtp.config` |
 | `/rtp config import permissions [source] [apply=true]` | Dry-run the LuckPerms commands that copy BetterRTP, JustRTP or EzRTP nodes onto `rtp.*`; `apply=true` runs them | `rtp.config` |
+| `/rtp config language <locale>` | Switch config files and messages to a bundled locale, then reload | `rtp.config` |
 | `/rtp admin setup <world\|gameplay\|perf\|preview\|confirm>` | Guided first-time setup from preset configs | `rtp.admin.setup` |
 | `/rtp scan start\|pause\|resume\|reset\|cancel` | Offline spatial memory pregeneration (was `/rtp fill` in 2.x) | `rtp.scan` |
 | `/rtp visualization [held\|export <type>]` | Render live held map charts or export high-resolution PNG/BMP diagnostic images | `rtp.admin` |
@@ -528,7 +532,7 @@ A: Rarely, and no player positions are tracked. In the Paper 26.2 runs (4,096 te
 A: Most `/rtp` calls are served from a queue of locations checked before anyone typed the command. The queue refills off the main thread: it skips ground it has already rejected and checks the rest against the region files before loading any chunk. Details are in [How it works](#how-it-works).
 
 **Q: Is it complicated to set up?**
-A: No. Sizing and configuring your regions takes a couple of minutes through the guided setup wizard (`/rtp admin setup`), the web workspace (`/rtp editor`), or in-game book (`/rtp admin`). If you are migrating from another plugin, `/rtp config import` translates your existing files automatically.
+A: No. Sizing and configuring your regions takes a couple of minutes through the guided setup wizard (`/rtp admin setup`), the web workspace (`/rtp editor`), or in-game book (`/rtp admin`). If you are migrating from another plugin, `/rtp config import` finds its folder and translates your existing files, with a preview before anything is written.
 
 **Q: How is the web editor secured? Does it open ports on my server?**
 A: Not to the outside. The hosted editor needs no inbound port: it connects outbound over TLS to an ephemeral WebSocket relay. Local mode (`/rtp editor local`) binds a token-authenticated socket on `127.0.0.1` only, which nothing outside the machine can reach. All messages require RSA-2048 signatures with strictly increasing sequence counters and single-use, expiring trust nonces.
