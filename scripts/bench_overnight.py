@@ -233,10 +233,15 @@ class Driver:
         if r is None:
             return None
         names: set[str] = set()
-        for line in r.splitlines():
-            line = line.strip()
+        # Paper prefixes only the first row of 10 names with "- " (continuation rows start
+        # with a space) and marks legacy plugins (no api-version) with "*".
+        for raw in r.splitlines():
+            line = raw.strip()
+            if not line or line.endswith(":"):
+                continue  # category headers
             if line.startswith("-"):
-                names.update(n.strip() for n in line[1:].split(",") if n.strip())
+                line = line[1:]
+            names.update(n.strip().lstrip("*").strip() for n in line.split(",") if n.strip())
         return names
 
     def jar_set_ok(self, target: str) -> tuple[bool, str]:

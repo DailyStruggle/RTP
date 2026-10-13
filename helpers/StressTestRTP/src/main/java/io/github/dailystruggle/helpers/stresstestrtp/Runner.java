@@ -947,7 +947,8 @@ public final class Runner {
         if (mode == Mode.RAMP) {
             Sched.cancel(rampTpsTaskId);
             rampTpsTaskId = null;
-            if (rampInWarmup) {
+            // IDLE also runs with recording off, but leaves rampInWarmup false.
+            if (rampInWarmup || rampState == RampState.IDLE) {
                 rampInWarmup = false;
                 recorder.setRecording(true);
             }
