@@ -8,7 +8,9 @@ import org.bukkit.inventory.meta.ItemMeta;
  * Mock stub of the HeadDatabaseAPI for testing LeafRTP integrations.
  */
 public class HeadDatabaseAPI {
-    public HeadDatabaseAPI() {}
+    public HeadDatabaseAPI() {
+        // Stateless mock: the real API's constructor binds to the HeadDatabase plugin.
+    }
 
     public ItemStack getItemHead(String id) {
         if (id == null || id.isBlank()) return null;

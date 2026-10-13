@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.paperplatform.entity;
 
+import java.util.Optional;
+import io.github.dailystruggle.rtp.bukkitplatform.tools.BukkitServers;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.bukkitplatform.entity.BukkitRTPPlayer;
@@ -51,15 +53,15 @@ public class PaperRTPPlayer extends BukkitRTPPlayer {
       RTP.log(Level.WARNING, "[RTP] teleport target " + name() + " (" + uuid() + ") is offline");
       return CompletableFuture.completedFuture(false);
     }
-    Location current = player.getLocation();
+    Optional<Location> current = BukkitServers.location(player);
     Location location =
         new Location(
             world,
             x,
             y,
             z,
-            current != null ? current.getYaw() : 0f,
-            current != null ? current.getPitch() : 0f);
+            current.map(Location::getYaw).orElse(0f),
+            current.map(Location::getPitch).orElse(0f));
 
     CompletableFuture<Boolean> future = new CompletableFuture<>();
     if (tryDirectTeleport(location, to.x(), to.z(), future)) return future;

@@ -80,14 +80,14 @@ public final class Targets {
                 if (o instanceof ConfigurationSection sec) {
                     String label = sec.getString("label", "target" + idx);
                     String cmd = sec.getString("command", "");
-                    if (!cmd.isEmpty()) out.add(new Entry(label, cmd, parseSender(sec.getString("sender"))));
+                    if (!cmd.isEmpty()) out.add(new Entry(label, cmd, parseSender(sec.getString("sender")).orElse(null)));
                 } else if (o instanceof java.util.Map<?, ?> m) {
                     Object lbl = m.get("label");
                     Object cmd = m.get("command");
                     if (cmd != null && !cmd.toString().isEmpty()) {
                         Object sender = m.get("sender");
                         out.add(new Entry(lbl == null ? "target" + idx : lbl.toString(), cmd.toString(),
-                                parseSender(sender == null ? null : sender.toString())));
+                                parseSender(sender == null ? null : sender.toString()).orElse(null)));
                     }
                 } else if (o instanceof String s && !s.isEmpty()) {
                     // Bare-string entry: derive a label from the first whitespace-separated token.
@@ -105,12 +105,12 @@ public final class Targets {
     }
 
     /** {@code player} / {@code console} (case-insensitive); anything else defers to the global setting. */
-    static Boolean parseSender(String raw) {
-        if (raw == null) return null;
+    static java.util.Optional<Boolean> parseSender(String raw) {
+        if (raw == null) return java.util.Optional.empty();
         String s = raw.trim().toLowerCase(java.util.Locale.ROOT);
-        if (s.equals("player")) return Boolean.TRUE;
-        if (s.equals("console")) return Boolean.FALSE;
-        return null;
+        if (s.equals("player")) return java.util.Optional.of(Boolean.TRUE);
+        if (s.equals("console")) return java.util.Optional.of(Boolean.FALSE);
+        return java.util.Optional.empty();
     }
 
     /** Compact human-readable description for status / summary output. */

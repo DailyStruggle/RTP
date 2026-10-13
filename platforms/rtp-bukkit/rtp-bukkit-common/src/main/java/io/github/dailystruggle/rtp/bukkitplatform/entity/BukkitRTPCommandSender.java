@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.bukkitplatform.entity;
 
+import io.github.dailystruggle.rtp.bukkitplatform.tools.BukkitServers;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
@@ -82,7 +83,7 @@ public class BukkitRTPCommandSender implements RTPCommandSender {
         return s;
       }
     }
-    if (Bukkit.getServer() == null) return null;
+    if (BukkitServers.absent()) return null;
     if (uuid.equals(RTPAPI.serverId)) {
       CommandSender console = Bukkit.getConsoleSender();
       this.sender = console;

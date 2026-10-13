@@ -848,8 +848,10 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      */
     @Override
     public boolean isChunkLoaded(int cx, int cz) {
+        ServerLevel level = world;
+        if (level == null) return false;
         try {
-            ServerChunkCache cache = world.getChunkSource();
+            ServerChunkCache cache = level.getChunkSource();
             return cache.hasChunk(cx, cz);
         } catch (Throwable ignored) {
             return false;

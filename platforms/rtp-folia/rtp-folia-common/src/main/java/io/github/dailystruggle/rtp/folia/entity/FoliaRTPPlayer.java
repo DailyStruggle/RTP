@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.bukkitplatform.tools.BukkitServers;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import io.github.dailystruggle.rtp.bukkitplatform.entity.PersonalBossBars;
 import io.github.dailystruggle.rtp.folia.world.FoliaRTPWorld;
@@ -16,6 +17,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 import org.bukkit.Bukkit;
@@ -39,8 +41,8 @@ public final class FoliaRTPPlayer implements RTPPlayer {
   private volatile WeakReference<Player> playerRef;
   private final UUID uuid;
   private final String name;
-  private volatile long lastCooldown;
-  private volatile long lastDelay;
+  private final AtomicLong lastCooldown = new AtomicLong();
+  private final AtomicLong lastDelay = new AtomicLong();
   private volatile Set<String> lastPermissions = Collections.emptySet();
 
   @RegionThread
@@ -54,8 +56,8 @@ public final class FoliaRTPPlayer implements RTPPlayer {
     this.playerRef = other.playerRef;
     this.uuid = other.uuid;
     this.name = other.name;
-    this.lastCooldown = other.lastCooldown;
-    this.lastDelay = other.lastDelay;
+    this.lastCooldown.set(other.lastCooldown.get());
+    this.lastDelay.set(other.lastDelay.get());
     this.lastPermissions = other.lastPermissions;
   }
 
@@ -101,16 +103,16 @@ public final class FoliaRTPPlayer implements RTPPlayer {
   @RegionThread
   public long cooldown() {
     Player player = player();
-    if (player != null) lastCooldown = new FoliaRTPCommandSender(player).cooldown();
-    return lastCooldown;
+    if (player != null) lastCooldown.set(new FoliaRTPCommandSender(player).cooldown());
+    return lastCooldown.get();
   }
 
   @Override
   @RegionThread
   public long delay() {
     Player player = player();
-    if (player != null) lastDelay = new FoliaRTPCommandSender(player).delay();
-    return lastDelay;
+    if (player != null) lastDelay.set(new FoliaRTPCommandSender(player).delay());
+    return lastDelay.get();
   }
 
   @Override
@@ -460,7 +462,7 @@ public final class FoliaRTPPlayer implements RTPPlayer {
   Player player() {
     Player p = playerRef.get();
     if (p != null) return p;
-    if (Bukkit.getServer() == null) return null;
+    if (BukkitServers.absent()) return null;
     p = Bukkit.getPlayer(uuid);
     if (p != null) playerRef = new WeakReference<>(p);
     return p;
