@@ -325,7 +325,10 @@ class AbstractForeignConfigImporterCoverageTest {
         List<String> warnings = new ArrayList<>();
         importer.mirrorEffectsConfig(src, tmp, true, mapped, new ArrayList<>(), warnings);
         assertTrue(warnings.stream().anyMatch(w -> w.startsWith("Failed to write effect profile")), warnings.toString());
-        assertTrue(warnings.stream().anyMatch(w -> w.startsWith("Failed to update effects.yml")), warnings.toString());
+        // File.length() of a directory is 0 on Windows (load yields an empty config, the write fails)
+        // but non-zero on POSIX (the read fails), so either warning reports the effects.yml failure.
+        assertTrue(warnings.stream().anyMatch(w -> w.startsWith("Failed to update effects.yml")
+                || w.startsWith("Failed to write effects.yml")), warnings.toString());
         assertTrue(mapped.isEmpty());
     }
 
