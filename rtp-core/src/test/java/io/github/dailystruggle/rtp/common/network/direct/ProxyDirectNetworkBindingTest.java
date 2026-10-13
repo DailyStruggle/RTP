@@ -9,6 +9,8 @@ import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.transport.codec.BackendHeartbeatCodec;
 import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectTlsConfig;
 import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWire;
+import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWire.Direction;
+import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWire.WireContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -89,10 +91,11 @@ class ProxyDirectNetworkBindingTest {
                 try (Socket s = socket.accept()) {
                     DataInputStream in = new DataInputStream(s.getInputStream());
                     DataOutputStream out = new DataOutputStream(s.getOutputStream());
-                    // Every proxy-direct connection is an opcode + signed
-                    // request; branch on it.
-                    byte op = ProxyDirectWire.readOpcode(in);
-                    String payload = ProxyDirectWire.readSignedPayload(in, verifier);
+                    // Every proxy-direct connection is a request header + signed
+                    // request; branch on the opcode, reply bound to the header.
+                    WireContext ctx = ProxyDirectWire.readRequestHeader(in).context();
+                    byte op = ctx.opcode();
+                    String payload = ProxyDirectWire.readSignedPayload(in, ctx, Direction.REQUEST, verifier);
                     if (op == ProxyDirectWire.OP_FIND_RESERVATION) {
                         // Manufacture a CLAIMED token for the requested player.
                         String reply = "";
@@ -103,10 +106,10 @@ class ProxyDirectNetworkBindingTest {
                                     9_999_999_999L, ReservationToken.State.CLAIMED, "arena");
                             reply = ProxyDirectWire.encodeToken(tok);
                         }
-                        ProxyDirectWire.writeSignedPayload(out, reply, verifier, schema);
+                        ProxyDirectWire.writeSignedPayload(out, ctx, Direction.RESPONSE, reply, verifier, schema);
                         out.flush();
                     } else if (op == ProxyDirectWire.OP_REDEEM) {
-                        ProxyDirectWire.writeSignedPayload(out,
+                        ProxyDirectWire.writeSignedPayload(out, ctx, Direction.RESPONSE,
                                 RedeemOutcome.REDEEMED.name(), verifier, schema);
                         out.flush();
                     } else { // OP_HEARTBEAT
@@ -114,7 +117,8 @@ class ProxyDirectNetworkBindingTest {
                             BackendHeartbeat hb = BackendHeartbeatCodec.decode(payload);
                             store.put(hb.serverId(), payload);
                         }
-                        ProxyDirectWire.writeList(out, List.copyOf(store.values()), verifier, schema);
+                        ProxyDirectWire.writeList(out, ctx, Direction.RESPONSE,
+                                List.copyOf(store.values()), verifier, schema);
                     }
                 } catch (Exception e) {
                     if (running.get()) { /* ignore between-accept errors in test */ }
@@ -315,8 +319,8 @@ class ProxyDirectNetworkBindingTest {
         Thread t = new Thread(() -> {
             try (Socket s = rogue.accept()) {
                 DataInputStream in = new DataInputStream(s.getInputStream());
-                ProxyDirectWire.readOpcode(in);
-                ProxyDirectWire.readSignedPayload(in, V);
+                WireContext ctx = ProxyDirectWire.readRequestHeader(in).context();
+                ProxyDirectWire.readSignedPayload(in, ctx, Direction.REQUEST, V);
                 DataOutputStream out = new DataOutputStream(s.getOutputStream());
                 out.writeInt(1);
                 out.writeInt(1);
@@ -335,6 +339,39 @@ class ProxyDirectNetworkBindingTest {
                     V, 1, 5000L, 1000, 2000, () -> 1000L);
             binding.publishBackendHeartbeat(hb("backend-a", List.of("default"))).get();
             assertEquals(0, binding.livePeerCount(), "unsigned row must not be ingested");
+            binding.close();
+        } finally {
+            rogue.close();
+        }
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-PROXY-007: a correctly signed reply bound to a different request is dropped")
+    void replyBoundToOtherRequestDropped() throws Exception {
+        ServerSocket rogue = new ServerSocket();
+        rogue.bind(new InetSocketAddress("127.0.0.1", 0));
+        Thread t = new Thread(() -> {
+            try (Socket s = rogue.accept()) {
+                DataInputStream in = new DataInputStream(s.getInputStream());
+                WireContext ctx = ProxyDirectWire.readRequestHeader(in).context();
+                ProxyDirectWire.readSignedPayload(in, ctx, Direction.REQUEST, V);
+                // Valid secret, but signed for another request's nonce.
+                WireContext other = new WireContext(ctx.opcode(), ctx.sentAtMs(), ctx.nonce() + "x");
+                DataOutputStream out = new DataOutputStream(s.getOutputStream());
+                ProxyDirectWire.writeList(out, other, Direction.RESPONSE,
+                        List.of(BackendHeartbeatCodec.encode(hb("evil", List.of("x")))), V, 1);
+            } catch (Exception ignored) {
+                // test double
+            }
+        }, "rogue-proxy-direct-binding");
+        t.setDaemon(true);
+        t.start();
+        try {
+            ProxyDirectNetworkBinding binding = new ProxyDirectNetworkBinding(
+                    List.of(InetSocketAddress.createUnresolved("127.0.0.1", rogue.getLocalPort())),
+                    V, 1, 5000L, 1000, 2000, () -> 1000L);
+            binding.publishBackendHeartbeat(hb("backend-a", List.of("default"))).get();
+            assertEquals(0, binding.livePeerCount(), "a reply bound to another request must not be ingested");
             binding.close();
         } finally {
             rogue.close();

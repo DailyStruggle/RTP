@@ -2235,12 +2235,14 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   /**
    * Marks a single 1D index bad and records the rejection {@code cause}. The cause
    * is carried on the pending entry's value (its {@link LocationGenerator.FailTypes}
-   * ordinal) and surfaces as the per-run cause after the next rebuild.
+   * ordinal) and surfaces as the per-run cause after the next rebuild. Transient causes
+   * ({@code TtlConfig.isTransient}) are discarded, never stored.
    *
    * @param location the 1D spiral index to mark bad
    * @param cause    the rejection reason; {@code null} is treated as {@link LocationGenerator.FailTypes#misc}
    */
   public void addBadLocation(long location, LocationGenerator.FailTypes cause) {
+    if (io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.isTransient(cause)) return;
     long ttl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(cause, null);
     addBadLocation(location, cause, ttl);
   }
@@ -2449,13 +2451,15 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /**
-   * Cause-tagged variant of {@link #addBadChunk(long)}.
+   * Cause-tagged variant of {@link #addBadChunk(long)}. Transient causes
+   * ({@code TtlConfig.isTransient}) are discarded, never stored.
    *
    * @param location 1D index decoding to target chunk
    * @param cause rejection cause attributed to marked indices
    * @return count of newly marked indices (0, 1, or 2)
    */
   public int addBadChunk(long location, LocationGenerator.FailTypes cause) {
+    if (io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.isTransient(cause)) return 0;
     long ttl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(cause, null);
     return addBadChunk(location, cause, ttl);
   }

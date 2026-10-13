@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.TtlKeys;
 import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,6 +22,10 @@ public final class TtlConfig {
   private static final Map<LocationGenerator.FailTypes, Long> causeTtls =
       new EnumMap<>(LocationGenerator.FailTypes.class);
   private static final Map<String, Long> verifierTtls = new ConcurrentHashMap<>();
+  private static final EnumSet<LocationGenerator.FailTypes> TRANSIENT = EnumSet.of(
+      LocationGenerator.FailTypes.timeout,
+      LocationGenerator.FailTypes.nullChunk,
+      LocationGenerator.FailTypes.ungenerated);
 
   static {
     resetDefaults();
@@ -46,10 +51,20 @@ public final class TtlConfig {
     causeTtls.put(LocationGenerator.FailTypes.uniquePlacement, 30L * 86400L); // 30 days
     causeTtls.put(LocationGenerator.FailTypes.safetyExternal, DEFAULT_DYNAMIC_TTL_SECONDS); // 14 days
 
-    // Transient tier: 0 (discard immediately / not retained)
-    causeTtls.put(LocationGenerator.FailTypes.timeout, 0L);
-    causeTtls.put(LocationGenerator.FailTypes.nullChunk, 0L);
-    causeTtls.put(LocationGenerator.FailTypes.ungenerated, 0L);
+    // Transient tier: never stored (see isTransient). The 0L here is NOT a TTL - a stored
+    // ttl <= 0 means permanent - so callers must check isTransient before resolving.
+    for (LocationGenerator.FailTypes t : TRANSIENT) causeTtls.put(t, 0L);
+  }
+
+  /**
+   * Transient causes (timeout, nullChunk, ungenerated) describe the attempt, not the terrain, and
+   * shall not be retained as bad locations.
+   *
+   * @param cause rejection cause, may be {@code null}
+   * @return {@code true} when marks with this cause must be discarded rather than stored
+   */
+  public static boolean isTransient(LocationGenerator.FailTypes cause) {
+    return cause != null && TRANSIENT.contains(cause);
   }
 
   /**
@@ -114,6 +129,11 @@ public final class TtlConfig {
         String keyStr = String.valueOf(entry.getKey());
         try {
           LocationGenerator.FailTypes cause = LocationGenerator.FailTypes.valueOf(keyStr);
+          if (isTransient(cause)) {
+            RTP.log(Level.WARNING, "[TtlConfig] ttl.yml causes." + keyStr
+                + " ignored: transient causes are never retained");
+            continue;
+          }
           causeTtls.put(cause, ConfigParser.parseDurationSeconds(entry.getValue()));
         } catch (IllegalArgumentException ignored) {
           // unknown cause enum

@@ -90,7 +90,7 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 ## [3.3.0] - Unreleased
 
-> **Upgrade note.** `rtp.servers.*` now defaults to `true` instead of `op`, so in network mode every player can reach open cross-server regions; restrict with negative permissions if you relied on the old default. `CIRCLE` and `SQUARE` now use new selection engines that ignore `weight`; use `CIRCLE_DEPRECATED_PURE_SPIRAL` or `SQUARE_DEPRECATED_PURE_SPIRAL` to keep the 3.2.1 behavior. Saved memory and region cache files upgrade in place on first load and can't be read by older builds, so back up `plugins/RTP/` if you may need to roll back.
+> **Upgrade note.** `rtp.servers.*` now defaults to `true` instead of `op`, so in network mode every player can reach open cross-server regions; restrict with negative permissions if you relied on the old default. `CIRCLE` and `SQUARE` now use new selection engines that ignore `weight`; use `CIRCLE_DEPRECATED_PURE_SPIRAL` or `SQUARE_DEPRECATED_PURE_SPIRAL` to keep the 3.2.1 behavior. In `config.yml`, `defaults.shape.uniquePlacements` now defaults to `"auto"` (a radius matching the view distance) instead of `0`, and `defaults.spatialResolution` to `"auto"` (scaled to the region's size) instead of `3`; set `0` and `3` to keep the 3.2.1 values. The Lite jar now requires Minecraft 1.21 or newer, like the full jar. Saved memory and region cache files from 3.2.1 still load, but RTP rewrites them in a new format at the next save or shutdown, and 3.2.1 can't read that format, so back up `plugins/RTP/` if you may need to roll back.
 
 ### Added
 
@@ -98,19 +98,23 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 - **Tag exclusions in `safety.yml` (ADR-017).** Remove entries from a block tag instead of listing every variant by hand, e.g. `#minecraft:slabs - OAK_SLAB`.
 
-- **Actions.** Script multi-step teleports in YAML: what happens before, during and after the teleport, what to do on failure or timeout, and conditions that must pass first (permission, balance, cooldown, world, biome, time, server load and more). Destinations can be anchored to a player, a claim, a faction or a world center, and teams can be placed together. Walk-in triggers start an action when a player enters a zone. Commands: `/rtp action`, `/rtp back` and `/rtp trigger`. The bundled action addon ships ready-made modes such as arena, KOTH, scatter and teams.
+- **Actions.** Script multi-step teleports in YAML: what happens before, during and after the teleport, what to do on failure or timeout, and conditions that must pass first (permission, balance, cooldown, world, biome, time, server load and more). Destinations can be anchored to a player, a claim, a faction or a world center, and teams can be placed together. Walk-in triggers start an action when a player enters a zone. Commands: `/rtp action` (`rtp.action`; `/rtp trigger` and `/rtp run` are other names for it), `/rtp action cancel` (`rtp.action.cancel`) and `/rtp back` (`rtp.back`). The bundled action addon ships ready-made modes such as arena, KOTH, scatter and teams.
 
-- **Web config editor (`/rtp editor`).** Edit RTP's configs in a browser and apply the changes back to the server. Passwords, tokens and other secrets are redacted before anything leaves the server and are never overwritten by the editor. Only config files inside the plugin folder can be written, and a browser must be trusted before it can apply changes (revoke with `/rtp editor untrust`; optional expiry with `editor.trust.maxAgeDays`).
+- **Web config editor (`/rtp editor`).** Edit RTP's configs in a browser and apply the changes back to the server. Permission: `rtp.editor`. Passwords, tokens and other secrets are redacted before anything leaves the server and are never overwritten by the editor. Only config files inside the plugin folder can be written, and a browser must be trusted before it can apply changes (revoke with `/rtp editor untrust`; optional expiry with `editor.trust.maxAgeDays` in `advanced/network.yml`).
 
 - **Addon tabs in the web editor (ADR-107).** Addons can add their own tabs, live status and config files to the editor using built-in widgets, so no addon code runs in the browser. Addon config changes are validated and backed up before they are written. A misbehaving addon is rate-limited and switched off for the session without affecting the rest of the editor, and mixed editor and plugin versions keep working together.
 
-- **Import from other RTP plugins (`/rtp config import`, ADR-066).** Moves settings over from BetterRTP, JustRTP, EzRTP, JakesRTP, AsyncRTP or AdvancedRTP: worlds, radius, shape, cooldowns, prices, database, effects and JustRTP zones. The old plugin doesn't need to be installed. Existing files are only replaced with `overwrite=true`, and are backed up first. `/rtp config import permissions` prints LuckPerms commands that map the old permission nodes to RTP's.
+- **Import from other RTP plugins (`/rtp config import`, ADR-066).** Reads another random-teleport plugin's config folder, such as BetterRTP, JustRTP or EzRTP, by recognizing common config layouts, and moves over worlds, radius, shape, cooldowns, prices, database, effects and JustRTP zones. Permission: `rtp.config`. The old plugin doesn't need to be installed. Existing files are only replaced with `overwrite=true`, and are backed up first. `/rtp config import permissions` prints LuckPerms commands that map BetterRTP, JustRTP and EzRTP permission nodes to RTP's.
 
-- **Setup wizard (`/rtp admin setup`).** A guided first-time setup in chat or the console: world, gameplay, performance, preview, confirm. Your config is backed up before anything is written.
+- **Setup wizard (`/rtp admin setup`).** A guided first-time setup in chat or the console: world, gameplay, performance, preview, confirm. Your config is backed up before anything is written. Permission: `rtp.admin.setup`.
 
 - **Teleport near your own claim or faction.** Actions can pick destinations around the player's land, with Towny, GriefPrevention and SaberFactions/FactionsUUID supported through the bundled claim addon. The search center stays put through small land changes, and terrain already known to be bad is reused so new searches start fast.
 
-- **Selection heatmaps (`/rtp visualization`).** See on the in-game map where destinations land and how the search moves through a region. Web map support (ADR-086) is planned.
+- **Selection heatmap and pipeline views (`/rtp visualization heatmap`, `/rtp visualization pipeline`).** See on the in-game map where destinations land and how the search moves through a region. Permission: `rtp.menu.admin`.
+
+- **More claim plugins.** The bundled claim addon also keeps players out of HuskTowns, PlotSquared, UltimateClaims and MinePlots land.
+
+- **Minecraft 26.3 on Fabric.** The Fabric jar also runs on 26.3 servers.
 
 - **Holograms.** Status and pre-teleport text can be shown as holograms, using built-in text displays on 1.19.4+ or DecentHolograms / HolographicDisplays.
 
@@ -124,7 +128,7 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 - **World border check.** RTP warns when a region reaches past the world border and keeps destinations inside it.
 
-- **API on Maven Central.** The API and platform artifacts are published to Maven Central.
+- **API on Maven Central.** `rtp-api`, `rtp-core` and the API libraries they depend on, such as `commands-api` and `effects-api`, are published to Maven Central. Platform jars are not.
 
 - **For addon developers.** New `rtp-api` surfaces for actions, claim boundaries (`ClaimBoundaryProvider`), web editor extensions, and extra region-file formats (`RegionFormatRegistry`, ADR-077; RTP itself reads only Anvil `.mca` and loads other formats such as `.linear` asynchronously).
 
@@ -132,7 +136,7 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 - **RTP is now MIT-licensed in full ([ADR-108](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-108-all-mit-licensing-pro-as-support.md)).** The PolyForm Noncommercial terms on non-core source (ADR-061) are withdrawn. Free and Pro jars are both MIT; Pro is a support tier and grants no extra licence. Earlier releases keep the licence they shipped with.
 
-- **Location queues renamed to hot, cold and backlog (ADR-078).** The `L1`/`L2`/`L3` names in `/rtp info` and the docs now say what each queue holds. Queues have fixed sizes and always release the chunks of locations they drop.
+- **Location queues renamed to hot, cold and backlog (ADR-078).** The `L1`/`L2`/`L3` names in `/rtp info` and the docs now say what each queue holds. Queues always release the chunks of locations they drop.
 
 - **Background search loads far fewer chunks (ADR-110).** Filling the location queues now checks only chunks that are already loaded or saved on disk, and loads or generates chunks only when a player is likely to use them soon.
 
@@ -152,6 +156,16 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 - **bStats on every platform, without a bundled bStats library.** Fabric and NeoForge now report too. RTP uses its own small, dependency-free client ([bstats-api-ADR-001](https://github.com/DailyStruggle/RTP/tree/V3/api/bstats-api/docs/adr/bstats-api-ADR-001-dependency-free-client.md)), keeping the same data, opt-out and server ID on Paper, Spigot and Folia.
 
+### Deprecated
+
+- **For addon developers.** `PaletteIdentifierNormalizer` in `rtp-api` is deprecated; use the one in `anvil-api`.
+
+### Removed
+
+- **Party and tether addons.** LeafRTPPartyAddon and LeafRTPTetherAddon are no longer built. For group teleports, use the action addon's `teams` and `scatter` modes.
+
+- **For addon developers.** The Bukkit-only classes in `commands-api` (`BukkitCommand`, `BukkitCommandRegistrar`, `BukkitParameter`, `StringCommandDispatcher`, `BukkitTreeCommand` and the `LocalParameters` package) and its `plugin.yml` are removed; use the platform-neutral `commandsapi.common` and `commandsapi.brigadier` packages. The Bukkit command classes and `plugin.yml` in `effects-api` are removed too.
+
 ### Fixed
 
 - **Arriving players could trigger a main-thread chunk load.** On servers that unload chunks immediately, the landing chunk could unload just before the player arrived. It now stays loaded briefly after a teleport.
@@ -168,13 +182,13 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 - **Cross-server `/rtp` requests could vanish with multiple proxies** sharing a Redis queue, or after a Redis hiccup. Requests are now handed to the proxy that holds the player.
 
-- **Some region-file chunks always fell back to a full chunk load.** The last chunk of a file that the server hadn't closed yet was treated as unreadable. In one test world this affected 6% of region files, and 74% in the Nether.
+- **Some region-file chunks always fell back to a full chunk load.** The last chunk of a file that the server hadn't closed yet was treated as unreadable.
 
 - **MySQL and PostgreSQL storage stopped saving after a few minutes** because database connections were never returned to the pool.
 
 - **Worlds using `region-file-compression=lz4` never got the region-file safety check.**
 
-- **lz4-java is no longer bundled.** LZ4 region chunks are decoded by RTP's own bounds-checked code, which closes CVE-2025-12183 and CVE-2026-59949 and makes the jar about 540 KB smaller.
+- **lz4-java is no longer bundled.** LZ4 region chunks are decoded by RTP's own bounds-checked code, which closes CVE-2025-12183 and CVE-2026-59949 and makes the jar smaller.
 
 - **Corrupt or crafted region chunks could crash the safety check or force huge memory use.** Such chunks are now loaded normally instead.
 
@@ -182,33 +196,29 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 - **MSPT on Fabric and NeoForge was stuck at 50 ms or higher.** It measured the time between ticks, which includes the server's idle sleep, instead of the time spent in a tick. This also made RTP throttle itself as if the server were overloaded. Expect much lower readings in `/rtp info`.
 
-- **Cross-server regions were hidden from non-op players.** See the upgrade note; regions that set `requirePermission` still require it.
-
 - **Shape `mode` and `uniqueplacements` inconsistencies.** `mode` values are case-insensitive, `NEAREST` mode no longer returns known-bad locations or ignores `uniqueplacements` on `CIRCLE` and `ELLIPSE`, `SQUARE_NORMAL` reads `uniqueplacements` as a radius, and regions using `uniqueplacements` no longer slow down as RTP learns more bad land.
 
 - **The `JUMP` vertical adjustor discarded whole chunks** after a miss in a single column.
 
-- **Players who left stayed in memory** (about 1 MB each) through their teleport history and boss bars. RTP now keeps only their ID and the data cooldowns need.
+- **Players who left stayed in memory** through their teleport history and boss bars. RTP now keeps only their ID and the data cooldowns need.
 
 - **Repeated hex colors showed a stray `&`** on servers without Adventure.
 
 ### Security
 
-> **Network mode upgrade note.** Upgrade every backend and proxy together: network messages and shared-store records now use a new signed format that older builds can't read. A rolling restart clears old tokens and queue entries; players in a Redis waitlist from an older build need to run the command again. Network mode now requires a Base64 `RTP_NET_SECRET` of at least 32 bytes; `plugin-message`, `proxy-cache` and `auto` can instead run unsigned with `network.allowUnsigned: true` in `advanced/network.yml`.
+> **Network mode upgrade note.** Upgrade every backend and proxy together: network messages and shared-store records now use a new signed format that older builds can't read. Tokens, queue entries and Redis waitlist entries in the old format are rejected, not migrated, so players waiting in a Redis waitlist from an older build need to run the command again. Network mode now requires a Base64 `RTP_NET_SECRET` of at least 32 bytes; `plugin-message`, `proxy-cache` and `auto` can instead run unsigned with `network.allowUnsigned: true` in `advanced/network.yml`.
 
-- **Network traffic and shared records are signed.** Heartbeats, proxy-cache replies, reservation tokens, request queues and Redis waitlists are signed with the network secret, so a modded client or anyone with store access can't inject fake servers, regions or requests. Tampered entries are dropped with a warning.
+- **More network traffic and shared records are signed.** Proxy-cache replies, request queues and Redis waitlists are now signed with the network secret too, as Redis heartbeats and reservation tokens already were, all in a new record format, so a modded client or anyone with store access can't inject fake servers, regions or requests. Tampered entries are dropped with a warning.
 
-- **Proxies only act for their own players,** one request at a time per player.
+- **One cross-server request at a time per player.** A proxy ignores a new request from a player while their previous one is still being handled.
 
 - **Proxy-direct link hardening.** All requests are signed, the listener binds to `127.0.0.1` by default, and new settings add an IP allowlist (`allowedClients`) and TLS with optional client certificates. Connection counts are capped.
 
 - **Redis connection options.** TLS, ACL usernames (`rediss://user@host`) and passwords from environment variables (`passwordEnv`). A password left in YAML logs a warning.
 
-- **Hardened Redis replies and token logging.** Oversized or deeply nested Redis replies are rejected, and tokens are no longer written to logs in full.
+- **Hardened Redis replies.** Oversized or deeply nested Redis replies are rejected.
 
 - **`RTPAPI.teleport` now checks destination permissions,** so menus and addons can't send players to worlds, biomes, regions or servers they lack permission for. Returns `NO_PERMISSION`; addons that relied on bypassing this must grant the permission themselves.
-
-- **GUI action buttons recheck permission when clicked,** not only when the menu opens.
 
 - **`reg:` command patterns are capped at 256 characters,** so a crafted pattern from the console or API can't stall the server.
 

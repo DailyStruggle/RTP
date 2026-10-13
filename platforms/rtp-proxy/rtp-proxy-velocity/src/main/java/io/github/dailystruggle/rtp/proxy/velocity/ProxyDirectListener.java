@@ -6,8 +6,11 @@ import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
 import io.github.dailystruggle.rtp.proxy.common.spi.RedeemOutcome;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectAllowlist;
+import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectReplayCache;
 import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectTlsConfig;
 import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWire;
+import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWire.Direction;
+import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWire.WireContext;
 import org.slf4j.Logger;
 
 import java.io.DataInputStream;
@@ -31,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -42,8 +46,8 @@ import java.util.regex.Pattern;
  * data-management transport like {@code redis}": backends open their OWN
  * outbound connections here (not a player's Minecraft session) and invoke
  * {@code NetworkTransport} / {@code NetworkRequestQueue} methods against the
- * proxy's own in-memory store. Each connection is one RPC keyed by the leading
- * {@link ProxyDirectWire} opcode. The proxy's existing dispatcher, trigger
+ * proxy's own in-memory store. Each connection is one RPC keyed by the
+ * {@link ProxyDirectWire} request-header opcode. The proxy's existing dispatcher, trigger
  * source, reaper, and pre-connect redeem then operate on a store that backends
  * actually populate.</p>
  *
@@ -57,6 +61,12 @@ import java.util.regex.Pattern;
  * <p>A frame that fails HMAC verification is dropped with a WARNING; the handler
  * still returns a benign empty response so the backend's read does not hang
  * (S-004: never silently swallow, never abort the whole listener).</p>
+ *
+ * <p>Header and replay rules (REQ-RTP-PROXY-007): an unknown opcode or a frame
+ * version other than {@link ProxyDirectWire#FRAME_VERSION} is refused before
+ * the body is read; once the MAC verifies, a request outside
+ * {@link ProxyDirectWire#MAX_CLOCK_SKEW_MS} or reusing a nonce is refused.
+ * Refusals close the socket unanswered and log a throttled WARNING.</p>
  *
  * <p>Fail-closed exposure rules, enforced in {@link #start()}: an HMAC verifier
  * is mandatory (no unsigned mode); the default bind is loopback; a non-loopback
@@ -107,6 +117,10 @@ public final class ProxyDirectListener {
     private final ConcurrentHashMap<InetAddress, Integer> perAddress = new ConcurrentHashMap<>();
     private final AtomicLong lastCapLogMs = new AtomicLong(0L);
     private final AtomicLong suppressedCapRejects = new AtomicLong(0L);
+    private final AtomicLong lastFrameRejectLogMs = new AtomicLong(0L);
+    private final AtomicLong suppressedFrameRejects = new AtomicLong(0L);
+    private final LongSupplier clock;
+    private final ProxyDirectReplayCache replayCache;
 
     /**
      * Discovery-only ctor (heartbeat/snapshot only; no reservation or queue
@@ -152,6 +166,21 @@ public final class ProxyDirectListener {
                                ProxyDirectTlsConfig tls,
                                ProxyDirectAllowlist allowlist,
                                Logger logger) {
+        this(bindHost, port, verifier, schemaVersion, onPush, snapshotRows, transport, requestQueue,
+                tls, allowlist, logger, System::currentTimeMillis);
+    }
+
+    /** Full ctor with an injected clock for freshness / replay checks (tests). */
+    ProxyDirectListener(String bindHost, int port,
+                        HmacVerifier verifier, int schemaVersion,
+                        Consumer<String> onPush,
+                        Supplier<List<String>> snapshotRows,
+                        NetworkTransport transport,
+                        NetworkRequestQueue requestQueue,
+                        ProxyDirectTlsConfig tls,
+                        ProxyDirectAllowlist allowlist,
+                        Logger logger,
+                        LongSupplier clock) {
         this.bindHost = (bindHost == null || bindHost.isBlank()) ? DEFAULT_BIND_HOST : bindHost.trim();
         this.port = port;
         this.verifier = verifier;
@@ -163,6 +192,8 @@ public final class ProxyDirectListener {
         this.transport = transport;
         this.requestQueue = requestQueue;
         this.logger = Objects.requireNonNull(logger, "logger");
+        this.clock = Objects.requireNonNull(clock, "clock");
+        this.replayCache = new ProxyDirectReplayCache(this.clock);
     }
 
     /**
@@ -294,29 +325,39 @@ public final class ProxyDirectListener {
             java.net.SocketAddress remote = s.getRemoteSocketAddress();
             DataInputStream in = new DataInputStream(s.getInputStream());
             DataOutputStream out = new DataOutputStream(s.getOutputStream());
-            byte opcode = ProxyDirectWire.readOpcode(in);
-            switch (opcode) {
+            ProxyDirectWire.RequestHeader header;
+            try {
+                header = ProxyDirectWire.readRequestHeader(in);
+            } catch (ProxyDirectWire.FrameRejectedException fre) {
+                logRejectedFrame(remote, fre.getMessage());
+                return;
+            }
+            WireContext ctx = header.context();
+            switch (header.opcode()) {
+                case ProxyDirectWire.OP_HEARTBEAT:
+                    handleHeartbeat(in, out, remote, ctx);
+                    return;
                 case ProxyDirectWire.OP_FLUSH_PENDING:
-                    handleFlushPending(in, out, remote);
+                    handleFlushPending(in, out, remote, ctx);
                     return;
                 case ProxyDirectWire.OP_POLL_STATUS:
-                    handlePollStatus(in, out, remote);
+                    handlePollStatus(in, out, remote, ctx);
                     return;
                 case ProxyDirectWire.OP_CANCEL:
-                    handleCancel(in, out, remote);
+                    handleCancel(in, out, remote, ctx);
                     return;
                 case ProxyDirectWire.OP_FIND_RESERVATION:
-                    handleFindReservation(in, out, remote);
+                    handleFindReservation(in, out, remote, ctx);
                     return;
                 case ProxyDirectWire.OP_REDEEM:
-                    handleRedeem(in, out, remote);
+                    handleRedeem(in, out, remote, ctx);
                     return;
                 case ProxyDirectWire.OP_LIST_ACTIVE:
-                    handleListActive(in, out, remote);
+                    handleListActive(in, out, remote, ctx);
                     return;
-                case ProxyDirectWire.OP_HEARTBEAT:
                 default:
-                    handleHeartbeat(in, out, remote);
+                    // readRequestHeader admits only KNOWN_OPCODES; a new opcode without a case lands here.
+                    logRejectedFrame(remote, "no handler for opcode " + (header.opcode() & 0xFF));
             }
         } catch (Throwable t) {
             logger.debug("RTP proxy-direct connection handling failed: {}", t.getMessage());
@@ -325,10 +366,12 @@ public final class ProxyDirectListener {
 
     /** OP_HEARTBEAT: ingest a heartbeat (region discovery) and reply with the merged snapshot. */
     private void handleHeartbeat(DataInputStream in, DataOutputStream out,
-                                 java.net.SocketAddress remote) throws Exception {
-        String payload = ProxyDirectWire.readSignedPayload(in, verifier);
+                                 java.net.SocketAddress remote, WireContext ctx) throws Exception {
+        String payload = ProxyDirectWire.readSignedPayload(in, ctx, Direction.REQUEST, verifier);
         if (payload == null) {
             logger.warn("RTP proxy-direct: rejecting HMAC-invalid heartbeat from {}.", remote);
+        } else if (!admit(ctx, remote)) {
+            return;
         } else {
             try {
                 onPush.accept(payload);
@@ -345,15 +388,16 @@ public final class ProxyDirectListener {
             }
         }
         List<String> rows = snapshotRows.get();
-        ProxyDirectWire.writeList(out, rows, verifier, schemaVersion);
+        ProxyDirectWire.writeList(out, ctx, Direction.RESPONSE, rows, verifier, schemaVersion);
         logger.debug("RTP proxy-direct: replied snapshot of {} server row(s) to {}.",
                 rows.size(), remote);
     }
 
     /** OP_FLUSH_PENDING: enqueue a batch of enrolments into the proxy's queue. */
     private void handleFlushPending(DataInputStream in, DataOutputStream out,
-                                    java.net.SocketAddress remote) throws Exception {
-        List<String> rows = ProxyDirectWire.readList(in, verifier);
+                                    java.net.SocketAddress remote, WireContext ctx) throws Exception {
+        List<String> rows = ProxyDirectWire.readList(in, ctx, Direction.REQUEST, verifier);
+        if (!admit(ctx, remote)) return;
         NetworkRequestQueue.EnrolOutcome outcome = NetworkRequestQueue.EnrolOutcome.REJECTED;
         if (requestQueue == null) {
             logger.warn("RTP proxy-direct: flushPending from {} but no request queue on proxy.", remote);
@@ -374,14 +418,15 @@ public final class ProxyDirectListener {
                 logger.warn("RTP proxy-direct: flushPending failed: {}", t.getMessage());
             }
         }
-        ProxyDirectWire.writeSignedPayload(out, outcome.name(), verifier, schemaVersion);
+        ProxyDirectWire.writeSignedPayload(out, ctx, Direction.RESPONSE, outcome.name(), verifier, schemaVersion);
         out.flush();
     }
 
     /** OP_POLL_STATUS: return per-player queue status rows. */
     private void handlePollStatus(DataInputStream in, DataOutputStream out,
-                                  java.net.SocketAddress remote) throws Exception {
-        List<String> idStrings = ProxyDirectWire.readList(in, verifier);
+                                  java.net.SocketAddress remote, WireContext ctx) throws Exception {
+        List<String> idStrings = ProxyDirectWire.readList(in, ctx, Direction.REQUEST, verifier);
+        if (!admit(ctx, remote)) return;
         List<String> reply = new ArrayList<>();
         if (requestQueue != null && !idStrings.isEmpty()) {
             List<UUID> ids = new ArrayList<>(idStrings.size());
@@ -401,13 +446,14 @@ public final class ProxyDirectListener {
                 logger.warn("RTP proxy-direct: pollStatus failed: {}", t.getMessage());
             }
         }
-        ProxyDirectWire.writeList(out, reply, verifier, schemaVersion);
+        ProxyDirectWire.writeList(out, ctx, Direction.RESPONSE, reply, verifier, schemaVersion);
     }
 
     /** OP_CANCEL: cancel a player's pending entry. */
     private void handleCancel(DataInputStream in, DataOutputStream out,
-                              java.net.SocketAddress remote) throws Exception {
-        String payload = ProxyDirectWire.readSignedPayload(in, verifier);
+                              java.net.SocketAddress remote, WireContext ctx) throws Exception {
+        String payload = ProxyDirectWire.readSignedPayload(in, ctx, Direction.REQUEST, verifier);
+        if (payload != null && !admit(ctx, remote)) return;
         if (payload != null && requestQueue != null) {
             String[] f = ProxyDirectWire.splitFields(payload);
             try {
@@ -425,14 +471,15 @@ public final class ProxyDirectListener {
                 logger.warn("RTP proxy-direct: cancel failed: {}", t.getMessage());
             }
         }
-        ProxyDirectWire.writeSignedPayload(out, "OK", verifier, schemaVersion);
+        ProxyDirectWire.writeSignedPayload(out, ctx, Direction.RESPONSE, "OK", verifier, schemaVersion);
         out.flush();
     }
 
     /** OP_FIND_RESERVATION: return the active reservation token for a player (or empty). */
     private void handleFindReservation(DataInputStream in, DataOutputStream out,
-                                       java.net.SocketAddress remote) throws Exception {
-        String payload = ProxyDirectWire.readSignedPayload(in, verifier);
+                                       java.net.SocketAddress remote, WireContext ctx) throws Exception {
+        String payload = ProxyDirectWire.readSignedPayload(in, ctx, Direction.REQUEST, verifier);
+        if (payload != null && !admit(ctx, remote)) return;
         String reply = "";
         if (payload != null && transport != null) {
             try {
@@ -449,14 +496,15 @@ public final class ProxyDirectListener {
                 logger.warn("RTP proxy-direct: findReservation failed: {}", t.getMessage());
             }
         }
-        ProxyDirectWire.writeSignedPayload(out, reply, verifier, schemaVersion);
+        ProxyDirectWire.writeSignedPayload(out, ctx, Direction.RESPONSE, reply, verifier, schemaVersion);
         out.flush();
     }
 
     /** OP_REDEEM: transition a CLAIMED reservation to CONSUMED on arrival. */
     private void handleRedeem(DataInputStream in, DataOutputStream out,
-                              java.net.SocketAddress remote) throws Exception {
-        String payload = ProxyDirectWire.readSignedPayload(in, verifier);
+                              java.net.SocketAddress remote, WireContext ctx) throws Exception {
+        String payload = ProxyDirectWire.readSignedPayload(in, ctx, Direction.REQUEST, verifier);
+        if (payload != null && !admit(ctx, remote)) return;
         RedeemOutcome outcome = RedeemOutcome.NOT_FOUND;
         if (payload != null && transport != null) {
             String[] f = ProxyDirectWire.splitFields(payload);
@@ -474,14 +522,15 @@ public final class ProxyDirectListener {
                 }
             }
         }
-        ProxyDirectWire.writeSignedPayload(out, outcome.name(), verifier, schemaVersion);
+        ProxyDirectWire.writeSignedPayload(out, ctx, Direction.RESPONSE, outcome.name(), verifier, schemaVersion);
         out.flush();
     }
 
     /** OP_LIST_ACTIVE: list active reservation tokens for a backend (boot reconcile). */
     private void handleListActive(DataInputStream in, DataOutputStream out,
-                                  java.net.SocketAddress remote) throws Exception {
-        String serverId = ProxyDirectWire.readSignedPayload(in, verifier);
+                                  java.net.SocketAddress remote, WireContext ctx) throws Exception {
+        String serverId = ProxyDirectWire.readSignedPayload(in, ctx, Direction.REQUEST, verifier);
+        if (serverId != null && !admit(ctx, remote)) return;
         List<String> reply = new ArrayList<>();
         if (serverId != null && !serverId.isEmpty() && transport != null) {
             try {
@@ -497,7 +546,43 @@ public final class ProxyDirectListener {
                 logger.warn("RTP proxy-direct: listActiveForServer failed: {}", t.getMessage());
             }
         }
-        ProxyDirectWire.writeList(out, reply, verifier, schemaVersion);
+        ProxyDirectWire.writeList(out, ctx, Direction.RESPONSE, reply, verifier, schemaVersion);
+    }
+
+    /**
+     * Freshness + nonce gate, called only after the request MAC verified so an
+     * unauthenticated peer cannot consume replay-cache capacity. False = refused
+     * (logged); the caller closes the socket without executing the RPC.
+     */
+    private boolean admit(WireContext ctx, java.net.SocketAddress remote) {
+        if (!ProxyDirectWire.isFresh(ctx.sentAtMs(), clock.getAsLong())) {
+            logRejectedFrame(remote, "request timestamp outside +/-" + ProxyDirectWire.MAX_CLOCK_SKEW_MS
+                    + "ms of this proxy's clock (check NTP on proxy and backends)");
+            return false;
+        }
+        ProxyDirectReplayCache.Result r = replayCache.checkAndRecord(ctx.nonce());
+        if (r == ProxyDirectReplayCache.Result.REPLAYED) {
+            logRejectedFrame(remote, "repeated request nonce");
+            return false;
+        }
+        if (r == ProxyDirectReplayCache.Result.FULL) {
+            logRejectedFrame(remote, "replay cache full; refusing request (fail closed)");
+            return false;
+        }
+        return true;
+    }
+
+    /** Throttled WARNING for a refused request frame; counts suppressed lines (REQ-RTP-S-004). */
+    private void logRejectedFrame(java.net.SocketAddress remote, String reason) {
+        long now = System.currentTimeMillis();
+        long last = lastFrameRejectLogMs.get();
+        if (now - last >= REJECT_LOG_INTERVAL_MS && lastFrameRejectLogMs.compareAndSet(last, now)) {
+            long suppressed = suppressedFrameRejects.getAndSet(0L);
+            logger.warn("RTP proxy-direct: rejected request from {}: {}{}.", remote, reason,
+                    suppressed > 0 ? "; " + suppressed + " further rejection(s) suppressed" : "");
+        } else {
+            suppressedFrameRejects.incrementAndGet();
+        }
     }
 
     /**

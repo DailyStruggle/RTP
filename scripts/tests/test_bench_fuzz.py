@@ -1367,7 +1367,7 @@ class LadderLoopTest(unittest.TestCase):
         self.assertIn("dropped at rung 1 (micro-only)", rep)
         self.assertIn("['rtp', 'quit']", rep)
 
-    def test_no_candidate_report_says_no_leak_found_within_budget(self):
+    def test_no_candidate_report_says_nothing_found_within_budget(self):
         self.swarm.leak_quit = False
         self.a.episodes, self.a.generation = 6, 3
         self.tr.run_seed(1)
@@ -1376,7 +1376,7 @@ class LadderLoopTest(unittest.TestCase):
         self.assertEqual(v["coverage"]["episodes"], 6)
         self.assertGreater(v["coverage"]["pairs"], 0)
         rep = bf.render_report(self.run_dir, ["betterrtp", "rtp"], {"seeds": [1]})
-        self.assertIn("=== betterrtp: PASS - no leak found within budget (not proof that there is none)", rep)
+        self.assertIn("=== betterrtp: PASS - nothing found within budget (not proof that there is none)", rep)
         self.assertIn("6 episodes", rep)
         self.assertIn("=== rtp: NOT RUN", rep)
         self.assertIn("leak rate per generation", rep)
@@ -1833,6 +1833,224 @@ class PlantedBugLoopTest(LoopFixture, unittest.TestCase):
         rec = self.tr.execute(1, 0, plan, None)
         self.assertIn("findings", rec)
         self.assertTrue(any(f["class"] == "PERMISSION_BYPASS" for f in rec["findings"]))
+
+
+def planted_trace(line=42, exc="java.lang.IllegalStateException", pkg="com.betterrtp.command.RTP"):
+    return (f"[12:00:00 ERROR]: Exception in thread \"Server thread\" {exc}: boom {line}\n"
+            f"\tat {pkg}.lambda$teleport${line % 7}(RTP.java:{line})\n"
+            "\tat net.minecraft.server.MinecraftServer.tick(MinecraftServer.java:1200)\n")
+
+
+class FindingSignatureTest(unittest.TestCase):
+    """Stable signatures, strict trace parsing and attribution of log findings."""
+
+    def scan(self, text, target="betterrtp", **kw):
+        return bf.ServerLogOracle(None, **kw).analyze_text(text, [], target)
+
+    def test_signature_ignores_line_numbers_lambdas_and_messages(self):
+        a, b = self.scan(planted_trace(42)), self.scan(planted_trace(97))
+        self.assertEqual(1, len(a))
+        self.assertEqual(a[0]["signature"], b[0]["signature"])
+        self.assertEqual(a[0]["finding_id"], b[0]["finding_id"])
+        self.assertEqual("BetterRTP|java.lang.IllegalStateException|com.betterrtp.command.RTP.lambda$teleport$#",
+                         a[0]["key"])
+        other = self.scan(planted_trace(42, exc="java.lang.NullPointerException"))
+        self.assertNotEqual(a[0]["signature"], other[0]["signature"])
+        self.assertEqual("CRITICAL", a[0]["severity"])  # on the main thread
+
+    def test_root_cause_and_plugin_frame_pick_the_key(self):
+        text = ("[12:00:00 ERROR]: Could not pass event PlayerQuitEvent to BetterRTP v3.6.13\n"
+                "org.bukkit.event.EventException: null\n"
+                "\tat org.bukkit.plugin.java.JavaPluginLoader$1.execute(JavaPluginLoader.java:310)\n"
+                "Caused by: java.util.ConcurrentModificationException\n"
+                "\tat java.base/java.util.HashMap$HashIterator.nextNode(HashMap.java:1605)\n"
+                "\tat app//com.betterrtp.player.Queue.drain(Queue.java:88)\n"
+                "\t... 12 more\n")
+        f = self.scan(text)
+        self.assertEqual(1, len(f))
+        self.assertEqual("EVENT_ERROR", f[0]["class"])
+        self.assertEqual("BetterRTP|PlayerQuitEvent|java.util.ConcurrentModificationException|"
+                         "com.betterrtp.player.Queue.drain", f[0]["key"])
+
+    def test_words_and_class_names_without_a_trace_are_not_exceptions(self):
+        text = ("[12:00:00 INFO]: [BetterRTP] Error: no safe location found\n"
+                "[12:00:00 INFO]: [BetterRTP] registered java.lang.String adapter\n"
+                "[12:00:00 WARN]: Exception: none\n"
+                "[12:00:01 INFO]: Done\n")
+        self.assertEqual([], self.scan(text))
+
+    def test_print_stack_trace_lines_with_log_prefixes_are_a_trace(self):
+        text = ("[12:00:00 WARN]: java.lang.IllegalArgumentException: bad radius\n"
+                "[12:00:00 WARN]: \tat com.betterrtp.region.Shape.pick(Shape.java:10)\n"
+                "[12:00:00 WARN]: \tat org.bukkit.craftbukkit.scheduler.CraftTask.run(CraftTask.java:82)\n")
+        f = self.scan(text)
+        self.assertEqual(1, len(f))
+        self.assertEqual("BetterRTP|java.lang.IllegalArgumentException|com.betterrtp.region.Shape.pick", f[0]["key"])
+        self.assertEqual("HIGH", f[0]["severity"])
+
+    def test_unknown_packages_are_never_blamed_on_the_target(self):
+        text = planted_trace(pkg="org.example.other.Thing")
+        f = self.scan(text)
+        self.assertEqual("unknown", f[0]["attributed_plugin"])
+        f = self.scan(text, packages=bf.plugin_packages("org.example.other=Other"))
+        self.assertEqual("Other", f[0]["attributed_plugin"])
+
+    def test_stalls_belong_to_the_server(self):
+        f = self.scan("[12:00:00 WARN]: Can't keep up! Is the server overloaded? Running 2100ms or 42 ticks behind\n"
+                      "[12:00:09 ERROR]: The server has not responded for 10 seconds! Creating thread dump\n")
+        self.assertEqual([("WATCHDOG_STALL", "MEDIUM", "lag"), ("WATCHDOG_STALL", "HIGH", "watchdog")],
+                         [(x["class"], x["severity"], x["key"]) for x in f])
+        self.assertTrue(all(x["attributed_plugin"] == "Server" for x in f))
+
+    def test_replaced_log_is_read_from_its_start(self):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        path = os.path.join(d, "latest.log")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("x" * 4000 + "\n")
+        o = bf.ServerLogOracle(path)
+        o.begin()
+        os.remove(path)  # restart: latest.log rotated away, a fresh, shorter one written
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(planted_trace())
+        self.assertEqual(1, len(o.observe([], [], "betterrtp")))
+        o.begin()
+        self.assertEqual([], o.observe([], [], "betterrtp"))  # nothing new since the mark
+
+    def test_permission_signature_drops_the_bot_name(self):
+        o = bf.LeastPrivilegeOracle()
+        ev = [{"ev": "denial_failure", "bot": "fzA_0", "cmd": "/op fzA_0", "text": "Made fzA_0 a server operator"}]
+        ev2 = [{"ev": "denial_failure", "bot": "fzB_1", "cmd": "/op fzB_1", "text": "Made fzB_1 a server operator"}]
+        self.assertEqual(o.observe(ev, [], "rtp")[0]["signature"], o.observe(ev2, [], "rtp")[0]["signature"])
+        self.assertEqual("op {self}", o.observe(ev, [], "rtp")[0]["key"])
+
+    def test_target_aliases_are_exact(self):
+        a = bf.build_parser().parse_args(["--server-dir", "."])
+        self.assertEqual({"rtp", "leafrtp"}, bf.target_aliases(a, "rtp"))
+        self.assertNotIn("betterrtp", bf.target_aliases(a, "rtp"))
+        self.assertEqual({"direct"}, bf.target_aliases(a, "direct"))
+
+    def test_corpus_keeps_a_new_signature(self):
+        c = bf.Corpus()
+        self.assertTrue(c.consider(0, [], [["join", "x"]], {}, ["s1"])["kept"])
+        res = c.consider(1, [], [["join", "x"]], {}, ["s1"])
+        self.assertFalse(res["kept"])
+        res = c.consider(2, [], [["join", "x"]], {}, ["s1", "s2"])
+        self.assertTrue(res["kept"])
+        self.assertEqual(["s2"], res["new_findings"])
+
+    def test_verdict_with_findings(self):
+        target = {"target_attributed": True, "in_control": False}
+        self.assertEqual("FAIL", bf.target_verdict(True, [], False, [dict(target, reproduced=True)]))
+        self.assertEqual("INCONCLUSIVE", bf.target_verdict(True, [], False, [dict(target, reproduced=False)]))
+        noise = [{"target_attributed": True, "in_control": True, "reproduced": False},
+                 {"target_attributed": False, "in_control": False, "reproduced": False}]
+        self.assertEqual("PASS", bf.target_verdict(True, [], False, noise))
+
+    def test_summary_dedupes_by_signature(self):
+        fs = self.scan(planted_trace(1)) + self.scan(planted_trace(2))
+        for i, f in enumerate(fs):
+            f.update(seed=1, ep=i, oracle="log", repeats=2, target_attributed=True, in_control=False)
+        s = bf.summarise_findings(fs, {fs[0]["signature"]: {"k": 3, "n": 3, "reproduced": True}})
+        self.assertEqual(1, len(s))
+        self.assertEqual(4, s[0]["seen"])
+        self.assertEqual({"seed": 1, "ep": 0}, s[0]["first"])
+        self.assertTrue(s[0]["reproduced"])
+        self.assertEqual({s[0]["signature"]}, set(bf.control_findings(fs)["signatures"]))
+
+
+class FindingLoopTest(LoopFixture, unittest.TestCase):
+    """Findings drive the corpus, replays, shrinking and the verdict."""
+
+    def setUp(self):
+        super().setUp()
+        self.swarm.leak_quit = False  # no leak signal: only findings decide
+        self.log_file = os.path.join(self.dir, "logs", "latest.log")
+        os.makedirs(os.path.dirname(self.log_file))
+        self.planted = 0
+
+    def plant_when(self, pred, trace=None):
+        def hook(req):
+            if pred(req):
+                self.planted += 1
+                with open(self.log_file, "a", encoding="utf-8") as fh:
+                    fh.write(trace or planted_trace(40 + self.planted))
+        self.swarm.after = hook
+
+    def test_reproducible_target_exception_fails_the_verdict(self):
+        self.plant_when(lambda req: True)
+        self.tr.run_seed(1)
+        replays = bf.read_trace(os.path.join(self.tdir, bf.FINDING_REPLAYS_FILE))
+        self.assertEqual(1, len(replays))  # one signature, tested once
+        self.assertEqual((3, 3, True), (replays[0]["k"], replays[0]["n"], replays[0]["reproduced"]))
+        recs = bf.read_trace(self.tr.trace)
+        self.assertEqual(3, sum(1 for r in recs if r["origin"] == "finding"))
+        self.assertTrue(all(r.get("reps") is None for r in recs if r["origin"] == "finding"))
+        first = next(r for r in recs if r["ep"] == 0)
+        self.assertTrue(first["kept"])
+        self.assertEqual([replays[0]["signature"]], first["new_findings"])  # the new signature kept it
+        v = self.tr.finish([], [])
+        self.assertEqual("FAIL", v["verdict"])
+        self.assertEqual(["log"], v["confirmed_by"])
+        self.assertEqual(1, len(v["findings"]))
+        self.assertTrue(v["findings"][0]["reproduced"])
+        self.assertEqual(1, v["coverage"]["finding_signatures"])
+        rep = bf.render_report(os.path.dirname(self.tdir), ["out"], {"seeds": [1]})
+        self.assertIn("=== out: FAIL", rep)
+        self.assertIn("confirmed by: log", rep)
+        self.assertIn("reproduced 3 of 3", rep)
+
+    def test_one_off_target_exception_is_inconclusive(self):
+        self.plant_when(lambda req: self.planted == 0)
+        self.tr.run_seed(1)
+        replays = bf.read_trace(os.path.join(self.tdir, bf.FINDING_REPLAYS_FILE))
+        self.assertEqual([(0, 2, False)], [(r["k"], r["n"], r["reproduced"]) for r in replays])  # 2nd miss: out of reach
+        v = self.tr.finish([], [])
+        self.assertEqual("INCONCLUSIVE", v["verdict"])
+        self.assertEqual([], v["confirmed_by"])
+
+    def test_control_signature_is_never_replayed(self):
+        self.plant_when(lambda req: True)
+        self.tr.control_findings = {bf.ServerLogOracle(None).analyze_text(planted_trace(), [], "")[0]["signature"]}
+        self.tr.run_seed(1)
+        self.assertFalse(os.path.exists(os.path.join(self.tdir, bf.FINDING_REPLAYS_FILE)))
+        v = self.tr.finish([], [])
+        self.assertEqual("PASS", v["verdict"])
+        self.assertTrue(v["findings"][0]["in_control"])
+
+    def test_other_plugins_exception_is_not_replayed(self):
+        self.plant_when(lambda req: True, planted_trace(pkg="com.justrtp.Core"))
+        self.tr.run_seed(1)
+        self.assertFalse(os.path.exists(os.path.join(self.tdir, bf.FINDING_REPLAYS_FILE)))
+        v = self.tr.finish([], [])
+        self.assertEqual("PASS", v["verdict"])
+        self.assertEqual("JustRTP", v["findings"][0]["attributed_plugin"])
+        self.assertFalse(v["findings"][0]["target_attributed"])
+
+    def test_confirmed_finding_shrinks_to_the_triggering_action(self):
+        self.plant_when(lambda req: any(x["a"] == "die" for b in req["bots"] for x in b["program"]))
+        self.assertTrue(self.tr.baseline(1, "base"))
+        plan = {"origin": "cem", "parent": None, "params": None,
+                "bots": [{"name": "fzsh_0", "program": [{"a": "rtp"}, {"a": "wait", "ms": 100}]},
+                         {"name": "fzsh_1", "program": [{"a": "move", "ms": 100, "dx": 1.0, "dz": 0.0},
+                                                          {"a": "die"}, {"a": "rtp"}]}]}
+        rec = self.tr.execute(1, 0, plan, None)
+        tested = self.tr.check_findings(1, rec, 0)
+        self.assertTrue(tested[0]["reproduced"])
+        shrunk = self.tr.shrink_findings(1, 1)
+        self.assertEqual(1, len(shrunk))
+        self.assertTrue(shrunk[0]["reproduced"])
+        self.assertEqual([["die"]], shrunk[0]["sequence"])
+        self.assertEqual(f"finding:{tested[0]['signature']}", shrunk[0]["count"])
+        v = self.tr.finish([], [])
+        self.assertEqual([["die"]], v["findings"][0]["shrunk"])
+
+    def test_bad_finding_k_fails_at_startup(self):
+        with open(os.path.join(self.dir, "server.properties"), "w", encoding="utf-8") as fh:
+            fh.write("rcon.password=x\n")
+        with self.assertRaises(SystemExit) as cm:
+            bf.main(["--server-dir", self.dir, "--finding-n", "2", "--finding-k", "3"])
+        self.assertEqual(2, cm.exception.code)
 
 
 if __name__ == "__main__":

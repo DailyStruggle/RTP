@@ -31,6 +31,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Multi-server / proxy (Velocity, BungeeCord) plan | [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md) (D-005 gated; admin stub: [`../admin/proxies/INDEX.md`](../admin/proxies/INDEX.md)) |
 | Why network mode (multi-server, multi-proxy) is in scope | [`../adr/ADR-036-network-mode-multi-server-multi-proxy.md`](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) (umbrella; subproject refinements under [`../../platforms/rtp-proxy/docs/adr/`](../../platforms/rtp-proxy/docs/adr/)) |
 | Runtime metrics SPI (TPS / MSPT / heap / pipeline samples) | [`METRICS_PLAN.md`](METRICS_PLAN.md) |
+| Behaviour fuzzing beyond leaks (finding oracles, live-server coverage, fault-only mode) | [`BEHAVIOUR_FUZZING_PLAN.md`](BEHAVIOUR_FUZZING_PLAN.md); decision record [`../adr/ADR-111-live-server-behaviour-fuzzing.md`](../adr/ADR-111-live-server-behaviour-fuzzing.md) |
 | Why Fabric is in scope | [`../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md`](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) (renumbered from ADR-022) |
 | Why NeoForge is in scope | [`../adr/ADR-033-neoforge-platform-in-scope.md`](../adr/ADR-033-neoforge-platform-in-scope.md) |
 | Why legacy MC / Java are out of scope | [`../adr/ADR-021-legacy-mc-and-java-support-scope.md`](../adr/ADR-021-legacy-mc-and-java-support-scope.md) |
@@ -90,6 +91,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | [`PLAYER_TAXONOMY_VALUATION.md`](PLAYER_TAXONOMY_VALUATION.md) | Player taxonomy, utility functions, site valuation weights, and behavioral benchmark models. |
 | [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md) | Dated engineering notes. |
 | [`../../helpers/StressTestRTP/LEAK_FUZZING.md`](../../helpers/StressTestRTP/LEAK_FUZZING.md) | Behaviour leak fuzzer (`scripts/bench_fuzz.py`): goals, methodology, reading a run, findings (BetterRTP, LeafRTP 3.3.0), limitations. |
+| [`BEHAVIOUR_FUZZING_PLAN.md`](BEHAVIOUR_FUZZING_PLAN.md) | Generalising `bench_fuzz.py` to coverage-guided fault finding: what is generic, detector defects, goals, staged plan (finding oracles done; JaCoCo coverage, fault-only mode, new oracles, vocabulary D-005 gated). Governed by [ADR-111](../adr/ADR-111-live-server-behaviour-fuzzing.md). |
 | [`SECURITY_AUDIT_v3.3.0.md`](SECURITY_AUDIT_v3.3.0.md) | v3.3.0 pre-release security and severe-bug audit: fixed, open, sound and uncovered areas. |
 
 > Plans that shipped or were superseded are removed; the ADR is the durable record. Pre-deletion state is recoverable from git.

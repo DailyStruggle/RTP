@@ -227,6 +227,20 @@ public final class TeleportPipelineTask extends RTPRunnable {
    * {@code null} when no {@code schematics/<region>.schem} file exists (the silent, expected case).
    */
   private io.github.dailystruggle.rtp.api.schematic.SchematicSource schematicSource;
+  /**
+   * ADR-058 / REQ-RTP-S-003: footprint claim verdict, started off-thread in {@link #runLoad} once
+   * the schematic decodes, so the destination region thread never joins a claim verifier.
+   * Read in {@link #runTeleport} only when done; pending, failed or {@code false} suppresses the
+   * paste (fail-safe) and the default platform runs instead.
+   */
+  private volatile java.util.concurrent.CompletableFuture<Boolean> schematicFootprint;
+
+  /** ADR-058 arrival paste options; shared by the off-thread footprint check and the paste. */
+  static io.github.dailystruggle.rtp.api.schematic.PasteOptions arrivalPasteOptions() {
+    // SURFACE_CENTER: the player lands on a standable floor in the schematic's center column.
+    return new io.github.dailystruggle.rtp.api.schematic.PasteOptions(
+        io.github.dailystruggle.rtp.api.schematic.PasteAnchor.SURFACE_CENTER, false, true);
+  }
 
   /**
    * ADR-058 / S-004: regions where platform-level schematic fallback was logged.
@@ -578,18 +592,33 @@ public final class TeleportPipelineTask extends RTPRunnable {
       boolean success = false;
       try {
         if (res == null) {
-          // If the player was successfully queued, gracefully halt this thread.
-          // Region.execute() will spawn a new pipeline task when a location is ready.
-          if (RTP.getInstance().processingPlayers.contains(playerId)) {
-            RTP.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] TeleportPipelineTask silent-halt (processingPlayers.contains==true) playerId=" + playerId);
+          // Queued: the enqueue branch registered the player in queuedPlayers, and
+          // Region.execute() spawns a new pipeline task when a location is ready.
+          // processingPlayers is not a discriminator: /rtp always holds it here.
+          if (RTP.getInstance().queuedPlayers.contains(playerId)) {
+            RTP.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] TeleportPipelineTask silent-halt (queued) playerId=" + playerId);
             if (region != null && handledInFlight.compareAndSet(false, true)) {
               region.inFlightCalculations.getAndDecrement();
+            }
+            // This task is done; the queue owns the wait. Untracked so the leak sweep cannot
+            // force-close it mid-wait and tear down the queued player's TeleportData.
+            if (this.trackingId != null) {
+              io.github.dailystruggle.rtp.common.tools.MemoryTracker.untrack(this.trackingId);
+              this.trackingId = null;
             }
             return;
           }
 
-          // Otherwise, generation failed entirely (e.g., custom biome search failed).
-          RTP.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] TeleportPipelineTask null-result CLEANUP playerId=" + playerId);
+          // Otherwise generation failed (start failure, biome search miss): S-004 - tell the
+          // player, refund, and release the busy lock so the next /rtp is not refused.
+          RTP.log(Level.WARNING, "[RTP] location generation returned no result for player "
+                  + playerId + " region=" + (region != null ? region.name : "null")
+                  + "; teleport aborted (S-004)");
+          RTPCommandSender failSender = sender();
+          RTP.serverAccessor.sendMessage(
+                  failSender != null ? failSender.uuid() : playerId, playerId, ConfigCache.unsafe);
+          RTPTeleportCancel.refund(playerId);
+          RTP.getInstance().processingPlayers.remove(playerId);
           currentPhase = Phase.CLEANUP;
           runCleanup();
           return;
@@ -761,6 +790,15 @@ public final class TeleportPipelineTask extends RTPRunnable {
             } else {
               schematicPaster = paster;
               schematicLoad = paster.load(src);
+              final RTPLocation footprintAt =
+                  new RTPLocation(schemWorld, coords.x(), coords.y(), coords.z());
+              final String footprintWorld = coords.worldName();
+              if (schematicLoad != null) {
+                schematicFootprint = schematicLoad.thenCompose(loaded -> loaded == null
+                    ? CompletableFuture.completedFuture(Boolean.FALSE)
+                    : schematicFootprintClearAsync(
+                        loaded, footprintAt, arrivalPasteOptions(), footprintWorld));
+              }
               // load() never throws (it returns a null-completed future on decode failure),
               // so detect that here and surface it; the underlying cause is logged by the
               // paster's load() implementation.
@@ -928,7 +966,6 @@ public final class TeleportPipelineTask extends RTPRunnable {
       // the schematic provides the footing the platform would have. The paste is best-effort
       // (S-004) - any skip/failure is audited and the default platform path still runs so the
       // player never lands without footing.
-      boolean pastedSchematic = false;
       io.github.dailystruggle.rtp.api.schematic.LoadedSchematic loadedSchematic =
           (schematicLoad != null && schematicLoad.isDone()) ? schematicLoad.join() : null;
       // S-004 - a region with a schematic file on disk that nonetheless reaches this point
@@ -952,61 +989,105 @@ public final class TeleportPipelineTask extends RTPRunnable {
         // destination region differs from the player's current region. Bounce the paste - and
         // its platform fallback - to the destination region via RTP.scheduler.runTask(location).
         // On non-Folia platforms this dispatches to the main thread / runs inline.
+        // S-001: setLocation is chained after the paste/platform inside that task, so the
+        // player never arrives before the footing exists; a throw there fails closed.
         final io.github.dailystruggle.rtp.api.schematic.LoadedSchematic loadedFinal =
             loadedSchematic;
         final RTPLocation locFinal = location;
         final boolean buildPlatformFinal = buildPlatform;
         final String worldNameFinal = coords.worldName();
-        pastedSchematic = true; // platform fallback is handled inside the region task below
+        // ADR-058 / REQ-RTP-S-003: verdict normally precomputed in runLoad; the fallback only
+        // starts the verifier futures and is read non-blocking like the precomputed one.
+        final CompletableFuture<Boolean> footprintFinal = (schematicFootprint != null)
+            ? schematicFootprint
+            : schematicFootprintClearAsync(
+                loadedFinal, locFinal, arrivalPasteOptions(), worldNameFinal);
         RTP.scheduler.runTask(locFinal, () -> {
-          boolean pasted = false;
-          // ADR-058 - anchor SURFACE_CENTER (not the BOTTOM_CENTER default): the schematic is
-          // dropped so the player lands on a standable floor in its center column instead of
-          // being buried under blocks pasted around their feet. The drop is computed from the
-          // schematic data in one pass, so the arrival point is standable without re-pasting.
-          io.github.dailystruggle.rtp.api.schematic.PasteOptions pasteOptions =
-              new io.github.dailystruggle.rtp.api.schematic.PasteOptions(
-                  io.github.dailystruggle.rtp.api.schematic.PasteAnchor.SURFACE_CENTER,
-                  false, true);
-          // ADR-058 / REQ-RTP-S-003 - footprint claim check. Before writing any block, verify
-          // the schematic's horizontal footprint against the GlobalRegionVerifiers registry (the
-          // sanctioned claim/protection mechanism - never an inline claim-plugin call). If any
-          // footprint cell intersects protected land, the paste is suppressed and the default
-          // platform path runs instead, so the paste never overwrites a claim.
-          if (pasteOptions.claimAware()
-              && !schematicFootprintClear(loadedFinal, locFinal, pasteOptions, worldNameFinal)) {
-            RTP.log(Level.INFO, "[RTP] region schematic '" + region.name
-                + "' footprint intersects a claim; paste suppressed (S-003), falling back to "
-                + "default platform.");
-          } else {
-            try {
-              io.github.dailystruggle.rtp.api.schematic.PasteResult pasteResult =
-                  schematicPaster.paste(loadedFinal, locFinal, pasteOptions);
-              if (pasteResult != null && pasteResult.placed()) {
-                pasted = true;
-                RTP.log(Level.FINE, "[PIPELINE_TRACE] runTeleport pasted region schematic '"
-                    + region.name + "'");
-              } else {
-                RTP.log(Level.WARNING, "[RTP] region schematic '" + region.name
-                    + "' not pasted (" + pasteResult + "); falling back to default platform "
-                    + "(S-004). See the preceding schematic-paste log line for the per-block "
-                    + "cause.");
+          try {
+            boolean pasted = false;
+            io.github.dailystruggle.rtp.api.schematic.PasteOptions pasteOptions =
+                arrivalPasteOptions();
+            // Footprint claim check (sanctioned GlobalRegionVerifiers registry, never an inline
+            // claim-plugin call): any protected, pending or failed verdict suppresses the paste
+            // and the default platform runs instead, so the paste never overwrites a claim.
+            if (pasteOptions.claimAware() && !footprintVerdictClear(footprintFinal)) {
+              RTP.log(Level.INFO, "[RTP] region schematic '" + region.name + "' "
+                  + (footprintFinal.isDone() ? "footprint intersects a claim"
+                      : "footprint claim check still pending at paste time")
+                  + "; paste suppressed (S-003), falling back to default platform.");
+            } else {
+              try {
+                io.github.dailystruggle.rtp.api.schematic.PasteResult pasteResult =
+                    schematicPaster.paste(loadedFinal, locFinal, pasteOptions);
+                if (pasteResult != null && pasteResult.placed()) {
+                  pasted = true;
+                  RTP.log(Level.FINE, "[PIPELINE_TRACE] runTeleport pasted region schematic '"
+                      + region.name + "'");
+                } else {
+                  RTP.log(Level.WARNING, "[RTP] region schematic '" + region.name
+                      + "' not pasted (" + pasteResult + "); falling back to default platform "
+                      + "(S-004). See the preceding schematic-paste log line for the per-block "
+                      + "cause.");
+                }
+              } catch (Exception e) {
+                SupportLogger.logException(Level.WARNING,
+                    "region schematic paste failed for '" + region.name + "'", e);
               }
-            } catch (Exception e) {
-              SupportLogger.logException(Level.WARNING,
-                  "region schematic paste failed for '" + region.name + "'", e);
             }
+            if (!pasted && buildPlatformFinal) {
+              buildArrivalPlatform(locFinal);
+            }
+          } catch (Throwable t) {
+            failArrivalFooting(playerId, t);
+            return;
           }
-          if (!pasted && buildPlatformFinal) {
-            buildArrivalPlatform(locFinal);
-          }
+          finishTeleport(player, playerId, locFinal);
         });
+        return;
       }
 
-      if (!pastedSchematic && buildPlatform) {
-        buildArrivalPlatform(location);
+      if (buildPlatform) {
+        try {
+          buildArrivalPlatform(location);
+        } catch (Throwable t) {
+          failArrivalFooting(playerId, t);
+          return;
+        }
       }
+      finishTeleport(player, playerId, location);
+    } catch (Exception e) {
+      SupportLogger.logException(Level.SEVERE, "Error in runTeleport", e);
+      currentPhase = Phase.CLEANUP;
+      runCleanup();
+    }
+  }
 
+  /**
+   * S-001 / S-004: arrival footing (schematic paste or platform) could not be placed. The
+   * player is not teleported; they are told, refunded and released, and the task cleans up.
+   */
+  private void failArrivalFooting(UUID playerId, Throwable cause) {
+    try {
+      SupportLogger.logException(Level.WARNING,
+          "arrival footing failed for " + playerId + "; teleport aborted (S-001)", cause);
+      RTP.serverAccessor.sendMessage(playerId, ConfigCache.unsafe);
+      RTPTeleportCancel.refund(playerId);
+    } finally {
+      RTP.getInstance().processingPlayers.remove(playerId);
+      currentPhase = Phase.CLEANUP;
+      runCleanup();
+    }
+  }
+
+  /** Non-blocking read of a footprint verdict: only a completed {@code TRUE} is clear. */
+  static boolean footprintVerdictClear(CompletableFuture<Boolean> verdict) {
+    return verdict != null && verdict.isDone() && !verdict.isCompletedExceptionally()
+        && Boolean.TRUE.equals(verdict.getNow(Boolean.FALSE));
+  }
+
+  /** Arrival tail, run once the footing exists: death hold, bookkeeping, setLocation. */
+  private void finishTeleport(RTPPlayer player, UUID playerId, RTPLocation location) {
+    try {
       if (deathEffectTriggered || RTP.deathEffectInFlight.contains(playerId)) {
         RTP.log(Level.FINE, "[PIPELINE_TRACE] runTeleport deathEffect active playerId=" + playerId
             + "; putting teleport on hold until respawn");
@@ -1338,9 +1419,13 @@ public final class TeleportPipelineTask extends RTPRunnable {
   /**
    * ADR-058 / REQ-RTP-S-003: footprint claim guard for region schematic pastes.
    *
-   * @return {@code true} when footprint is clear (or no verifiers registered)
+   * Never joins: the per-cell verifier futures are combined, so the caller (off-thread in
+   * {@link #runLoad}) does not block and the region thread only reads the completed verdict.
+   *
+   * @return future of {@code true} when footprint is clear (or no verifiers registered);
+   *     {@code false} when any cell is protected or any check errors (fail-safe)
    */
-  static boolean schematicFootprintClear(
+  static CompletableFuture<Boolean> schematicFootprintClearAsync(
       io.github.dailystruggle.rtp.api.schematic.LoadedSchematic schematic,
       RTPLocation at,
       io.github.dailystruggle.rtp.api.schematic.PasteOptions options,
@@ -1348,7 +1433,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
     int width = schematic.width();
     int length = schematic.length();
     if (width <= 0 || length <= 0) {
-      return true;
+      return CompletableFuture.completedFuture(Boolean.TRUE);
     }
     int baseX;
     int baseZ;
@@ -1366,26 +1451,46 @@ public final class TeleportPipelineTask extends RTPRunnable {
     }
     String worldName = (at.world() != null) ? at.world().name() : fallbackWorldName;
     int y = at.y();
+    List<CompletableFuture<Boolean>> checks = new ArrayList<>(width * length);
     for (int dz = 0; dz < length; dz++) {
       for (int dx = 0; dx < width; dx++) {
         RTPCoords cell = new RTPCoords(worldName, baseX + dx, y, baseZ + dz);
         try {
           CompletableFuture<Boolean> check =
               GlobalRegionVerifiers.checkGlobalRegionVerifiers(cell);
-          Boolean ok = check.join();
-          if (ok != null && !ok) {
-            return false;
+          if (check == null) {
+            return CompletableFuture.completedFuture(Boolean.FALSE);
           }
+          // A cell already known protected short-circuits without issuing the rest.
+          if (check.isDone() && !check.isCompletedExceptionally()
+              && Boolean.FALSE.equals(check.getNow(null))) {
+            return CompletableFuture.completedFuture(Boolean.FALSE);
+          }
+          checks.add(check);
         } catch (Throwable t) {
           // Fail-safe (S-003): if the footprint claim check itself errors, treat the cell as
           // protected and suppress the paste rather than risk overwriting a claim.
           SupportLogger.logException(Level.FINE,
               "schematic footprint claim check failed; suppressing paste", t);
-          return false;
+          return CompletableFuture.completedFuture(Boolean.FALSE);
         }
       }
     }
-    return true;
+    return CompletableFuture.allOf(checks.toArray(new CompletableFuture[0]))
+        .handle((ignored, err) -> {
+          if (err != null) {
+            SupportLogger.logException(Level.FINE,
+                "schematic footprint claim check failed; suppressing paste", err);
+            return Boolean.FALSE;
+          }
+          for (CompletableFuture<Boolean> check : checks) {
+            // All complete normally here; getNow never blocks.
+            if (Boolean.FALSE.equals(check.getNow(null))) {
+              return Boolean.FALSE;
+            }
+          }
+          return Boolean.TRUE;
+        });
   }
 
   private void runCleanup() {

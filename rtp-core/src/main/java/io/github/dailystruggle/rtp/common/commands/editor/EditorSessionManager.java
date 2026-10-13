@@ -16,6 +16,7 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.security.SecureRandom;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -1448,9 +1449,11 @@ public final class EditorSessionManager {
                     try {
                         String existing = Files.readString(target, StandardCharsets.UTF_8);
                         if (!existing.equals(entry.getValue())) {
-                            // File is dirty, create .bak backup
+                            // Dirty: fresh .bak, never written through a pre-existing link
                             Path bakFile = target.resolveSibling(target.getFileName().toString() + ".bak");
-                            Files.copy(target, bakFile, StandardCopyOption.REPLACE_EXISTING);
+                            EditorSecurity.checkRealPath(pluginPath, bakFile, relPath + ".bak");
+                            Files.deleteIfExists(bakFile);
+                            Files.copy(target, bakFile);
                         }
                     } catch (IOException e) {
                         RTP.log(Level.WARNING, "Failed to create .bak backup for " + target + ": " + e.getMessage(), e);
@@ -1469,10 +1472,17 @@ public final class EditorSessionManager {
                         Files.createDirectories(target.getParent());
                     }
 
-                    // Write to temp file then atomic move
+                    // Fresh temp file (CREATE_NEW refuses a planted link), then atomic move
                     Path tmpFile = target.resolveSibling(target.getFileName().toString() + ".tmp");
-                    Files.writeString(tmpFile, entry.getValue(), StandardCharsets.UTF_8);
-                    Files.move(tmpFile, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                    EditorSecurity.checkRealPath(pluginPath, tmpFile, relPath + ".tmp");
+                    Files.deleteIfExists(tmpFile);
+                    Files.writeString(tmpFile, entry.getValue(), StandardCharsets.UTF_8,
+                            StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+                    try {
+                        Files.move(tmpFile, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                    } catch (AtomicMoveNotSupportedException e) {
+                        Files.move(tmpFile, target, StandardCopyOption.REPLACE_EXISTING);
+                    }
                 } catch (IOException e) {
                     RTP.log(Level.WARNING, "Failed writing file " + target + ": " + e.getMessage(), e);
                     throw new RuntimeException("Failed writing configuration file " + relPath + ": " + e.getMessage(), e);

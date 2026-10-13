@@ -9,6 +9,10 @@ import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
+import java.awt.geom.Area;
+import java.awt.geom.Ellipse2D;
+import java.awt.geom.Path2D;
+import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 
 @DisplayName("Visual render test producing Web Editor presentation assets for FRONT_PAGE.md")
@@ -103,34 +107,57 @@ public class WebEditorPresentationChartTest {
         g.drawLine(cx, 54, cx, height);
         g.drawLine(0, cy, mapW, cy);
 
-        // Region Outer Circle (Radius 6000)
+        // POLYGON region as docs/editor/index.html drawMap() renders it: vertices are chunk
+        // coordinates drawn at chunk centres; no radius / centerRadius rings (Polygon derives its
+        // bounding square from the vertices); dashed AABB; outside shaded. P3 was dragged, P5 added.
+        int[][] vertices = {{-200, -150}, {112, -175}, {225, 100}, {50, 200}, {-138, 125}};
+        int selectedVertex = 2;
+        double pxPerChunk = 0.8;
+        Path2D.Double poly = new Path2D.Double();
+        int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
+        for (int i = 0; i < vertices.length; i++) {
+            double vx = cx + (vertices[i][0] + 0.5) * pxPerChunk;
+            double vy = cy + (vertices[i][1] + 0.5) * pxPerChunk;
+            if (i == 0) poly.moveTo(vx, vy);
+            else poly.lineTo(vx, vy);
+            minX = Math.min(minX, vertices[i][0]);
+            maxX = Math.max(maxX, vertices[i][0]);
+            minZ = Math.min(minZ, vertices[i][1]);
+            maxZ = Math.max(maxZ, vertices[i][1]);
+        }
+        poly.closePath();
+
+        // Outside-region shading with the polygon interior cut out
+        Area outside = new Area(new Rectangle2D.Double(0, 54, mapW, mapH));
+        outside.subtract(new Area(poly));
+        g.setColor(new Color(17, 17, 27, 166));
+        g.fill(outside);
+
+        // Bounding box of the vertices in chunk extents (Square base of Polygon)
+        g.setColor(new Color(137, 180, 250, 102));
+        g.setStroke(new BasicStroke(1, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, new float[]{4.0f, 4.0f}, 0.0f));
+        g.draw(new Rectangle2D.Double(cx + minX * pxPerChunk, cy + minZ * pxPerChunk,
+                (maxX - minX + 1) * pxPerChunk, (maxZ - minZ + 1) * pxPerChunk));
+
+        // Polygon boundary stroke
         g.setColor(accent);
-        g.setStroke(new BasicStroke(2.5f));
-        int r = 210;
-        g.drawOval(cx - r, cy - r, r * 2, r * 2);
-
-        // Region Inner Deadzone (CenterRadius 1200)
-        g.setColor(red);
-        g.setStroke(new BasicStroke(1.8f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER, 10.0f, new float[]{6.0f, 6.0f}, 0.0f));
-        int cr = 50;
-        g.drawOval(cx - cr, cy - cr, cr * 2, cr * 2);
-
-        // Custom Polygon Boundary (Overworld Mining Zone)
-        int[] polyX = {cx - 160, cx + 90, cx + 180, cx + 40, cx - 110};
-        int[] polyY = {cy - 120, cy - 140, cy + 80, cy + 160, cy + 100};
-        g.setColor(new Color(166, 227, 161, 45));
-        g.fillPolygon(polyX, polyY, polyX.length);
-        g.setColor(green);
         g.setStroke(new BasicStroke(2.2f));
-        g.drawPolygon(polyX, polyY, polyX.length);
+        g.draw(poly);
 
-        // Polygon Vertex Handles
-        g.setColor(yellow);
-        for (int i = 0; i < polyX.length; i++) {
-            g.fillOval(polyX[i] - 5, polyY[i] - 5, 10, 10);
+        // Vertex drag handles (selected / dragged vertex highlighted)
+        for (int i = 0; i < vertices.length; i++) {
+            double vx = cx + (vertices[i][0] + 0.5) * pxPerChunk;
+            double vy = cy + (vertices[i][1] + 0.5) * pxPerChunk;
+            double hr = i == selectedVertex ? 7 : 6;
+            Ellipse2D.Double handle = new Ellipse2D.Double(vx - hr, vy - hr, hr * 2, hr * 2);
+            g.setColor(i == selectedVertex ? yellow : green);
+            g.fill(handle);
             g.setColor(dark);
-            g.drawOval(polyX[i] - 5, polyY[i] - 5, 10, 10);
-            g.setColor(yellow);
+            g.setStroke(new BasicStroke(1.5f));
+            g.draw(handle);
+            g.setColor(i == selectedVertex ? yellow : subtext);
+            g.setFont(new Font("SansSerif", Font.BOLD, 11));
+            g.drawString("P" + (i + 1), (int) Math.round(vx + 10), (int) Math.round(vy - 8));
         }
 
         // HUD Overlay on Map
@@ -180,36 +207,33 @@ public class WebEditorPresentationChartTest {
         g.setColor(overlay);
         g.drawRoundRect(sideX + 20, diffY, sideW - 40, diffH, 8, 8);
 
+        // Same line format as generateYamlDiff(): vertices staged in chunks ([xc, zc]) by
+        // regionGeometryValues(); the drag replaces P3, the added point appends P5
         g.setFont(new Font("Monospaced", Font.PLAIN, 12));
-        int textY = diffY + 24;
+        int textY = diffY + 22;
         g.setColor(subtext);
-        g.drawString("--- definitions/regions/survival_spawn.yml", sideX + 32, textY);
-        textY += 18;
-        g.drawString("+++ definitions/regions/survival_spawn.yml", sideX + 32, textY);
-        textY += 24;
-        g.setColor(accent);
-        g.drawString("@@ -14,4 +14,5 @@ shape:", sideX + 32, textY);
+        g.drawString("# Staged YAML diff for", sideX + 32, textY);
+        textY += 16;
+        g.drawString("# definitions/regions/survival_spawn.yml:", sideX + 32, textY);
         textY += 20;
-        g.setColor(red);
-        g.drawString("-   radius: 5000", sideX + 32, textY);
-        textY += 18;
-        g.setColor(green);
-        g.drawString("+   radius: 6000", sideX + 32, textY);
-        textY += 18;
-        g.setColor(red);
-        g.drawString("-   centerRadius: 1000", sideX + 32, textY);
-        textY += 18;
-        g.setColor(green);
-        g.drawString("+   centerRadius: 1200", sideX + 32, textY);
-        textY += 24;
-        g.setColor(text);
-        g.drawString("    price: \"@economy\"", sideX + 32, textY);
-        textY += 18;
-        g.setColor(green);
-        g.drawString("+   requirePermission: true", sideX + 32, textY);
-        textY += 24;
-        g.setColor(subtext);
-        g.drawString("# 2 files modified | 1 polygon created", sideX + 32, textY);
+        String[] diffLines = {
+                "  shape:",
+                "    name: \"POLYGON\"",
+                "    mode: \"ACCUMULATE\"",
+                "    vertices:",
+                "      - [-200c, -150c]",
+                "      - [112c, -175c]",
+                "-     - [210c, 120c]",
+                "+     - [225c, 100c]",
+                "      - [50c, 200c]",
+                "+     - [-138c, 125c]",
+                "    weight: 1.0"
+        };
+        for (String line : diffLines) {
+            g.setColor(line.startsWith("-") ? red : line.startsWith("+") ? green : text);
+            g.drawString(line, sideX + 32, textY);
+            textY += 17;
+        }
 
         // Validation Invariants Card (ADR-034, ADR-099)
         int valY = diffY + diffH + 20;

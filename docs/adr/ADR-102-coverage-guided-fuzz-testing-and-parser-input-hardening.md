@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-10-02
 **Relevant Requirements:** REQ-RTP-SYS-001, REQ-RTP-S-001, REQ-RTP-S-004, REQ-RTP-S-005
-**Related ADRs:** [ADR-016](ADR-016-anvil-subsystem.md), [ADR-077](ADR-077-multi-format-region-support.md), [ADR-100](ADR-100-superseding-adr-024-sla-and-support-tier.md)
+**Related ADRs:** [ADR-016](ADR-016-anvil-subsystem.md), [ADR-077](ADR-077-multi-format-region-support.md), [ADR-100](ADR-100-superseding-adr-024-sla-and-support-tier.md), [ADR-111](ADR-111-live-server-behaviour-fuzzing.md) (live-server behaviour fuzzing tier)
 
 ---
 

@@ -104,8 +104,8 @@ Each scenario is described in `docs/admin/proxies/CROSS_SERVER_VERIFICATION.md`.
 
 | Scenario           | Headless evidence                                                |
 |--------------------|------------------------------------------------------------------|
-| boot               | `docker compose ps` reports all eight services `Up`             |
-| heartbeat          | `redis-cli` lists 5 backend (3 backends + 2 lobbies) + 2 proxy keys |
+| boot               | `docker compose ps` reports all nine services `Up`              |
+| heartbeat          | `redis-cli` lists 6 backend (4 backends + 2 lobbies) + 2 proxy keys |
 | roundtrip          | requires a manual MC client login (see admin doc)                |
 | killmidflight      | reservation row clears within `reservation.ttlMs + reapInterval` |
 | killswitch         | Lua claim returns `KILL_SWITCH`; harness asserts proxy log line  |
@@ -233,23 +233,29 @@ each backend's destination in a **different dimension** to demo per-server load
 distribution. Three pieces make the menu rich:
 
 1. **One `default` region per backend, each in a distinct dimension, with a
-   configurable `displayName`.** Committed under each backend's
-   `rtp-config/regions/default.yml` and seed-copied into the running container
-   by the compose entrypoint shim (into `/data/plugins/RTP/regions/`):
+   configurable `displayName`.** Each lives in the backend's
+   `rtp-config/regions/default.yml` and is seed-copied into the running container
+   by the compose entrypoint shim (into `/data/plugins/RTP/regions/`). Only the
+   backend-c and backend-d files are tracked; `devstack/.gitignore` excludes the
+   whole `backend-a/` and `backend-b/` `rtp-config/` trees, so a fresh clone has
+   no demo region for those two:
 
-   | Backend            | Dimension | `displayName`          |
-   |--------------------|-----------|------------------------|
-   | backend-a (Paper)  | Overworld | `&#55ff55Verdant Wilds`|
-   | backend-b (Folia)  | Nether    | `&#ff5533Ashen Wastes` |
-   | backend-c (Folia)  | End       | `&#c77dffVoid Reaches` |
+   | Backend              | Dimension | `displayName`               |
+   |----------------------|-----------|-----------------------------|
+   | backend-a (Paper)    | Overworld | `&#55ff55Verdant Wilds`     |
+   | backend-b (Folia)    | Nether    | `&#ff5533Ashen Wastes`      |
+   | backend-c (Fabric)   | End       | `&#c77dffVoid Reaches`      |
+   | backend-d (NeoForge) | Overworld | `&#ffb703Neo Forge Frontier`|
 
    The optional cosmetic `displayName` key (color/gradient supported) renames the
    region in `/rtp info` and the GUI menu without changing its identity (the
    region key stays `default`), and is advertised over the network so a lobby
    shows each backend's chosen words for its cross-server destination. All
-   regions are centered on `(0,0)` with radii well inside +/-512 blocks so they
-   land in the pre-generated spawn-area chunks (below). backend-c (Folia)
-   targets the End via the Bukkit world name `world_the_end`.
+   regions are centered on `(0,0)`. Bare radii are in chunks (backend-c: 150 =
+   2,400 blocks; backend-d: 2,000 = 32,000 blocks), so they reach well past the
+   spawn area; the full pre-generated world copy (below) is what keeps them on
+   generated terrain. backend-c (Fabric) targets the End via the world name
+   `world_the_end`; backend-d uses the namespaced `minecraft:overworld`.
 
 2. **A supplied pre-generated world.** A freshly-booted world generates chunks
    on demand, and under load the async chunk loads can time out and surface as
@@ -259,7 +265,7 @@ distribution. Three pieces make the menu rich:
    world** (every `.mca`), which both eliminates the null-chunk timeouts and
    gives the L3 backlog cache (`backlogCacheCap`, set in the region files) real
    `.mca` files to anvil-prefilter - the backlog cache only does useful work
-   when there are on-disk `.mca` files to check. All three backends also bind
+   when there are on-disk `.mca` files to check. All four backends also bind
    their `world_nether` and `world_the_end` dirs (Paper/Folia keep Nether/End
    as separate top-level dirs). Pass `-RegionRadius <n>` (>= 0) to copy only a small
    spawn-area window instead (cheaper, but supplies too few `.mca` for the
@@ -279,11 +285,11 @@ docker compose up -d
 
 Then connect a 1.21.x client to `localhost:25577` (proxy-a). You land on a
 lobby, whose own `regions/` is intentionally empty - so `/rtp` there shows the
-**cross-server peer regions** advertised by all three backends, each labelled by
-its configured `displayName` and landing in a different dimension (Verdant Wilds
--> Overworld, Ashen Wastes -> Nether, Void Reaches -> End). Run `/server
-backend-a` (or `backend-b` / `backend-c`) and `/rtp` to teleport into that
-backend's default region directly.
+**cross-server peer regions** advertised by all four backends, each labelled by
+its configured `displayName` (Verdant Wilds -> Overworld, Ashen Wastes ->
+Nether, Void Reaches -> End, Neo Forge Frontier -> Overworld). Run `/server
+backend-a` (or `backend-b` / `backend-c` / `backend-d`) and `/rtp` to teleport
+into that backend's default region directly.
 
 Pass `-Source <path>` to point at a different pre-generated world, or
 `-RegionRadius <n>` (>= 0) to copy only a small spawn-area window instead of the

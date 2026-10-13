@@ -89,10 +89,13 @@ public class BukkitRTPWorld extends RTPWorld<World> {
         m = null;
       }
     } catch (Throwable ignored) {
-      // No such method on the running server - fall back to synchronous loading.
+      // No such method on the running server - live loads are rejected (S-005).
     }
     CHUNK_AT_ASYNC_FUTURE = m;
   }
+
+  /** Once-per-world latch for the async-API-absent warning; avoids per-candidate spam. */
+  private final AtomicBoolean asyncApiAbsentWarned = new AtomicBoolean(false);
 
   public BukkitRTPWorld(World world) {
     super(world);
@@ -597,15 +600,13 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   }
 
   /**
-   * Perform the actual chunk load (reflective async → sync-on-primary-thread fallback).
+   * Perform the actual chunk load through the reflective async API only.
    *
-   * <p>When the reflective async path is unavailable, returns {@code null} (async I/O
-   * failed), or resolves to a {@code null} {@link Chunk} (some Paper/Folia builds
-   * return null when a chunk cannot be provided off-tick without generation), this
-   * method falls back to {@link World#getChunkAt(int, int)} on the primary thread
-   * - the only Bukkit API guaranteed to generate a missing chunk. Each failure edge
-   * is logged at {@code WARNING} so operators can isolate problems in the pregen
-   * summary's {@code nullChunk} bucket (REQ-RTP-S-004).
+   * <p>When the async API is unavailable, throws, returns {@code null}, or resolves to a
+   * {@code null} {@link Chunk}, the candidate is rejected: the future completes with
+   * {@code null} (pregen {@code nullChunk}/{@code asyncLoadNull}). No synchronous
+   * {@link World#getChunkAt(int, int)} fallback exists (S-005). Each edge is logged at
+   * {@code WARNING}; the API-absent edge once per world (REQ-RTP-S-004).
    */
   private CompletableFuture<Long> loadChunkFuture(int cx, int cz, long key) {
     // Count only actual live chunk-load attempts dispatched to the chunk system.
@@ -632,6 +633,15 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     // fork implements true async generation (Paper/Folia). On vanilla Spigot the
     // scheduling still resolves on the main thread internally, but the caller is
     // not blocked - a strict improvement over the previous runTask+getChunkAt path.
+    return profileChunkLoad(requestChunkAsync(cx, cz, key), chunkLoadStartNanos, chunkGenerated);
+  }
+
+  /**
+   * Async-only chunk request without load counters/profiling. Caches the chunk and completes
+   * with {@code key} on success; every failure edge logs and completes with {@code null}.
+   * Never completes exceptionally; never calls {@link World#getChunkAt(int, int)} (S-005).
+   */
+  private CompletableFuture<Long> requestChunkAsync(int cx, int cz, long key) {
     if (CHUNK_AT_ASYNC_FUTURE != null) {
       try {
         @SuppressWarnings("unchecked")
@@ -644,36 +654,39 @@ public class BukkitRTPWorld extends RTPWorld<World> {
               RTP.log(java.util.logging.Level.WARNING,
                   "[RTP] Async chunk load threw for world=" + name + " chunk=(" + cx + "," + cz
                       + "): " + ex.getClass().getSimpleName() + ": " + ex.getMessage()
-                      + " — falling back to Bukkit synchronous getChunkAt");
-              completeViaSyncGenerate(cx, cz, key, out);
+                      + " - candidate rejected (no synchronous fallback, S-005)");
+              out.complete(null);
               return;
             }
             if (chunk == null) {
               RTP.log(java.util.logging.Level.WARNING,
                   "[RTP] Async chunk load returned null for world=" + name + " chunk=(" + cx
-                      + "," + cz + ") — falling back to Bukkit synchronous getChunkAt to"
-                      + " trigger generation");
-              completeViaSyncGenerate(cx, cz, key, out);
+                      + "," + cz + ") - candidate rejected (no synchronous fallback, S-005)");
+              out.complete(null);
               return;
             }
             cacheChunk(cx, cz, chunk);
             out.complete(key);
           });
-          return profileChunkLoad(out, chunkLoadStartNanos, chunkGenerated);
+          return out;
         }
+        RTP.log(java.util.logging.Level.WARNING,
+            "[RTP] Reflective async chunk API returned null for world=" + name + " chunk=("
+                + cx + "," + cz + ") - candidate rejected (no synchronous fallback, S-005)");
       } catch (Throwable t) {
-        // Some test doubles (e.g. MockBukkit builds) or very old forks may not
-        // honor the async API - fall through to the synchronous generation path.
+        // Test doubles (e.g. MockBukkit) or old forks may not honor the async API.
         RTP.log(java.util.logging.Level.WARNING,
             "[RTP] Reflective async chunk API failed for world=" + name + " chunk=(" + cx
                 + "," + cz + "): " + t.getClass().getSimpleName() + ": " + t.getMessage()
-                + " — falling back to Bukkit synchronous getChunkAt");
+                + " - candidate rejected (no synchronous fallback, S-005)");
       }
+    } else if (asyncApiAbsentWarned.compareAndSet(false, true)) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[RTP] World#getChunkAtAsync(int,int) CompletableFuture API is unavailable on this"
+              + " server; unloaded chunks in world=" + name + " are rejected instead of loaded"
+              + " synchronously (S-005). Pre-generate the world or use Paper/Folia.");
     }
-
-    CompletableFuture<Long> future = new CompletableFuture<>();
-    completeViaSyncGenerate(cx, cz, key, future);
-    return profileChunkLoad(future, chunkLoadStartNanos, chunkGenerated);
+    return CompletableFuture.completedFuture(null);
   }
 
   /**
@@ -691,59 +704,6 @@ public class BukkitRTPWorld extends RTPWorld<World> {
             .record(generated, System.nanoTime() - startNanos);
       }
     });
-  }
-
-  /**
-   * Synchronous generation fallback. Runs {@link World#getChunkAt(int, int)} on the
-   * primary thread (generating the chunk if needed) and completes {@code out} with
-   * {@code key} on success or {@code null} on failure. Each failure edge is logged
-   * at {@code WARNING} so operators can isolate which candidates are being dropped
-   * and why.
-   */
-  private void completeViaSyncGenerate(int cx, int cz, long key, CompletableFuture<Long> out) {
-    Runnable loadChunkTask = () -> {
-      try {
-        org.bukkit.Chunk chunk = world.getChunkAt(cx, cz);
-        if (chunk == null) {
-          RTP.log(java.util.logging.Level.WARNING,
-              "[RTP] Synchronous world.getChunkAt returned null for world=" + name
-                  + " chunk=(" + cx + "," + cz + ")");
-          out.complete(null);
-          return;
-        }
-        cacheChunk(cx, cz, chunk);
-        out.complete(key);
-      } catch (Throwable t) {
-        RTP.log(java.util.logging.Level.WARNING,
-            "[RTP] Synchronous chunk load threw for world=" + name + " chunk=(" + cx + ","
-                + cz + "): " + t.getClass().getSimpleName() + ": " + t.getMessage());
-        out.complete(null);
-      }
-    };
-
-    if (org.bukkit.Bukkit.isPrimaryThread()) {
-      loadChunkTask.run();
-      return;
-    }
-    // Folia note: Bukkit.getScheduler().runTask(...) throws UnsupportedOperationException
-    // on Folia, so route the synchronous load through RTP.scheduler (region-aware on
-    // Folia, main-thread on Bukkit/Paper).
-    io.github.dailystruggle.rtp.api.scheduling.RTPScheduler scheduler =
-        RTP.serverAccessor == null ? null : RTP.serverAccessor.getScheduler();
-    if (scheduler != null) {
-      scheduler.runTask(this, cx, cz, loadChunkTask);
-      return;
-    }
-    org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
-    if (plugin != null) {
-      org.bukkit.Bukkit.getScheduler().runTask(plugin, loadChunkTask);
-    } else {
-      RTP.log(java.util.logging.Level.WARNING,
-          "[RTP] Cannot schedule synchronous chunk load — RTP plugin is not registered"
-              + " with Bukkit plugin manager (world=" + name + " chunk=(" + cx + "," + cz
-              + ")) — dropping candidate");
-      out.complete(null);
-    }
   }
 
   @Override
@@ -960,9 +920,27 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
   @Override
   public void keepChunkAt(int cx, int cz) {
-    RTP.scheduler.runTask(this, cx, cz, () -> {
-      chunkCache.put(((long) cx & 0xffffffffL | ((long) cz << 32)), new WeakReference<>(world.getChunkAt(cx, cz)));
-      setForceLoaded(cx, cz, true);
+    // S-005: async load only; requestChunkAsync caches into the concurrent chunkCache on success.
+    // Ticket only once resident; failures keep nothing and are logged (S-004). API-absent edge
+    // is already logged once per world by requestChunkAsync.
+    final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
+    requestChunkAsync(cx, cz, key).whenComplete((k, ex) -> {
+      if (ex != null || k == null) {
+        if (CHUNK_AT_ASYNC_FUTURE != null) {
+          RTP.log(java.util.logging.Level.WARNING,
+              "[RTP] keepChunkAt async load failed for world=" + name + " chunk=(" + cx + "," + cz
+                  + ")" + (ex == null ? "" : ": " + ex.getClass().getSimpleName() + ": " + ex.getMessage())
+                  + " - chunk not kept");
+        }
+        return;
+      }
+      setForceLoaded(cx, cz, true).whenComplete((v, tex) -> {
+        if (tex != null) {
+          RTP.log(java.util.logging.Level.WARNING,
+              "[RTP] keepChunkAt ticket apply failed for world=" + name + " chunk=(" + cx + "," + cz
+                  + "): " + tex.getClass().getSimpleName() + ": " + tex.getMessage());
+        }
+      });
     });
   }
 

@@ -29,8 +29,10 @@ Make `proxy-direct` a thin RPC client/server over the existing socket:
 1. **Wire (`ProxyDirectWire`).** One opcode per SPI method invoked *from a backend* (the
    only RPC direction): `OP_HEARTBEAT` (publishBackendHeartbeat + readSnapshot),
    `OP_FLUSH_PENDING`, `OP_POLL_STATUS`, `OP_CANCEL`, `OP_FIND_RESERVATION`, `OP_REDEEM`,
-   `OP_LIST_ACTIVE`. Each is `byte opcode` + signed request + signed response (single or
-   count-framed list), reusing the HMAC framing. Proxy-local methods (`claim`,
+   `OP_LIST_ACTIVE` (opcodes 1-7; any other opcode is refused). Each is the wire-v2 request
+   header (`byte opcode`, `byte frameVersion`, `long sentAtMs`, `UTF nonce`; rtp-proxy-ADR-017)
+   then a signed request and a signed response (single or count-framed list), reusing the HMAC
+   framing with the response bound to its request. Proxy-local methods (`claim`,
    `dequeueReady`, `transition`, `release`, `reapExpired`) are never sent.
 
 2. **Backend client (`rtp-core`).** `ProxyDirectNetworkBinding` is a full RPC

@@ -120,6 +120,27 @@ public class RTPCmdPvPGateTest {
   }
 
   @Test
+  @DisplayName("REQ-RTP-S-004: PvP refusal releases the busy lock acquired by the outer onCommand")
+  void inCombat_refusalReleasesOuterLock() {
+    setSafety(SafetyKeys.pvpCheckEnabled.name(), true);
+    setSafety(SafetyKeys.pvpOnCombat.name(), "DENY");
+
+    UUID playerId = UUID.randomUUID();
+    accessor.addPlayer(new MockRTPPlayer(playerId, "combatantLocked", null));
+    PvPGate.nativeTracker().stamp(playerId, System.currentTimeMillis());
+    // RTPCmd.onCommand(sender, ...) adds the sender before dispatching to compute().
+    RTP.getInstance().processingPlayers.add(playerId);
+
+    TestRTPCmd cmd = new TestRTPCmd();
+    AtomicReference<String> msg = new AtomicReference<>();
+    assertTrue(cmd.onCommand(playerId, new HashMap<>(), null, msg::set));
+
+    assertNotNull(msg.get(), "refusal must emit the pvpInCombat message");
+    assertFalse(RTP.getInstance().processingPlayers.contains(playerId),
+            "a refused request must not leave the player 'already teleporting'");
+  }
+
+  @Test
   @DisplayName("disabled gate never refuses, even for a combat-tagged player")
   void disabledGate_doesNotRefuse() {
     setSafety(SafetyKeys.pvpCheckEnabled.name(), false);

@@ -15,6 +15,7 @@ import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.spi.RtpDispatcher;
 import io.github.dailystruggle.rtp.proxy.common.spi.RtpRequest;
 import io.github.dailystruggle.rtp.proxy.common.spi.TransferOutcome;
+import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWire;
 
 import java.time.Duration;
 import java.util.Map;
@@ -445,7 +446,7 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
         if (!sender.isConnected(request.playerId())) {
             LOG.log(Level.WARNING,
                     "RTP dispatch: player {0} disconnected after claim; releasing token {1}.",
-                    new Object[]{request.playerId(), token.tokenId()});
+                    new Object[]{request.playerId(), ProxyDirectWire.redactToken(token.tokenId())});
             releaseQuietly(token.tokenId(), ReleaseReason.PLAYER_DISCONNECTED);
             emitStatus(request.playerId(), QueueState.CANCELLED, Optional.of(MSG_PLAYER_GONE.key()));
             return CompletableFuture.completedFuture(new DispatchOutcome.Failed(
@@ -460,7 +461,8 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
         // never being entered at all) without spamming production consoles.
         LOG.log(Level.FINE,
                 "[NETWORK][trace] DefaultRtpDispatcher.sendAfterClaim: invoking sender.sendTo(player={0}, serverId={1}, token={2}) correlationId={3}",
-                new Object[]{request.playerId(), token.serverId(), token.tokenId(), request.correlationId()});
+                new Object[]{request.playerId(), token.serverId(),
+                        ProxyDirectWire.redactToken(token.tokenId()), request.correlationId()});
         return sender.sendTo(request.playerId(), token.serverId(), token)
                 .thenApply(result -> {
                     if (result == TransferOutcome.SUCCESS) {
@@ -473,7 +475,8 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
                     LOG.log(Level.WARNING,
                             "RTP dispatch: transfer of player {0} to backend {1} returned {2}; "
                                     + "releasing token {3}.",
-                            new Object[]{request.playerId(), token.serverId(), result, token.tokenId()});
+                            new Object[]{request.playerId(), token.serverId(), result,
+                                    ProxyDirectWire.redactToken(token.tokenId())});
                     releaseQuietly(token.tokenId(), releaseReasonFor(result));
                     DispatchOutcome failed = mapTransferFailure(result);
                     String reasonKey = failed instanceof DispatchOutcome.Failed f
@@ -488,7 +491,7 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
                     LOG.log(Level.WARNING,
                             "RTP dispatch: transfer of player " + request.playerId()
                                     + " threw " + cause.getClass().getSimpleName()
-                                    + "; releasing token " + token.tokenId(),
+                                    + "; releasing token " + ProxyDirectWire.redactToken(token.tokenId()),
                             cause);
                     releaseQuietly(token.tokenId(), ReleaseReason.BACKEND_REJECTED);
                     sender.sendMessage(request.playerId(), MSG_TRANSFER_FAILED, Map.of());
@@ -532,7 +535,7 @@ public final class DefaultRtpDispatcher implements RtpDispatcher {
         } catch (RuntimeException ex) {
             LOG.log(Level.FINE,
                     "RTP dispatch: best-effort release({0}, {1}) threw: {2}",
-                    new Object[]{tokenId, reason, ex.getMessage()});
+                    new Object[]{ProxyDirectWire.redactToken(tokenId), reason, ex.getMessage()});
         }
     }
 

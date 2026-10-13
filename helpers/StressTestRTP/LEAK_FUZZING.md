@@ -2,6 +2,10 @@
 
 `scripts/bench_fuzz.py` is a behaviour fuzzer for memory and resource leaks in Paper plugins. It drives a swarm of real Minecraft clients (`devstack/clients/bench-swarm.js --fuzz-control`) against one plugin at a time. After each episode it measures what the server still holds after a full GC, compares that with a plugin-free control, and learns which behaviour makes the difference grow.
 
+The same episodes also feed finding oracles (server-log exceptions, event errors, stalls, permission denials); see *Findings beyond leaks* below. The plan to grow the tool into general coverage-guided behaviour fuzzing is [`docs/dev/BEHAVIOUR_FUZZING_PLAN.md`](../../docs/dev/BEHAVIOUR_FUZZING_PLAN.md).
+
+Governing decision: [ADR-111](../../docs/adr/ADR-111-live-server-behaviour-fuzzing.md) (fuzzing tiers, tool invariants, oracle and signature model, procedure, verdict meaning).
+
 This document records why the tool exists, how a run works, how to read it, and what it has found. The CLI reference and output files are in [`README.md` *Behaviour fuzzing*](README.md#behaviour-fuzzing).
 
 ---
@@ -40,7 +44,7 @@ An episode is 2 to 8 bots, each running a seeded program for 20 to 60 s:
 - **Console actions (opt-in):** `--console "rtp=rtp reload,..."` fires allow-listed console commands over RCON at random times while the bots are active (about 30 % of episodes, up to 2 commands). They are carried through replays, shrink and the ladder.
 - **Repetitions (`--reps`, default 3):** the episode's programs run `reps` times with fresh bot names, with a checkpoint after each. `slope.<metric>` is the growth per repetition. A cache that fills during the first repetition has slope about 0; a leak keeps rising.
 - **Checkpoint:** `/rtpstress leakcheck <label> quick` forces a full GC and reports retained players (`ServerPlayer`/`CraftPlayer` alive minus players online), heap after GC, live histogram bytes, RSS, memory pools (metaspace, compressed class space), loaded classes, direct and mapped buffers, threads, file descriptors, and per plugin its live instances, listeners and pending tasks. It also writes every class's instance delta to `classes.jsonl`.
-- **States:** each bot's chat reply or kick reason, normalised (digits to `#`, colours stripped). An episode joins the corpus when it reaches a new `(action, state)` pair or changes a count.
+- **States:** each bot's chat reply or kick reason, normalised (digits to `#`, colours stripped). An episode joins the corpus when it reaches a new `(action, state)` pair, a new finding signature, or changes a count.
 
 ### Learning
 
@@ -53,7 +57,15 @@ An episode is 2 to 8 bots, each running a seeded program for 20 to 60 s:
 1. **Surprise replay:** an episode that grows a count far beyond the control (`--surprise-z`) is replayed straight away. "Reproduced k of n" with k at the threshold makes it a **candidate**.
 2. **Shrink:** `ddmin` over bots and actions finds the smallest program that still reproduces k of n (`--shrink`, `--shrink-probes`, `--shrink-n`).
 3. **Ladder:** candidates climb `--rungs` (default `4x1,12x3,48x10`, bots x reps) by successive halving. At the top rung a target **FAILs** when the count grows by at least half the prediction and heap after GC grows beyond the control's. Heap dumps are taken and, with `--mat`, `heap_owner.py` names the owning plugin class.
-4. **Verdict** (`verdict.json`): `FAIL`, `PASS` (nothing found within budget, with coverage), `INCONCLUSIVE` (a signal that did not confirm at scale), `CONTROL` for `direct`.
+4. **Verdict** (`verdict.json`): `FAIL` (a top-rung leak or a reproduced target finding; `confirmed_by` lists `leak` and/or the oracle), `PASS` (nothing found within budget, with coverage), `INCONCLUSIVE` (a signal that did not confirm: a leak lost at scale, or a one-off target finding), `CONTROL` for `direct`.
+
+### Findings beyond leaks
+
+- **Oracles:** `ServerLogOracle` reads the `latest.log` lines written during the episode: a qualified throwable type followed by a stack trace, `Could not pass event`, and `Can't keep up` / watchdog lines. A replaced or shorter log (restart) is read from its start. `LeastPrivilegeOracle` turns the swarm's `denial_failure` events into findings.
+- **Signature:** class plus a key of owning plugin, root exception type (the last `Caused by:`) and the first frame in that plugin's packages, with digits dropped, so line numbers, lambda indices and messages do not split one bug into many. Findings dedupe per episode (`repeats`) and per run.
+- **Attribution:** by the topmost frame in a known package (`PLUGIN_PACKAGES`, extended with `--plugin-packages`), or the plugin named by `Could not pass event`. A trace with no known frame is `unknown` and never counts against the target. A finding counts against the target only when its plugin is exactly the target label or its `--names` / `--jars` entry. Stalls are attributed to `Server`, since one log line cannot name the cause; they are reported, not confirmed.
+- **Control:** `direct` writes its signatures to `control-findings.json`; the same signature under a target is harness or vanilla noise and is not replayed.
+- **Confirmation:** an episode that reaches a new target signature is replayed `--finding-n` times (default 3) under fresh names, one run each, no repetitions; `--finding-k` (default 2) reports of the same signature confirm it. Replays draw on `--replay-budget`. `--finding-shrink` (default 1 per seed) delta-debugs a confirmed finding to the fewest actions that still produce it, from `--shrink-budget`. No ladder: an exception does not need to be amplified to be real.
 
 ### Attribution
 
@@ -145,6 +157,7 @@ No growth in loaded classes or metaspace per repetition across the reload episod
 - **Native memory.** RSS is recorded but not explained; run the server with `-XX:NativeMemoryTracking=summary` to break it down.
 - **Not counted at checkpoints:** loaded chunks and plugin chunk tickets.
 - **Intermittent leaks** reproduce k of n; the shrinker can stall near the minimum, and short screening runs can miss them.
+- **Finding oracles:** attribution needs a known package; a third-party target needs `--plugin-packages`. The permission oracle only fires on commands in the swarm's `DENIED_ACTIONS`, which the grammar never sends, and under `--grant *` nothing is denied. Finding replays still take a quick checkpoint each (to keep the leak baseline consistent).
 
 ---
 
@@ -152,5 +165,5 @@ No growth in loaded classes or metaspace per repetition across the reload episod
 
 1. Rerun `direct,rtp` for a formal 3.3.0 verdict now that byte-based scoring and attribution filtering are in place.
 2. Confirmation by amplification (shrunk segment 1x, 2x, 4x, 8x), with dumps at 1x and 8x compared by dominator tree, in place of the bots x reps ladder.
-3. Command discovery, GUI and chat actions, n-gram features and a bandit over action types; continuous mode until the heap guard trips.
+3. Command discovery, GUI and chat actions, n-gram features and a bandit over action types; continuous mode until the heap guard trips. Coverage feedback from the live server and the fast fault-only mode: [`BEHAVIOUR_FUZZING_PLAN.md`](../../docs/dev/BEHAVIOUR_FUZZING_PLAN.md).
 4. Run all plugins with the same `--reps` setup for the front-page memory comparison ([`docs/publishing/FRONT_PAGE.md`](../../docs/publishing/FRONT_PAGE.md)). Report per plugin: verdict, players retained per episode, live MB and classes per repetition above the control, and starting heap, and state that PASS means "not found within budget".

@@ -176,6 +176,12 @@ public final class LobbyDispatchRetryQueue {
         return playerId != null && parked.containsKey(playerId);
     }
 
+    /** True while this queue owns the player's processing lock (parked or enrolled). */
+    public boolean holds(UUID playerId) {
+        return playerId != null
+                && (parked.containsKey(playerId) || enrolled.containsKey(playerId));
+    }
+
     /**
      * Start the periodic retry pulse on {@link RTP#scheduler}'s async
      * tier. Idempotent: a second call is a no-op.
