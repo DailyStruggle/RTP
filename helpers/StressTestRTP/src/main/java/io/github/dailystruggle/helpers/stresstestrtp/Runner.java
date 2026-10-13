@@ -186,6 +186,11 @@ public final class Runner {
     private long rampIssued = 0L;         // due slots consumed (dispatched + shed)
     private int rampShed = 0;
     private int rampPeakInFlight = 0;
+    // Per-player repeating-task accounting (Sched.Kind.PLAYER): counters at stage start, live count then, and the
+    // worst live count seen at a stage start (the settle gap must have returned it to ~0).
+    private Sched.TimerStats rampTimersAtStart = new Sched.TimerStats(0L, 0L, 0L);
+    private long rampLiveTimersAtStart = 0L;
+    private long rampMaxLiveBetweenStages = 0L;
     private int rampRosterSize = 0;
     private boolean rampAborted = false;
     // Synchronized: an operator stop builds the partial row off the tick thread.
@@ -522,6 +527,7 @@ public final class Runner {
         this.rampFinalized.set(false);
         this.rampSparkStarted = false;
         this.rampStageIdx = -1;
+        this.rampMaxLiveBetweenStages = 0L;
         this.rampNextIdx = 0;
         this.rampWallTps = -1.0;
         this.rampTpsLastNs = -1L;
@@ -590,6 +596,16 @@ public final class Runner {
     private void beginRampStage(int idx, long now) {
         rampStageIdx = idx;
         resetRampWindow(now);
+        rampTimersAtStart = Sched.timerStats(Sched.Kind.PLAYER);
+        rampLiveTimersAtStart = rampTimersAtStart.live();
+        rampMaxLiveBetweenStages = Math.max(rampMaxLiveBetweenStages, rampLiveTimersAtStart);
+        long tolerance = Math.max(0L, config.getLong("ramp.repeating-task-tolerance", 2L));
+        if (rampLiveTimersAtStart > tolerance) {
+            plugin.getLogger().warning(String.format(Locale.ROOT,
+                    "[StressTestRTP] ramp stage %d starts with %d live per-player repeating tasks (expected ~0, tolerance %d): scheduled=%d cancelled=%d cancel_failures=%d",
+                    idx, rampLiveTimersAtStart, tolerance, rampTimersAtStart.scheduled(),
+                    rampTimersAtStart.cancelled(), rampTimersAtStart.cancelFailures()));
+        }
         rampStageEndMs = now + rampStageMs;
         rampState = RampState.RUNNING;
         nextDispatchAt.clear();
@@ -820,10 +836,14 @@ public final class Runner {
         } else {
             ev = RampEvaluator.evaluate(sr, rampEval.thresholds());
         }
+        Sched.TimerStats timersNow = Sched.timerStats(Sched.Kind.PLAYER);
+        Sched.TimerStats timersStage = timersNow.minus(rampTimersAtStart);
         RampWriter.Extras x = new RampWriter.Extras(
                 MetricsRecorder.percentile(lat, 50), MetricsRecorder.percentile(lat, 95),
                 MetricsRecorder.percentile(lat, 99), msptP50, ms.size(), rampTpsMin, rampHeapPeakMb,
-                rampRosterSize, rampPeakInFlight, complete, rampStateStartMs, end);
+                rampRosterSize, rampPeakInFlight, complete, rampStateStartMs, end,
+                timersStage.scheduled(), timersStage.cancelled(), rampLiveTimersAtStart, timersNow.live(),
+                timersStage.cancelFailures());
         try {
             rampWriter.appendStage(rampTarget.label, ev, x);
         } catch (java.io.IOException e) {
@@ -873,6 +893,10 @@ public final class Runner {
         sb.append("first_failure_stage: ").append(ff == null ? -1 : ff.stage().index()).append('\n');
         sb.append("first_failure_criteria: ").append(ff == null ? "" : ff.criteriaString()).append('\n');
         sb.append("stop_reason: ").append(ev.stopReason().name()).append('\n');
+        Sched.TimerStats pt = Sched.timerStats(Sched.Kind.PLAYER);
+        sb.append("repeating_live_between_stages_max: ").append(rampMaxLiveBetweenStages).append('\n');
+        sb.append("repeating_live_at_end: ").append(pt.live()).append('\n');
+        sb.append("repeating_cancel_failures: ").append(pt.cancelFailures()).append('\n');
         sb.append(line).append('\n');
         try {
             rampWriter.writeSummary(sb.toString());
@@ -1563,7 +1587,7 @@ public final class Runner {
                 // arms that behave worst.
                 if (onTick) attempt.recordTickInterval(startNs, System.nanoTime());
             }
-            if (watchPinned) startPinnedPositionWatch(target, attempt, from.getX(), from.getZ());
+            if (watchPinned) startPinnedPositionWatch(target, attempt, from.getX(), from.getZ(), timeoutMs);
         });
     }
 
@@ -1583,12 +1607,19 @@ public final class Runner {
      * position on the first tick after the teleport and releases the slot
      * there. Set {@code folia.pinned-position-watch: false} to fall back to
      * the run-loop poll alone.
+     *
+     * <p>Self-limiting: {@link Sched.TimerHandle} reads its stop flag before
+     * running this body, attempts cancel once, and stops after
+     * {@link #pinnedWatchMaxTicks} ticks, so a repeater whose cancel fails
+     * stops doing work instead of re-running the early-return path every
+     * tick on a region thread.
      */
     private void startPinnedPositionWatch(Player target, MetricsRecorder.Attempt attempt,
-                                          double fromX, double fromZ) {
+                                          double fromX, double fromZ, long timeoutMs) {
         UUID tid = target.getUniqueId();
         double thr = config.getDouble("folia.poll-distance-threshold", 16.0);
         double thr2 = thr * thr;
+        long maxTicks = pinnedWatchMaxTicks(timeoutMs, config.getLong("folia.pinned-position-watch-max-ticks", 0L));
         Sched.runOnPlayerTimer(plugin, target, () -> {
             try {
                 // Identity check, not a null check: a superseding dispatch for
@@ -1609,7 +1640,13 @@ public final class Runner {
             } catch (Throwable t) {
                 return false; // best-effort: a watcher must never wedge a region
             }
-        }, 1L);
+        }, 1L, maxTicks);
+    }
+
+    /** Hard tick bound of the pinned watch: the attempt timeout plus 2 s of slack, unless configured (> 0). */
+    static long pinnedWatchMaxTicks(long timeoutMs, long configured) {
+        if (configured > 0L) return configured;
+        return Math.max(40L, Math.max(0L, timeoutMs) / 50L + 40L);
     }
 
     /**

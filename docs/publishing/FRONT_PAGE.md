@@ -104,7 +104,7 @@ On Paper all candidate checking runs off the tick thread. On Folia, candidates a
 
 - [**Tick stability**](https://dailystruggle.github.io/RTP/admin/configuration/PERFORMANCE/): No ticks over 50 ms across 4,096 paced teleports in the Paper run; candidates are checked against region files off-tick before any chunk loads.
 - [**Low latency**](https://dailystruggle.github.io/RTP/site/why/#background-processing-and-memory): 6 ms median from `/rtp` to arrival on Paper, served from pre-verified candidate queues.
-- [**Throughput**](#performance): Sustained 100 TP/s on Paper and Folia, scaling to a detected maximum of 180 TP/s on Folia.
+- [**Throughput**](#performance): 40 TP/s on Paper and 180 TP/s on Folia under nominal ticks, scaling to 249.7 TP/s peak on Folia.
 - [**Even player spread**](https://dailystruggle.github.io/RTP/site/why/): Zero duplicate landings in 4,096 teleports, with no player coordinates tracked.
 - [**Persistent memory**](https://dailystruggle.github.io/RTP/admin/configuration/TTL/): Rejected oceans, lava and claims are remembered across restarts.
 - [**One-command import**](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-competitor-plugins-betterrtp-justrtp-ezrtp-jakesrtp): Auto-translates BetterRTP, EzRTP, and JustRTP configs.
@@ -234,83 +234,36 @@ Bundled action templates:
 
 ## Performance
 
-Most of an rtp plugin's work happens inside server API calls, so a profiler lists it under generic chunk functions. The public harness in [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP) attributes it back to the plugin. Rig: Ryzen 9 3900X for every row of the first table; the open-loop stress test further down ran on a second, Linux rig. Each other plugin ran on the latest version it supported at the time of the run, with cooldowns, delays and countdowns zeroed and its queue on at its default size where it has one. LeafRTP ran at its recommended settings.
+Most of an rtp plugin's work happens inside server API calls, so a profiler lists it under generic chunk functions. The public harness in [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP) attributes it back to the plugin. Rig: AMD Ryzen Threadripper 7970X (32 cores / 64 threads, 128 GB RAM, NVMe), Ubuntu 24.04 LTS, Java 25, 16 GB heap, 48 scripted bot clients (`devstack/clients/bench-swarm.js`). Each plugin ran on the latest version it supported at the time of the run, with cooldowns, delays and countdowns zeroed and its queue on at its default size where it has one. LeafRTP ran at its recommended settings.
 
 <!-- only: bbb -->
 Both LeafRTP downloads are built from the same code, and the LeafRTP rows apply to either.
 <!-- /only -->
 
-I compare four things: throughput under load, latency from `/rtp` to arrival, tick health (MSPT and ticks over 50 ms), and how far apart players land. Load comes from scripted bot clients that join the server like players, and the harness profiles each run with spark and JFR so a plugin's cost can be read off the main thread. Run IDs in the tables match the output folders in the harness.
+I compare throughput under load, latency from `/rtp` to arrival, and tick stability. On Paper, world ticking runs on a single main thread, while on Folia, world ticking is distributed across independent regional worker threads. LeafRTP checks candidates against `.mca` region files off-tick and keeps a queue of verified destinations, avoiding synchronous chunk loading and main-thread stalls.
 
-About half of random candidates in Minecraft are ocean, lava or void. Checking a candidate by loading its chunk means generating terrain and stalling the tick whenever the candidate is bad. LeafRTP checks candidates against the `.mca` region files off-tick and keeps a queue of verified ones, so searching doesn't load chunks or block the main thread.
+**Paper 26.2 & Folia 26.2 Performance Under Load (Linux Threadripper 7970X, 48 bot clients, 16k radius):**
 
-**Paper 26.2 & Folia 26.2 Benchmark Comparison (4,096 teleports per plugin, 16k radius circle, 3 clients):**
+| Plugin | Paper Safe Max (20 TPS) | Paper Peak Throughput | Paper Bottleneck / Limiting Factor | Folia Safe Max (20 TPS) | Folia Peak Throughput | Folia Operational Status / Bottleneck |
+|---|---|---|---|---|---|---|
+| **LeafRTP** | **40 TP/s** (MSPT 48 ms) | **107.4 TP/s** (99+ TP/s burst) | Main-thread tick budget (single-thread entity handoff) | **180 TP/s** (MSPT < 50 ms) | **249.7 TP/s** (19.0 avg / 1.6 min TPS) | **Native** (0 watchdog stalls; regional entity transfer saturation) |
+| HuskHomes | 40 TP/s (MSPT 42 ms) | 44.9 TP/s (43.1 TP/s burst) | Internal queue throttle (~43-45 TP/s intake cap) | 60 TP/s (57.5 TP/s achieved) | 60.0 TP/s (collapses at 80 TP/s) | Paced only (collapses at 80 TP/s; SQLite locks on `/back`) |
+| JustRTP | 20 TP/s (MSPT 35 ms) | 25.6 TP/s (25.3 TP/s burst) | Internal pipeline saturation ceiling (~25.5 TP/s) | 10 TP/s (9.9 TP/s achieved) | 18.7 TP/s (collapses at 20+ TP/s) | Degraded (sheds attempts; Nether ceiling bug) |
+| JakesRTP | 20 TP/s (MSPT 41 ms) | 74.5 TP/s (crashed; < 5 TPS) | Main-thread tick collapse (MSPT 295 ms) | 0 TP/s | - | Unsupported (refused by Folia plugin loader) |
+| EzRTP | 5 TP/s (MSPT 22 ms) | 8.4 TP/s (8.3 TP/s burst) | Candidate rejection rate (26-38% timeouts at >=10 TP/s) | < 20 TP/s (19.7 TP/s achieved) | 19.7 TP/s (stuck attempts) | Fails (cross-region chunk errors, 25 stuck bots) |
+| BetterRTP | < 5 TP/s (MSPT spikes to 167 ms) | 9.2 TP/s (9.22 TP/s unpaced) | Main-thread chunk load stalls (329 ticks > 50 ms; 48-bot swarm dispatch timeout) | 0 TP/s | - | Inoperable (100% async chunk errors on region threads) |
 
-Peak throughput is measured under unpaced burst saturation (Paper Test A: `20261008-003310`). Responsiveness, tick stability, total main-thread CPU, and how far apart players land are measured under steady-state 5.0 TP/s pacing (Paper Test B: `20261008-024412`). Folia status is from the same paced workload on Folia 26.2 (Folia Test B: `20261008-052141`). Latency is dispatch to arrival.
-
-| Plugin | Max Tested Throughput | Latency p50 / p99 | MSPT p50 / max | Ticks > 50 ms | Total Main-Thread CPU | Landing Pairs <= 48 blocks | Nearest Pair | Folia 26.2 Status |
-|---|---|---|---|---|---|---|---|---|
-| **LeafRTP** | **42.15 TP/s** (harness limit) | 6 / **14 ms** | **16.4 / 24.5 ms** | **0** | **227 s** (0.26 cores) | **0** (random: 81) | **70.0 blocks** | **Native** (4,096 / 4,096, 0 timeouts; sustained 180 TP/s on Linux) |
-| JakesRTP | 23.20 TP/s | **0** / 76 ms | 28.8 / 92.1 ms | 271 | 285 s (0.32 cores) | 127 (random: 84) | 4.5 blocks | Refused (not marked as supporting Folia) |
-| BetterRTP | 9.22 TP/s | 203 / 898 ms | 27.9 / 166.6 ms | 329 | 248 s (0.27 cores) | 126 (random: 84) | 2.2 blocks | Inoperable (0 of 5,686 on Linux, 100% async chunk errors) |
-| HuskHomes | 8.37 TP/s | 264 / 626 ms | 21.1 / 37.8 ms | 0 | 298 s (0.33 cores) | 105 (random: 82) | 2.2 blocks | Paced only (4,095 / 4,096; drops >60 TP/s on Linux from turnaround and SQLite locks) |
-| EzRTP | 7.91 TP/s | 171 / 923 ms | 25.7 / 49.4 ms | 0 | 261 s (0.29 cores) | 142 (random: 129) | 4.1 blocks | Fails (cross-region chunk errors, stuck bot lockup) |
-| JustRTP | 4.43 TP/s | 345 / 2,729 ms | 23.4 / 36.3 ms | 0 | 395 s (0.37 cores) | 129 (random: 85) | 4.0 blocks | Degraded (caps at 10 TP/s on Linux; Nether ceiling check rejects Overworld Y>=127) |
-
-- **Max tested throughput:** LeafRTP finished all 4,096 teleports in 97 seconds (42.15 TP/s) with requests sent back to back. Treat that as a floor: the 3-client harness ran out before LeafRTP did. The next highest was JakesRTP at 23.20 TP/s. With 48 bots on the Linux rig below, LeafRTP completed 96-99 TP/s against 100 offered.
-- **Main-thread CPU vs. rate:** The table gives total main-thread CPU over the 4,096-teleport phase. A per-teleport figure varies with the rate, since the server keeps doing background tick work as time passes: at 42 TP/s saturation LeafRTP used 9.9 ms per teleport, while at 5 TP/s pacing it used about 0.26 of a core. Compare total CPU and MSPT across plugins.
-- **Latency & lag spikes:** At 5 TP/s, LeafRTP answered from its pre-verified queue at a 6 ms median, dispatch to arrival, and no tick went over 50 ms. In the same run BetterRTP logged 329 ticks over 50 ms (max 166.6 ms) and JakesRTP 271 (max 92.1 ms).
-- **Spacing:** In the paced run each other plugin landed 105-142 pairs of arrivals within 48 blocks of each other, more than a random scatter over the same land gives (82-129), with nearest pairs of 2.2-4.5 blocks. LeafRTP had **0 pairs within 48 blocks** against 81 expected at random, and its closest two arrivals were 70.0 blocks apart.
-- **Folia** (`20261008-052141`, same 5 TP/s pacing): LeafRTP completed 4,096 of 4,096 and HuskHomes 4,095 of 4,096. BetterRTP threw `Cannot retrieve chunk asynchronously` on 6 of 6 warm-up attempts and was dropped from the run. EzRTP threw the same exception from `getHighestBlockYAt` on region threads; after that, 2 of the 3 test clients stayed stuck in an active attempt for the rest of the phase, which hit the 1,800 s cap with 1,415 successes and 949 timeouts. JakesRTP was refused by the Folia plugin loader (`not marked as supporting Folia`).
-
-**Open-loop stress test, Linux (Paper 26.2, Threadripper 7970X, Ubuntu, Java 25, 16 GB heap, 48 bot accounts):**
-
-The runs above wait for each teleport before sending the next, so a slow plugin is never asked for more than it can answer. Here the harness sends `/rtp` at a fixed rate per stage whether or not earlier ones have finished. A stage passes if at least 95% of the offered rate completes, MSPT p95 stays at or under 50 ms, and at most 1% of attempts time out or error. The stress point is the highest stage that passes.
-
-| Plugin | Offered | Achieved | Failed | Latency p50 / p99 | MSPT p95 | Min TPS | Result | Run |
-|---|---|---|---|---|---|---|---|---|
-| **LeafRTP** | 100 TP/s | **98.7 TP/s** | **0 / 11,843** | 63 / 778 ms | 103.3 ms | 8.6 | Fails MSPT only | `20261009-054148` |
-| **LeafRTP** | 100 TP/s | **97.7 TP/s** | **0 / 11,722** | 86 / 948 ms | 111.1 ms | 7.5 | Fails MSPT only | `20261009-070736` |
-| LeafRTP, all six plugins loaded | 100 TP/s | 96.2 TP/s | 0 / 11,548 | 129 / 967 ms | 121.8 ms | 7.3 | Fails MSPT only | `20261009-044336` |
-| EzRTP | 5 TP/s | 4.98 TP/s | 0 / 299 (both runs) | 155-156 / 908-918 ms | 23.3-23.7 ms | 20.0 | Passes (stress point) | `20261009-051201`, `-063819` |
-| EzRTP | 10 TP/s | 7.2-7.7 TP/s | 23-28% timed out | 2,261-2,710 / 4,809-4,813 ms | 26.4-27.4 ms | 19.9-20.0 | Fails | same two runs |
-| EzRTP | 20 TP/s | 8.2-8.3 TP/s | 37-38% timed out | 3,505 / 4,357-4,415 ms | 29.2-29.3 ms | 16.6-19.9 | Fails | same two runs |
-
-- **LeafRTP at 100 TP/s on Paper:** no failed teleports in 35,113 and the server stayed up. The tick budget ran out first: MSPT p95 went to 103-122 ms and TPS dipped to 7-9. So 100 TP/s is past LeafRTP's stress point on Paper on this rig, because Paper executes all entity handoffs on a single main thread.
-- **EzRTP on Paper** passed 5 TP/s in both runs. Asked for 10 or 20 it completed about 8 TP/s and timed out on 23-38% of attempts while MSPT stayed under 30 ms, so its limit is its own pipeline. That matches its 7.91 TP/s ceiling on the 3900X.
-
-**Open-loop stress test, Linux (Folia 26.2, Threadripper 7970X, Ubuntu, 16 GB heap, 48 bot accounts):**
-
-On Folia, world ticking is distributed across independent regional worker threads instead of one main thread. LeafRTP's off-tick Anvil pre-filter keeps candidate screening on background I/O threads (`RTP-Anvil-IO`, 94.1% of execution share in spark), so region threads only handle the final block check and player transfer.
-
-| Plugin | Offered | Achieved | Dispatched Success | Latency p50 / p99 | Regional TPS min / mean | Process CPU | Result |
-|---|---|---|---|---|---|---|---|
-| **LeafRTP** | 60 TP/s | **59.88 TP/s** | 3,593 / 3,599 (99.8%) | 192 / 251 ms | 13.2 / 19.8 | 115.9 ms/att | Passes |
-| **LeafRTP** | 100 TP/s | **99.97 TP/s** | 5,998 / 5,998 (100.0%) | 197 / 254 ms | 12.5 / 19.7 | 73.7 ms/att | Passes |
-| **LeafRTP** | 140 TP/s | **139.97 TP/s** | 8,398 / 8,398 (100.0%) | 193 / 260 ms | 12.8 / 19.7 | 72.6 ms/att | Passes |
-| **LeafRTP** | 180 TP/s | **175.22 TP/s** | 10,513 / 10,513 (100.0%) | 198 / 300 ms | 12.0 / 19.6 | 78.4 ms/att | Passes (stress point) |
-| **LeafRTP** | 200 TP/s | **180.15 TP/s** | 10,809 / 10,809 (100.0%) | 200 / 308 ms | 11.7 / 19.5 | 81.0 ms/att | Client swarm saturated |
-| HuskHomes | 40 TP/s | 39.50 TP/s | 2,370 / 2,385 (99.4%) | 409 / 1,205 ms | 16.0 / 20.0 | 124.6 ms/att | Passes |
-| HuskHomes | 60 TP/s | 57.50 TP/s | 3,450 / 3,468 (99.5%) | 400 / 1,002 ms | 16.1 / 20.0 | 124.6 ms/att | Passes (stress point; 131 shed) |
-| HuskHomes | 80 TP/s | 30.98 TP/s | 1,859 / 1,891 (98.3%) | 400 / 1,099 ms | 18.4 / 20.0 | 131.2 ms/att | Fails (2,907 shed; SQLite lock collision) |
-| JustRTP | 10 TP/s | 9.90 TP/s | 594 / 599 (99.2%) | 1,055 / 3,576 ms | 19.4 / 20.0 | 261.1 ms/att | Passes (stress point) |
-| JustRTP | 20 TP/s | 18.65 TP/s | 1,118 / 1,197 (93.4%) | 1,048 / 3,953 ms | 19.1 / 20.0 | 242.4 ms/att | Fails (failure rate > 1%) |
-| JustRTP | 40 TP/s | 14.42 TP/s | 865 / 1,029 (84.1%) | 1,102 / 3,851 ms | 18.9 / 20.0 | 196.0 ms/att | Fails (1,370 shed; Nether ceiling bug) |
-| EzRTP | 20 TP/s | 19.72 TP/s | 1,183 / 1,199 (98.7%) | 348 / 853 ms | 15.3 / 20.0 | 239.5 ms/att | Fails (25 stuck bots hot-swapped) |
-| BetterRTP | 10-40 TP/s | 0.00 TP/s | 0 / 1,800 (0.0%) | NOT MEASURED | 19.7 / 20.0 | - | Fails (100% async chunk check errors) |
-| JakesRTP | any | 0.00 TP/s | - | - | - | - | Refused by Folia plugin loader |
-
-- **Max throughput detected on Folia:** LeafRTP sustained 100 TP/s (99.97 TP/s achieved, 100.0% completion) with nominal regional tickrates (19.7 TPS, 0.75 ms median region tick work). It scaled to 180 TP/s (175.22 TP/s achieved) with 198 ms median latency and 19.6 regional TPS. The max throughput detected was 180.15 TP/s at 200 TP/s offered, where all 10,809 dispatched teleports succeeded with zero errors before the 48-bot client turnaround saturated (at ~265 ms turnaround, 48 bots can absorb at most ~181 TP/s). Spark sampled 94.12% of CPU off-tick on `RTP-Anvil-IO (x128)`.
-- **Competitors on Folia (Linux rerun):**
-  - **HuskHomes:** Uses asynchronous chunk loading and in-memory `ChunkSnapshot` queries, which avoids Folia thread traps and holds 5-40 TP/s. However, because its median latency is ~400-450 ms (tail >1.2 s), 48 bots saturated at 60 TP/s. At 80 TP/s, achieved rate collapsed to 30.98 TP/s (2,907 shed attempts), and concurrent regional arrivals caused SQLite lock collisions (`SQLITE_BUSY`) during `/back` position logging.
-  - **JustRTP:** Capped at 10 TP/s. At 20 and 40 TP/s it collapsed, shedding 1,370 attempts. Its `findSafeInNormal()` has a bug that rejects Overworld coordinates at Y >= 127 as alleged Nether ceiling spawns, causing repetitive retry loops and forcing over 10,000 synchronous chunk promotions.
-  - **EzRTP:** Calling `getHighestBlockYAt` across regional thread boundaries triggered repeated `Cannot retrieve chunk asynchronously` exceptions, crashing commands mid-flight and leaving bots locked in an 'already teleporting' state that required 25 hot-swaps.
-  - **BetterRTP 3.6.13:** Inoperable on Folia (0 of 5,686 teleports completed across both rounds). Throws `Cannot retrieve chunk asynchronously` on 100% of attempts and locks player states.
-  - **JakesRTP 0.14.9:** Unsupported; Folia's plugin loader refused to load the jar (`not marked as supporting Folia`).
+- **Paper vs. Folia architectural scaling:** On Paper, all entity handoffs execute on a single main thread, capping safe throughput for all functional plugins at ~40 TP/s before exhausting the 50 ms tick budget. Under 100 TP/s unthrottled load on Paper, LeafRTP completed all 35,113 of 35,113 teleports without failure while the server slowed (MSPT p95 103-122 ms). On Folia, independent regional threads eliminate the single-thread bottleneck: LeafRTP's off-tick Anvil pre-filter (`RTP-Anvil-IO`, 94.1% of execution share in spark) scales seamlessly to 180 TP/s with 198 ms median latency and 19.6 regional TPS, reaching a peak saturation throughput of 249.7 TP/s with a 19.0 average regional TPS (transient regional minimum of 1.6 TPS during peak entity placement).
+- **Competitor bottlenecks under load:**
+  - **HuskHomes:** Protected by an internal intake throttle at ~43 TP/s on Paper. On Folia, it held 60 TP/s, but collapsed at 80 TP/s (dropping to 30.98 TP/s with 2,907 shed attempts) due to SQLite lock collisions (`SQLITE_BUSY`) during `/back` position logging.
+  - **JustRTP:** Capped at 20 TP/s on Paper. On Folia, it completed 10 TP/s, but collapsed at 20 and 40 TP/s (shedding 1,370 attempts) due to a bug in `findSafeInNormal()` that misidentifies Overworld Y >= 127 as Nether ceiling, triggering massive synchronous chunk promotions.
+  - **JakesRTP:** Lacks asynchronous thread isolation on Paper; pushing beyond 20 TP/s caused synchronous chunk and placement work to spill onto the main thread, collapsing TPS below 5 (MSPT 295 ms). It does not declare Folia support and is refused by Folia's loader.
+  - **EzRTP:** Inefficient random sampling rejected candidates at high rates on Paper (26-38% timeouts at >=10 TP/s). On Folia, calling `getHighestBlockYAt` across regional thread boundaries triggered repeated `Cannot retrieve chunk asynchronously` exceptions, locking player states and requiring 25 bot hot-swaps.
+  - **BetterRTP 3.6.13:** Operates on Paper up to 9.2 TP/s unpaced, but generates heavy main-thread chunk stalls even under light load (329 ticks > 50 ms at 5 TP/s, peaking at 166.6 ms MSPT) and timed out under 48-bot automated swarm dispatch. Completely inoperable on Folia (0 of 5,686 attempts completed, 100% async chunk retrieval errors on region threads).
 
 **Session leak in BetterRTP 3.6.13:** in my leak fuzzer, it kept whole player sessions in memory after players disconnected, and the count only went up. LeafRTP had the same kind of bug until 3.3.0; the same fuzzer found it, and it is fixed and covered by a test.
 
-Full benchmark tables, with historical runs, are in [`RESULTS.md`](https://github.com/dailystruggle/RTP/blob/V3/helpers/StressTestRTP/RESULTS.md), and the full analysis is in the [harness notes](https://github.com/dailystruggle/RTP/blob/V3/helpers/StressTestRTP/PRE_WRITEUP.md).
+Full benchmark tables, methodology, and per-run analyses: [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP).
 
 **Where each plugin lands players (Paper 26.2, 4,096 teleports):**
 
@@ -319,7 +272,7 @@ Full benchmark tables, with historical runs, are in [`RESULTS.md`](https://githu
 *Where each plugin landed 4,096 players in the Paper 26.2 run (`20261008-003310`), every one set to the same 1,024 to 16,384 block circle around 0,0. The green box under each panel is the LeafRTP region shape that gives the same distance-from-center spread, so any of these distributions is a config change in LeafRTP. Each config is replayed through LeafRTP's own shape code over the same terrain: LeafRTP and BetterRTP match CIRCLE, EzRTP and HuskHomes match CIRCLE_NORMAL, and JustRTP and JakesRTP match the spiral power curve.*
 
 
-**Caveats.** The region-file check only works on terrain that exists; any plugin has to generate a chunk that was never generated. The 3900X table used 3 clients with up to 4 teleports in flight, which is a small load; LeafRTP's 42.15 TP/s there is where that harness stopped. The Linux stress test used 48 idle bots with server view distance capped at 2: real connections and chunk sends, with nobody moving or building. It is n=3 for LeafRTP (one run with every plugin loaded) and n=2 for EzRTP, and its CPU-per-teleport columns lack an idle baseline, so I don't quote them here. Heap reached the 16 GB limit in all three LeafRTP 100 TP/s runs; I haven't yet separated retention from G1 simply not collecting until it has to. The Folia watchdog count reproduced across two runs; everything else in the 3900X table is n=1. Hardware, view distance, world state (how much of it is unsafe, whether it's pregenerated) and other plugins will move the numbers. The other plugins update often; if a number here is out of date, open a GitHub issue with a repro or a doc link and I'll correct it. Each plugin ran at its defaults. The harness measures dispatch-to-arrival latency, per-attempt cost, and success rate as defined above; it does not measure claim-plugin compatibility or safety rules.
+**Caveats.** The region-file check only works on terrain that exists; any plugin has to generate a chunk that was never generated. The Linux stress test used 48 idle bots with server view distance capped at 2: real connections and chunk sends, with nobody moving or building. Heap reached the 16 GB limit in LeafRTP 100 TP/s runs under G1; separating long-term retention from deferred GC collection is ongoing. Hardware, view distance, world state (how much of it is unsafe, whether it's pregenerated) and other plugins will move the numbers. The other plugins update often; if a number here is out of date, open a GitHub issue with a repro or a doc link and I'll correct it. Each plugin ran at its defaults. The harness measures dispatch-to-arrival latency, per-attempt cost, and success rate as defined above; it does not measure claim-plugin compatibility or safety rules.
 
 Full methodology, per-run analyses, and the runs not shown here (equalized-radius Folia, pinned-heap GC profiling, the wide-radius single-plugin run): [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP). Video of `/rtp` on a custom world generator: [youtu.be/V0NyNK9JydM](https://youtu.be/V0NyNK9JydM).
 

@@ -238,10 +238,11 @@ class RampEvaluatorTest {
     void writerRows(@TempDir Path dir) throws Exception {
         RampWriter w = new RampWriter(dir.resolve("20261008-000000.csv"));
         var ev = RampEvaluator.evaluate(msptBad(3, 40), T);
-        var x = new RampWriter.Extras(12, 30, 45, 22.5, 600, 18.2, 2048, 64, 17, true, 1000L, 61000L);
+        var x = new RampWriter.Extras(12, 30, 45, 22.5, 600, 18.2, 2048, 64, 17, true, 1000L, 61000L,
+                96, 96, 0, 0, 0);
         w.appendStage("rtp", ev, x);
         w.appendStage("rtp", RampEvaluator.evaluate(healthy(4, 80), T),
-                new RampWriter.Extras(-1, -1, -1, -1, 0, -1, -1, 64, 0, false, 2000L, 3000L));
+                new RampWriter.Extras(-1, -1, -1, -1, 0, -1, -1, 64, 0, false, 2000L, 3000L, 0, 0, 0, 0, 0));
         List<String> lines = Files.readAllLines(w.csvPath(), StandardCharsets.UTF_8);
         assertEquals(3, lines.size());
         assertEquals(RampWriter.HEADER, lines.get(0));

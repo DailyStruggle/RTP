@@ -9,6 +9,9 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.LongSupplier;
 import java.util.logging.Level;
 
@@ -181,9 +184,20 @@ public final class ProbeFirstGovernor {
         }
     }
 
+    /** Immutable decision state exposed to selection threads without synchronization. */
+    record DecisionState(Mode mode, double z, double exploreShare) {
+        static final DecisionState INITIAL = new DecisionState(Mode.PROBE, Double.NaN, MAX_EXPLORE);
+    }
+
+    /** Immutable trial state for SKIP-mode trial probe bursts within one region file bin. */
+    record TrialState(double credit, long bin, int left, long until) {
+        static final TrialState INITIAL = new TrialState(0.0, NO_BIN, 0, 0);
+    }
+
     private final String region;
     private final Path path;
     private final LongSupplier clock;
+    private final ReentrantLock updateLock = new ReentrantLock();
     private final Ewma probe = new Ewma();
     private final Fit probeFit = new Fit();
     /** {@code 1/g} of probes recorded while probing is the default; frozen in SKIP. */
@@ -191,17 +205,18 @@ public final class ProbeFirstGovernor {
     private final Ewma reject = new Ewma();
     private final Ewma loadAfterProbe = new Ewma();
     private final Ewma loadDirect = new Ewma();
-    private final Ewma skip = new Ewma();
+    private final AtomicLong skipCount = new AtomicLong();
+    private final AtomicLong skipMeanBits = new AtomicLong(Double.doubleToRawLongBits(Double.NaN));
+    private final AtomicLong decisions = new AtomicLong();
+    private final AtomicLong probeSamples = new AtomicLong();
+    private final AtomicLong directSamples = new AtomicLong();
+    private final AtomicReference<TrialState> trialState = new AtomicReference<>(TrialState.INITIAL);
+    private volatile DecisionState decisionState = DecisionState.INITIAL;
     private Mode mode = Mode.PROBE;
     private long flips;
-    private long decisions;
     private long lastSummary;
     private long sinceFlip;
     private int beyond;
-    private double trialCredit;
-    private long trialBin = NO_BIN;
-    private int trialLeft;
-    private long trialUntil;
     private double costProbe = Double.NaN;
     private double costDirect = Double.NaN;
     private double z = Double.NaN;
@@ -220,21 +235,45 @@ public final class ProbeFirstGovernor {
 
     /** Decide for one candidate in region-file bin {@code bin} ({@link #binKey}): {@code true} = probe first. */
     public boolean shouldProbe(long bin) {
-        boolean skipNow;
-        synchronized (this) {
-            decisions++;
-            if (probe.n < MIN_SAMPLES) {
-                skipNow = false;
-            } else if (loadDirect.n < MIN_SAMPLES) {
-                skipNow = every(MAX_EXPLORE);
-            } else if (mode == Mode.PROBE) {
-                skipNow = every(exploreShare());
-            } else {
-                skipNow = !trialProbe(bin, exploreShare());
-            }
-            skip.add(skipNow ? 1.0 : 0.0);
+        long d = decisions.incrementAndGet();
+        if (probeSamples.get() < MIN_SAMPLES) {
+            recordSkip(false);
+            return true;
         }
+        if (directSamples.get() < MIN_SAMPLES) {
+            boolean skipNow = every(d, MAX_EXPLORE);
+            recordSkip(skipNow);
+            return !skipNow;
+        }
+        DecisionState state = this.decisionState;
+        boolean skipNow;
+        if (state.mode() == Mode.PROBE) {
+            skipNow = every(d, state.exploreShare());
+        } else {
+            skipNow = !trialProbe(bin, state.exploreShare(), d);
+        }
+        recordSkip(skipNow);
         return !skipNow;
+    }
+
+    private void recordSkip(boolean skipped) {
+        double x = skipped ? 1.0 : 0.0;
+        long n = skipCount.incrementAndGet();
+        if (n == 1) {
+            skipMeanBits.set(Double.doubleToRawLongBits(x));
+            return;
+        }
+        double a = Math.max(1.0 / n, ALPHA);
+        skipMeanBits.getAndUpdate(prevBits -> {
+            double prev = Double.longBitsToDouble(prevBits);
+            if (Double.isNaN(prev)) return Double.doubleToRawLongBits(x);
+            double next = prev + a * (x - prev);
+            return Double.doubleToRawLongBits(next);
+        });
+    }
+
+    private double skipMean() {
+        return Double.longBitsToDouble(skipMeanBits.get());
     }
 
     /**
@@ -242,22 +281,42 @@ public final class ProbeFirstGovernor {
      * up to {@link #TRIAL_RUN} candidates of one bin within {@link #TRIAL_WINDOW} decisions, so trial
      * probes can share a drain as default probes would while the long-run probe share stays the same.
      */
-    private boolean trialProbe(long bin, double share) {
-        trialCredit = Math.min(trialCredit + share, 1.0);
-        if (trialLeft > 0 && decisions > trialUntil) trialLeft = 0;
-        if (trialLeft > 0 && bin != NO_BIN && bin == trialBin) {
-            trialLeft--;
-            trialCredit -= 1.0;
-            return true;
+    private boolean trialProbe(long bin, double share, long currentDecisions) {
+        while (true) {
+            TrialState cur = trialState.get();
+            double credit = Math.min(cur.credit() + share, 1.0);
+            int left = cur.left();
+            long trialBin = cur.bin();
+            long until = cur.until();
+
+            if (left > 0 && currentDecisions > until) {
+                left = 0;
+            }
+            if (left > 0 && bin != NO_BIN && bin == trialBin) {
+                left--;
+                credit -= 1.0;
+                TrialState next = new TrialState(credit, trialBin, left, until);
+                if (trialState.compareAndSet(cur, next)) {
+                    return true;
+                }
+                continue;
+            }
+            if (credit >= 1.0) {
+                credit -= 1.0;
+                trialBin = bin;
+                left = (bin == NO_BIN) ? 0 : TRIAL_RUN - 1;
+                until = currentDecisions + TRIAL_WINDOW;
+                TrialState next = new TrialState(credit, trialBin, left, until);
+                if (trialState.compareAndSet(cur, next)) {
+                    return true;
+                }
+                continue;
+            }
+            TrialState next = new TrialState(credit, trialBin, left, until);
+            if (trialState.compareAndSet(cur, next)) {
+                return false;
+            }
         }
-        if (trialCredit >= 1.0) {
-            trialCredit -= 1.0;
-            trialBin = bin;
-            trialLeft = (bin == NO_BIN) ? 0 : TRIAL_RUN - 1;
-            trialUntil = decisions + TRIAL_WINDOW;
-            return true;
-        }
-        return false;
     }
 
     /** One finished, uncoalesced probe: wall time from dispatch to verdict, and whether it rejected. */
@@ -273,12 +332,16 @@ public final class ProbeFirstGovernor {
         if (nanos < 0L) return;
         double invG = 1.0 / Math.max(1, groupSize);
         String log;
-        synchronized (this) {
+        updateLock.lock();
+        try {
             probe.add(nanos);
+            probeSamples.set(probe.n);
             probeFit.add(invG, nanos);
-            if (mode == Mode.PROBE) defaultInvG.add(invG);
+            if (decisionState.mode() == Mode.PROBE) defaultInvG.add(invG);
             reject.add(rejected ? 1.0 : 0.0);
             log = evaluate();
+        } finally {
+            updateLock.unlock();
         }
         if (log != null) RTP.log(Level.INFO, log);
     }
@@ -287,21 +350,33 @@ public final class ProbeFirstGovernor {
     public void recordLoad(boolean afterProbe, long nanos) {
         if (nanos < 0L) return;
         String log;
-        synchronized (this) {
+        updateLock.lock();
+        try {
             (afterProbe ? loadAfterProbe : loadDirect).add(nanos);
+            if (!afterProbe) {
+                directSamples.set(loadDirect.n);
+            }
             log = evaluate();
+        } finally {
+            updateLock.unlock();
         }
         if (log != null) RTP.log(Level.INFO, log);
     }
 
-    public synchronized Mode mode() {
-        return mode;
+    public Mode mode() {
+        return decisionState.mode();
     }
 
-    public synchronized ProbeGovernorRow snapshot() {
-        return new ProbeGovernorRow(region, path.label, mode.name(), !warm(),
-                reject.mean, ms(probeAtDefault()), ms(loadAfterProbe.mean), ms(loadDirect.mean),
-                ms(costProbe), ms(costDirect), z, skip.mean, flips, probe.n, loadDirect.n);
+    public ProbeGovernorRow snapshot() {
+        updateLock.lock();
+        try {
+            DecisionState state = this.decisionState;
+            return new ProbeGovernorRow(region, path.label, state.mode().name(), !warm(),
+                    reject.mean, ms(probeAtDefault()), ms(loadAfterProbe.mean), ms(loadDirect.mean),
+                    ms(costProbe), ms(costDirect), state.z(), skipMean(), flips, probe.n, loadDirect.n);
+        } finally {
+            updateLock.unlock();
+        }
     }
 
     private boolean warm() {
@@ -314,26 +389,36 @@ public final class ProbeFirstGovernor {
     }
 
     /** Fitted per-chunk probe cost at the default-probing group size. */
-    synchronized double probeAtDefault() {
-        return (probeFit.n == 0) ? Double.NaN : probeFit.at(invGAtDefault());
+    double probeAtDefault() {
+        updateLock.lock();
+        try {
+            return (probeFit.n == 0) ? Double.NaN : probeFit.at(invGAtDefault());
+        } finally {
+            updateLock.unlock();
+        }
     }
 
     /** Group size the probe arm is judged at ({@code 1 / E[1/g]}). */
-    synchronized double groupSizeAtDefault() {
-        double x = invGAtDefault();
-        return (Double.isNaN(x) || x <= 0.0) ? Double.NaN : 1.0 / x;
+    double groupSizeAtDefault() {
+        updateLock.lock();
+        try {
+            double x = invGAtDefault();
+            return (Double.isNaN(x) || x <= 0.0) ? Double.NaN : 1.0 / x;
+        } finally {
+            updateLock.unlock();
+        }
     }
 
     /** Losing-arm share: ~1/(1+|z|), within [MIN_EXPLORE, MAX_EXPLORE]. */
-    private double exploreShare() {
-        double az = Double.isNaN(z) ? 0.0 : Math.abs(z);
+    static double computeExploreShare(double zScore) {
+        double az = Double.isNaN(zScore) ? 0.0 : Math.abs(zScore);
         return Math.max(MIN_EXPLORE, Math.min(MAX_EXPLORE, 1.0 / (1.0 + az)));
     }
 
     /** Deterministic stride: true on every round(1/share)-th decision. */
-    private boolean every(double share) {
+    private static boolean every(long d, double share) {
         long stride = Math.max(1L, Math.round(1.0 / share));
-        return decisions % stride == 0L;
+        return d % stride == 0L;
     }
 
     /** Recompute costs; flip on a significant gap. Returns a log line to emit, or null. */
@@ -365,11 +450,12 @@ public final class ProbeFirstGovernor {
             flips++;
             sinceFlip = 0;
             beyond = 0;
-            trialCredit = 0.0;
-            trialLeft = 0;
+            trialState.set(TrialState.INITIAL);
             lastSummary = clock.getAsLong();
+            this.decisionState = new DecisionState(next, z, computeExploreShare(z));
             return "[RTP][probe-gov] " + region + "/" + path.label + " flip " + prev + "->" + next + " " + describe();
         }
+        this.decisionState = new DecisionState(mode, z, computeExploreShare(z));
         return summaryIfDue();
     }
 
@@ -386,7 +472,7 @@ public final class ProbeFirstGovernor {
                         + " cost probe=%.3fms direct=%.3fms z=%.2f skip=%.3f n(probe/direct)=%d/%d flips=%d",
                 mode, warm() ? "" : "(warmup)", reject.mean, ms(probeAtDefault()), ms(probe.mean),
                 groupSizeAtDefault(), ms(probeFit.slope()), ms(loadAfterProbe.mean),
-                ms(loadDirect.mean), ms(costProbe), ms(costDirect), z, skip.mean, probe.n, loadDirect.n, flips);
+                ms(loadDirect.mean), ms(costProbe), ms(costDirect), z, skipMean(), probe.n, loadDirect.n, flips);
     }
 
     private static double ms(double nanos) {

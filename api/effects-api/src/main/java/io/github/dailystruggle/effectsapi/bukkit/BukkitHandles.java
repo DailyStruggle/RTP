@@ -130,6 +130,52 @@ public final class BukkitHandles implements HandleProvider {
         };
     }
 
+    private static final int MAX_ENTITY_REDISPATCH = 5;
+
+    /**
+     * {@code true} when the current thread may mutate {@code entity}: always off Folia, and on Folia
+     * only when the thread owns the entity's region. Fails open when the probe is unavailable.
+     */
+    public static boolean ownedByCurrentRegion(Entity entity) {
+        if (!isFolia()) return true;
+        try {
+            return (boolean) org.bukkit.Bukkit.class
+                    .getMethod("isOwnedByCurrentRegion", Entity.class).invoke(null, entity);
+        } catch (Throwable t) {
+            return true;
+        }
+    }
+
+    /**
+     * Runs {@code task} on the region thread that owns {@code player}. Executes inline when the current
+     * thread already owns it; otherwise re-dispatches through the entity scheduler (a bounded number of
+     * times, since a player mid-teleport can briefly belong to no ticking region). The task is dropped
+     * when the entity is retired or never becomes owned.
+     */
+    public static void runOnOwningRegion(Player player, Runnable task) {
+        runOnOwningRegion(player, task, MAX_ENTITY_REDISPATCH);
+    }
+
+    private static void runOnOwningRegion(Player player, Runnable task, int attemptsLeft) {
+        if (ownedByCurrentRegion(player)) {
+            task.run();
+            return;
+        }
+        if (attemptsLeft <= 0) return;
+        try {
+            org.bukkit.plugin.Plugin caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();
+            Object entityScheduler = player.getClass().getMethod("getScheduler").invoke(player);
+            entityScheduler.getClass()
+                    .getMethod("runDelayed", org.bukkit.plugin.Plugin.class, java.util.function.Consumer.class,
+                            Runnable.class, long.class)
+                    .invoke(entityScheduler, caller,
+                            (java.util.function.Consumer<Object>) t -> runOnOwningRegion(player, task, attemptsLeft - 1),
+                            null, 1L);
+        } catch (Throwable ignored) {
+            // scheduler unavailable or plugin disabled: dropping a cosmetic effect beats an off-thread mutation
+        }
+    }
+
     /**
      * Runs a delayed task across Bukkit or Folia schedulers.
      */
@@ -248,9 +294,11 @@ public final class BukkitHandles implements HandleProvider {
 
         @Override
         public void applyPotionEffect(Object type, int duration, int amplifier, boolean ambient, boolean particles, boolean icon) {
-            if (player.isValid() && !player.isDead()) {
-                player.addPotionEffect(new org.bukkit.potion.PotionEffect((org.bukkit.potion.PotionEffectType) type, duration, amplifier, ambient, particles, icon));
-            }
+            runOnOwningRegion(player, () -> {
+                if (player.isValid() && !player.isDead()) {
+                    player.addPotionEffect(new org.bukkit.potion.PotionEffect((org.bukkit.potion.PotionEffectType) type, duration, amplifier, ambient, particles, icon));
+                }
+            });
         }
 
         @Override

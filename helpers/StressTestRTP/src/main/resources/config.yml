@@ -350,6 +350,19 @@ sample-period-ms: 50
 # @default: 250
 region-tps-sample-period-ms: 250
 
+# Read-only gauge of the RTP Folia scheduler's regional in-flight cap
+# (getInFlightRegionalTasks / getMaxRegionalInflight / getInteractiveQueueSize,
+# read by reflection). Active only while a run is going and RTP is loaded on Folia;
+# writes one row per second to <output-subdir>/scheduler-gauge.csv.
+scheduler-gauge:
+  # @type: boolean
+  # @default: true
+  enabled: true
+  # Also print one console line per second while a run is active.
+  # @type: boolean
+  # @default: true
+  log: true
+
 # Polling interval for the runner async dispatch loop.
 # @type: integer
 # @range: [1, null]

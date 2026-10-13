@@ -20,15 +20,22 @@ public final class RampWriter {
                     + "busy_rejections,harness_shed,achieved_tps,achieved_fraction,fail_fraction,"
                     + "latency_p50_ms,latency_p95_ms,latency_p99_ms,mspt_p50,mspt_p95,mspt_samples,"
                     + "tps_min,heap_peak_mb,roster_size,peak_in_flight,aborted,complete,verdict,fail_criteria,"
-                    + "start_epoch_ms,end_epoch_ms";
+                    + "start_epoch_ms,end_epoch_ms,"
+                    + "repeating_scheduled,repeating_cancelled,repeating_live_start,repeating_live_end,"
+                    + "repeating_cancel_failures";
 
     /** Per-stage values not carried by {@link RampEvaluator.StageResult}. -1 = NOT MEASURED.
      *  {@code complete} false = cut short by an operator stop; such a row is
-     *  kept for the record but never feeds the stress point. */
+     *  kept for the record but never feeds the stress point.
+     *  {@code repeating*}: per-player repeating tasks ({@link Sched.Kind#PLAYER}) scheduled / cancelled during
+     *  the stage, live count when the stage began (after the settle gap; ~0 expected) and ended, and cancel()
+     *  failures during the stage. */
     public record Extras(long latencyP50Ms, long latencyP95Ms, long latencyP99Ms,
                          double msptP50, int msptSamples, double tpsMin, long heapPeakMb,
                          int rosterSize, int peakInFlight, boolean complete,
-                         long startEpochMs, long endEpochMs) {}
+                         long startEpochMs, long endEpochMs,
+                         long repeatingScheduled, long repeatingCancelled, long repeatingLiveStart,
+                         long repeatingLiveEnd, long repeatingCancelFailures) {}
 
     private final Path csvPath;
     private final Path summaryPath;
@@ -79,7 +86,12 @@ public final class RampWriter {
                 !x.complete() ? "PARTIAL" : (e.passed() ? "PASS" : "FAIL"),
                 e.criteriaString(),
                 Long.toString(x.startEpochMs()),
-                Long.toString(x.endEpochMs()));
+                Long.toString(x.endEpochMs()),
+                Long.toString(x.repeatingScheduled()),
+                Long.toString(x.repeatingCancelled()),
+                Long.toString(x.repeatingLiveStart()),
+                Long.toString(x.repeatingLiveEnd()),
+                Long.toString(x.repeatingCancelFailures()));
     }
 
     /** Appends and closes; the row is durable when this returns. */

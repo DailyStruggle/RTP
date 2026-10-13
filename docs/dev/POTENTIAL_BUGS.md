@@ -153,4 +153,14 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** Lingering encoding anomalies in Gradle files; reduced coverage of mojibake detection across Gradle build definitions in the repository.
 - **Suggested next step:** Replace the corrupted em dash sequences with clean em dashes or ASCII hyphens in `platforms/rtp-neoforge/rtp-neoforge-common/build.gradle`. Update `scripts/check-mojibake.py` to match directory components (`/build/` or Path parts) rather than simple substring matching.
 
+### 2026-10-12 - FoliaSchedulerImpl.runTask regional cap is check-then-increment and re-queues at a fixed 50 ms
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** StressTestRTP Sched.cancel leak investigation (read-only scheduler review)
+- **Location:** `platforms/rtp-folia/rtp-folia-common/src/main/java/io/github/dailystruggle/rtp/folia/scheduling/FoliaSchedulerImpl.java` lines 251-256 (`runTask(RTPWorld, int, int, Runnable)`)
+- **Symptom / hypothesis:** The background regional path reads `inFlightRegionalTasks.get() >= maxRegionalInflight` and then calls `incrementAndGet()` as two separate steps, so concurrent callers can overshoot `maxRegionalInflight` (`availableProcessors() / 2`) by the number of racing threads. When the cap is reached the task is re-queued with a fixed 50 ms `runDelayed` and no backoff or jitter, so a saturated cap adds up to 50 ms per deferred task and every retry repeats the ownership check.
+- **Impact:** Soft cap is not exact under load; above the cap, deferred background regional work gains a 50 ms quantised delay that can flatten achieved TP/s near `maxRegionalInflight / service time`.
+- **Suggested next step:** Use a CAS loop (as `pumpQueue` does) for the permit, and consider routing deferred entries through `interactiveQueue`/`pumpQueue` instead of a timed re-queue. Confirm first with the cap-saturation counters from a >= 96-bot ramp at 200-320 TP/s.
+
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->
