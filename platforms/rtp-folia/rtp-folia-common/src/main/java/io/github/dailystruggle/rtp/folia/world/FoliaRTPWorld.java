@@ -24,6 +24,7 @@ import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Biome;
 import org.jetbrains.annotations.NotNull;
+import io.github.dailystruggle.rtp.folia.thread.AnyThread;
 import io.github.dailystruggle.rtp.folia.thread.RegionThread;
 import io.github.dailystruggle.rtp.folia.thread.GlobalRegionThread;
 
@@ -676,22 +677,87 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
     }
   }
 
+  /**
+   * In-flight ticket adds deferred behind an async preload, keyed by packed chunk key. A release
+   * removes the entry, so the deferred add sees its token gone and skips (S-002). Holds only
+   * pending adds; entries are removed when the add applies, fails, or is cancelled.
+   */
+  private final ConcurrentHashMap<Long, Object> deferredTicketAdds = new ConcurrentHashMap<>();
+
+  /**
+   * Ticket adds always preload via {@code getChunkAtAsync} first: {@code addPluginChunkTicket}
+   * on an absent chunk loads it synchronously on the region thread (S-005). The ticket is then
+   * applied on the owning region, never the global region. A failed or null preload adds no
+   * ticket and fails the future (ChunkReservation.awaitReady reports not-ready). The returned
+   * future completes only after the native call ran (ADR-015).
+   */
   @Override
-  @GlobalRegionThread
-  protected java.util.concurrent.CompletableFuture<Void> setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
+  @AnyThread
+  protected CompletableFuture<Void> setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
     org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
     if (plugin == null || !plugin.isEnabled()) {
-      return java.util.concurrent.CompletableFuture.completedFuture(null);
+      return CompletableFuture.completedFuture(null);
     }
-    // ADR-015 Paper chunk-system-v2 follow-up (ticket-application race):
-    // on Folia the ticket application runs on the Global Region Scheduler;
-    // the returned future completes inside that scheduled task so off-thread
-    // callers (e.g. LocationGenerator on an async scheduler thread) can
-    // await the actual application before relying on the chunk being pinned.
-    java.util.concurrent.CompletableFuture<Void> future = new java.util.concurrent.CompletableFuture<>();
-    RTP.serverAccessor.getScheduler().runTask(() -> {
+    final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
+    if (!forceLoad) {
+      deferredTicketAdds.remove(key);
+      return applyTicketOnOwner(plugin, cx, cz, false, null);
+    }
+    final Object token = new Object();
+    deferredTicketAdds.put(key, token);
+    CompletableFuture<Chunk> load;
+    try {
+      load = world.getChunkAtAsync(cx, cz, true);
+    } catch (Throwable t) {
+      load = CompletableFuture.failedFuture(t);
+    }
+    if (load == null) {
+      load = CompletableFuture.completedFuture(null);
+    }
+    return load.<Throwable>handle((chunk, ex) -> {
+      if (ex != null) return ex;
+      return chunk == null ? new IllegalStateException("getChunkAtAsync returned null") : null;
+    }).thenCompose(failure -> {
+      if (failure == null) {
+        return applyTicketOnOwner(plugin, cx, cz, true, token);
+      }
+      if (!deferredTicketAdds.remove(key, token)) {
+        return CompletableFuture.completedFuture(null); // released or superseded meanwhile
+      }
+      RTP.log(java.util.logging.Level.WARNING,
+          "[RTP] Folia async pre-load before chunk ticket failed for world=" + name + " chunk=("
+              + cx + "," + cz + "): " + failure.getClass().getSimpleName() + ": "
+              + failure.getMessage() + " - ticket not applied");
+      return CompletableFuture.failedFuture(failure);
+    });
+  }
+
+  /**
+   * Apply or drop the plugin chunk ticket on the region owning {@code (cx, cz)}; runs inline
+   * when the caller already owns it.
+   *
+   * @param deferredToken non-null for a deferred add; the add is skipped unless the token is
+   *     still registered, so a release that ran first cannot leave an orphaned ticket (S-002)
+   */
+  @AnyThread
+  private CompletableFuture<Void> applyTicketOnOwner(
+      org.bukkit.plugin.Plugin plugin, int cx, int cz, boolean forceLoad, Object deferredToken) {
+    final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
+    io.github.dailystruggle.rtp.api.scheduling.RTPScheduler scheduler =
+        RTP.serverAccessor == null ? null : RTP.serverAccessor.getScheduler();
+    if (scheduler == null || !plugin.isEnabled()) {
+      // Shutdown: the scheduler would drop the task and the future would never complete.
+      if (deferredToken != null) deferredTicketAdds.remove(key, deferredToken);
+      return CompletableFuture.completedFuture(null);
+    }
+    CompletableFuture<Void> future = new CompletableFuture<>();
+    scheduler.runTask(this, cx, cz, () -> {
       try {
         if (forceLoad) {
+          if (deferredToken != null && !deferredTicketAdds.remove(key, deferredToken)) {
+            future.complete(null);
+            return;
+          }
           if (!world.getPluginChunkTickets(cx, cz).contains(plugin)) {
             world.addPluginChunkTicket(cx, cz, plugin);
           }
@@ -699,11 +765,9 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
           world.removePluginChunkTicket(cx, cz, plugin);
         }
         future.complete(null);
-      } catch (Exception e) {
-        // Silently catch exceptions from lingering async tasks attempting to fire after shutdown.
-        // Complete the future exceptionally so callers attributing via awaitReady() can
-        // treat this as a ticket-apply failure rather than hang indefinitely.
-        future.completeExceptionally(e);
+      } catch (Throwable t) {
+        // Late task after shutdown or region failure: fail rather than hang awaitReady().
+        future.completeExceptionally(t);
       }
     });
     return future;
@@ -758,11 +822,36 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
 
+  /**
+   * Loads via {@code getChunkAtAsync}; {@code getChunkAt} would sync-load/generate on the
+   * region thread (S-005). Cache entry and ticket are applied only after a non-null load;
+   * {@link #chunkCache} is concurrent, and the ticket add hops to the owning region itself.
+   * A failed or null load is logged (S-004) and neither cached nor ticketed.
+   */
   @Override
-  @RegionThread
+  @AnyThread
   public void keepChunkAt(int cx, int cz) {
-    RTP.scheduler.runTask(this, cx, cz, () -> {
-      chunkCache.put(((long) cx & 0xffffffffL | ((long) cz << 32)), new WeakReference<>(world.getChunkAt(cx, cz)));
+    final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
+    CompletableFuture<Chunk> load;
+    try {
+      load = world.getChunkAtAsync(cx, cz, true);
+    } catch (Throwable t) {
+      load = CompletableFuture.failedFuture(t);
+    }
+    if (load == null) {
+      load = CompletableFuture.completedFuture(null);
+    }
+    load.whenComplete((chunk, ex) -> {
+      if (ex != null || chunk == null) {
+        RTP.log(java.util.logging.Level.WARNING,
+            "[RTP] Folia async load for keepChunkAt failed for world=" + name + " chunk=("
+                + cx + "," + cz + "): "
+                + (ex != null ? ex.getClass().getSimpleName() + ": " + ex.getMessage()
+                    : "getChunkAtAsync returned null")
+                + " - chunk not kept");
+        return;
+      }
+      chunkCache.put(key, new WeakReference<>(chunk));
       setForceLoaded(cx, cz, true);
     });
   }

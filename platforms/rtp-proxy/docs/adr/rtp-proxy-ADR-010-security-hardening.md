@@ -15,6 +15,7 @@
   - `redis`, `sql` and `proxy-direct` shall refuse to start without a decodable secret of at least 32 bytes; there is no in-memory fallback. `proxy-direct` (rtp-proxy-ADR-017) binds loopback by default, supports `allowedClients`, TLS and mTLS under `transport.direct`, and caps accepted sockets. Redis supports TLS (`tls: true` or `rediss://`), an ACL `username` and `passwordEnv`; RESP replies are line-, depth- and element-capped.
   - Mixed old/new builds cannot share a store; all hosts upgrade together.
   - Open gap: the plugin-message path stamps liveness with the receiver's clock and does not yet enforce the *Replay Resistance* heartbeat window below (tracked in `docs/dev/POTENTIAL_BUGS.md`).
+- **2026-10-13** - `proxy-direct` replay and freshness (wire v2, rtp-proxy-ADR-017): every request MAC covers its opcode, `sentAtMs` and a random nonce, and every response is signed against its request. After the MAC verifies, the listener shall reject a request whose `sentAtMs` is more than 30 s from its own clock, or whose nonce it has already accepted within twice that window; a full nonce cache rejects (fail closed). Each rejection logs a WARNING (S-004). Proxy and backends need synchronised clocks and upgrade together.
 
 ## Context
 

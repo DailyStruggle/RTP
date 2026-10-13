@@ -232,6 +232,56 @@ class EditorSecurityHardeningTest {
         assertTrue(sizeEx.getMessage().contains("Payload too large"), sizeEx.getMessage());
     }
 
+    private static void createLinkOrSkip(Path link, Path target) {
+        try {
+            Files.createSymbolicLink(link, target);
+        } catch (IOException | UnsupportedOperationException | SecurityException e) {
+            Assumptions.abort("symlinks unavailable here: " + e);
+        }
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-S-004: a linked <name>.yml.tmp is refused visibly; the outside file is untouched")
+    void tmpSymlinkRefused() throws IOException {
+        Path outside = Files.writeString(tempDir.resolve("outside-tmp.txt"), "keep\n", StandardCharsets.UTF_8);
+        Path target = Files.writeString(pluginDir.resolve("linked.yml"), "a: 1\n", StandardCharsets.UTF_8);
+        createLinkOrSkip(pluginDir.resolve("linked.yml.tmp"), outside);
+        EditorSessionManager m = EditorSessionManager.getInstance();
+        CompletionException e = assertThrows(CompletionException.class,
+                () -> m.applyPayload(m.createPayloadJson(Map.of("linked.yml", "a: 1\n"))).join());
+        assertTrue(e.getCause().getMessage().contains("outside the plugin folder"), e.getCause().getMessage());
+        assertEquals("keep\n", Files.readString(outside, StandardCharsets.UTF_8));
+        assertFalse(Files.isSymbolicLink(target));
+        assertEquals("a: 1\n", Files.readString(target, StandardCharsets.UTF_8));
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-S-004: a linked <name>.yml.bak is refused visibly for a dirty target; the outside file is untouched")
+    void bakSymlinkRefused() throws IOException {
+        Path outside = Files.writeString(tempDir.resolve("outside-bak.txt"), "keep\n", StandardCharsets.UTF_8);
+        Path target = Files.writeString(pluginDir.resolve("dirty.yml"), "a: 1\n", StandardCharsets.UTF_8);
+        createLinkOrSkip(pluginDir.resolve("dirty.yml.bak"), outside);
+        EditorSessionManager m = EditorSessionManager.getInstance();
+        CompletionException e = assertThrows(CompletionException.class,
+                () -> m.applyPayload(m.createPayloadJson(Map.of("dirty.yml", "a: 2\n"))).join());
+        assertTrue(e.getCause().getMessage().contains("outside the plugin folder"), e.getCause().getMessage());
+        assertEquals("keep\n", Files.readString(outside, StandardCharsets.UTF_8));
+        assertEquals("a: 1\n", Files.readString(target, StandardCharsets.UTF_8), "nothing written after a refused backup");
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-S-004: stale regular <name>.yml.tmp / .bak files are replaced, not reused")
+    void staleTmpAndBakReplaced() throws IOException {
+        Path target = Files.writeString(pluginDir.resolve("stale.yml"), "a: 1\n", StandardCharsets.UTF_8);
+        Path tmp = Files.writeString(pluginDir.resolve("stale.yml.tmp"), "junk from a crashed apply\n", StandardCharsets.UTF_8);
+        Path bak = Files.writeString(pluginDir.resolve("stale.yml.bak"), "old backup\n", StandardCharsets.UTF_8);
+        EditorSessionManager m = EditorSessionManager.getInstance();
+        m.applyPayload(m.createPayloadJson(Map.of("stale.yml", "a: 2\n"))).join();
+        assertEquals("a: 2\n", Files.readString(target, StandardCharsets.UTF_8));
+        assertEquals("a: 1\n", Files.readString(bak, StandardCharsets.UTF_8));
+        assertFalse(Files.exists(tmp), "temp file moved into place");
+    }
+
     private static EditorHttpTransport remote(String body) {
         return new EditorHttpTransport(HttpClient.newHttpClient(), "https://bytebin.invalid", "https://editor.invalid") {
             @Override

@@ -453,6 +453,8 @@ public interface RTPCmd extends BaseRTPCmd {
         // S-004: the refusal is never silent.
         RTP.log(Level.WARNING, "[RTP] PvP gate refused /rtp for " + senderId
                 + " (action=" + pvpAction + ", in combat)");
+        // Terminal refuse: release the lock the outer onCommand acquired.
+        RTP.getInstance().processingPlayers.remove(senderId);
         return true;
       } else if (io.github.dailystruggle.rtp.common.pvp.PvPGate.isEnabled()
               && io.github.dailystruggle.rtp.common.pvp.PvPGate.isInCombat(senderId)) {
@@ -560,6 +562,9 @@ public interface RTPCmd extends BaseRTPCmd {
       }
     }
 
+    // The sender's processingPlayers entry is owned by a pipeline only when one is
+    // submitted for the sender themself; every other exit releases it (S-004).
+    boolean senderDispatched = false;
     for (int i = 0; i < players.size(); i++) {
       RTPPlayer player = players.get(i);
 
@@ -952,6 +957,7 @@ public interface RTPCmd extends BaseRTPCmd {
         syncLoading = biomes == null && region.hasLocation(player.uuid()) && delay <= 0;
       }
 
+      if (player.uuid().equals(senderId)) senderDispatched = true;
       if (syncLoading) {
         RTP.log(Level.FINER, "[RTP][trace] RTPCmd.compute SUBMIT pipelineTask SYNC playerId=" + player.uuid());
         region.inFlightCalculations.incrementAndGet();
@@ -963,6 +969,9 @@ public interface RTPCmd extends BaseRTPCmd {
       }
     }
 
+    if (!senderDispatched && !senderId.equals(CommandsAPI.serverId)) {
+      RTP.getInstance().processingPlayers.remove(senderId);
+    }
     return true;
   }
 

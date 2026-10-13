@@ -494,6 +494,23 @@ reproducible by readers".
   valid between servers whose world files match; the design must say how that is detected and how
   concurrent writes merge. Requires a D-005 proposal and an ADR before implementation. Until it
   ships, the front page shall not describe spatial memory as shareable.
+- [ ] **Coverage-guided behaviour fuzzing (planned, on hold).** Direction settled in
+  [ADR-111](../adr/ADR-111-live-server-behaviour-fuzzing.md) (Accepted); details and test criteria
+  in [`BEHAVIOUR_FUZZING_PLAN.md`](BEHAVIOUR_FUZZING_PLAN.md). The finding oracles (stable
+  signatures, control subtraction, replay k of n, shrink, FAIL on a reproduced target finding)
+  ship in `scripts/bench_fuzz.py`. Remaining work, in order:
+  - [ ] JaCoCo coverage feedback from the bench server via `/rtpstress coverage <label>` (probe
+    JSON, Python stays stdlib-only), with probes reached reported on every PASS.
+  - [ ] Fast fault mode: one repetition, no leak checkpoints, leak oracle only on episodes with new
+    coverage or a new signature.
+  - [ ] New oracles: silently dropped teleport (S-004), unsafe landing (S-001), chunk-ticket growth
+    (S-002), tick-time excess over the control, thread and task growth.
+  - [ ] Larger bot action vocabulary: `plugin.yml` and tab-completion commands and arguments, GUI
+    clicks, chat.
+  - **Hold condition:** none of the above starts until the shipped finding oracles have been through
+    extended real-server runs and the results (findings, false positives, run cost) are recorded in
+    [`LEAK_FUZZING.md`](../../helpers/StressTestRTP/LEAK_FUZZING.md). Each item then needs its own
+    D-005 proposal.
 
 ---
 

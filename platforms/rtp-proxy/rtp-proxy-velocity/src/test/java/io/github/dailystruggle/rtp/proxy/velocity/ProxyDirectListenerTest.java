@@ -10,6 +10,8 @@ import io.github.dailystruggle.rtp.proxy.common.transport.codec.BackendHeartbeat
 import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectAllowlist;
 import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectTlsConfig;
 import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWire;
+import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWire.Direction;
+import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWire.WireContext;
 import io.github.dailystruggle.rtp.proxy.common.transport.memory.InMemoryNetworkRequestQueue;
 import io.github.dailystruggle.rtp.proxy.common.transport.memory.InMemoryNetworkStateBinding;
 import org.junit.jupiter.api.DisplayName;
@@ -17,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
@@ -29,6 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.LongSupplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -81,13 +86,13 @@ class ProxyDirectListenerTest {
                 s.connect(new InetSocketAddress("127.0.0.1", port), 1000);
                 s.setSoTimeout(5000);
                 DataOutputStream out = new DataOutputStream(s.getOutputStream());
-                ProxyDirectWire.writeOpcode(out, ProxyDirectWire.OP_HEARTBEAT);
-                ProxyDirectWire.writeSignedPayload(out,
+                WireContext ctx = ProxyDirectWire.writeRequestHeader(out, ProxyDirectWire.OP_HEARTBEAT);
+                ProxyDirectWire.writeSignedPayload(out, ctx, Direction.REQUEST,
                         BackendHeartbeatCodec.encode(hb("backend-x", List.of("default", "arena"))),
                         V, 1);
                 out.flush();
                 DataInputStream in = new DataInputStream(s.getInputStream());
-                reply = ProxyDirectWire.readList(in, V);
+                reply = ProxyDirectWire.readList(in, ctx, Direction.RESPONSE, V);
             }
             assertEquals(1, reply.size(), "snapshot reply must carry the just-pushed row");
             BackendHeartbeat got = BackendHeartbeatCodec.decode(reply.get(0));
@@ -156,11 +161,11 @@ class ProxyDirectListenerTest {
             // read into a spurious SocketTimeoutException.
             s.setSoTimeout(5000);
             DataOutputStream out = new DataOutputStream(s.getOutputStream());
-            ProxyDirectWire.writeOpcode(out, op);
-            ProxyDirectWire.writeSignedPayload(out, request, V, 1);
+            WireContext ctx = ProxyDirectWire.writeRequestHeader(out, op);
+            ProxyDirectWire.writeSignedPayload(out, ctx, Direction.REQUEST, request, V, 1);
             out.flush();
             DataInputStream in = new DataInputStream(s.getInputStream());
-            return ProxyDirectWire.readSignedPayload(in, V);
+            return ProxyDirectWire.readSignedPayload(in, ctx, Direction.RESPONSE, V);
         }
     }
 
@@ -170,10 +175,126 @@ class ProxyDirectListenerTest {
             // Read timeout must exceed the listener's RPC_AWAIT_MS (2000ms); see rpcSingle.
             s.setSoTimeout(5000);
             DataOutputStream out = new DataOutputStream(s.getOutputStream());
-            ProxyDirectWire.writeOpcode(out, op);
-            ProxyDirectWire.writeList(out, requests, V, 1);
+            WireContext ctx = ProxyDirectWire.writeRequestHeader(out, op);
+            ProxyDirectWire.writeList(out, ctx, Direction.REQUEST, requests, V, 1);
             DataInputStream in = new DataInputStream(s.getInputStream());
-            return ProxyDirectWire.readSignedPayload(in, V);
+            return ProxyDirectWire.readSignedPayload(in, ctx, Direction.RESPONSE, V);
+        }
+    }
+
+    /** Heartbeat-only listener on an injected clock that counts accepted pushes. */
+    private static ProxyDirectListener countingListener(AtomicInteger pushes, LongSupplier clock) {
+        return new ProxyDirectListener("127.0.0.1", 0, V, 1,
+                payload -> pushes.incrementAndGet(), () -> List.of("row-a"), null, null,
+                null, null, LoggerFactory.getLogger("test"), clock);
+    }
+
+    /** Sends raw request bytes; returns the first reply byte, or -1 when closed unanswered. */
+    private static int sendRaw(int port, byte[] request) throws Exception {
+        try (Socket s = new Socket()) {
+            s.connect(new InetSocketAddress("127.0.0.1", port), 1000);
+            s.setSoTimeout(5000);
+            s.getOutputStream().write(request);
+            s.getOutputStream().flush();
+            try {
+                return s.getInputStream().read();
+            } catch (IOException reset) {
+                return -1;
+            }
+        }
+    }
+
+    /** A complete signed heartbeat request stamped by {@code sender}. */
+    private static byte[] heartbeatRequest(LongSupplier sender) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(baos);
+        WireContext ctx = ProxyDirectWire.writeRequestHeader(out, ProxyDirectWire.OP_HEARTBEAT, sender);
+        ProxyDirectWire.writeSignedPayload(out, ctx, Direction.REQUEST, "hb", V, 1);
+        out.flush();
+        return baos.toByteArray();
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-PROXY-007: unknown opcode is closed unanswered and never handled as a heartbeat")
+    void unknownOpcodeRejected() throws Exception {
+        AtomicInteger pushes = new AtomicInteger();
+        ProxyDirectListener listener = countingListener(pushes, System::currentTimeMillis);
+        listener.start();
+        try {
+            byte unknown = 0x2A;
+            WireContext ctx = new WireContext(unknown, System.currentTimeMillis(), "0123456789abcdef");
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            DataOutputStream out = new DataOutputStream(baos);
+            out.writeByte(unknown);
+            out.writeByte(ProxyDirectWire.FRAME_VERSION);
+            out.writeLong(ctx.sentAtMs());
+            out.writeUTF(ctx.nonce());
+            ProxyDirectWire.writeSignedPayload(out, ctx, Direction.REQUEST, "hb", V, 1);
+            assertEquals(-1, sendRaw(listener.boundPort(), baos.toByteArray()));
+            assertEquals(0, pushes.get(), "unknown opcode must not reach the heartbeat handler");
+
+            // A well-formed heartbeat still works.
+            assertTrue(sendRaw(listener.boundPort(), heartbeatRequest(System::currentTimeMillis)) >= 0);
+            assertEquals(1, pushes.get());
+        } finally {
+            listener.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-PROXY-007: a v1 frame is closed unanswered")
+    void v1FrameRejected() throws Exception {
+        AtomicInteger pushes = new AtomicInteger();
+        ProxyDirectListener listener = countingListener(pushes, System::currentTimeMillis);
+        listener.start();
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            DataOutputStream out = new DataOutputStream(baos);
+            out.writeByte(ProxyDirectWire.OP_HEARTBEAT);
+            out.writeInt(1);
+            out.writeUTF(V.sign(1, "hb"));
+            out.writeUTF("hb");
+            assertEquals(-1, sendRaw(listener.boundPort(), baos.toByteArray()));
+            assertEquals(0, pushes.get());
+        } finally {
+            listener.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-PROXY-007: a replayed request nonce is rejected after the first use")
+    void replayedNonceRejected() throws Exception {
+        AtomicInteger pushes = new AtomicInteger();
+        ProxyDirectListener listener = countingListener(pushes, System::currentTimeMillis);
+        listener.start();
+        try {
+            byte[] request = heartbeatRequest(System::currentTimeMillis);
+            assertTrue(sendRaw(listener.boundPort(), request) >= 0, "first use must be answered");
+            assertEquals(1, pushes.get());
+            assertEquals(-1, sendRaw(listener.boundPort(), request), "replay must be closed unanswered");
+            assertEquals(1, pushes.get(), "replay must not be executed");
+        } finally {
+            listener.stop();
+        }
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-PROXY-007: a request timestamp outside the clock-skew window is rejected")
+    void staleTimestampRejected() throws Exception {
+        long now = 1_800_000_000_000L;
+        AtomicInteger pushes = new AtomicInteger();
+        ProxyDirectListener listener = countingListener(pushes, () -> now);
+        listener.start();
+        try {
+            long skew = ProxyDirectWire.MAX_CLOCK_SKEW_MS;
+            assertEquals(-1, sendRaw(listener.boundPort(), heartbeatRequest(() -> now - skew - 1)));
+            assertEquals(-1, sendRaw(listener.boundPort(), heartbeatRequest(() -> now + skew + 1)));
+            assertEquals(0, pushes.get(), "stale or future-dated requests must not be executed");
+            assertTrue(sendRaw(listener.boundPort(), heartbeatRequest(() -> now - skew)) >= 0,
+                    "edge of the window is accepted");
+            assertEquals(1, pushes.get());
+        } finally {
+            listener.stop();
         }
     }
 
@@ -226,10 +347,10 @@ class ProxyDirectListenerTest {
             DataOutputStream out = new DataOutputStream(s.getOutputStream());
             DataInputStream in = new DataInputStream(s.getInputStream());
             try {
-                ProxyDirectWire.writeOpcode(out, ProxyDirectWire.OP_HEARTBEAT);
-                ProxyDirectWire.writeSignedPayload(out, "x", V, 1);
+                WireContext ctx = ProxyDirectWire.writeRequestHeader(out, ProxyDirectWire.OP_HEARTBEAT);
+                ProxyDirectWire.writeSignedPayload(out, ctx, Direction.REQUEST, "x", V, 1);
                 out.flush();
-                assertThrows(IOException.class, () -> ProxyDirectWire.readList(in, V));
+                assertThrows(IOException.class, () -> ProxyDirectWire.readList(in, ctx, Direction.RESPONSE, V));
             } catch (IOException expected) {
                 // Connection was closed by listener
             }
@@ -328,10 +449,11 @@ class ProxyDirectListenerTest {
             plain.setSoTimeout(5000);
             try (Socket s = clientTls.wrapClient(plain, "localhost", listener.boundPort())) {
                 DataOutputStream out = new DataOutputStream(s.getOutputStream());
-                ProxyDirectWire.writeOpcode(out, ProxyDirectWire.OP_HEARTBEAT);
-                ProxyDirectWire.writeSignedPayload(out, "not-a-heartbeat", V, 1);
+                WireContext ctx = ProxyDirectWire.writeRequestHeader(out, ProxyDirectWire.OP_HEARTBEAT);
+                ProxyDirectWire.writeSignedPayload(out, ctx, Direction.REQUEST, "not-a-heartbeat", V, 1);
                 out.flush();
-                assertEquals(List.of("row-a"), ProxyDirectWire.readList(new DataInputStream(s.getInputStream()), V));
+                assertEquals(List.of("row-a"), ProxyDirectWire.readList(
+                        new DataInputStream(s.getInputStream()), ctx, Direction.RESPONSE, V));
             }
 
             // Hostname verification: the cert does not cover this name.
@@ -347,11 +469,11 @@ class ProxyDirectListenerTest {
                 raw.setSoTimeout(3000);
                 DataOutputStream out = new DataOutputStream(raw.getOutputStream());
                 try {
-                    ProxyDirectWire.writeOpcode(out, ProxyDirectWire.OP_HEARTBEAT);
-                    ProxyDirectWire.writeSignedPayload(out, "x", V, 1);
+                    WireContext ctx = ProxyDirectWire.writeRequestHeader(out, ProxyDirectWire.OP_HEARTBEAT);
+                    ProxyDirectWire.writeSignedPayload(out, ctx, Direction.REQUEST, "x", V, 1);
                     out.flush();
                     DataInputStream rawIn = new DataInputStream(raw.getInputStream());
-                    assertThrows(IOException.class, () -> ProxyDirectWire.readList(rawIn, V));
+                    assertThrows(IOException.class, () -> ProxyDirectWire.readList(rawIn, ctx, Direction.RESPONSE, V));
                 } catch (IOException expected) {
                     // Connection was closed by listener
                 }

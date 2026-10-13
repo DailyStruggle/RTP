@@ -639,9 +639,11 @@ identifiers unquoted to match the folded columns.
       - Integrated `me.champeau.gradle.japicmp` plugin in `gradle/libs.versions.toml` and `build.gradle`.
       - Configured `checkBinaryCompatibility` task on all 7 public API modules (`:rtp-api`,
         `:commands-api`, `:effects-api`, `:maps-api`, `:metrics-api`, `:anvil-api`, `:tags-api`)
-        with root aggregator task `:checkBinaryCompatibility`.
+        with root aggregator task `:checkBinaryCompatibility`. `:anvil-api` and `:tags-api` have no
+        published 3.2.1 artifact, so their check skips until a release publishes them (see F-6).
       - Compares newly compiled JAR against baseline artifact coordinate (`io.github.dailystruggle:<module>:<baselineVersion>`,
-        default `3.2.0`, configurable via `-PjapicmpBaselineVersion=...`).
+        default `3.2.1`, configurable via `-PjapicmpBaselineVersion=...`). Accepted breaks are listed in
+        `config/binary-compatibility-accepted-breaks.json`.
       - Produces detailed HTML reports (`build/reports/japi.html`) and enforces binary compatibility rules
         in accordance with `DEPRECATION_POLICY.md`.
 - [x] 32\. Write a **deprecation policy**: minimum N minor versions of notice,
@@ -702,7 +704,7 @@ identifiers unquoted to match the folded columns.
       - Added dedicated scheduled/push OWASP dependency-check workflow at
         [`.github/workflows/dependency-check.yml`](../../.github/workflows/dependency-check.yml)
         using `dependency-check/Dependency-Check_Action` scanning all project dependencies with
-        CVSS threshold gating (`--failOnCVSS 8`), suppression configuration at
+        CVSS threshold gating (`--failOnCVSS 4`), suppression configuration at
         `config/dependency-check-suppressions.xml`, and automated HTML/JSON report artifact archiving.
 - [x] 39\. Sign the shaded plugin jar and publish checksums alongside it
       (Maven Central signing already exists; extend to the deliverable).
@@ -836,7 +838,8 @@ on its own, and it matches the evidence-over-adjectives voice the project alread
 Graded against section 9 by reading the repository, not the checklist. Evidence
 column names the file an outside reviewer can open. All 7 criteria are now **MET**.
 
-The 2026-10-05 re-audit items (F-1 through F-7) have been fully resolved (2026-10-08).
+The 2026-10-05 re-audit items (F-1 through F-7) were resolved on 2026-10-08, except that F-6
+still skips `anvil-api` and `tags-api` (no published baseline). F-8 was resolved on 2026-10-13.
 
 | # | Criterion (section 9) | Status | Prior (10-05) | Evidence (2026-10-08) | Remaining work |
 |---|---|---|---|---|---|
@@ -907,12 +910,17 @@ approved designs; build and workflow changes go through the usual proposal step.
   unpublished (Maven Central lists 3.2.1), and the `onlyIf` guard turns "baseline missing" into
   a skip. `anvil-api` / `tags-api` are absent from `publishedModulePaths`, so they can never
   have a baseline.
+  **Partly resolved (2026-10-13):** the default baseline is `3.2.1`, which Maven Central
+  publishes for `rtp-api`, `commands-api`, `effects-api`, `maps-api` and `metrics-api`, so those
+  five are enforced. `anvil-api` and `tags-api` are still not published, so their check still skips.
 - **F-7 (criterion 7).** The Dependency-Check job scans source files, not the resolved Gradle
   dependency graph or the shaded jar. A green run therefore does not show zero CVEs in
   shipped dependencies.
 - **F-8 (item 48 regression).** `cross_plugin_destinations_scatter_chart.png` and
   `cross_plugin_destinations_scatter_chart_16k.png` are tracked at the repository root again
   (the root `*.log` files are gitignored local clutter only).
+  **Resolved (2026-10-13):** both root PNGs are removed; the charts live in `docs/assets/img/`.
+  The 115 `api/anvil-api/.cifuzz-corpus/` files, which `.gitignore` already excluded, are untracked.
 
 ---
 

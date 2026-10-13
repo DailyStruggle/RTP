@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Behaviour fuzzer for memory leaks (stdlib only).
+"""Behaviour fuzzer for memory leaks and runtime faults (stdlib only).
 
 Runs short seeded *episodes* of player behaviour against the bench server and
 records the exact post-GC count deltas each one causes, without knowing
@@ -56,9 +56,22 @@ fits are <run>/control*.json (so `direct` should be among --targets); the
 summary is <run>/report.txt.
 
 An episode joins the corpus when it reaches a new (previous action, plugin
-reply) pair, changes a count in a way no corpus episode did, or moves a count
-its features do not explain (unexplained finds). Replies are normalised:
-colour codes stripped, bot names -> {self}, digits -> #.
+reply) pair, a new finding signature, changes a count in a way no corpus
+episode did, or moves a count its features do not explain (unexplained
+finds). Replies are normalised: colour codes stripped, bot names -> {self},
+digits -> #.
+
+Finding oracles run beside the leak path on every episode: the server log
+(uncaught exceptions with a stack trace, `Could not pass event`, tick stalls)
+and permission denials. A finding's signature is its class plus owning plugin,
+root exception type and first frame in that plugin (no digits), so repeats
+dedupe. A new signature attributed to the target (--names / --jars entry;
+--plugin-packages adds package prefixes) and absent from the control's
+(<run>/control-findings.json) is replayed --finding-n times, one run each;
+--finding-k reproductions confirm it, --finding-shrink delta-debugs it, and a
+confirmed finding makes the verdict FAIL with no ladder. Per target:
+findings.jsonl (every finding), finding-replays.jsonl; verdict.json lists one
+entry per signature and `confirmed_by` (leak and/or oracle names).
 
 The command each bot sends is the only per-target input (`--cmd`): `direct`,
 the plugin-free control, maps /rtp to `/rtpstress tp {self}`. Bots get their
@@ -467,19 +480,23 @@ def console_states(events: list[dict], names=()) -> list[list[str]]:
 
 class Corpus:
     """Keep-what's-new: an episode is kept when it reaches an unseen
-    (previous action, state) pair, or moves an exact count in a direction or by
-    a magnitude no kept episode did. Plain 'any count changed' keeps nearly
-    every episode, since some plugin's live instances always move."""
+    (previous action, state) pair, an unseen finding signature, or moves an
+    exact count in a direction or by a magnitude no kept episode did. Plain
+    'any count changed' keeps nearly every episode, since some plugin's live
+    instances always move."""
 
     def __init__(self, cap: int = 500):
         self.cap = cap
         self.pairs: set[tuple[str, str]] = set()
+        self.signatures: set[str] = set()
         self.max_up: dict[str, float] = {}
         self.max_down: dict[str, float] = {}
         self.entries: list[dict] = []
 
-    def consider(self, ep, bots: list[dict], pairs: list[list[str]], deltas: dict | None) -> dict:
+    def consider(self, ep, bots: list[dict], pairs: list[list[str]], deltas: dict | None,
+                 signatures=()) -> dict:
         new_pairs = [p for p in pairs if tuple(p) not in self.pairs]
+        new_sigs = list(dict.fromkeys(s for s in signatures or () if s not in self.signatures))
         new_counts = {}
         for k, v in (deltas or {}).items():
             if not EXACT_COUNT.match(k) or k.startswith(HARNESS_PLUGIN) or not v:
@@ -487,16 +504,20 @@ class Corpus:
             book = self.max_up if v > 0 else self.max_down
             if abs(v) > book.get(k, 0):
                 new_counts[k] = v
-        kept = bool(new_pairs or new_counts)
+        kept = bool(new_pairs or new_counts or new_sigs)
         if kept:
             self.pairs.update(tuple(p) for p in new_pairs)
+            self.signatures.update(new_sigs)
             for k, v in new_counts.items():
                 book = self.max_up if v > 0 else self.max_down
                 book[k] = abs(v)
             self.entries.append({"ep": ep, "bots": bots})
             if len(self.entries) > self.cap:
                 self.entries.pop(0)
-        return {"kept": kept, "new_states": new_pairs, "new_counts": new_counts}
+        res = {"kept": kept, "new_states": new_pairs, "new_counts": new_counts}
+        if new_sigs:
+            res["new_findings"] = new_sigs
+        return res
 
 
 # --- deltas ---------------------------------------------------------------------
@@ -777,6 +798,10 @@ def bonferroni_z(tests: int, alpha: float = 0.05) -> float:
 CONTROL_FILE = "control.json"
 CONTROL_CLASSES_FILE = "control-classes.json"
 CONTROL_HEAP_FILE = "control-heap.json"
+CONTROL_FINDINGS_FILE = "control-findings.json"
+FINDING_REPLAYS_FILE = "finding-replays.jsonl"
+# Episodes that re-run another episode's programs: never a source of new replays.
+RERUN_ORIGINS = ("replay", "shrink", "rung", "finding")
 VERDICT_FILE = "verdict.json"
 HEAP = "heap_used_after_gc_mb"
 CLASS_TERM_CAP = 5.0  # max score contribution of one class per episode, in noise units
@@ -1283,13 +1308,16 @@ def confirm_rule(count_growth: float, predicted: float, heap_net: float, heap_no
             "heap_net_mb": round(heap_net, 3)}
 
 
-def target_verdict(searching: bool, confirmed: list[dict], had_candidates: bool) -> str:
-    """FAIL: a top-rung confirmation. PASS: the whole budget ran without any
-    signal (no leak found within budget, not proof of none). INCONCLUSIVE: a
-    signal that did not confirm at scale."""
-    if any(c["fail"] for c in confirmed):
+def target_verdict(searching: bool, confirmed: list[dict], had_candidates: bool, findings=()) -> str:
+    """FAIL: a top-rung leak confirmation or a reproduced target finding.
+    PASS: the whole budget ran without any signal (nothing found within
+    budget, not proof of none). INCONCLUSIVE: a signal that did not confirm
+    (a leak candidate lost at scale, a target finding that did not reproduce).
+    `findings` are summarise_findings() entries."""
+    if any(c["fail"] for c in confirmed) or any(f.get("reproduced") for f in findings):
         return "FAIL"
-    if searching and not had_candidates:
+    signal = had_candidates or any(f.get("target_attributed") and not f.get("in_control") for f in findings)
+    if searching and not signal:
         return "PASS"
     return "INCONCLUSIVE"
 
@@ -1579,6 +1607,16 @@ class PermissionGrant:
 
 
 # --- behaviour oracles ----------------------------------------------------------
+#
+# A finding oracle watches one episode (begin() before the bots start,
+# observe() after they finish) and returns findings. Each finding carries a
+# stable `signature`: a hash of its class and a normalised key (owning plugin,
+# root exception type, first frame in that plugin's code; digits and line
+# numbers dropped), so the same bug seen twice is one finding. The episode
+# loop keeps an episode that reaches a new signature, replays target-
+# attributed ones, ignores those the `direct` control also produced, and
+# fails the verdict on a reproduction. The leak path (checkpoints, fit,
+# ladder) is the other oracle and keeps its own confirmation rule.
 
 PLUGIN_PACKAGES = {
     "io.github.dailystruggle.rtp": "LeafRTP",
@@ -1591,59 +1629,169 @@ PLUGIN_PACKAGES = {
 }
 
 
-def attribute_plugin(text: str, fallback_target: str | None = None) -> str:
-    """Attribute log text or stack trace to a plugin based on package prefixes or event lines."""
-    m = re.search(r"Could not pass event \S+ to (\S+)", text)
+# Server, JDK and library frames: never the key frame of a plugin's bug.
+PLATFORM_FRAME = re.compile(r"^(java|javax|jdk|sun|com\.sun|kotlin|org\.bukkit|org\.spigotmc|net\.minecraft|"
+                            r"io\.papermc|com\.destroystokyo|net\.md_5|io\.netty|com\.mojang|co\.aikar|"
+                            r"org\.slf4j|org\.apache)\.")
+# A qualified throwable type (`java.lang.NullPointerException`), not a bare word.
+EXC_TYPE = re.compile(r"(?<![\w$.])((?:[a-z_$][\w$]*\.)+[A-Z][\w$]*(?:Exception|Error|Throwable))(?=$|[:\s])")
+# `at [module/]pkg.Class.method(` with an optional `java.base/` or `app//` loader prefix.
+FRAME = re.compile(r"^\s*at\s+(?:\S*/)?([\w.$<>]+)\(")
+# `[12:00:00 WARN]: ` in front of every line a plugin prints with printStackTrace().
+LOG_PREFIX = re.compile(r"^\[\d{1,2}:\d{2}:\d{2}[^\]]*\]:?\s?")
+EVENT_ERROR = re.compile(r"Could not pass event (\S+) to (\S+)")
+
+
+def _unprefixed(line: str) -> str:
+    return LOG_PREFIX.sub("", line, count=1)
+
+
+def trace_continues(line: str) -> bool:
+    """A stack trace's frame, cause, suppressed or `... n more` line."""
+    s = _unprefixed(line)
+    t = s.lstrip()
+    return bool(FRAME.match(s)) or t.startswith(("Caused by:", "Suppressed:", "... "))
+
+
+def exception_header(line: str) -> bool:
+    t = _unprefixed(line).lstrip()
+    return bool(EXC_TYPE.search(t)) and not t.startswith(("at ", "Caused by:", "Suppressed:"))
+
+
+def trace_frames(lines: list[str]) -> list[str]:
+    out = []
+    for ln in lines:
+        m = FRAME.match(_unprefixed(ln))
+        if m:
+            out.append(m.group(1))
+    return out
+
+
+def root_exception(lines: list[str]) -> str:
+    """Type of the innermost cause (the last `Caused by:`), else the first type."""
+    typ = ""
+    for ln in lines:
+        t = _unprefixed(ln).lstrip()
+        if typ and not t.startswith("Caused by:"):
+            continue
+        m = EXC_TYPE.search(t)
+        if m:
+            typ = m.group(1)
+    return typ
+
+
+def plugin_of_frame(frame: str, packages: dict[str, str]) -> str | None:
+    for pkg in sorted(packages, key=len, reverse=True):
+        if frame == pkg or frame.startswith(pkg + "."):
+            return packages[pkg]
+    return None
+
+
+def key_frame(frames: list[str], packages: dict[str, str], plugin: str) -> str:
+    """First frame in the owning plugin's packages, else the first non-platform
+    frame, else the top frame; digits dropped (lambda$x$3, v1_21_R1)."""
+    pick = next((f for f in frames if plugin_of_frame(f, packages) == plugin), None)
+    if pick is None:
+        pick = next((f for f in frames if not PLATFORM_FRAME.match(f)), frames[0] if frames else "")
+    return NUMBER.sub("#", pick)
+
+
+def attribute_plugin(text: str, fallback_target: str | None = None, packages: dict[str, str] | None = None) -> str:
+    """Plugin a log block belongs to: the plugin named by `Could not pass event`,
+    else the topmost frame in a known package, else a known package anywhere in
+    the text, else fallback_target or `unknown`. Oracles pass no fallback, so a
+    trace with no known frame is never blamed on the target."""
+    packages = packages if packages is not None else PLUGIN_PACKAGES
+    m = EVENT_ERROR.search(text)
     if m:
-        name = m.group(1).rstrip("v0123456789.-_")
-        for k, v in PLUGIN_PACKAGES.items():
-            if v.lower() == name.lower() or name.lower() in v.lower():
+        name = m.group(2).rstrip("v0123456789.-_")
+        for v in packages.values():
+            if v.lower() == name.lower():
                 return v
         return name
-    for pkg, name in PLUGIN_PACKAGES.items():
+    for f in trace_frames(text.splitlines()):
+        owner = plugin_of_frame(f, packages)
+        if owner:
+            return owner
+    for pkg in sorted(packages, key=len, reverse=True):
         if pkg in text:
-            return name
-    if fallback_target:
-        for k, v in PLUGIN_PACKAGES.items():
-            if v.lower() == fallback_target.lower():
-                return v
-        return fallback_target
-    return "unknown"
+            return packages[pkg]
+    return fallback_target or "unknown"
 
 
-class ServerLogOracle:
-    """Scans server log (e.g. latest.log) for uncaught exceptions, Bukkit event errors,
-    and server watchdog stalls, attributing them to plugins by stack trace package."""
+def make_finding(cls: str, severity: str, plugin: str, key: str, witness: list, evidence: dict) -> dict:
+    """A finding whose id and signature depend only on its class and key."""
+    sig = hashlib.sha1(f"{cls}|{key}".encode("utf-8")).hexdigest()[:12]
+    return {"finding_id": f"FIND-{cls}-{sig}", "signature": sig, "key": key, "class": cls,
+            "severity": severity, "witness_program": witness, "attributed_plugin": plugin, "evidence": evidence}
 
-    def __init__(self, log_path: str | None):
+
+class FindingOracle:
+    """One episode in, findings out (see the section comment)."""
+    name = "oracle"
+
+    def begin(self) -> None:
+        """Called right before the episode's bots start."""
+
+    def observe(self, events: list[dict], programs: list, target: str) -> list[dict]:
+        return []
+
+
+class ServerLogOracle(FindingOracle):
+    """Server log (latest.log) lines written during an episode: uncaught
+    exceptions with a stack trace, `Could not pass event` errors and tick
+    stalls. Exceptions are attributed by their frames' packages; a stall is
+    attributed to `Server` (one line cannot name the cause)."""
+    name = "log"
+
+    def __init__(self, log_path: str | None, packages: dict[str, str] | None = None, target_names=()):
         self.log_path = log_path
+        self.packages = dict(packages if packages is not None else PLUGIN_PACKAGES)
+        self.target_names = {n.lower() for n in target_names if n}
         self.offset = 0
-        if self.log_path and os.path.exists(self.log_path):
-            try:
-                self.offset = os.path.getsize(self.log_path)
-            except OSError:
-                self.offset = 0
+        self.ident = None
+        self.start = 0
+        self.mark()
+
+    def _stat(self):
+        try:
+            st = os.stat(self.log_path)
+        except (OSError, TypeError, ValueError):
+            return None, 0
+        return (st.st_dev, st.st_ino), st.st_size
 
     def mark(self) -> int:
-        if self.log_path and os.path.exists(self.log_path):
-            try:
-                self.offset = os.path.getsize(self.log_path)
-                return self.offset
-            except OSError:
-                return 0
-        return 0
+        """The log's current end (0 when absent); scan() reads from there."""
+        if not self.log_path:
+            return 0
+        self.ident, self.offset = self._stat()
+        return self.offset
+
+    def begin(self) -> None:
+        self.start = self.mark()
+
+    def observe(self, events: list[dict], programs: list, target: str) -> list[dict]:
+        return self.scan(self.start, programs, target)
 
     def scan(self, start_offset: int, witness_program: list, target_plugin: str | None = None) -> list[dict]:
+        """Findings in the log since start_offset. A replaced log (restart:
+        another file identity) or a shorter one is read from its start."""
         if not self.log_path or not os.path.exists(self.log_path):
             return []
+        ident, size = self._stat()
+        if ident != self.ident or size < start_offset:
+            start_offset = 0
         try:
-            with open(self.log_path, "r", encoding="utf-8", errors="replace") as fh:
+            with open(self.log_path, "rb") as fh:
                 fh.seek(start_offset)
-                content = fh.read()
-                self.offset = fh.tell()
-        except Exception:
+                data = fh.read()
+        except OSError:
             return []
-        return self.analyze_text(content, witness_program, target_plugin)
+        self.ident, self.offset = ident, start_offset + len(data)
+        return self.analyze_text(data.decode("utf-8", "replace"), witness_program, target_plugin)
+
+    def is_target(self, plugin: str, target_plugin: str | None) -> bool:
+        return plugin.lower() in (self.target_names | ({target_plugin.lower()} if target_plugin else set()))
 
     def analyze_text(self, text: str, witness_program: list, target_plugin: str | None = None) -> list[dict]:
         findings = []
@@ -1653,79 +1801,56 @@ class ServerLogOracle:
         i = 0
         while i < len(lines):
             line = lines[i]
-            # 1. Bukkit Event errors
-            if "Could not pass event" in line:
-                snippet = [line]
+            ev = EVENT_ERROR.search(line)
+            if ev:
+                # The listener's exception follows: its type line, then the trace.
                 j = i + 1
-                # Include the immediate exception type/message line if present
-                if j < len(lines) and ("Exception" in lines[j] or "Error" in lines[j]):
-                    snippet.append(lines[j])
+                if j < len(lines) and exception_header(lines[j]):
                     j += 1
-                while j < len(lines) and (lines[j].startswith("\tat ") or lines[j].startswith("Caused by:") or lines[j].startswith("\t... ")):
-                    snippet.append(lines[j])
+                while j < len(lines) and trace_continues(lines[j]):
                     j += 1
-                snippet_text = "\n".join(snippet[:15])
-                plugin = attribute_plugin(snippet_text, target_plugin)
-                findings.append({
-                    "finding_id": f"FIND-EVT-{int(time.time() * 1000)}-{len(findings) + 1}",
-                    "class": "EVENT_ERROR",
-                    "severity": "HIGH" if (target_plugin and target_plugin.lower() in plugin.lower()) else "MEDIUM",
-                    "witness_program": witness_program,
-                    "attributed_plugin": plugin,
-                    "evidence": {
-                        "log_snippet": snippet_text,
-                        "line": line.strip()
-                    }
-                })
+                block = lines[i:j]
+                plugin = attribute_plugin("\n".join(block), packages=self.packages)
+                key = "|".join((plugin, ev.group(1), root_exception(block),
+                                 key_frame(trace_frames(block), self.packages, plugin)))
+                findings.append(make_finding("EVENT_ERROR", "HIGH" if self.is_target(plugin, target_plugin) else "MEDIUM",
+                                             plugin, key, witness_program,
+                                             {"log_snippet": "\n".join(block[:15]), "line": line.strip()}))
                 i = j
                 continue
-
-            # 2. Uncaught exceptions / Errors
-            if ("Exception in thread" in line or "java.lang." in line or "Exception:" in line or "Error:" in line) and "StressTestRTP: leakcheck" not in line:
-                snippet = [line]
+            # A qualified throwable type followed by at least one trace line;
+            # an `Error:` word or a class name in a message is not one.
+            if ("StressTestRTP: leakcheck" not in line and exception_header(line)
+                    and i + 1 < len(lines) and trace_continues(lines[i + 1])):
                 j = i + 1
-                while j < len(lines) and (lines[j].startswith("\tat ") or lines[j].startswith("Caused by:") or lines[j].startswith("\t... ")):
-                    snippet.append(lines[j])
+                while j < len(lines) and trace_continues(lines[j]):
                     j += 1
-                if len(snippet) > 1:
-                    snippet_text = "\n".join(snippet[:15])
-                    plugin = attribute_plugin(snippet_text, target_plugin)
-                    findings.append({
-                        "finding_id": f"FIND-EXC-{int(time.time() * 1000)}-{len(findings) + 1}",
-                        "class": "UNCAUGHT_EXCEPTION",
-                        "severity": "CRITICAL" if ("Server thread/ERROR" in line or "NullPointerException" in snippet_text) else "HIGH",
-                        "witness_program": witness_program,
-                        "attributed_plugin": plugin,
-                        "evidence": {
-                            "log_snippet": snippet_text,
-                            "line": line.strip()
-                        }
-                    })
-                    i = j
-                    continue
-
-            # 3. Watchdog stall / can't keep up
-            if "Can't keep up! Is the server overloaded?" in line or "The server has not responded for" in line:
-                m = re.search(r"Running (\d+)ms or (\d+) ticks behind", line)
-                ms_behind = int(m.group(1)) if m else 0
-                findings.append({
-                    "finding_id": f"FIND-STALL-{int(time.time() * 1000)}-{len(findings) + 1}",
-                    "class": "WATCHDOG_STALL",
-                    "severity": "HIGH" if ms_behind >= 5000 else "MEDIUM",
-                    "witness_program": witness_program,
-                    "attributed_plugin": target_plugin or "Server",
-                    "evidence": {
-                        "log_snippet": line.strip(),
-                        "ms_behind": ms_behind
-                    }
-                })
+                block = lines[i:j]
+                plugin = attribute_plugin("\n".join(block), packages=self.packages)
+                key = "|".join((plugin, root_exception(block), key_frame(trace_frames(block), self.packages, plugin)))
+                findings.append(make_finding("UNCAUGHT_EXCEPTION", "CRITICAL" if "Server thread" in line else "HIGH",
+                                             plugin, key, witness_program,
+                                             {"log_snippet": "\n".join(block[:15]), "line": line.strip()}))
+                i = j
+                continue
+            lag = re.search(r"Can't keep up!.*?Running (\d+)ms", line)
+            hang = re.search(r"The server has not responded for (\d+) seconds", line)
+            if lag or hang or "Can't keep up!" in line:
+                ms_behind = int(lag.group(1)) if lag else (int(hang.group(1)) * 1000 if hang else 0)
+                stall = bool(hang) or ms_behind >= 5000
+                findings.append(make_finding("WATCHDOG_STALL", "HIGH" if stall else "MEDIUM", "Server",
+                                             "watchdog" if hang else ("stall" if stall else "lag"), witness_program,
+                                             {"log_snippet": line.strip(), "ms_behind": ms_behind}))
             i += 1
         return findings
 
 
-class LeastPrivilegeOracle:
+class LeastPrivilegeOracle(FindingOracle):
     """Verifies that unprivileged bot accounts receive proper permission denials
-    when executing administrative commands."""
+    when executing administrative commands (the swarm's `denial_failure`
+    events). Only meaningful with a narrow --grant: under `*` every command is
+    allowed."""
+    name = "permission"
 
     DENIED_ACTIONS = [
         "op", "deop", "stop", "restart", "reload", "lp", "luckperms",
@@ -1741,23 +1866,66 @@ class LeastPrivilegeOracle:
     def __init__(self, denied_actions: list[str] | None = None):
         self.denied_actions = denied_actions or list(self.DENIED_ACTIONS)
 
+    def observe(self, events: list[dict], programs: list, target: str) -> list[dict]:
+        return self.check_events(events, programs, target)
+
     def check_events(self, events: list[dict], witness_program: list, target_plugin: str) -> list[dict]:
         findings = []
         for ev in events:
             if ev.get("ev") == "denial_failure":
-                findings.append({
-                    "finding_id": f"FIND-PERM-{int(time.time() * 1000)}-{len(findings) + 1}",
-                    "class": "PERMISSION_BYPASS",
-                    "severity": "HIGH",
-                    "witness_program": witness_program,
-                    "attributed_plugin": target_plugin,
-                    "evidence": {
-                        "cmd": ev.get("cmd"),
-                        "reply": ev.get("text"),
-                        "bot": ev.get("bot")
-                    }
-                })
+                cmd = normalise_state(str(ev.get("cmd") or "").lstrip("/"), [ev.get("bot", "")])
+                findings.append(make_finding("PERMISSION_BYPASS", "HIGH", target_plugin, cmd, witness_program,
+                                             {"cmd": ev.get("cmd"), "reply": ev.get("text"), "bot": ev.get("bot")}))
         return findings
+
+
+def target_aliases(a, target: str) -> set[str]:
+    """Lower-case plugin names that make a finding count against `target`: the
+    label and its --names / --jars entries. Exact matches only, so `rtp` never
+    claims BetterRTP's findings."""
+    out = {target.lower()}
+    for spec in (getattr(a, "names", None), getattr(a, "jars", None)):
+        for pair in (spec or "").split(","):
+            t, sep, n = pair.partition("=")
+            if sep and t.strip().lower() == target.lower() and n.strip():
+                out.add(n.strip().lower())
+    return out
+
+
+def plugin_packages(spec: str | None) -> dict[str, str]:
+    """PLUGIN_PACKAGES plus --plugin-packages 'com.example.foo=Foo,...'."""
+    out = dict(PLUGIN_PACKAGES)
+    for pair in (spec or "").split(","):
+        p, sep, n = pair.partition("=")
+        if sep and p.strip() and n.strip():
+            out[p.strip()] = n.strip()
+    return out
+
+
+def summarise_findings(findings: list[dict], tests: dict | None = None) -> list[dict]:
+    """One entry per signature in first-seen order: how often it fired, where
+    first, whether it counts against the target, and its replay result."""
+    out: dict[str, dict] = {}
+    for f in findings:
+        s = out.get(f["signature"])
+        if s is None:
+            s = out[f["signature"]] = {k: f.get(k) for k in (
+                "signature", "class", "oracle", "severity", "attributed_plugin", "key", "target_attributed",
+                "in_control", "evidence")}
+            s.update(first={"seed": f.get("seed"), "ep": f.get("ep")}, seen=0)
+        s["seen"] += int(f.get("repeats") or 1)
+    for sig, s in out.items():
+        t = (tests or {}).get(sig)
+        s["reproduced"] = bool(t and t.get("reproduced"))
+        if t:
+            s.update(k=t["k"], n=t["n"], shrunk=t.get("sequence"))
+    return list(out.values())
+
+
+def control_findings(findings: list[dict]) -> dict:
+    """The control's signatures: harness or vanilla noise every target ignores."""
+    return {"signatures": {s["signature"]: {"class": s["class"], "key": s["key"], "seen": s["seen"]}
+                           for s in summarise_findings(findings)}}
 
 
 # --- swarm ----------------------------------------------------------------------
@@ -1997,10 +2165,16 @@ class TargetRun:
         self.learnt: dict[int, dict] = {}  # seed -> final generator parameters
         self.coverage = {"episodes": 0, "pairs": set(), "restarts": 0, "seeds": [], "heap_stopped": False}
         log_path = os.path.join(a.server_dir, "logs", "latest.log") if getattr(a, "server_dir", None) else None
-        self.log_oracle = ServerLogOracle(log_path)
+        self.target_names = target_aliases(a, target)
+        self.log_oracle = ServerLogOracle(log_path, plugin_packages(getattr(a, "plugin_packages", None)),
+                                          self.target_names)
         self.least_privilege_oracle = LeastPrivilegeOracle()
+        self.oracles: list[FindingOracle] = [self.log_oracle, self.least_privilege_oracle]
         self.findings_path = os.path.join(tdir, "findings.jsonl")
         self.findings: list[dict] = []
+        cf = None if target == DIRECT else load_json(os.path.join(run_dir, CONTROL_FINDINGS_FILE))
+        self.control_findings: set[str] = set((cf or {}).get("signatures") or {})
+        self.finding_tests: dict[str, dict] = {}  # signature -> replay result
 
     @property
     def ref(self) -> dict:
@@ -2082,8 +2256,10 @@ class TargetRun:
         if side is not None:
             append_jsonl(os.path.join(self.tdir, CLASSES_FILE), side)
 
-    def execute(self, seed: int, ep, plan: dict, corpus: Corpus | None, gen: int = 0, rung: int = 0) -> dict:
-        """Run one planned episode and write its trace line; returns the record."""
+    def execute(self, seed: int, ep, plan: dict, corpus: Corpus | None, gen: int = 0, rung: int = 0,
+                reps: int | None = None) -> dict:
+        """Run one planned episode and write its trace line; returns the record.
+        reps overrides --reps (finding replays need one run, not a slope)."""
         eid = f"{self.target}-s{seed}-e{ep}"[:64]
         bots = plan["bots"]
         rec = {"seed": seed, "ep": ep, "parent": plan.get("parent"), "gen": gen, "rung": rung,
@@ -2098,7 +2274,8 @@ class TargetRun:
             return rec
         if plan.get("console"):
             rec["console"] = plan["console"]
-        log_marker = self.log_oracle.mark()
+        for o in self.oracles:
+            o.begin()
         t0 = time.time()
         rec["t_start"] = dt.datetime.now().isoformat(timespec="seconds")
         try:
@@ -2110,16 +2287,16 @@ class TargetRun:
             return rec
         rec["events"], rec["done"] = events, {k: done.get(k) for k in ("ms", "reason", "bots")}
         rec["ms"] = int((time.time() - t0) * 1000)
-        progs = [b["program"] for b in bots]
-        f_log = self.log_oracle.scan(log_marker, progs, self.target)
-        f_perm = self.least_privilege_oracle.check_events(events, progs, self.target)
-        new_findings = f_log + f_perm
+        new_findings = self.observe(seed, ep, rec["origin"], events, [b["program"] for b in bots])
         if new_findings:
             rec["findings"] = new_findings
             self.findings.extend(new_findings)
             for f in new_findings:
                 append_jsonl(self.findings_path, f)
-                log(f"{self.target}: FINDING: [{f['class']}] {f['severity']} {f['attributed_plugin']}: "
+                tag = "target" if f["target_attributed"] else "other"
+                log(f"{self.target}: FINDING {f['signature']} ({f['oracle']}, {tag}"
+                    f"{', in control' if f['in_control'] else ''}): [{f['class']}] {f['severity']} "
+                    f"{f['attributed_plugin']}: "
                     f"{f['evidence'].get('line') or f['evidence'].get('cmd') or f['evidence'].get('log_snippet', '')[:80]}")
         names = [b["name"] for b in bots] + [b.get("last", "") for b in done.get("bots") or []]
         rec["states"] = extract_states(events, names, [b["name"] for b in bots]) + console_states(events, names)
@@ -2154,13 +2331,15 @@ class TargetRun:
                 self.prev, self.prev_histo = None, {}
             else:
                 self.prev, self.prev_histo = d, (h or {})
-                if self.a.reps > 1:
-                    self.repeat(seed, ep, rec, d, h or {})
+                reps = self.a.reps if reps is None else reps
+                if reps > 1:
+                    self.repeat(seed, ep, rec, d, h or {}, reps)
         if "excluded" in rec:
             rec["features"] = None
         rec["score"] = score_episode(rec, self.score_counts, self.ref, self.class_z, target_fit=self.fit)
         if corpus is not None and "excluded" not in rec:
-            res = corpus.consider(ep, bots, rec["states"], rec["deltas"])
+            res = corpus.consider(ep, bots, rec["states"], rec["deltas"],
+                                  [f["signature"] for f in rec.get("findings") or []])
             rec.update(res)
         self.write(rec)
         ds = rec["deltas"] or {}
@@ -2175,9 +2354,27 @@ class TargetRun:
             + (f" reps-cut({rec['reps_error']})" if rec.get("reps_error") else "")
             + (f" EXCLUDED({rec['excluded']})" if rec.get("excluded") else "")
             + (" no-histogram" if rec.get("no_histogram") else "")
+            + (f" findings={len(rec['findings'])}" if rec.get("findings") else "")
             + (" kept" if rec.get("kept") else "")
             + (f" score={rec['score']:+.2f}/min" if rec.get("score") is not None else ""))
         return rec
+
+    def observe(self, seed: int, ep, origin: str, events: list[dict], programs: list) -> list[dict]:
+        """Every finding oracle's findings of one episode, one per signature
+        (`repeats` = how often it fired), tagged with the episode, whether it
+        counts against the target and whether the control produced it too."""
+        out: dict[str, dict] = {}
+        for o in self.oracles:
+            for f in o.observe(events, programs, self.target):
+                seen = out.get(f["signature"])
+                if seen is not None:
+                    seen["repeats"] += 1
+                    continue
+                f.update(oracle=o.name, seed=seed, ep=ep, origin=origin, repeats=1,
+                         target_attributed=str(f.get("attributed_plugin") or "").lower() in self.target_names,
+                         in_control=f["signature"] in self.control_findings)
+                out[f["signature"]] = f
+        return list(out.values())
 
     def swarm_failed(self, ep, e: Exception) -> None:
         log(f"{self.target}: episode {ep}: {e}; restarting the swarm")
@@ -2225,13 +2422,13 @@ class TargetRun:
             events = sorted(list(events) + con, key=lambda e: float(e.get("t", 0) or 0))
         return events, done
 
-    def repeat(self, seed: int, ep, rec: dict, d1: dict, h1: dict) -> None:
+    def repeat(self, seed: int, ep, rec: dict, d1: dict, h1: dict, reps: int | None = None) -> None:
         """--reps - 1 more runs of the episode's programs (fresh names, same
         console actions), a checkpoint after each; adds `slope.<metric>`
         deltas (growth per repetition) and the classes that grew from the
         first to the last repetition (`rep_classes`, for attribution)."""
         series, h_last = [slope_metrics(d1)], h1
-        for j in range(1, self.a.reps):
+        for j in range(1, self.a.reps if reps is None else reps):
             bots = [{"name": bot_name(self.cfg["run"], seed, f"{ep}k{j}", i), "program": b["program"]}
                     for i, b in enumerate(rec["bots"])]
             try:
@@ -2292,6 +2489,92 @@ class TargetRun:
         log(f"{self.target}: s{seed} e{rec['ep']} surprise {count} reproduced {hits} of {done}"
             + (" -> candidate" if ok else " (one-off)"))
         return entry
+
+    def check_findings(self, seed: int, rec: dict, gen: int) -> list[dict]:
+        """Replay an episode that reached an untested target finding signature
+        (--finding-n times, fresh names, one run each, from the --replay-budget
+        surprises use too): k >= --finding-k reproductions confirm it. A
+        signature the control produced is harness or vanilla noise and is never
+        replayed. Results go to finding-replays.jsonl."""
+        if self.target == DIRECT or self.a.finding_n <= 0 or rec["origin"] in RERUN_ORIGINS:
+            return []
+        out = []
+        sigs = [f["signature"] for f in rec.get("findings") or []
+                if f.get("target_attributed") and not f.get("in_control") and f["signature"] not in self.finding_tests]
+        for sig in sigs:
+            n, k = self.a.finding_n, self.a.finding_k
+            if getattr(self.a, "replay_budget", -1) >= 0:
+                n = min(n, self.a.replay_budget - self.replay_spent)
+                if n < k:
+                    log(f"{self.target}: s{seed} e{rec['ep']} finding {sig} not replayed: replay budget spent")
+                    break
+            hits, done = self.reproduce_finding(seed, f"{rec['ep']}f{len(self.finding_tests)}", rec["bots"], sig, n, k,
+                                                rec.get("console"), gen=gen)
+            self.replay_spent += done
+            f = next(x for x in rec["findings"] if x["signature"] == sig)
+            entry = {"seed": seed, "gen": gen, "ep": rec["ep"], "signature": sig, "class": f["class"],
+                     "oracle": f["oracle"], "key": f["key"], "k": hits, "n": done, "reproduced": hits >= k,
+                     "bots": rec["bots"], "console": rec.get("console")}
+            self.finding_tests[sig] = entry
+            append_jsonl(os.path.join(self.tdir, FINDING_REPLAYS_FILE), entry)
+            log(f"{self.target}: s{seed} e{rec['ep']} finding {sig} [{f['class']}] reproduced {hits} of {done}"
+                + (" -> confirmed" if entry["reproduced"] else " (one-off)"))
+            out.append(entry)
+        return out
+
+    def reproduce_finding(self, seed: int, tag: str, bots: list[dict], sig: str, n: int, k: int,
+                          console: list[dict] | None, origin: str = "finding", gen: int = 0) -> tuple[int, int]:
+        """(hits, runs): replays of bots under fresh names in which the oracles
+        report `sig` again. A replay whose bots never ran counts as neither;
+        stops once k hits are out of reach."""
+        hits = done = 0
+        for j in range(n):
+            plan = {"origin": origin, "parent": tag, "params": None, "console": console,
+                    "bots": [{"name": bot_name(self.cfg["run"], seed, f"{tag}r{j}", i), "program": b["program"]}
+                             for i, b in enumerate(bots)]}
+            r = self.execute(seed, f"{tag}r{j}", plan, None, gen=gen, reps=1)
+            if "ms" not in r:
+                continue
+            done += 1
+            hits += any(f["signature"] == sig for f in r.get("findings") or [])
+            if hits + (n - j - 1) < k:
+                break
+        return hits, done
+
+    def shrink_findings(self, seed: int, limit: int) -> list[dict]:
+        """Delta-debug up to `limit` confirmed findings of this seed down to the
+        fewest actions that still reproduce the signature k of n times
+        (--shrink-n/--shrink-k, --shrink-probes, the shared --shrink-budget);
+        written to shrunk.jsonl with count `finding:<signature>`."""
+        out = []
+        todo = [t for t in self.finding_tests.values() if t["seed"] == seed and t["reproduced"] and "sequence" not in t]
+        for ti, t in enumerate(todo[:max(0, limit)]):
+            left = self.a.shrink_probes
+            if getattr(self.a, "shrink_budget", -1) >= 0:
+                left = min(left, max(0, self.a.shrink_budget - self.shrink_spent))
+            budget = {"left": left, "used": 0}
+
+            def probe(bots, t=t, ti=ti, budget=budget):
+                if budget["left"] <= 0:
+                    return 0, 0, False
+                budget["left"] -= 1
+                budget["used"] += 1
+                self.shrink_spent += 1
+                hits, done = self.reproduce_finding(seed, f"{t['ep']}g{ti}s{budget['used']}", bots, t["signature"],
+                                                    self.a.shrink_n, self.a.shrink_k, t.get("console"), origin="shrink")
+                return hits, done, hits >= self.a.shrink_k
+
+            res = shrink_bots(t["bots"], probe)
+            seq = [[action_label(a) for a in b["program"]] for b in res["bots"]]
+            line = {"seed": seed, "ep": t["ep"], "count": f"finding:{t['signature']}", "signature": t["signature"],
+                    "budget_exhausted": budget["left"] <= 0, **res, "sequence": seq}
+            append_jsonl(os.path.join(self.tdir, "shrunk.jsonl"), line)
+            if res["reproduced"]:
+                t["sequence"] = seq
+            log(f"{self.target}: shrunk e{t['ep']} finding {t['signature']}: {res['actions']} of {res['of']} actions, "
+                f"{res['hits']} of {res['n']} reproduced: {seq}")
+            out.append(line)
+        return out
 
     def end_generation(self, seed: int, gen: int, cem: "Cem | None", gen_recs: list[dict],
                        all_recs: list[dict], corpus: Corpus, gen_surprises=()) -> dict:
@@ -2380,6 +2663,8 @@ class TargetRun:
             if s:
                 gen_surprises.append(s)
             recs += replays
+            # Finding replays run once each (no slope) and stay out of the fit.
+            self.check_findings(seed, rec, gen)
             ep += 1
             stop = self.over_heap()
             if len(gen_recs) == size or spent >= self.a.episodes or stop:
@@ -2614,14 +2899,19 @@ class TargetRun:
                           dumps=r.get("dumps"), sequence=r["sequence"]) for r in ladder if "confirm" in r]
         if self.coverage["heap_stopped"] and not confirmed:
             confirmed = [{"fail": True, "heap_stop": True, "cand": None, "count": HEAP}]
-        verdict = target_verdict(self.search.searching, confirmed, bool(cands or self.candidates))
-        cov = dict(self.coverage, pairs=len(self.coverage["pairs"]), classes_tested=self.classes_seen)
-        out = {"target": self.target, "verdict": verdict, "state": self.search.state, "reason": self.search.reason,
+        findings = summarise_findings(self.findings, self.finding_tests)
+        verdict = target_verdict(self.search.searching, confirmed, bool(cands or self.candidates), findings)
+        by = (["leak"] if any(c["fail"] for c in confirmed) else []) + sorted(
+            {f["oracle"] for f in findings if f.get("reproduced")})
+        cov = dict(self.coverage, pairs=len(self.coverage["pairs"]), classes_tested=self.classes_seen,
+                   finding_signatures=len(findings))
+        out = {"target": self.target, "verdict": verdict, "confirmed_by": by, "state": self.search.state,
+               "reason": self.search.reason,
                "candidates": [{k: c[k] for k in ("cand", "count", "source", "shrunk")} for c in cands],
-               "confirmed": confirmed, "findings": self.findings, "coverage": cov, "learnt": self.learnt}
+               "confirmed": confirmed, "findings": findings, "coverage": cov, "learnt": self.learnt}
         save_json(os.path.join(self.tdir, VERDICT_FILE), out)
-        log(f"{self.target}: verdict {verdict}" + (" (no leak found within budget)" if verdict == "PASS" else "")
-            + f"; coverage {cov}")
+        log(f"{self.target}: verdict {verdict}" + (f" by {', '.join(by)}" if by else "")
+            + (" (nothing found within budget)" if verdict == "PASS" else "") + f"; coverage {cov}")
         return out
 
 
@@ -2661,7 +2951,7 @@ def render_report(run_dir: str, targets: list[str], meta: dict) -> str:
         v = load_json(os.path.join(tdir, VERDICT_FILE)) or {}
         verdict = v.get("verdict", "NOT RUN")
         L.append(f"=== {t}: {verdict}"
-                 + (" - no leak found within budget (not proof that there is none)" if verdict == "PASS" else ""))
+                 + (" - nothing found within budget (not proof that there is none)" if verdict == "PASS" else ""))
         cov = v.get("coverage") or {}
         if cov:
             L.append(f"  coverage: {cov.get('episodes', 0)} episodes, {cov.get('pairs', 0)} distinct (action, state) "
@@ -2670,12 +2960,30 @@ def render_report(run_dir: str, targets: list[str], meta: dict) -> str:
                      + (", stopped at the heap limit" if cov.get("heap_stopped") else ""))
         if v.get("state"):
             L.append(f"  search: {v['state']}" + (f" ({v['reason']})" if v.get("reason") else " (no signal)"))
+        if v.get("confirmed_by"):
+            L.append(f"  confirmed by: {', '.join(v['confirmed_by'])}")
         findings = v.get("findings") or []
         if findings:
-            L.append(f"  findings ({len(findings)}):")
-            for f in findings[:10]:
-                ev_str = f.get('evidence', {}).get('line') or f.get('evidence', {}).get('cmd') or f.get('evidence', {}).get('log_snippet', '')[:80]
-                L.append(f"    [{f.get('class')}] {f.get('severity')} ({f.get('attributed_plugin')}): {ev_str}")
+            L.append(f"  findings ({len(findings)} signatures, "
+                     f"{sum(1 for f in findings if f.get('reproduced'))} reproduced):")
+            for f in sorted(findings, key=lambda f: (not f.get("reproduced"), not f.get("target_attributed"),
+                                                     bool(f.get("in_control"))))[:15]:
+                ev = f.get("evidence") or {}
+                ev_str = ev.get("line") or ev.get("cmd") or (ev.get("log_snippet") or "")[:80]
+                if f.get("reproduced"):
+                    status = f"reproduced {f.get('k')} of {f.get('n')}"
+                elif f.get("n"):
+                    status = f"one-off ({f.get('k')} of {f.get('n')})"
+                elif f.get("in_control"):
+                    status = "also in the control"
+                elif f.get("target_attributed"):
+                    status = "not replayed"
+                else:
+                    status = "not the target"
+                L.append(f"    {f.get('signature', '?')} [{f.get('class')}] {f.get('severity')} "
+                         f"({f.get('attributed_plugin')}) x{f.get('seen', 1)}, {status}: {ev_str}")
+                if f.get("shrunk"):
+                    L.append(f"      shrunk: {f['shrunk']}")
         for c in v.get("confirmed") or []:
             L.append(f"  confirmation {c.get('cand')} {c.get('count')}: {'FAIL' if c.get('fail') else 'not confirmed'}"
                      f" growth {c.get('count_growth')} vs predicted {c.get('predicted')}, heap net "
@@ -2724,9 +3032,10 @@ def render_report(run_dir: str, targets: list[str], meta: dict) -> str:
                 L.append(f"  ladder rung {r['rung']} {r['bots']}x{r['reps']} {r['cand']} {r['count']}: mean "
                          f"{r['mean']} ci {r['ci']} -> {'holds' if r['holds'] else 'lost'}")
         L.append("")
-    L.append("FAIL = the count grew by >= half the predicted amount at the top rung and heap after GC grew "
-             "beyond the control's for the same behaviour. PASS = the full budget ran without any signal. "
-             "INCONCLUSIVE = a signal that did not confirm at scale.")
+    L.append("FAIL = a leak (the count grew by >= half the predicted amount at the top rung and heap after GC "
+             "grew beyond the control's for the same behaviour) or a finding attributed to the target, absent "
+             "from the control, that replays reproduced k of n times. PASS = the full budget ran without any "
+             "signal. INCONCLUSIVE = a signal that did not confirm (a leak lost at scale, a one-off finding).")
     return "\n".join(L) + "\n"
 
 
@@ -2774,6 +3083,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--shrink-n", type=int, default=3, help="replays per shrink candidate")
     p.add_argument("--shrink-k", type=int, default=2, help="replays that must reproduce the count")
     p.add_argument("--shrink-probes", type=int, default=24, help="max shrink candidates per episode")
+    p.add_argument("--finding-n", type=int, default=3,
+                   help="replays of an episode that reached a new target finding signature (0 = off; "
+                        "draws on --replay-budget)")
+    p.add_argument("--finding-k", type=int, default=2, help="replays that must report the signature again")
+    p.add_argument("--finding-shrink", type=int, default=1,
+                   help="shrink this many reproduced findings per seed (draws on --shrink-budget)")
+    p.add_argument("--plugin-packages",
+                   help="extra package=plugin attributions for stack traces, e.g. 'com.example.rtp=ExampleRTP'")
     p.add_argument("--min-bots", type=int, default=2)
     p.add_argument("--max-bots", type=int, default=8)
     p.add_argument("--min-episode-s", type=float, default=20)
@@ -2865,6 +3182,8 @@ def run_target(a, drv, swarm, target, seeds, run_dir, stamp, w, replay_rec=None)
             recs = tr.run_seed(seed)
             all_recs += recs
             shrunk = tr.shrink_top(seed, recs, a.shrink) if a.shrink > 0 and target != DIRECT else []
+            if target != DIRECT and a.finding_shrink > 0:
+                tr.shrink_findings(seed, a.finding_shrink)
             by_seed[seed] = (recs, shrunk)
         if target != DIRECT:
             cands = [c for s, (r, sh) in by_seed.items() for c in tr.ladder_candidates(s, r, sh)]
@@ -2880,6 +3199,8 @@ def run_target(a, drv, swarm, target, seeds, run_dir, stamp, w, replay_rec=None)
                     a.episodes = episodes
                 all_recs += recs
                 shrunk = tr.shrink_top(seed, recs, a.shrink) if a.shrink > 0 else []
+                if a.finding_shrink > 0:
+                    tr.shrink_findings(seed, a.finding_shrink)
                 cands = tr.ladder_candidates(seed, recs, shrunk)
             ladder = tr.climb(cands) if cands and not tr.coverage["heap_stopped"] else []
             tr.finish(cands, ladder)
@@ -2890,7 +3211,9 @@ def run_target(a, drv, swarm, target, seeds, run_dir, stamp, w, replay_rec=None)
             cstats = class_stats(all_recs)
             save_json(os.path.join(run_dir, CONTROL_CLASSES_FILE), cstats)
             save_json(os.path.join(run_dir, CONTROL_HEAP_FILE), fit_counts(all_recs, [HEAP], a.ridge_lam))
+            save_json(os.path.join(run_dir, CONTROL_FINDINGS_FILE), control_findings(tr.findings))
             save_json(os.path.join(tdir, VERDICT_FILE), {"target": target, "verdict": "CONTROL",
+                                                         "findings": summarise_findings(tr.findings),
                                                          "coverage": dict(tr.coverage, pairs=len(tr.coverage["pairs"]))})
             log(f"{target}: control class stats over {cstats['n']} episodes, {len(cstats['classes'])} classes")
             log(f"{target}: control fit over {max((c['n'] for c in control.values()), default=0)} "
@@ -2916,6 +3239,8 @@ def main(argv=None) -> int:
         p.error("need 0 < --elite <= 1, 0 < --cem-alpha <= 1, 1 <= --shrink-k <= --shrink-n, --stall-gens >= 1")
     if a.surprise_n > 0 and not 1 <= a.surprise_k <= a.surprise_n:
         p.error("need 1 <= --surprise-k <= --surprise-n")
+    if a.finding_n > 0 and not 1 <= a.finding_k <= a.finding_n:
+        p.error("need 1 <= --finding-k <= --finding-n")
     if not 0 <= a.novelty <= a.novelty_max <= 1:
         p.error("need 0 <= --novelty <= --novelty-max <= 1")
     try:

@@ -94,7 +94,7 @@ There is also a paid LeafRTP-Pro listing on BuiltByBit. It is the same code, and
 <!-- /kind -->
 <!-- /only -->
 <!-- only: modrinth -->
-One jar for Paper, Folia and Spigot (1.20+), Fabric (needs Fabric API) and NeoForge (1.21.1+), up to 26.x, and it also loads as a Velocity plugin for cross-server `/rtp`. Java 21+.
+One jar for Paper, Folia and Spigot (1.21+), Fabric (needs Fabric API) and NeoForge (1.21.1+), up to 26.x, and it also loads as a Velocity plugin for cross-server `/rtp`. Java 21+.
 <!-- /only -->
 <!-- only: hangar -->
 On Paper all candidate checking runs off the tick thread. On Folia, candidates are screened against the region files first, nothing waits on a synchronous chunk load, and only the final block check of a loaded chunk runs on its region thread. The same jar also loads on Velocity for cross-server `/rtp`.
@@ -105,13 +105,13 @@ On Paper all candidate checking runs off the tick thread. On Folia, candidates a
 - [**Tick stability**](https://dailystruggle.github.io/RTP/admin/configuration/PERFORMANCE/): No ticks over 50 ms across 4,096 paced teleports in the Paper run; candidates are checked against region files off-tick before any chunk loads.
 - [**Low latency**](https://dailystruggle.github.io/RTP/site/why/#background-processing-and-memory): 6 ms median from `/rtp` to arrival on Paper, served from pre-verified candidate queues.
 - [**Throughput**](#performance): 40 TP/s on Paper and 180 TP/s on Folia under nominal ticks, scaling to 249.7 TP/s peak on Folia.
-- [**Even player spread**](https://dailystruggle.github.io/RTP/site/why/): Zero duplicate landings in 4,096 teleports, with no player coordinates tracked.
+- [**Even player spread**](https://dailystruggle.github.io/RTP/site/why/): Zero duplicate landings in each 4,096-teleport Paper 26.2 run, with no player coordinates tracked.
 - [**Spatial memory**](https://dailystruggle.github.io/RTP/admin/configuration/TTL/): Biomes and rejected chunks (with cause and TTL) remembered across restarts at chunk resolution.
 - [**One-command import**](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-competitor-plugins-betterrtp-justrtp-ezrtp-jakesrtp): Auto-translates third-party configs and generates LuckPerms permission commands.
 - [**Web workspace**](https://dailystruggle.github.io/RTP/admin/WEB_EDITOR_GUIDE/): Edit region borders on a map, search configs by intent, and view live engine stats (`/rtp editor`).
 - [**One jar**](https://dailystruggle.github.io/RTP/admin/QUICK_START/): Runs on Paper, Folia, Spigot, Fabric, NeoForge, and Velocity.
 - [**Action engine**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Scriptable pipeline for step-in portals, party scatter, and 1v1 arena duels.
-- [**Claim checks**](https://dailystruggle.github.io/RTP/admin/CLAIM_PLUGIN_COMPATIBILITY/): Fail-closed claim checks, PvP damage cancel, zero open firewall ports.
+- [**Claim checks**](https://dailystruggle.github.io/RTP/admin/CLAIM_PLUGIN_COMPATIBILITY/): Fail-closed claim checks, PvP damage cancel; the hosted web editor needs no inbound port.
 
 Benchmark comparisons and hardware metrics are in [Performance](#performance).
 
@@ -125,13 +125,13 @@ These work without extra plugins:
 - [**1v1 and 2v2 PvP matchmaking**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Bundled `challenge.yml`, `arena.yml`, and `teams.yml` actions queue and pair players for 1v1 duels or 2v2 squad battles into temporary bounded arenas with countdowns and border constraints, cleaned up automatically.
 - [**Near-player & claim hunting**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Bundled `nearplayer.yml` and `nearclaim.yml` actions land players safely near random players or town and claim perimeters (`anchor: entity`, `anchor: claimboundary`) without inline claim-plugin overhead.
 - [**Sky drops**](https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/): A `Fixed` vertical adjustor at Y=250+ pairs with a slow-falling potion effect for aerial parachute drops.
-- [**Survival and resource worlds**](https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/#spacing-repeats-and-worst-case-by-mode): Destinations do not repeat within a run (0 of 4,096 landings within 48 blocks), preventing base hunting without tracking players.
+- [**Survival and resource worlds**](https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/#spacing-repeats-and-worst-case-by-mode): In the Paper 26.2 runs no destination repeated (0 of 4,096 landings within 48 blocks of another), without tracking players. On the default `ACCUMULATE` mode a used spot can still come up again at about the random-pick rate; `REROLL` rules that out until the shuffle has cycled.
 
 ---
 
 ## Install
 
-**Requirements:** Java 21+. Paper, Folia, Spigot on 1.20+, or Fabric / NeoForge on 1.21.1+, up to 26.x.
+**Requirements:** Java 21+. Paper, Folia, Spigot on 1.21+, or Fabric / NeoForge on 1.21.1+, up to 26.x.
 
 1. Drop `{{jar}}` into `plugins/` (or `mods/`).
 2. Type `/rtp`. With the bundled GUI addon it opens a picker listing your regions, with links to the map visualizations and the admin panel; without it, `/rtp` teleports straight away.
@@ -141,7 +141,7 @@ That's enough to run. If you want to tune it, my recommended order is: `/rtp adm
 **Customize (optional):**
 - **Chat wizard:** `/rtp admin setup`
 - **Web workspace:** `/rtp editor` in your browser
-- **YAML files:** `plugins/RTP/` (`radius: 10km`, `cooldown: 30s`)
+- **YAML files:** `plugins/RTP/` (`radius: 10km`, `teleportCooldown: 30s`)
 - **Switching from another rtp plugin:** `/rtp config import` previews the translated config and permissions; add `overwrite=true` to write them ([switching guide](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-competitor-plugins-betterrtp-justrtp-ezrtp-jakesrtp)).
 
 (Advanced database, network proxy, and cache tuning: see the [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/).)
@@ -152,7 +152,7 @@ That's enough to run. If you want to tune it, my recommended order is: `/rtp adm
 
 ### Setting it up
 
-All configuration routes edit the same files, accept human units (`radius: 10km`, `cooldown: 30s`), and hot-reload via `/rtp reload`.
+All configuration routes edit the same files, accept human units (`radius: 10km`, `teleportCooldown: 30s`), and hot-reload via `/rtp reload`.
 
 - [**Web Workspace**](https://dailystruggle.github.io/RTP/admin/WEB_EDITOR_GUIDE/) (`/rtp editor`): Browser admin with no port forwarding. Drag region boundaries on a map and search YAML by intent with live setting docs beside each key. A diagnostics tab shows live tick, queue and latency stats.
 - [**In-Game Admin Book**](https://dailystruggle.github.io/RTP/admin/configuration/IN_GAME_CONFIG/#1-the-interactive-admin-panel-rtp-admin) (`/rtp admin`): Clickable operator book for inspecting queues and reloading configs in game.
@@ -196,7 +196,7 @@ All configuration routes edit the same files, accept human units (`radius: 10km`
 
 ### Gameplay and worlds
 
-- **Regions**: any number per world with customizable shape (Square, Circle, Rectangle, Polygon), radius, center, curve weighting, vertical bounds, world override, required permission, and price. Vertical adjustors (Linear, Jump, Fixed) for sky islands, void worlds, aerial parachute drops, and Nether ceilings. A world's `override` key (`definitions/worlds/<name>.yml`) routes Nether or End teleports to designated safe worlds.
+- **Regions**: any number per world with customizable shape (Square, Circle, Ellipse, Rectangle, Polygon), radius, center, curve weighting, vertical bounds, world override, required permission, and price. Vertical adjustors (Linear, Jump, Fixed) for sky islands, void worlds, aerial parachute drops, and Nether ceilings. A world's `override` key (`definitions/worlds/<name>.yml`) routes Nether or End teleports to designated safe worlds.
 - **Arrival schematics**: drop a Sponge `.schem` named after a region into `plugins/RTP/advanced/schematics/` and every teleport into that region pastes it centered on the landing spot. Decoded in-house, no WorldEdit needed, and claim-aware.
 - **Auto-RTP on events**: join, first join, respawn, world change, move, and teleport (`rtp.onevent.*`). A login reserve cache keeps destinations ready so join-time teleports are served from the queue.
 - **Economy**: charge per `/rtp` through Vault, per-region pricing, refund on cancel, and `rtp.free` permission bypass.
@@ -219,15 +219,15 @@ An extensible action pipeline for group events, boundary confinement, and miniga
 
 - **Claim plugins**: 16 on Bukkit / Paper / Folia through the bundled claim addon (GriefDefender, GriefPrevention, Lands, WorldGuard, TownyAdvanced, SaberFactions, FactionsBridge, HuskClaims, HuskTowns, PlotSquared, RedProtect, CrashClaim, KingdomsX, Residence, UltimateClaims, MinePlots), plus FTB Chunks and Open Parties and Claims on Fabric / NeoForge. Claim checks run in the async pipeline, off the teleport tick. You can add your own through `RegionVerifierRegistry` with one lambda.
 - **Claim and faction anchors**: an action can land players relative to their own town, claim or faction land (`anchor: claimboundary`, `anchor: faction`). Towny, GriefPrevention and SaberFactions / FactionsUUID boundaries are supported directly; others plug in through `ClaimBoundaryProvider`. The anchor stays put while it's inside the claim and is recomputed at most once per cooldown, which keeps destination anchors stable every time land changes hands.
-- **Safety filter**: `safety.yml` takes plain materials, block-state predicates (`OAK_SLAB[waterlogged=true]`), numeric ranges (`WATER[level>=5]`), vanilla and datapack block tags (`#minecraft:leaves`) and wildcards (`*[waterlogged=true]`). Grammar is in the details below.
+- **Safety filter**: the block lists in `advanced/blocks.yml` (`unsafeBlocks`, `airBlocks`) take plain materials, block-state predicates (`OAK_SLAB[waterlogged=true]`), numeric ranges (`WATER[level>=5]`), vanilla and datapack block tags (`#minecraft:leaves`) and wildcards (`*[waterlogged=true]`). Grammar is in the details below.
 
 ### Networks
 
-- **Cross-server `/rtp`**: Velocity, over proxy-direct, SQL or Redis. Tested nightly on the in-repo devstack: 2 Velocity proxies, 2 lobbies, 2 backends behind Redis.
+- **Cross-server `/rtp`**: Velocity, over proxy-direct, SQL or Redis. Tested nightly on the in-repo devstack: 2 Velocity proxies, 2 lobbies and 4 backends (Paper, Folia, Fabric, NeoForge) behind Redis.
 
 ### For developers
 
-- **API and addons**: `rtp-api` (pre / mid / post teleport hooks, region verifiers, config, scheduling) and `effects-api`. Addons compile against `rtp-api` only and load through a `ServiceLoader` SPI; one addon jar runs on Spigot, Paper, Folia, Fabric and NeoForge. The bundled addons (GUI picker, claim integrations, Countdown reference, scripted actions) unpack into `plugins/RTP/addons/` on first run; delete one from that folder to turn it off. Their source, and the Rift warmup-effect addon's, is under `addons/` as a starting point.
+- **API and addons**: `rtp-api` (pre / mid / post teleport hooks, region verifiers, config, scheduling) and `effects-api`. A third-party addon needs only `rtp-api` and loads through a `ServiceLoader` SPI; an addon built on `rtp-api` alone runs on Spigot, Paper, Folia, Fabric and NeoForge. The bundled addons (GUI picker, claim integrations, Countdown reference, scripted actions) also use `rtp-core` internals. They unpack into `plugins/RTP/addons/` on first run; delete one from that folder to turn it off. Their source, and the Rift warmup-effect addon's, is under `addons/` as a starting point.
 - **Swappable parts**: server backend, economy, location validity, shapes, world border, PvP checks, region file format and commands can all be replaced through SPI.
 - **PlaceholderAPI**: queue depth (total / public / personal), last-teleport coordinates, player status.
 - **bStats**: on by default; anonymous usage counts help me decide which platforms to spend time on.
@@ -257,7 +257,7 @@ These are snapshots of each plugin under one harness on my hardware. The other p
 | EzRTP | 5 TP/s (MSPT 22 ms) | 8.4 TP/s | < 20 TP/s | 19.7 TP/s |
 | BetterRTP | < 5 TP/s | 9.2 TP/s | - | Did not complete on this rig |
 
-- **Paper vs. Folia:** Paper places every arriving player on one main thread, so no plugin here gets much past 40 TP/s at 20 TPS. Under 100 TP/s unthrottled load on Paper, LeafRTP completed 35,113 of 35,113 teleports while the server slowed (MSPT p95 103-122 ms). Folia spreads that work across region threads, and LeafRTP reached 180 TP/s at 19.6 regional TPS (198 ms median latency), peaking at 249.7 TP/s.
+- **Paper vs. Folia:** Paper places every arriving player on one main thread, so no plugin here gets much past 40 TP/s at 20 TPS. Under 100 TP/s unthrottled load on Paper, LeafRTP completed 35,113 of 35,113 teleports while the server slowed (MSPT p95 103-122 ms; runs `20261009-044336`, `20261009-054148` and `20261009-070736`). Folia spreads that work across region threads, and LeafRTP reached 180 TP/s at 19.6 regional TPS (198 ms median latency), peaking at 249.7 TP/s.
 
 Full benchmark tables, methodology, and per-run analyses: [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP).
 
@@ -290,11 +290,11 @@ Safe destinations are verified in advance and held in background queues. Answeri
 
 ### Spacing between players
 
-Destinations cycle across available land, and a spot doesn't come up again until the shuffle has cycled. Consecutive landings are normally hundreds of blocks apart (closest pair 70 blocks at 16k radius in the Paper 26.2 run), so `/rtp` spam is a poor way to find someone's base, and no player coordinates are tracked. Each region shuffle uses a random seed generated at startup, so players can't predict landing spots from the world seed. Full spacing statistics and repetition rules: [Regions guide](https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/#spacing-repeats-and-worst-case-by-mode).
+Destinations come from a keyed shuffle of the region, and no player coordinates are tracked. On the default 16,384-block circle, spots drawn back to back sit one bin (512 blocks) apart, and closer where the spiral turns its corners. In the paced Paper 26.2 run (4,096 teleports at 16k radius) no spot repeated and the closest pair of landings was 70 blocks apart, so `/rtp` spam is a poor way to find someone's base. That is a measured result, not a minimum. On the default `ACCUMULATE` mode with `expand: false`, a used spot can come up again at about the random-pick rate (around 0.1% of landings in simulation); `REROLL` doesn't repeat a spot until the shuffle has cycled. Each region shuffle uses a random seed generated at startup, so players can't predict landing spots from the world seed. Full spacing statistics and repetition rules: [Regions guide](https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/#spacing-repeats-and-worst-case-by-mode).
 
 ### No shaded dependencies
 
-I don't shade libraries. The SQL connection pool, Redis client, cross-server messaging, bStats and region-file reader are written in-house on plain Java. The web workspace connects outward to an ephemeral relay (like spark and LuckPerms) with no embedded HTTP server daemon, so there are no open listening ports and no library version conflicts.
+I don't shade libraries. The SQL connection pool, Redis client, cross-server messaging, bStats and region-file reader are written in-house on plain Java, so there are no library version conflicts. The hosted web workspace connects outward to an ephemeral relay (like spark and LuckPerms), so it needs no inbound port. Local editor mode (`/rtp editor local`) binds a token-gated socket on `127.0.0.1` only. The proxy-direct network transport opens a TCP listener on the Velocity proxy (`127.0.0.1` by default) only if you choose that transport.
 
 ### Maps and image exports
 
@@ -303,7 +303,7 @@ LeafRTP includes a standalone map renderer (`maps-api`) that generates live in-g
 - **High-resolution image exports** (`/rtp visualization export <type>`): Exports standalone PNG and BMP image files to `plugins/RTP/charts/` (biomes, hazards, heatmaps, pipeline composites).
 - **Combined diagnostic chart** (`/rtp visualization export comprehensive`): One panel with biome layouts, hazard overlays, candidate markers, and player spread metrics.
 - **Held in-game maps** (`/rtp visualization`): Real-time biome layouts, rejected terrain, and candidate heatmaps on held Minecraft map items.
-- **External web map integration**: Non-blocking tile providers and vector region borders for Dynmap, BlueMap, and Pl3xMap via `maps-api` and `anvil-api`.
+- **External web maps (planned)**: Dynmap, BlueMap and Pl3xMap support is proposed in [ADR-086](https://github.com/DailyStruggle/RTP/blob/V3/docs/adr/ADR-086-external-web-map-integration.md); no web-map integration ships yet.
 
 ### Chunk loading, by platform
 
@@ -325,11 +325,11 @@ These charts come from the visualizer test fixtures in `rtp-core`, which assert 
 
 ![32x32 region file zoom](../assets/img/region_32x32_zoom_path_chart.png)
 
-**Player separation.** With unconstrained random search, 35.8% of players land within render distance of an existing arrival. With LeafRTP's spaced distribution, 0% do within 8 chunks, and the minimum separation is 16 chunks.
+**Player separation (simulation).** In the 600-placement simulation in [Shape Algorithm Verification](https://dailystruggle.github.io/RTP/site/shape-algorithms/) (`DownsamplingSideBySideBenchmarkTest`, 256-chunk square), unconstrained picks (stride S=1) put 35.8% of arrivals within 8 chunks of an earlier one. Stride S=64 (8-chunk exclusion) brought that to 0%, and stride S=256 (16-chunk exclusion) kept every arrival at least 16 chunks from the rest. These strides apply only with `uniquePlacements` and `expand: true`; the shipped default is `expand: false`.
 
 ![Player spacing comparison chart](../assets/img/side_by_side_downsampling_comparison_chart.png)
 
-**Pre-screened candidates.** In a 32,768-block world with 10,000 cached candidates, 505 ocean-only region files are discarded directly from the map header without reading chunk data from disk. Candidates are spread evenly across all viable land.
+**Pre-screened candidates.** In a 32,768-block world with 10,000 cached candidates, ocean-only region files are discarded directly from the map header without reading chunk data from disk. Candidates are spread evenly across all viable land.
 
 ![Backlog cache state across the region](../assets/img/full_l3_state_chart.png)
 
@@ -346,9 +346,9 @@ A plugin can pass one of these tools and fail another.
 |---|---|---|
 | Stress harness (`helpers/StressTestRTP/`) | Scripted bot clients that join like players, in closed-loop, open-loop and paced modes, with spark and JFR attached | Throughput ceiling, MSPT and ticks over 50 ms, chunks and CPU per teleport, and which thread pays for them |
 | Behaviour fuzzer (`scripts/bench_fuzz.py`) | Seeded bot programs: `/rtp`, move, quit, rejoin under a new name, die, console `reload`. Coverage-guided search, automatic replay and shrinking | Memory the server still holds after a full GC, scored against a control run with no rtp plugin. Every plugin gets the same seeds, bots and server |
-| Jazzer targets | Region-file readers, the compression decoder, the NBT readers and the proxy wire parser | Crashes and unexpected exceptions on malformed input; failing inputs are saved as reproducers |
+| Jazzer targets | The Anvil chunk and column readers, the LZ4 decoder, the NBT readers and the Redis (RESP) reply parser; only the two Anvil readers have real-region seeds | Crashes and unexpected exceptions on malformed input; failing inputs are saved as reproducers |
 | Spacing simulations | Landing coordinates from real stress runs and from the shape models | Repeats, clustering and distance to the nearest earlier landing |
-| Safety and mutation tests | One test per safety prohibition, plus weekly PIT on the teleport pipeline | Rules that must never break, and tests that wouldn't notice a broken rule |
+| Safety and mutation tests | One test per safety prohibition, plus weekly PIT on the teleport pipeline and three other `rtp-core` packages | Rules that must never break, and tests that wouldn't notice a broken rule |
 
 What they found:
 
@@ -373,9 +373,9 @@ The build fails when coverage drops below a floor, and lowering a floor takes a 
 | `tags-api` | 98.2% / 90.9% | 0.95 / 0.85 | met |
 | `yaml-api` | 97.0% / 88.1% | 0.92 / 0.80 | met |
 | `rtp-api` | 95.7% / 81.3% | 0.90 / 0.80 | met |
-| `maps-api` | 94.7% / 82.1% | 0.90 / 0.78 | met |
+| `maps-api` | 94.7% / 82.1% | 0.90 / 0.80 | met |
 | `commands-api` | 93.6% / 80.3% | 0.90 / 0.80 | met |
-| `anvil-api` | 90.5% / 80.5% | 0.86 / 0.75 | met |
+| `anvil-api` | 90.5% / 80.5% | 0.90 / 0.80 | met |
 | `rtp-core` | 81.6% / 65.8% | 0.80 / 0.64 | not met (branch coverage still climbing) |
 | `rtp-proxy-common` | 87.0% / 68.8% | 0.85 / 0.67 | not met (branch coverage still climbing) |
 
@@ -383,20 +383,20 @@ Safety-critical packages inside `rtp-core` have higher floors on top of the modu
 
 | Gate | What it enforces | Where it runs |
 |---|---|---|
-| Test suite | over 650 committed JUnit test classes; `rtp-core` alone has roughly 3,700 test cases | `gradle.yml` on every push and pull request |
-| Mutation testing (PIT) | weekly PIT run over the teleport pipeline, region cache and world-border packages; the scheduled teleport-pipeline shard gates at 40% while I work toward 60% | `mutation-testing.yml` |
+| Test suite | over 650 committed JUnit test classes; `rtp-core` alone has roughly 4,700 test methods | `gradle.yml` on every push and pull request |
+| Mutation testing (PIT) | weekly PIT run in four shards over the `rtp-core` teleport pipeline, region selection, world-border and tools packages; each shard fails below a 60% mutation score | `mutation-testing.yml` |
 | Safety prohibitions | one automated test per prohibition (unsafe destinations, force-loaded chunks, claim bypass, swallowed teleport failures, main-thread chunk I/O, null-guard no-ops on the public API, hardcoded failure messages), plus ArchUnit layering and chunk-ticket rules | `gradle.yml` |
 | Changed-line coverage | new and modified lines must be >= 80% covered | `gradle.yml` (`scripts/diff-coverage.py`) |
-| Static analysis | SpotBugs plus a PMD ruleset with a project-specific rule that flags blocking constructs | `gradle.yml` (`-PstaticAnalysis`) |
-| Fuzzing | Jazzer targets for the region-file readers, the compression decoder and the proxy wire parser. A separate behaviour fuzzer drives seeded bot players against a server and checks what stays in memory after a full GC, against a control run with no rtp plugin | `fuzzing.yml` (weekly, Jazzer); the behaviour fuzzer (`scripts/bench_fuzz.py`) is run by hand |
+| Static analysis | PMD with a curated ruleset (`config/pmd/ruleset.xml`), including a project-specific rule that flags blocking constructs; any violation fails the build | `gradle.yml` (`-PstaticAnalysis`) |
+| Fuzzing | Five Jazzer targets: the Anvil chunk and column readers, the LZ4 decoder, the NBT readers and the Redis (RESP) reply parser. Only the two Anvil read targets have real-region seeds, and the reworked weekly workflow hasn't completed a scheduled run yet. A separate behaviour fuzzer drives seeded bot players against a server and checks what stays in memory after a full GC, against a control run with no rtp plugin | `fuzzing.yml` (weekly, Jazzer); the behaviour fuzzer (`scripts/bench_fuzz.py`) is run by hand |
 | Profiling and load | Stress harness with spark and JFR attached, bot clients, open-loop and paced modes. It is the source of every benchmark number above | run by hand from `helpers/StressTestRTP/` |
-| Binary API compatibility | japicmp check against a released baseline is wired up but not enforcing yet: the configured baseline isn't a published version and the check skips. Removals follow a 2-minor deprecation policy | `gradle.yml` (japicmp) |
+| Binary API compatibility | japicmp against the 3.2.1 release on Maven Central for `rtp-api`, `commands-api`, `effects-api`, `maps-api` and `metrics-api`; a binary break not listed in `config/binary-compatibility-accepted-breaks.json` fails the build. `anvil-api` and `tags-api` have no published 3.2.1 artifact, so their check skips. Removals follow a 2-minor deprecation policy | `gradle.yml` (japicmp) |
 | Dependency CVEs | OWASP dependency-check fails at CVSS >= 4 on the scanned files; scanning the resolved Gradle dependency graph and shaded jar isn't in place yet | `dependency-check.yml`, weekly and on dependency changes |
 | Release provenance | SLSA build provenance on every release; GitHub releases also carry a CycloneDX SBOM and SHA-256 / SHA-512 checksums | `release.yml`, `release-bbb.yml` |
-| Runtime acceptance | nightly multi-server devstack: 2 Velocity proxies, 2 lobbies, 2 backends over Redis, on Velocity + Paper + Folia + Fabric (MC 1.21.11, Java 25) and NeoForge (MC 1.21.1, Java 21) | `devstack-acceptance.yml` |
+| Runtime acceptance | nightly multi-server devstack: 2 Velocity proxies, 2 lobbies and 4 backends over Redis, on Velocity + Paper + Folia + Fabric (MC 1.21.11, Java 25) and NeoForge (MC 1.21.1, Java 21) | `devstack-acceptance.yml` |
 | Encoding and docs | tracked text files scanned for UTF-8 mojibake; the docs site builds from the same tree | `gradle.yml`, `docs.yml` |
 
-**Coverage scope.** The `rtp-core` and `rtp-proxy-common` floors sit a point or two under the measured numbers and only go up. The uncovered remainder in `rtp-core` is mostly platform bootstrap and dispatch code, which the nightly devstack exercises. Spigot, NeoForge, BungeeCord and non-LTS Java have no scheduled live CI suite and are best-effort. The weekly Jazzer job runs each fuzz target as its own job for the configured duration, seeded from real region files.
+**Coverage scope.** The `rtp-core` and `rtp-proxy-common` floors sit a point or two under the measured numbers and only go up. The uncovered remainder in `rtp-core` is mostly platform bootstrap and dispatch code, which the nightly devstack exercises. Spigot, NeoForge, BungeeCord and non-LTS Java have no scheduled live CI suite and are best-effort. The weekly Jazzer workflow runs each of the five fuzz targets as its own job for the configured duration (5 minutes by default). Only the two Anvil read targets are seeded from real region files; the LZ4 and NBT targets have no seeds yet. The reworked workflow has not completed a scheduled run yet.
 
 </details>
 
@@ -452,8 +452,11 @@ Switching between the free download and this one is a jar swap. Config, data fil
 | `/rtp back` | Return to where you were before the last `/rtp` | `rtp.back` |
 | `/rtp centerx=<x> centerz=<z> radius=<r>` | One-off overrides for this call; units allowed (`radius=10km`) | `rtp.params` |
 | `/rtp menu` | Player book menu | `rtp.use` |
+| `/rtp gui` | Open the menu a GUI addon bound to `/rtp`; without one, a plain teleport | `rtp.gui` |
 | `/rtp admin` | Operator book menu | `rtp.menu.admin` |
-| `/rtp editor [local\|trust\|apply]` | Web editor link, offline copy, browser trust, token apply | `rtp.editor` |
+| `/rtp editor [local\|trust\|untrust\|apply]` | Web editor link, offline copy, browser trust and revocation (`untrust key=<prefix\|all>`), token apply | `rtp.editor` |
+| `/rtp docs [topic\|list\|export]` | Read the bundled docs in game; `export` writes an offline HTML bundle | `rtp.admin.docs` |
+| `/rtp clear <cache\|cooldown\|queue\|limit\|invuln>` | Clear location caches, cooldowns, queues, use limits or invulnerability | `rtp.admin` |
 | `/rtp info` | Operator diagnostics | `rtp.info` |
 | `/rtp reload [file]` | Reload all configuration, or one file | `rtp.reload` |
 | `/rtp config <file> view\|set <k>=<v>` | View or set a config key, then reload | `rtp.config` |
@@ -475,6 +478,8 @@ Switching between the free download and this one is a jar swap. Config, data fil
 | `rtp.onevent.*` | `false` | Auto-RTP on join / firstjoin / respawn / changeworld / move / teleport |
 | `rtp.back` | `op` | `/rtp back` (not declared in `plugin.yml`; op by server default) |
 | `rtp.editor` | `op` | `/rtp editor` and its subcommands (not declared in `plugin.yml`; op by server default) |
+| `rtp.gui` | `op` | `/rtp gui` (not declared in `plugin.yml`; op by server default) |
+| `rtp.admin.docs` | `op` | `/rtp docs` (not declared in `plugin.yml`; op by server default) |
 | `rtp.servers.*` | `true` | Cross-server destinations in network mode (was `op` before 3.3.0) |
 | `rtp.admin` | `op` | `/rtp clear`, plus `rtp.reload`, `rtp.config`, `rtp.scan`, `rtp.info` and `rtp.menu.admin` |
 | `rtp.admin.setup` | `op` | `/rtp admin setup` wizard |
@@ -486,7 +491,8 @@ Switching between the free download and this one is a jar swap. Config, data fil
 | --- | --- | --- |
 | `config.yml` | Delays, cooldowns, move-cancel distance | `teleportDelay`, `teleportCooldown`, `cancelDistance` |
 | `definitions/regions/<name>.yml` | Shape, radius, center, price, permissions | `shape`, `radius`, `price`, `requirePermission` |
-| `safety.yml` | Unsafe blocks (lava, water) and block tags | `unsafeBlocks`, `airBlocks` |
+| `safety.yml` | Invulnerability, landing platforms, PvP check | `invulnerabilityTime`, `platformRadius`, `pvpCheckEnabled` |
+| `advanced/blocks.yml` | Unsafe blocks (lava, water), air blocks and block tags | `unsafeBlocks`, `airBlocks` |
 | `economy.yml` | Vault pricing and cancellation refunds | `price`, `refundOnCancel` |
 | `definitions/actions/<name>.yml` | Portals, party spacing, and arena bounds | `minSeparation`, `confinement.damage` |
 
@@ -497,9 +503,9 @@ Switching between the free download and this one is a jar swap. Config, data fil
 </details>
 
 <details>
-<summary><b>safety.yml token grammar</b></summary>
+<summary><b>Block-list token grammar (advanced/blocks.yml)</b></summary>
 
-Six token shapes can be mixed freely in `unsafeBlocks` and `airBlocks`:
+Six token shapes can be mixed freely in `unsafeBlocks` and `airBlocks` (`advanced/blocks.yml`):
 
 - **Plain material:** `LAVA`, `MAGMA_BLOCK`.
 - **Material + state predicate:** `OAK_SLAB[waterlogged=true]`. Multiple predicates AND together: `OAK_SLAB[waterlogged=true,type=top]`.
@@ -508,7 +514,7 @@ Six token shapes can be mixed freely in `unsafeBlocks` and `airBlocks`:
 - **Tag + state predicate:** `#minecraft:slabs[waterlogged=true]`.
 - **Wildcard + state predicate:** `*[waterlogged=true]`: one line instead of listing every waterloggable block.
 
-Unknown tags and properties fail open: a config written for a newer MC version still loads on an older one. Malformed tokens are never silent: `[WARNING] [safety.yml] rejected token '<token>': <reason>`. Block states are only read when a token needs them, and plain-material configs cost nothing extra. Plain-material entries from an older `safety.yml` keep working unchanged.
+Unknown tags and properties fail open: a config written for a newer MC version still loads on an older one. Malformed tokens are never silent: `[WARNING] [safety.yml] rejected unsafe-blocks token '<token>': <reason>` (the log prefix still names `safety.yml`, where these lists used to live). Block states are only read when a token needs them, and plain-material configs cost nothing extra. On an older install, lists kept in `safety.yml` are moved into `advanced/blocks.yml` on load, and plain-material entries keep working unchanged.
 
 </details>
 
@@ -516,7 +522,7 @@ Unknown tags and properties fail open: a config written for a newer MC version s
 <summary><b>FAQ</b></summary>
 
 **Q: Will players land on top of each other or in each other's bases?**
-A: No. A spot doesn't come up again until the shuffle has cycled, and on regions past about 720 blocks of radius consecutive spots are at least 256 blocks apart. See [Spacing between players](#spacing-between-players).
+A: Rarely, and no player positions are tracked. In the Paper 26.2 runs (4,096 teleports each) no spot repeated and the closest pair of landings was 70 blocks apart; that is a measured result, not a minimum. On the default `ACCUMULATE` mode a used spot can come up again at about the random-pick rate; `REROLL` doesn't repeat a spot until the shuffle has cycled. See [Spacing between players](#spacing-between-players).
 
 **Q: How does it avoid lagging the server?**
 A: Most `/rtp` calls are served from a queue of locations checked before anyone typed the command. The queue refills off the main thread: it skips ground it has already rejected and checks the rest against the region files before loading any chunk. Details are in [How it works](#how-it-works).
@@ -525,7 +531,7 @@ A: Most `/rtp` calls are served from a queue of locations checked before anyone 
 A: No. Sizing and configuring your regions takes a couple of minutes through the guided setup wizard (`/rtp admin setup`), the web workspace (`/rtp editor`), or in-game book (`/rtp admin`). If you are migrating from another plugin, `/rtp config import` translates your existing files automatically.
 
 **Q: How is the web editor secured? Does it open ports on my server?**
-A: No. The web editor opens zero listening ports on your server. It communicates outbound-only via TLS to an ephemeral WebSocket relay, or over a token-authenticated loopback socket (`127.0.0.1`) for local edits. All messages require RSA-2048 signatures with strictly increasing sequence counters and single-use, expiring trust nonces.
+A: Not to the outside. The hosted editor needs no inbound port: it connects outbound over TLS to an ephemeral WebSocket relay. Local mode (`/rtp editor local`) binds a token-authenticated socket on `127.0.0.1` only, which nothing outside the machine can reach. All messages require RSA-2048 signatures with strictly increasing sequence counters and single-use, expiring trust nonces.
 
 **Q: Why is it called "LeafRTP" now instead of just "RTP"?**
 A: "RTP" is the generic name for random teleport, and the old name was just the function. That worked for years with older search and word of mouth (passing 400k downloads under that name), but current search and marketplace indexes lump it in with every other random-teleport plugin, command and forum thread, and it stopped showing up. "LeafRTP" is a name that points at this plugin. The `/rtp` command, `rtp-api`, config paths and data files stay exactly as they were, and nothing changes for existing installs.
@@ -546,7 +552,7 @@ A: No, but they work well together. `/rtp scan` walks a region off-tick, verifie
 A: Yes. Region files are read directly: modded and namespaced IDs are kept, and `/rtp biome=<x>` matches what's on disk. Plugins that use the live noise-map lookup get this wrong after a version migration. Chunks that were never populated fall back to a live load.
 
 **Q: What about the Linear (.linear) region format?**
-A: Region pre-filtering reads standard Anvil (`.mca`) files directly because 4 KiB sectors allow random-access chunk checks without decompressing whole regions or shading third-party libraries. For `.linear` or any other unsupported format, the pre-filter returns `UNKNOWN` and falls back to live chunk loading on the server engine. The reader is pluggable through `RegionFileReader` SPI for addons.
+A: Region pre-filtering reads standard Anvil (`.mca`) files directly because 4 KiB sectors allow random-access chunk checks without decompressing whole regions or shading third-party libraries. For `.linear` or any other unsupported format, the pre-filter returns `UNKNOWN` and falls back to live chunk loading on the server engine. No `.linear` reader ships yet, built in or as an addon. An addon can add one through the `RegionFileReader` SPI, registered with `RegionFormatRegistry`.
 
 **Q: I'm on NeoForge.**
 A: There's a native NeoForge adapter for 1.21.x / 26.x running the same core as every other platform. I test it less than the Bukkit family and Fabric, and broader testing on the 26.x carrier is still ongoing. If you hit something there, it goes to the front of my list.
@@ -555,7 +561,7 @@ A: There's a native NeoForge adapter for 1.21.x / 26.x running the same core as 
 A: Run Arclight or Mohist and use this jar. A native Forge adapter isn't planned.
 
 **Q: Memory and MSPT: should I worry?**
-A: MSPT, no. Spatial memory stays compact (about 26 bytes per sector segment). Locations kept in the hot queue hold chunk tickets so arrival doesn't wait on chunk loading, and `MemoryTracker` makes sure those tickets are released. Under heap pressure (`maxHeapPercent`, or under 512 MB free) background filling pauses and the held tickets are dropped back to cold storage, which frees the pinned chunks right away.
+A: MSPT, no. Locations kept in the hot queue hold chunk tickets so arrival doesn't wait on chunk loading, and `MemoryTracker` makes sure those tickets are released. Under heap pressure (old-generation use at or above `maxHeapPercent`, 85% by default; on a JVM with no separate old-generation pool and under 512 MB free, total heap use counts too) background filling pauses and the held tickets are dropped back to cold storage, which frees the pinned chunks right away.
 
 **Q: Can I use ItemsAdder, Oraxen, Nexo, or CustomModelData in the GUI menu?**
 A: Yes. Icon strings in `guimenu.yml` accept prefix routing for `ia:<id>`, `oraxen:<id>`, `nexo:<id>`, `hdb:<id>`, `head:<player>`, `base64:<hash>`, and `<MATERIAL>:<cmd>`. Because commercial plugins carry closed-source licenses and commercial price tags, automated CI cannot run proprietary binaries; testing relies on mock contract stubs and open-source equivalents, so third-party proprietary compatibility is maintained on a best-effort basis. If an item plugin is absent or changes unexpectedly, LeafRTP falls back to vanilla materials. See [Custom Item & Menu Integration](https://dailystruggle.github.io/RTP/admin/CUSTOM_ITEMS/).

@@ -290,13 +290,24 @@ other target subtracts.
   replayed at once (`--surprise-n`, `--surprise-k`); a reproduction makes
   a candidate and switches to `exploiting`. Candidates are shrunk to the
   fewest actions that still leak.
+- **Findings:** every episode also runs the finding oracles (server log:
+  uncaught exceptions with a stack trace, `Could not pass event`, tick
+  stalls; permission denials). A finding has a stable signature (class,
+  owning plugin, root exception type, first frame in that plugin, digits
+  dropped). A new signature attributed to the target (`--names` /
+  `--jars`, plus `--plugin-packages`) and absent from the control is
+  replayed the first time it appears (`--finding-n`, `--finding-k`) and
+  shrunk (`--finding-shrink`).
 - **Ladder and verdict:** candidates climb `--rungs` (default
   `4x1,12x3,48x10` bots x reps) by successive halving. At the top rung a
   target **fails** when the count grows by at least half the prediction
   and heap after GC beyond the control's; heap dumps are taken and
-  `heap_owner.py` runs with `--mat`. **PASS** means no leak found within
-  budget, with the coverage reached; **INCONCLUSIVE** is a signal that did
-  not confirm at scale (a candidate lost on the way is micro-only).
+  `heap_owner.py` runs with `--mat`. A reproduced target finding also
+  **fails**, with no ladder (`confirmed_by` names the oracle). **PASS**
+  means nothing found within budget, with the coverage reached;
+  **INCONCLUSIVE** is a signal that did not confirm (a candidate lost at
+  scale is micro-only; a target finding that did not reproduce is a
+  one-off).
 
 ```
 python3 scripts/bench_fuzz.py --server-dir /mnt/threadripper-dir/26.2 --host <bench> \
@@ -306,7 +317,9 @@ python3 scripts/bench_fuzz.py --server-dir /mnt/threadripper-dir/26.2 --host <be
 Output goes to `scripts/tmp/runs/fuzz-<stamp>/`: `report.txt`, and per
 target `episodes.jsonl` (one line per episode, replayable with `--replay
 FILE --ep K`), `classes.jsonl`, `optimiser.jsonl`, `fit.json`,
-`surprises.jsonl`, `shrunk.jsonl`, `ladder.jsonl` and `verdict.json`.
+`surprises.jsonl`, `shrunk.jsonl`, `ladder.jsonl`, `findings.jsonl`,
+`finding-replays.jsonl` and `verdict.json`; the control's signatures are
+in `control-findings.json`.
 Stop any passive swarm first: the script refuses to run with non-fuzz
 players online unless `--allow-online` is set.
 

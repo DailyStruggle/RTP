@@ -215,6 +215,46 @@ public class MemoryTracker {
     return ceiling > 0 && allocatedBytes > ceiling;
   }
 
+  /**
+   * Players owning a live, non-leaking, non-cancelled tracked pipeline task, and players with a
+   * live tracked TeleportData record. Weakly consistent; safe from any thread.
+   */
+  static void collectLiveOwners(java.util.Set<UUID> pipelines, java.util.Set<UUID> data) {
+    for (TrackedObject tracked : trackedObjects.values()) {
+      Object target = tracked.getTarget();
+      if (target instanceof io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask wrapper
+          && wrapper.getTask() != null) {
+        target = wrapper.getTask();
+      }
+      if (target instanceof io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask task) {
+        if (tracked.isLeaking() || task.isCancelled()) {
+          continue;
+        }
+        io.github.dailystruggle.rtp.api.entity.RTPPlayer player = task.player();
+        if (player != null) {
+          pipelines.add(player.uuid());
+        }
+      } else if (target instanceof io.github.dailystruggle.rtp.common.playerData.TeleportData) {
+        UUID id = teleportDataPlayerId(tracked.getLabel());
+        if (id != null) {
+          data.add(id);
+        }
+      }
+    }
+  }
+
+  /** Player id from a {@code TeleportData-<uuid>} tracker label, or {@code null}. */
+  static UUID teleportDataPlayerId(String label) {
+    if (label == null || !label.startsWith("TeleportData-")) {
+      return null;
+    }
+    try {
+      return UUID.fromString(label.substring("TeleportData-".length()));
+    } catch (IllegalArgumentException e) {
+      return null;
+    }
+  }
+
   public static void runDiagnostics() {
     // Spark-profiler tagged entry: dispatch through a method whose name matches the
     // documented allow-list tag so the async sampler attributes diagram-04 work
@@ -232,6 +272,9 @@ public class MemoryTracker {
     log(Level.FINE,
             "[RTP][GC] Sweep pulse start: tracked={0}",
             trackedObjects.size());
+    // Owners captured before the purge, so a TeleportData whose pipeline is alive is spared.
+    java.util.Set<UUID> livePipelinesBefore = new java.util.HashSet<>();
+    collectLiveOwners(livePipelinesBefore, new java.util.HashSet<>());
     trackedObjects
             .entrySet()
             .removeIf(
@@ -297,19 +340,26 @@ public class MemoryTracker {
                         }
 
                         if (actualTask instanceof io.github.dailystruggle.rtp.common.playerData.TeleportData teleportData) {
+                          // The label names the teleported player; the sender may be someone else.
+                          UUID targetPlayerId = teleportDataPlayerId(label);
+                          if (targetPlayerId == null
+                              && teleportData.sender instanceof io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer) {
+                            targetPlayerId = rtpPlayer.uuid();
+                          }
+                          // The 120 s budget excludes the warm-up delay and legitimate waits (queue,
+                          // death hold, live pipeline, network): keep the record; re-checked next sweep.
+                          if (!teleportData.completed && targetPlayerId != null
+                              && (leakDuration <= Math.max(0L, teleportData.delay)
+                                  || ProcessingLockSweeper.isHeld(targetPlayerId, livePipelinesBefore))) {
+                            log(Level.FINER,
+                                    "[RTP][GC] Keeping TeleportData label={0}: delay or wait still in progress",
+                                    label);
+                            return false;
+                          }
                           log(Level.FINE,
                                   "[RTP][GC] Purging stalled TeleportData label={0} ageOverBudgetMs={1}",
                                   label, leakDuration);
                           teleportData.completed = true;
-                          UUID targetPlayerId = null;
-                          if (teleportData.sender instanceof io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer) {
-                            targetPlayerId = rtpPlayer.uuid();
-                          } else if (label != null && label.startsWith("TeleportData-")) {
-                            try {
-                              targetPlayerId = UUID.fromString(label.substring("TeleportData-".length()));
-                            } catch (IllegalArgumentException ignored) {
-                            }
-                          }
                           if (targetPlayerId != null && RTP.getInstance() != null) {
                             RTP.getInstance().processingPlayers.remove(targetPlayerId);
                             RTP.getInstance().latestTeleportData.remove(targetPlayerId, teleportData);
@@ -327,6 +377,16 @@ public class MemoryTracker {
                       }
                       return false;
                     });
+
+    // S-004 safety net: release processingPlayers entries nothing owns any more.
+    try {
+      java.util.Set<UUID> livePipelines = new java.util.HashSet<>();
+      java.util.Set<UUID> liveData = new java.util.HashSet<>();
+      collectLiveOwners(livePipelines, liveData);
+      ProcessingLockSweeper.sweep(livePipelines, liveData);
+    } catch (RuntimeException e) {
+      RTP.log(Level.WARNING, "[RTP][GC] stale teleport lock sweep failed", e);
+    }
 
     RTP rtp = RTP.getInstance();
     if (rtp != null) {

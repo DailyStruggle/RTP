@@ -43,6 +43,7 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 ## Open
 
 
+
 ### 2026-10-08 — Probe governor's probe time includes coalescer queue wait
 
 - **Severity:** Medium
@@ -143,16 +144,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Linear:** RTP-32
 
 
-### 2026-10-08 — Mojibake in NeoForge build script and overly broad exclusion in check-mojibake.py
-
-- **Severity:** Low
-- **Status:** Open
-- **Discovered during:** pre-commit mojibake violation resolution
-- **Location:** `platforms/rtp-neoforge/rtp-neoforge-common/build.gradle` lines 1, 11, 17, 53, 61, 65; `scripts/check-mojibake.py` line 87 (`if exc in rel_path:`)
-- **Symptom / hypothesis:** `platforms/rtp-neoforge/rtp-neoforge-common/build.gradle` contains several corrupted em dash sequences (double-encoded UTF-8). `scripts/check-mojibake.py` failed to detect this because `EXCLUDED_PATHS` contains `'build'`, and substring matching `if exc in rel_path:` unintentionally excludes any file named `build.gradle` or under a directory containing `build`.
-- **Impact:** Lingering encoding anomalies in Gradle files; reduced coverage of mojibake detection across Gradle build definitions in the repository.
-- **Suggested next step:** Replace the corrupted em dash sequences with clean em dashes or ASCII hyphens in `platforms/rtp-neoforge/rtp-neoforge-common/build.gradle`. Update `scripts/check-mojibake.py` to match directory components (`/build/` or Path parts) rather than simple substring matching.
-
 ### 2026-10-12 - FoliaSchedulerImpl.runTask regional cap is check-then-increment and re-queues at a fixed 50 ms
 
 - **Severity:** Low
@@ -172,5 +163,45 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** `GateEvaluator` applies `context.context().gateValidators()`, but the session builds its `ActionGateContext` without an `ActionContext`, so validators added via `ActionContext.withValidator` gate only queue admission in `ActionManager` and never lifecycle steps. Unclear whether that is intended.
 - **Impact:** An addon that expects its validator to suppress `onBoundaryViolation` / `onStart` steps sees them run anyway.
 - **Suggested next step:** Decide the contract; either pass `context` into the session's gate contexts or document `withValidator` as admission-only. `ActionSessionImplCoverageTest#gatesAndDelayedSteps` pins the current behaviour.
+
+### 2026-10-13 - Devstack demo regions: two untracked, one with a Bukkit world name on Fabric
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** v3.3.0 pre-release docs audit (`devstack/README.md` backend counts)
+- **Location:** `devstack/.gitignore` lines 78-79 (`backend-a/rtp-config/**`, `backend-b/rtp-config/**`); `devstack/backend-c/rtp-config/regions/default.yml` (`world: "world_the_end"`, header comment still says Folia)
+- **Symptom / hypothesis:** The README and `setup-multiworld-demo.ps1` describe one committed demo region per backend, but the backend-a (Verdant Wilds) and backend-b (Ashen Wastes) files exist only in local working copies. backend-c runs Fabric, whose adapters name worlds by registry key (`minecraft:the_end`, see `FabricRTPWorld` region-dir mapping); backend-d already uses `minecraft:overworld`. `world_the_end` probably does not resolve there.
+- **Impact:** On a fresh clone the lobby GUI demo shows fewer cross-server destinations than documented, and the Fabric End region may fall back or fail to load.
+- **Suggested next step:** Add `!backend-a/rtp-config/regions/default.yml` and the backend-b equivalent to `devstack/.gitignore` and commit the two files. Boot backend-c and check `/rtp info`; switch to `minecraft:the_end` if the region is not bound.
+
+### 2026-10-13 - TeleportPipelineTask.ConfigCache is global, not a per-task snapshot
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** v3.3.0 pre-release bug fixes (pipeline audit item 10, deferred)
+- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/tasks/teleport/TeleportPipelineTask.java` `ConfigCache` (~143-163, refreshed by `Configs.onReload`)
+- **Symptom / hypothesis:** Every in-flight task reads the same static fields, so a `/rtp reload` mid-teleport can give one attempt messages, `viewDistanceTeleport`, lock-after and respawn settings from two different config generations.
+- **Impact:** Rare and cosmetic in practice (reload is already refused while it runs); a teleport that straddles a reload may mix old and new settings.
+- **Suggested next step:** Snapshot the values into an immutable record at task construction (or at the SETUP-to-LOAD transition) and read that record in the later phases; keep the static cache only as the source for new snapshots.
+
+### 2026-10-13 - AbstractForeignConfigImporterCoverageTest expects a warning wording the importer never emits
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** v3.3.0 pre-release bug fixes (full `:rtp-core:test` run)
+- **Location:** `rtp-core/src/test/java/io/github/dailystruggle/rtp/common/importer/AbstractForeignConfigImporterCoverageTest.java` `mirrorEffectsFailures` (~328); `AbstractForeignConfigImporter#mirrorEffectsConfig`
+- **Symptom / hypothesis:** The test asserts a warning starting with `Failed to update effects.yml`, but the importer emits `Failed to write effects.yml: <path>`. The test fails on its own (1 of 35 in the class) and both files are unchanged since commit `cd1d8cbdc`.
+- **Impact:** None for users (the failure is reported, only the wording differs); `:rtp-core:test` stays red until it is aligned.
+- **Suggested next step:** Decide the intended wording and align either the assertion or the importer message (the message is a log/report string, not a `messages.yml` key).
+
+### 2026-10-13 - Block-list rejection log still names `safety.yml`
+
+- **Severity:** Cosmetic
+- **Status:** Open
+- **Discovered during:** v3.3.0 pre-release front-page audit (block-list grammar section)
+- **Location:** `PregenState` / `QueueTask` warnings `[safety.yml] rejected unsafe-blocks token ...`
+- **Symptom / hypothesis:** `unsafeBlocks` / `airBlocks` live in `advanced/blocks.yml` (lists in an old `safety.yml` are migrated there, ADR-071), but the warning prefix still names `safety.yml`.
+- **Impact:** Operators look in the wrong file for the rejected token. FRONT_PAGE.md quotes the current text and explains the mismatch, so it needs updating with the fix.
+- **Suggested next step:** Change the prefix to `[advanced/blocks.yml]` (message text is a log string, not a `messages.yml` key) and update the quoted line in `docs/publishing/FRONT_PAGE.md`.
 
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->

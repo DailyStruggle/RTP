@@ -802,6 +802,9 @@ public final class NetworkModeBootstrap {
     /** Visible for tests. */
     public NetworkStatusCache statusCache() { return statusCache; }
 
+    /** Lobby auto-retry queue; null off-lobby or when wiring failed. */
+    public LobbyDispatchRetryQueue lobbyRetryQueue() { return lobbyRetryQueue; }
+
     /** Visible for tests. Null when {@code transport.type}
      *  is {@code sql} or {@code redis} and the queue is not yet wired. */
     public NetworkRequestQueue requestQueue() { return requestQueue; }
