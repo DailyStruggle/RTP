@@ -285,10 +285,10 @@ class BytesocksTransportTest {
                 }
                 String accept = Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-1")
                         .digest((wsKey + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").getBytes(StandardCharsets.US_ASCII)));
+                sockets.add(s);
                 out.write(("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
                         + "Sec-WebSocket-Accept: " + accept + "\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
                 out.flush();
-                sockets.add(s);
                 DataInputStream din = new DataInputStream(in);
                 while (true) {
                     int b0 = din.read();
@@ -355,10 +355,15 @@ class BytesocksTransportTest {
         }
 
         /** The relay drops every socket with a close frame (as on a relay restart). */
-        void dropAll() throws IOException {
+        void dropAll() throws IOException, InterruptedException {
+            await(() -> !sockets.isEmpty());
             for (Socket s : sockets) {
-                writeFrame(s, 0x88, new byte[]{0x03, (byte) 0xE9});
-                s.close();
+                try {
+                    writeFrame(s, 0x88, new byte[]{0x03, (byte) 0xE9});
+                } catch (IOException ignored) {
+                } finally {
+                    s.close();
+                }
             }
         }
 
