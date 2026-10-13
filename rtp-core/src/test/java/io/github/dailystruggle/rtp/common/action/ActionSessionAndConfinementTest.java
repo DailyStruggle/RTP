@@ -1538,10 +1538,18 @@ class ActionSessionAndConfinementTest {
         "world", 0, 0, null, null, null
     );
 
-    // Track session directly with a 0ms budget so it is immediately considered stalled/leaking
+    // Track session directly with a 0ms budget so it is considered stalled once the clock advances
+    long trackedAtMs = System.currentTimeMillis();
     io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(session, "ActionSession-" + session.sessionId(), 0L);
     session.arm();
     assertTrue(session.isActive());
+
+    // TrackedObject.isLeaking() is strict (age > budget, ms resolution): a sweep within the
+    // tracking millisecond sees age 0 and skips the entry. Wait out that millisecond.
+    long deadlineNs = System.nanoTime() + 1_000_000_000L;
+    while (System.currentTimeMillis() <= trackedAtMs && System.nanoTime() < deadlineNs) {
+      Thread.onSpinWait();
+    }
 
     // Run active GC sweep via runDiagnostics
     io.github.dailystruggle.rtp.common.tools.MemoryTracker.runDiagnostics();

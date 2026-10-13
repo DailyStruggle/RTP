@@ -106,11 +106,11 @@ On Paper all candidate checking runs off the tick thread. On Folia, candidates a
 - [**Low latency**](https://dailystruggle.github.io/RTP/site/why/#background-processing-and-memory): 6 ms median from `/rtp` to arrival on Paper, served from pre-verified candidate queues.
 - [**Throughput**](#performance): 40 TP/s on Paper and 180 TP/s on Folia under nominal ticks, scaling to 249.7 TP/s peak on Folia.
 - [**Even player spread**](https://dailystruggle.github.io/RTP/site/why/): Zero duplicate landings in 4,096 teleports, with no player coordinates tracked.
-- [**Persistent memory**](https://dailystruggle.github.io/RTP/admin/configuration/TTL/): Rejected oceans, lava and claims are remembered across restarts.
-- [**One-command import**](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-competitor-plugins-betterrtp-justrtp-ezrtp-jakesrtp): Auto-translates BetterRTP, EzRTP, and JustRTP configs.
-- [**Web workspace**](https://dailystruggle.github.io/RTP/admin/WEB_EDITOR_GUIDE/): Edit region borders and configs in your browser, with live tick, queue and latency stats (`/rtp editor`).
+- [**Spatial memory**](https://dailystruggle.github.io/RTP/admin/configuration/TTL/): Biomes and rejected chunks (with cause and TTL) remembered across restarts at chunk resolution.
+- [**One-command import**](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-competitor-plugins-betterrtp-justrtp-ezrtp-jakesrtp): Auto-translates third-party configs and generates LuckPerms permission commands.
+- [**Web workspace**](https://dailystruggle.github.io/RTP/admin/WEB_EDITOR_GUIDE/): Edit region borders on a map, search configs by intent, and view live engine stats (`/rtp editor`).
 - [**One jar**](https://dailystruggle.github.io/RTP/admin/QUICK_START/): Runs on Paper, Folia, Spigot, Fabric, NeoForge, and Velocity.
-- [**Portals & events**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Templates for step-in portals, party scatter, and 1v1 arenas.
+- [**Action engine**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Scriptable pipeline for step-in portals, party scatter, and 1v1 arena duels.
 - [**Claim checks**](https://dailystruggle.github.io/RTP/admin/CLAIM_PLUGIN_COMPATIBILITY/): Fail-closed claim checks, PvP damage cancel, zero open firewall ports.
 
 Benchmark comparisons and hardware metrics are in [Performance](#performance).
@@ -152,11 +152,11 @@ These work without extra plugins:
 
 All configuration routes edit the same files, accept human units (`radius: 10km`, `cooldown: 30s`), and hot-reload via `/rtp reload`.
 
-- [**Web Workspace**](https://dailystruggle.github.io/RTP/admin/WEB_EDITOR_GUIDE/) (`/rtp editor`): Browser admin with no port forwarding. Drag region boundaries on a map and edit YAML with the setting docs beside it. A diagnostics tab shows live tick, queue and latency stats.
+- [**Web Workspace**](https://dailystruggle.github.io/RTP/admin/WEB_EDITOR_GUIDE/) (`/rtp editor`): Browser admin with no port forwarding. Drag region boundaries on a map and search YAML by intent with live setting docs beside each key. A diagnostics tab shows live tick, queue and latency stats.
 - [**In-Game Admin Book**](https://dailystruggle.github.io/RTP/admin/configuration/IN_GAME_CONFIG/#1-the-interactive-admin-panel-rtp-admin) (`/rtp admin`): Clickable operator book for inspecting queues and reloading configs in game.
 - [**Chat Wizard**](https://dailystruggle.github.io/RTP/admin/QUICK_START/#guided-setup-rtp-admin-setup) (`/rtp admin setup`): 60-second guided questionnaire sizing regions to world borders with automatic backups.
-- [**Config Import**](https://dailystruggle.github.io/RTP/admin/MIGRATION/) (`/rtp config import`): Translates worlds, radii, and cooldowns from BetterRTP, EzRTP, and JustRTP.
-- [**Spatial Pregeneration**](https://dailystruggle.github.io/RTP/admin/configuration/TTL/) (`/rtp scan`): Checks region files off-tick ahead of time and records the oceans, lava and claims it finds.
+- [**Config & Permission Import**](https://dailystruggle.github.io/RTP/admin/MIGRATION/) (`/rtp config import`): Translates worlds, radii, cooldowns, and generates dry-run LuckPerms commands from supported rtp configs.
+- [**Spatial Pregeneration**](https://dailystruggle.github.io/RTP/admin/configuration/TTL/) (`/rtp scan`): Checks region files off-tick ahead of time, recording biomes, invalidity causes, and claims at chunk resolution.
 - [**Live Visualizations**](https://dailystruggle.github.io/RTP/admin/configuration/IN_GAME_CONFIG/#c-diagnostics--monitoring) (`/rtp visualization`): Renders boundaries, biome layouts, and candidate heatmaps onto held in-game maps.
 - [**Engine Diagnostics**](https://dailystruggle.github.io/RTP/admin/QUICK_START/#diagnostics-rtp-info) (`/rtp info`): Live queue depth, latency percentiles, and per-region generation rates.
 
@@ -201,14 +201,14 @@ All configuration routes edit the same files, accept human units (`radius: 10km`
 - **PvP / combat-tag check**: off by default; refuses or delays `/rtp` for players who recently dealt or took PvP damage. Includes built-in tracking or hooks into PvPManager, CombatLogX, or Simple Combat Log if installed.
 - **Command blocks and console**: the same command parser handles player, console, and command-block callers.
 
-### Portals, party scatter & PvP duels
+### Action engine: portals, party scatter & arenas
 
-Bundled action templates:
+An extensible action pipeline for group events, boundary confinement, and minigames:
 
 - **Step-in portals**: Configurable trigger zones for portals and launch pads with countdown holograms, particles, and sounds.
-- **Party scatter**: Sends a queued party out together, with a minimum block spacing between teammates.
-- **1v1 & 2v2 duels** (`/rtp action challenge <player>`): Temporary bounded arenas with countdowns, cleaned up when the match ends.
-- **Anchor drops**: Land players near friends (`anchor: entity`) or outside town claims (`anchor: claimboundary`).
+- **Party & group scatter**: Sends a queued party out together, guaranteeing a minimum block spacing between teammates.
+- **1v1 & 2v2 arenas** (`/rtp action challenge <player>`): Matchmaking duels in temporary bounded arenas with countdowns and automated border cleanup.
+- **Anchor drops**: Land players relative to teammates (`anchor: entity`) or outside town claims (`anchor: claimboundary`).
 - **Event scripts**: Trigger console commands, titles, sounds, or potion effects on match start, boundary violation, or finish.
 
 *Templates and configuration options: [Actions & arenas guide](https://dailystruggle.github.io/RTP/admin/ACTIONS/).*
@@ -244,24 +244,18 @@ I compare throughput under load, latency from `/rtp` to arrival, and tick stabil
 
 **Paper 26.2 & Folia 26.2 Performance Under Load (Linux Threadripper 7970X, 48 bot clients, 16k radius):**
 
-| Plugin | Paper Safe Max (20 TPS) | Paper Peak Throughput | Paper Bottleneck / Limiting Factor | Folia Safe Max (20 TPS) | Folia Peak Throughput | Folia Operational Status / Bottleneck |
-|---|---|---|---|---|---|---|
-| **LeafRTP** | **40 TP/s** (MSPT 48 ms) | **107.4 TP/s** (99+ TP/s burst) | Main-thread tick budget (single-thread entity handoff) | **180 TP/s** (MSPT < 50 ms) | **249.7 TP/s** (19.0 avg / 1.6 min TPS) | **Native** (0 watchdog stalls; regional entity transfer saturation) |
-| HuskHomes | 40 TP/s (MSPT 42 ms) | 44.9 TP/s (43.1 TP/s burst) | Internal queue throttle (~43-45 TP/s intake cap) | 60 TP/s (57.5 TP/s achieved) | 60.0 TP/s (collapses at 80 TP/s) | Paced only (collapses at 80 TP/s; SQLite locks on `/back`) |
-| JustRTP | 20 TP/s (MSPT 35 ms) | 25.6 TP/s (25.3 TP/s burst) | Internal pipeline saturation ceiling (~25.5 TP/s) | 10 TP/s (9.9 TP/s achieved) | 18.7 TP/s (collapses at 20+ TP/s) | Degraded (sheds attempts; Nether ceiling bug) |
-| JakesRTP | 20 TP/s (MSPT 41 ms) | 74.5 TP/s (crashed; < 5 TPS) | Main-thread tick collapse (MSPT 295 ms) | 0 TP/s | - | Unsupported (refused by Folia plugin loader) |
-| EzRTP | 5 TP/s (MSPT 22 ms) | 8.4 TP/s (8.3 TP/s burst) | Candidate rejection rate (26-38% timeouts at >=10 TP/s) | < 20 TP/s (19.7 TP/s achieved) | 19.7 TP/s (stuck attempts) | Fails (cross-region chunk errors, 25 stuck bots) |
-| BetterRTP | < 5 TP/s (MSPT spikes to 167 ms) | 9.2 TP/s (9.22 TP/s unpaced) | Main-thread chunk load stalls (329 ticks > 50 ms; 48-bot swarm dispatch timeout) | 0 TP/s | - | Inoperable (100% async chunk errors on region threads) |
+These are snapshots of each plugin under one harness on my hardware. The other plugins make different trade-offs, and most don't aim for 100+ TP/s.
 
-- **Paper vs. Folia architectural scaling:** On Paper, all entity handoffs execute on a single main thread, capping safe throughput for all functional plugins at ~40 TP/s before exhausting the 50 ms tick budget. Under 100 TP/s unthrottled load on Paper, LeafRTP completed all 35,113 of 35,113 teleports without failure while the server slowed (MSPT p95 103-122 ms). On Folia, independent regional threads eliminate the single-thread bottleneck: LeafRTP's off-tick Anvil pre-filter (`RTP-Anvil-IO`, 94.1% of execution share in spark) scales seamlessly to 180 TP/s with 198 ms median latency and 19.6 regional TPS, reaching a peak saturation throughput of 249.7 TP/s with a 19.0 average regional TPS (transient regional minimum of 1.6 TPS during peak entity placement).
-- **Competitor bottlenecks under load:**
-  - **HuskHomes:** Protected by an internal intake throttle at ~43 TP/s on Paper. On Folia, it held 60 TP/s, but collapsed at 80 TP/s (dropping to 30.98 TP/s with 2,907 shed attempts) due to SQLite lock collisions (`SQLITE_BUSY`) during `/back` position logging.
-  - **JustRTP:** Capped at 20 TP/s on Paper. On Folia, it completed 10 TP/s, but collapsed at 20 and 40 TP/s (shedding 1,370 attempts) due to a bug in `findSafeInNormal()` that misidentifies Overworld Y >= 127 as Nether ceiling, triggering massive synchronous chunk promotions.
-  - **JakesRTP:** Lacks asynchronous thread isolation on Paper; pushing beyond 20 TP/s caused synchronous chunk and placement work to spill onto the main thread, collapsing TPS below 5 (MSPT 295 ms). It does not declare Folia support and is refused by Folia's loader.
-  - **EzRTP:** Inefficient random sampling rejected candidates at high rates on Paper (26-38% timeouts at >=10 TP/s). On Folia, calling `getHighestBlockYAt` across regional thread boundaries triggered repeated `Cannot retrieve chunk asynchronously` exceptions, locking player states and requiring 25 bot hot-swaps.
-  - **BetterRTP 3.6.13:** Operates on Paper up to 9.2 TP/s unpaced, but generates heavy main-thread chunk stalls even under light load (329 ticks > 50 ms at 5 TP/s, peaking at 166.6 ms MSPT) and timed out under 48-bot automated swarm dispatch. Completely inoperable on Folia (0 of 5,686 attempts completed, 100% async chunk retrieval errors on region threads).
+| Plugin | Paper safe max (20 TPS) | Paper peak | Folia safe max (20 TPS) | Folia peak |
+|---|---|---|---|---|
+| **LeafRTP** | **40 TP/s** (MSPT 48 ms) | **107.4 TP/s** | **180 TP/s** (MSPT < 50 ms) | **249.7 TP/s** (19.0 avg TPS) |
+| HuskHomes | 40 TP/s (MSPT 42 ms) | 44.9 TP/s | 60 TP/s | 60.0 TP/s |
+| JustRTP | 20 TP/s (MSPT 35 ms) | 25.6 TP/s | 10 TP/s | 18.7 TP/s |
+| JakesRTP | 20 TP/s (MSPT 41 ms) | 74.5 TP/s (TPS < 5) | - | Not loaded (no Folia support declared) |
+| EzRTP | 5 TP/s (MSPT 22 ms) | 8.4 TP/s | < 20 TP/s | 19.7 TP/s |
+| BetterRTP | < 5 TP/s | 9.2 TP/s | - | Did not complete on this rig |
 
-**Session leak in BetterRTP 3.6.13:** in my leak fuzzer, it kept whole player sessions in memory after players disconnected, and the count only went up. LeafRTP had the same kind of bug until 3.3.0; the same fuzzer found it, and it is fixed and covered by a test.
+- **Paper vs. Folia:** Paper places every arriving player on one main thread, so no plugin here gets much past 40 TP/s at 20 TPS. Under 100 TP/s unthrottled load on Paper, LeafRTP completed 35,113 of 35,113 teleports while the server slowed (MSPT p95 103-122 ms). Folia spreads that work across region threads, and LeafRTP reached 180 TP/s at 19.6 regional TPS (198 ms median latency), peaking at 249.7 TP/s.
 
 Full benchmark tables, methodology, and per-run analyses: [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP).
 
@@ -282,7 +276,7 @@ Full methodology, per-run analyses, and the runs not shown here (equalized-radiu
 
 ### Spatial memory
 
-About 35-65% of typical Minecraft terrain is ocean, lava or void. LeafRTP remembers rejected ground across server restarts so it doesn't check the same dead ground twice. Locations are mapped in constant time, and `/rtp scan` pregenerates spatial memory off-tick. Mathematical derivations and distribution benchmarks: [Why LeafRTP exists](https://dailystruggle.github.io/RTP/site/why/).
+About 35-65% of typical Minecraft terrain is ocean, lava or void. LeafRTP remembers biomes and invalid chunks (with cause and TTL) at chunk resolution across server restarts so it doesn't check the same dead ground twice. Operations like `/rtp biome:<biome>` resolve directly from memory without chunk loading. Locations are mapped in constant time, and `/rtp scan` pregenerates spatial memory off-tick. Mathematical derivations and distribution benchmarks: [Why LeafRTP exists](https://dailystruggle.github.io/RTP/site/why/).
 
 ### Region-file pre-filter
 
@@ -356,7 +350,7 @@ A plugin can pass one of these tools and fail another.
 
 What they found:
 
-- **Retained player sessions (fuzzer).** LeafRTP kept a disconnected player's objects alive through its last-teleport records. The fuzzer flagged it and it reproduced on replay; it is fixed in 3.3.0 and covered by a regression test. The latest 3.3.0 run retained 0 players across 86 episodes, including config reloads. The run found nothing within its budget, which doesn't rule a leak out. The same method found a session-retention leak in BetterRTP 3.6.13 (see [Performance](#performance)).
+- **Retained player sessions (fuzzer).** LeafRTP kept a disconnected player's objects alive through its last-teleport records. The fuzzer flagged it and it reproduced on replay; it is fixed in 3.3.0 and covered by a regression test. The latest 3.3.0 run retained 0 players across 86 episodes, including config reloads. The run found nothing within its budget, which doesn't rule a leak out.
 - **Main-thread chunk load on arrival (spark).** A profile of the Paper stress run put 14.1 s of a 115.7 s phase (about 3.4 ms per teleport) in the arriving player's first tick loading its landing chunk synchronously. The cause was the arrival chunk ticket being released before the player's own ticket held it. The fix keeps the ticket through the first ticks. A later spark profile of the Linux 100 TP/s run (`20261009-085505`, 5.8k teleports per profile window) shows `Entity.isInWall` at 0.02-0.03 s of 59.5 s on the server thread, with no chunk load under it.
 - **Repeats under spacing (simulation).** Modelling consecutive landings showed that with `expand: false` a used chunk can come up again at about the random-pick rate. This is disclosed in [the region spacing notes](https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/#spacing-repeats-and-worst-case-by-mode). Both obvious fixes were tested and ruled out.
 - **Harness errors.** An overnight driver loaded the wrong plugin set for four Linux rows, so they measured a server without the plugin. I caught it on inspection and threw those rows out.
