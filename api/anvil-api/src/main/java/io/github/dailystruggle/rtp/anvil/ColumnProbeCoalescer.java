@@ -41,6 +41,12 @@ final class ColumnProbeCoalescer {
     Group(Key key) {
       this.key = key;
     }
+
+    /** Closes the group and snapshots its requests under the same monitor {@code submit} joins on. */
+    synchronized List<Request> closeAndSnapshot() {
+      closed = true;
+      return new ArrayList<>(requests);
+    }
   }
 
   private final ConcurrentHashMap<Key, Group> open = new ConcurrentHashMap<>();
@@ -85,11 +91,7 @@ final class ColumnProbeCoalescer {
   }
 
   private List<Request> close(Group g) {
-    List<Request> batch;
-    synchronized (g) {
-      g.closed = true;
-      batch = new ArrayList<>(g.requests);
-    }
+    List<Request> batch = g.closeAndSnapshot();
     open.remove(g.key, g);
     return batch;
   }

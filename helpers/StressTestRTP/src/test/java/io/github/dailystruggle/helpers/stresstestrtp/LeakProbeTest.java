@@ -241,6 +241,7 @@ class LeakProbeTest {
         assertFalse(t.get(1).dispatchAsPlayer(false));
         assertTrue(t.get(2).dispatchAsPlayer(false));
         assertEquals("betterrtp:betterrtp player bench_001", t.get(0).render("bench_001"));
-        assertNull(Targets.parseSender("bogus"));
+        assertTrue(Targets.parseSender("bogus").isEmpty());
+        assertTrue(Targets.parseSender(null).isEmpty());
     }
 }

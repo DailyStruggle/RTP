@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.bukkitplatform.entity;
 
+import java.util.Optional;
+import io.github.dailystruggle.rtp.bukkitplatform.tools.BukkitServers;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
@@ -112,7 +114,7 @@ public class BukkitRTPPlayer implements RTPPlayer {
   public @Nullable Player player() {
     Player p = this.playerRef.get();
     if (p != null && p.isOnline()) return p;
-    if (Bukkit.getServer() == null) return null;
+    if (BukkitServers.absent()) return null;
     p = Bukkit.getPlayer(uuid);
     if (p != null) {
       this.playerRef = new WeakReference<>(p);
@@ -229,15 +231,15 @@ public class BukkitRTPPlayer implements RTPPlayer {
       RTP.log(Level.WARNING, "[RTP] teleport target " + name + " (" + uuid + ") is offline");
       return CompletableFuture.completedFuture(false);
     }
-    Location current = player.getLocation();
+    Optional<Location> current = BukkitServers.location(player);
     Location location =
         new Location(
             world,
             x,
             y,
             z,
-            current != null ? current.getYaw() : 0f,
-            current != null ? current.getPitch() : 0f);
+            current.map(Location::getYaw).orElse(0f),
+            current.map(Location::getPitch).orElse(0f));
 
     CompletableFuture<Boolean> future = new CompletableFuture<>();
 

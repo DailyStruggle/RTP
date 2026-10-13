@@ -110,7 +110,7 @@ public final class LeakProbe implements Listener {
     private static final Pattern LINE_SPLIT = Pattern.compile("\\R");
     private static final Pattern DIGITS = Pattern.compile("\\d+");
     private static final Pattern METRIC_NON_ALPHANUM = Pattern.compile("[^a-z0-9#_-]+");
-    private static final Pattern METRIC_UNDERSCORES = Pattern.compile("^_+|_+$");
+    private static final Pattern METRIC_UNDERSCORES = Pattern.compile("(?:^_+)|(?:_+$)");
     private static final Pattern FILE_SAFE = Pattern.compile("[^A-Za-z0-9._-]");
     private static final DateTimeFormatter STAMP_FORMATTER =
             DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss", Locale.ROOT)
