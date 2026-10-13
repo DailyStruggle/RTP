@@ -802,6 +802,10 @@ Empirical results showed:
 
 ---
 
+## 2026-10-12 - Folia benchmark: `chunk-system.io-threads: -1` is one IO thread
+
+Paper/Folia `paper-global.yml` `chunk-system.io-threads: -1` runs a single chunk IO thread (any value below zero). At 200+ TP/s every arrival queues ~25 chunk reads, and a villager in the fresh destination region blocks its region thread in `AcquirePoi` -> `PoiManager.getOrLoad` -> `ChunkHolderManager.loadPoiChunk` (`LockSupport.park`) until that one IO thread reaches it; the Folia watchdog logged 6-16 s stalls and 44 s slow teleports. Parked time reads as idle in spark, so region threads looked 83% idle. Set `io-threads` explicitly (16 on a 32-core host) for high-rate Folia benchmarks. `worker-threads: -1` already scales (half the physical cores).
+
 ## Git & Workspace Safety
 
 ### Working tree protection and destructive git operations (2026-06-14)

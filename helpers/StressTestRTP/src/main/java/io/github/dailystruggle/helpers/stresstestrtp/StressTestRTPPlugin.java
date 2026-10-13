@@ -46,6 +46,7 @@ public final class StressTestRTPPlugin extends JavaPlugin {
     private TicketFootprintProbe ticketFootprintProbe;
     private DirectTeleportProbe directProbe;
     private RegionTpsSampler regionTpsSampler;
+    private SchedulerGauge schedulerGauge;
     private JfrAllocationProfiler jfrProfiler;
     private LeakProbe leakProbe;
     private HarnessTeleporter harnessTeleporter;
@@ -201,6 +202,16 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         regionTpsSampler.start();
         runner = new Runner(this, proxy, probe, sampler, getConfig());
         runner.setRegionTpsSampler(regionTpsSampler);
+        // Read-only gauge of the RTP Folia scheduler's regional in-flight cap,
+        // sampled by reflection while a run is active.
+        if (getConfig().getBoolean("scheduler-gauge.enabled", true)) {
+            schedulerGauge = new SchedulerGauge(this,
+                    getDataFolder().toPath().resolve(getConfig().getString("output-subdir", "runs"))
+                            .resolve("scheduler-gauge.csv"),
+                    () -> runner != null && runner.isRunning(),
+                    getConfig().getBoolean("scheduler-gauge.log", true));
+            schedulerGauge.start();
+        }
         runner.setDirectProbe(directProbe);
         // Release the runner's in-flight slot the moment a teleport is
         // attributed, instead of waiting for the per-attempt timeout reaper.
@@ -257,6 +268,7 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         if (probe != null) probe.unregister();
         if (directProbe != null) directProbe.unregister();
         if (regionTpsSampler != null) regionTpsSampler.stop();
+        if (schedulerGauge != null) schedulerGauge.stop();
         if (chunkCounter != null) chunkCounter.unregister();
         if (regionMonitor != null) regionMonitor.stop();
         if (residencySampler != null) residencySampler.unregister();

@@ -477,7 +477,7 @@ def run_matrix(a, drv: MatrixDriver, poller: BandwidthPoller, out_dir: str, plan
     if a.ramp_warmup_s is not None:
         warm_s = a.ramp_warmup_s
     refused: set[tuple[int, str]] = {(int(r["pass"]), r["target"]) for r in prior if r["outcome"] == "unsupported-not-loaded"}
-    new_file = not prior
+    new_file = not os.path.exists(manifest_path) or os.path.getsize(manifest_path) == 0
     default_retries = a.restart_retries
     with open(manifest_path, "a", newline="", encoding="utf-8") as mf:
         w = csv.writer(mf)

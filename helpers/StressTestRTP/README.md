@@ -398,8 +398,21 @@ target,stage_index,offered_tps,stage_seconds,attempts,successes,timeouts,errors,
 busy_rejections,harness_shed,achieved_tps,achieved_fraction,fail_fraction,
 latency_p50_ms,latency_p95_ms,latency_p99_ms,mspt_p50,mspt_p95,mspt_samples,
 tps_min,heap_peak_mb,roster_size,peak_in_flight,aborted,complete,verdict,fail_criteria,
-start_epoch_ms,end_epoch_ms
+start_epoch_ms,end_epoch_ms,
+repeating_scheduled,repeating_cancelled,repeating_live_start,repeating_live_end,
+repeating_cancel_failures
 ```
+
+`repeating_*` count the harness's own per-player repeating tasks (the Folia
+pinned-position watch): scheduled and cancelled during the stage, the live
+count when the stage began (after the settle gap; ~0 expected, a warning is
+logged above `ramp.repeating-task-tolerance`, default 2) and when it ended,
+and `cancel()` failures. A non-zero `repeating_cancel_failures` means a
+scheduler task could not be cancelled; the task then stops itself through its
+stop flag and a hard tick bound (`folia.pinned-position-watch-max-ticks`,
+default attempt timeout + 2 s). The summary file adds
+`repeating_live_between_stages_max`, `repeating_live_at_end` and
+`repeating_cancel_failures`.
 
 `verdict` is `PASS`, `FAIL`, or `PARTIAL`. `PARTIAL` (`complete=false`)
 marks a stage cut short by `/rtpstress stop`; it is kept for the record

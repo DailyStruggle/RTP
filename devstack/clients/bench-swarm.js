@@ -12,7 +12,8 @@
  * Server prerequisites (see helpers/StressTestRTP/README.md, "Ramp mode"):
  *   - server.properties online-mode=false (offline UUIDs).
  *   - bukkit.yml settings.connection-throttle: every bot shares one IP, so
- *     either set it to -1 or keep --join-delay-ms above it (default 4000 ms).
+ *     either set it to -1 (then --join-delay-ms 400 brings 192 bots online in ~77 s) or keep
+ *     --join-delay-ms above it (default 4500 ms, ~14 min for 192 bots).
  *
  * Usage:
  *   node devstack/clients/bench-swarm.js --host 10.0.0.5 --count 64
@@ -292,6 +293,14 @@ function pumpJoins() {
   joinTimer = setTimeout(() => { joinTimer = null; pumpJoins(); }, joinDelayMs);
 }
 
+let throttleWarned = false;
+function warnIfThrottled(text) {
+  if (throttleWarned || !/throttl/i.test(text || '')) return;
+  throttleWarned = true;
+  console.warn('[bench] server connection-throttle is rejecting joins; raise --join-delay-ms above '
+    + 'bukkit.yml settings.connection-throttle (4000), or set it to -1 for fast joins');
+}
+
 function scheduleReconnect(state) {
   if (shuttingDown || state.reconnectTimer) return;
   const exp = Math.min(reconnectMaxMs, reconnectBaseMs * Math.pow(2, Math.min(state.failures, 10)));
@@ -371,6 +380,7 @@ function connect(state) {
     stats.kickReasons.set(r, (stats.kickReasons.get(r) || 0) + 1);
     if (churnRename && r.includes(CHURN_MARKER)) state.renamePending = true;
     console.warn(`[bench] [${state.username}] kicked: ${r}`);
+    warnIfThrottled(r);
   });
 
   bot.on('error', (err) => {
