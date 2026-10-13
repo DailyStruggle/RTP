@@ -82,6 +82,12 @@ public final class MenuIcons {
             lore.add("");
             lore.add("&aClick to open visualizations");
             return lore;
+          case "action:operator:editor":
+            lore.add("&7Browser workspace: region map,");
+            lore.add("&7settings with docs & live diagnostics");
+            lore.add("");
+            lore.add("&aClick to get the editor link");
+            return lore;
           case "action:operator:status":
             lore.add("&7Real-time queues, memory & metrics");
             lore.add("");

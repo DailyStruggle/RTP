@@ -1,232 +1,489 @@
 package io.github.dailystruggle.rtp.common.commands.menu;
 
-import static org.junit.jupiter.api.Assertions.*;
+import io.github.dailystruggle.rtp.api.maps.ChartSpec;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.menu.MenuConcreteCommandLeaves.MenuActionLeafCmd;
+import io.github.dailystruggle.rtp.common.commands.menu.MenuConcreteCommandLeaves.VisualizationExportCmd;
+import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
+import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
+import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-import io.github.dailystruggle.rtp.common.commands.menu.MenuConcreteCommandLeaves.*;
+import java.io.File;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Consumer;
-import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+@DisplayName("MenuConcreteCommandLeaves export sizing, leaf dispatch and export command branches")
 class MenuConcreteCommandLeavesCoverageTest {
 
-  @Test
-  void testParsePixelDimensionAndDimensions() {
-    VisualizationExportCmd exportCmd = new VisualizationExportCmd();
-    assertEquals("export", exportCmd.name());
-    assertEquals(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION, exportCmd.permission());
-    assertNotNull(exportCmd.getCommandLookup());
-    assertFalse(exportCmd.getCommandLookup().isEmpty());
-  }
+    /** Region name unique to this class so exported chart files can be removed in teardown. */
+    private static final String REGION = "mcclc_region";
 
-  @Test
-  void testMenuActionLeafCmd() {
-    boolean[] called = new boolean[] {false};
-    java.util.function.BiConsumer<UUID, Map<String, List<String>>> action = (u, p) -> called[0] = true;
-    MenuActionLeafCmd leaf1 = MenuConcreteCommandLeaves.createLeaf(
-        null, "leaf1", "perm", "desc", action);
-    assertEquals("leaf1", leaf1.name());
-    assertEquals("perm", leaf1.permission());
-    assertEquals("desc", leaf1.description());
-    assertTrue(leaf1.onCommand(UUID.randomUUID(), Map.of(), null));
-    assertTrue(called[0]);
+    @TempDir
+    File tempDir;
 
-    boolean[] fbCalled = new boolean[] {false};
-    java.util.function.BiFunction<UUID, java.util.function.Consumer<String>, Boolean> fbAction = (u, m) -> {
-      fbCalled[0] = true;
-      return true;
-    };
-    MenuActionLeafCmd leaf2 = MenuConcreteCommandLeaves.createLeaf(
-        null, "leaf2", "perm2", null, fbAction);
-    assertEquals("", leaf2.description());
-    assertTrue(leaf2.onCommand(UUID.randomUUID(), Map.of(), null, msg -> {}));
-    assertTrue(fbCalled[0]);
-  }
+    private UUID caller;
+    private SelectionAPI previousSelection;
 
-  @Test
-  void testExportComprehensiveCmdParameters() {
-    assertTrue(true);
-  }
-
-  @Test
-  void testMenuConcreteSubcommands(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) {
-    io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
-    io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl dummyParent =
-        new io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl(null) {
-          @Override public String name() { return "rtp"; }
-          @Override public String permission() { return "rtp.use"; }
-          @Override public String description() { return "root"; }
-          @Override public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, io.github.dailystruggle.commandsapi.common.CommandsAPICommand nextCommand) {
-            return true;
-          }
-        };
-    MenuRedeemSubcommand owner = new MenuRedeemSubcommand(dummyParent);
-    OpenMenuConcreteCmd openCmd = new OpenMenuConcreteCmd(owner);
-    assertEquals("open", openCmd.name());
-    assertEquals(MenuRedeemSubcommand.PERMISSION, openCmd.permission());
-    assertTrue(openCmd.getParameterLookup().containsKey(MenuConcreteCommandLeaves.PARAM_PATH));
-
-    OpenAdminPanelConcreteCmd adminCmd = new OpenAdminPanelConcreteCmd(owner);
-    assertEquals("admin", adminCmd.name());
-    assertEquals(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION, adminCmd.permission());
-
-    OpenFrontPageConcreteCmd frontCmd = new OpenFrontPageConcreteCmd(owner);
-    assertEquals("front", frontCmd.name());
-    assertEquals(MenuRedeemSubcommand.PERMISSION, frontCmd.permission());
-
-    OpenVisualizationsConcreteCmd visCmd = new OpenVisualizationsConcreteCmd(owner);
-    assertEquals("visualizations", visCmd.name());
-    assertEquals(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION, visCmd.permission());
-
-    VisualizationRootCmd rootVisCmd = new VisualizationRootCmd(dummyParent, owner);
-    assertEquals("visualization", rootVisCmd.name());
-    assertEquals(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION, rootVisCmd.permission());
-    // nextCommand step aside
-    assertTrue(rootVisCmd.onCommand(UUID.randomUUID(), Map.of(), rootVisCmd));
-    assertTrue(rootVisCmd.onCommand(UUID.randomUUID(), Map.of(), rootVisCmd, msg -> {}));
-
-    VisualizationDispatch dispatch = new VisualizationDispatch(owner.permissionProbeFactory());
-    VisualizationBadLocationsCmd badCmd = new VisualizationBadLocationsCmd(dispatch, (u, m) -> true);
-    assertEquals("bad-locations", badCmd.name());
-    badCmd.onCommand(UUID.randomUUID(), Map.of(), null, msg -> {});
-
-    VisualizationBiomesCmd bioCmd = new VisualizationBiomesCmd(dispatch, (u, m) -> true);
-    assertEquals("biomes", bioCmd.name());
-    bioCmd.onCommand(UUID.randomUUID(), Map.of(), null, msg -> {});
-
-    VisualizationPipelineCmd pipeCmd = new VisualizationPipelineCmd(dispatch, (u, m) -> true);
-    assertEquals("pipeline", pipeCmd.name());
-    pipeCmd.onCommand(UUID.randomUUID(), Map.of(), null, msg -> {});
-
-    VisualizationHeatmapCmd heatCmd = new VisualizationHeatmapCmd(dispatch, (u, m) -> true);
-    assertEquals("heatmap", heatCmd.name());
-    heatCmd.onCommand(UUID.randomUUID(), Map.of(), null, msg -> {});
-
-    VisualizationSparklineCmd sparkCmd = new VisualizationSparklineCmd(dispatch);
-    assertEquals("sparkline", sparkCmd.name());
-    sparkCmd.onCommand(UUID.randomUUID(), Map.of(), null, msg -> {});
-  }
-
-  @Test
-  void testExportAllCmdParameters() {
-    VisualizationExportCmd.ExportAllCmd cmd = new VisualizationExportCmd.ExportAllCmd();
-    assertEquals("all", cmd.name());
-    assertEquals(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION, cmd.permission());
-  }
-
-  @Test
-  void testExportTypeCmdParameters() {
-    VisualizationExportCmd.ExportTypeCmd cmd = new VisualizationExportCmd.ExportTypeCmd(
-        "pipeline", io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind.REGION_COMPOSITE
-    );
-    assertEquals("pipeline", cmd.name());
-  }
-
-  @Test
-  void testVisualizationExportSubcommandsAndParsing(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) {
-    io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
-    VisualizationExportCmd exportCmd = new VisualizationExportCmd();
-
-    // Test onCommand with and without messageMethod
-    UUID callerId = UUID.randomUUID();
-    assertTrue(exportCmd.onCommand(callerId, Map.of(), null));
-    java.util.concurrent.atomic.AtomicReference<String> msgRef = new java.util.concurrent.atomic.AtomicReference<>();
-    assertTrue(exportCmd.onCommand(callerId, Map.of(), null, msgRef::set));
-    assertNotNull(msgRef.get());
-    assertTrue(msgRef.get().contains("Usage:"));
-
-    // Step aside if nextCommand is present
-    msgRef.set(null);
-    assertTrue(exportCmd.onCommand(callerId, Map.of(), exportCmd, msgRef::set));
-    assertNull(msgRef.get());
-
-    // Test size and unit variations
-    VisualizationExportCmd.ExportComprehensiveCmd compCmd = new VisualizationExportCmd.ExportComprehensiveCmd();
-    assertEquals("comprehensive", compCmd.name());
-    assertEquals(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION, compCmd.permission());
-    assertNotNull(compCmd.getParameterLookup().get(MenuConcreteCommandLeaves.PARAM_REGION));
-    assertNotNull(compCmd.getParameterLookup().get(MenuConcreteCommandLeaves.PARAM_REGION).values());
-
-    // Test various size parsing options
-    Map<String, List<String>> params = new java.util.HashMap<>();
-    params.put("size", List.of("1920x1080"));
-    params.put("zoom", List.of("2.0"));
-    params.put("region", List.of("default"));
-    assertTrue(compCmd.onCommand(callerId, params, null));
-    assertTrue(compCmd.onCommand(callerId, params, null, msg -> {}));
-
-    // Test metric suffixes
-    String[] testSizes = new String[]{
-        "4k", "2kp", "1kpix", "3kpixels", "5kilo", "2kilos",
-        "2m", "1mp", "3mpx", "4mpix", "1mpixels", "2mega",
-        "1g", "2gp", "1gpx", "3gpix", "1gpixels", "2giga",
-        "2kib", "1mib", "500px", "600pix", "800pixels", "invalid_size"
-    };
-    for (String s : testSizes) {
-      Map<String, List<String>> p = Map.of("size", List.of(s), "width", List.of(s), "height", List.of(s), "zoom", List.of("invalid_zoom"));
-      compCmd.onCommand(callerId, p, null, msg -> {});
+    @BeforeEach
+    void setUp() {
+        previousSelection = RTP.selectionAPI;
+        RTPTestSetup.install(tempDir);
+        caller = UUID.randomUUID();
     }
 
-    // ExportAllCmd
-    VisualizationExportCmd.ExportAllCmd allCmd = new VisualizationExportCmd.ExportAllCmd();
-    assertTrue(allCmd.onCommand(callerId, params, null));
-    assertTrue(allCmd.onCommand(callerId, params, null, msg -> {}));
+    @AfterEach
+    void tearDown() {
+        RTPTestSetup.cleanUp();
+        RTP.selectionAPI = previousSelection;
+        File[] charts = new File("plugins/RTP/charts").listFiles((d, n) -> n.startsWith(REGION) || n.startsWith("mcclc_"));
+        if (charts != null) {
+            for (File f : charts) {
+                f.delete();
+            }
+        }
+    }
 
-    // ExportTypeCmd for each kind
-    VisualizationExportCmd.ExportTypeCmd typeCmd = new VisualizationExportCmd.ExportTypeCmd(
-        "biomes", io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind.REGION_BIOMES
-    );
-    assertTrue(typeCmd.onCommand(callerId, params, null));
-    assertTrue(typeCmd.onCommand(callerId, params, null, msg -> {}));
-  }
+    // ---------------------------------------------------------------------
+    // Reflection helpers for private static parsers
+    // ---------------------------------------------------------------------
 
-  @Test
-  void testAbstractVisualizationRegionCmdBranches(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) {
-    io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
-    VisualizationDispatch dispatch = new VisualizationDispatch(id -> perm -> true);
+    private static int parsePixel(String raw, int def) throws Exception {
+        Method m = VisualizationExportCmd.class.getDeclaredMethod("parsePixelDimension", String.class, int.class);
+        m.setAccessible(true);
+        return (int) m.invoke(null, raw, def);
+    }
 
-    boolean[] selectorCalled = new boolean[]{false};
-    java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selector = (u, m) -> {
-      selectorCalled[0] = true;
-      return true;
-    };
+    private static Integer[] parseDims(Map<String, List<String>> params) throws Exception {
+        Method m = VisualizationExportCmd.class.getDeclaredMethod("parseDimensions", Map.class);
+        m.setAccessible(true);
+        return (Integer[]) m.invoke(null, params);
+    }
 
-    VisualizationBadLocationsCmd badCmd = new VisualizationBadLocationsCmd(dispatch, selector);
-    assertNotNull(badCmd.getParameterLookup().get(MenuConcreteCommandLeaves.PARAM_REGION).values());
+    private static double parseZoom(Map<String, List<String>> params) throws Exception {
+        Method m = VisualizationExportCmd.class.getDeclaredMethod("parseZoom", Map.class);
+        m.setAccessible(true);
+        return (double) m.invoke(null, params);
+    }
 
-    // Call without region parameter -> triggers selector fallback
-    selectorCalled[0] = false;
-    assertTrue(badCmd.onCommand(UUID.randomUUID(), Map.of(), null));
-    assertTrue(selectorCalled[0]);
+    private static Region squareRegion(String name) {
+        MockRTPWorld world = new MockRTPWorld("mcclc_world");
+        RegionSettings settings = new RegionSettings(
+                name, world, new Square(), new LinearAdjustor(new ArrayList<>()),
+                false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
+        return new Region(name, settings);
+    }
 
-    selectorCalled[0] = false;
-    assertTrue(badCmd.onCommand(UUID.randomUUID(), Map.of(), null, msg -> {}));
-    assertTrue(selectorCalled[0]);
+    // ---------------------------------------------------------------------
+    // Pixel dimension parsing
+    // ---------------------------------------------------------------------
 
-    // Call with empty region parameter -> triggers selector fallback
-    selectorCalled[0] = false;
-    assertTrue(badCmd.onCommand(UUID.randomUUID(), Map.of("region", List.of("")), null, msg -> {}));
-    assertTrue(selectorCalled[0]);
+    @Test
+    @DisplayName("parsePixelDimension falls back to default for null, blank and non-numeric input")
+    void parsePixel_defaults() throws Exception {
+        assertEquals(77, parsePixel(null, 77));
+        assertEquals(77, parsePixel("   ", 77));
+        assertEquals(77, parsePixel("abc", 77));
+        assertEquals(77, parsePixel("1.2.3", 77));
+        assertEquals(77, parsePixel("1..k", 77));
+    }
 
-    // Call with valid region parameter
-    badCmd.onCommand(UUID.randomUUID(), Map.of("region", List.of("default")), null, msg -> {});
+    @Test
+    @DisplayName("parsePixelDimension applies metric, binary and pixel suffixes with clamping")
+    void parsePixel_suffixes() throws Exception {
+        assertEquals(4000, parsePixel("4k", 1));
+        assertEquals(1000, parsePixel("k", 1));
+        assertEquals(2000, parsePixel("2kilo", 1));
+        assertEquals(3000, parsePixel("3KPX", 1));
+        assertEquals(8192, parsePixel("2m", 1));
+        assertEquals(8192, parsePixel("mega", 1));
+        assertEquals(8192, parsePixel("1g", 1));
+        assertEquals(8192, parsePixel("5giga", 1));
+        assertEquals(2048, parsePixel("2kib", 1));
+        assertEquals(8192, parsePixel("1mib", 1));
+        assertEquals(500, parsePixel("500px", 1));
+        assertEquals(600, parsePixel("600pix", 1));
+        assertEquals(16, parsePixel("px", 1));
+        assertEquals(1234, parsePixel(" 1234 ", 1));
+    }
 
-    // BiomesCmd
-    VisualizationBiomesCmd bioCmd = new VisualizationBiomesCmd(dispatch, selector);
-    bioCmd.onCommand(UUID.randomUUID(), Map.of("region", List.of("default")), null, msg -> {});
+    @Test
+    @DisplayName("parsePixelDimension recognises every alternative unit spelling")
+    void parsePixel_alternativeSpellings() throws Exception {
+        for (String s : new String[]{"1gp", "1gpx", "1gpix", "1gpixels", "1mp", "1mpx", "1mpix", "1mpixels"}) {
+            assertEquals(8192, parsePixel(s, 1), s);
+        }
+        for (String s : new String[]{"2kilos", "2kp", "2kpix", "2kpixels"}) {
+            assertEquals(2000, parsePixel(s, 1), s);
+        }
+        assertEquals(700, parsePixel("700pixels", 1));
+        assertEquals(77, parsePixel("1.2.3px", 77));
+        assertEquals(77, parsePixel("1.2.3kib", 77));
+        assertEquals(77, parsePixel("1.2.3mib", 77));
+        assertEquals(77, parsePixel("1.2.3m", 77));
+        assertEquals(77, parsePixel("1.2.3g", 77));
+        assertEquals(1024, parsePixel("kib", 1));
+        assertEquals(8192, parsePixel("mib", 1));
+    }
 
-    // PipelineCmd
-    VisualizationPipelineCmd pipeCmd = new VisualizationPipelineCmd(dispatch, selector);
-    pipeCmd.onCommand(UUID.randomUUID(), Map.of("region", List.of("default")), null, msg -> {});
+    @Test
+    @DisplayName("Export parent registers every chart sub-command")
+    void exportParent_subcommands() {
+        VisualizationExportCmd cmd = new VisualizationExportCmd();
+        assertEquals("export", cmd.name());
+        assertEquals(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION, cmd.permission());
+        assertTrue(cmd.onCommand(caller, Map.of(), null));
+        for (String sub : new String[]{"all", "pipeline", "biomes", "bad-locations", "sparkline", "walk",
+                "walk-path", "heatmap", "selection-heatmap", "comprehensive"}) {
+            assertTrue(cmd.getCommandLookup().containsKey(sub)
+                    || cmd.getCommandLookup().containsKey(sub.toUpperCase(java.util.Locale.ROOT)), sub);
+        }
+        assertEquals("all", new VisualizationExportCmd.ExportAllCmd().name());
+        assertEquals("comprehensive", new VisualizationExportCmd.ExportComprehensiveCmd().name());
+        assertEquals(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION, new VisualizationExportCmd.ExportAllCmd().permission());
+        assertEquals(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION, new VisualizationExportCmd.ExportComprehensiveCmd().permission());
+        assertEquals(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
+                new VisualizationExportCmd.ExportTypeCmd("walk", ChartSpec.Kind.REGION_WALK_PATH).permission());
+    }
 
-    // HeatmapCmd
-    VisualizationHeatmapCmd heatCmd = new VisualizationHeatmapCmd(dispatch, selector);
-    heatCmd.onCommand(UUID.randomUUID(), Map.of("region", List.of("default")), null, msg -> {});
+    @Test
+    @DisplayName("parsePixelDimension clamps tiny, negative and degree-suffixed values to the minimum side")
+    void parsePixel_minimum() throws Exception {
+        assertEquals(16, parsePixel("3", 1));
+        assertEquals(16, parsePixel("-50", 1));
+        assertEquals(16, parsePixel("5deg", 1));
+        assertEquals(8192, parsePixel("99999", 1));
+    }
 
-    // SparklineCmd
-    VisualizationSparklineCmd sparkCmd = new VisualizationSparklineCmd(dispatch);
-    sparkCmd.onCommand(UUID.randomUUID(), Map.of(), null);
-    sparkCmd.onCommand(UUID.randomUUID(), Map.of(), null, msg -> {});
-  }
+    @Test
+    @DisplayName("parseDimensions handles size, WxH, width and height overrides")
+    void parseDimensions_variants() throws Exception {
+        assertArrayEquals(new Integer[]{null, null}, parseDims(null));
+        assertArrayEquals(new Integer[]{null, null}, parseDims(Collections.emptyMap()));
+        assertArrayEquals(new Integer[]{null, null}, parseDims(Map.of("size", List.of())));
+        assertArrayEquals(new Integer[]{1920, 1080}, parseDims(Map.of("size", List.of("1920x1080"))));
+        assertArrayEquals(new Integer[]{800, null}, parseDims(Map.of("size", List.of("800"))));
+        assertArrayEquals(new Integer[]{512, 512}, parseDims(Map.of("size", List.of("x"))));
+
+        Map<String, List<String>> p = new HashMap<>();
+        p.put("width", List.of("300"));
+        p.put("height", List.of("abc"));
+        assertArrayEquals(new Integer[]{300, 512}, parseDims(p));
+
+        p.put("size", List.of("100x200"));
+        p.put("height", List.of("bad"));
+        assertArrayEquals(new Integer[]{300, 200}, parseDims(p));
+
+        assertArrayEquals(new Integer[]{null, null},
+                parseDims(Map.of("width", List.of(), "height", List.of())));
+    }
+
+    @Test
+    @DisplayName("parseZoom accepts positive factors and defaults otherwise")
+    void parseZoom_variants() throws Exception {
+        assertEquals(1.0, parseZoom(null));
+        assertEquals(1.0, parseZoom(Collections.emptyMap()));
+        assertEquals(1.0, parseZoom(Map.of("zoom", List.of())));
+        assertEquals(2.5, parseZoom(Map.of("zoom", List.of(" 2.5 "))));
+        assertEquals(1.0, parseZoom(Map.of("zoom", List.of("-1"))));
+        assertEquals(1.0, parseZoom(Map.of("zoom", List.of("abc"))));
+    }
+
+    // ---------------------------------------------------------------------
+    // MenuActionLeafCmd
+    // ---------------------------------------------------------------------
+
+    @Test
+    @DisplayName("MenuActionLeafCmd runs the plain action on both onCommand overloads")
+    void leaf_plainActionBothOverloads() {
+        List<Map<String, List<String>>> seen = new ArrayList<>();
+        MenuActionLeafCmd leaf = MenuConcreteCommandLeaves.createLeaf(
+                null, "leaf", "perm", (String) null,
+                (java.util.function.BiConsumer<UUID, Map<String, List<String>>>) (u, p) -> seen.add(p));
+        assertEquals("", leaf.description());
+        Map<String, List<String>> params = Map.of("k", List.of("v"));
+        assertTrue(leaf.onCommand(caller, params, null));
+        assertTrue(leaf.onCommand(caller, params, null, msg -> { }));
+        assertEquals(2, seen.size());
+    }
+
+    @Test
+    @DisplayName("MenuActionLeafCmd feedback action result maps through Boolean.TRUE on both overloads")
+    void leaf_feedbackActionResult() {
+        MenuActionLeafCmd falseLeaf = MenuConcreteCommandLeaves.createLeaf(
+                null, "f", "perm", "d",
+                (java.util.function.BiFunction<UUID, java.util.function.Consumer<String>, Boolean>) (u, m) -> null);
+        assertFalse(falseLeaf.onCommand(caller, Map.of(), null));
+        assertFalse(falseLeaf.onCommand(caller, Map.of(), null, msg -> { }));
+
+        List<Object> sinks = new ArrayList<>();
+        MenuActionLeafCmd trueLeaf = MenuConcreteCommandLeaves.createLeaf(
+                null, "t", "perm", "d",
+                (java.util.function.BiFunction<UUID, java.util.function.Consumer<String>, Boolean>) (u, m) -> {
+                    sinks.add(m == null ? "null" : "sink");
+                    return Boolean.TRUE;
+                });
+        assertTrue(trueLeaf.onCommand(caller, Map.of(), null));
+        assertTrue(trueLeaf.onCommand(caller, Map.of(), null, msg -> { }));
+        assertEquals(List.of("null", "sink"), sinks);
+    }
+
+    // ---------------------------------------------------------------------
+    // Export commands without a scheduler
+    // ---------------------------------------------------------------------
+
+    @Test
+    @DisplayName("Export leaves return false when no scheduler is installed")
+    void exportLeaves_noScheduler() {
+        RTP.scheduler = null;
+        VisualizationExportCmd.ExportAllCmd all = new VisualizationExportCmd.ExportAllCmd();
+        VisualizationExportCmd.ExportComprehensiveCmd comp = new VisualizationExportCmd.ExportComprehensiveCmd();
+        VisualizationExportCmd.ExportTypeCmd type =
+                new VisualizationExportCmd.ExportTypeCmd("biomes", ChartSpec.Kind.REGION_BIOMES);
+        assertFalse(all.onCommand(caller, null, null));
+        assertFalse(all.onCommand(caller, Map.of(), null, msg -> { }));
+        assertFalse(comp.onCommand(caller, null, null));
+        assertFalse(comp.onCommand(caller, Map.of(), null, msg -> { }));
+        assertFalse(type.onCommand(caller, null, null));
+        assertFalse(type.onCommand(caller, Map.of(), null, msg -> { }));
+    }
+
+    @Test
+    @DisplayName("Export parent prints usage only as a true leaf with a message sink")
+    void exportParent_usage() {
+        VisualizationExportCmd cmd = new VisualizationExportCmd();
+        List<String> out = new ArrayList<>();
+        assertTrue(cmd.onCommand(caller, Map.of(), null, (java.util.function.Consumer<String>) null));
+        assertTrue(cmd.onCommand(caller, Map.of(), cmd, out::add));
+        assertTrue(out.isEmpty());
+        assertTrue(cmd.onCommand(caller, Map.of(), null, out::add));
+        assertEquals(1, out.size());
+        assertTrue(out.get(0).startsWith("Usage: /rtp visualization export"));
+    }
+
+    // ---------------------------------------------------------------------
+    // Canvas sizing against a memory-shaped region
+    // ---------------------------------------------------------------------
+
+    @Test
+    @DisplayName("resolveCanvasDimensions falls back to defaults for non-spatial charts")
+    void canvas_nonSpatialDefaults() {
+        Region region = squareRegion(REGION);
+        assertArrayEquals(new int[]{512, 256},
+                VisualizationExportCmd.resolveCanvasDimensions(region, null, null, false));
+        assertArrayEquals(new int[]{300, 300},
+                VisualizationExportCmd.resolveCanvasDimensions(region, 300, null, false));
+        assertArrayEquals(new int[]{512, 200},
+                VisualizationExportCmd.resolveCanvasDimensions(null, null, 200, false));
+        assertArrayEquals(new int[]{512, 512},
+                VisualizationExportCmd.resolveCanvasDimensions(null, null, null, true));
+        assertArrayEquals(new int[]{640, 480},
+                VisualizationExportCmd.resolveCanvasDimensions(region, 640, 480, true));
+    }
+
+    @Test
+    @DisplayName("resolveCanvasDimensions follows a square region's aspect for auto and single-side sizes")
+    void canvas_spatialSquareRegion() {
+        Region region = squareRegion(REGION);
+        int[] auto = VisualizationExportCmd.resolveCanvasDimensions(region, null, null, true);
+        assertEquals(auto[0], auto[1]);
+        assertTrue(auto[0] >= 512 && auto[0] <= 4096);
+
+        int[] byWidth = VisualizationExportCmd.resolveCanvasDimensions(region, 400, null, true);
+        assertEquals(400, byWidth[0]);
+        assertTrue(Math.abs(byWidth[1] - 400) <= 2);
+
+        int[] byHeight = VisualizationExportCmd.resolveCanvasDimensions(region, null, 300, true);
+        assertEquals(300, byHeight[1]);
+        assertTrue(Math.abs(byHeight[0] - 300) <= 2);
+
+        int[] tinyWidth = VisualizationExportCmd.resolveCanvasDimensions(region, 2, null, true);
+        assertEquals(16, tinyWidth[0]);
+        int[] tinyHeight = VisualizationExportCmd.resolveCanvasDimensions(region, null, 2, true);
+        assertEquals(16, tinyHeight[1]);
+    }
+
+    // ---------------------------------------------------------------------
+    // Region parameter suggestions and sizing parameter values
+    // ---------------------------------------------------------------------
+
+    @Test
+    @DisplayName("Region parameter suggestions track the selection API, including absent and throwing APIs")
+    void regionParameterValues() {
+        List<io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl> cmds = List.of(
+                new VisualizationExportCmd.ExportAllCmd(),
+                new VisualizationExportCmd.ExportComprehensiveCmd(),
+                new VisualizationExportCmd.ExportTypeCmd("walk", ChartSpec.Kind.REGION_WALK_PATH));
+
+        RTP.selectionAPI = new SelectionAPI();
+        RTP.selectionAPI.permRegionLookup.put(REGION, squareRegion(REGION));
+        for (var c : cmds) {
+            assertTrue(c.getParameterLookup().get(MenuConcreteCommandLeaves.PARAM_REGION).values().contains(REGION));
+        }
+
+        RTP.selectionAPI = null;
+        for (var c : cmds) {
+            assertTrue(c.getParameterLookup().get(MenuConcreteCommandLeaves.PARAM_REGION).values().isEmpty());
+        }
+
+        RTP.selectionAPI = new SelectionAPI() {
+            @Override
+            public java.util.Set<String> regionNames() {
+                throw new IllegalStateException("boom");
+            }
+        };
+        for (var c : cmds) {
+            assertTrue(c.getParameterLookup().get(MenuConcreteCommandLeaves.PARAM_REGION).values().isEmpty());
+        }
+    }
+
+    @Test
+    @DisplayName("Sizing parameters expose curated suggestion sets")
+    void sizingParameterValues() {
+        var lookup = new VisualizationExportCmd.ExportAllCmd().getParameterLookup();
+        assertTrue(lookup.get("size").values().contains("4k"));
+        assertTrue(lookup.get("width").values().contains("8192"));
+        assertTrue(lookup.get("height").values().contains("4096"));
+        assertTrue(lookup.get("zoom").values().contains("2.0"));
+    }
+
+    // ---------------------------------------------------------------------
+    // Export failure messages
+    // ---------------------------------------------------------------------
+
+    @Test
+    @DisplayName("Export all and comprehensive report an uninitialised selection API")
+    void export_noSelectionApi() {
+        RTP.selectionAPI = null;
+        List<String> out = new ArrayList<>();
+        assertTrue(new VisualizationExportCmd.ExportAllCmd().onCommand(caller, Map.of(), null, out::add));
+        assertTrue(new VisualizationExportCmd.ExportComprehensiveCmd().onCommand(caller, Map.of(), null, out::add));
+        assertEquals(List.of("[RTP] Selection API not initialized", "[RTP] Selection API not initialized"), out);
+
+        // Without a message sink the message is routed through the server accessor.
+        assertTrue(new VisualizationExportCmd.ExportAllCmd().onCommand(caller, Map.of(), null));
+        assertTrue(new VisualizationExportCmd.ExportComprehensiveCmd().onCommand(caller, Map.of(), null));
+    }
+
+    @Test
+    @DisplayName("Export all and comprehensive report an unknown region when lookup throws")
+    void export_regionLookupThrows() {
+        RTP.selectionAPI = new SelectionAPI();
+        List<String> out = new ArrayList<>();
+        Map<String, List<String>> params = Map.of("region", List.of("mcclc_missing"));
+        assertTrue(new VisualizationExportCmd.ExportAllCmd().onCommand(caller, params, null, out::add));
+        assertTrue(new VisualizationExportCmd.ExportComprehensiveCmd().onCommand(caller, params, null, out::add));
+        assertEquals(List.of("[RTP] Region not found: mcclc_missing", "[RTP] Region not found: mcclc_missing"), out);
+    }
+
+    @Test
+    @DisplayName("Export all and comprehensive report an unknown region when lookup returns null")
+    void export_regionLookupNull() {
+        RTP.selectionAPI = new SelectionAPI() {
+            @Override
+            public Region getRegionOrDefault(String regionName) {
+                return null;
+            }
+        };
+        List<String> out = new ArrayList<>();
+        Map<String, List<String>> params = Map.of("region", List.of());
+        assertTrue(new VisualizationExportCmd.ExportAllCmd().onCommand(caller, params, null, out::add));
+        assertTrue(new VisualizationExportCmd.ExportComprehensiveCmd().onCommand(caller, params, null, out::add));
+        assertEquals(List.of("[RTP] Region not found: default", "[RTP] Region not found: default"), out);
+        // Server accessor route for the null-region branch.
+        assertTrue(new VisualizationExportCmd.ExportAllCmd().onCommand(caller, params, null));
+        assertTrue(new VisualizationExportCmd.ExportComprehensiveCmd().onCommand(caller, params, null));
+    }
+
+    // ---------------------------------------------------------------------
+    // Export success paths against a registered region
+    // ---------------------------------------------------------------------
+
+    private void registerRegion() {
+        RTP.selectionAPI = new SelectionAPI();
+        RTP.selectionAPI.permRegionLookup.put(REGION, squareRegion(REGION));
+    }
+
+    private static Map<String, List<String>> smallExport() {
+        Map<String, List<String>> params = new HashMap<>();
+        params.put("region", List.of(REGION));
+        params.put("size", List.of("64"));
+        params.put("zoom", List.of("1.5"));
+        return params;
+    }
+
+    @Test
+    @DisplayName("Export all renders each visualization for a registered region and reports a summary")
+    void exportAll_success() {
+        registerRegion();
+        List<String> out = new ArrayList<>();
+        assertTrue(new VisualizationExportCmd.ExportAllCmd().onCommand(caller, smallExport(), null, out::add));
+        assertEquals(1, out.size());
+        assertTrue(out.get(0).startsWith("[RTP] Exported "), out.get(0));
+        assertTrue(out.get(0).contains(REGION), out.get(0));
+    }
+
+    @Test
+    @DisplayName("Export comprehensive reports a single outcome message for a registered region")
+    void exportComprehensive_outcome() {
+        registerRegion();
+        List<String> out = new ArrayList<>();
+        assertTrue(new VisualizationExportCmd.ExportComprehensiveCmd().onCommand(caller, smallExport(), null, out::add));
+        assertEquals(1, out.size());
+        assertTrue(out.get(0).startsWith("[RTP] Export"), out.get(0));
+    }
+
+    @Test
+    @DisplayName("Export type writes a framed chart for spatial and sparkline kinds")
+    void exportType_outcomes() {
+        registerRegion();
+        String[][] types = {
+                {"pipeline", "REGION_COMPOSITE"},
+                {"bad-locations", "REGION_BAD_LOCATIONS_SHAPE"},
+                {"sparkline", "METRIC_SPARKLINE"},
+        };
+        for (String[] t : types) {
+            List<String> out = new ArrayList<>();
+            VisualizationExportCmd.ExportTypeCmd cmd =
+                    new VisualizationExportCmd.ExportTypeCmd(t[0], ChartSpec.Kind.valueOf(t[1]));
+            assertEquals(t[0], cmd.name());
+            assertTrue(cmd.onCommand(caller, smallExport(), null, out::add));
+            assertEquals(1, out.size(), t[0]);
+            assertTrue(out.get(0).startsWith("[RTP] Export"), out.get(0));
+        }
+        File pipeline = new File("plugins/RTP/charts", REGION + "_pipeline.png");
+        assertTrue(pipeline.isFile());
+    }
+
+    @Test
+    @DisplayName("Export type reports a failure when the region cannot be resolved")
+    void exportType_unresolvable() {
+        RTP.selectionAPI = new SelectionAPI();
+        List<String> out = new ArrayList<>();
+        VisualizationExportCmd.ExportTypeCmd cmd =
+                new VisualizationExportCmd.ExportTypeCmd("pipeline", ChartSpec.Kind.REGION_COMPOSITE);
+        assertTrue(cmd.onCommand(caller, Map.of("region", List.of("mcclc_missing")), null, out::add));
+        assertEquals(1, out.size());
+        assertTrue(out.get(0).startsWith("[RTP] Export failed") || out.get(0).startsWith("Failed to resolve"), out.get(0));
+        // Server accessor route.
+        assertTrue(cmd.onCommand(caller, Map.of("region", List.of("mcclc_missing")), null));
+    }
 }

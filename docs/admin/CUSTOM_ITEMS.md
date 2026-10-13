@@ -2,7 +2,7 @@
 
 LeafRTP's bundled GUI addon (`LeafRTPGuiAddon`) supports custom items from third-party plugins and vanilla mechanics as destination and filler icons in `plugins/RTP/addons/guimenu.yml`. This allows servers using custom resource packs, 3D models, or head databases to match their `/rtp` menu with the rest of their custom theme.
 
-All third-party item integrations are decoupled through reflection and soft-dependencies (following ADR-026). The plugin carries zero shaded third-party dependencies, prevents classpath conflicts, and degrades gracefully to standard vanilla materials when a custom item plugin is absent or encounters invalid IDs.
+None of these plugins are required. LeafRTP does not bundle any of them, and if a custom item plugin is missing or an item ID is invalid, the icon falls back to a vanilla material.
 
 ---
 
@@ -72,7 +72,7 @@ To ensure reliable integration without violating third-party licenses:
 ### Defensive Fallbacks
 If a custom item plugin is not installed, disabled, or an invalid item identifier is provided:
 - LeafRTP logs a single clear diagnostic notice to the console once on startup.
-- The item resolver degrades gracefully to the configured vanilla fallback material (`Material.COMPASS` or `Material.BARRIER`).
+- The icon falls back to the configured vanilla material (`COMPASS` or `BARRIER`).
 - Teleport menus never throw `ClassNotFoundException` or crash the player's inventory screen.
 
 If an upstream update in a proprietary plugin changes its public API signatures or breaks reflective access, please report it via the issue tracker, and the integration will be updated on a best-effort basis.

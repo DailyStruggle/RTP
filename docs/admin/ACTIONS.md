@@ -1,6 +1,6 @@
 # Declarative Action Engine
 
-The **Action Engine** (`ADR-093`, `ADR-095`, `ADR-097`, `ADR-098`) is LeafRTP's generalized subsystem for scripted, multi-entity, confined, physical-trigger, and anchor-driven teleports.
+The **Action Engine** handles teleports that go beyond a plain `/rtp`: group placements, teleports near a player or landmark, confined arenas, and teleports started by stepping into a portal or zone.
 
 Instead of writing custom plugins or rigid command chains to handle specialized gameplay modes (such as 1v1 duels, squad arena battles, landing near a random player, dropping near landmark coordinates, or portal triggers), administrators can declare these behaviors as YAML files in `definitions/actions/<id>.yml`.
 
@@ -8,13 +8,13 @@ Instead of writing custom plugins or rigid command chains to handle specialized 
 
 ## Overview & Architecture
 
-The action engine adheres to the **"Capability, Not Catalogue"** architectural principle (`ADR-093`): LeafRTP ships foundational engine primitives—spatial placement, boundary containment, gated execution, scoreboards, and fault-tolerant dispatch—rather than hardcoded minigames. Specific game modes (such as duels or team scatters) are declared entirely in YAML or delegated to vanilla commands.
+LeafRTP does not ship hardcoded minigames. It provides building blocks - group placement, boundaries, conditions, scoreboards, and lifecycle scripts - and you describe each game mode (a duel, a team scatter) in YAML, calling vanilla commands where you need custom behavior.
 
 Each `.yml` file in `definitions/actions/` defines one autonomous action. The action engine handles:
 1. **Command Registration:** Automatically registers `/rtp action <id>` and optional standalone custom top-level commands (e.g. `/challenge`, `/duel`, `/nearplayer`, `/spawnzone`).
-2. **Anchor Resolution:** Dynamically anchors teleport destinations to a pre-warmed region queue, live player entity, coordinate landmark, spatial claim perimeter, or external claim/faction boundary (`ADR-095`).
-3. **Subspace Group Placement:** Positions multiple participants into an arena or cluster with guaranteed minimum separation (`minSeparation`), elevation tolerance (`elevationTolerance`), and bounded retries off-tick without blocking (`ADR-093`, `ADR-097`).
-4. **Confinement & Shrinking Boundaries:** Restricts players to an active boundary (`SUBSPACE`, `REGION`, `LEASH`, or custom `SHAPE`) with clientbound visual world borders, dynamic border shrinking (sudden-death), boundary damage, and safe interior pull-backs (`ADR-093`).
+2. **Anchor Resolution:** Picks the center point for the teleport: a location from a region's prepared queue, a live player, fixed landmark coordinates, the edge of a known claim, or a claim/faction border.
+3. **Group Placement:** Places several participants together with a minimum distance between them (`minSeparation`) and a maximum height difference (`elevationTolerance`). Searching happens in the background and gives up after a fixed number of retries.
+4. **Confinement & Shrinking Boundaries:** Keeps players inside a boundary (`SUBSPACE`, `REGION`, `LEASH`, or custom `SHAPE`), shows them a world border, can shrink it over time (sudden death), deals damage outside it, and pulls players back inside.
 5. **Physical World Triggers:** Activates actions via cuboid trigger zones (portals, launch pads, step-in thresholds) with support for wave-accumulator spatial lobbies (`/rtp trigger` and `triggers:` specs).
 6. **Scoreboards & Lifecycles:** Tracks session state, violation counts, and timers using isolated dummy scoreboards, executing scripted console/player commands on lifecycle triggers (`onEnqueue`, `onStart`, `onBoundaryViolation`, `onExpire`, `onDeath`, `onCancel`).
 
@@ -78,7 +78,7 @@ When an action configures a `command:` block, LeafRTP exposes the action as a ro
 /<command_name> <subcommand>
 ```
 
-* **Startup Registration (`ADR-093`, `ADR-098`):** Top-level action commands and aliases are registered into the Brigadier command tree during plugin startup before the command tree is frozen. Adding or renaming command aliases requires a server restart; `/rtp reload` updates placement, confinement, and lifecycle scripts without modifying root command nodes.
+* **Startup Registration:** Top-level action commands and aliases are registered when the plugin starts. Adding or renaming a command or alias requires a server restart; `/rtp reload` updates placement, confinement, and lifecycle scripts but does not add or remove commands.
 * **Built-in Cancel Subcommand:** Top-level commands automatically inherit a nested `cancel` subcommand (e.g. `/challenge cancel`).
 * **Custom Subcommands:** Actions can declare custom subcommands (such as `/challenge leave` or `/duel surrender`) with dedicated permissions and execution scripts.
 
@@ -96,7 +96,7 @@ description: "Confined 1v1 arena duel with shrinking world border and forfeit su
 icon: "DIAMOND_SWORD"
 title: "&c&l1v1 Arena Duel"
 
-# (Optional) Top-level server command registration (ADR-098)
+# (Optional) Top-level server command registration
 command:
   name: "duel"
   permission: "rtp.command.duel"
@@ -120,7 +120,7 @@ command:
       permission: "rtp.command.duel.target"
       default: "any"              # 'any' for open matchmaking, 'self' for caller
 
-# Subspace Placement & Anchor Configuration (ADR-093, ADR-095, ADR-097)
+# Placement & Anchor Configuration
 placement:
   # Target world or parent region (inherits spatial memory, biomes, and verifiers)
   region: "default"
@@ -131,15 +131,15 @@ placement:
   # Footprint shape used to arrange participants around the anchor coordinate
   shape:
     name: "SQUARE"               # SQUARE, CIRCLE, POLYGON, ELLIPSE, RECTANGLE
-    radius: 4c                   # Footprint radius (supports 'c' for chunks or blocks)
-    centerRadius: 0              # Inner exclusion ring (donut center)
+    radius: 4c                   # Footprint radius: 4c = 4 chunks = 64 blocks (64b also works)
+    centerRadius: 0              # Inner exclusion ring (donut center); 0 = none
 
   # Spacing and elevation constraints
   minSeparation: 32              # Minimum blocks between participants
   elevationTolerance: 256        # Maximum Y-delta across participants
 
-  # Bounded retries and pre-validated caching (ADR-097)
-  retries: 3                     # Off-tick retry attempts before failing closed (default: 3)
+  # Retries and pre-checked caching
+  retries: 3                     # Background attempts before the action fails with a message (default: 3)
   cacheSize: 5                   # Pre-warmed placement candidate slots (default: 0)
 
   # Anchor-specific parameters (e.g. for fixed landmarks or faction namespaces)
@@ -150,7 +150,7 @@ placement:
     anchorWorld: "world"         # Landmark world (defaults to placement.region world)
     namespace: "factions"        # Claim boundary namespace (for anchor: faction)
 
-# Confinement & Boundary Enforcement (ADR-093)
+# Confinement & Boundary Enforcement
 confinement:
   # Boundary type: NONE | SUBSPACE | REGION | LEASH | SHAPE
   boundary: "LEASH"
@@ -180,7 +180,7 @@ confinement:
   # In-match participant cancellation toggle
   cancellable: false             # false = participants cannot cancel mid-match
 
-# Physical World Triggers & Spatial Lobbies (ADR-093)
+# Physical World Triggers & Spatial Lobbies
 triggers:
   - id: "arena_portal"
     type: "PORTAL"               # PORTAL, PRESSURE_PLATE, STEP_IN
@@ -190,7 +190,7 @@ triggers:
     cooldown: 5s                 # Per-player trigger cooldown
     batchInterval: 10s           # Wave accumulator lobby timer (0s = instant)
 
-# Matchmaking & Reciprocity Gates (ADR-093, ADR-098)
+# Matchmaking & Reciprocity Gates
 gate:
   # Participant count condition
   - players: ">= 2"
@@ -258,33 +258,33 @@ version: "1.0"
 
 ---
 
-## Anchor Types (`ADR-095`)
+## Anchor Types
 
-Anchor providers define where the center point $(X_0, Z_0)$ of the subspace placement is rooted. Resolution runs completely off-tick with zero main-thread chunk I/O (S-005):
+The anchor decides where the center of the placement is. Anchors are resolved in the background and do not load chunks on the main thread:
 
 | Anchor Key | Aliases | Origin & Resolution Mechanism | Unresolved Fallback |
 |---|---|---|---|
 | `regionQueue` | `scatter` | Polled from LeafRTP's pre-warmed shared region location buffer. (Note: `scatter` is an alias of `regionQueue`, drawing from the parent region's pre-warmed queue). | On-demand generation from parent region. |
 | `fixed` | `location`, `landmark` | Sourced from static landmark coordinates (`anchorX`, `anchorY`, `anchorZ`, `anchorWorld`) defined in `placement.parameters` or context metadata. | Falls back to `regionQueue`. |
-| `entity` | `player`, `nearplayer` | Dynamically targets an active player or entity. If no coordinates are supplied, auto-discovers a random online player (excluding participants). | Fails closed (`entity(() -> null)`); never silently falls back to random terrain (S-004). |
-| `claimHazard` | `claim`, `nearclaim` | Scans parent spatial memory (`MemoryShape`) for chunks recorded under `FailTypes.safetyExternal` (ADR-079) and targets a perimeter edge without calling foreign claim APIs. | Fails closed (`NO_ANCHOR`) if no claim rejections have been discovered. |
-| `claimBoundary` | `faction` | Resolves primary participant's exact claim/faction perimeter through `ClaimBoundaryRegistry` (Towny, GriefPrevention, SaberFactions, FactionsUUID; namespace `factions` for `faction`, overridable via `namespace`). | Falls back to `claimHazard`. |
+| `entity` | `player`, `nearplayer` | Targets an online player or entity. If none is given, picks a random online player who is not a participant. | The action fails with a message; it never quietly falls back to random terrain. |
+| `claimHazard` | `claim`, `nearclaim` | Uses the region's memory of spots that earlier teleports rejected because they were claimed, and targets the edge of such a claim. It does not call the claim plugin. | The action fails with a message if no claimed spots have been recorded yet. |
+| `claimBoundary` | `faction` | Looks up the exact claim or faction border of the first participant (Towny, GriefPrevention, SaberFactions, FactionsUUID; namespace `factions` for `faction`, overridable via `namespace`). | Falls back to `claimHazard`. |
 
 ---
 
-## Placement & Cache Tuning (`ADR-097`)
+## Placement & Cache Tuning
 
-Multi-participant placement employs a two-stage off-tick candidate pipeline:
+Group placement happens in the background, in two passes:
 
-1. **Stage 1 (Off-Tick Anvil Pre-Screening):** The engine synthesizes a candidate lattice across the subspace footprint ($2\times$ over-provisioning factor) and inspects Anvil `.mca` files on disk off-tick. Biomes, rivers, oceans, and 5-point chunk column offsets are evaluated with zero server chunk loads (S-005).
-2. **Stage 2 (Async Validation & Mutual Clustering):** Selected candidates are checked for mutual elevation tolerance and minimum separation before asynchronous chunk loading.
-3. **Bounded Retries (`retries`):** Clamped $\ge 1$ (default `3` for actions). If external claim verifiers (S-003) or local block hazards reject a candidate set, the rejected chunks are logged to spatial memory as `safetyExternal` and a fresh anchor/lattice is tried off-tick.
-4. **Pre-Validated Caches (`cacheSize`):** For stationary actions (`scatter`, `location`, `nearclaim`, `arena`), configuring `cacheSize: 3` keeps pre-screened multi-player placement sets warm in background memory (`ActionCacheWarmTask`).
-5. **Mandatory Pre-Flight Recheck:** Upon popping a cached entry, resident blocks and external claims are re-verified immediately prior to teleport dispatch (S-001, S-003). Invalid entries are cleanly discarded with tickets released (S-002).
+1. **Pre-screening:** LeafRTP picks about twice as many candidate spots as it needs inside the footprint and checks the saved region files on disk for biome, rivers, and oceans. No chunks are loaded in this pass.
+2. **Validation:** The best candidates are checked against each other for height difference and minimum separation, then their chunks are loaded in the background and checked for safe blocks.
+3. **Retries (`retries`):** Minimum `1` (default `3` for actions). If a claim plugin or an unsafe block rejects a set, LeafRTP remembers those chunks as rejected and tries a new anchor.
+4. **Caches (`cacheSize`):** For actions whose anchor does not move (`scatter`, `location`, `nearclaim`, `arena`), `cacheSize: 3` keeps three ready-checked placement sets in memory so the action starts faster.
+5. **Recheck before teleport:** A cached set is checked again for safe blocks and claims right before players are teleported. Sets that no longer pass are thrown away and their chunks are released.
 
 ---
 
-## Confinement & Sudden-Death Arenas (`ADR-093`)
+## Confinement & Sudden-Death Arenas
 
 The confinement engine restricts participants to an active spatial boundary:
 
@@ -292,17 +292,17 @@ The confinement engine restricts participants to an active spatial boundary:
 
 * `NONE`: No spatial confinement. Placement teleports participants and immediately disarms.
 * `SUBSPACE`: Restricts players to the generated subspace footprint centered on the anchor.
-* `REGION`: Restricts players to the parent region's mathematical boundary. Evaluated live against `MemoryShape.contains(x, z)` (expands monotonically if the region has `expand: true`).
-* `LEASH`: Radial boundary around the anchor coordinate (`leashRadius: 48.0`).
-* `SHAPE`: Custom mathematical shape boundary (`shape: { name: CIRCLE, radius: 5c }`).
+* `REGION`: Restricts players to the parent region's shape. If the region has `expand: true`, the boundary grows with it and never shrinks.
+* `LEASH`: Circle around the anchor, radius in blocks (`leashRadius: 48.0`).
+* `SHAPE`: Custom shape boundary (`shape: { name: CIRCLE, radius: 5c }`, i.e. 80 blocks).
 
 ### Clientbound Visual World Borders
 
-When `boundary` is set to `LEASH` or `SUBSPACE`, LeafRTP projects a clientbound world border wall centered on the anchor coordinate. The border is visible exclusively to session participants and is automatically removed upon session disarm.
+When `boundary` is set to `LEASH` or `SUBSPACE`, participants see a world border centered on the anchor. Only session participants see it, and it is removed when the session ends.
 
 ### Sudden-Death Shrinking Borders
 
-For battle-royale and duel arenas, the world border can smoothly contract over time:
+For battle-royale and duel arenas, the world border can shrink over time:
 * `initialSize`: Starting border diameter in blocks (e.g. `128` or `8c`).
 * `shrinkTo`: Target final border diameter in blocks (e.g. `32`).
 * `shrinkOver`: Duration of the shrinking phase (e.g. `4m` or `240s`).
@@ -338,7 +338,7 @@ When `batchInterval` is set to a non-zero duration (e.g. `15s`), the trigger fun
 
 ---
 
-## Declarative Parameters & Permissions (`ADR-098`)
+## Declarative Parameters & Permissions
 
 Actions with custom `command:` blocks declare parameter validation and authoritative fallback defaults:
 
@@ -354,7 +354,7 @@ command:
       default: "any"             # 'any' = open matchmaking; 'self' = caller only
 ```
 
-* **Targeting Protection:** Teleporting or challenging another player requires an explicit permission node (e.g. `rtp.command.<action>.target` or `rtp.command.<action>.other`). Without this permission, the command fails closed with the configurable `noPerms` message (S-007).
+* **Targeting Protection:** Teleporting or challenging another player requires an explicit permission node (e.g. `rtp.command.<action>.target` or `rtp.command.<action>.other`). Without it, the command is refused with the configurable `noPerms` message.
 * **Authoritative Defaults:** When an argument is omitted, the declared `default` dictates behavior:
   * `player` type: `self` defaults to the caller; `any` leaves the target open for matchmaking.
   * `coordinate` type: `self` or `spawn`.
@@ -366,7 +366,7 @@ command:
 
 ### Script Actions
 
-Commands inside lifecycle blocks execute with guarded, non-fatal dispatch (command errors never abort teardown; S-004):
+If a command in a lifecycle block fails, the error is logged and the remaining commands and cleanup still run:
 
 * `CONSOLE: <command>`: Executes a command at server console privilege.
 * `PLAYER: <command>`: Executes a command as the participant.
@@ -397,7 +397,7 @@ All placeholders are sanitized before execution to prevent command injection:
 * `[countdown]`, `[time_left]`, `[time_remaining]`: Remaining seconds.
 * `[action]`, `[trigger]`: Action and trigger identifiers.
 
-### Universal Scoreboards (`ADR-093`)
+### Universal Scoreboards
 
 LeafRTP automatically maintains dummy scoreboard objectives for state inspection without external bridge plugins:
 * `rtp_session_id`: Active session token hash.
@@ -407,7 +407,7 @@ LeafRTP automatically maintains dummy scoreboard objectives for state inspection
 * `rtp_dist_sq`: Squared distance from anchor coordinate.
 * `rtp_alive`: Count of living participants in the session.
 
-These scoreboards work seamlessly with vanilla target selectors (e.g. `@a[scores={rtp_violations=..2}]`), command blocks, and datapacks.
+These scoreboards work with vanilla target selectors (e.g. `@a[scores={rtp_violations=..2}]`), command blocks, and datapacks.
 
 **Startup Orphan Reaper:** If a server crashes mid-session, LeafRTP's startup reaper sweeps and removes all lingering `rtp_session_*` tags and objectives on restart, preventing stranded score states.
 
@@ -420,9 +420,9 @@ LeafRTP ships with built-in production templates in `definitions/actions/`:
 1. **`scatter.yml`**
    * Single-player or group party scatter using `anchor: regionQueue`. Disperses queued parties across natural terrain with guaranteed minimum spacing (`minSeparation: 32`).
 2. **`nearplayer.yml`**
-   * Drops a player into a safe ring (`radius: 6c`, `centerRadius: 1c`) around a random online player using `anchor: entity`. Reproduces competitor "nearplayer" mechanics natively on the unified subspace engine.
+   * Drops a player into a ring 16 to 96 blocks (`centerRadius: 1c`, `radius: 6c`) from a random online player using `anchor: entity`.
 3. **`nearclaim.yml`**
-   * Lands players outside claimed perimeters (`anchor: claimHazard`) using spatial memory without foreign claim-plugin lookups.
+   * Lands players just outside claims that earlier teleports ran into (`anchor: claimHazard`), without querying the claim plugin.
 4. **`location.yml`**
    * Teleports players around a fixed landmark structure (`anchor: fixed`, `anchorX/Y/Z`) with permissions restricting targeting of others (`rtp.command.location.other`).
 5. **`challenge.yml`**

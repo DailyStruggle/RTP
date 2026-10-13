@@ -163,4 +163,14 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** Soft cap is not exact under load; above the cap, deferred background regional work gains a 50 ms quantised delay that can flatten achieved TP/s near `maxRegionalInflight / service time`.
 - **Suggested next step:** Use a CAS loop (as `pumpQueue` does) for the permit, and consider routing deferred entries through `interactiveQueue`/`pumpQueue` instead of a timed re-queue. Confirm first with the cap-saturation counters from a >= 96-bot ramp at 200-320 TP/s.
 
+### 2026-10-12 - ActionContext gate validators are not consulted by in-session lifecycle gates
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** SonarCloud PR 57 coverage tests for `ActionSessionImpl`
+- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/action/ActionSessionImpl.java` `triggerBoundaryViolation` / `triggerStart` (`new ActionGateContext(...)` without the session's `ActionContext`); `GateEvaluator.evaluate` lines 75-79, 123-127
+- **Symptom / hypothesis:** `GateEvaluator` applies `context.context().gateValidators()`, but the session builds its `ActionGateContext` without an `ActionContext`, so validators added via `ActionContext.withValidator` gate only queue admission in `ActionManager` and never lifecycle steps. Unclear whether that is intended.
+- **Impact:** An addon that expects its validator to suppress `onBoundaryViolation` / `onStart` steps sees them run anyway.
+- **Suggested next step:** Decide the contract; either pass `context` into the session's gate contexts or document `withValidator` as admission-only. `ActionSessionImplCoverageTest#gatesAndDelayedSteps` pins the current behaviour.
+
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->

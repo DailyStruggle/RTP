@@ -321,7 +321,7 @@ Operator-facing self-test commands that exercise the teleport pipeline, queue, s
 
 ## `/rtp action` — Declarative Scripted Actions
 
-Executes a declarative scripted action defined in `definitions/actions/<id>.yml` (`ADR-093`, `ADR-095`). Actions support multi-entity group placements, custom anchor types (`nearplayer`, `nearclaim`, `location`, `scatter`), arena confinement boundaries, scoreboards, and lifecycle automation.
+Executes a declarative scripted action defined in `definitions/actions/<id>.yml`. Actions support multi-entity group placements, custom anchor types (`nearplayer`, `nearclaim`, `location`, `scatter`), arena confinement boundaries, scoreboards, and lifecycle automation.
 
 **Syntax**
 ```

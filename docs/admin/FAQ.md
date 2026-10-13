@@ -10,9 +10,9 @@ Answers to the most common questions from server administrators and contributors
 
 ### Does RTP work on Paper / Folia, or only Spigot?
 
-The Bukkit family is all supported by one jar: download the same jar for Spigot, Paper, Paper forks, and Folia, and RTP auto-detects the platform at startup and loads the correct adapter. No separate jar is needed across the Bukkit family.
+One jar covers every platform: Spigot, Paper and its forks, Folia, Fabric (needs Fabric API), NeoForge, and Velocity. RTP detects the platform at startup and loads the matching adapter. Put it in `plugins/` on Bukkit-family servers and Velocity, or `mods/` on Fabric and NeoForge.
 
-Fabric and NeoForge are also supported as first-class platforms (Minecraft 1.21.x / 26.1.x); those run as a mod, so you download the Fabric or NeoForge artifact rather than the Bukkit jar. Legacy Forge has no native build: run the Bukkit jar under Arclight or Mohist.
+Legacy Forge has no native adapter: run the same jar under Arclight or Mohist.
 
 ### Do I need to restart the server after changing config files?
 
@@ -24,7 +24,13 @@ Yes. RTP does not interfere with other teleport plugins. It only acts on `/rtp` 
 
 ### Does RTP support BungeeCord / Velocity cross-server teleportation?
 
-Velocity is supported. The `proxy-direct` transport lets a Velocity proxy send a player to a random region on a backend server over a lightweight TCP socket, with no Redis or SQL database required. Configure it in `network.yml`.
+Velocity is supported, over one of three transports:
+
+- **proxy-direct**: the proxy and backends talk directly; no database needed.
+- **SQL**: servers share reservations through a MySQL / PostgreSQL database.
+- **Redis**: servers share reservations through Redis.
+
+Configure it in `advanced/network.yml`; setup guides are in [proxies](proxies/CONFIGURATION.md).
 
 BungeeCord is not supported yet. A single backend server still works fully on its own with no proxy configuration.
 
@@ -40,24 +46,25 @@ You can increase `cacheCap` in the region config to maintain a larger pool of re
 
 ### Players keep landing in the ocean / nether / end. How do I stop that?
 
-Open `plugins/RTP/safety.yml` and add the unwanted biomes to the biome blacklist. Common entries:
+Open `plugins/RTP/advanced/biomes.yml`. With `biomeWhitelist: false` (the default), `biomes` is a list of biomes players never land in. Oceans, rivers and beaches are already on it; add any others:
 
 ```yaml
-biomeBlacklist:
+biomeWhitelist: false
+biomes:
   - OCEAN
   - DEEP_OCEAN
   - FROZEN_OCEAN
   - WARM_OCEAN
-  - NETHER_WASTES
   - SOUL_SAND_VALLEY
-  - THE_END
 ```
 
-After saving, run `/rtp reload`.
+Set `biomeWhitelist: true` to flip it, so players only land in the listed biomes. For Nether or End, give that world its own region (or a world `override`) rather than listing whole dimensions here.
+
+After saving, run `/rtp reload`, then `/rtp scan reset` and `/rtp scan start` so terrain checked under the old list is checked again.
 
 ### Players are landing too close to spawn / inside the exclusion zone.
 
-Check the `centerRadius` value in the region's `shape:` block. By default, raw numbers are measured in **chunks** (not blocks). A `centerRadius: 64` means players cannot land within 64 × 16 = 1 024 blocks of the centre. You can also specify units explicitly (e.g. `centerRadius: 1000b` or `64c`). Increase it if needed.
+Check `centerRadius` in the region's `shape:` block and raise it. Write it with a unit, e.g. `centerRadius: 1024b` or `centerRadius: 1km`, so players never land closer than that to the centre. (A bare number like `64` means chunks: 64 x 16 = 1,024 blocks.)
 
 ### Players are always landing in the same area.
 
@@ -75,10 +82,12 @@ RTP exhausted its `maxAttempts` (set in `performance.yml`) without finding a val
 
 ### What does `spatialResolution` do?
 
-It controls how precisely the plugin stores spatial memory and samples candidate landing zones:
-- **Memory Coalescing:** Controls the distance (in chunks) across which bad-location runs merge in memory (`computeAdmissibleGap`). Higher values merge nearby hazard pockets more aggressively, shrinking database and RAM footprints.
-- **Dyadic Stride Downsampling:** In dual-layer PRP shapes (`SQUARE`, `CIRCLE`), values greater than `1` (e.g. `4`, `8`, `16`) coarsen the candidate sampling lattice into macro-cells ($4\times 4$, $8\times 8$, $16\times 16$ chunks). This speeds up world pre-scanning (`/rtp scan`) by up to 100× and spaces candidate arrivals across large maps.
-- **Default (`3`):** Suitable for most servers. When `spatialResolution: 1` and `expand: true` is configured with `uniquePlacements: auto` (or an integer radius), RTP automatically derives the optimal power-of-four dyadic stride from player view distance.
+It trades precision for speed and memory:
+- **Higher values** remember bad terrain in coarser patches and check fewer, more widely spaced spots. `/rtp scan` finishes much faster, memory use drops, and landings spread further apart, but small safe pockets between hazards can be skipped.
+- **Lower values** check terrain chunk by chunk. More precise, slower to scan.
+- **Default (`3`):** right for most servers. With `spatialResolution: 1`, `expand: true` and `uniquePlacements: auto`, RTP picks the spacing from player view distance for you.
+
+Details: [REGIONS.md](configuration/REGIONS.md).
 
 ---
 
@@ -95,7 +104,7 @@ Set it too high and you waste memory holding locations nobody will use. Set it t
 
 ### Will RTP lag my server?
 
-RTP is designed to be lag-free. All chunk loading and location validation happens asynchronously off the main thread. The only main-thread work is the final teleport itself, which Bukkit requires. If you notice lag spikes, check:
+Candidate checks and chunk loading run off the main thread. The main-thread work left is the teleport itself and the arriving player's first ticks. In my Paper benchmark there were no ticks over 50 ms across 4,096 paced teleports, but your hardware and world will differ. If you notice lag spikes, check:
 - `minTPS` in `performance.yml`; RTP throttles background work when TPS drops below this value.
 - `syncAllottedTime`, which limits how long per tick the synchronous portion of a teleport can take.
 
@@ -138,8 +147,8 @@ cacheCap: 10
 shape:
   name: "CIRCLE"
   mode: "ACCUMULATE"
-  radius: 128
-  centerRadius: 16
+  radius: 2048b
+  centerRadius: 256b
 vert:
   name: "JUMP"
   minY: 32
@@ -172,12 +181,12 @@ That world will now use `myRegionName` as its default region when players run `/
 
 Correct, and it is not missing - radius is not a world setting. A world file only names the region that answers `/rtp` there; the **region** owns the destination, including distance, shape, vertical range, and price. So you change the region, not the world:
 
-1. **Edit the region that world points at.** Read the name out of `plugins/RTP/definitions/worlds/<world>.yml` (`region:`), then either run `/rtp config regions <region> shape.radius=625` or edit the `shape:` block in `plugins/RTP/definitions/regions/<region>.yml`. Add `--dry-run` to the command to preview it.
+1. **Edit the region that world points at.** Read the name out of `plugins/RTP/definitions/worlds/<world>.yml` (`region:`), then either run `/rtp config regions <region> shape.radius=10km` or edit the `shape:` block in `plugins/RTP/definitions/regions/<region>.yml`. Add `--dry-run` to the command to preview it.
 2. **If that region is shared** by other worlds and you only want this one to change, create a new region file and point the world at it instead.
 
 On a fresh install the region ships `shape: "@config"`, which inherits the whole `defaults.shape` block from `config.yml`. That is why a new setup has only one `radius` on disk: editing `defaults.shape.radius` moves every region that still inherits, which is what a single-world server wants. To give one world its own distance, replace `"@config"` with an inline `shape:` block in that region. Full walkthrough: [Where to set the radius](configuration/REGIONS.md#where-to-set-the-radius).
 
-The payoff for the extra hop: because distance belongs to the region, one world can offer several distances at the same time. Ship `wild` at `radius: 625` and `wild_far` at `radius: 3125`, gate the second with `requirePermission: true`, and players who have it use `/rtp region=wild_far`. A radius attached to the world could not do that.
+The payoff for the extra hop: because distance belongs to the region, one world can offer several distances at the same time. Ship `wild` at `radius: 10km` and `wild_far` at `radius: 50km`, gate the second with `requirePermission: true`, and players who have it use `/rtp region=wild_far`. A radius attached to the world could not do that.
 
 ### Can I disable the invulnerability period?
 
@@ -205,7 +214,7 @@ Addons can arrive three ways - as a standalone plugin/mod, dropped into `plugins
 
 ### I want to add a custom claim plugin integration. Where do I start?
 
-RTP already bundles claim-plugin support for the common protection plugins (GriefPrevention, WorldGuard, Towny, etc.) directly in the plugin jar — there is no separate integration jar to install. To add your *own* integration, look at the `addons/RTP_ExampleAddon/` directory for a working example: your addon compiles against `rtp-api` only, registers a safety verifier through `RTPAPI.hooks()` (the same seam the bundled claim checks use), and registers itself on plugin enable. See [the addon API contract](https://github.com/dailystruggle/RTP/blob/V3/addons/REQUIREMENTS.md) for details.
+RTP already ships claim-plugin support for the common protection plugins (GriefPrevention, WorldGuard, Towny, etc.) as a bundled addon that unpacks on first run - there is nothing extra to install. To add your *own* integration, look at the `addons/RTP_ExampleAddon/` directory for a working example: your addon compiles against `rtp-api` only, registers a safety verifier through `RTPAPI.hooks()` (the same seam the bundled claim checks use), and registers itself on plugin enable. See [the addon API contract](https://github.com/dailystruggle/RTP/blob/V3/addons/REQUIREMENTS.md) for details.
 
 ### I added a requirement to a `REQUIREMENTS.md` file and CI is failing.
 

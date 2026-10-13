@@ -566,6 +566,18 @@ public final class MenuModel {
               0.0));
     }
 
+    // 4b. Web Editor (rtp.editor)
+    if (RTPAPI.checkPermission(playerId, "rtp.editor") || RTPAPI.checkPermission(playerId, "rtp.admin")) {
+      entries.add(
+          new MenuEntry(
+              RtpTarget.action("action:operator:editor"),
+              RtpTargetStatus.Availability.READY,
+              config.titleOperatorEditor(),
+              config.iconOperatorEditor(),
+              0L,
+              0.0));
+    }
+
     // 5. Status & Metrics (rtp.info)
     if (RTPAPI.checkPermission(playerId, "rtp.info") || RTPAPI.checkPermission(playerId, "rtp.admin")) {
       entries.add(

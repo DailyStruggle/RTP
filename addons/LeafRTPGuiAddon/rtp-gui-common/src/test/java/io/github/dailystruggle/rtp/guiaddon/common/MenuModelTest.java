@@ -109,6 +109,7 @@ public class MenuModelTest {
         assertEquals("HOPPER", config.iconOperatorImport());
         assertEquals("REPEATER", config.iconOperatorConfig());
         assertEquals("FILLED_MAP", config.iconOperatorVisualizations());
+        assertEquals("SPYGLASS", config.iconOperatorEditor());
         assertEquals("CLOCK", config.iconOperatorStatus());
         assertEquals("WRITABLE_BOOK", config.iconOperatorAdminBook());
         assertEquals("REDSTONE_TORCH", config.iconOperatorReload());
@@ -116,6 +117,7 @@ public class MenuModelTest {
         assertEquals("&e&lImport Configs", config.titleOperatorImport());
         assertEquals("&b&lConfig Editor", config.titleOperatorConfig());
         assertEquals("&d&lVisualizations", config.titleOperatorVisualizations());
+        assertEquals("&3&lWeb Editor", config.titleOperatorEditor());
         assertEquals("&f&lStatus & Metrics", config.titleOperatorStatus());
         assertEquals("&6&lAdmin Book Panel", config.titleOperatorAdminBook());
         assertEquals("&c&lQuick Reload", config.titleOperatorReload());
@@ -168,11 +170,12 @@ public class MenuModelTest {
 
             MenuModel model = MenuModel.buildOperatorMenu(testPlayer, config);
             assertNotNull(model);
-            assertEquals(8, model.entries().size());
+            assertEquals(9, model.entries().size());
             assertTrue(model.entries().stream().anyMatch(e -> "action:operator:setup".equals(e.target().name())));
             assertTrue(model.entries().stream().anyMatch(e -> "action:operator:import".equals(e.target().name())));
             assertTrue(model.entries().stream().anyMatch(e -> "action:operator:config".equals(e.target().name())));
             assertTrue(model.entries().stream().anyMatch(e -> "action:operator:visualizations".equals(e.target().name())));
+            assertTrue(model.entries().stream().anyMatch(e -> "action:operator:editor".equals(e.target().name())));
             assertTrue(model.entries().stream().anyMatch(e -> "action:operator:status".equals(e.target().name())));
             assertTrue(model.entries().stream().anyMatch(e -> "action:operator:adminbook".equals(e.target().name())));
             assertTrue(model.entries().stream().anyMatch(e -> "action:operator:reload".equals(e.target().name())));

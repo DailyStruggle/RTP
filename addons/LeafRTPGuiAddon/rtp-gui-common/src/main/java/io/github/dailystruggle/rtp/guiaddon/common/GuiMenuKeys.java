@@ -56,6 +56,8 @@ public enum GuiMenuKeys {
   iconOperatorConfig,
   /** Icon material name for the visualizations button in the operator menu. */
   iconOperatorVisualizations,
+  /** Icon material name for the web editor button in the operator menu. */
+  iconOperatorEditor,
   /** Icon material name for the status/metrics button in the operator menu. */
   iconOperatorStatus,
   /** Icon material name for the master admin book button in the operator menu. */
@@ -90,6 +92,8 @@ public enum GuiMenuKeys {
   titleOperatorConfig,
   /** Display title for the visualizations button in the operator menu. */
   titleOperatorVisualizations,
+  /** Display title for the web editor button in the operator menu. */
+  titleOperatorEditor,
   /** Display title for the status/metrics button in the operator menu. */
   titleOperatorStatus,
   /** Display title for the master admin book button in the operator menu. */

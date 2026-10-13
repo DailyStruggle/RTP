@@ -172,6 +172,10 @@ public final class GuiMenuConfig {
     return str(GuiMenuKeys.iconOperatorVisualizations, "FILLED_MAP");
   }
 
+  public String iconOperatorEditor() {
+    return str(GuiMenuKeys.iconOperatorEditor, "SPYGLASS");
+  }
+
   public String iconOperatorStatus() {
     return str(GuiMenuKeys.iconOperatorStatus, "CLOCK");
   }
@@ -238,6 +242,10 @@ public final class GuiMenuConfig {
 
   public String titleOperatorVisualizations() {
     return str(GuiMenuKeys.titleOperatorVisualizations, "&d&lVisualizations");
+  }
+
+  public String titleOperatorEditor() {
+    return str(GuiMenuKeys.titleOperatorEditor, "&3&lWeb Editor");
   }
 
   public String titleOperatorStatus() {

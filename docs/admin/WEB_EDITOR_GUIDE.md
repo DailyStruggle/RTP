@@ -1,8 +1,7 @@
 # Web Workspace & Visual Editor Guide
 
 **Current Plugin Version:** `@version@`
-**Architecture Record:** [ADR-104](../../adr/ADR-104-ephemeral-web-editor-and-packed-docs-integration.md) (Ephemeral Web Editor and In-Game Packed Docs Integration)
-**Related Prohibitions:** S-004 (no silent failures), S-005 (zero main-thread chunk/network I/O), S-006 (fail-closed API contract)
+**Design notes:** [ADR-104](../../adr/ADR-104-ephemeral-web-editor-and-packed-docs-integration.md) (Ephemeral Web Editor and In-Game Packed Docs Integration)
 
 The LeafRTP Web Workspace is a browser-based visual cartography and configuration staging application (`docs/editor/` or hosted `/editor/`). It allows server operators to inspect engine diagnostics, adjust region boundary geometry, and configure plugin YAML with live documentation hints on a secondary monitor while retaining active gameplay on their primary display.
 
@@ -11,7 +10,7 @@ The LeafRTP Web Workspace is a browser-based visual cartography and configuratio
 ## 1. Problem Statement: The Simultaneous View & Edit Dilemma
 
 Traditional server management confronts operators with screen conflicts and accessibility hurdles:
-- **Screen Lock:** Opening in-game books (`/rtp docs`, ADR-045) or inventory menus locks the Minecraft client screen. Operators cannot comfortably cross-reference documentation while tweaking complex configuration files or command arguments.
+- **Screen Lock:** Opening in-game books (`/rtp docs`) or inventory menus locks the Minecraft client screen. Operators cannot comfortably cross-reference documentation while tweaking complex configuration files or command arguments.
 - **Port-Forwarding & Remote Hosting Restrictions:** Running an embedded HTTP listener inside the Minecraft JVM requires inbound firewall ports, which are frequently blocked by shared hosting environments or home NATs. Embedded servers also introduce network attack surfaces (e.g. CSRF, unauthenticated sockets).
 - **Geometric Complexity:** Manually hand-typing coordinates for multi-vertex polygons (`POLYGON`) or inner exclusion rings (`centerRadius`) is error-prone and unintuitive.
 
@@ -25,7 +24,7 @@ LeafRTP resolves these issues using an **outbound ephemeral session architecture
 +---------------------------------------------------------------------------------------------------+
 | PRIMARY SCREEN: Minecraft Client (In-Game)                                                        |
 |                                                                                                   |
-|   /rtp editor (or /rtp admin -> [🌐 Web Editor])                                                  |
+|   /rtp editor (or /rtp admin -> [🌐 Web Editor])                                                   |
 |       │                                                                                           |
 |       ▼                                                                                           |
 |   Emits ephemeral link: https://dailystruggle.github.io/RTP/editor#<128-bit-token>                |
@@ -37,15 +36,15 @@ LeafRTP resolves these issues using an **outbound ephemeral session architecture
 | SECONDARY SCREEN: Dedicated Web Workspace (Browser)                                               |
 |                                                                                                   |
 |   ┌───────────────────────────────────────────────┬───────────────────────────────────────────┐   |
-|   │ 🗺 2D Vector Cartography Canvas               │ 📋 Staging Diff & Validation Inspector    │   |
+|   │ 🗺 2D Vector Cartography Canvas               │ 📋 Staging Diff & Validation Inspector    │     |
 |   │ - Polygon vertex dragging & simplification    │ - Live YAML mutations across files        │   |
-|   │ - Donut (centerRadius) & Box boundary gizmos  │ - ADR-034 non-self-intersection guard     │   |
+|   │ - Donut (centerRadius) & Box boundary gizmos  │ - polygon self-intersection guard        │    |
 |   │ - Live Biome & Bad-Location Overlays          │ - Context-tracking schema documentation   │   |
 |   └───────────────────────────────────────────────┴───────────────────────────────────────────┘   |
 |                                       │                                                           |
-|                                       │ Click [⚡ Hot-Apply / Copy]                               |
+|                                       │ Click [⚡ Hot-Apply / Copy]                                |
 |                                       ▼                                                           |
-|   Outbound WebSocket commit OR Copy-to-clipboard: /rtp editor apply <token>                      |
+|   Outbound WebSocket commit OR Copy-to-clipboard: /rtp editor apply <token>                       |
 +---------------------------------------------------------------------------------------------------+
                                         │
                                         │ (WebSocket push or operator pastes /rtp editor apply <token>)
@@ -53,19 +52,19 @@ LeafRTP resolves these issues using an **outbound ephemeral session architecture
 +---------------------------------------------------------------------------------------------------+
 | SERVER VERIFICATION & COMMIT PIPELINE                                                             |
 |                                                                                                   |
-|   1. Async fetch/receive session payload via outbound HTTPS/WebSocket (S-005)                     |
+|   1. Async fetch/receive session payload via outbound HTTPS/WebSocket                             |
 |   2. Validate payload SHA-256 integrity and authorization token                                   |
-|   3. Validate geometry invariants (ADR-034 non-self-intersection & world border bounds)           |
+|   3. Validate geometry (no self-intersecting polygons, inside world border)                       |
 |   4. Off-thread disk backup of affected configuration files (.bak)                                |
 |   5. Atomic in-memory config swap and disk flush on async worker                                  |
-|   6. Notify operator in chat with exact diff summary (S-004)                                      |
+|   6. Notify operator in chat with exact diff summary                                              |
 +---------------------------------------------------------------------------------------------------+
 ```
 
 ### Security Safeguards
 1. **Zero Inbound Attack Surface:** The server opens no listening network sockets, HTTP daemons, or open ports. All network traffic is outbound HTTPS/WebSocket to the ephemeral byte store.
 2. **Cryptographic Tokens:** Sessions use cryptographically random 128-bit hex tokens (`SecureRandom`). Tokens expire automatically and are invalidated once applied.
-3. **Fail-Closed Geometry Validation:** Proposed region boundaries are validated against ADR-034 non-self-intersection rules and world borders before any config file is updated on disk.
+3. **Fail-Closed Geometry Validation:** Proposed region boundaries are checked for self-intersecting polygons and world-border limits before any config file is updated on disk.
 4. **Non-Destructive Backups:** The server automatically writes `.bak` copies of all affected configuration files prior to applying modifications.
 5. **Secrets Stay on the Server:** Passwords and other secret values are uploaded as `<redacted>`. Applying a file that still shows `<redacted>` keeps the value already on disk.
 6. **Trusted Browsers:** A new browser has to be trusted once in-game with `/rtp editor trust <code>`. The code matches the one shown on the page and expires after 5 minutes. To revoke trust, run `/rtp editor untrust key=<fingerprint prefix>`, or `key=all` to revoke every browser.
@@ -77,10 +76,10 @@ LeafRTP resolves these issues using an **outbound ephemeral session architecture
 
 For the optimal workflow, configure your physical workspace as follows:
 
-| Display | Environment | Role |
-|---------|-------------|------|
-| **Screen 1 (Main)** | Minecraft Client (Full-screen or Borderless) | In-game navigation, player perspective testing, and immediate execution of `/rtp` or `/rtp apply`. |
-| **Screen 2 (Adjacent)** | Web Browser (`docs/editor/` or hosted `/editor/`) | Interactive 2D cartography canvas, live staging diff inspector, and contextual YAML schema documentation. |
+| Display | Environment | Role                                                                      |
+|---------|-------------|------                                                                     |
+| **Screen 1 (Main)** | Minecraft Client (Full-screen or Borderless) | In-game navigation, player perspective testing, and immediate execution of `/rtp` or `/rtp apply`.|
+| **Screen 2 (Adjacent)** | Web Browser (`docs/editor/` or hosted `/editor/`) | Interactive 2D cartography canvas, live staging diff inspector, and contextual YAML schema documentation.|
 
 ---
 
@@ -107,9 +106,9 @@ Click the link to open the workspace in your browser on Screen 2.
   - **Move a Region:** Drag the round centre handle to move the region. `centerX` / `centerZ` snap to whole chunks (or the 🧲 Snap grid) and keep the unit you wrote (`4096b` stays in blocks, `256c` / `256` stay in chunks). For a polygon, drag the centre handle or anywhere inside the shape to shift every vertex.
   - **Resize a Region:** Drag the square handles on the outer edge to change `radius` (`ELLIPSE`: `radius` on the X axis, `radius2` on the Z axis; `RECTANGLE`: `width` / `height` from the edges, both from the corners). Drag the pink handles on the inner ring to change `centerRadius` / `centerRadius2` (the deadzone hole). The hole always stays smaller than the outer edge. For a polygon, the outer handles scale every vertex about the centre, and a scale that would collapse or cross the outline is refused.
   - **Live Values:** The cursor changes over a handle, and a label shows the value as you drag (e.g. `radius 260c (4160 b)`). The YAML diff updates while you drag; the server path preview is requested once, when you let go.
-  - **Drag Vertices:** Click and drag polygon vertices to adjust region perimeters. Vertices take priority over the move / resize handles. Redundant collinear points are simplified dynamically (ADR-099).
+  - **Drag Vertices:** Click and drag polygon vertices to adjust region perimeters. Vertices take priority over the move / resize handles. Redundant collinear points are simplified dynamically.
   - **Type Exact Values:** Every value a handle changes can also be typed in the shape settings form, which uses the same staging path.
-  - **Visualization Layers:** Toggle overlays for chunk-resolution pregenerated land (biome data streamed progressively to maintain > 5 FPS), rejected candidate blocks (`bad-locations`), and 1D Archimedean spiral walk traces (ADR-001).
+  - **Visualization Layers:** Toggle overlays for chunk-resolution pregenerated land (biome data streamed progressively to maintain > 5 FPS), rejected candidate blocks (`bad-locations`), and 1D Archimedean spiral walk traces.
 
 - **Panel 2: 📊 Diagnostics & Telemetry**
   - Monitor real-time L1 hot chunk queue depth (active tickets), L2 cold queue depth, and L3 backlog binned cache.
@@ -132,7 +131,7 @@ Every modification is staged as an explicit delta:
 -   centerRadius: 64c
 +   centerRadius: 80c
 ```
-The **Math Invariant Guard** confirms that all geometric shapes satisfy ADR-034 requirements (non-self-intersecting polygons, valid radii, coordinates within world borders).
+The **Math Invariant Guard** confirms that all geometric shapes are valid (non-self-intersecting polygons, valid radii, coordinates within world borders).
 
 ### Step 4: Apply Changes
 Click **[⚡ Hot-Apply / Copy]** in the top navigation bar.
@@ -147,7 +146,7 @@ Click **[⚡ Hot-Apply / Copy]** in the top navigation bar.
 
 ## 5. Air-Gapped & Local Offline Mode (`file:///`)
 
-For environments without outbound internet connectivity or where external byte stores are unreachable (ADR-104 §4.4):
+For environments without outbound internet connectivity or where external byte stores are unreachable:
 
 1. Generate a self-contained offline HTML bundle via console or chat:
    ```text
@@ -166,12 +165,12 @@ For environments without outbound internet connectivity or where external byte s
 
 ## 6. Troubleshooting & Common Operational Errors
 
-| Symptom | Cause | Resolution |
-|---------|-------|------------|
-| **`/rtp editor` logs connection timeout** | Server outbound HTTPS traffic blocked by host firewall. | Whitelist outbound HTTPS connections to `bytebin.lucko.me` or generate the local offline export via `/rtp editor local`. |
-| **"Invalid or expired session token" upon `/rtp editor apply`** | Token expired (exceeded TTL) or was already committed. | Re-run `/rtp editor` in-game to issue a fresh session token. |
-| **"Self-intersecting polygon boundary" warning in browser** | Vertex dragging created an invalid complex polygon. | Reposition vertices so boundary edges do not cross each other; verify the Math Invariant Guard displays green checks. |
-| **Browser canvas appears blank** | Hardware acceleration disabled or canvas size zeroed. | Resize browser window or click the **🗺 Visual Region Editor** tab to trigger automatic canvas resize. |
+| Symptom | Cause | Resolution                                                                      |
+|---------|-------|------------                                                                     |
+| **`/rtp editor` logs connection timeout** | Server outbound HTTPS traffic blocked by host firewall. | Whitelist outbound HTTPS connections to `bytebin.lucko.me` or generate the local offline export via `/rtp editor local`.|
+| **"Invalid or expired session token" upon `/rtp editor apply`** | Token expired (exceeded TTL) or was already committed. | Re-run `/rtp editor` in-game to issue a fresh session token.|
+| **"Self-intersecting polygon boundary" warning in browser** | Vertex dragging created an invalid complex polygon. | Reposition vertices so boundary edges do not cross each other; verify the Math Invariant Guard displays green checks.|
+| **Browser canvas appears blank** | Hardware acceleration disabled or canvas size zeroed. | Resize browser window or click the **🗺 Visual Region Editor** tab to trigger automatic canvas resize.|
 
 ---
 
