@@ -242,7 +242,7 @@ subprojects {
             // tags-api measured: 98.2% instruction / 90.9% branch.
             // Sits at Stage A target (0.95/0.85). ENTERPRISE_READINESS.md 4.2 item 8.
             ':tags-api': [instruction: 0.95, branch: 0.85],
-            // anvil-api measured: 90.5% instruction / 80.5% branch.
+            // anvil-api measured via jacocoTestReport (2026-10-13): 91.7% instruction / 82.7% branch.
             ':anvil-api': [instruction: 0.90, branch: 0.80],
             // maps-api measured via jacocoTestReport (2026-10-08): 96.2% instruction / 84.6% branch.
             ':maps-api': [instruction: 0.90, branch: 0.80],
