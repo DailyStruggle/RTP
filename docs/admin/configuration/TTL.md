@@ -12,7 +12,7 @@ Historically, all bad-location entries were permanent: once marked bad, an area 
 - **Player claims:** If a player claims land, RTP records the area as an invalid destination under `safetyExternal`. If the player later abandons or unclaims the plot, the land would remain locked out permanently.
 - **Unique placement buffers:** Landing spots reserved under `uniquePlacements` would stay blacklisted indefinitely.
 
-With cause-based TTL (ADR-079), spatial memory segments are assigned retention lifecycles based on their rejection cause. When dynamic entries reach their expiration threshold, they enter a staged probation window and naturally cycle back into circulation without requiring manual cache resets.
+With cause-based TTL, spatial memory segments are assigned retention lifecycles based on their rejection cause. When dynamic entries reach their expiration threshold, they enter a staged probation window and naturally cycle back into circulation without requiring manual cache resets.
 
 ---
 
@@ -106,7 +106,7 @@ verifiers:
 RTP compresses spatial memory using Run-Length Encoded (RLE) intervals on an Archimedean spiral.
 To prevent data corruption:
 - **Static runs ($\text{TTL} = \infty$) never merge with dynamic runs.** A permanent ocean boundary will never accidentally inherit a temporary claim's expiration date.
-- **Dynamic runs merge cleanly:** When two dynamic runs touch, the combined interval inherits the maximum TTL of both runs ($\max(\text{TTL}_A, \text{TTL}_B)$), minimizing memory fragmentation while preventing premature expiration.
+- **Touching entries merge:** when two remembered stretches touch, the merged one keeps the longer of the two TTLs, so nothing expires early.
 
 ### Staged Probation Buffer
 When a dynamic entry reaches its expiration date ($t \ge \text{TTL}$):
@@ -114,9 +114,9 @@ When a dynamic entry reaches its expiration date ($t \ge \text{TTL}$):
 2. **Phase 2 (Candidate Selection):**
    - **If still claimed:** If RTP selects a candidate in that area and the claim plugin rejects it again, the entire probationary interval is immediately restored with a refreshed TTL in $O(\log M)$ time with zero heap allocation.
    - **If unclaimed / safe:** If the candidate passes verification, the location is used for teleportation and the probation record is naturally dropped on the next off-tick rebuild.
-3. **Phase 3 (Eviction):** Segments that pass twice their TTL ($t \ge 2 \times \text{TTL}$) without re-occurrence are permanently purged from memory.
+3. **Phase 3 (Eviction):** Segments that pass twice their TTL (twice their TTL) without re-occurrence are permanently purged from memory.
 
 ### Disk Persistence (`BIN_VERSION 3`)
 Spatial memory cache files (`.bin` under region storage) store non-overlapping 1D spiral intervals alongside their 64-bit expiration timestamps.
-- **Offline Decay:** If the server is offline or shut down for weeks, expired claims are evaluated against real-world wall-clock time on server startup and cleanly routed to probation or pruned immediately.
+- **Offline Decay:** If the server is offline or shut down for weeks, expired claims are evaluated against real-world wall-clock time on server startup and moved to probation or removed right away.
 - **Backward Compatibility:** Legacy cache files (`BIN_VERSION 1` or `2`) are loaded seamlessly, treating all entries as static ($\text{TTL} = \infty$).

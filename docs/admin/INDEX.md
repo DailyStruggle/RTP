@@ -11,7 +11,7 @@ Welcome to the LeafRTP operator documentation catalog. This index routes server 
 | Guide | Description |
 |-------|-------------|
 | [Quick Start](QUICK_START.md) | 10-minute cold-start guide covering installation, default regions, and essential permissions. |
-| [Web Workspace & Editor Guide](WEB_EDITOR_GUIDE.md) | Operational runbook for the browser-based 2D cartography canvas, live staging diff inspector, and ephemeral `/rtp editor` workflow (ADR-104). |
+| [Web Workspace & Editor Guide](WEB_EDITOR_GUIDE.md) | Operational runbook for the browser-based 2D cartography canvas, live staging diff inspector, and ephemeral `/rtp editor` workflow. |
 | [Command Reference](COMMANDS.md) | Exhaustive reference of every `/rtp` subcommand, parameter, syntax, and permission node. |
 | [Operator Runbook](RUNBOOK.md) | Incident response procedures structured by **Symptom → Diagnosis → Resolution**. |
 | [Actions & Arenas](ACTIONS.md) | Event triggers, world hooks, and arena boundaries. |

@@ -134,13 +134,15 @@ These work without extra plugins:
 **Requirements:** Java 21+. Paper, Folia, Spigot on 1.20+, or Fabric / NeoForge on 1.21.1+, up to 26.x.
 
 1. Drop `{{jar}}` into `plugins/` (or `mods/`).
-2. Type `/rtp`.
+2. Type `/rtp`. With the bundled GUI addon it opens a picker listing your regions, with links to the map visualizations and the admin panel; without it, `/rtp` teleports straight away.
+
+That's enough to run. If you want to tune it, my recommended order is: `/rtp admin setup` -> set each region's radius for how players will use it (the wizard doesn't ask; e.g. `/rtp config regions default shape.radius=10km`, or drag the border in `/rtp editor`) -> `/rtp scan start` to pre-check the terrain -> a stress test if you expect heavy traffic.
 
 **Customize (optional):**
 - **Chat wizard:** `/rtp admin setup`
 - **Web workspace:** `/rtp editor` in your browser
 - **YAML files:** `plugins/RTP/` (`radius: 10km`, `cooldown: 30s`)
-- **Migrate:** `/rtp config import <BetterRTP|EzRTP|JustRTP>`
+- **Switching from another rtp plugin:** `/rtp config import` previews the translated config and permissions; add `overwrite=true` to write them ([switching guide](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-competitor-plugins-betterrtp-justrtp-ezrtp-jakesrtp)).
 
 (Advanced database, network proxy, and cache tuning: see the [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/).)
 
@@ -182,7 +184,7 @@ All configuration routes edit the same files, accept human units (`radius: 10km`
 
 ### For players
 
-- **`/rtp` and `/wild`**: teleport to the world's default region, or pick a region, world or biome (`/rtp region:<name>`, `/rtp biome:<biome>`). `/rtp back` returns players to their prior location.
+- **`/rtp` and `/wild`**: teleport to the world's default region, or pick a region, world or biome (`/rtp region=<name>`, `/rtp biome=<biome>`). `/rtp back` returns players to their prior location.
 - **Menus & custom items**: `/rtp menu` opens an interactive player book on Paper, Folia, Fabric and NeoForge (chat pages on Spigot) for teleporting or picking a region, world or biome. The bundled GUI addon adds a chest-based destination picker with barrier indicators for blocked destinations, customizable hover lore, and prefix routing for custom items (`ia:`, `oraxen:`, `nexo:`, `hdb:`, Base64 heads, and CustomModelData; see [item compatibility](https://dailystruggle.github.io/RTP/admin/CUSTOM_ITEMS/)).
 - **Per-player queues** (`rtp.personalqueue`): personal reserve queues alongside the shared queue, so a surge doesn't delay a player who has one reserved.
 - **Effects**: particles, sounds, fireworks, potions, titles, action bar notices, console or player commands, and holograms on every teleport phase, each controlled by `rtp.effect.<stage>.*` permissions. Holograms use the 1.19.4+ text display entity directly; DecentHolograms and HolographicDisplays are supported if present.
@@ -221,7 +223,7 @@ An extensible action pipeline for group events, boundary confinement, and miniga
 
 ### Networks
 
-- **Cross-server `/rtp`**: Velocity with plugin messaging, or SQL / Redis for reservation tokens. Tested nightly on the in-repo devstack: 2 Velocity proxies, 2 lobbies, 2 backends behind Redis.
+- **Cross-server `/rtp`**: Velocity, over proxy-direct, SQL or Redis. Tested nightly on the in-repo devstack: 2 Velocity proxies, 2 lobbies, 2 backends behind Redis.
 
 ### For developers
 
@@ -276,7 +278,7 @@ Full methodology, per-run analyses, and the runs not shown here (equalized-radiu
 
 ### Spatial memory
 
-About 35-65% of typical Minecraft terrain is ocean, lava or void. LeafRTP remembers biomes and invalid chunks (with cause and TTL) at chunk resolution across server restarts so it doesn't check the same dead ground twice. Operations like `/rtp biome:<biome>` resolve directly from memory without chunk loading. Locations are mapped in constant time, and `/rtp scan` pregenerates spatial memory off-tick. Mathematical derivations and distribution benchmarks: [Why LeafRTP exists](https://dailystruggle.github.io/RTP/site/why/).
+About 35-65% of typical Minecraft terrain is ocean, lava or void. LeafRTP remembers biomes and invalid chunks (with cause and TTL) at chunk resolution across server restarts so it doesn't check the same dead ground twice. Operations like `/rtp biome=<biome>` resolve directly from memory without chunk loading. Locations are mapped in constant time, and `/rtp scan` pregenerates spatial memory off-tick. Mathematical derivations and distribution benchmarks: [Why LeafRTP exists](https://dailystruggle.github.io/RTP/site/why/).
 
 ### Region-file pre-filter
 
@@ -441,10 +443,10 @@ Switching between the free download and this one is a jar swap. Config, data fil
 | Command | Description | Permission |
 | --- | --- | --- |
 | `/rtp` / `/wild` | Random teleport to the default region for your current world (or the GUI picker, if that addon is installed) | `rtp.use` |
-| `/rtp region:<name>` | Teleport to a named region | `rtp.region` / `rtp.regions.*` |
-| `/rtp world:<world>` | Teleport within a specific world | `rtp.world` / `rtp.worlds.*` |
-| `/rtp player:<name>` | Teleport another player | `rtp.other` |
-| `/rtp biome:<biome>` | Teleport to a chosen biome | `rtp.biome` / `rtp.biome.*` |
+| `/rtp region=<name>` | Teleport to a named region | `rtp.region` / `rtp.regions.*` |
+| `/rtp world=<world>` | Teleport within a specific world | `rtp.world` / `rtp.worlds.*` |
+| `/rtp player=<name>` | Teleport another player | `rtp.other` |
+| `/rtp biome=<biome>` | Teleport to a chosen biome | `rtp.biome` / `rtp.biome.*` |
 | `/rtp action <name> [player]` | Trigger a scripted action, arena, or matchmaking duel | `rtp.action` / `rtp.action.<name>` |
 | `/rtp action cancel [action]` | Leave a matchmaking queue or cancel an action entry | `rtp.action.cancel` |
 | `/rtp back` | Return to where you were before the last `/rtp` | `rtp.back` |
@@ -532,7 +534,7 @@ A: "RTP" is the generic name for random teleport, and the old name was just the 
 A: Yes. How it loads chunks there is under [Chunk loading, by platform](#chunk-loading-by-platform). In the Folia benchmarks it had 0 watchdog stalls.
 
 **Q: How do I set up teleportation between worlds?**
-A: Resolution order: the player's current world (or the `world:` parameter) -> that world's target region -> the region's target world. See the admin guide.
+A: Resolution order: the player's current world (or the `world=` parameter) -> that world's target region -> the region's target world. See the admin guide.
 
 **Q: Do you support triangle / diamond region shapes?**
 A: Use the `Polygon` shape. A triangle is a 3-vertex polygon and a diamond is a rotated square.
@@ -541,7 +543,7 @@ A: Use the `Polygon` shape. A triangle is a 3-vertex polygon and a diamond is a 
 A: No, but they work well together. `/rtp scan` walks a region off-tick, verifies safety and generates chunks that aren't on disk yet while recording which sectors are unsafe. Run Chunky first if you want the whole map on disk up front; scan then reads those chunks through the region-file pre-filter.
 
 **Q: Iris / Terra / custom datapack generators, or a world upgraded from an older version?**
-A: Yes. Region files are read directly: modded and namespaced IDs are kept, and `/rtp biome:<x>` matches what's on disk. Plugins that use the live noise-map lookup get this wrong after a version migration. Chunks that were never populated fall back to a live load.
+A: Yes. Region files are read directly: modded and namespaced IDs are kept, and `/rtp biome=<x>` matches what's on disk. Plugins that use the live noise-map lookup get this wrong after a version migration. Chunks that were never populated fall back to a live load.
 
 **Q: What about the Linear (.linear) region format?**
 A: Region pre-filtering reads standard Anvil (`.mca`) files directly because 4 KiB sectors allow random-access chunk checks without decompressing whole regions or shading third-party libraries. For `.linear` or any other unsupported format, the pre-filter returns `UNKNOWN` and falls back to live chunk loading on the server engine. The reader is pluggable through `RegionFileReader` SPI for addons.

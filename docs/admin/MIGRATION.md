@@ -2,142 +2,25 @@
 
 **Current Plugin Version:** `@version@`
 
-This document provides upgrade instructions for server operators and addon developers when moving between RTP versions.
+Switching from another rtp plugin? Start with [Migrating from Competitor Plugins](#migrating-from-competitor-plugins-betterrtp-justrtp-ezrtp-jakesrtp) right below. Upgrading an existing RTP install? Skip to [Upgrading to 3.x](#upgrading-to-3x-current-release-330).
 
 > 📎 For the **mechanics** of how RTP upgrades on-disk YAML files (what `.old1`/`.old2` files are, how your customizations are read into memory before the file is replaced, and how they are overlaid onto the new defaults), see [CONFIG_LIFECYCLE.md](configuration/CONFIG_LIFECYCLE.md).
 
 ---
 
-## Upgrading to 3.x (Current Release: 3.3.0)
-
-> ⚠️ **Major Version Architecture:** The 3.x series introduces fundamental architectural modernization over legacy 2.x releases. This includes breaking `rtp-api` changes, a streamlined tiered configuration directory layout (ADR-076), unified unit parsing, space-filling Hilbert curve spatial memory persistence (ADR-085, ADR-088), pluggable Bare-`/rtp` root action menus (ADR-056), and multi-platform support (Bukkit, Paper, Folia, Fabric, NeoForge, and Velocity/BungeeCord proxy clusters).
-
----
-
-### Key Upgrade Pathways at a Glance
-
-| If upgrading from... | Recommended path & primary actions |
-|----------------------|-------------------------------------|
-| **Legacy 2.x (e.g. 2.0.18 or earlier)** | Full major upgrade. Review breaking API changes, rename permissions/commands (`rtp.fill` -> `rtp.scan`, parameter delimiter `:` -> `=`), remove PaperLib on Paper servers, verify tiered configuration directory migration, and allow cache files to upgrade automatically. |
-| **Early 3.0.x / 3.0.0-beta.x** | Update command syntax to `key=value`, adjust `uniquePlacements` (now chunk radius integer rather than boolean), review bundled add-on jar auto-extraction (`LeafRTPGuiAddon`, `LeafRTPClaimAddon`), and check `rtp.admin` permission umbrella. |
-| **3.1.x** | Note that in 3.2.0+ bare `/rtp` opens the GUI picker by default if an inventory/menu renderer is available; claim integrations moved to bundled `LeafRTPClaimAddon` (`plugins/RTP/addons/LeafRTPClaimAddon.jar`); `LINEAR` vertical search defaults to middle-out (`direction: 2`) with sky light requirement (`vert.requireSkyLight: true`). |
-| **3.2.x** | Config files and definitions are organized in tiered folders (`definitions/`, `advanced/`, `addons/`). Database configuration lives in `advanced/database.yml`, biome weighting in `advanced/biomes.yml`, and messages in `advanced/messages/*.yml`. Spatial memory `.bin` cache auto-migrates to Format Version 5 with continuous Hilbert curves and segment TTLs (`BIN_VERSION 3`). |
-
----
-
-## Detailed Version Upgrade Notes
-
-### Upgrading to 3.3.0 (from 3.2.x or earlier)
-
-1. **Network Mode Permissions (`rtp.servers.*`):**
-   - The permission node `rtp.servers.*` now defaults to `true` (previously `op`) in `plugin.yml`. In network/proxy mode, every player can reach open cross-server regions by default.
-   - If your network configuration relied on `rtp.servers.*` defaulting to operators only, configure explicit negative permissions (e.g. `-rtp.servers.<server>` or `-rtp.servers.*`) in your permissions manager.
-   - Cross-server peer regions only require `rtp.regions.<region>` if the owning backend explicitly configured `requirePermission: true`.
-
-2. **Spatial Memory Persistence (Format Version 5 & `BIN_VERSION 3`):**
-   - Spatial memory `.bin` files and region cache files now support continuous spiral-addressed Hilbert curves (`CIRCLE_OPTIMIZED_DUAL_LAYER`, `SQUARE_OPTIMIZED_DUAL_LAYER`) with dynamic 4-byte/8-byte chunk address keys and cause-based expiration epochs.
-   - Existing cache files are automatically upgraded in place on first load with upward ratchet migration.
-   - *Rollback note:* Older RTP versions (3.1.x and earlier) cannot read Format 5 or `BIN_VERSION 3` binary files. Always make a backup of `plugins/RTP/` before upgrading in case you need to roll back.
-
-3. **In-Game Packed Documentation & Offline HTML Export (`/rtp docs`):**
-   - Introduces `/rtp docs [topic]`, `/rtp docs list`, and `/rtp docs export` under permission `rtp.admin.docs`.
-   - Operators can browse version-matched manuals in-game or export self-contained offline documentation bundles (`docs-bundle.html`).
-
-4. **Tag-Group Set Subtraction in `safety.yml`:**
-   - Block safety lists support subtraction expressions (e.g. `#minecraft:slabs - OAK_SLAB`, `#minecraft:leaves - AZALEA_LEAVES`).
-   - Existing syntax and unmodified lists remain fully backward-compatible.
-
-5. **Unified Unit Parsing:**
-   - Configuration files and command parameters accept explicit units for lengths/distances (`b`/`blocks`, `c`/`chunks`, `r`/`regions`), durations (`t`, `ms`, `s`, `m`, `h`, `d`, composite `2h30m`), and memory sizes (`kib`, `mib`, `gib`). Plain unitless numbers remain backward-compatible and auto-interpreted in context.
-
----
-
-### Upgrading to 3.2.x (from 3.1.x or earlier)
-
-1. **Bare `/rtp` Opens GUI Menu by Default (ADR-056):**
-   - `LeafRTPGuiAddon` is bundled in the RTP jar and self-extracts into `plugins/RTP/addons/` on first startup when the folder does not exist.
-   - By default, executing `/rtp` without arguments now opens the visual destination-picker GUI menu on platforms where a menu renderer is available (Paper, Folia, Fabric, NeoForge).
-   - *To restore instant teleportation on `/rtp`:* Delete `plugins/RTP/addons/LeafRTPGuiAddon.jar` (the `addons/` directory prevents re-extraction) or configure the bare root action in `config.yml`. The classic command remains directly accessible via `/rtp teleport` or menu items.
-
-2. **Tiered Configuration Directory Layout (ADR-076):**
-   - The plugin data directory is reorganized into clean, tiered subdirectories:
-     - Root: everyday operational files (`config.yml`, `economy.yml`, `language.yml`, `safety.yml`).
-     - `definitions/`: authored game content (`definitions/regions/`, `definitions/worlds/`, `definitions/effects/`, `definitions/actions/`).
-     - `advanced/`: infrastructure and tuning (`advanced/database.yml`, `advanced/biomes.yml`, `advanced/performance.yml`, `advanced/logging.yml`, `advanced/metrics.yml`, `advanced/ttl.yml`).
-     - `advanced/messages/`: modular localization files (`commands.yml`, `network.yml`, `placeholders.yml`, `player.yml`, `system.yml`).
-     - `addons/`: bundled and external addon configurations (`addons/countdown.yml`, `addons/guimenu.yml`, `addons/integrations.yml`).
-   - *Automatic relocation:* On first load, RTP automatically relocates existing flat files to their new tiered paths without overwriting files that already exist.
-   - *Manual settings check:* If you customized database settings in `config.yml` or biome weights in `performance.yml`, verify those values in `advanced/database.yml` and `advanced/biomes.yml`.
-
-3. **Claim Integrations Extracted to Bundled Addon (ADR-069):**
-   - Claim and land-protection integrations (WorldGuard, GriefPrevention, Towny, Lands, etc.) have moved from the core plugin into the bundled `LeafRTPClaimAddon` (`plugins/RTP/addons/LeafRTPClaimAddon.jar`).
-   - Claim protection remains active out of the box with zero configuration required.
-
-4. **Surface Teleport Defaults (`LINEAR` Middle-Out & Sky Light):**
-   - Overworld vertical adjustment defaults to `LINEAR` with middle-out scan (`direction: 2`) and `requireSkyLight: true` (`vert.requireSkyLight: true`) in default region templates.
-   - Eliminates players landing in roofed caves or dark overhangs while preserving Nether/End roof ceilings.
-
----
-
-### Upgrading to 3.1.x (from 3.0.x)
-
-1. **`uniquePlacements` is now an Integer Chunk Radius:**
-   - The `uniquePlacements` parameter on memory shapes changed from a boolean flag to an integer chunk radius (default `0` = off).
-   - Setting `uniquePlacements: 3` clears a square area of chunks around previous teleport spots to spread players out.
-   - Legacy boolean values (`true`/`false`) in older configs automatically coerce to `1` and `0` without breaking.
-
-2. **PvP Combat Gate (ADR-055):**
-   - Optional combat gate in `safety.yml` (`pvpCheckEnabled: false` by default). When enabled, prevents players in active combat from teleporting, supporting native damage tracking or soft-depend hooks (PvPManager, CombatLogX, SimpleCombatLog).
-
-3. **Unified Admin Tooling (`rtp.admin` & `/rtp clear`):**
-   - The master permission node `rtp.admin` now groups administrative sub-permissions (`rtp.reload`, `rtp.config`, `rtp.scan`, `rtp.info`).
-   - `/rtp clear <cache|cooldown|queue|limit|invuln>` provides single-shot cache and state purging.
-
----
-
-### Upgrading from Legacy 2.x to 3.x
-
-If you are upgrading from 2.0.18 or earlier:
-
-1. **Command & Permission Renames:**
-   - `/rtp fill` is now `/rtp scan` (permission `rtp.scan`).
-   - Command parameter syntax uses key-value equations (e.g. `/rtp world=world region=default` rather than colon syntax `world:world`).
-2. **PaperLib Removal (Paper & Folia Servers):**
-   - `rtp-paper` and `rtp-folia` use native asynchronous chunk scheduling directly.
-   - If PaperLib was installed in `plugins/` solely for RTP, remove `PaperLib.jar`.
-3. **Platform Additions:**
-   - First-class native support is available for Spigot, Paper, Folia, Fabric (via mod jar), and NeoForge.
-4. **Cache & Database Ingestion:**
-   - Legacy 2.x `.bin` files and spatial memory rows are ingested cleanly. If you desire a full reset for fresh terrain shapes, run `/rtp scan reset`.
-
----
-
-### Addon Developers (`rtp-api` Breaking Changes)
-
-Addons built against `rtp-api` 2.x must recompile against 3.x:
-
-1. **`ChunkReservation`:** Chunk ticket lifecycles are managed via `ChunkReservation` (implements `AutoCloseable`). Replace manual ticket code with try-with-resources.
-2. **`CachedLocation`:** Refactored into an immutable Java `record`. Construct new instances instead of mutating fields.
-3. **Menu & Addon SPIs:** New platform-agnostic `RTPAddon` interface and ServiceLoader-based `AddonRegistry` allow addons to run across Bukkit, Paper, Folia, Fabric, and NeoForge without platform imports.
-4. **Personal Queue API (ADR-043):** Deprecated `Region.queue(UUID)` is replaced by `openPersonalQueue(UUID)` (opt-in bucket) and `requestTeleport(UUID)` (waitlist enqueue).
-
----
-
-## General Upgrade Procedure
-
-1. **Back up** your `plugins/RTP/` folder (configs, database files).
-2. **Stop** the server.
-3. **Replace** the RTP jar with the new version.
-4. **Remove PaperLib** from `plugins/` if upgrading to 3.0.0-beta.1+ on a Paper server and PaperLib was only used by RTP.
-5. **Start** the server. RTP will load existing config and cache files automatically.
-6. Run `/rtp info` to confirm the new version is active.
-7. Run `/rtp reload` if you want to force a full config re-read.
-
----
-
 ## Migrating from Competitor Plugins (BetterRTP, JustRTP, EzRTP, JakesRTP)
 
-RTP provides a non-destructive, one-shot foreign configuration importer and permission migration seam (ADR-066). This allows server administrators migrating from competing plugins to ingest existing world definitions, boundaries, shapes, cooldowns, delays, economy prices, database connections, effect profiles, and portal/lobby trigger zones into LeafRTP without manual translation.
+`/rtp config import` reads another rtp plugin's config files and writes the matching LeafRTP files: worlds, radii, shapes, cooldowns, delays, prices, database settings, effects, and portal zones. It never overwrites an existing file unless you pass `overwrite=true`, and it can copy your players' permissions too.
+
+**Short version:**
+
+```
+/rtp config import                        # preview what would be imported
+/rtp config import overwrite=true         # write it
+/rtp config import permissions apply=true # copy permission nodes (LuckPerms)
+```
+
+The old plugin doesn't need to be running; RTP reads its folder from disk.
 
 ### Overview of Imported Systems
 
@@ -176,13 +59,13 @@ Run the import command in dry-run mode (default, `overwrite=false`) to preview w
 
 - **Specifying an external or custom directory path:**
   ```
-  /rtp config import betterrtp path "C:/backups/plugins/BetterRTP"
+  /rtp config import betterrtp path=C:/backups/plugins/BetterRTP
   ```
 
 #### Step 3: Review and Confirm (Apply Writes)
 By default, the importer writes only files that do not yet exist, preserving your existing configuration. To execute and allow overwriting or updating existing destination configs, supply `overwrite=true`:
 ```
-/rtp config import betterrtp overwrite true
+/rtp config import betterrtp overwrite=true
 ```
 Every file touched or written is reported in the console and command sender chat. Any approximations or deferred features are explicitly flagged in warning lines.
 
@@ -197,8 +80,8 @@ Every file touched or written is reported in the console and command sender chat
 - **World & Region Mapping:**
   - `Default` configuration maps to region defaults.
   - `CustomWorlds` entries generate per-world region files (`regions/<world>.yml`).
-  - `Shape: SQUARE` maps cleanly to RTP `SQUARE`.
-  - `Shape: CIRCLE` / `ROUND` maps cleanly to RTP `CIRCLE`.
+  - `Shape: SQUARE` maps to RTP `SQUARE`.
+  - `Shape: CIRCLE` / `ROUND` maps to RTP `CIRCLE`.
   - `Shape: RECTANGLE` maps to RTP `RECTANGLE`.
   - `MinRadius` and `MaxRadius` map to `minRadius` and `radius`.
   - `CenterX` and `CenterZ` map to `center` coordinates.
@@ -220,7 +103,7 @@ Every file touched or written is reported in the console and command sender chat
 - **World & Location Mapping:**
   - `worlds` sections map to `regions/<world>.yml`.
   - `custom_locations.yml` targets map to individual custom region configs (`regions/<id>.yml`).
-  - Shapes (`ROUND` -> `CIRCLE`, `SQUARE` -> `SQUARE`) and inner/outer radius boundaries translate cleanly.
+  - Shapes (`ROUND` -> `CIRCLE`, `SQUARE` -> `SQUARE`) and inner/outer radius boundaries translate directly.
 - **SQL Mirroring:**
   - MySQL / SQLite connection pools in `config.yml` mirror into `advanced/database.yml`.
 - **Spatial RTP Zones & Portals:**
@@ -315,7 +198,7 @@ lifecycle:
 
 ### Non-Destructive Permission Migration
 
-RTP integrates non-destructive permission migration directly into `/rtp config import`. When importing configs, competitor permission nodes assigned to groups in your permissions provider (such as LuckPerms) are automatically mapped and applied (unless `permissions=false` is explicitly passed).
+`/rtp config import` also migrates permissions, without removing anything. When importing configs, competitor permission nodes assigned to groups in your permissions provider (such as LuckPerms) are automatically mapped and applied (unless `permissions=false` is explicitly passed).
 
 #### Command Syntax
 ```
@@ -370,3 +253,130 @@ permissions:
     user_unset: "lp user [user] permission unset [permission] [contexts]"
 ```
 - Existing competitor permissions are **never deleted or unset** during migration. LeafRTP appends equivalent nodes alongside the existing nodes, preserving contexts (e.g. `world=survival server=lobby`).
+
+---
+
+## Upgrading to 3.x (Current Release: 3.3.0)
+
+> ⚠️ **3.x is a major upgrade from 2.x:** config files move into subfolders, distances and times accept units, bare `/rtp` can open a menu, the addon API changed, and Fabric, NeoForge and Velocity are supported. Back up `plugins/RTP/` first.
+
+---
+
+### Key Upgrade Pathways at a Glance
+
+| If upgrading from... | Recommended path & primary actions |
+|----------------------|-------------------------------------|
+| **Legacy 2.x (e.g. 2.0.18 or earlier)** | Full major upgrade. Review breaking API changes, rename permissions/commands (`rtp.fill` -> `rtp.scan`, parameter delimiter `:` -> `=`), remove PaperLib on Paper servers, verify tiered configuration directory migration, and allow cache files to upgrade automatically. |
+| **Early 3.0.x / 3.0.0-beta.x** | Update command syntax to `key=value`, adjust `uniquePlacements` (now chunk radius integer rather than boolean), review bundled add-on jar auto-extraction (`LeafRTPGuiAddon`, `LeafRTPClaimAddon`), and check `rtp.admin` permission umbrella. |
+| **3.1.x** | Note that in 3.2.0+ bare `/rtp` opens the GUI picker by default if an inventory/menu renderer is available; claim integrations moved to bundled `LeafRTPClaimAddon` (`plugins/RTP/addons/LeafRTPClaimAddon.jar`); `LINEAR` vertical search defaults to middle-out (`direction: 2`) with sky light requirement (`vert.requireSkyLight: true`). |
+| **3.2.x** | Config files and definitions are organized in tiered folders (`definitions/`, `advanced/`, `addons/`). Database configuration lives in `advanced/database.yml`, biome weighting in `advanced/biomes.yml`, and messages in `advanced/messages/*.yml`. The terrain memory files upgrade themselves on first load. |
+
+---
+
+## Detailed Version Upgrade Notes
+
+### Upgrading to 3.3.0 (from 3.2.x or earlier)
+
+1. **Network Mode Permissions (`rtp.servers.*`):**
+   - The permission node `rtp.servers.*` now defaults to `true` (previously `op`) in `plugin.yml`. In network/proxy mode, every player can reach open cross-server regions by default.
+   - If your network configuration relied on `rtp.servers.*` defaulting to operators only, configure explicit negative permissions (e.g. `-rtp.servers.<server>` or `-rtp.servers.*`) in your permissions manager.
+   - Cross-server peer regions only require `rtp.regions.<region>` if the owning backend explicitly configured `requirePermission: true`.
+
+2. **Terrain memory file format:**
+   - The `.bin` files that remember bad terrain now store why each spot was rejected and when that expires.
+   - Existing files are upgraded in place on first load.
+   - *Rollback note:* 3.1.x and earlier cannot read the upgraded files. Always make a backup of `plugins/RTP/` before upgrading in case you need to roll back.
+
+3. **In-Game Packed Documentation & Offline HTML Export (`/rtp docs`):**
+   - Introduces `/rtp docs [topic]`, `/rtp docs list`, and `/rtp docs export` under permission `rtp.admin.docs`.
+   - Operators can browse version-matched manuals in-game or export self-contained offline documentation bundles (`docs-bundle.html`).
+
+4. **Tag-Group Set Subtraction in `safety.yml`:**
+   - Block safety lists support subtraction expressions (e.g. `#minecraft:slabs - OAK_SLAB`, `#minecraft:leaves - AZALEA_LEAVES`).
+   - Existing syntax and unmodified lists remain fully backward-compatible.
+
+5. **Unified Unit Parsing:**
+   - Configuration files and command parameters accept explicit units for lengths/distances (`b`/`blocks`, `c`/`chunks`, `r`/`regions`), durations (`t`, `ms`, `s`, `m`, `h`, `d`, composite `2h30m`), and memory sizes (`kib`, `mib`, `gib`). Plain unitless numbers remain backward-compatible and auto-interpreted in context.
+
+---
+
+### Upgrading to 3.2.x (from 3.1.x or earlier)
+
+1. **Bare `/rtp` Opens GUI Menu by Default:**
+   - `LeafRTPGuiAddon` is bundled in the RTP jar and self-extracts into `plugins/RTP/addons/` on first startup when the folder does not exist.
+   - By default, executing `/rtp` without arguments now opens the visual destination-picker GUI menu on platforms where a menu renderer is available (Paper, Folia, Fabric, NeoForge).
+   - *To restore instant teleportation on `/rtp`:* Delete `plugins/RTP/addons/LeafRTPGuiAddon.jar` (the `addons/` directory prevents re-extraction) or configure the bare root action in `config.yml`. The classic command remains directly accessible via `/rtp teleport` or menu items.
+
+2. **Tiered Configuration Directory Layout:**
+   - The plugin data directory is reorganized into clean, tiered subdirectories:
+     - Root: everyday operational files (`config.yml`, `economy.yml`, `language.yml`, `safety.yml`).
+     - `definitions/`: authored game content (`definitions/regions/`, `definitions/worlds/`, `definitions/effects/`, `definitions/actions/`).
+     - `advanced/`: infrastructure and tuning (`advanced/database.yml`, `advanced/biomes.yml`, `advanced/performance.yml`, `advanced/logging.yml`, `advanced/metrics.yml`, `advanced/ttl.yml`).
+     - `advanced/messages/`: modular localization files (`commands.yml`, `network.yml`, `placeholders.yml`, `player.yml`, `system.yml`).
+     - `addons/`: bundled and external addon configurations (`addons/countdown.yml`, `addons/guimenu.yml`, `addons/integrations.yml`).
+   - *Automatic relocation:* On first load, RTP automatically relocates existing flat files to their new tiered paths without overwriting files that already exist.
+   - *Manual settings check:* If you customized database settings in `config.yml` or biome weights in `performance.yml`, verify those values in `advanced/database.yml` and `advanced/biomes.yml`.
+
+3. **Claim Integrations Extracted to Bundled Addon:**
+   - Claim and land-protection integrations (WorldGuard, GriefPrevention, Towny, Lands, etc.) have moved from the core plugin into the bundled `LeafRTPClaimAddon` (`plugins/RTP/addons/LeafRTPClaimAddon.jar`).
+   - Claim protection remains active out of the box with zero configuration required.
+
+4. **Surface Teleport Defaults (`LINEAR` Middle-Out & Sky Light):**
+   - Overworld vertical adjustment defaults to `LINEAR` with middle-out scan (`direction: 2`) and `requireSkyLight: true` (`vert.requireSkyLight: true`) in default region templates.
+   - Eliminates players landing in roofed caves or dark overhangs while preserving Nether/End roof ceilings.
+
+---
+
+### Upgrading to 3.1.x (from 3.0.x)
+
+1. **`uniquePlacements` is now an Integer Chunk Radius:**
+   - The `uniquePlacements` parameter on memory shapes changed from a boolean flag to an integer chunk radius (default `0` = off).
+   - Setting `uniquePlacements: 3` clears a square area of chunks around previous teleport spots to spread players out.
+   - Legacy boolean values (`true`/`false`) in older configs automatically coerce to `1` and `0` without breaking.
+
+2. **PvP Combat Gate:**
+   - Optional combat gate in `safety.yml` (`pvpCheckEnabled: false` by default). When enabled, prevents players in active combat from teleporting, supporting native damage tracking or soft-depend hooks (PvPManager, CombatLogX, SimpleCombatLog).
+
+3. **Unified Admin Tooling (`rtp.admin` & `/rtp clear`):**
+   - The master permission node `rtp.admin` now groups administrative sub-permissions (`rtp.reload`, `rtp.config`, `rtp.scan`, `rtp.info`).
+   - `/rtp clear <cache|cooldown|queue|limit|invuln>` provides single-shot cache and state purging.
+
+---
+
+### Upgrading from Legacy 2.x to 3.x
+
+If you are upgrading from 2.0.18 or earlier:
+
+1. **Command & Permission Renames:**
+   - `/rtp fill` is now `/rtp scan` (permission `rtp.scan`).
+   - Command parameter syntax uses key-value equations (e.g. `/rtp world=world region=default` rather than colon syntax `world:world`).
+2. **PaperLib Removal (Paper & Folia Servers):**
+   - `rtp-paper` and `rtp-folia` use native asynchronous chunk scheduling directly.
+   - If PaperLib was installed in `plugins/` solely for RTP, remove `PaperLib.jar`.
+3. **Platform Additions:**
+   - First-class native support is available for Spigot, Paper, Folia, Fabric (via mod jar), and NeoForge.
+4. **Cache & Database Ingestion:**
+   - Legacy 2.x `.bin` files and spatial memory rows are read automatically. If you desire a full reset for fresh terrain shapes, run `/rtp scan reset`.
+
+---
+
+### Addon Developers (`rtp-api` Breaking Changes)
+
+Addons built against `rtp-api` 2.x must recompile against 3.x:
+
+1. **`ChunkReservation`:** Chunk ticket lifecycles are managed via `ChunkReservation` (implements `AutoCloseable`). Replace manual ticket code with try-with-resources.
+2. **`CachedLocation`:** Refactored into an immutable Java `record`. Construct new instances instead of mutating fields.
+3. **Menu & Addon SPIs:** New platform-agnostic `RTPAddon` interface and ServiceLoader-based `AddonRegistry` allow addons to run across Bukkit, Paper, Folia, Fabric, and NeoForge without platform imports.
+4. **Personal Queue API:** Deprecated `Region.queue(UUID)` is replaced by `openPersonalQueue(UUID)` (opt-in bucket) and `requestTeleport(UUID)` (waitlist enqueue).
+
+---
+
+## General Upgrade Procedure
+
+1. **Back up** your `plugins/RTP/` folder (configs, database files).
+2. **Stop** the server.
+3. **Replace** the RTP jar with the new version.
+4. **Remove PaperLib** from `plugins/` if upgrading to 3.0.0-beta.1+ on a Paper server and PaperLib was only used by RTP.
+5. **Start** the server. RTP will load existing config and cache files automatically.
+6. Run `/rtp info` to confirm the new version is active.
+7. Run `/rtp reload` if you want to force a full config re-read.

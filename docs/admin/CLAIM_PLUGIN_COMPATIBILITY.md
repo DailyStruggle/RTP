@@ -2,7 +2,7 @@
 
 This document provides the canonical compatibility, API interaction model, and version matrix for all 18 third-party land-claim and territory protection systems supported by LeafRTP (16 Bukkit/Paper/Folia checkers in `LeafRTPClaimAddon` and 2 native mod checkers on Fabric/NeoForge).
 
-Claim integrations are packaged in `addons/LeafRTPClaimAddon` (Bukkit/Paper/Folia) and native mod platforms (`rtp-fabric`, `rtp-neoforge`). All integrations enforce **REQ-RTP-S-003** (no teleport into claim-protected land) and route through `RTPHooks.verifiers()` per **ADR-026** and **ADR-069**.
+Claim integrations are packaged in `addons/LeafRTPClaimAddon` (Bukkit/Paper/Folia) and native mod platforms (`rtp-fabric`, `rtp-neoforge`). Every integration blocks teleports into claimed land.
 
 ---
 
@@ -26,7 +26,7 @@ Claim integrations are packaged in `addons/LeafRTPClaimAddon` (Bukkit/Paper/Foli
 | **KingdomsX** | Bukkit / Paper / Folia | `KingdomsXChecker` | Reflective (`Kingdoms.getLand`) | No | `1.15.x+` |
 | **UltimateClaims** | Bukkit / Paper / Folia | `UltimateClaimsChecker` | Reflective (`ClaimManager.getClaim`) | No | `2.x`, `1.x` |
 | **MinePlots** | Bukkit / Paper / Folia | `MinePlotsChecker` | Reflective (`MinePlots.getPlotAt`) | No | `1.x` |
-| **FTB Chunks** | Fabric / NeoForge | `FTBChunksChecker` | Mod SPI (`FTBChunksAPI.isChunkClaimed`) | Planned (`ADR-099`) | `2001.x` (1.20.x), `2100.x` (1.21.x) |
+| **FTB Chunks** | Fabric / NeoForge | `FTBChunksChecker` | Mod SPI (`FTBChunksAPI.isChunkClaimed`) | Planned | `2001.x` (1.20.x), `2100.x` (1.21.x) |
 | **OpenPartiesAndClaims** | Fabric / NeoForge | `OpenPartiesAndClaimsChecker` | Mod SPI (`IOpenPartiesAndClaimsAPI.isClaimed`) | No | `0.21.x+` |
 
 ---
@@ -36,7 +36,7 @@ Claim integrations are packaged in `addons/LeafRTPClaimAddon` (Bukkit/Paper/Foli
 ### Fail-Closed Execution
 All checkers implement a strict **fail-closed on error** policy:
 - If a claim plugin throws an unexpected runtime exception, reflection error, or threading exception during verification, the exception is caught, logged once, and the destination is rejected (`!isInClaim` returns `false`).
-- If an architectural incompatibility is detected, the integration disables itself cleanly for the session to prevent server log spam or crashes, while respecting Rule **S-004** (no silent swallow of teleport failures).
+- If an architectural incompatibility is detected, the integration disables itself cleanly for the session to prevent server log spam or crashes, and the player still gets a failure message instead of a silent no-op.
 
 ### Decoupled Reflection Architecture
 Integrations marked **Reflective** do not link compile-time classes into the LeafRTP jar. They dynamically inspect public API singletons at runtime:
@@ -46,7 +46,7 @@ Integrations marked **Reflective** do not link compile-time classes into the Lea
 
 ### Folia Threading Caveats
 LeafRTP checks destinations across async workers and regional threads:
-- Synchronous claim verifiers perform fast in-memory spatial tree lookups (`DataStore`, spatial hash tables, or chunk maps) without initiating disk chunk I/O, conforming to **S-005**.
+- Synchronous claim verifiers perform fast in-memory spatial tree lookups (`DataStore`, spatial hash tables, or chunk maps) without initiating disk chunk I/O, so they never load chunks on the main thread.
 - Where claim plugins mutate internal state or are not thread-safe, LeafRTP provides asynchronous verification APIs (`RegionVerifierRegistry.registerAsync`) to safely hop to the target region thread when required.
 
 ---

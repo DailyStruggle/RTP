@@ -31,7 +31,7 @@ You can create and update regions through:
 | `backlogCacheCap` | Integer | `1000` (lite: `0`) | Maximum number of **unverified** candidate locations to stage upstream of `cacheCap`. See *Backlog Cache (L3)* below. Set to `0` to disable. |
 | `activeChunkCap` | Integer | `10` | Maximum number of chunks to keep loaded for zero-latency teleports. |
 | `price` | Double | `0.0` | Economy cost to use this specific region (overrides global `price`). |
-| `spatialResolution` | Integer / String | `"auto"` | Precision for spatial memory (bad location tracking). Can be `"auto"` or any positive integer (e.g. `1`, `3`, `4`). Values > 1 in dual-layer shapes also dictate dyadic candidate downsampling grids (e.g. 4 -> 4x4 chunk macro-cells, 8 -> 8x8 macro-cells). |
+| `spatialResolution` | Integer / String | `"auto"` | Precision for spatial memory (bad location tracking). Can be `"auto"` or any positive integer (e.g. `1`, `3`, `4`). Higher values check fewer, more widely spaced spots (e.g. `4` = one spot per 4x4 chunks): faster scans and less memory, but small safe pockets can be missed. |
 | `displayName` | String | (region name) | Optional cosmetic display name shown in menus and messages; does not change the region's identity or the permission node. |
 | `biomeWhitelist` / `biomes` | Boolean / List | (inherited from `safety.yml`) | Optional per-region override of the global biome filter. `biomeWhitelist: true` makes `biomes` an allow-list; `false` makes it a block-list. See [SAFETY.md](SAFETY.md). |
 | `version` | String | `"1.1"` | Internal config version. **Do not modify.** |
@@ -191,14 +191,12 @@ Standard shapes with uniform or weighted distribution.
 - `expand`: If true, radius grows as locations are used.
 
 #### `CIRCLE_OPTIMIZED_DUAL_LAYER` / `SQUARE_OPTIMIZED_DUAL_LAYER`
-Optimized dual-layer shapes implementing the continuous spiral-addressed Hilbert key space (ADR-085).
-- Expands coarse spiral points into intra-point Hilbert traversals mapped to travel direction, eliminating run fragmentation across ring seams and drastically reducing memory footprint at one-chunk precision.
-- Backed by hardware-cache segmented secondary tables (`SegmentedKeyRunTable`), providing up to 2x-11x faster coordinate selection under `ACCUMULATE` mode.
+Variants of `CIRCLE` and `SQUARE` that use less memory at one-chunk precision and pick locations faster (2x-11x in my benchmarks under `ACCUMULATE` mode).
 - Accepts the exact same parameters as `CIRCLE` and `SQUARE` (`radius`, `centerRadius`, `centerX`, `centerZ`, `weight`, `uniquePlacements`, `expand`, `mode`).
 
 #### `CIRCLE_DEPRECATED_PURE_SPIRAL` / `SQUARE_DEPRECATED_PURE_SPIRAL`
 Legacy pure 1D Archimedean spiral mapping shapes.
-- Preserved for backwards compatibility, regression testing, and side-by-side performance benchmarking against dual-layer Hilbert shapes.
+- Preserved for backwards compatibility, regression testing, and side-by-side benchmarks against the newer shapes.
 - Accepts identical parameters to `CIRCLE` and `SQUARE`.
 
 #### `CIRCLE_NORMAL` / `SQUARE_NORMAL`

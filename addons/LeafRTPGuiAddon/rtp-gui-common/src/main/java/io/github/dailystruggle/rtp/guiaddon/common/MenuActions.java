@@ -204,6 +204,13 @@ public final class MenuActions {
         }
         dispatchCommand(playerId, "rtp visualization");
       }
+      case "action:operator:editor" -> {
+        if (!hasPerm(playerId, "rtp.editor")) {
+          message(playerId, config.textUnavailable());
+          return;
+        }
+        dispatchCommand(playerId, "rtp editor");
+      }
       case "action:operator:status" -> {
         if (!hasPerm(playerId, "rtp.info")) {
           message(playerId, config.textUnavailable());
