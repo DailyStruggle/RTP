@@ -783,6 +783,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1262,7 +1304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1283,7 +1325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3687,6 +3729,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3888,10 +3993,6 @@
 <td><a href="../../adr/ADR-000-development-workflow/"><code>../adr/ADR-000-development-workflow.md</code></a></td>
 </tr>
 <tr>
-<td>Fabric status / blockers</td>
-<td><a href="../MULTI_PLATFORM_PLAN/"><code>MULTI_PLATFORM_PLAN.md</code></a></td>
-</tr>
-<tr>
 <td>Multi-server / proxy (Velocity, BungeeCord) plan</td>
 <td><a href="../MULTI_SERVER_PLAN/"><code>MULTI_SERVER_PLAN.md</code></a> (D-005 gated; admin stub: <a href="../../admin/proxies/INDEX/"><code>../admin/proxies/INDEX.md</code></a>)</td>
 </tr>
@@ -3904,8 +4005,16 @@
 <td><a href="../METRICS_PLAN/"><code>METRICS_PLAN.md</code></a></td>
 </tr>
 <tr>
-<td>Why Fabric is in scope (and Forge / NeoForge are not)</td>
+<td>Behaviour fuzzing beyond leaks (finding oracles, live-server coverage, fault-only mode)</td>
+<td><a href="../BEHAVIOUR_FUZZING_PLAN/"><code>BEHAVIOUR_FUZZING_PLAN.md</code></a>; decision record <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/"><code>../adr/ADR-111-live-server-behaviour-fuzzing.md</code></a></td>
+</tr>
+<tr>
+<td>Why Fabric is in scope</td>
 <td><a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md"><code>../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md</code></a> (renumbered from ADR-022)</td>
+</tr>
+<tr>
+<td>Why NeoForge is in scope</td>
+<td><a href="../../adr/ADR-033-neoforge-platform-in-scope/"><code>../adr/ADR-033-neoforge-platform-in-scope.md</code></a></td>
 </tr>
 <tr>
 <td>Why legacy MC / Java are out of scope</td>
@@ -3976,6 +4085,10 @@
 <td><a href="../ADDON_LOADING/"><code>ADDON_LOADING.md</code></a> (ADR-057)</td>
 </tr>
 <tr>
+<td>Publish rtp-api / rtp-core artifacts (JitPack, GitHub Packages, Maven Central)</td>
+<td><a href="../PUBLISHING/"><code>PUBLISHING.md</code></a></td>
+</tr>
+<tr>
 <td>Flat map of every doc</td>
 <td><a href="../../MAP/"><code>../MAP.md</code></a></td>
 </tr>
@@ -3990,6 +4103,10 @@
 <tr>
 <td>External hooks (claim verifiers, economy, placeholders, world border, anvil prefilter)</td>
 <td><a href="../EXTERNAL_HOOKS/"><code>EXTERNAL_HOOKS.md</code></a> (ADR-026)</td>
+</tr>
+<tr>
+<td>Player archetypes, utility functions &amp; valuation weights</td>
+<td><a href="../PLAYER_TAXONOMY_VALUATION/"><code>PLAYER_TAXONOMY_VALUATION.md</code></a></td>
 </tr>
 <tr>
 <td>How and why AI tooling is used in this repository</td>
@@ -4078,8 +4195,8 @@
 <td>Deprecation lifecycle, notice window, and compiler annotation policy.</td>
 </tr>
 <tr>
-<td><a href="../MULTI_PLATFORM_PLAN/"><code>MULTI_PLATFORM_PLAN.md</code></a></td>
-<td>Active Fabric frontier status.</td>
+<td><a href="../PUBLISHING/"><code>PUBLISHING.md</code></a></td>
+<td>Addon artifact publishing guide (JitPack, GitHub Packages, Maven Central).</td>
 </tr>
 <tr>
 <td><a href="../MULTI_SERVER_PLAN/"><code>MULTI_SERVER_PLAN.md</code></a></td>
@@ -4098,8 +4215,20 @@
 <td>Roles and review expectations.</td>
 </tr>
 <tr>
+<td><a href="../PLAYER_TAXONOMY_VALUATION/"><code>PLAYER_TAXONOMY_VALUATION.md</code></a></td>
+<td>Player taxonomy, utility functions, site valuation weights, and behavioral benchmark models.</td>
+</tr>
+<tr>
 <td><a href="../LESSONS_LEARNED/"><code>LESSONS_LEARNED.md</code></a></td>
 <td>Dated engineering notes.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/DailyStruggle/RTP/blob/V3/helpers/StressTestRTP/LEAK_FUZZING.md"><code>../../helpers/StressTestRTP/LEAK_FUZZING.md</code></a></td>
+<td>Behaviour leak fuzzer (<code>scripts/bench_fuzz.py</code>): goals, methodology, reading a run, findings (BetterRTP, LeafRTP 3.3.0), limitations.</td>
+</tr>
+<tr>
+<td><a href="../BEHAVIOUR_FUZZING_PLAN/"><code>BEHAVIOUR_FUZZING_PLAN.md</code></a></td>
+<td>Generalising <code>bench_fuzz.py</code> to coverage-guided fault finding: what is generic, detector defects, goals, staged plan (finding oracles done; JaCoCo coverage, fault-only mode, new oracles, vocabulary D-005 gated). Governed by <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/">ADR-111</a>.</td>
 </tr>
 <tr>
 <td><a href="../SECURITY_AUDIT_v3.3.0/"><code>SECURITY_AUDIT_v3.3.0.md</code></a></td>

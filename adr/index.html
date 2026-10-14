@@ -789,6 +789,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1268,7 +1310,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../dev/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1289,7 +1331,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../dev/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3765,6 +3807,69 @@
   
   
     <li class="md-nav__item">
+      <a href="ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3898,7 +4003,7 @@
 <tr>
 <td><a href="ADR-005-paperlib-removal/">ADR-005</a></td>
 <td>Removal of PaperLib in Favour of Native Paper APIs</td>
-<td>Accepted</td>
+<td>Accepted (amended 2026-10-08)</td>
 </tr>
 <tr>
 <td><a href="ADR-006-async-queue-pre-generation/">ADR-006</a></td>
@@ -4384,6 +4489,21 @@
 <td><a href="ADR-108-all-mit-licensing-pro-as-support/">ADR-108</a></td>
 <td>All-MIT Licensing; Pro as Support, Not Source (root <code>LICENSE</code> becomes MIT for all source and both jars; Pro sells priority support, early access and sponsorship with no extra licence; withdraws ADR-100's commercial-grant bullet; the lite <code>tags-api</code> exclusion recorded as the one remaining parity follow-up)</td>
 <td>Accepted (2026-10-05; supersedes ADR-061)</td>
+</tr>
+<tr>
+<td><a href="ADR-109-measured-cost-probe-first-gate/">ADR-109</a></td>
+<td>Measured-Cost Probe-First Gate (per region and path, a <code>ProbeFirstGovernor</code> decides whether the center-column probe runs before the full load from wall-clock moving averages of probe cost, reject rate and full-load cost; flips only on a sustained 3-standard-error gap; starts in probe-first; 1-in-32 exploration floor; the probe may only reject; no config keys; published on <code>RTPMetricsExtension.probeGovernors</code>; extends ADR-016)</td>
+<td>Proposed</td>
+</tr>
+<tr>
+<td><a href="ADR-110-purpose-gated-live-loads/">ADR-110</a></td>
+<td>Purpose-Gated Live Loads (<code>LoadPurpose</code> on location generation: queue fill is <code>SPECULATIVE</code> and verifies first from resident chunks and region files via the new <code>RTPWorld.getChunkIfReadable</code> / <code>getOrReadChunk</code> SPI; a native load or generation pins the result into the kept queue under a <code>LiveLoadGate</code> slot bounded by <code>activeChunkCap</code> when one is free, otherwise loads center and safety neighbours unpinned for the cold queue; deferred only under heap pressure, ending the fill run; no unpinned success ring; immediate requests unchanged; published on <code>RTPMetricsExtension.liveLoadGates</code>; extends ADR-015 and ADR-016)</td>
+<td>Proposed</td>
+</tr>
+<tr>
+<td><a href="ADR-111-live-server-behaviour-fuzzing/">ADR-111</a></td>
+<td>Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback (<code>scripts/bench_fuzz.py</code> as the live-server tier beside ADR-102's in-process Jazzer tier; per-target input limited to the command and package prefixes; same-run <code>direct</code> control; finding oracles with stable signatures attributed by stack-frame packages, never by fallback to the target; keep -&gt; control subtraction -&gt; replay k of n -&gt; ddmin -&gt; verdict, no ladder for faults; FAIL on a confirmed leak or a reproduced target finding, PASS never proof of absence; JaCoCo coverage via <code>/rtpstress coverage</code> writing JSON, a fast fault mode, S-001/S-002/S-004 oracles and a larger action vocabulary as accepted direction behind D-005; opt-in and local, never CI)</td>
+<td>Accepted (2026-10-13)</td>
 </tr>
 </tbody>
 </table>

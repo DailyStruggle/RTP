@@ -15,6 +15,10 @@
         <link rel="canonical" href="https://dailystruggle.github.io/RTP/admin/CLAIM_PLUGIN_COMPATIBILITY/">
       
       
+        <link rel="prev" href="../CUSTOM_ITEMS/">
+      
+      
+        <link rel="next" href="../configuration/CONFIGURATION/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -22,7 +26,7 @@
     
     
       
-        <title>Claim Plugin Compatibility & Audit Reference - LeafRTP</title>
+        <title>Claim compatibility - LeafRTP</title>
       
     
     
@@ -108,7 +112,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Claim Plugin Compatibility &amp; Audit Reference
+              Claim compatibility
             
           </span>
         </div>
@@ -250,10 +254,12 @@
         
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
+      <li class="md-tabs__item md-tabs__item--active">
         <a href="../RUNBOOK/" class="md-tabs__link">
           
   
@@ -663,25 +669,30 @@
       
   
   
+    
   
   
+  
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
             
   
   <span class="md-ellipsis">
@@ -692,7 +703,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             Operations
@@ -778,6 +789,148 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-supported-integration-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Supported Integration Matrix
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-api-design-safety-contracts" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. API Design &amp; Safety Contracts
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. API Design & Safety Contracts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fail-closed-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      Fail-Closed Execution
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decoupled-reflection-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decoupled Reflection Architecture
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#folia-threading-caveats" class="md-nav__link">
+    <span class="md-ellipsis">
+      Folia Threading Caveats
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Configuration
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1262,7 +1415,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1283,7 +1436,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3687,6 +3840,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3814,7 +4030,7 @@
 
 <h1 id="claim-plugin-compatibility-audit-reference">Claim Plugin Compatibility &amp; Audit Reference<a class="headerlink" href="#claim-plugin-compatibility-audit-reference" title="Permanent link">&para;</a></h1>
 <p>This document provides the canonical compatibility, API interaction model, and version matrix for all 18 third-party land-claim and territory protection systems supported by LeafRTP (16 Bukkit/Paper/Folia checkers in <code>LeafRTPClaimAddon</code> and 2 native mod checkers on Fabric/NeoForge).</p>
-<p>Claim integrations are packaged in <code>addons/LeafRTPClaimAddon</code> (Bukkit/Paper/Folia) and native mod platforms (<code>rtp-fabric</code>, <code>rtp-neoforge</code>). All integrations enforce <strong>REQ-RTP-S-003</strong> (no teleport into claim-protected land) and route through <code>RTPHooks.verifiers()</code> per <strong>ADR-026</strong> and <strong>ADR-069</strong>.</p>
+<p>Claim integrations are packaged in <code>addons/LeafRTPClaimAddon</code> (Bukkit/Paper/Folia) and native mod platforms (<code>rtp-fabric</code>, <code>rtp-neoforge</code>). Every integration blocks teleports into claimed land.</p>
 <hr />
 <h2 id="1-supported-integration-matrix">1. Supported Integration Matrix<a class="headerlink" href="#1-supported-integration-matrix" title="Permanent link">&para;</a></h2>
 <table>
@@ -3962,7 +4178,7 @@
 <td>Fabric / NeoForge</td>
 <td><code>FTBChunksChecker</code></td>
 <td>Mod SPI (<code>FTBChunksAPI.isChunkClaimed</code>)</td>
-<td>Planned (<code>ADR-099</code>)</td>
+<td>Planned</td>
 <td><code>2001.x</code> (1.20.x), <code>2100.x</code> (1.21.x)</td>
 </tr>
 <tr>
@@ -3980,7 +4196,7 @@
 <h3 id="fail-closed-execution">Fail-Closed Execution<a class="headerlink" href="#fail-closed-execution" title="Permanent link">&para;</a></h3>
 <p>All checkers implement a strict <strong>fail-closed on error</strong> policy:
 - If a claim plugin throws an unexpected runtime exception, reflection error, or threading exception during verification, the exception is caught, logged once, and the destination is rejected (<code>!isInClaim</code> returns <code>false</code>).
-- If an architectural incompatibility is detected, the integration disables itself cleanly for the session to prevent server log spam or crashes, while respecting Rule <strong>S-004</strong> (no silent swallow of teleport failures).</p>
+- If an architectural incompatibility is detected, the integration disables itself cleanly for the session to prevent server log spam or crashes, and the player still gets a failure message instead of a silent no-op.</p>
 <h3 id="decoupled-reflection-architecture">Decoupled Reflection Architecture<a class="headerlink" href="#decoupled-reflection-architecture" title="Permanent link">&para;</a></h3>
 <p>Integrations marked <strong>Reflective</strong> do not link compile-time classes into the LeafRTP jar. They dynamically inspect public API singletons at runtime:
 - No hard compile dependencies that could introduce transitive version conflicts.
@@ -3988,7 +4204,7 @@
 - Zero classpath pollution on platforms running alternative fork implementations.</p>
 <h3 id="folia-threading-caveats">Folia Threading Caveats<a class="headerlink" href="#folia-threading-caveats" title="Permanent link">&para;</a></h3>
 <p>LeafRTP checks destinations across async workers and regional threads:
-- Synchronous claim verifiers perform fast in-memory spatial tree lookups (<code>DataStore</code>, spatial hash tables, or chunk maps) without initiating disk chunk I/O, conforming to <strong>S-005</strong>.
+- Synchronous claim verifiers perform fast in-memory spatial tree lookups (<code>DataStore</code>, spatial hash tables, or chunk maps) without initiating disk chunk I/O, so they never load chunks on the main thread.
 - Where claim plugins mutate internal state or are not thread-safe, LeafRTP provides asynchronous verification APIs (<code>RegionVerifierRegistry.registerAsync</code>) to safely hop to the target region thread when required.</p>
 <hr />
 <h2 id="3-configuration">3. Configuration<a class="headerlink" href="#3-configuration" title="Permanent link">&para;</a></h2>

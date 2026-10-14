@@ -12,13 +12,9 @@
         <meta name="author" content="DailyStruggle">
       
       
-        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/CROSS_SERVER_VERIFICATION/">
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/PLAYER_TAXONOMY_VALUATION/">
       
       
-        <link rel="prev" href="../SINGLE_BACKEND_VERIFICATION/">
-      
-      
-        <link rel="next" href="../../site/why/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -26,7 +22,7 @@
     
     
       
-        <title>Cross-server verification - LeafRTP</title>
+        <title>Player Taxonomy, Utility Functions, and Valuation Weights for Random Teleportation (/rtp) - LeafRTP</title>
       
     
     
@@ -78,7 +74,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#cross-server-rtp-verification" class="md-skip">
+        <a href="#player-taxonomy-utility-functions-and-valuation-weights-for-random-teleportation-rtp" class="md-skip">
           Skip to content
         </a>
       
@@ -112,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Cross-server verification
+              Player Taxonomy, Utility Functions, and Valuation Weights for Random Teleportation (/rtp)
             
           </span>
         </div>
@@ -290,12 +286,10 @@
         
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
+      <li class="md-tabs__item">
         <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
           
   
@@ -789,6 +783,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1183,30 +1219,25 @@
       
   
   
-    
   
   
-  
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
             
   
   <span class="md-ellipsis">
@@ -1217,7 +1248,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             Proxy mode
@@ -1273,7 +1304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1291,30 +1322,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    Cross-server verification
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1323,107 +1334,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
-    <span class="md-ellipsis">
-      Prerequisites
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#configuration-outline" class="md-nav__link">
-    <span class="md-ellipsis">
-      Configuration outline
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#scenario-1-stack-boot" class="md-nav__link">
-    <span class="md-ellipsis">
-      Scenario 1: stack boot
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#scenario-2-heartbeat-convergence" class="md-nav__link">
-    <span class="md-ellipsis">
-      Scenario 2: heartbeat convergence
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#scenario-3-cross-server-rtp-round-trip" class="md-nav__link">
-    <span class="md-ellipsis">
-      Scenario 3: cross-server /rtp round-trip
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#scenario-4-kill-mid-flight" class="md-nav__link">
-    <span class="md-ellipsis">
-      Scenario 4: kill mid-flight
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#scenario-5-kill-switch" class="md-nav__link">
-    <span class="md-ellipsis">
-      Scenario 5: kill switch
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#teardown" class="md-nav__link">
-    <span class="md-ellipsis">
-      Teardown
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    <span class="md-ellipsis">
-      Troubleshooting
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -3819,6 +3729,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3867,81 +3840,318 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#prerequisites" class="md-nav__link">
+  <a href="#1-executive-summary-purpose" class="md-nav__link">
     <span class="md-ellipsis">
-      Prerequisites
+      1. Executive Summary &amp; Purpose
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#configuration-outline" class="md-nav__link">
+  <a href="#2-functional-modalities-how-players-use-rtp-in-practice" class="md-nav__link">
     <span class="md-ellipsis">
-      Configuration outline
+      2. Functional Modalities: How Players Use RTP in Practice
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Functional Modalities: How Players Use RTP in Practice">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mode-1-initial-wilderness-homesteading-fresh-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mode 1: Initial Wilderness Homesteading (Fresh Start)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mode-2-off-site-resource-extraction-quarrying-deforestation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mode 2: Off-Site Resource Extraction (Quarrying &amp; Deforestation)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mode-3-biome-structure-hunting-looting-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mode 3: Biome &amp; Structure Hunting (Looting &amp; Mapping)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mode-4-spawn-escape-anti-camp-evasion-anarchy-hostile-smps" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mode 4: Spawn Escape &amp; Anti-Camp Evasion (Anarchy &amp; Hostile SMPs)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mode-5-strategic-border-scouting-raiding-factions-raiding-smps" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mode 5: Strategic Border Scouting &amp; Raiding (Factions &amp; Raiding SMPs)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mode-6-technical-farm-perimeter-siting-redstone-scicraft-meta" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mode 6: Technical Farm &amp; Perimeter Siting (Redstone &amp; SciCraft Meta)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mode-7-casual-wandering-server-auditing-first-impression-sampling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mode 7: Casual Wandering &amp; Server Auditing (First-Impression Sampling)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mode-8-cooperative-group-settle-duo-guild-settle" class="md-nav__link">
+    <span class="md-ellipsis">
+      Mode 8: Cooperative Group Settle (Duo &amp; Guild Settle)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-player-archetypes-quantitative-valuation-functions" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Player Archetypes &amp; Quantitative Valuation Functions
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Player Archetypes & Quantitative Valuation Functions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#archetype-1-the-aesthetic-homesteader-solo-builder-hermit" class="md-nav__link">
+    <span class="md-ellipsis">
+      Archetype 1: The Aesthetic Homesteader (Solo Builder / Hermit)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#archetype-2-the-resource-extractor-quarry-miner-logger" class="md-nav__link">
+    <span class="md-ellipsis">
+      Archetype 2: The Resource Extractor (Quarry Miner / Logger)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#archetype-3-the-structure-hunter-cartographer" class="md-nav__link">
+    <span class="md-ellipsis">
+      Archetype 3: The Structure Hunter / Cartographer
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#archetype-4-the-technical-architect-redstone-farm-engineer" class="md-nav__link">
+    <span class="md-ellipsis">
+      Archetype 4: The Technical Architect (Redstone / Farm Engineer)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#archetype-5-the-anarchy-survivor-concealment-specialist" class="md-nav__link">
+    <span class="md-ellipsis">
+      Archetype 5: The Anarchy Survivor (Concealment Specialist)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#archetype-6-the-competitive-raider-faction-scout" class="md-nav__link">
+    <span class="md-ellipsis">
+      Archetype 6: The Competitive Raider / Faction Scout
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#archetype-7-the-co-op-guild-pioneer-group-settlement" class="md-nav__link">
+    <span class="md-ellipsis">
+      Archetype 7: The Co-op Guild Pioneer (Group Settlement)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-cross-archetype-valuation-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Cross-Archetype Valuation Matrix
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#scenario-1-stack-boot" class="md-nav__link">
+  <a href="#5-spatial-economics-why-proximity-inflicts-disutility-in-minecraft" class="md-nav__link">
     <span class="md-ellipsis">
-      Scenario 1: stack boot
+      5. Spatial Economics: Why Proximity Inflicts Disutility in Minecraft
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Spatial Economics: Why Proximity Inflicts Disutility in Minecraft">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-the-128-block-despawn-sphere-mob-cap-sabotage" class="md-nav__link">
+    <span class="md-ellipsis">
+      A. The 128-Block Despawn Sphere &amp; Mob Cap Sabotage
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#scenario-2-heartbeat-convergence" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#b-the-spatial-footprint-of-modern-base-design" class="md-nav__link">
     <span class="md-ellipsis">
-      Scenario 2: heartbeat convergence
+      B. The Spatial Footprint of Modern Base Design
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#scenario-3-cross-server-rtp-round-trip" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#c-the-self-selection-bias-of-rtp" class="md-nav__link">
     <span class="md-ellipsis">
-      Scenario 3: cross-server /rtp round-trip
+      C. The Self-Selection Bias of /rtp
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#scenario-4-kill-mid-flight" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#d-targeted-proximity-the-role-of-nearplayer-and-nearclaim" class="md-nav__link">
     <span class="md-ellipsis">
-      Scenario 4: kill mid-flight
+      D. Targeted Proximity: The Role of nearplayer and nearclaim
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#scenario-5-kill-switch" class="md-nav__link">
-    <span class="md-ellipsis">
-      Scenario 5: kill switch
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#teardown" class="md-nav__link">
+  <a href="#6-empirical-telemetry-game-theoretic-phenomena" class="md-nav__link">
     <span class="md-ellipsis">
-      Teardown
+      6. Empirical Telemetry &amp; Game-Theoretic Phenomena
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Empirical Telemetry & Game-Theoretic Phenomena">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-the-plains-clumping-artifact" class="md-nav__link">
+    <span class="md-ellipsis">
+      A. The "Plains Clumping" Artifact
     </span>
   </a>
   
 </li>
+        
+          <li class="md-nav__item">
+  <a href="#b-strategic-exploitation-of-rtp-blind-spots" class="md-nav__link">
+    <span class="md-ellipsis">
+      B. Strategic Exploitation of RTP Blind Spots
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c-the-compounding-cost-of-the-reroll-cascade" class="md-nav__link">
+    <span class="md-ellipsis">
+      C. The Compounding Cost of the Reroll Cascade
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
+  <a href="#7-lightweight-behavioral-benchmark-architecture" class="md-nav__link">
     <span class="md-ellipsis">
-      Troubleshooting
+      7. Lightweight Behavioral Benchmark Architecture
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. Lightweight Behavioral Benchmark Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-state-signaling-via-in-world-block-placement" class="md-nav__link">
+    <span class="md-ellipsis">
+      A. State Signaling via In-World Block Placement
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b-core-longitudinal-health-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      B. Core Longitudinal Health Metrics
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-architectural-validation-in-leafrtp" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. Architectural Validation in LeafRTP
     </span>
   </a>
   
@@ -3965,188 +4175,448 @@
   
 
 
-<h1 id="cross-server-rtp-verification">Cross-Server <code>/rtp</code> Verification<a class="headerlink" href="#cross-server-rtp-verification" title="Permanent link">&para;</a></h1>
-<p>Operator-facing manual verification of the cross-server <code>/rtp</code> round-trip on
-a multi-proxy, multi-backend network.</p>
-<p>Start with the single-backend precursor first:
-<a href="../SINGLE_BACKEND_VERIFICATION/"><code>SINGLE_BACKEND_VERIFICATION.md</code></a>, and see the
-<a href="../INDEX/">Proxy mode overview</a> for what network mode is and what it needs.</p>
-<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Two Velocity proxies sharing the same <code>forwarding.secret</code>.</li>
-<li>Two Paper backends, each with <code>RTP</code> installed and registered against
-  both proxies' <code>[servers]</code> block.</li>
-<li>One Redis instance reachable from every proxy and backend on a single
-  resolvable host:port.</li>
-<li>A shared 32-byte HMAC secret in <code>RTP_NET_SECRET</code> on every JVM.</li>
-<li><code>rtp-proxy-velocity</code> on both proxies, <code>rtp-plugin</code> on both backends, all
-  built from the same release tag.</li>
-</ul>
-<h2 id="configuration-outline">Configuration outline<a class="headerlink" href="#configuration-outline" title="Permanent link">&para;</a></h2>
-<p>On each proxy (<code>plugins/rtp-proxy-velocity/network.yml</code>):</p>
-<div class="highlight"><pre><span></span><code><span class="nt">network</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<span class="w">  </span><span class="nt">proxyId</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;proxy-a&quot;</span><span class="w">          </span><span class="c1"># unique per proxy</span>
-<span class="w">  </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">proxy</span>
-<span class="w">  </span><span class="nt">secretEnv</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RTP_NET_SECRET</span>
-<span class="nt">transport</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">redis</span>
-<span class="w">  </span><span class="nt">redis</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> host</span><span class="p">:</span><span class="w"> </span><span class="nv">redis</span><span class="p p-Indicator">,</span><span class="nt"> port</span><span class="p">:</span><span class="w"> </span><span class="nv">6379</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<h1 id="player-taxonomy-utility-functions-and-valuation-weights-for-random-teleportation-rtp">Player Taxonomy, Utility Functions, and Valuation Weights for Random Teleportation (<code>/rtp</code>)<a class="headerlink" href="#player-taxonomy-utility-functions-and-valuation-weights-for-random-teleportation-rtp" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>Status</strong>: Living Reference Document<br />
+<strong>Audience</strong>: Core Developers, Benchmark Architects, Server Administrators<br />
+<strong>Related Documents</strong>: <a href="../BENCHMARK_ANALYSIS/"><code>BENCHMARK_ANALYSIS.md</code></a>, <a href="../DESIGN/"><code>DESIGN.md</code></a>, <a href="../REQUIREMENTS/"><code>REQUIREMENTS.md</code></a>, <a href="../TESTING_GUIDE/"><code>TESTING_GUIDE.md</code></a>, <a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>, <a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a>, <a href="../../adr/ADR-077-multi-format-region-support/">ADR-077</a>, <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/">ADR-095</a></p>
+</blockquote>
+<hr />
+<h2 id="1-executive-summary-purpose">1. Executive Summary &amp; Purpose<a class="headerlink" href="#1-executive-summary-purpose" title="Permanent link">&para;</a></h2>
+<p>Standard benchmark harnesses evaluate random teleportation engines through memoryless, high-rate dispatch loops (e.g., firing 4,096 teleports at stationary bots in a pristine pregenerated world). While this methodology effectively captures raw dispatch throughput, async chunk-loading latency, and initial thread allocation, it treats candidate selection as a zero-entropy, isolated event.</p>
+<p>In an active multiplayer ecosystem, candidate selection directly governs the long-term health of the server and the aggregate welfare of its player base. Dropping players into undesirable, hazardous, or contested terrain does not result in passive acceptance; it triggers <strong>reroll cascades</strong>, multiplies cold chunk loads, defaces virgin landscapes, and inflates world autosave serialization costs across fragmented region files.</p>
+<p>This document formalizes:
+1. <strong>The 8 Operational Modalities</strong> of <code>/rtp</code> across modern multiplayer server genres.
+2. <strong>Player Archetypes &amp; Utility Functions</strong>, defining the mathematical valuation weights players assign to candidate locations.
+3. <strong>The Spatial Economics of Multiplayer Survival</strong>, analyzing why classical urban agglomeration models fail in Minecraft and why spatial isolation is the primary utility delivered by <code>/rtp</code>.
+4. <strong>Empirical Telemetry Insights</strong>, detailing observed failure modes such as the "Plains Clumping" artifact and strategic exploitation of algorithm blind spots.
+5. <strong>A Lightweight Behavioral Benchmark Architecture</strong>, establishing how multi-agent simulations can model authentic player agency, world modification, and autosave debt without deadweight client pathfinding costs.
+6. <strong>Architectural Alignment in LeafRTP</strong>, mapping these behavioral realities to specific engine components.</p>
+<hr />
+<h2 id="2-functional-modalities-how-players-use-rtp-in-practice">2. Functional Modalities: How Players Use RTP in Practice<a class="headerlink" href="#2-functional-modalities-how-players-use-rtp-in-practice" title="Permanent link">&para;</a></h2>
+<p>Players deploy <code>/rtp</code> across eight distinct operational modes depending on server genre, game progression, and economic constraints:</p>
+<div class="highlight"><pre><span></span><code>+───────────────────────────────────────────────────────────────────────────────────+
+|                           THE 8 OPERATIONAL MODES OF RTP                          |
++─────────────────────────────────────────┬─────────────────────────────────────────+
+| 1. Initial Wilderness Homesteading      | 5. Strategic Border Scouting &amp; Raiding  |
+| 2. Off-Site Resource Extraction         | 6. Technical Farm &amp; Perimeter Siting    |
+| 3. Biome &amp; Structure Hunting            | 7. Casual Wandering &amp; Server Auditing   |
+| 4. Spawn Escape &amp; Anti-Camp Evasion     | 8. Cooperative Group Settle             |
++─────────────────────────────────────────┴─────────────────────────────────────────+
 </code></pre></div>
-<p>On each backend (<code>plugins/RTP/network.yml</code>):</p>
-<div class="highlight"><pre><span></span><code><span class="nt">network</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">enabled</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
-<span class="w">  </span><span class="nt">serverId</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;backend-a&quot;</span><span class="w">       </span><span class="c1"># unique per backend</span>
-<span class="w">  </span><span class="nt">role</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">backend</span>
-<span class="w">  </span><span class="nt">secretEnv</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">RTP_NET_SECRET</span>
-<span class="nt">transport</span><span class="p">:</span>
-<span class="w">  </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">redis</span>
-<span class="w">  </span><span class="nt">redis</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> host</span><span class="p">:</span><span class="w"> </span><span class="nv">redis</span><span class="p p-Indicator">,</span><span class="nt"> port</span><span class="p">:</span><span class="w"> </span><span class="nv">6379</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<h3 id="mode-1-initial-wilderness-homesteading-fresh-start">Mode 1: Initial Wilderness Homesteading (Fresh Start)<a class="headerlink" href="#mode-1-initial-wilderness-homesteading-fresh-start" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Context:</strong> The quintessential survival experience upon joining an SMP or leaving spawn.</li>
+<li><strong>Objective:</strong> Locate an expansive, scenic, unmolested tract of wilderness to establish a permanent home base, storage complex, and local farm network.</li>
+<li><strong>Operational Pattern:</strong> The player dispatches <code>/rtp</code>. If the terrain is unviable (steep jagged peaks, ocean, swamp, dense dark forest) or shows signs of prior players (stumps, floating foliage, torches, claim borders), they immediately reroll until satisfied. Once accepted, they execute <code>/sethome</code> and rarely use open-world RTP from that location again.</li>
+</ul>
+<h3 id="mode-2-off-site-resource-extraction-quarrying-deforestation">Mode 2: Off-Site Resource Extraction (Quarrying &amp; Deforestation)<a class="headerlink" href="#mode-2-off-site-resource-extraction-quarrying-deforestation" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Context:</strong> Mid-to-late-game players with established bases requiring industrial quantities of building materials (sand, gravel, wood, terracotta, deepslate) without scarring their local landscape.</li>
+<li><strong>Objective:</strong> Teleport to a dedicated resource world (<code>/rtp world_resource</code>) or remote wild chunks to clear-cut forests, excavate deserts, or strip-mine underground.</li>
+<li><strong>Operational Pattern:</strong> Rapid dispatch -&gt; high-entropy block stripping -&gt; return via <code>/home</code>. Aesthetics and terrain continuity are irrelevant; raw harvestable density is paramount.</li>
+</ul>
+<h3 id="mode-3-biome-structure-hunting-looting-mapping">Mode 3: Biome &amp; Structure Hunting (Looting &amp; Mapping)<a class="headerlink" href="#mode-3-biome-structure-hunting-looting-mapping" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Context:</strong> Mid-game adventurers seeking unlooted generated structures (Trial Chambers, Ancient Cities, Woodland Mansions, Nether Fortresses, End Cities) or rare biomes (Cherry Groves, Badlands, Mangrove Swamps, Mushroom Fields).</li>
+<li><strong>Objective:</strong> Maximize discovery rate. Players utilize targeted parameters where available (<code>/rtp biome &lt;name&gt;</code>) or rapidly cycle random candidates to roll coordinates near unexplored structures.</li>
+<li><strong>Operational Pattern:</strong> Short dwell times (&lt; 60 seconds); scan local coordinates or minimaps; loot high-value containers; depart.</li>
+</ul>
+<h3 id="mode-4-spawn-escape-anti-camp-evasion-anarchy-hostile-smps">Mode 4: Spawn Escape &amp; Anti-Camp Evasion (Anarchy &amp; Hostile SMPs)<a class="headerlink" href="#mode-4-spawn-escape-anti-camp-evasion-anarchy-hostile-smps" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Context:</strong> Anarchy, semi-anarchy, or hardcore PvP environments (e.g., 2b2t, DonutSMP, Lifesteal).</li>
+<li><strong>Objective:</strong> Immediately escape spawn traps, wither swarms, lava casts, and spawn campers.</li>
+<li><strong>Operational Pattern:</strong> Pure survival triage. The player requires instantaneous distance from $(0, 0)$ and zero fall/lava damage. Upon arrival, they do not settle; they travel an additional $20,000$ to $100,000$ blocks outward via Elytra or Nether highways before establishing a concealed base.</li>
+</ul>
+<h3 id="mode-5-strategic-border-scouting-raiding-factions-raiding-smps">Mode 5: Strategic Border Scouting &amp; Raiding (Factions &amp; Raiding SMPs)<a class="headerlink" href="#mode-5-strategic-border-scouting-raiding-factions-raiding-smps" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Context:</strong> Competitive faction servers or PvP environments where claims can be raided, breached, or monitored.</li>
+<li><strong>Objective:</strong> Exploit spatial teleport mechanics to discover target bases.</li>
+<li><strong>Operational Pattern:</strong> Players utilize targeted proximity commands (<code>/rtp action nearclaim</code>, <code>/rtp action nearplayer</code>) or cycle <code>/rtp</code> at the outer perimeter of the plugin's configured radius, scanning for player claims, entity radars, or underground redstone activity.</li>
+</ul>
+<h3 id="mode-6-technical-farm-perimeter-siting-redstone-scicraft-meta">Mode 6: Technical Farm &amp; Perimeter Siting (Redstone &amp; SciCraft Meta)<a class="headerlink" href="#mode-6-technical-farm-perimeter-siting-redstone-scicraft-meta" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Context:</strong> Advanced technical players designing high-output mob grinders, witch farms, raid farms, or slime perimeters.</li>
+<li><strong>Objective:</strong> Identify coordinates that minimize external mob spawning or provide optimal algorithmic spawn conditions (low sub-chunk Y levels, deep ocean boundaries to eliminate cave lighting overhead, specific swamp boundaries, slime chunk alignment).</li>
+<li><strong>Operational Pattern:</strong> Highly deliberate. Candidate chunks are mathematically verified via F3 debug screens, chunk border overlays (<code>F3 + G</code>), or seed mappers before any block is placed.</li>
+</ul>
+<h3 id="mode-7-casual-wandering-server-auditing-first-impression-sampling">Mode 7: Casual Wandering &amp; Server Auditing (First-Impression Sampling)<a class="headerlink" href="#mode-7-casual-wandering-server-auditing-first-impression-sampling" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Context:</strong> New players evaluating world generation quality, server latency, and overall community atmosphere before committing time.</li>
+<li><strong>Objective:</strong> Experience immediate visual interest, smooth server performance (no rubberbanding or tick lag during chunk loading), and clear progression paths.</li>
+</ul>
+<h3 id="mode-8-cooperative-group-settle-duo-guild-settle">Mode 8: Cooperative Group Settle (Duo &amp; Guild Settle)<a class="headerlink" href="#mode-8-cooperative-group-settle-duo-guild-settle" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Context:</strong> Groups of 2 to 6 friends joining a server together who wish to establish adjacent private estates or a shared commune.</li>
+<li><strong>Objective:</strong> Arrive together in a large, multi-biome territory with enough spatial capacity to accommodate multiple bases without crowding.</li>
+<li><strong>Operational Pattern:</strong> Group RTP commands (<code>/rtp group</code>), party anchors, or chaining <code>/rtp</code> followed by sequential <code>/tpa</code> requests.</li>
+</ul>
+<hr />
+<h2 id="3-player-archetypes-quantitative-valuation-functions">3. Player Archetypes &amp; Quantitative Valuation Functions<a class="headerlink" href="#3-player-archetypes-quantitative-valuation-functions" title="Permanent link">&para;</a></h2>
+<p>Player decision-making can be formalized through an objective <strong>Site Valuation Function</strong> ($\mathcal{U}_{\text{site}}$):</p>
+<p>$$\mathcal{U}<em i="i">{\text{site}} = \sum</em> c_j \cdot C_j$$} w_i \cdot V_i - \sum_{j</p>
+<p>Where:
+- $V_i \in [0, 1]$ represents positive environmental attributes (flatness, aesthetic score, resource density).
+- $C_j \in [0, 1]$ represents negative friction and hazard penalties (sheer cliffs, nearby strangers, defaced terrain).
+- $w_i, c_j \ge 0$ represent archetype-specific valuation weights.
+- If $\mathcal{U}<em _text_threshold="\text{threshold">{\text{site}} &lt; \theta</em>$, the player rejects the landing and executes an immediate }<code>/rtp</code> reroll.</p>
+<div class="highlight"><pre><span></span><code>+───────────────────────────────────────────────────────────────────────────────────+
+|                             PLAYER VALUE PROFILE SUMMARY                          |
++─────────────────────────┬───────────────────────┬─────────────────────────────────+
+| Archetype               | Primary Driver ($w$)  | Critical Veto Factor ($c$)      |
++─────────────────────────┼───────────────────────┼─────────────────────────────────+
+| 1. Aesthetic Homesteader| Biome Beauty, Flatness| Nearby Players, Defaced Land    |
+| 2. Resource Extractor   | Ore &amp; Wood Density    | Resource Depletion              |
+| 3. Structure Hunter     | Structure Proximity   | Long Travel Distance            |
+| 4. Technical Architect  | Mob Cap / Y-Level Opt | Unfavorable Biome / Cave Clutter|
+| 5. Anarchy Survivor     | Concealment / Distance| Spawn Proximity, Visible Trails |
+| 6. Anarchy Raider       | Target / Claim Access | Pure Isolation / No Targets     |
+| 7. Co-op Guild Pioneer  | Multi-Base Footprint  | Cramped Terrain, Border Bounds  |
++─────────────────────────┴───────────────────────┴─────────────────────────────────+
 </code></pre></div>
-<p><code>proxyId</code> and <code>serverId</code> are network-wide identifiers; collisions cause one
-participant to overwrite another's heartbeat row and silently degrade. Pick
-short, stable strings (hostnames work).</p>
-<h2 id="scenario-1-stack-boot">Scenario 1: stack boot<a class="headerlink" href="#scenario-1-stack-boot" title="Permanent link">&para;</a></h2>
-<p>Bring everything up and confirm all five processes report healthy startup.</p>
-<p>Pass criteria:</p>
+<h3 id="archetype-1-the-aesthetic-homesteader-solo-builder-hermit">Archetype 1: The Aesthetic Homesteader (Solo Builder / Hermit)<a class="headerlink" href="#archetype-1-the-aesthetic-homesteader-solo-builder-hermit" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Both proxies log <code>RTP network mode enabled (proxy-X)</code>.</li>
-<li>Both backends log <code>RTP network mode enabled (backend-X)</code>.</li>
-<li>No <code>WARNING</code> lines mention <code>RTP_NET_SECRET</code>, <code>transport</code>, or <code>Redis</code>.</li>
+<li><strong>Psychological Profile:</strong> High Builder, moderate Explorer, low Killer. Represents the largest demographic on standard survival SMPs.</li>
+<li><strong>Preferred Biomes:</strong> Plains, Meadow, Cherry Grove, Forest, Savanna, Birch Forest. Rejects Deserts, Swamps, Badlands, and Oceans.</li>
+<li><strong>Valuation Weights:</strong></li>
+<li>$w_{\text{isolation}} = +0.95$: Premium on absolute distance from strangers ($d &gt; 1,500$ blocks).</li>
+<li>$w_{\text{flatness}} = +0.80$: Low elevation variance ($\sigma_Y &lt; 8$) to minimize terraforming overhead.</li>
+<li>$w_{\text{aesthetic_biome}} = +0.85$: Vibrant foliage colors and scenic terrain backdrops.</li>
+<li>$c_{\text{prior_activity}} = 1.0$ (Hard Veto): Chopped trees, floating leaves, torches, or nearby claims trigger an instant reroll.</li>
+<li>$c_{\text{hazard}} = 0.90$: Heavy penalty for ravines, cliffs, or surface lava pools.</li>
 </ul>
-<h2 id="scenario-2-heartbeat-convergence">Scenario 2: heartbeat convergence<a class="headerlink" href="#scenario-2-heartbeat-convergence" title="Permanent link">&para;</a></h2>
-<p>Within ~5 seconds of full boot, all four participants must publish a
-heartbeat row to Redis.</p>
-<div class="highlight"><pre><span></span><code><span class="n">redis-cli</span> <span class="n">KEYS</span> <span class="s1">&#39;rtp:net:backend:*&#39;</span>
-<span class="n">redis-cli</span> <span class="n">KEYS</span> <span class="s1">&#39;rtp:net:proxy:*&#39;</span>
-</code></pre></div>
-<p>Pass criteria: 4 keys total - 2 under <code>:backend:</code>, 2 under <code>:proxy:</code>.</p>
-<p>Common failure mode: 0 keys. Cause is almost always <code>RTP_NET_SECRET</code>
-unset on at least one JVM, or <code>transport.type: redis</code> missing on one
-participant (it silently runs in-memory).</p>
-<h2 id="scenario-3-cross-server-rtp-round-trip">Scenario 3: cross-server <code>/rtp</code> round-trip<a class="headerlink" href="#scenario-3-cross-server-rtp-round-trip" title="Permanent link">&para;</a></h2>
-<p>The end-to-end happy path. Required: a live Minecraft 1.21.x client.</p>
-<ol>
-<li>Connect the client to proxy-a (default backend: backend-a).</li>
-<li>Run <code>/server backend-b</code> once to ensure the client's session is known
-   to backend-b's permission map. Then <code>/server backend-a</code> again.</li>
-<li>From backend-a, run <code>/rtp</code>. The backend's <code>NetworkRouter</code> enrols the
-   request in the shared wait queue (<code>rtp:net:wq:ready</code> LIST + per-player
-   <code>rtp:net:wq:status:&lt;pid&gt;</code> HASH). Some proxy worker dequeues the
-   envelope, runs the <code>BackendSelector</code> (kept-count + killSwitch +
-   region availability), claims a reservation token against the chosen
-   backend's <code>networkKeptLocations</code> pool, and issues the transfer.</li>
-<li>On arrival, the destination backend's <code>JoinTriggerSource</code> calls
-   <code>findReservation -&gt; redeem</code>, and on REDEEMED pins the pre-warmed
-   coordinate via <code>RegionQueueManager.acceptRedeemedReservation(...)</code>
-   so the immediately-following <code>/rtp</code> dispatch consumes that exact
-   coord (no second pipeline run).</li>
-</ol>
-<p>Queue + reservation state transitions an operator can observe:</p>
+<p>$$\mathcal{U}<em _text_isolation="\text{isolation">{\text{homestead}} = 0.95 \cdot D</em>}} + 0.85 \cdot B_{\text{aesthetic}} + 0.80 \cdot T_{\text{flat}} - 1.0 \cdot \mathbb{I<em _text_hazard="\text{hazard">{\text{defaced}} - 0.90 \cdot H</em>$$}</p>
+<h3 id="archetype-2-the-resource-extractor-quarry-miner-logger">Archetype 2: The Resource Extractor (Quarry Miner / Logger)<a class="headerlink" href="#archetype-2-the-resource-extractor-quarry-miner-logger" title="Permanent link">&para;</a></h3>
 <ul>
-<li><code>rtp:net:wq:status:&lt;pid&gt;</code> HASH cycles through <code>PENDING -&gt; ROUTING -&gt;
-  RESERVED -&gt; COMPLETED</code> (or <code>FAILED/CANCELLED</code> on the failure paths);
-  the HASH is DEL'd by the terminal <code>transition.lua</code> script along with
-  the envelope HASH and the <code>rtp:net:wq:seen</code> SET entry.</li>
-<li><code>rtp:net:tok:&lt;tokenId&gt;</code> HASH transitions <code>PENDING -&gt; CLAIMED -&gt;
-  CONSUMED</code> (or <code>RELEASED</code> on <code>PLAYER_DISCONNECTED</code> / <code>TTL_EXPIRED</code> /
-  <code>BACKEND_REJECTED</code>); CONSUMED/RELEASED rows are removed by the
-  release Lua. The reaper's <code>ReleaseSink</code> fires <code>releaseToNetworkKept</code>
-  on the owning backend so the coord returns to the pool.</li>
-<li>Heartbeat HASH <code>regionKeptCounts</code> field on the chosen backend drops
-  by 1 at claim time and is replenished on the next pulse.</li>
+<li><strong>Psychological Profile:</strong> High Achiever, high Miner. Motivated by inventory accumulation and material hoarding.</li>
+<li><strong>Preferred Biomes:</strong> Badlands (terracotta/gold), Deserts (sand), Warm/Deep Oceans (gravel/sponges), Dark Forest / Old Growth Taiga (dense wood), Deep Caves / Stony Peaks (exposed iron/coal).</li>
+<li><strong>Valuation Weights:</strong></li>
+<li>$w_{\text{resource_density}} = +1.0$: Volume of harvestable blocks per cubic meter.</li>
+<li>$w_{\text{cave_exposure}} = +0.85$: Open ravines or cave mouths descending into deepslate ($Y &lt; 0$).</li>
+<li>$w_{\text{isolation}} = 0.0$: Indifferent to neighboring builds, provided local resources are intact.</li>
+<li>$c_{\text{depleted}} = 1.0$ (Hard Veto): Chopped tree stumps or mined quarry pits yield zero value -&gt; instant reroll.</li>
 </ul>
-<p>Pass criteria:</p>
+<p>$$\mathcal{U}<em _text_density="\text{density">{\text{extract}} = 1.0 \cdot R</em>$$}} + 0.85 \cdot C_{\text{exposure}} - 1.0 \cdot \mathbb{I}_{\text{depleted}</p>
+<h3 id="archetype-3-the-structure-hunter-cartographer">Archetype 3: The Structure Hunter / Cartographer<a class="headerlink" href="#archetype-3-the-structure-hunter-cartographer" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Client lands on the destination backend at a valid coordinate.</li>
-<li>Destination backend log contains a <code>JoinTriggerSource ... redeemed</code> line.</li>
-<li><code>redis-cli KEYS 'rtp:net:tok:*'</code> shows zero entries after the redeem
-  completes (terminal <code>transition.lua</code> deleted the row).</li>
-<li><code>redis-cli KEYS 'rtp:net:wq:status:*'</code> shows zero entries for the
-  player UUID (terminal envelope cleanup).</li>
+<li><strong>Psychological Profile:</strong> Pure Explorer. Motivated by discovery, rare loot (Armor Trims, Heavy Cores, Elytra), and world completion.</li>
+<li><strong>Preferred Targets:</strong> Ancient Cities, Trial Chambers, Villages, Woodland Mansions, Nether Fortresses, End Cities.</li>
+<li><strong>Valuation Weights:</strong></li>
+<li>$w_{\text{structure_proximity}} = +1.0$: Distance to nearest generated structure ($d \le 150$ blocks).</li>
+<li>$w_{\text{unlooted}} = +0.95$: Structure must contain intact chests and spawners.</li>
+<li>$w_{\text{traversability}} = +0.60$: Open terrain or waterways facilitating high-speed flight or boat transit.</li>
+<li>$c_{\text{permanence}} = 0.0$: Zero value placed on base-building suitability.</li>
 </ul>
-<p>Common failure modes:</p>
+<p>$$\mathcal{U}<em _text_structure="\text{structure">{\text{hunter}} = 1.0 \cdot S</em>}} + 0.95 \cdot \mathbb{I<em _text_open="\text{open">{\text{unlooted}} + 0.60 \cdot T</em>$$}} - 0.80 \cdot \mathbb{I}_{\text{looted}</p>
+<h3 id="archetype-4-the-technical-architect-redstone-farm-engineer">Archetype 4: The Technical Architect (Redstone / Farm Engineer)<a class="headerlink" href="#archetype-4-the-technical-architect-redstone-farm-engineer" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Client lands but no <code>/rtp</code> runs: HMAC verify failed (secret mismatch),
-  or <code>JoinTriggerSource</code> not registered (network bootstrap aborted).</li>
-<li><code>/rtp</code> runs locally on the source backend: <code>NetworkRouter</code> gated to
-  <code>local</code> (check <code>routing.mode</code> in <code>network.yml</code>), token-bucket rate
-  limit exhausted, no backend qualified (all killSwitch / zero
-  <code>keptCount</code> / region unavailable), or the dispatcher fell through to
-  the local pipeline. Check the backend log for <code>RoutingDecision</code>
-  <code>FallbackReason</code> entries and the proxy log for <code>DispatchOutcome</code>
-  warnings.</li>
-<li>Wait-queue envelope stuck in <code>PENDING</code>: no proxy worker is draining
-  <code>rtp:net:wq:ready</code> (proxy <code>TransportRequestTriggerSource</code> not started,
-  or all proxies are down). The reservation TTL reaper will clear stale
-  entries, but the player observes a fallback message.</li>
+<li><strong>Psychological Profile:</strong> High Mastery / Systemic Achiever. Treats the Minecraft world as an engine to be optimized.</li>
+<li><strong>Preferred Biomes:</strong> Deep Ocean (eliminates surface and cave mob spawning within render distance), Swamps (Witch huts / low-slime rules), Deserts (Husk farms / low passive mob interference), Nether Soul Sand Valleys (Wither Skeleton / Ghast spawn concentration).</li>
+<li><strong>Valuation Weights:</strong></li>
+<li>$w_{\text{mobcap_isolation}} = +1.0$: Minimizes unlit subterranean volume within a 128-block spherical radius from the AFK platform.</li>
+<li>$w_{\text{low_y}} = +0.90$: Surface elevation as close to bedrock as possible (exploiting the sub-chunk spawning algorithm: lower Y levels yield higher mob spawning rates).</li>
+<li>$w_{\text{chunk_alignment}} = +0.70$: Natural alignment with slime chunks or bounding boxes of witch huts / nether structures.</li>
+<li>$c_{\text{entity_clutter}} = 0.90$: Rejects chunks with excessive passive mob entities, tile entities, or overlapping village centers.</li>
 </ul>
-<h2 id="scenario-4-kill-mid-flight">Scenario 4: kill mid-flight<a class="headerlink" href="#scenario-4-kill-mid-flight" title="Permanent link">&para;</a></h2>
-<p>Verify that an orphan reservation is reaped without manual cleanup.</p>
-<ol>
-<li>Seed a reservation (operator: log into a client and run <code>/rtp</code>, then
-   immediately <code>Ctrl+C</code> the destination backend before the client's
-   <code>PlayerJoinEvent</code> fires; dev: use <code>run-acceptance.ps1 -Scenario killmidflight</code>,
-   which seeds via the claim Lua and kills the backend container).</li>
-<li>Wait <code>reservation.ttlMs + reservation.reapIntervalMs</code> (default 5 min
-   total in production; 35s in the devstack).</li>
-<li><code>redis-cli KEYS 'rtp:net:reservation:*'</code> must report zero matching keys.</li>
-</ol>
-<p>Pass criteria: the row clears within the budget without operator intervention.</p>
-<h2 id="scenario-5-kill-switch">Scenario 5: kill switch<a class="headerlink" href="#scenario-5-kill-switch" title="Permanent link">&para;</a></h2>
-<p>Verify that flipping <code>network.killSwitch: true</code> on a proxy halts new claims
-without affecting in-flight redeems.</p>
-<ol>
-<li>Edit <code>proxy-a/network.yml</code>, set <code>network.killSwitch: true</code>, restart proxy-a.</li>
-<li>From a client on proxy-a, run <code>/rtp</code>. The proxy must reject the request
-   with <code>MSG_NETWORK_KILL_SWITCH</code> (configurable via <code>messages.yml</code>).</li>
-<li>From a client on proxy-b (unaffected), <code>/rtp</code> continues to work.</li>
-</ol>
-<p>Pass criteria: proxy-a rejects with the configured message; no claim is
-written to Redis; proxy-b is unaffected.</p>
-<p>Note: the devstack's <code>run-acceptance.ps1 -Scenario killswitch</code> performs a
-wiring smoke test by issuing a synthetic claim with a sentinel value. It
-does NOT exercise the real proxy gate - that requires a live client and
-the manual procedure above. Treat the harness result as a regression
-canary for the Lua contract, not as authoritative acceptance evidence.</p>
-<h2 id="teardown">Teardown<a class="headerlink" href="#teardown" title="Permanent link">&para;</a></h2>
+<p>$$\mathcal{U}<em _text_isolation="\text{isolation">{\text{technical}} = 1.0 \cdot M</em>}} + 0.90 \cdot (1 - \hat{Y<em _text_structure_95_box="\text{structure_box">{\text{surface}}) + 0.70 \cdot A</em>$$}} - 0.90 \cdot E_{\text{clutter}</p>
+<h3 id="archetype-5-the-anarchy-survivor-concealment-specialist">Archetype 5: The Anarchy Survivor (Concealment Specialist)<a class="headerlink" href="#archetype-5-the-anarchy-survivor-concealment-specialist" title="Permanent link">&para;</a></h3>
 <ul>
-<li><code>network.enabled: false</code> on every participant restores byte-identical
-  single-server behavior.</li>
-<li>Reservation rows older than their TTL are reaped automatically. To
-  flush manually: <code>redis-cli --scan --pattern 'rtp:net:*' | xargs redis-cli DEL</code>.</li>
+<li><strong>Psychological Profile:</strong> Paranoia-driven Survivalist. Operates under zero grief rules or theft protection.</li>
+<li><strong>Valuation Weights:</strong></li>
+<li>$w_{\text{spawn_distance}} = +1.0$: Distance from world spawn ($d &gt; 50,000$ blocks).</li>
+<li>$w_{\text{concealment}} = +0.95$: Natural camouflage (deep ocean floor, under ocean monuments with mining fatigue, hollow mountain interiors).</li>
+<li>$c_{\text{rtp_landing_zone}} = 1.0$ (Hard Veto): Rejects any location where another player could casually land via <code>/rtp</code> (e.g., standard flat plains, hills, or land within the core RTP radius).</li>
+<li>$c_{\text{trail}} = 1.0$: Any visible entry path or coordinate marker is an immediate disqualifier.</li>
 </ul>
-<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<p>$$\mathcal{U}<em _text_spawn="\text{spawn">{\text{survivor}} = 1.0 \cdot D</em>$$}} + 0.95 \cdot C_{\text{camouflage}} - 1.0 \cdot \mathbb{I}_{\text{rtp_reachable}</p>
+<h3 id="archetype-6-the-competitive-raider-faction-scout">Archetype 6: The Competitive Raider / Faction Scout<a class="headerlink" href="#archetype-6-the-competitive-raider-faction-scout" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Psychological Profile:</strong> High Killer / Competitor. Seeks confrontation, dominance, and economic looting.</li>
+<li><strong>Valuation Weights:</strong></li>
+<li>$w_{\text{target_proximity}} = +1.0$: Prefers landing between $150$ and $400$ blocks from a target base (close enough to infiltrate, far enough to avoid claim-detection alarms or anti-RTP claim protection).</li>
+<li>$w_{\text{radar_signals}} = +0.80$: Detects tile-entity clusters, animal pens, or custom player blocks via client rendering or map markers.</li>
+<li>$c_{\text{empty_wilderness}} = 0.85$: Pristine, untouched wilderness has low utility -&gt; triggers another <code>/rtp</code> jump to continue scanning the perimeter ring.</li>
+</ul>
+<p>$$\mathcal{U}<em _text_target="\text{target">{\text{raider}} = 1.0 \cdot P</em>$$}} + 0.80 \cdot S_{\text{radar}} - 0.85 \cdot \mathbb{I}_{\text{pristine}</p>
+<h3 id="archetype-7-the-co-op-guild-pioneer-group-settlement">Archetype 7: The Co-op Guild Pioneer (Group Settlement)<a class="headerlink" href="#archetype-7-the-co-op-guild-pioneer-group-settlement" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Psychological Profile:</strong> Socializer / Collaborative Builder. Plays with a dedicated group of friends or guildmates.</li>
+<li><strong>Valuation Weights:</strong></li>
+<li>$w_{\text{spatial_capacity}} = +1.0$: Contiguous usable land area ($&gt; 500 \times 500$ blocks without severe mountains or ravines dividing the plots).</li>
+<li>$w_{\text{biome_diversity}} = +0.80$: Multiple biome borders within 250 blocks to support diverse aesthetic tastes among group members.</li>
+<li>$w_{\text{isolation_external}} = +0.90$: High distance from non-guild strangers.</li>
+<li>$c_{\text{boundary_clamping}} = 1.0$: Landing near the server's world border or near foreign claims that restrict outward expansion.</li>
+</ul>
+<p>$$\mathcal{U}<em _text_capacity="\text{capacity">{\text{guild}} = 1.0 \cdot A</em>$$}} + 0.80 \cdot B_{\text{diversity}} + 0.90 \cdot D_{\text{strangers}} - 1.0 \cdot \mathbb{I}_{\text{cramped}</p>
+<hr />
+<h2 id="4-cross-archetype-valuation-matrix">4. Cross-Archetype Valuation Matrix<a class="headerlink" href="#4-cross-archetype-valuation-matrix" title="Permanent link">&para;</a></h2>
+<p>The following matrix compares normalized valuation weights ($-1.0$ = extreme aversion / veto, $+1.0$ = essential requirement, $0.0$ = indifferent) across all primary environmental dimensions:</p>
 <table>
 <thead>
 <tr>
-<th>Symptom</th>
-<th>Likely cause</th>
+<th>Dimension / Environmental Feature</th>
+<th style="text-align: center;">Homesteader</th>
+<th style="text-align: center;">Extractor</th>
+<th style="text-align: center;">Structure Hunter</th>
+<th style="text-align: center;">Technical</th>
+<th style="text-align: center;">Anarchy Survivor</th>
+<th style="text-align: center;">Raider</th>
+<th style="text-align: center;">Guild Pioneer</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Backend logs <code>RTP_NET_SECRET is required</code> at startup</td>
-<td>Env var unset on that JVM</td>
+<td><strong>Isolation from Strangers ($d &gt; 1.5\text{k}$)</strong></td>
+<td style="text-align: center;"><strong>+0.95</strong></td>
+<td style="text-align: center;">0.00</td>
+<td style="text-align: center;">0.00</td>
+<td style="text-align: center;">+0.40</td>
+<td style="text-align: center;"><strong>+1.00</strong></td>
+<td style="text-align: center;"><strong>-0.85</strong></td>
+<td style="text-align: center;"><strong>+0.90</strong></td>
 </tr>
 <tr>
-<td>Heartbeat keys present but <code>/rtp</code> runs locally</td>
-<td>Proxy <code>serverId</code> mismatch (selector saw none)</td>
+<td><strong>Topographic Flatness ($\sigma_Y &lt; 8$)</strong></td>
+<td style="text-align: center;"><strong>+0.80</strong></td>
+<td style="text-align: center;">+0.10</td>
+<td style="text-align: center;">+0.40</td>
+<td style="text-align: center;"><strong>+0.75</strong></td>
+<td style="text-align: center;">-0.20</td>
+<td style="text-align: center;">0.00</td>
+<td style="text-align: center;"><strong>+0.85</strong></td>
 </tr>
 <tr>
-<td><code>redeem</code> returns <code>WRONG_SERVER</code></td>
-<td>Player landed on a backend other than the one claimed; usually a Velocity <code>try</code> fallback</td>
+<td><strong>Aesthetic Biome (Plains/Cherry/Forest)</strong></td>
+<td style="text-align: center;"><strong>+0.85</strong></td>
+<td style="text-align: center;">-0.20</td>
+<td style="text-align: center;">+0.20</td>
+<td style="text-align: center;">-0.30</td>
+<td style="text-align: center;">-0.40</td>
+<td style="text-align: center;">0.00</td>
+<td style="text-align: center;"><strong>+0.80</strong></td>
 </tr>
 <tr>
-<td><code>redeem</code> returns <code>ALREADY_CONSUMED</code></td>
-<td>Duplicate <code>PlayerJoinEvent</code> (benign; second is a no-op)</td>
+<td><strong>Specialized Biome (Ocean/Desert/Swamp)</strong></td>
+<td style="text-align: center;"><strong>-0.70</strong></td>
+<td style="text-align: center;"><strong>+0.85</strong></td>
+<td style="text-align: center;">+0.50</td>
+<td style="text-align: center;"><strong>+1.00</strong></td>
+<td style="text-align: center;"><strong>+0.90</strong></td>
+<td style="text-align: center;">0.00</td>
+<td style="text-align: center;">-0.20</td>
 </tr>
 <tr>
-<td><code>redeem</code> returns <code>EXPIRED</code></td>
-<td>Transfer took longer than <code>reservation.ttlMs</code>; increase TTL or shorten transfer latency</td>
+<td><strong>Raw Surface Ore / Log Density</strong></td>
+<td style="text-align: center;">+0.40</td>
+<td style="text-align: center;"><strong>+1.00</strong></td>
+<td style="text-align: center;">0.00</td>
+<td style="text-align: center;">0.00</td>
+<td style="text-align: center;">+0.30</td>
+<td style="text-align: center;">0.00</td>
+<td style="text-align: center;">+0.50</td>
+</tr>
+<tr>
+<td><strong>Generated Structure Proximity ($&lt; 200\text{b}$)</strong></td>
+<td style="text-align: center;">+0.30</td>
+<td style="text-align: center;">+0.20</td>
+<td style="text-align: center;"><strong>+1.00</strong></td>
+<td style="text-align: center;"><strong>+0.70</strong></td>
+<td style="text-align: center;"><strong>-0.80</strong></td>
+<td style="text-align: center;">+0.60</td>
+<td style="text-align: center;">+0.40</td>
+</tr>
+<tr>
+<td><strong>Proximity to Existing Claims</strong></td>
+<td style="text-align: center;"><strong>-1.00</strong></td>
+<td style="text-align: center;">-0.20</td>
+<td style="text-align: center;">0.00</td>
+<td style="text-align: center;">-0.50</td>
+<td style="text-align: center;"><strong>-1.00</strong></td>
+<td style="text-align: center;"><strong>+1.00</strong></td>
+<td style="text-align: center;"><strong>-1.00</strong></td>
+</tr>
+<tr>
+<td><strong>Prior Human Traces (Stumps/Torches)</strong></td>
+<td style="text-align: center;"><strong>-1.00</strong></td>
+<td style="text-align: center;"><strong>-1.00</strong></td>
+<td style="text-align: center;">-0.30</td>
+<td style="text-align: center;">0.00</td>
+<td style="text-align: center;"><strong>-1.00</strong></td>
+<td style="text-align: center;"><strong>+0.80</strong></td>
+<td style="text-align: center;"><strong>-0.90</strong></td>
+</tr>
+<tr>
+<td><strong>Sub-Chunk Y Optimization (Low Y)</strong></td>
+<td style="text-align: center;">0.00</td>
+<td style="text-align: center;">+0.50</td>
+<td style="text-align: center;">0.00</td>
+<td style="text-align: center;"><strong>+0.90</strong></td>
+<td style="text-align: center;"><strong>+0.80</strong></td>
+<td style="text-align: center;">0.00</td>
+<td style="text-align: center;">0.00</td>
+</tr>
+<tr>
+<td><strong>Terrain Hazards (Cliffs/Lava/Dark)</strong></td>
+<td style="text-align: center;"><strong>-0.90</strong></td>
+<td style="text-align: center;">-0.40</td>
+<td style="text-align: center;">-0.20</td>
+<td style="text-align: center;">-0.50</td>
+<td style="text-align: center;">-0.30</td>
+<td style="text-align: center;">0.00</td>
+<td style="text-align: center;"><strong>-0.80</strong></td>
 </tr>
 </tbody>
 </table>
+<hr />
+<h2 id="5-spatial-economics-why-proximity-inflicts-disutility-in-minecraft">5. Spatial Economics: Why Proximity Inflicts Disutility in Minecraft<a class="headerlink" href="#5-spatial-economics-why-proximity-inflicts-disutility-in-minecraft" title="Permanent link">&para;</a></h2>
+<p>Classical urban economics posits that spatial clustering generates positive network externalities (reduced transit costs, shared infrastructure, and economic specialization). In a Minecraft survival world, however, <strong>the physical laws of the universe are inverted</strong>:</p>
+<ol>
+<li><strong>Land is Functionally Infinite:</strong> A standard Minecraft world encompasses $60,000,000 \times 60,000,000$ blocks ($3.6 \text{ billion chunks}$). Economic rent on open wilderness is zero.</li>
+<li><strong>Transportation Cost Approaches Zero:</strong> Nether highways ($8:1$ coordinate compression), blue ice boat channels ($72 \text{ m/s}$), and Elytra flight allow players to traverse thousands of blocks in minutes.</li>
+<li><strong>Every Player Is an Autonomous Industrial Economy:</strong> Automated iron farms, crop towers, villager trading halls, and mob grinders produce near-infinite yields. Players do not need physical proximity to barter for raw subsistence materials.</li>
+</ol>
+<p>Because the economic drivers of physical clustering do not exist, proximity to strangers on an SMP yields <strong>almost purely negative externalities</strong>:</p>
+<h3 id="a-the-128-block-despawn-sphere-mob-cap-sabotage">A. The 128-Block Despawn Sphere &amp; Mob Cap Sabotage<a class="headerlink" href="#a-the-128-block-despawn-sphere-mob-cap-sabotage" title="Permanent link">&para;</a></h3>
+<p>Minecraft's spawning engine uses a hard $128$-block spherical radius centered on the player. Hostile mobs outside $128$ blocks despawn instantly, and mob caps ($70$ monsters per player) are shared across loaded chunks:
+- If Player B builds $100$ blocks away from Player A, their $128$-block despawn spheres heavily overlap.
+- If Player B leaves unlit caves beneath their base, hostile mobs spawn there and fail to despawn, filling the regional mob cap and breaking Player A's mob farms, perimeter grinders, or slime farms.
+- Villager trading halls and iron farms within $64$ to $96$ blocks of each other merge villages, corrupting iron golem spawning lines and causing villagers to bind to foreign workstations.</p>
+<h3 id="b-the-spatial-footprint-of-modern-base-design">B. The Spatial Footprint of Modern Base Design<a class="headerlink" href="#b-the-spatial-footprint-of-modern-base-design" title="Permanent link">&para;</a></h3>
+<p>A modern SMP base is not a single structure; it is an extensive compound:
+- Main residence and storage hub ($64 \times 64$ to $128 \times 128$ blocks).
+- Technical farms and livestock pens ($64 \times 64$ blocks).
+- Aesthetic perimeters: terraformed hills, custom foliage, perimeter walls, and sightlines.
+- Subterranean branch-mining nets spanning hundreds of blocks.</p>
+<p>When a stranger settles within view distance ($100$ to $250$ blocks), they cut off future expansion, introduce conflicting architectural styles, and leave unsightly terrain scarring.</p>
+<h3 id="c-the-self-selection-bias-of-rtp">C. The Self-Selection Bias of <code>/rtp</code><a class="headerlink" href="#c-the-self-selection-bias-of-rtp" title="Permanent link">&para;</a></h3>
+<p>The act of dispatching <code>/rtp</code> is an explicit declaration: <strong>"Place me in pristine, untouched wilderness."</strong>
+If two players wish to collaborate or visit, they use direct targeted mechanisms (<code>/tpa</code>, <code>/warp market</code>, <code>/home</code>). If an <code>/rtp</code> engine drops a player within sight of an existing base, the player does not settle; they immediately reroll or walk thousands of blocks away.</p>
+<div class="highlight"><pre><span></span><code>+─────────────────────────────────────────────────────────────────────────────+
+|               THE DUAL-CHANNEL VALUE &amp; RESOURCE MATRIX                      |
++──────────────────────────────────────┬──────────────────────────────────────+
+|          /rtp (Wilderness)           |            /tpa (Social)             |
++──────────────────────────────────────┼──────────────────────────────────────+
+| • Intent: Clean land acquisition     | • Intent: Voluntary social contact   |
+| • Marginal Chunk Cost: ~80 chunks    | • Marginal Chunk Cost: ~0 chunks     |
+|   (Cold generation / disk read)      |   (Destination chunk already warm)   |
+| • Failure Mode if Crowded:           | • Failure Mode if Isolated:          |
+|   Immediate reroll (wasted compute)  |   None (direct targeted link)        |
+| • Net Welfare Yield: High per-base   | • Net Welfare Yield: Instantaneous,  |
+|   capital investment over time       |   zero-search social satisfaction    |
++──────────────────────────────────────┴──────────────────────────────────────+
+</code></pre></div>
+<h3 id="d-targeted-proximity-the-role-of-nearplayer-and-nearclaim">D. Targeted Proximity: The Role of <code>nearplayer</code> and <code>nearclaim</code><a class="headerlink" href="#d-targeted-proximity-the-role-of-nearplayer-and-nearclaim" title="Permanent link">&para;</a></h3>
+<p>Proximity is transformed from a nuisance into a gameplay feature only when it is <strong>opt-in and intentional</strong>. Dedicated actions like <code>nearplayer</code> and <code>nearclaim</code> (implemented via <code>LeafRTPActionAddon</code>) serve competitive raiding, border scouting, and group gatherings without compromising the virgin wilderness guarantees of the primary <code>/rtp</code> queue.</p>
+<hr />
+<h2 id="6-empirical-telemetry-game-theoretic-phenomena">6. Empirical Telemetry &amp; Game-Theoretic Phenomena<a class="headerlink" href="#6-empirical-telemetry-game-theoretic-phenomena" title="Permanent link">&para;</a></h2>
+<p>Analysis of public SMP telemetry (including over 10,000 automated test teleports across high-concurrency servers) reveals several critical failure modes in naive candidate selection:</p>
+<h3 id="a-the-plains-clumping-artifact">A. The "Plains Clumping" Artifact<a class="headerlink" href="#a-the-plains-clumping-artifact" title="Permanent link">&para;</a></h3>
+<p>On servers utilizing basic candidate selection, <strong>up to 85% of <code>/rtp</code> landings cluster in Plains biomes</strong>, with forests representing under 3% and specialized biomes virtually unrepresented.
+- <strong>Root Cause:</strong> Naive plugins enforce crude block blacklists to prevent player suffocation:
+  - Water / Lava -&gt; eliminates all Oceans, Rivers, and Beaches (~40% of world volume).
+  - Leaves / Logs -&gt; eliminates dense Forests, Dark Forests, and Jungles.
+  - Sheer cliffs / Snow -&gt; eliminates Jagged Peaks, Stony Peaks, and Mountain slopes.
+- <strong>Consequence:</strong> By filtering blocks reactively rather than using multi-layer vertical column adjustors, naive algorithms funnel the vast majority of candidates into the few biomes that are naturally flat and treeless: <strong>Plains</strong>.
+- <strong>Player Impact:</strong> Homesteaders quickly recognize this clumping and immediately reroll away from Plains biomes because they know Plains have the highest player traffic, highest grief rates, and lowest isolation.</p>
+<h3 id="b-strategic-exploitation-of-rtp-blind-spots">B. Strategic Exploitation of RTP Blind Spots<a class="headerlink" href="#b-strategic-exploitation-of-rtp-blind-spots" title="Permanent link">&para;</a></h3>
+<p>Because players understand algorithm limitations, defensive builders deliberately establish bases where RTP algorithms cannot land:
+1. <strong>Sub-Oceanic Vaults:</strong> Built under deep ocean trenches where surface RTP drops are banned by fluid filters.
+2. <strong>Beyond the Outer Radius:</strong> Constructed outside the configured <code>maxRadius</code> (e.g., traveling to coordinate $60,000$ when RTP max radius is $25,000$).
+3. <strong>Mushroom Fields:</strong> Naturally hostile mob-free zones, completely excluded by plugins that lack biome override configurations.</p>
+<h3 id="c-the-compounding-cost-of-the-reroll-cascade">C. The Compounding Cost of the Reroll Cascade<a class="headerlink" href="#c-the-compounding-cost-of-the-reroll-cascade" title="Permanent link">&para;</a></h3>
+<p>When an engine drops a player into an undesirable location ($\mathcal{U}_{\text{site}} &lt; \theta$), the player executes an immediate reroll. The true server cost of a settled player is the <strong>cumulative resource expenditure across all discarded attempts</strong>:</p>
+<p>$$\text{Total System Cost} = \sum_{i=1}^{N_{\text{attempts}}} \left( \text{Cost}<em _text_handoff="\text{handoff">{\text{selection}} + \text{Cost}</em> \right)$$}} + \text{Cost}_{\text{view-distance}</p>
+<ul>
+<li>If Plugin A has a "cheap" candidate selection cost ($5 \text{ ms}$) but drops players into oceans, cliffs, or crowded areas 60% of the time, the player must execute an average of $2.5$ teleports to settle. The server incurs $2.5 \times 80 = 200$ chunk loads and $2.5 \times 10.6 \text{ ms} = 26.5 \text{ ms}$ of main-thread handoff time per settled player.</li>
+<li>If Plugin B consumes slightly more background CPU ($15 \text{ ms}$) running Anvil pre-filters and spatial dispersion checks (<code>uniquePlacements: "AUTO"</code>), its settlement acceptance rate approaches $95\%$. The player settles on attempt 1, consuming only $80$ chunk loads and $10.6 \text{ ms}$ of main-thread execution.</li>
+<li><strong>Outcome:</strong> Proactive verification delivers higher aggregate efficiency and protects server tick stability by minimizing the total number of round-trip teleports required to achieve player satisfaction.</li>
+</ul>
+<hr />
+<h2 id="7-lightweight-behavioral-benchmark-architecture">7. Lightweight Behavioral Benchmark Architecture<a class="headerlink" href="#7-lightweight-behavioral-benchmark-architecture" title="Permanent link">&para;</a></h2>
+<p>To measure these dynamics without the deadweight CPU cost and fragility of full client-side survival AI (pathfinding, tree-cutting, obstacle jumping), the harness decouples <strong>decision metrics</strong> from <strong>physical bot execution</strong>.</p>
+<div class="highlight"><pre><span></span><code>[ Lightweight Bot Connects ]
+            │
+            ▼
+[ Dispatches /rtp Command ]
+            │
+            ▼
+[ Landing Zone Valuation ] ──&gt; Evaluates Biome, Terrain Height, Existing Modifications
+            │
+            ├─── Unacceptable / Consumed ──► Dispatch Next `/rtp` (Reroll Cascade)
+            │
+            └─── Desirable / Available
+                     │
+                     ▼
+[ Single Block Interaction ] ──► Marks Chunk Dirty (`ChunkAccess.setUnsaved(true)`)
+                     │
+                     ▼
+[ Session Termination ] ───────► Frees Client Slot for Successor Bot
+</code></pre></div>
+<h3 id="a-state-signaling-via-in-world-block-placement">A. State Signaling via In-World Block Placement<a class="headerlink" href="#a-state-signaling-via-in-world-block-placement" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Upon arrival, the bot inspects its client-side chunk cache ($O(1)$ lookup via <code>bot.findBlock</code>).</li>
+<li>If an existing human marker (e.g., <code>CHEST</code>, <code>TORCH</code>, <code>COBBLESTONE</code>) is detected within view distance, a Homesteader agent flags the chunk as consumed and triggers an immediate reroll.</li>
+<li>If the location is accepted, the bot executes a single atomic block placement packet (e.g., placing a <code>CHEST</code>).</li>
+<li><strong>Server Impact:</strong> This single packet forces the server engine to update heightmaps, recalculate local lighting, and flag the chunk as unsaved (<code>ChunkAccess.setUnsaved(true)</code>), authentically exercising the server's persistence layer during periodic world autosaves (<code>/save-all</code>).</li>
+</ul>
+<h3 id="b-core-longitudinal-health-metrics">B. Core Longitudinal Health Metrics<a class="headerlink" href="#b-core-longitudinal-health-metrics" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th>Measurement Source</th>
+<th>Direction</th>
+<th>Diagnostic Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Settlement Yield ($\eta_{\text{settle}}$)</strong></td>
+<td>$\frac{\text{Accepted Settlements}}{\text{Total Dispatched Teleports}}$</td>
+<td>Higher</td>
+<td>Measures placement viability; inverse reflects reroll waste.</td>
+</tr>
+<tr>
+<td><strong>Wasted Chunk Ratio ($W_{\text{chunk}}$)</strong></td>
+<td>$\frac{\text{Chunks Loaded on Rejected Teleports}}{\text{Total Chunks Loaded}}$</td>
+<td>Lower</td>
+<td>Quantifies compute and I/O expended on discarded candidates.</td>
+</tr>
+<tr>
+<td><strong>Autosave Flush MSPT Delta ($\Delta_{\text{save}}$)</strong></td>
+<td>Server tick sampler during periodic <code>/save-all</code></td>
+<td>Lower</td>
+<td>Measures disk write amplification caused by wide spatial dispersion.</td>
+</tr>
+<tr>
+<td><strong>Interference Probability ($P_{\text{interfere}}$)</strong></td>
+<td>Chebyshev distance to prior disturbance footprints</td>
+<td>Lower</td>
+<td>Measures frequency of dropping newcomers into defaced or occupied terrain.</td>
+</tr>
+<tr>
+<td><strong>Clark-Evans $R$ Over Time</strong></td>
+<td>Nearest-neighbor landing analysis</td>
+<td>Near $1.0$</td>
+<td>Tracks whether spatial dispersion degrades into clusters as world ages.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="8-architectural-validation-in-leafrtp">8. Architectural Validation in LeafRTP<a class="headerlink" href="#8-architectural-validation-in-leafrtp" title="Permanent link">&para;</a></h2>
+<p>The specialized subsystems of LeafRTP directly address these behavioral realities and optimize the aggregate welfare of the server ecosystem:</p>
+<ol>
+<li><strong>Archimedean Spiral Mapping &amp; <code>uniquePlacements: "AUTO"</code> (<a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>):</strong><br />
+   Guarantees uniform spatial dispersion ($R = 0.977$ in Paper 26.2 benchmarks) and marks client view-distance footprints as occupied. This eliminates near-neighbor collisions ($0$ pairs within 48 blocks across 4,096 teleports) and prevents the costly reroll cascades caused by Gaussian clustering engines.</li>
+<li><strong>Multi-Layer Vertical Clearance &amp; Safe Adjustors (<code>Fixed</code>, <code>Linear</code>, <code>Jump</code>):</strong><br />
+   Unlike naive engines that check only surface heightmaps (causing the 85% Plains clumping artifact), LeafRTP's vertical adjustors evaluate full vertical column clearance. This enables safe, dry landings under forest canopies, inside mountain valleys, and on multi-tiered terrain, restoring natural biome diversity.</li>
+<li><strong>Subspace Anchor Engines (<code>nearplayer</code> and <code>nearclaim</code> via <code>LeafRTPActionAddon</code> / <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/">ADR-095</a>):</strong><br />
+   Isolates intentional proximity into specialized, opt-in actions. By sourcing candidates from spatial memory without querying third-party claim plugins inline, LeafRTP satisfies raiding and social grouping without compromising the purity of the primary wilderness queue.</li>
+<li><strong>Anvil &amp; Linear Region-File Pre-Filtering (<a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a>, <a href="../../adr/ADR-077-multi-format-region-support/">ADR-077</a>):</strong><br />
+   Decompresses raw region files off the main thread to evaluate biomes, terrain surfaces, and structures before chunks are loaded into memory. This eliminates main-thread chunk allocation for rejected candidates, ensuring that sub-5ms latency is delivered without hitching the server tick loop.</li>
+<li><strong>Cross-Server Routing &amp; Dedicated Resource Worlds (<a href="../../adr/ADR-036-network-mode-multi-server-multi-proxy/">ADR-036</a>):</strong><br />
+   Enables operators to route the Resource Extractor archetype to self-resetting mining dimensions, containing high-entropy terrain scarring and protecting permanent builder worlds from disk bloating and autosave strain.</li>
+</ol>
 
 
 

@@ -789,6 +789,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1268,7 +1310,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1289,7 +1331,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3867,6 +3909,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4235,7 +4340,7 @@
    - <strong>Spiral Walk Tracer (<code>/rtp visualization walk-path</code>):</strong> Verifies 1D spiral curve coverage across custom polygon geometry (ADR-001).
      - The walk-path payload shall declare <code>units: "block"</code> and carry <code>points</code>: a seed polyline of absolute block coordinates (chunk centres) sampled at even intervals along the full curve range, at most 2,048 vertices. The seed is drawn until full-resolution path tiles (section 4.6) cover the view; it is not the path's final resolution. The export carries no other path data: the full path is produced over time as live tiles.
      - The hazard RLE payload shall declare <code>units: "chunk"</code>; the client scales its bounds to blocks before drawing.
-     - The client shall draw server-computed layers only for the geometry they were computed from. The page carries no built-in curve model: curve code comes only from the payload, as each shape's <code>toJavaScript()</code> helper, run in a sandboxed iframe and verified against a 256-sample hash (ADR-106 section 4). A region drawn from its helper carries no walk-path seed and no 2D hazard RLE; its hazards are curve-space runs (ADR-106 section 4.7). For shapes without a verified helper, after a local shape edit the page requests the walk path of the edited geometry over the channel (section 4.6 item 6), and without the channel it states that the path shows applied geometry only.
+     - The client shall draw server-computed layers only for the geometry they were computed from. The page carries no built-in curve model: curve code comes only from the payload, as each shape's <code>toJavaScript()</code> helper, run in a sandboxed iframe and verified against a 256-sample hash (ADR-106 section 4). A region drawn from its helper carries no walk-path seed and no 2D hazard RLE; its hazards are curve-space runs (ADR-106 section 4.7). For shapes without a verified helper, a local shape edit is only staged: the page states that the path is shown after Hot-Apply and requests nothing from the plugin.
      - Shape names, their parameters and their types come only from the payload's <code>schema</code> (the registered shape and vertical-adjustor factories, add-on shapes included); the page shall hold no built-in shape list, and without a session it skips name checks.</p>
 <h3 id="44-local-self-contained-html-production-file-portable-air-gap-fallback-template-ssot">4.4 Local Self-Contained HTML Production (<code>file:///</code> Portable Air-Gap Fallback) &amp; Template SSOT<a class="headerlink" href="#44-local-self-contained-html-production-file-portable-air-gap-fallback-template-ssot" title="Permanent link">&para;</a></h3>
 <p>In environments where outbound internet access is restricted, the byte store is unreachable, or the operator prefers working completely locally:
@@ -4309,8 +4414,7 @@
    - A non-blocking RFC 6455 listener bound to the loopback interface on an ephemeral port, driven by an <code>RTP.scheduler</code> timer (no own threads), opened per export and stopped with the feed. The export embeds its <code>ws://127.0.0.1:&lt;port&gt;/rtp-editor-ws?token=&lt;128-bit hex&gt;</code> address.
    - Handshake rules: loopback peer, loopback <code>Host</code>, Origin absent / <code>null</code> / localhost only, constant-time token compare, at most 4 clients; masked text frames up to 256 KiB, a 2 MiB outbound cap per client.
    - Server to page: each feed head is pushed as <code>{type: "feed"}</code>, so updates arrive without waiting for the next poll.
-   - Page to server: <code>{type: "focus", world, y, minRx, minRz, maxRx, maxRz}</code> (debounced view rectangle) prioritises those bins; <code>{action: "apply", token, files}</code> Hot-Applies through the same validation pipeline as <code>/rtp editor apply</code> and is acknowledged with <code>apply_ack</code>; <code>{type: "walkpath", region, sig, shape: {name, key: YAML scalar, vertices}}</code> asks for the walk path of edited geometry (<code>EditorWalkPathPreview</code>).
-   - Walk-path previews: the shape is built from the registered factory prototype (clone, scalar settings, polygon vertices) as a region file would build it, with no world access, and answered to the requesting client only as <code>{type: "walkpath", region, sig, data}</code> (the 2,048-point seed) or <code>{..., error}</code>. At most 4 per feed tick, newest request per client and region; messages up to 64 KiB, 1,024 vertices, scalar values only. The page keeps a reply only while its geometry still matches <code>sig</code>.
+   - Page to server: <code>{type: "focus", world, y, minRx, minRz, maxRx, maxRz}</code> (debounced view rectangle) prioritises those bins; <code>{action: "apply", token, files}</code> Hot-Applies through the same validation pipeline as <code>/rtp editor apply</code> and is acknowledged with <code>apply_ack</code>. The page shall send nothing else besides the handshake, keepalive and ADR-107 addon types; walk paths and curve state flow server to page only, for applied geometry (ADR-106 section 5.9).
    - Without the channel (browser on another machine, channel failed to open: logged), the page works one-way from <code>feed.js</code>.
 7. </strong>Walk path tiles (<code>WalkPathTiles</code>):<strong> skipped, together with <code>HazardTiles</code>, for regions whose curve helper the page reports verified (ADR-106 section 4.7); they remain the local fallback for every other region.
    - One producer per configured region with a curve-backed shape. Tiles covering the shape's chunk bounds are computed nearest the shape centre first, 16 per tick, using <code>MemoryShape.xzToLocation</code> / <code>locationToXZ</code> only (pure math, no world access). A chunk is on the curve when its location is in range and maps back to it, or to a direct neighbour.
@@ -4327,7 +4431,7 @@
 <ul>
 <li><strong>Simultaneous Read &amp; Edit:</strong> Solves the screen-lock limitation of in-game Minecraft menus.</li>
 <li><strong>Zero Firewall / Port Hassles:</strong> 100% outbound HTTPS; runs on any shared host or personal PC. The loopback channel is never reachable from another machine.</li>
-<li><strong>Hosted live updates (ADR-106):</strong> hosted sessions get the complete walk path and hazards from the snapshot at any zoom, plus live curve changes, hazard deltas, focus-driven land detail, walk-path previews and Hot-Apply over the signed relay channel, with no inbound listener.</li>
+<li><strong>Hosted live updates (ADR-106):</strong> hosted sessions get the complete walk path and hazards from the snapshot at any zoom, plus live curve changes, hazard deltas, focus-driven land detail and Hot-Apply over the signed relay channel, with no inbound listener.</li>
 <li><strong>Fast, persistent land map:</strong> coarse-first passes and sampled region reads fill the world map in minutes; the persisted store makes re-exports and restarts re-read only changed region files.</li>
 <li><strong>Air-Gapped Reliability:</strong> In-game book viewer works fully offline when internet or web browser is unavailable.</li>
 <li><strong>High Usability:</strong> No tedious manual typing of config paths or parameters.</li>

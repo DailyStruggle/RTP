@@ -789,6 +789,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1268,7 +1310,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1289,7 +1331,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2194,6 +2236,15 @@
   <a href="#refill-loop" class="md-nav__link">
     <span class="md-ellipsis">
       Refill loop
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#amendment-prefilter-outcomes-and-the-cold-fill-2026-10-13" class="md-nav__link">
+    <span class="md-ellipsis">
+      Amendment: Prefilter Outcomes and the Cold Fill (2026-10-13)
     </span>
   </a>
   
@@ -3912,6 +3963,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4027,6 +4141,15 @@
   <a href="#refill-loop" class="md-nav__link">
     <span class="md-ellipsis">
       Refill loop
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#amendment-prefilter-outcomes-and-the-cold-fill-2026-10-13" class="md-nav__link">
+    <span class="md-ellipsis">
+      Amendment: Prefilter Outcomes and the Cold Fill (2026-10-13)
     </span>
   </a>
   
@@ -4153,7 +4276,7 @@
 
 <h1 id="adr-028-l3-backlog-cache-backloglocations">ADR-028 — L3 Backlog Cache (<code>backlogLocations</code>)<a class="headerlink" href="#adr-028-l3-backlog-cache-backloglocations" title="Permanent link">&para;</a></h1>
 <ul>
-<li><strong>Status</strong>: Accepted (amended 2026-05-08)</li>
+<li><strong>Status</strong>: Accepted (amended 2026-05-08; amended 2026-10-13: prefilter outcomes and the cold fill)</li>
 <li><strong>Date</strong>: 2026-05-08 (amended; accepted 2026-05-07; originally proposed 2026-05-02)</li>
 <li><strong>Supersedes</strong>: —</li>
 <li><strong>Related</strong>: ADR-006 (async queue pre-generation), ADR-015 (stale-chunk guard / count-bound pipes), ADR-016 (anvil subsystem), ADR-023 (login reserve cache), <code>REQ-RTP-S-005</code> (no chunk loading on the main thread)</li>
@@ -4306,6 +4429,19 @@ is already at cap, head-of-L3 validated entries simply wait — the buffer
 is intentionally allowed to sit idle when downstream cannot drain it.
 All three steps (refill, verify-one-bin, drain-head-validated) execute
 linearly within <code>Region.execute()</code>; there is no producer/consumer split.</p>
+<h3 id="amendment-prefilter-outcomes-and-the-cold-fill-2026-10-13">Amendment: Prefilter Outcomes and the Cold Fill (2026-10-13)<a class="headerlink" href="#amendment-prefilter-outcomes-and-the-cold-fill-2026-10-13" title="Permanent link">&para;</a></h3>
+<p>Supersedes the "verified by default" fallback (see <em>Negative / Trade-offs</em>) and the refill pacing in <em>Refill loop</em> above. Every prefilter outcome other than <code>REJECT</code> used to mark an entry <code>VALIDATED</code>, so with no provider bound, or on ungenerated land, picks that nobody had checked drained into cold, counted as backlog stock and recorded successes.</p>
+<ol>
+<li><strong>The backlog reads region files only.</strong> It never loads, generates or tickets a chunk (S-005, S-002); its only I/O is the binned region-file read (one <code>classifyBatch</code> per region file).</li>
+<li><strong>Four validity states.</strong> <code>UNVERIFIED</code>: not yet prefiltered. <code>VALIDATED</code>: <code>ACCEPT</code> on disk data. <code>UNKNOWN</code>: no disk data to decide from (chunk not generated, unreadable or unsupported file, failed or timed-out batch, or no provider bound). <code>INVALIDATED</code>: <code>REJECT</code>; removed in the same pulse, recorded as a <code>prefilterBlock</code> failure and a bad chunk in the owner's shape.</li>
+<li><strong>Validated entries cost nothing more until promotion.</strong> <code>VALIDATED</code> entries drain into cold up to <code>cacheCap</code> with no chunk load (contiguous head under <code>FLAT_STRIDE</code>, random under <code>BINNED_AMORTIZED</code>), recording one success each. <code>ACCEPT</code> only screens the surface blocks of every column for unsafe blocks, so it is not the full check (see item 8).</li>
+<li><strong>Unknown entries wait for the cold fill.</strong> <code>UNKNOWN</code> entries stay in the backlog and block the head drain until the public cold fill (<code>RegionCacheTask</code> -&gt; <code>LocationGenerator</code> -&gt; <code>PregenTask</code>, single-flight per region) takes the oldest one (<code>pollOldest(UNKNOWN)</code>) in place of a shape draw. The fill checks it through the existing speculative path: region-file read, else a native load (pinned when a kept slot is free, otherwise unpinned and validated on load; ADR-110). Under heap pressure the load is refused and the entry returns to the backlog as <code>UNKNOWN</code>. Because the fill takes one candidate at a time, a region file full of ungenerated chunks never turns into a burst of generation requests.</li>
+<li><strong>Shape draws only without a backlog.</strong> The fill draws from the shape when the backlog is disabled or empty. When the backlog holds entries but none is <code>UNKNOWN</code>, the run ends without a draw (<code>drained/backlog</code>, not counted as a failure). Per-player and observational fills keep drawing from the shape.</li>
+<li><strong>Time-bounded refill.</strong> Unverified picks are shape math only (no chunk I/O, ~100 B each), so refill runs toward <code>backlogCacheCap</code> each pulse with no count window. It stops when elapsed time plus the EWMA cost of one pick (7/8 decay, as in <code>TimeBoundTaskPipe</code>) would pass <code>Region.refillDeadline</code>: the remaining pulse budget (<code>asyncAllottedTime</code>) less a fixed 20% headroom (<code>Region.BACKLOG_HEADROOM</code>) for later stages and other plugins. The refill hysteresis (<code>backlogRefillThreshold</code>) still applies. Splitting this budget across Folia region threads is out of scope here.</li>
+<li><strong>Pregenerated preference applies once.</strong> Backlog candidates already passed <code>pregeneratedPreference</code> at refill; the fill does not draw it again.</li>
+<li><strong>Promotion to hot is the full check for cold entries.</strong> Cold-to-hot promotion already loads the chunk. After the vertical adjustor finds the real Y on it, <code>Region.promotionChecks</code> runs the world border, the biome filter, the safety-radius scan (<code>SafetyScan</code>; neighbours from resident chunks or region files, native load only on a miss) and claims (<code>GlobalRegionVerifiers</code>, async). A failure drops the location, purges its database row and records the cause. Validated backlog entries and stored locations used to reach hot with the vertical adjustor as their only check (S-001, S-003). Entries from the cold fill pass these checks twice; on the already loaded chunk the repeat costs block reads and a claim lookup, not a load.</li>
+</ol>
+<p>Persistence is unchanged: backlog entries never reach the database.</p>
 <h2 id="alternatives-considered">Alternatives Considered<a class="headerlink" href="#alternatives-considered" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -4329,7 +4465,23 @@ linearly within <code>Region.execute()</code>; there is no producer/consumer spl
 </tr>
 <tr>
 <td>Use the full pipeline (chunk + vert + safety) for L3 verification</td>
-<td>Negates the cost win — L3 then duplicates L2's work. Anvil-only verification is a cheap <em>rejection filter</em>; survivors still face the full pipeline at L2 → L1.</td>
+<td>Negates the cost win — L3 then duplicates L2's work. Anvil-only verification is a cheap <em>rejection filter</em>; only entries without disk data go through the cold fill's chunk-load check (2026-10-13 amendment).</td>
+</tr>
+<tr>
+<td>Let the backlog load or generate chunks it cannot read from disk</td>
+<td>One region-file batch would issue a generation request per ungenerated chunk at once. The cold fill already takes one candidate at a time, so it owns every chunk load.</td>
+</tr>
+<tr>
+<td>Copy loaded chunks into detached snapshots for unpinned checks</td>
+<td>Duplicates the region-file chunk view the anvil subsystem already provides; an unpinned load validated on load needs no copy (ADR-110).</td>
+</tr>
+<tr>
+<td>Pace refill by a count window of unverified entries</td>
+<td>Throttled a near-free step: 4 picks per region pulse at the default 20-tick <code>period</code> took ~4 minutes to reach 1000, which read as hidden verification work. Time-bounded refill reaches the cap in milliseconds; the reported count is gated by validity instead.</td>
+</tr>
+<tr>
+<td>Count <code>UNKNOWN</code> entries as validated</td>
+<td>Without a provider (or on ungenerated land) every pick reported as verified stock, so the backlog count meant nothing.</td>
 </tr>
 <tr>
 <td>Persist L3 to the database</td>
@@ -4373,9 +4525,9 @@ linearly within <code>Region.execute()</code>; there is no producer/consumer spl
   invoking the (absent) DB callbacks.</li>
 <li>Anvil pre-filter availability is platform-dependent. On Fabric (which
   remains unstable per ADR-022) and on worlds whose region files are
-  not yet flushed to disk, anvil verification falls back to "verified
-  by default" (do not block on absent anvil data). This avoids stalling
-  L3 on freshly generated worlds.</li>
+  not yet flushed to disk, entries go <code>UNKNOWN</code> and the cold fill checks
+  them with a chunk load (2026-10-13 amendment), so L3 never stalls on
+  freshly generated worlds and never reports them as verified.</li>
 </ul>
 <h3 id="neutral">Neutral<a class="headerlink" href="#neutral" title="Permanent link">&para;</a></h3>
 <ul>
@@ -4437,11 +4589,11 @@ change. Anticipated touch points:</p>
 </tr>
 <tr>
 <td>Verify</td>
-<td>new per-pulse step: pick this region's oldest-<code>UNVERIFIED</code> entry → look up world bin → anvil pre-filter every entry in the bin list → set tri-state validity</td>
+<td>new per-pulse step: pick this region's oldest-<code>UNVERIFIED</code> entry → look up world bin → anvil pre-filter every entry in the bin list → set validity (<code>VALIDATED</code> / <code>UNKNOWN</code> / <code>INVALIDATED</code>, 2026-10-13)</td>
 </tr>
 <tr>
 <td>Promote</td>
-<td>head-only contiguous-<code>VALIDATED</code> promotion to <code>unkeptLocations</code> (drop <code>INVALIDATED</code> head, stop on <code>UNVERIFIED</code>), inline within <code>Region.execute()</code></td>
+<td><code>Region.drainValidatedToCold</code> drains <code>VALIDATED</code> entries into cold; the cold fill (<code>RegionCacheTask</code> -&gt; <code>PregenTask</code>) takes <code>UNKNOWN</code> entries through <code>BacklogLocationBuffer.pollOldest(UNKNOWN)</code>; <code>Region.promotionChecks</code> completes the check at cold-to-hot promotion (2026-10-13)</td>
 </tr>
 <tr>
 <td>Templates</td>

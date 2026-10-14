@@ -789,6 +789,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1268,7 +1310,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1289,7 +1331,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3783,6 +3825,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3898,7 +4003,7 @@
 <strong>Date:</strong> 2026-05-11
 <strong>Activated:</strong> 2026-06-01 (Fabric stabilization gate per section 2 confirmed clear; bring-up sequence section 3 started — D-005 proposal <code>docs/dev/scratch/PROPOSAL-neoforge-bringup.md</code> and subproject <code>rtp-neoforge-ADR-001</code> on file)</p>
 <h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
-<p>The supported-platform set in <a href="../../dev/REQUIREMENTS/"><code>REQUIREMENTS.md</code></a> historically enumerated Spigot, Paper, Folia, and Fabric, and explicitly listed NeoForge among <strong>unsupported</strong> mod loaders. That exclusion was reasonable when the active platform-expansion frontier was Fabric (still unstable; see <em>Current Development Focus</em> in <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> and the open S-005 / null-stub blockers tracked in <a href="../../dev/MULTI_PLATFORM_PLAN/"><code>MULTI_PLATFORM_PLAN.md</code></a>).</p>
+<p>The supported-platform set in <a href="../../dev/REQUIREMENTS/"><code>REQUIREMENTS.md</code></a> historically enumerated Spigot, Paper, Folia, and Fabric, and explicitly listed NeoForge among <strong>unsupported</strong> mod loaders. That exclusion was reasonable when the active platform-expansion frontier was Fabric (still unstable; see <em>Current Development Focus</em> in <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> and the open S-005 / null-stub blockers tracked in <a href="../dev/MULTI_PLATFORM_PLAN.md"><code>MULTI_PLATFORM_PLAN.md</code></a>).</p>
 <p>The platform landscape has shifted enough that the blanket exclusion now under-serves the strategic direction of the project:</p>
 <ul>
 <li><strong>NeoForge is the dominant modded-Java server platform on 1.20.4+.</strong> It is the active successor to legacy Forge, has captured the large-modpack audience (the user profile that benefits most from a bounded-distribution RTP), and is on a release cadence aligned with vanilla Minecraft.</li>
@@ -3909,7 +4014,7 @@
 <p>The landscape analysis, API-surface delta, reuse map, risks, and module-layout sketch were captured during early planning and converted into this binding scope decision and subproject <code>rtp-neoforge-ADR-001</code>.</p>
 <p>What this ADR is <strong>not</strong>:</p>
 <ul>
-<li>It is <strong>not</strong> an approval to begin NeoForge implementation work today. Implementation remains gated on Fabric reaching the stability bar defined in <a href="../../dev/MULTI_PLATFORM_PLAN/"><code>MULTI_PLATFORM_PLAN.md</code></a> (no open S-005 violations in <code>rtp-fabric</code>, the <code>FabricServerAccessor.getLocationGenerator</code> null stub resolved, the Loom dependency resolved, and a green <code>rtp test full</code> on at least one shipped MC carrier).</li>
+<li>It is <strong>not</strong> an approval to begin NeoForge implementation work today. Implementation remains gated on Fabric reaching the stability bar defined in <a href="../dev/MULTI_PLATFORM_PLAN.md"><code>MULTI_PLATFORM_PLAN.md</code></a> (no open S-005 violations in <code>rtp-fabric</code>, the <code>FabricServerAccessor.getLocationGenerator</code> null stub resolved, the Loom dependency resolved, and a green <code>rtp test full</code> on at least one shipped MC carrier).</li>
 <li>It is <strong>not</strong> an expansion of the supported platform set to mod loaders in general. Legacy Forge, Sponge, Minestom, hybrid servers (Mohist, Magma, Arclight), and Bedrock-native servers remain explicitly out of scope.</li>
 </ul>
 <h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
@@ -3978,7 +4083,7 @@
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../../dev/REQUIREMENTS/"><code>REQUIREMENTS.md</code></a> — amended In-Scope list, Out-of-Scope clause, <code>REQ-RTP-NF-002</code>, and <code>REQ-RTP-SYS-002</code>.</li>
-<li><a href="../../dev/MULTI_PLATFORM_PLAN/"><code>MULTI_PLATFORM_PLAN.md</code></a> — current phase status; NeoForge phase rows to be added on activation.</li>
+<li><a href="../dev/MULTI_PLATFORM_PLAN.md"><code>MULTI_PLATFORM_PLAN.md</code></a> — current phase status; NeoForge phase rows to be added on activation.</li>
 <li><a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a> — precedent: Fabric in-scope decision; the NeoForge subproject ADR will mirror its shape.</li>
 <li><a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-007-mojmap-name-decoupling.md">rtp-fabric-ADR-007</a>, <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md">rtp-fabric-ADR-009</a> — Mojmap discipline and carrier-split pattern reused by NeoForge.</li>
 <li><a href="../ADR-010-versioned-platform-adapter-submodules/">ADR-010</a> — versioned per-MC carrier pattern.</li>

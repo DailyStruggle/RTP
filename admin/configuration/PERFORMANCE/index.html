@@ -789,6 +789,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1394,7 +1436,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../dev/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1415,7 +1457,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../dev/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3819,6 +3861,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3993,7 +4098,14 @@
 <td><code>minTPS</code></td>
 <td>Double</td>
 <td><code>19.0</code></td>
-<td>Minimum server TPS required to queue new locations. Range: 0.0–20.0.</td>
+<td>Pause background cache filling (backlog picks, chunk loads for the ready queue, cold fill) when TPS drops below this. On Folia the slowest region counts. Players already waiting are still served. Resumes 0.5 TPS above the threshold. <code>0</code> disables. Range: 0.0–20.0.</td>
+<td><strong>LOW</strong></td>
+</tr>
+<tr>
+<td><code>maxMSPT</code></td>
+<td>Double</td>
+<td><code>45.0</code></td>
+<td>Pause background cache filling when a tick takes longer than this many ms. TPS stays at 20 until ticks pass 50 ms, so this catches a loaded server earlier. On Folia the slowest region counts. Resumes 5 ms below the threshold. <code>0</code> disables.</td>
 <td><strong>LOW</strong></td>
 </tr>
 <tr>
@@ -4014,21 +4126,21 @@
 <td><code>period</code></td>
 <td>Integer</td>
 <td><code>20</code></td>
-<td>Ticks between background cache cycles (20 ticks = 1 second).</td>
+<td>Ticks between refills of the same region (20 ticks = 1 second). Regions take turns, so each region gets one refill every <code>period</code> ticks.</td>
 <td><strong>MEDIUM</strong> — Lower values refill faster but use more CPU.</td>
 </tr>
 <tr>
 <td><code>syncAllottedTime</code></td>
 <td>Integer</td>
-<td><code>50</code></td>
-<td>Max milliseconds per tick spent on synchronous RTP tasks.</td>
+<td><code>5</code></td>
+<td>Max milliseconds per tick for RTP's main-thread work (cancellations, queued commands, scripted actions, sync task queue). Values above 25 are treated as 25, so at least half of each tick stays free for the server and other plugins. Range: 1–25.</td>
 <td><strong>MEDIUM</strong> — Higher values allow faster processing at the risk of tick time.</td>
 </tr>
 <tr>
 <td><code>asyncAllottedTime</code></td>
 <td>Integer</td>
-<td><code>50</code></td>
-<td>Max milliseconds per tick spent on asynchronous RTP tasks.</td>
+<td><code>25</code></td>
+<td>Max milliseconds per pulse for RTP's background work. Values above 25 are treated as 25. Range: 1–25.</td>
 <td><strong>MEDIUM</strong></td>
 </tr>
 </tbody>
@@ -4072,6 +4184,13 @@
 <td><code>false</code></td>
 <td>Use synchronous chunk loading for location selection. <strong>NOT RECOMMENDED</strong>.</td>
 <td><strong>HIGH</strong> — Can cause server hangs.</td>
+</tr>
+<tr>
+<td><code>teleportPath</code></td>
+<td>String</td>
+<td><code>AUTO</code></td>
+<td>Paper only. <code>AUTO</code> teleports in the same tick when the destination chunk is already loaded and the teleport starts on the main thread, otherwise uses <code>teleportAsync</code>. <code>ASYNC</code> always uses <code>teleportAsync</code> (up to one tick slower). Folia always uses <code>teleportAsync</code>.</td>
+<td><strong>LOW</strong></td>
 </tr>
 </tbody>
 </table>

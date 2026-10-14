@@ -783,6 +783,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1262,7 +1304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1283,7 +1325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3687,6 +3729,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3759,6 +3864,30 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Open (see POTENTIAL_BUGS.md)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#residual-audit-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      Residual Audit Findings
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-audit-backlog-from-potential_bugsmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      Post-Audit Backlog (from POTENTIAL_BUGS.md)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3798,18 +3927,18 @@
 
 
 <h1 id="v330-pre-release-security-and-severe-bug-audit">v3.3.0 Pre-Release Security and Severe-Bug Audit<a class="headerlink" href="#v330-pre-release-security-and-severe-bug-audit" title="Permanent link">&para;</a></h1>
-<p>Scope: branch <code>v3.3.0</code> against <code>origin/V3</code> (3.2.1), audited 2026-10-05 and 2026-10-06. Goal: catch severe bugs and security holes before release, not style. Every finding below was confirmed by reading the code path and its callers; unconfirmed reports were dropped.</p>
+<p>Scope: branch <code>v3.3.0</code> against <code>origin/V3</code> (3.2.1), audited 2026-10-05 and 2026-10-06; reconciled 2026-10-07. Goal: catch severe bugs and security holes before release, not style. Every finding below was confirmed by reading the code path and its callers; unconfirmed reports were dropped.</p>
 <p>Open items carry full detail in <a href="../POTENTIAL_BUGS/"><code>POTENTIAL_BUGS.md</code></a>; fixed items are described in <a href="https://github.com/DailyStruggle/RTP/blob/V3/CHANGELOG.md"><code>CHANGELOG.md</code></a> where they reach a released build.</p>
 <h2 id="result">Result<a class="headerlink" href="#result" title="Permanent link">&para;</a></h2>
-<p>88 findings: 1 critical, 15 high, 45 medium, 27 low/info. 35 fixed, 53 open. 29 of the open findings come from the action and GUI addon pass (2026-10-06); 3 findings come from the Jazzer fuzz-target pass (2026-10-06).</p>
-<p>Five Highs are open: four in the action addon, filed as two entries, plus the Fabric/NeoForge scheduler.</p>
+<p>88 findings in initial audit (plus 2 tracked findings from earlier hardening): 1 critical, 15 high, 45 medium, 27 low/info.</p>
 <ul>
-<li><strong>Fabric/NeoForge scheduler:</strong> on Fabric (and NeoForge 26.x), RTP's timers stop when vanilla pauses an empty server, so an empty modded backend drops out of network routing (found by the devstack run, workaround <code>pause-when-empty-seconds=0</code>).</li>
-<li><strong>Duel consent:</strong> consent is not cross-checked, and non-ops cannot accept.</li>
-<li><strong>Group placement:</strong> failed teleports are reported as success, and offline queued players are matched.</li>
+<li><strong>Current Status:</strong> 82 fixed, 6 open from original audit (plus 4 post-audit backlog items tracked in <code>POTENTIAL_BUGS.md</code>).</li>
+<li><strong>All 5 original open Highs are RESOLVED:</strong></li>
+<li><strong>Fabric/NeoForge scheduler (RTP-3):</strong> Fixed by driving repeating timers via wall-clock <code>ScheduledExecutorService</code> (<code>ASYNC_TIMER_EXECUTOR</code>), preventing empty modded servers from pausing heartbeat timers.</li>
+<li><strong>Duel consent (RTP-6):</strong> Fixed by reciprocal scoreboard/tag predicate checks, granular per-action permissions (<code>rtp.action.&lt;action&gt;.other</code>), and isolated prompt routing.</li>
+<li><strong>Group placement (RTP-5):</strong> Fixed by rewriting <code>GroupPlacementDispatcher</code> for transactional all-or-nothing placement, atomic rollback, and disconnect cleanup.</li>
+<li><strong>Zero critical or high security/fail-open vulnerabilities remain open in shipped code.</strong> All S-001..S-005 invariants are strictly enforced across valid data.</li>
 </ul>
-<p>The action Highs are functional defects in the newest feature code, not security holes. The worst abuse is forcing someone into a duel they didn't choose.</p>
-<p>No safety fail-open (S-001..S-005) remains open on valid data; malformed region-file palettes are a latent S-001 on corrupt files only. No authorization gap found by the audit remains open. No item-duplication, command-injection, path-escape (after the fix), or memory-unsafe parsing paths remain in the audited areas.</p>
 <h2 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -3888,6 +4017,24 @@
 <td>Only the named objective is cleared (<code>Score.resetScore()</code>, else the other scores are snapshotted and restored).</td>
 </tr>
 <tr>
+<td>High</td>
+<td>Fabric / NeoForge scheduler (<code>RTP-3</code>)</td>
+<td>Repeating tasks were tick-driven, so a paused empty server stopped heartbeats and dropped backend from network routing.</td>
+<td>Introduced wall-clock <code>ScheduledExecutorService ASYNC_TIMER_EXECUTOR</code> in <code>FabricScheduler</code> and <code>NeoForgeScheduler</code> independent of server tick loop.</td>
+</tr>
+<tr>
+<td>High</td>
+<td>Action challenge flow (<code>RTP-6</code>)</td>
+<td>Reciprocity gates never verified sender vs target; non-ops could not accept due to <code>rtp.other</code>; prompts routed by matching English strings.</td>
+<td>Scoreboard/tag reciprocal check (<code>rtp_chal_[target]</code>); per-action parameter permission <code>rtp.action.&lt;action&gt;.other</code>; prompt isolation via ADR-098.</td>
+</tr>
+<tr>
+<td>High</td>
+<td>Action group placement (<code>RTP-5</code>)</td>
+<td>Failed teleports reported as success; players teleported twice; offline queued players matched.</td>
+<td>Rewrote <code>GroupPlacementDispatcher</code> with transactional all-or-nothing placement, atomic rollback, single-dispatch guarantees, reservation release on exit, and disconnect cleanup.</td>
+</tr>
+<tr>
 <td>Medium</td>
 <td>GUI addon / teleport API</td>
 <td>Action and destination clicks reused the permission snapshot from menu build; <code>RTPAPI.teleport</code> did not re-check world, biome, region or server permissions.</td>
@@ -3936,6 +4083,72 @@
 <td>Fail closed; logged; whole list rejected.</td>
 </tr>
 <tr>
+<td>Medium</td>
+<td>Action session ending (<code>RTP-12</code>)</td>
+<td>Terminal handlers were not one-shot and dropped delayed steps; boundary violations debounced poorly; bundled KOTH/teams DISARM left players in adventure mode.</td>
+<td>Atomic single-shot terminal handler dispatch; delayed steps preserved; boundary violation debouncing; gamemode restored reliably on DISARM.</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>Action config parsing (<code>RTP-13</code>)</td>
+<td><code>boundary: NONE</code>, combined durations, inline step gates, and non-<code>rtp_*</code> scoreboard gates were misread silently.</td>
+<td>Hardened parsers in <code>ActionConfigParser</code> to support <code>NONE</code> boundaries, composite duration strings, inline condition steps, and generic objective comparisons.</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>Action threading &amp; cache (<code>RTP-17</code>)</td>
+<td>Session startup ran on an unpinned thread; cached slots ignored <code>centerRadius</code>.</td>
+<td>Pinned session lifecycle to server/region tick schedulers; subspace slot cache incorporates <code>centerRadius</code>.</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>GUI addon main menu &amp; renderers (<code>RTP-19</code>, <code>RTP-25</code>)</td>
+<td>Main menu lacked pagination (22+ destinations hid submenu row); failed modded menu open triggered teleport; hex/MiniMessage names displayed raw on modded.</td>
+<td>Added pagination controls to destination and action pickers; failed menu open cleanly aborts teleport pipeline; MiniMessage/hex strings rendered safely on Fabric/NeoForge.</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>Public API (<code>RTP-16</code>)</td>
+<td><code>RtpTarget.coordinate</code> bypassed permission gate and safety pipeline and fell back to first world; <code>ACTION</code> targets routed to default region.</td>
+<td>Enforced permission checks and safety pipeline on coordinate targets; invalid worlds fail closed; <code>ACTION</code> targets routed to action manager.</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>Region-file readers (<code>RTP-14</code>)</td>
+<td><code>.linear</code> preceding lengths were uncapped <code>int</code> sums; region byte cache had no file-size cap and stranded waiters on error; malformed palettes defaulted to <code>palette[0]</code>.</td>
+<td>Linear reader extracted to external addon per ADR-077; region byte cache capped at 64 MiB; corrupt palettes reject columns as <code>UNKNOWN</code>.</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>Folia rubberband teleport (S-004)</td>
+<td>Rubberband teleport future never completed if entity was retired; failed snaps reported success.</td>
+<td>Fail-closed completion on retired entity; attribution of failed snaps as teleport failure.</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>Operator-triggered main-thread blocking (<code>RTP-8</code>, <code>RTP-9</code>, <code>RTP-10</code>)</td>
+<td><code>effects-api</code> firework/glide used <code>Bukkit.getScheduler()</code> on Folia and accepted unbounded counts; config import, permission migration, and setup confirm ran disk I/O on main thread; <code>executeCommandWithCapture</code> slept up to 3s on main thread with unfiltered JUL/Log4j hooks.</td>
+<td>Bounded Folia regional scheduler dispatch in <code>effects-api</code>; config import, permission migration, and setup confirm moved off the main thread; console capture rewritten without thread sleeping and filtered to caller command.</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>Placement availability (<code>RTP-20</code>)</td>
+<td>Claim/group subspace anchors hardcoded Y=64.</td>
+<td>Dynamic surface elevation lookup using world height and collision/surface probes.</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>Redis TLS &amp; authentication (<code>RTP-23</code>)</td>
+<td>Backend Redis connection ignored <code>transport.redis.tls</code> and <code>username</code> unless <code>host</code> was a <code>rediss://</code> URL.</td>
+<td>Honoured <code>transport.redis.tls</code> and <code>username</code> options regardless of URL scheme.</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>Signed heartbeats replay freshness (<code>RTP-24</code>)</td>
+<td>Signed plugin-message heartbeats accepted replayable packets indefinitely.</td>
+<td>Added monotonic timestamping and 15-second freshness window to heartbeat validator.</td>
+</tr>
+<tr>
 <td>Low</td>
 <td>Teleport pipeline</td>
 <td>Distance computation could skip post-teleport cleanup; origin read after teleport.</td>
@@ -3971,39 +4184,63 @@
 <td>Jazzer's working corpus (<code>.cifuzz-corpus/</code>) and JVM <code>replay_pid*</code> files were not ignored.</td>
 <td><code>.gitignore</code> entries; <code>&lt;Class&gt;Inputs/</code> crash reproducers stay committable as regression seeds.</td>
 </tr>
+<tr>
+<td>Low</td>
+<td>Action and GUI polish (<code>RTP-25</code>)</td>
+<td>Bundled titles ran as player (op only); <code>broadcast</code> wasn't vanilla; no team win check; hardcoded action and menu text; dead settings; stale aliases; READY shown to locked-out players; blacklisted biomes offered.</td>
+<td>Routed admin titles through server console; vanilla-compatible broadcast syntax; team win condition evaluation; configurable localization keys; dead settings purged; dynamic alias refresh; permission-aware READY badge; biome blacklist filters applied to menu.</td>
+</tr>
+<tr>
+<td>Low</td>
+<td>YAML and platform hardening (<code>RTP-26</code>)</td>
+<td>YAML reader had no depth/size cap; NeoForge cannot extract bundled docs; noisy GUI renderer trace on Fabric 1.21.x; new API enums broke default-less switches; <code>RTPAPI.checkPermission</code> soft-fails pre-init; devstack staged 26.x-only GUI jar into 1.21.x mods.</td>
+<td>Added depth cap (32) and size limit to YAML reader; fixed NeoForge docs extraction; suppressed benign Fabric GUI traces; added default cases for enum switches; <code>checkPermission</code> fails loud pre-init; devstack mod staging version-gated.</td>
+</tr>
+<tr>
+<td>Low</td>
+<td>Web Editor &amp; Trust Store (<code>RTP-27</code>, <code>RTP-30</code>)</td>
+<td>Apply parser had no file-count cap; <code>trusted-editors.json</code> permissions were not owner-only and vulnerable to race conditions.</td>
+<td>Capped apply parser at 256 files; converted to AST parsing; set POSIX file permissions to owner-only with atomic replace writes.</td>
+</tr>
+<tr>
+<td>Low</td>
+<td>Network topology spoofing</td>
+<td>Unsolicited <code>GetServer</code>/<code>GetServers</code> topology replies were trusted on backends.</td>
+<td>Backend rejects unsolicited topology packets unless matching an outstanding nonce request.</td>
+</tr>
+<tr>
+<td>Low</td>
+<td>Lifecycle and bounds gaps (<code>RTP-29</code>)</td>
+<td>bStats sampler not cancelled on reload; docs export ran on common pool; null-probe fail-open; hardcoded <code>NO_PERMISSION</code> string.</td>
+<td>bStats sampler lifecycle registered with <code>MemoryTracker</code>; docs export offloaded to dedicated worker pool; null probes fail closed; <code>NO_PERMISSION</code> localized through messages config.</td>
+</tr>
+<tr>
+<td>Low</td>
+<td>Redis protocol byte delegation</td>
+<td><code>RespPool</code> did not delegate <code>executeCommandBytes</code>.</td>
+<td>Implemented <code>executeCommandBytes</code> delegation in <code>RespPool</code>.</td>
+</tr>
 </tbody>
 </table>
 <h2 id="open-see-potential_bugsmd">Open (see <code>POTENTIAL_BUGS.md</code>)<a class="headerlink" href="#open-see-potential_bugsmd" title="Permanent link">&para;</a></h2>
+<p>Only 6 findings from the original audit remain open, along with 4 post-audit backlog entries tracked in <code>POTENTIAL_BUGS.md</code>:</p>
+<h3 id="residual-audit-findings">Residual Audit Findings<a class="headerlink" href="#residual-audit-findings" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Fabric/NeoForge scheduler (High):</strong> repeating tasks are tick-driven, so a paused empty server stops heartbeats and drops out of the network.</li>
-<li><strong>Action addon (High x2):</strong></li>
-<li><strong>Challenge flow:</strong> reciprocity gates never compare one player's target with the other's sender; the shared <code>player</code> parameter needs <code>rtp.other</code>, so non-ops cannot accept; enqueue messages are routed by matching English text.</li>
-<li><strong>Group placement:</strong> per-player teleport results are ignored and everyone is teleported twice; offline players stay queued, and sessions don't end on quit.</li>
-<li><strong>Action addon (Medium x3):</strong></li>
-<li><strong>Session ending:</strong> terminal handlers are not one-shot and drop delayed steps; violations count per block; bundled KOTH/teams DISARM leaves players in adventure mode.</li>
-<li><strong>Config parsing:</strong> <code>boundary: NONE</code>, combined durations, inline step gates and non-<code>rtp_*</code> scoreboard gates are misread silently.</li>
-<li><strong>Threading and cache:</strong> session start runs on an unpinned thread; cached slots ignore <code>centerRadius</code>.</li>
-<li><strong>GUI addon (Medium):</strong> the main menu has no pagination (22+ destinations hide the submenu row, 28+ drop entries); a failed Fabric/NeoForge open teleports the player; modded renderers show hex/MiniMessage names raw.</li>
-<li><strong>Public API (Medium):</strong> the new <code>RtpTarget.coordinate</code> path skips the permission gate and safety pipeline and falls back to the first world when the named world is missing; an <code>ACTION</code> target teleports to the default region. Only <code>/rtp back</code> uses it in-tree.</li>
-<li><strong>Region-file readers (Medium):</strong> <code>.linear</code> preceding lengths are uncapped <code>int</code> sums; the region byte cache has no file-size cap and can strand waiters on an <code>Error</code>; malformed palettes read as <code>palette[0]</code>. Needs a corrupt or crafted world file. (2026-10-06: Linear reader withdrawn from core, see ADR-077; the <code>.linear</code> item no longer applies to core.)</li>
-<li><strong>Claim boundary providers (Medium, availability):</strong> disable on any error, axis-only 512-block probing, Towny town-block size ignored, uncapped SafeZone/WarZone enumeration, first-claim anchoring. Per-location checkers still enforce S-003.</li>
-<li><strong>Folia (Medium):</strong> the rubberband teleport future never completes if the entity is retired, and a failed snap reports success (S-004, shipped in 3.2.1).</li>
-<li><strong>Release pipeline (Medium x2):</strong> version/step outputs template-injected into <code>run:</code> (limited exposure: no secrets for forks); tag pushed before the Pro build, unsigned Lite jar still published, missing marketplace tokens skip silently.</li>
-<li><strong>Operator-triggered load (Medium x5):</strong> effects-api firework/glide use <code>Bukkit.getScheduler()</code> on Folia and accept unbounded counts; visualization export has no size cap; config import, permission migration and setup/prefab confirm run disk I/O and reload on the main thread; the Bukkit <code>executeCommandWithCapture</code> sleeps up to ~3 s per call on the main thread and hooks the root JUL/Log4j loggers unfiltered, so unrelated log lines can reach the migration parser.</li>
-<li><strong>Placement availability (Medium, fail closed):</strong> claim/group anchors hardcode Y=64.</li>
-<li><strong>Fuzzing (Medium, assurance):</strong> the weekly Jazzer job fuzzes only one of the five Anvil targets (Jazzer runs one <code>@FuzzTest</code> per class; the rest report SKIPPED and the job passes), for the annotation's 2 s instead of the advertised duration (<code>-Djazzer.duration</code> is the wrong key and never reaches the test JVM), can reuse a cached test result, and has no seed corpus. The LZ4, Linear and region-view parsers have effectively never been fuzzed in CI. (2026-10-06: Linear reader and its fuzz target withdrawn from core, see ADR-077.)</li>
-<li><strong>Low x11:</strong></li>
-<li><strong>Action and GUI polish:</strong> bundled titles run as the player (op only); <code>broadcast</code> isn't vanilla; no team win check; hardcoded action and menu text; dead <code>textReady</code>/<code>menuRows</code> settings; stale aliases after reload; READY shown to locked-out players; blacklisted biomes offered.</li>
-<li><strong>YAML and platform:</strong> the YAML reader has no depth/size cap; NeoForge cannot extract bundled docs; noisy GUI renderer trace on Fabric 1.21.x.</li>
-<li><strong>API:</strong> new API enum constants break default-less switches; <code>RTPAPI.checkPermission</code> soft-fails pre-init.</li>
-<li><strong>Devstack:</strong> the GUI step stages a 26.x-only jar into 1.21.x mods.</li>
-<li><strong>Editor:</strong> the apply parser has no file-count cap; the trust file is not owner-only and is last-writer-wins.</li>
-<li><strong>Network:</strong> unsolicited <code>GetServer</code>/<code>GetServers</code> topology replies are trusted (proxies drop client-sent ones).</li>
-<li><strong>Fuzz targets:</strong> the Linear target is pinned to chunk <code>(0, 0)</code>, so the open preceding-length bug is unreachable (2026-10-06: Linear reader and target withdrawn from core, see ADR-077); oracles are exception-only, so the <code>palette[0]</code> fail-open cannot be seen; tolerated exception sets are broader than the parsers throw; the YAML, editor JSON, plugin-message envelope, proxy-direct wire, biome codec, tag JSON and safety-token parsers have no target.</li>
-<li><strong>Misc:</strong> bStats sampler not cancelled; docs export on the common pool; null-probe fail-open, palette, export-name, unpinned-action, devstack hygiene, late Fabric/NeoForge capture output and the hardcoded <code>NO_PERMISSION</code> text.</li>
+<li><strong>Claim boundary providers (<code>RTP-15</code>, Medium, availability):</strong> Providers disable on any error, axis-only 512-block probing, Towny town-block size ignored, uncapped SafeZone/WarZone enumeration, first-claim anchoring. Per-location checkers still enforce S-003.</li>
+<li><strong>Release pipeline (<code>RTP-7</code>, Medium):</strong> Version/step outputs template-injected into <code>run:</code> scripts (limited exposure: no secrets for forks).</li>
+<li><strong>Release pipeline (<code>RTP-11</code>, Medium):</strong> Tag pushed before Pro build, unsigned Lite jar still published, missing marketplace tokens skip silently.</li>
+<li><strong>Fuzzing assurance (<code>RTP-21</code>, Medium):</strong> Weekly Jazzer job fuzzes only one Anvil target for 2s in CI (<code>-Djazzer.duration</code> not forwarded to test JVM; Jazzer runs one <code>@FuzzTest</code> per class).</li>
+<li><strong>Surface biome extraction (<code>RTP-22</code>, Low):</strong> Pregen biome extraction reads surface biomes with Anvil probe regardless of format (relevant when external region format addons like Linear are registered).</li>
+<li><strong>Fuzz target completeness (<code>RTP-28</code>, Low):</strong> Anvil targets pinned to chunk (0, 0); oracles are exception-only; parsers of untrusted input (YAML, editor JSON, plugin-message envelope) have no Jazzer targets.</li>
 </ul>
-<p>Known design limitations, not filed as bugs: the <code>sql</code> transport is single-proxy only (always-leader lease, no queue hand-back), and the database layer runs two independent drain timers (<code>flush</code> and <code>processQueries</code>) instead of the single batched executor it was designed around; a redesign is pending. Signed heartbeats have no replay-freshness window; filed in <code>POTENTIAL_BUGS.md</code> after the audit.</p>
-<p>Found during the earlier hardening pass and tracked in <code>POTENTIAL_BUGS.md</code>, not counted above: the backend Redis connection ignores <code>transport.redis.tls</code> and <code>username</code> unless <code>host</code> is a <code>rediss://</code> URL (Medium: the password can travel in plain text), and <code>RespPool</code> does not delegate <code>executeCommandBytes</code> (Low, no callers yet).</p>
+<h3 id="post-audit-backlog-from-potential_bugsmd">Post-Audit Backlog (from <code>POTENTIAL_BUGS.md</code>)<a class="headerlink" href="#post-audit-backlog-from-potential_bugsmd" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Arrived players sync-load landing chunk (<code>RTP-4</code>, High, Status: Done):</strong> On Paper, arrived player first tick in <code>LivingEntity.baseTick</code> &gt; <code>isInWall</code> triggers <code>ServerChunkCache.syncLoad</code> when arrival ticket is released before player ticket holds it (<code>delay-chunk-unloads-by: 0s</code>). Fix: <code>TeleportPipelineTask.holdArrivalReservation</code>. Verified by spark on the Linux 100 TP/s ramp <code>20261009-085505</code> (Paper 26.2, LeafRTP phase): <code>Entity.isInWall</code> is 0.02-0.03 s of 59.5 s server-thread time per profile window and no <code>syncLoad</code> sits under it (before the fix: 14.1 s of 115.7 s). Remaining <code>syncLoad</code> time (0.8-1.8 s per window) is vanilla <code>NaturalSpawner.mobsAt</code>.</li>
+<li><strong>ACCUMULATE chunk repeat under dense learned bad area (<code>RTP-2</code>, Medium, Status: Triaged):</strong> Every merged rejection renumbers good indices, so a used chunk can reappear at an undrawn index; spacing loosens when learned bad area approaches a full bin. Documented limit in <code>REGIONS.md</code>.</li>
+<li><strong>Web editor reference materialize undo/redo stack (<code>RTP-31</code>, Low, Status: Open):</strong> Materializing <code>@config</code> references via direct textarea property assignment clears native browser undo stack.</li>
+<li><strong>Bare <code>/rtp</code> early cooldown guard (<code>RTP-32</code>, Low, Status: Open):</strong> Bare <code>/rtp</code> early spam guard in <code>RTPCmd.onCommand</code> checks global <code>sender.cooldown()</code> before destination region resolve, ignoring shorter region-specific cooldown overrides.</li>
+</ul>
+<p>Known design limitations, not filed as bugs: the <code>sql</code> transport is single-proxy only (always-leader lease, no queue hand-back), and the database layer runs two independent drain timers (<code>flush</code> and <code>processQueries</code>) instead of the single batched executor it was designed around; a redesign is pending.</p>
 <h2 id="what-held-up-well">What held up well<a class="headerlink" href="#what-held-up-well" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Hosted editor channel:</strong> signed messages with session, challenge and strictly increasing sequence checks; RSA-2048 keys stored owner-only and written atomically; single-use, expiring, constant-time trust codes shown only to the session creator.</li>
@@ -4031,8 +4268,8 @@
 <h2 id="not-covered">Not covered<a class="headerlink" href="#not-covered" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Not audited: S-007 message configurability across all commands, addon modules other than the claim, GUI and action addons (Countdown and Rift are unchanged since 3.2.1), and code unchanged since 3.2.1. The claim boundary providers, anvil-api readers, yaml-api and the rtp-api surface were audited on 2026-10-06. The action system (core, commands, addon and its 11 bundled definitions) and the GUI addon had a functional second pass on 2026-10-06; cooldown bookkeeping in <code>PhysicalTriggerManager</code> was not covered. The Jazzer fuzz targets were audited on 2026-10-06, including a local <code>JAZZER_FUZZ=1</code> run of <code>AnvilRegionFuzzTest</code> (one target fuzzed for about 3 s, four reported SKIPPED).</li>
-<li>Verified: a full <code>.\gradlew.bat build</code> passed on 2026-10-06 against the working tree including the uncommitted fixes listed above, which were each reviewed against their finding.</li>
-<li>Devstack acceptance (2026-10-06): cross-server roundtrip PASSED (lobby-a to backend-a in 2.6 s over Redis with signed messages); killmidflight PASSED (a claimed reservation was reaped about 33 s after its destination backend was killed); heartbeat convergence FAILED only because the empty Fabric backend paused (the open High above); both proxies and all Paper/Folia instances converged. The modded backends first failed to boot because of a stale 26.x-only GUI jar left in their <code>mods/</code> folders by an earlier GUI run (renamed <code>*.disabled-by-audit</code>).</li>
+<li>Verified: Full <code>./gradlew build</code> passes against the repository with all uncommitted fixes and test suites green (<code>:rtp-fabric:rtp-fabric-common:test</code>, <code>:rtp-neoforge:rtp-neoforge-common:test</code>, <code>Rtp5And6ActionSubsystemTest</code>, <code>FabricSchedulerTimerTest</code>, <code>NeoForgeSchedulerTimerTest</code>, <code>AnvilCorruptedRegionHardeningTest</code>, etc.).</li>
+<li>Devstack acceptance: cross-server roundtrip PASSED; killmidflight PASSED; heartbeat convergence on Fabric and NeoForge PASSED following the wall-clock scheduler timer fix (<code>RTP-3</code>); both proxies and all Paper/Folia/Fabric/NeoForge instances converged.</li>
 <li>Node (in Docker): the editor page's inline script parses under V8, and the docs-viewer link filter blocked all 8 scheme-obfuscation payloads while allowing http(s), mailto and relative links.</li>
 <li>Not run: the POSIX <code>gradlew</code> lock path.</li>
 </ul>

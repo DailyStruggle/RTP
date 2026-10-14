@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://dailystruggle.github.io/RTP/site/why/">
       
       
-        <link rel="prev" href="../../dev/CROSS_SERVER_VERIFICATION/">
+        <link rel="prev" href="../../admin/proxies/CROSS_SERVER_VERIFICATION/">
       
       
         <link rel="next" href="../shape-algorithms/">
@@ -789,6 +789,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1268,7 +1310,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1289,7 +1331,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1475,6 +1517,15 @@
   <a href="#background-processing-and-memory" class="md-nav__link">
     <span class="md-ellipsis">
       Background processing and memory
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#verification-and-shape-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      Verification and Shape Algorithms
     </span>
   </a>
   
@@ -3816,6 +3867,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3936,6 +4050,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#verification-and-shape-algorithms" class="md-nav__link">
+    <span class="md-ellipsis">
+      Verification and Shape Algorithms
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4038,6 +4161,8 @@
 <p>BetterRTP has historically had some difficulty with an attempted queue system, and carries a few extra time costs between command and teleportation. It leans toward file interactions over memory allocation; RTP prefers the opposite, which is reflected in the timing and memory-usage differences.</p>
 <p>Like JakesRTP, RTP adds a location cache system, operating at a configurable rate (defined in <code>performance.yml</code>) and capped per-region. Unlike JakesRTP, selected chunks are force-loaded until used in order to achieve millisecond response times on commands - the cost of 10-100 extra chunks is less than one online player, which I consider acceptable. To resolve the possibility of changes to the chunk between selection and usage, a second safety check runs when the location is picked up from the cache.</p>
 <p>RTP also adds player queues, operating at cache rate, to prevent overlapping selection tasks by default. That means <code>/rtp</code> cannot easily be used to DDoS the server via chunk loading.</p>
+<h3 id="verification-and-shape-algorithms">Verification and Shape Algorithms<a class="headerlink" href="#verification-and-shape-algorithms" title="Permanent link">&para;</a></h3>
+<p>For visual unit tests running against real-world Anvil terrain, radial distance curves, nearest-neighbor distance distributions, and the dual-layer space-filling curve architecture, see <a href="../shape-algorithms/">Shape Algorithm Verification</a>.</p>
 
 
 

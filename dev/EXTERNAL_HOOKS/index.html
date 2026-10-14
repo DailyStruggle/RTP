@@ -783,6 +783,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1262,7 +1304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1283,7 +1325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3687,6 +3729,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4400,6 +4505,12 @@
 <td>Lives in <code>effects-api</code> SPI layer. Probed on startup in <code>HologramIntegrations.setup()</code>: hooks DecentHolograms or HolographicDisplays when enabled, falling back to Paper/Folia native vanilla <code>TextDisplay</code> entities (1.19.4+) or <code>VirtualHologramHandle</code> when headless/unsupported.</td>
 <td><code>effects-api/.../hologram/HologramRegistry.java</code>, <code>rtp-plugin/.../softdepends/hologram/</code></td>
 </tr>
+<tr>
+<td><strong>Custom item providers</strong> (ItemsAdder / Oraxen / Nexo / HeadDatabase)</td>
+<td><code>BukkitCustomItemResolver.java</code> (<code>addons/LeafRTPGuiAddon/rtp-gui-bukkit</code>)</td>
+<td>Addon-side item stack factory for menu icons (<code>guimenu.yml</code>). Reflectively inspects public API contracts (<code>CustomStack</code>, <code>OraxenItems</code>, <code>NexoItems</code>, <code>HeadDatabaseAPI</code>). Not routed through <code>RTPHooks</code> because it is an addon presentation concern rather than core engine behavior.</td>
+<td><code>docs/admin/CUSTOM_ITEMS.md</code>, ADR-026</td>
+</tr>
 </tbody>
 </table>
 <hr />
@@ -4492,6 +4603,10 @@
 <tr>
 <td>Holograms &amp; floating displays (DecentHolograms / HolographicDisplays)</td>
 <td>Plugin not installed or API missing → <code>HologramIntegrations.setup()</code> falls back to native vanilla <code>TextDisplay</code> entities on Paper/Folia 1.19.4+, or <code>VirtualHologramHandle</code> (no-op in-memory handle, zero entity/packet overhead, zero crashes).</td>
+</tr>
+<tr>
+<td>Custom item providers (ItemsAdder / Oraxen / Nexo / HeadDatabase)</td>
+<td>Plugin not installed or API missing → <code>BukkitCustomItemResolver</code> logs an informative diagnostic once per session and falls back cleanly to the configured vanilla fallback material (<code>Material.COMPASS</code> or <code>Material.BARRIER</code>) without throwing exceptions. Third-party proprietary plugin compatibility is maintained on a best-effort basis.</td>
 </tr>
 </tbody>
 </table>

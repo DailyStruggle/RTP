@@ -783,6 +783,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1262,7 +1304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1283,7 +1325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3687,6 +3729,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3966,16 +4071,16 @@
 <tr>
 <td><strong>Cold (unkept)</strong></td>
 <td><code>unkeptLocations</code> (<code>LockFreeLocationBuffer</code>)</td>
-<td>Fully verified through the teleport pipeline; chunk reservations released</td>
-<td>One async chunk re-load on promotion to hot</td>
+<td>Cold-fill results (fully verified) and pre-filter-accepted backlog entries (surface screened only); chunk reservations released</td>
+<td>One async chunk load on promotion to hot, which re-runs the vertical adjustor and then border, biome, safety and claims (<code>Region#promotionChecks</code>)</td>
 <td><code>cacheCap</code></td>
 <td>Yes</td>
 </tr>
 <tr>
 <td><strong>Backlog (binned)</strong> <em>(implemented, <a href="../../adr/ADR-028-l3-backlog-cache/">ADR-028</a>)</em></td>
 <td><code>backlogLocations</code> (<code>BacklogLocationBuffer</code>, nullable)</td>
-<td><strong>Unverified</strong> spiral picks with a tri-state per-entry <code>Validity</code> (<code>UNVERIFIED</code> / <code>VALIDATED</code> / <code>INVALIDATED</code>); head-blocking FIFO</td>
-<td>None on the backlog itself; verification is region-prefilter only (Anvil <code>.mca</code> or an addon-registered format, <a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a>, <a href="../../adr/ADR-077-multi-format-region-support/">ADR-077</a>)</td>
+<td><strong>Unverified</strong> spiral picks with a per-entry <code>Validity</code> (<code>UNVERIFIED</code> / <code>VALIDATED</code> / <code>UNKNOWN</code> / <code>INVALIDATED</code>); head-blocking FIFO</td>
+<td>None on the backlog itself; verification is region-prefilter only (Anvil <code>.mca</code> or an addon-registered format, <a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a>, <a href="../../adr/ADR-077-multi-format-region-support/">ADR-077</a>); <code>UNKNOWN</code> entries are loaded and checked one at a time by the cold fill</td>
 <td><code>backlogCacheCap</code> (default <code>1000</code>; lite default <code>0</code> ⇒ disabled)</td>
 <td>No</td>
 </tr>
@@ -3990,7 +4095,7 @@
 <ul>
 <li><strong>Order preservation.</strong> Entries are inserted in spiral-selection order and never reordered. The promotion contract to the cold stage is <em>head-only, contiguous-verified</em>: an unverified entry at the backlog head blocks all later entries from advancing, even if those later entries have already been anvil-verified. This preserves the spatial-distribution semantics established by the Archimedean spiral mapping (<a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>).</li>
 <li><strong>One bin per pulse.</strong> Each <code>Region.execute()</code> pulse picks the bin (region file = 32 × 32 chunks; <code>.mca</code> or an addon-registered format per <a href="../../adr/ADR-077-multi-format-region-support/">ADR-077</a>) containing the <em>oldest</em> unverified backlog entry, runs the region pre-filter for every backlog entry whose chunk lies inside that bin, and marks each entry's <code>verified</code> flag. This bounds per-pulse work (count-bound on Folia per <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/">ADR-015</a>) and amortizes the single region-file read across all in-bin candidates.</li>
-<li><strong>Region-prefilter-only verification.</strong> Backlog verification is a cheap <em>rejection filter</em> - prefilter passes still face the full pipeline (chunk load + vert + biome + safety) at cold -&gt; hot promotion. Prefilter rejects are dropped without chunk I/O, DB row, or chunk reservation. On platforms / worlds where the region pre-filter is unavailable (e.g. unflushed region files, region files in an unregistered format such as <code>.linear</code>, custom generators, Fabric pre-stabilization), backlog entries fall through as "verified by default" so the backlog never stalls a freshly generated world.</li>
+<li><strong>Region-prefilter-only verification.</strong> Backlog verification is a cheap <em>rejection filter</em> that never loads a chunk. Prefilter passes (<code>VALIDATED</code>) drain into cold with no load and face the rest of the check at cold -&gt; hot promotion: the chunk load that promotion already does, the vertical adjustor, then world border, biome, safety scan and claims (<code>Region#promotionChecks</code>). Prefilter rejects are dropped without chunk I/O, DB row, or chunk reservation. Where the region pre-filter has no answer (ungenerated or unflushed chunks, an unregistered region format such as <code>.linear</code>, custom generators, no provider bound), entries go <code>UNKNOWN</code> and the single-flight cold fill takes them one at a time in place of a shape draw, checking each through the speculative pipeline with a load validated on load (ADR-110). A region file of ungenerated chunks therefore never becomes a burst of generation requests, and the backlog never stalls a freshly generated world.</li>
 <li><strong>No DB persistence.</strong> Unverified entries are not written through <code>installDatabaseCallbacks</code>; spiral re-selection after restart is cheap and avoids a "tentative row" schema delta.</li>
 <li><strong>Default-off in lite.</strong> The <code>rtp-lite</code> assembly (<a href="../../adr/ADR-024-rtp-lite-assembly-variant/">ADR-024</a>) ships with the key omitted; runtime default <code>0</code> keeps the trimmed memory profile. The full assembly defaults to <code>1000</code>, sized well above <code>cacheCap</code> so binning yields meaningful amortization.</li>
 </ul>

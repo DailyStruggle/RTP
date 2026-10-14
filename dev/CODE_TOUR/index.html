@@ -783,6 +783,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1262,7 +1304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1283,7 +1325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3687,6 +3729,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4167,7 +4272,7 @@
 <li><strong>Shape pick.</strong> <code>MemoryShape.rand()</code> is the bounded Archimedean spiral (<a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>). If <code>biomeRecall: true</code>, a prefix-sum weighted pick is used over biomes already seen; <code>biomeRecallForced: false</code> silently falls back to uniform when memory is empty. <em>Break:</em> "clustered spawns" → recall is on and has converged on a few tiles; toggle it off or lower <code>cacheCap</code> so the memory churns.</li>
 <li><strong>WorldBorder probe.</strong> If the candidate is outside, <code>worldBorderFails++</code> and <code>maxAttempts++</code> — cheap misses. Cap is 1000. <em>Break:</em> a region configured beyond the vanilla border will hit the cap and emit an empty result; check <code>worldBorderOverride</code> in <code>region.yml</code>.</li>
 <li><strong>Probe-first chunk resolution.</strong> <code>world.getOrLoadChunk(cx, cz)</code> walks cached → Anvil → live (<a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a> section 13.1). A null return is attributed to <code>FailTypes.nullChunk</code> with a sub-reason (<code>ticketFailed</code>, <code>chunkLoadTimeout</code>, <code>asyncLoadNull</code>). <strong>Do not refactor this attribution</strong> — the regression guard is <code>ReqRtpS004NullChunkAttributionTest</code> (S-004).</li>
-<li><strong>Self-contained vs live branch.</strong> If <code>chunk.isSelfContained()</code> (Anvil), stay on the async thread. Otherwise hop to the region-owning thread via <code>dispatchLiveEvaluation</code>, which allocates the <code>ChunkReservation</code> (<a href="#4-chunk-ticket-lifecycle">section 4</a>) and arms the <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/">ADR-015</a> stale guard. <strong>This branch is where most S-005 violations hide when porting</strong> — if a new platform runs the live path on the wrong thread, you will see <code>ThreadAccessException</code> on Folia or silent corruption on Paper. The Fabric blocker mentioned in <a href="../MULTI_PLATFORM_PLAN/"><code>MULTI_PLATFORM_PLAN.md</code></a> is exactly this.</li>
+<li><strong>Self-contained vs live branch.</strong> If <code>chunk.isSelfContained()</code> (Anvil), stay on the async thread. Otherwise hop to the region-owning thread via <code>dispatchLiveEvaluation</code>, which allocates the <code>ChunkReservation</code> (<a href="#4-chunk-ticket-lifecycle">section 4</a>) and arms the <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/">ADR-015</a> stale guard. <strong>This branch is where most S-005 violations hide when porting</strong> — if a new platform runs the live path on the wrong thread, you will see <code>ThreadAccessException</code> on Folia or silent corruption on Paper. The initial Fabric porting blocker resolved under ADR-022 was exactly this.</li>
 <li><strong><code>vert.adjust(chunk)</code>.</strong> Returns the <code>(x, y, z)</code> for a given chunk under the region's vertical adjustor (linear, nether-ceiling, etc.). Null = no valid y. <em>Break:</em> "teleports into lava at y=-64" or "always picks y=0" → wrong adjustor for the dimension; verify <code>vert:</code> in <code>region.yml</code>.</li>
 <li><strong>Biome filter.</strong> <code>biomeNames</code> + <code>biomeWhitelist</code>. Misses increment <code>biomeChecks</code> (soft cap <code>maxBiomeChecks</code>) but also <code>maxAttempts++</code>, so biome filtering doesn't prematurely exhaust hard attempts. <em>Break:</em> "infinite misses" when targeting a rare biome → turn on <code>biomeRecall</code> so the shape remembers hits; without it every attempt is uniform across the whole region.</li>
 <li><strong>Neighbour grid load.</strong> For <code>safetyRadius r</code>, loads the <code>(2r+1)²</code> neighbour chunks via <code>getChunkAt</code> with a 5-second <code>orTimeout</code>. Timeout or any null neighbour → <code>FailTypes.nullChunk / neighborNull</code>. <em>Break:</em> scans or caches that stall with <code>neighborNull</code> in verbose output point at a slow chunk backend — check the Anvil pre-filter wiring (ADR-016 section 11).</li>

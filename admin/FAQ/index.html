@@ -1167,6 +1167,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1646,7 +1688,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1667,7 +1709,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -4071,6 +4113,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4474,14 +4579,20 @@
 <hr />
 <h2 id="installation-setup">Installation &amp; Setup<a class="headerlink" href="#installation-setup" title="Permanent link">&para;</a></h2>
 <h3 id="does-rtp-work-on-paper-folia-or-only-spigot">Does RTP work on Paper / Folia, or only Spigot?<a class="headerlink" href="#does-rtp-work-on-paper-folia-or-only-spigot" title="Permanent link">&para;</a></h3>
-<p>The Bukkit family is all supported by one jar: download the same jar for Spigot, Paper, Paper forks, and Folia, and RTP auto-detects the platform at startup and loads the correct adapter. No separate jar is needed across the Bukkit family.</p>
-<p>Fabric and NeoForge are also supported as first-class platforms (Minecraft 1.21.x / 26.1.x); those run as a mod, so you download the Fabric or NeoForge artifact rather than the Bukkit jar. Legacy Forge has no native build: run the Bukkit jar under Arclight or Mohist.</p>
+<p>One jar covers every platform: Spigot, Paper and its forks, Folia, Fabric (needs Fabric API), NeoForge, and Velocity. RTP detects the platform at startup and loads the matching adapter. Put it in <code>plugins/</code> on Bukkit-family servers and Velocity, or <code>mods/</code> on Fabric and NeoForge.</p>
+<p>Legacy Forge has no native adapter: run the same jar under Arclight or Mohist.</p>
 <h3 id="do-i-need-to-restart-the-server-after-changing-config-files">Do I need to restart the server after changing config files?<a class="headerlink" href="#do-i-need-to-restart-the-server-after-changing-config-files" title="Permanent link">&para;</a></h3>
 <p>No. Run <code>/rtp reload</code> after editing any config file. The only exception is plugin.yml entries, such as adding a new permission node that another plugin reads at startup, as those require a full restart.</p>
 <h3 id="can-i-run-rtp-alongside-other-teleport-plugins">Can I run RTP alongside other teleport plugins?<a class="headerlink" href="#can-i-run-rtp-alongside-other-teleport-plugins" title="Permanent link">&para;</a></h3>
 <p>Yes. RTP does not interfere with other teleport plugins. It only acts on <code>/rtp</code> commands and its own subcommands.</p>
 <h3 id="does-rtp-support-bungeecord-velocity-cross-server-teleportation">Does RTP support BungeeCord / Velocity cross-server teleportation?<a class="headerlink" href="#does-rtp-support-bungeecord-velocity-cross-server-teleportation" title="Permanent link">&para;</a></h3>
-<p>Velocity is supported. The <code>proxy-direct</code> transport lets a Velocity proxy send a player to a random region on a backend server over a lightweight TCP socket, with no Redis or SQL database required. Configure it in <code>network.yml</code>.</p>
+<p>Velocity is supported, over one of three transports:</p>
+<ul>
+<li><strong>proxy-direct</strong>: the proxy and backends talk directly; no database needed.</li>
+<li><strong>SQL</strong>: servers share reservations through a MySQL / PostgreSQL database.</li>
+<li><strong>Redis</strong>: servers share reservations through Redis.</li>
+</ul>
+<p>Configure it in <code>advanced/network.yml</code>; setup guides are in <a href="../proxies/CONFIGURATION/">proxies</a>.</p>
 <p>BungeeCord is not supported yet. A single backend server still works fully on its own with no proxy configuration.</p>
 <hr />
 <h2 id="behaviour">Behaviour<a class="headerlink" href="#behaviour" title="Permanent link">&para;</a></h2>
@@ -4489,19 +4600,19 @@
 <p>RTP pre-generates a queue of safe locations in the background. On a cold start (server just started, or after <code>/rtp reload</code>), the queue starts empty and the first few teleports may generate locations on-demand if the queue has not yet finished filling. Once the background queue populates, all teleports are instant.</p>
 <p>You can increase <code>cacheCap</code> in the region config to maintain a larger pool of ready locations, or tune replenishment intervals in <code>advanced/performance.yml</code>.</p>
 <h3 id="players-keep-landing-in-the-ocean-nether-end-how-do-i-stop-that">Players keep landing in the ocean / nether / end. How do I stop that?<a class="headerlink" href="#players-keep-landing-in-the-ocean-nether-end-how-do-i-stop-that" title="Permanent link">&para;</a></h3>
-<p>Open <code>plugins/RTP/safety.yml</code> and add the unwanted biomes to the biome blacklist. Common entries:</p>
-<div class="highlight"><pre><span></span><code><span class="nt">biomeBlacklist</span><span class="p">:</span>
+<p>Open <code>plugins/RTP/advanced/biomes.yml</code>. With <code>biomeWhitelist: false</code> (the default), <code>biomes</code> is a list of biomes players never land in. Oceans, rivers and beaches are already on it; add any others:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">biomeWhitelist</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">false</span>
+<span class="nt">biomes</span><span class="p">:</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">OCEAN</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">DEEP_OCEAN</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">FROZEN_OCEAN</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">WARM_OCEAN</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">NETHER_WASTES</span>
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">SOUL_SAND_VALLEY</span>
-<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">THE_END</span>
 </code></pre></div>
-<p>After saving, run <code>/rtp reload</code>.</p>
+<p>Set <code>biomeWhitelist: true</code> to flip it, so players only land in the listed biomes. For Nether or End, give that world its own region (or a world <code>override</code>) rather than listing whole dimensions here.</p>
+<p>After saving, run <code>/rtp reload</code>, then <code>/rtp scan reset</code> and <code>/rtp scan start</code> so terrain checked under the old list is checked again.</p>
 <h3 id="players-are-landing-too-close-to-spawn-inside-the-exclusion-zone">Players are landing too close to spawn / inside the exclusion zone.<a class="headerlink" href="#players-are-landing-too-close-to-spawn-inside-the-exclusion-zone" title="Permanent link">&para;</a></h3>
-<p>Check the <code>centerRadius</code> value in the region's <code>shape:</code> block. By default, raw numbers are measured in <strong>chunks</strong> (not blocks). A <code>centerRadius: 64</code> means players cannot land within 64 × 16 = 1 024 blocks of the centre. You can also specify units explicitly (e.g. <code>centerRadius: 1000b</code> or <code>64c</code>). Increase it if needed.</p>
+<p>Check <code>centerRadius</code> in the region's <code>shape:</code> block and raise it. Write it with a unit, e.g. <code>centerRadius: 1024b</code> or <code>centerRadius: 1km</code>, so players never land closer than that to the centre. (A bare number like <code>64</code> means chunks: 64 x 16 = 1,024 blocks.)</p>
 <h3 id="players-are-always-landing-in-the-same-area">Players are always landing in the same area.<a class="headerlink" href="#players-are-always-landing-in-the-same-area" title="Permanent link">&para;</a></h3>
 <p>This can happen if:
 - <code>uniquePlacements: 0</code> and the region is small; try increasing <code>radius</code>.
@@ -4513,10 +4624,11 @@
 2. <code>minY</code> / <code>maxY</code> are too restrictive for the world's terrain, such as nether with <code>maxY: 255</code>.
 3. The entire region has been marked bad in the database. Delete the region's database entry and restart.</p>
 <h3 id="what-does-spatialresolution-do">What does <code>spatialResolution</code> do?<a class="headerlink" href="#what-does-spatialresolution-do" title="Permanent link">&para;</a></h3>
-<p>It controls how precisely the plugin stores spatial memory and samples candidate landing zones:
-- <strong>Memory Coalescing:</strong> Controls the distance (in chunks) across which bad-location runs merge in memory (<code>computeAdmissibleGap</code>). Higher values merge nearby hazard pockets more aggressively, shrinking database and RAM footprints.
-- <strong>Dyadic Stride Downsampling:</strong> In dual-layer PRP shapes (<code>SQUARE</code>, <code>CIRCLE</code>), values greater than <code>1</code> (e.g. <code>4</code>, <code>8</code>, <code>16</code>) coarsen the candidate sampling lattice into macro-cells ($4\times 4$, $8\times 8$, $16\times 16$ chunks). This speeds up world pre-scanning (<code>/rtp scan</code>) by up to 100× and spaces candidate arrivals across large maps.
-- <strong>Default (<code>3</code>):</strong> Suitable for most servers. When <code>spatialResolution: 1</code> and <code>expand: true</code> is configured with <code>uniquePlacements: auto</code> (or an integer radius), RTP automatically derives the optimal power-of-four dyadic stride from player view distance.</p>
+<p>It trades precision for speed and memory:
+- <strong>Higher values</strong> remember bad terrain in coarser patches and check fewer, more widely spaced spots. <code>/rtp scan</code> finishes much faster, memory use drops, and landings spread further apart, but small safe pockets between hazards can be skipped.
+- <strong>Lower values</strong> check terrain chunk by chunk. More precise, slower to scan.
+- <strong>Default (<code>3</code>):</strong> right for most servers. With <code>spatialResolution: 1</code>, <code>expand: true</code> and <code>uniquePlacements: auto</code>, RTP picks the spacing from player view distance for you.</p>
+<p>Details: <a href="../configuration/REGIONS/">REGIONS.md</a>.</p>
 <hr />
 <h2 id="performance">Performance<a class="headerlink" href="#performance" title="Permanent link">&para;</a></h2>
 <h3 id="how-many-locations-should-i-pre-generate-cachecap">How many locations should I pre-generate (<code>cacheCap</code>)?<a class="headerlink" href="#how-many-locations-should-i-pre-generate-cachecap" title="Permanent link">&para;</a></h3>
@@ -4526,9 +4638,9 @@
 - Large server (&gt; 100 players): <code>cacheCap: 100–200</code></p>
 <p>Set it too high and you waste memory holding locations nobody will use. Set it too low and players may occasionally wait for the queue to refill.</p>
 <h3 id="will-rtp-lag-my-server">Will RTP lag my server?<a class="headerlink" href="#will-rtp-lag-my-server" title="Permanent link">&para;</a></h3>
-<p>RTP is designed to be lag-free. All chunk loading and location validation happens asynchronously off the main thread. The only main-thread work is the final teleport itself, which Bukkit requires. If you notice lag spikes, check:
-- <code>minTPS</code> in <code>performance.yml</code>; RTP throttles background work when TPS drops below this value.
-- <code>syncAllottedTime</code>, which limits how long per tick the synchronous portion of a teleport can take.</p>
+<p>Candidate checks and chunk loading run off the main thread. The main-thread work left is the teleport itself and the arriving player's first ticks. In my Paper benchmark there were no ticks over 50 ms across 4,096 paced teleports, but your hardware and world will differ. If you notice lag spikes, check:
+- <code>minTPS</code> and <code>maxMSPT</code> in <code>performance.yml</code>; RTP pauses background cache filling when TPS drops below <code>minTPS</code> or a tick takes longer than <code>maxMSPT</code>. On Folia the slowest region counts.
+- <code>syncAllottedTime</code>, which limits how long per tick RTP's main-thread work can take (capped at 25 ms).</p>
 <h3 id="my-tps-is-dropping-when-players-teleport-what-do-i-check">My TPS is dropping when players teleport. What do I check?<a class="headerlink" href="#my-tps-is-dropping-when-players-teleport-what-do-i-check" title="Permanent link">&para;</a></h3>
 <ol>
 <li>Ensure you are on Paper or Folia; both provide async chunk loading APIs that reduce main-thread pressure compared to Spigot.</li>
@@ -4554,8 +4666,8 @@
 <span class="nt">shape</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;CIRCLE&quot;</span>
 <span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ACCUMULATE&quot;</span>
-<span class="w">  </span><span class="nt">radius</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">128</span>
-<span class="w">  </span><span class="nt">centerRadius</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">16</span>
+<span class="w">  </span><span class="nt">radius</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2048b</span>
+<span class="w">  </span><span class="nt">centerRadius</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">256b</span>
 <span class="nt">vert</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;JUMP&quot;</span>
 <span class="w">  </span><span class="nt">minY</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">32</span>
@@ -4578,11 +4690,11 @@
 <h3 id="how-do-i-change-the-teleport-radius-for-one-world-there-is-no-radius-in-worldsworldyml">How do I change the teleport radius for one world? There is no <code>radius</code> in <code>worlds/&lt;world&gt;.yml</code>.<a class="headerlink" href="#how-do-i-change-the-teleport-radius-for-one-world-there-is-no-radius-in-worldsworldyml" title="Permanent link">&para;</a></h3>
 <p>Correct, and it is not missing - radius is not a world setting. A world file only names the region that answers <code>/rtp</code> there; the <strong>region</strong> owns the destination, including distance, shape, vertical range, and price. So you change the region, not the world:</p>
 <ol>
-<li><strong>Edit the region that world points at.</strong> Read the name out of <code>plugins/RTP/definitions/worlds/&lt;world&gt;.yml</code> (<code>region:</code>), then either run <code>/rtp config regions &lt;region&gt; shape.radius=625</code> or edit the <code>shape:</code> block in <code>plugins/RTP/definitions/regions/&lt;region&gt;.yml</code>. Add <code>--dry-run</code> to the command to preview it.</li>
+<li><strong>Edit the region that world points at.</strong> Read the name out of <code>plugins/RTP/definitions/worlds/&lt;world&gt;.yml</code> (<code>region:</code>), then either run <code>/rtp config regions &lt;region&gt; shape.radius=10km</code> or edit the <code>shape:</code> block in <code>plugins/RTP/definitions/regions/&lt;region&gt;.yml</code>. Add <code>--dry-run</code> to the command to preview it.</li>
 <li><strong>If that region is shared</strong> by other worlds and you only want this one to change, create a new region file and point the world at it instead.</li>
 </ol>
 <p>On a fresh install the region ships <code>shape: "@config"</code>, which inherits the whole <code>defaults.shape</code> block from <code>config.yml</code>. That is why a new setup has only one <code>radius</code> on disk: editing <code>defaults.shape.radius</code> moves every region that still inherits, which is what a single-world server wants. To give one world its own distance, replace <code>"@config"</code> with an inline <code>shape:</code> block in that region. Full walkthrough: <a href="../configuration/REGIONS/#where-to-set-the-radius">Where to set the radius</a>.</p>
-<p>The payoff for the extra hop: because distance belongs to the region, one world can offer several distances at the same time. Ship <code>wild</code> at <code>radius: 625</code> and <code>wild_far</code> at <code>radius: 3125</code>, gate the second with <code>requirePermission: true</code>, and players who have it use <code>/rtp region=wild_far</code>. A radius attached to the world could not do that.</p>
+<p>The payoff for the extra hop: because distance belongs to the region, one world can offer several distances at the same time. Ship <code>wild</code> at <code>radius: 10km</code> and <code>wild_far</code> at <code>radius: 50km</code>, gate the second with <code>requirePermission: true</code>, and players who have it use <code>/rtp region=wild_far</code>. A radius attached to the world could not do that.</p>
 <h3 id="can-i-disable-the-invulnerability-period">Can I disable the invulnerability period?<a class="headerlink" href="#can-i-disable-the-invulnerability-period" title="Permanent link">&para;</a></h3>
 <p>Set <code>invulnerabilityTime: 0</code> in <code>plugins/RTP/safety.yml</code>.</p>
 <h3 id="can-i-use-a-normal-distribution-instead-of-a-flat-spread">Can I use a normal distribution instead of a flat spread?<a class="headerlink" href="#can-i-use-a-normal-distribution-instead-of-a-flat-spread" title="Permanent link">&para;</a></h3>
@@ -4596,7 +4708,7 @@
 <h3 id="how-does-rtp-load-addons-and-how-do-i-turn-the-bundled-ones-off">How does RTP load addons, and how do I turn the bundled ones off?<a class="headerlink" href="#how-does-rtp-load-addons-and-how-do-i-turn-the-bundled-ones-off" title="Permanent link">&para;</a></h3>
 <p>Addons can arrive three ways - as a standalone plugin/mod, dropped into <code>plugins/RTP/addons/</code>, or bundled inside the RTP jar and auto-extracted to that folder on first run (this is how the on-by-default GUI picker ships). To turn a bundled addon off, delete its individual jar from <code>plugins/RTP/addons/</code> (do <strong>not</strong> delete the whole folder - a missing folder is treated as a fresh install and re-extracts the bundled jars) or set its config knob. Full details, including the <code>/rtp gui</code> behavior and a troubleshooting table, are in <a href="../ADDONS/">ADDONS.md</a>.</p>
 <h3 id="i-want-to-add-a-custom-claim-plugin-integration-where-do-i-start">I want to add a custom claim plugin integration. Where do I start?<a class="headerlink" href="#i-want-to-add-a-custom-claim-plugin-integration-where-do-i-start" title="Permanent link">&para;</a></h3>
-<p>RTP already bundles claim-plugin support for the common protection plugins (GriefPrevention, WorldGuard, Towny, etc.) directly in the plugin jar — there is no separate integration jar to install. To add your <em>own</em> integration, look at the <code>addons/RTP_ExampleAddon/</code> directory for a working example: your addon compiles against <code>rtp-api</code> only, registers a safety verifier through <code>RTPAPI.hooks()</code> (the same seam the bundled claim checks use), and registers itself on plugin enable. See <a href="https://github.com/dailystruggle/RTP/blob/V3/addons/REQUIREMENTS.md">the addon API contract</a> for details.</p>
+<p>RTP already ships claim-plugin support for the common protection plugins (GriefPrevention, WorldGuard, Towny, etc.) as a bundled addon that unpacks on first run - there is nothing extra to install. To add your <em>own</em> integration, look at the <code>addons/RTP_ExampleAddon/</code> directory for a working example: your addon compiles against <code>rtp-api</code> only, registers a safety verifier through <code>RTPAPI.hooks()</code> (the same seam the bundled claim checks use), and registers itself on plugin enable. See <a href="https://github.com/dailystruggle/RTP/blob/V3/addons/REQUIREMENTS.md">the addon API contract</a> for details.</p>
 <h3 id="i-added-a-requirement-to-a-requirementsmd-file-and-ci-is-failing">I added a requirement to a <code>REQUIREMENTS.md</code> file and CI is failing.<a class="headerlink" href="#i-added-a-requirement-to-a-requirementsmd-file-and-ci-is-failing" title="Permanent link">&para;</a></h3>
 <p>The <code>check_traceability.sh</code> script enforces that every <code>REQ-*</code> ID in a requirements file has a corresponding row in <code>TRACEABILITY.md</code>. Add the row before pushing. See <a href="https://github.com/dailystruggle/RTP/blob/V3/CONTRIBUTING.md">CONTRIBUTING.md</a> for the full four-step workflow.</p>
 <h3 id="where-are-the-automated-tests">Where are the automated tests?<a class="headerlink" href="#where-are-the-automated-tests" title="Permanent link">&para;</a></h3>

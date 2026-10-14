@@ -18,7 +18,7 @@
         <link rel="prev" href="../../dev/HAZARDS/">
       
       
-        <link rel="next" href="../configuration/CONFIGURATION/">
+        <link rel="next" href="../CUSTOM_ITEMS/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -903,6 +903,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1382,7 +1424,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1403,7 +1445,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3807,6 +3849,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4042,6 +4147,7 @@ gets the visual menu immediately.</p>
 <li>Bare <code>/rtp</code> opens the picker too, and <strong>falls back to a classic teleport</strong> when no menu
   renderer is available (e.g. wrong platform) or the caller is not a resolvable player -
   it never silently does nothing.</li>
+<li><strong>Custom items &amp; at-a-glance status</strong>: Destination and filler icons in <code>guimenu.yml</code> support custom items from ItemsAdder (<code>ia:&lt;id&gt;</code>), Oraxen (<code>oraxen:&lt;id&gt;</code>), Nexo (<code>nexo:&lt;id&gt;</code>), HeadDatabase (<code>hdb:&lt;id&gt;</code>), Base64 heads, and CustomModelData (<code>MATERIAL:CMD</code>). Blocked destinations swap to barrier blocks (<code>barrierOnUnavailable: true</code>), and hover tooltips render configurable duration and state placeholders. Third-party proprietary plugin compatibility is maintained on a best-effort basis (see <a href="../CUSTOM_ITEMS/">Custom Item &amp; Menu Icon Integration</a>).</li>
 <li>To revert bare <code>/rtp</code> to the classic immediate teleport while keeping the addon, change
   the menu style in the GUI addon's config (see the GUI addon's README).</li>
 <li>To remove the GUI entirely, delete its jar from <code>plugins/RTP/addons/</code> and restart.</li>
@@ -4083,6 +4189,7 @@ gets the visual menu immediately.</p>
 <h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../FAQ/">FAQ.md</a> - Development &amp; Addons section.</li>
+<li><a href="../CUSTOM_ITEMS/">CUSTOM_ITEMS.md</a> - custom item prefix routing, barrier cues, and third-party item plugin compatibility.</li>
 <li><a href="../../FOR_ADDON_DEVELOPERS/">Addon developers guide</a> - how RTP discovers, loads, and extends addons.</li>
 <li><a href="../configuration/INTEGRATIONS/">configuration/INTEGRATIONS.md</a> - bundled claim-plugin
   integrations (folded into the jar, not loaded as addons).</li>

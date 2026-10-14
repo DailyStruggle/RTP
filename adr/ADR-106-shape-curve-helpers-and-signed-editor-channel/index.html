@@ -789,6 +789,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1268,7 +1310,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1289,7 +1331,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3891,6 +3933,24 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#59-amendment-2026-10-13-page-sends-only-its-view-and-hot-apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.9 Amendment (2026-10-13): Page sends only its view and Hot-Apply
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#510-amendment-2026-10-14-session-link-trust-hosted-feed-heads" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.10 Amendment (2026-10-14): Session link trust, hosted feed heads
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4007,6 +4067,69 @@
   
   <span class="md-ellipsis">
     ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
   </span>
   
 
@@ -4281,6 +4404,24 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#59-amendment-2026-10-13-page-sends-only-its-view-and-hot-apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.9 Amendment (2026-10-13): Page sends only its view and Hot-Apply
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#510-amendment-2026-10-14-session-link-trust-hosted-feed-heads" class="md-nav__link">
+    <span class="md-ellipsis">
+      5.10 Amendment (2026-10-14): Session link trust, hosted feed heads
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4488,7 +4629,7 @@
 - distance values accept the unit suffixes (<code>b</code> / <code>c</code> / <code>r</code> / <code>km</code> / <code>mi</code>);
 - integers and numbers get number inputs with the suggestions as presets;
 - booleans get a checkbox, and enums a select.</p>
-<p>Settings the shape doesn't declare are not shown. Add-on shapes get a form the same way. An edit to a setting in <code>curveParams</code> redraws the path from the helper immediately. When the channel is connected, a <code>curve-state</code> request (section 5.3) replaces the estimated state with the exact one.</p>
+<p>Settings the shape doesn't declare are not shown. Add-on shapes get a form the same way. An edit to a setting in <code>curveParams</code> redraws the path from the helper immediately, labelled "estimated". The edit is only staged; the exact state arrives as a <code>curve</code> push (section 5.3) once Hot-Apply commits it.</p>
 <h3 id="44-snapshot-fields-and-the-curve-hash">4.4 Snapshot fields and the curve hash<a class="headerlink" href="#44-snapshot-fields-and-the-curve-hash" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>curveCode: {SHAPE: {sha256, js, sample?}}</code></strong> at the payload top level, one entry per registered shape name with a helper, whether or not a region uses it, keyed by that name. <code>sha256</code> is the lowercase hex SHA-256 of the UTF-8 <code>js</code>. Each source is sent once per snapshot, however many regions use it.</li>
@@ -4604,6 +4745,7 @@
 <li><code>/rtp editor trust &lt;nonce&gt;</code> (<code>TrustCmd</code>, permission <code>rtp.editor</code>) adds the fingerprint to <code>TrustedEditors</code>. That is persisted as <code>&lt;dataFolder&gt;/editor/trusted-editors.json</code> with an atomic replace. The plugin then sends <code>hello-reply {state: "trusted"}</code>.</li>
 <li>An expired or unknown nonce is refused with a configurable message.</li>
 <li>A corrupt trusted-editors file is logged and treated as empty, and it is replaced on the next successful trust write.</li>
+<li>A hosted page opened from the operator's own link skips the nonce: its <code>hello</code> carries a session link proof (section 5.10).</li>
 <li><strong>Acceptance rules (plugin side):</strong> from untrusted keys the plugin accepts only <code>hello</code> and <code>ping</code>. Any other message needs a trusted key, a valid signature, the current challenge and a higher <code>seq</code>. Forged, replayed, out-of-order, unknown-type and oversized messages are dropped and logged, rate-limited to one line per key per minute.</li>
 <li>The trust prompt, trusted / rejected replies, and channel opened / lost / expired notices are configurable in <code>messages.yml</code>, with locale parity (REQ-RTP-F-013, S-007).</li>
 </ol>
@@ -4638,11 +4780,6 @@
 <td><code>{region, curve: {shape, params, state, hash}}</code> when a region's settings or state change (for example <code>expand</code> grows <code>rEff</code>); the page re-verifies and redraws</td>
 </tr>
 <tr>
-<td><code>curve-state</code></td>
-<td>page -&gt; plugin, reply plugin -&gt; page</td>
-<td>request <code>{reqId, region, shape: {name, key: YAML scalar}}</code> for edited settings; reply <code>{reqId, state, hash, range}</code> or <code>{reqId, error}</code>; evaluated on a temporary shape built as <code>EditorWalkPathPreview</code> builds one, under its build limits (4 per feed tick, newest per client and region, 1,024 vertices, scalar values only) and the section 5.5 frame cap</td>
-</tr>
-<tr>
 <td><code>hazard-delta</code></td>
 <td>plugin -&gt; page</td>
 <td><code>{region, base, version, add: runs, remove: runs}</code> against hazard version <code>base</code>; <code>{region, version, reset: true, runs}</code> when the page's version is unknown or stale</td>
@@ -4663,11 +4800,6 @@
 <td>debounced view rectangle <code>{world, y, minRx, minRz, maxRx, maxRz}</code>, plus <code>verified: [regions]</code>, <code>hazardVersions: {region: v}</code> and, after a lost <code>land-ref</code>, <code>landReset: true</code></td>
 </tr>
 <tr>
-<td><code>walkpath</code></td>
-<td>page -&gt; plugin, reply plugin -&gt; page</td>
-<td>walk-path preview of edited geometry (ADR-104 section 4.6 item 6), for shapes without a verified helper; a reply over the frame cap is handed off through bytebin (section 5.5)</td>
-</tr>
-<tr>
 <td><code>apply</code> / <code>apply_ack</code></td>
 <td>page -&gt; plugin / plugin -&gt; page</td>
 <td>Hot-Apply: <code>{files}</code> inline (every staged file that differs from the server copy: worlds, regions, config), or <code>{bytebinKey, sha256}</code> above the frame cap; runs the full <code>/rtp editor apply</code> validation pipeline; acknowledged with the result, after which the page treats the sent text as the server copy</td>
@@ -4679,7 +4811,7 @@
 </tr>
 </tbody>
 </table>
-<p>The handlers (<code>EditorWalkPathPreview</code>, <code>EditorLoopbackApply</code>, the feed's focus queue) register with <code>EditorChannel</code> by <code>type</code> instead of parsing loopback frames themselves.</p>
+<p>The handlers (<code>EditorLoopbackApply</code>, the feed's focus queue) register with <code>EditorChannel</code> by <code>type</code> instead of parsing loopback frames themselves. The page shall send the plugin only <code>focus</code> (its view rectangle) and <code>apply</code> (a Hot-Apply commit), besides the handshake and keepalive and the addon types of ADR-107. Walk paths and curve state shall flow plugin -&gt; page only, for applied geometry; any other page type is dropped as unknown (section 5.2 item 5).</p>
 <h3 id="54-transports">5.4 Transports<a class="headerlink" href="#54-transports" title="Permanent link">&para;</a></h3>
 <p><code>EditorChannel</code> owns the envelope, signing and verification, trust, the challenge and <code>seq</code> checks, routing by <code>type</code> and the outbound caps. <code>ChannelTransport</code> is only <code>send(String)</code>, an inbound callback and a state / close callback. There are three implementations:
 - <strong><code>BytesocksTransport</code> (hosted):</strong>
@@ -4689,7 +4821,7 @@
   - It reconnects with backoff (1 s, doubling, at most 60 s) and expires 30 minutes after the session starts, the same lifetime as the local feed.
 - <strong><code>LoopbackTransport</code> (local):</strong> wraps <code>EditorLoopbackChannel</code>. The loopback handshake rules (loopback peer and Host, Origin check, token, at most 4 clients) stay as defence in depth. The local export's <code>channel.relay</code> is the loopback <code>ws://127.0.0.1:&lt;port&gt;/rtp-editor-ws?token=...</code> address, so the page runs the identical handshake and messages.
 - <strong><code>InMemoryTransport</code> (tests):</strong> a connected pair, so JUnit drives the full protocol, including a page stub, without sockets.</p>
-<p>The page has one <code>EditorChannelClient</code> (keys, signing, verification, handshake, reconnect) that connects to <code>snapshot.channel.relay</code>. The existing <code>focus</code> / <code>walkpath</code> / <code>apply</code> callers move onto it.</p>
+<p>The page has one <code>EditorChannelClient</code> (keys, signing, verification, handshake, reconnect) that connects to <code>snapshot.channel.relay</code>. The <code>focus</code> and <code>apply</code> callers use it.</p>
 <h3 id="55-caps-and-the-bytebin-hand-off">5.5 Caps and the bytebin hand-off<a class="headerlink" href="#55-caps-and-the-bytebin-hand-off" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Frames are capped at <strong>32 KiB</strong> (the envelope included) on every transport, so local runs test the hosted limits. Larger inbound frames are refused and logged.</li>
@@ -4698,7 +4830,8 @@
 <li>Frame pacing: bytesocks counts frames per IP (30 per 2 minutes by default, all channels together), closes a socket over the limit with 1008 and deletes a channel once its last client has left. A transport may therefore declare a frame share per 2-minute window (<code>ChannelTransport.framesPerWindow</code>). The bytesocks transport declares 18 and the page keeps to 10 on any <code>wss://</code> relay, since page and server often share one IP; loopback and in-memory transports are unpaced.</li>
 <li>On a paced channel, replies go first and wait in order when the share is used up. Broadcast pushes are held (newest <code>feed</code>, newest <code>curve</code> per region, <code>land</code> and <code>hazard-delta</code> in order) and leave as one <code>bundle</code> at most every 8 s, leaving 4 frames of the share for replies. A new push is refused while a frame's worth is already held, so its producer resends later. <code>bye</code> is never held.</li>
 <li>The page coalesces queued <code>focus</code> messages, counts every outbound frame (hello and ping included), and treats any verified plugin frame as proof of liveness. The plugin skips a <code>pong</code> within 10 s of other outbound traffic.</li>
-<li>On every channel the feed pushes a head only when the page would see something new: <code>seq</code> and <code>timestamp</code> alone do not count, and the telemetry gauges count only beyond their jitter (TPS 0.5, MSPT 1 ms or 20 %, tick budget 5 %, heap 0.25 GiB, measured against the last pushed value). A <code>focus</code> (sent first by a page that has just connected) forces the next head, and an unchanged head is still pushed every 60 s as a heartbeat. An idle session therefore costs about 2 plugin frames per 2 minutes instead of a bundle every 8 s; the local <code>feed.js</code> file is still rewritten every tick.</li>
+<li>On every channel the feed pushes a head only when the page would see something new: <code>seq</code> and <code>timestamp</code> alone do not count, and the telemetry gauges count only beyond their jitter (TPS 0.5, MSPT 1 ms or 20 %, tick budget 5 %, heap 0.25 GiB, measured against the last pushed value). A <code>focus</code> (sent first by a page that has just connected) forces the next head, and an unchanged head is still pushed every 40 s as a heartbeat. An idle session therefore costs about 3 plugin frames per 2 minutes instead of a bundle every 8 s; the local <code>feed.js</code> file is still rewritten every tick.</li>
+<li>A hosted feed pushes a changed head at most every 20 s (survey progress changes every tick), and its head carries no tile versions or palettes, which name local files. A head over the frame cap goes without telemetry.</li>
 <li>The page marks a connected link <code>feed stale</code> when no head has arrived for 90 s (heartbeat plus a bundle gap and margin).</li>
 </ul>
 <h3 id="56-relay-failure-behaviour-s-004">5.6 Relay failure behaviour (S-004)<a class="headerlink" href="#56-relay-failure-behaviour-s-004" title="Permanent link">&para;</a></h3>
@@ -4724,6 +4857,20 @@
 <li><strong>Trust lifetime:</strong> <code>/rtp editor untrust key=&lt;fingerprint prefix|all&gt;</code> revokes trusted browser keys. <code>editor.trust.maxAgeDays</code> in <code>advanced/network.yml</code> (default <code>0</code>, no expiry) expires old trust entries. The trust prompt shows the full fingerprint, and wrong trust codes are limited to 5 per minute.</li>
 <li><strong>Sessions:</strong> sessions expire after 30 minutes, at most 32 are open at once, and tokens are logged by prefix only. The key file and local exports are owner-only, Windows included. Each local export closes the previous loopback socket and opens a new one with a fresh token.</li>
 <li><strong>Hosted page:</strong> <code>no-referrer</code> and a CSP meta tag; <code>?token=</code> is removed from the address bar after load; fetched docs HTML is sanitised, and links are limited to an allow-list.</li>
+</ul>
+<h3 id="59-amendment-2026-10-13-page-sends-only-its-view-and-hot-apply">5.9 Amendment (2026-10-13): Page sends only its view and Hot-Apply<a class="headerlink" href="#59-amendment-2026-10-13-page-sends-only-its-view-and-hot-apply" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The <code>walkpath</code> and <code>curve-state</code> page -&gt; plugin requests are removed, together with <code>EditorWalkPathPreview</code>. Each geometry edit cost relay frames from the page's 10-frame share (section 5.5), so a later Hot-Apply waited behind them.</li>
+<li>Geometry and setting edits only stage. Staged geometry is drawn from the page's helper estimate ("estimated"), or shows no path for shapes without a helper, until Hot-Apply; the plugin then pushes the applied <code>curve</code>, path and hazards.</li>
+<li>The plugin accepts from the page only <code>focus</code>, <code>apply</code>, the handshake / keepalive and ADR-107 addon types.</li>
+</ul>
+<h3 id="510-amendment-2026-10-14-session-link-trust-hosted-feed-heads">5.10 Amendment (2026-10-14): Session link trust, hosted feed heads<a class="headerlink" href="#510-amendment-2026-10-14-session-link-trust-hosted-feed-heads" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Session link secret:</strong> each channel holds 256 random bits (<code>EditorChannel.linkSecret</code>). <code>/rtp editor</code> appends them to the operator's link as <code>#k=&lt;base64url&gt;</code>. Browsers send no fragment to the site or the relay, the snapshot does not carry it, and the page removes it from the address bar on load and keeps it in memory only.</li>
+<li><strong>Proof:</strong> the page's <code>hello</code> carries <code>linkProof</code>, base64 HMAC-SHA256 keyed with the secret over <code>rtp-editor-link|&lt;channel id&gt;|&lt;key fingerprint&gt;</code>. It is bound to one key, so a relay observer can't reuse it for another key, and it reveals nothing about the secret.</li>
+<li><strong>Trust:</strong> the first key whose proof verifies (constant-time compare) is trusted for this channel only, in memory, never written to <code>trusted-editors.json</code>, and without a prompt. The secret then counts as used; a later key, or a proof that does not verify, gets the nonce flow of section 5.2 (logged, rate-limited). <code>/rtp editor untrust</code> also drops link-trusted keys. A key that connects without the link (anyone who knows the channel id) is never trusted automatically.</li>
+<li>The trust ends with the channel (30 minutes), so a console log or screenshot of the link exposes nothing once the session is over or the link was used.</li>
+<li><strong>Hosted feed heads:</strong> hosted feeds push the <code>feed</code> head over the channel as local ones do (section 5.3). Without it a hosted page marked its link <code>feed stale</code> 90 s after trust. On a paced channel the feed also flushes held pushes every tick, so a bundle leaves once its 8 s gap has passed instead of waiting for the next send.</li>
 </ul>
 <hr />
 <h2 id="6-snapshot-size">6. Snapshot Size<a class="headerlink" href="#6-snapshot-size" title="Permanent link">&para;</a></h2>
@@ -4760,7 +4907,7 @@
 <ul>
 <li>The hosted page draws the complete walk path and hazards at any zoom from the snapshot alone, for every shape that ships a helper, add-ons included.</li>
 <li>Setting edits redraw the path locally with no server request. The typed settings form works for any registered shape.</li>
-<li>Hosted sessions become two-way: live curve changes, hazard deltas, focus-driven land detail, walk-path previews and Hot-Apply, with in-game trust.</li>
+<li>Hosted sessions become two-way: live curve changes, hazard deltas, focus-driven land detail and Hot-Apply, with in-game trust.</li>
 <li>Local, hosted and test runs share one protocol, so a local session and the in-memory tests exercise everything hosted mode does except the relay hop.</li>
 <li>Snapshots shrink for regions drawn from code.</li>
 </ul>
@@ -4797,7 +4944,7 @@
 <h2 id="10-references">10. References<a class="headerlink" href="#10-references" title="Permanent link">&para;</a></h2>
 <ul>
 <li><code>MemoryShape</code>, <code>AbstractDualLayerShape</code>, <code>CircleOptimizedDualLayer</code>, <code>SquareOptimizedDualLayer</code> (<code>rtp-core/.../selection/region/selectors/memory/shapes/</code>).</li>
-<li><code>EditorSessionManager</code>, <code>EditorHttpTransport</code>, <code>EditorCmd</code>, <code>EditorLiveFeed</code>, <code>EditorLoopbackChannel</code>, <code>EditorWalkPathPreview</code>, <code>EditorLoopbackApply</code>, <code>WalkPathTiles</code>, <code>HazardTiles</code>, <code>BiomeBinCodec</code> (<code>rtp-core/.../commands/editor/</code>).</li>
+<li><code>EditorSessionManager</code>, <code>EditorHttpTransport</code>, <code>EditorCmd</code>, <code>EditorLiveFeed</code>, <code>EditorLoopbackChannel</code>, <code>EditorLoopbackApply</code>, <code>WalkPathTiles</code>, <code>HazardTiles</code>, <code>BiomeBinCodec</code> (<code>rtp-core/.../commands/editor/</code>).</li>
 <li><code>docs/editor/index.html</code> (hosted and packaged editor page).</li>
 <li>LuckPerms web editor socket protocol (bytesocks relay, <code>{msg, signature}</code> envelope, in-game trust).</li>
 </ul>

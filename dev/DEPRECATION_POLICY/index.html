@@ -783,6 +783,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1262,7 +1304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1283,7 +1325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3687,6 +3729,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3824,7 +3929,7 @@
 <h1 id="deprecation-and-api-evolution-policy">Deprecation and API Evolution Policy<a class="headerlink" href="#deprecation-and-api-evolution-policy" title="Permanent link">&para;</a></h1>
 <blockquote>
 <p><strong>Scope:</strong> Public API (<code>rtp-api</code>, SPI frameworks: <code>commands-api</code>, <code>effects-api</code>, <code>maps-api</code>, <code>metrics-api</code>, <code>anvil-api</code>, <code>tags-api</code>), platform carriers, and configuration keys.
-<strong>Related:</strong> ADR-000 (development workflow), ADR-011 (<code>rtp-api</code> separate module), ADR-051 (two-tier API extension model), <code>MULTI_PLATFORM_PLAN.md</code> (carrier retirement policy).</p>
+<strong>Related:</strong> ADR-000 (development workflow), ADR-011 (<code>rtp-api</code> separate module), ADR-051 (two-tier API extension model), ADR-022 (Fabric), ADR-033 (NeoForge).</p>
 </blockquote>
 <hr />
 <h2 id="1-principles">1. Principles<a class="headerlink" href="#1-principles" title="Permanent link">&para;</a></h2>
@@ -3882,7 +3987,7 @@
 </ol>
 <hr />
 <h2 id="3-platform-carrier-retirement-lifecycle">3. Platform Carrier Retirement Lifecycle<a class="headerlink" href="#3-platform-carrier-retirement-lifecycle" title="Permanent link">&para;</a></h2>
-<p>As defined in <code>MULTI_PLATFORM_PLAN.md</code> (<em>Carrier Retirement &amp; Deprecation Policy</em>):</p>
+<p>Standard carrier support guidelines:</p>
 <ol>
 <li><strong>Carrier Support Window:</strong>
    RTP maintains active carriers for:</li>
@@ -3912,7 +4017,7 @@
 <ol>
 <li><strong>Verification Mechanism:</strong></li>
 <li>Executed via <code>./gradlew checkBinaryCompatibility</code> across all public API modules (<code>rtp-api</code>, <code>commands-api</code>, <code>effects-api</code>, <code>maps-api</code>, <code>metrics-api</code>, <code>anvil-api</code>, <code>tags-api</code>).</li>
-<li>Powered by <code>japicmp</code> comparing the current compiled JAR against the baseline release artifact (<code>japicmpBaselineVersion</code>, default <code>3.2.0</code>).</li>
+<li>Powered by <code>japicmp</code> comparing the current compiled JAR against the baseline release artifact (<code>japicmpBaselineVersion</code>, default <code>3.2.1</code>).</li>
 <li>Runs in CI (<code>.github/workflows/gradle.yml</code>) on every pull request and push to release branches.</li>
 <li><strong>Accepted Breaks Registry:</strong></li>
 <li>If a binary-incompatible change or removal has satisfied the mandatory notice window (&gt;= 2 minor versions) and is ready for removal in an announced release, it must be explicitly recorded in:

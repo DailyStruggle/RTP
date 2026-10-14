@@ -783,6 +783,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1262,7 +1304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1283,7 +1325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3687,6 +3729,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3942,7 +4047,8 @@ For specific code-level and platform-specific requirements, please refer to the 
 - <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-bukkit/REQUIREMENTS.md">rtp-bukkit Requirements</a>
 - <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-paper/REQUIREMENTS.md">rtp-paper Requirements</a>
 - <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-folia/REQUIREMENTS.md">rtp-folia Requirements</a>
-- <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/REQUIREMENTS.md">rtp-fabric Requirements</a></p>
+- <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/REQUIREMENTS.md">rtp-fabric Requirements</a>
+- <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-neoforge/REQUIREMENTS.md">rtp-neoforge Requirements</a></p>
 <h2 id="0-scope">0. Scope<a class="headerlink" href="#0-scope" title="Permanent link">&para;</a></h2>
 <h3 id="in-scope">In Scope<a class="headerlink" href="#in-scope" title="Permanent link">&para;</a></h3>
 <ul>
@@ -3951,7 +4057,7 @@ For specific code-level and platform-specific requirements, please refer to the 
 <li>Per-region configuration of shapes, statistical distributions, biome filters, and permission nodes.</li>
 <li>Integration hooks for third-party land-protection plugins (GriefPrevention, WorldGuard, Towny) and economy plugins (Vault).</li>
 <li>A stable, versioned public API (<code>rtp-api</code>) for addon developers to register custom shapes, vertical adjustors, and validation checks.</li>
-<li>Platform adapters for Spigot, Paper, Folia, Fabric, and NeoForge ensuring correct thread-safety on each server type. NeoForge support is deferred until the Fabric adapter stabilizes; see <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a> and <a href="../MULTI_PLATFORM_PLAN/">MULTI_PLATFORM_PLAN.md</a>.</li>
+<li>Platform adapters for Spigot, Paper, Folia, Fabric, and NeoForge, ensuring correct thread-safety and runtime abstraction on each server type. All five platforms are fully implemented first-class supported targets (see <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a> and <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a>).</li>
 <li>Network mode: optional, disabled-by-default coordination of teleportation across multiple backend servers behind one or more Velocity/BungeeCord proxies, with world state remaining authoritative on backends (section 1.6, <a href="../../adr/ADR-036-network-mode-multi-server-multi-proxy/">ADR-036</a>, <a href="../../adr/ADR-049-network-mode-platform-neutral-lift/">ADR-049</a>, <a href="../MULTI_SERVER_PLAN/">MULTI_SERVER_PLAN.md</a>).</li>
 <li>Built-in interactive menus rendered as written books with chat fallback, driven by the command tree; core menus shall not use inventory click events (<a href="../../adr/ADR-035-interactive-menus-book-first/">ADR-035</a>, <a href="../../adr/ADR-050-concrete-menu-commands-supersede-tokens/">ADR-050</a>).</li>
 <li>Bundled addons: companion addons shipped inside the distribution jar and self-extracted once into <code>plugins/RTP/addons/</code> (e.g. <code>LeafRTPGuiAddon</code>, <code>LeafRTPClaimAddon</code>, <code>LeafRTPCountdownAddon</code>, <code>LeafRTPActionAddon</code>). Each bundled addon shall depend only on <code>rtp-api</code>, shall be removable by deleting its jar, and shall be replaceable by any third-party addon implementing the same SPI (<a href="../../adr/ADR-057-platform-agnostic-addon-spi/">ADR-057</a>, <a href="../../adr/ADR-069-claim-integrations-extracted-to-bundled-addon/">ADR-069</a>, <a href="../../admin/ADDONS/"><code>docs/admin/ADDONS.md</code></a>).</li>
@@ -3963,7 +4069,7 @@ For specific code-level and platform-specific requirements, please refer to the 
 <li><strong>Anti-cheat:</strong> RTP does not detect or prevent cheating. It is the responsibility of the server operator to configure compatible anti-cheat plugins.</li>
 <li><strong>Inventory GUIs in core:</strong> <code>rtp-core</code> and the platform adapters shall not implement inventory (chest) menus. Inventory GUIs are delivered only by addons - the bundled <code>LeafRTPGuiAddon</code> binds bare <code>/rtp</code> through the pluggable root action (<a href="../../adr/ADR-056-bare-rtp-root-action/">ADR-056</a>) and may be removed or replaced without changing core behaviour; with no GUI addon present, bare <code>/rtp</code> performs the classic teleport.</li>
 <li><strong>Proxy-owned world state:</strong> The proxy coordinator does not own world state, region definitions, or chunk data, and does not validate locations (REQ-RTP-NET-005).</li>
-<li><strong>Unsupported platforms:</strong> RTP shall target Bukkit-derived software (Spigot, Paper, Folia), Fabric, and NeoForge. Legacy Forge, Sponge, Minestom, hybrid servers (Mohist, Magma, Arclight), and Bedrock-native servers (PocketMine-MP, Nukkit, BDS) shall not be supported. Rationale and the phased adapter plans are recorded in <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a>, <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a>, and <a href="../MULTI_PLATFORM_PLAN/">MULTI_PLATFORM_PLAN.md</a>.</li>
+<li><strong>Unsupported platforms:</strong> RTP shall target Bukkit-derived software (Spigot, Paper, Folia), Fabric, and NeoForge. Legacy Forge, Sponge, Minestom, hybrid servers (Mohist, Magma, Arclight), and Bedrock-native servers (PocketMine-MP, Nukkit, BDS) shall not be supported. Furthermore, non-Java / native Minecraft server runtimes (including Rust-based implementations such as PumpkinMC, Feather, C/C++ native engines, or other non-JVM runtimes) are strictly out of scope for the native plugin and mod codebase, as they require fundamentally disjoint architectures (e.g., native FFI bindings or sidecar IPC) reserved for potential future exploration. Rationale and platform boundaries are recorded in <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a> and <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a>.</li>
 <li><strong>Legacy Minecraft and Java versions:</strong> RTP targets Java 21+ (REQ-RTP-SYS-001) and the Minecraft versions enumerated by the shipped versioned platform adapter submodules (ADR-010). Older Minecraft versions and older Java runtimes are out of scope; users on legacy servers shall be directed to the last RTP release that supported their server. Revisit conditions and rationale are recorded in <a href="../../adr/ADR-021-legacy-mc-and-java-support-scope/">ADR-021</a>.</li>
 </ul>
 <h2 id="1-functional-requirements">1. Functional Requirements<a class="headerlink" href="#1-functional-requirements" title="Permanent link">&para;</a></h2>
@@ -4144,7 +4250,7 @@ For specific code-level and platform-specific requirements, please refer to the 
 <h2 id="4-system-requirements">4. System Requirements<a class="headerlink" href="#4-system-requirements" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>REQ-RTP-SYS-001 — Runtime Environment:</strong> The system shall require Java 21 or higher.</li>
-<li><strong>REQ-RTP-SYS-002 — Server Software:</strong> The system shall be compatible with Bukkit-derived server software (Spigot, Paper, and Folia), with Fabric, and with NeoForge. NeoForge compatibility shall be delivered through a dedicated platform adapter whose activation is gated on the stabilization of the Fabric adapter; rationale is recorded in <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a>.</li>
+<li><strong>REQ-RTP-SYS-002 — Server Software:</strong> The system shall be compatible with Bukkit-derived server software (Spigot, Paper, and Folia), with Fabric, and with NeoForge. All platforms are delivered through dedicated native platform adapters; rationale and decisions are recorded in <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a> and <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a>.</li>
 </ul>
 
 

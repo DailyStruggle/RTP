@@ -783,6 +783,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1262,7 +1304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1283,7 +1325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3687,6 +3729,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3781,9 +3886,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#1d-fabric-supported-stable-as-of-2026-05-26" class="md-nav__link">
+  <a href="#1d-fabric-supported-stable-as-of-2026-05-26-multi-platform-expansion-completed" class="md-nav__link">
     <span class="md-ellipsis">
-      1.D — Fabric: supported (stable as of 2026-05-26)
+      1.D — Fabric: supported (stable as of 2026-05-26; multi-platform expansion completed)
     </span>
   </a>
   
@@ -3923,12 +4028,10 @@ to the authoritative live load.</p>
   surface) with <code>unpopulatedFallthrough</code> so <code>/rtp test full</code> can report its frequency distinctly
   from other fallbacks. Currently invisible.~~</li>
 </ul>
-<h3 id="1d-fabric-supported-stable-as-of-2026-05-26">1.D — Fabric: supported (stable as of 2026-05-26)<a class="headerlink" href="#1d-fabric-supported-stable-as-of-2026-05-26" title="Permanent link">&para;</a></h3>
-<p>Fabric (<code>rtp-fabric</code>) is a first-class, in-scope, stable platform. The three standing blockers
-documented in prior revisions of this section are resolved; the front page and <code>REQUIREMENTS.md section 0</code>
-should be updated to reflect that Fabric is supported, not out of scope.</p>
+<h3 id="1d-fabric-supported-stable-as-of-2026-05-26-multi-platform-expansion-completed">1.D — Fabric: supported (stable as of 2026-05-26; multi-platform expansion completed)<a class="headerlink" href="#1d-fabric-supported-stable-as-of-2026-05-26-multi-platform-expansion-completed" title="Permanent link">&para;</a></h3>
+<p>Fabric (<code>rtp-fabric</code>) and NeoForge (<code>rtp-neoforge</code>) are first-class, in-scope, stable platforms (ADR-022, ADR-033). All phases of the multi-platform expansion are completed and verified. Standing blockers documented in prior revisions are resolved; the front page and <code>REQUIREMENTS.md section 0</code> confirm full first-class support.</p>
 <ul>
-<li>[x] ~~<strong>Resolve the three standing blockers in <code>MULTI_PLATFORM_PLAN.md</code>:</strong>~~</li>
+<li>[x] ~~<strong>Resolve the three standing blockers during platform porting:</strong>~~</li>
 <li>[x] ~~<strong>S-005 violation in <code>FabricRTPWorld.getChunkAt</code>.</strong>~~ — <code>getChunkAt</code> returns
     <code>CompletableFuture&lt;Long&gt;</code> and routes through an async chunk-load path; S-005 compliant.</li>
 <li>[x] ~~<strong>Null stub in <code>FabricServerAccessor.getLocationGenerator</code>.</strong>~~ — fully wired; throws
@@ -3940,7 +4043,7 @@ should be updated to reflect that Fabric is supported, not out of scope.</p>
   platform.~~</li>
 <li>[x] ~~<strong>Re-run the <code>rtp-api</code> interface-sufficiency analysis</strong> and record the result as an ADR
   (April 2026 gap analysis concluded interfaces are sufficient; promote the finding from
-  <code>MULTI_PLATFORM_PLAN.md</code> to an Accepted ADR).~~</li>
+  the platform evaluation to an Accepted ADR).~~</li>
 </ul>
 <h3 id="1e-unsourced-statistics-on-the-front-page">1.E — Unsourced statistics on the front page<a class="headerlink" href="#1e-unsourced-statistics-on-the-front-page" title="Permanent link">&para;</a></h3>
 <p>The Spatial Memory paragraph now cites a concrete ~45% Overworld-safe figure from a local profiling
@@ -3978,6 +4081,11 @@ reproducible by readers".</p>
 <li>In-game selection bridge (<code>SelectionBridge</code> SPI) hooking existing WorldEdit/FAWE (<code>Polygonal2DRegion</code>, <code>CuboidRegion</code>) across Paper/Folia/Fabric/NeoForge, and FTB Chunks claim contours on modded (<code>/rtp region fromselection &lt;name&gt;</code>).</li>
 <li>Zero-backend web map vector drawing tool (<code>leaf-rtp-map-tool.js</code>) generating one-click clipboard YAML snippets and in-game commands.</li>
 <li>Cartography map item visual inspection (<code>maps-api</code> <code>RegionBoundaryRenderer</code> via <code>/rtp map create region_boundary</code>).</li>
+<li>[ ] <strong>Runtime physical trigger creation &amp; WorldEdit selection bridge (<code>/rtp trigger</code>).</strong>
+  Enable in-game operators to define, inspect, and remove physical trigger volumes (portals, launch pads, step-in thresholds) dynamically at runtime without manually writing coordinate bounds in action YAML files:</li>
+<li>Register the <code>/rtp trigger &lt;create|remove|list&gt;</code> runtime command surface in <code>rtp-core</code> wired into <code>PhysicalTriggerManager</code>.</li>
+<li>In-game WorldEdit/FAWE selection bridge compatibility (<code>SelectionBridge</code> SPI) to define cuboid trigger volumes directly from active player wand selections (<code>//wand</code>, cuboid selection) alongside center-radius boxes.</li>
+<li>Persist runtime-created triggers across server restarts with automatic synchronization to <code>definitions/actions/&lt;name&gt;.yml</code>.</li>
 <li>[ ] <strong>External web map raster layers (<a href="../../adr/ADR-086-external-web-map-integration/">ADR-086</a>).</strong>
   Zero-chunk-load on-demand raster heatmaps, coverage layers, and vector polygon overlays for Pl3xMap, BlueMap, and Dynmap.</li>
 <li>[ ] <strong>Seamless loading-screen-free Velocity transfers (<a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-021-seamless-in-play-velocity-transfers.md">rtp-proxy-ADR-021</a>).</strong>
@@ -4186,7 +4294,7 @@ reproducible by readers".</p>
   NI book-menu + chat-prompt, NJ network-mode backend parity incl. live boot + reservation-token
   redemption, NK maps API + metrics binding + backend-state sampler) and Phase N3 (docs,
   traceability, beta release) are complete. See
-  <a href="../MULTI_PLATFORM_PLAN/"><code>MULTI_PLATFORM_PLAN.md</code></a> Phase 4 for the full step breakdown.</p>
+  <a href="../../adr/ADR-033-neoforge-platform-in-scope/">ADR-033</a> and <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-neoforge/docs/adr/rtp-neoforge-ADR-001-platform-in-scope.md">rtp-neoforge-ADR-001</a> for architectural records (multi-platform expansion completed and archived).</p>
 </li>
 <li>
 <p>[ ] <strong>Rich book-menu drawing via resource-pack soft-dependencies.</strong> The written-book menu renderer
@@ -4335,6 +4443,23 @@ reproducible by readers".</p>
   valid between servers whose world files match; the design must say how that is detected and how
   concurrent writes merge. Requires a D-005 proposal and an ADR before implementation. Until it
   ships, the front page shall not describe spatial memory as shareable.</li>
+<li>[ ] <strong>Coverage-guided behaviour fuzzing (planned, on hold).</strong> Direction settled in
+  <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/">ADR-111</a> (Accepted); details and test criteria
+  in <a href="../BEHAVIOUR_FUZZING_PLAN/"><code>BEHAVIOUR_FUZZING_PLAN.md</code></a>. The finding oracles (stable
+  signatures, control subtraction, replay k of n, shrink, FAIL on a reproduced target finding)
+  ship in <code>scripts/bench_fuzz.py</code>. Remaining work, in order:</li>
+<li>[ ] JaCoCo coverage feedback from the bench server via <code>/rtpstress coverage &lt;label&gt;</code> (probe
+    JSON, Python stays stdlib-only), with probes reached reported on every PASS.</li>
+<li>[ ] Fast fault mode: one repetition, no leak checkpoints, leak oracle only on episodes with new
+    coverage or a new signature.</li>
+<li>[ ] New oracles: silently dropped teleport (S-004), unsafe landing (S-001), chunk-ticket growth
+    (S-002), tick-time excess over the control, thread and task growth.</li>
+<li>[ ] Larger bot action vocabulary: <code>plugin.yml</code> and tab-completion commands and arguments, GUI
+    clicks, chat.</li>
+<li><strong>Hold condition:</strong> none of the above starts until the shipped finding oracles have been through
+    extended real-server runs and the results (findings, false positives, run cost) are recorded in
+    <a href="https://github.com/DailyStruggle/RTP/blob/V3/helpers/StressTestRTP/LEAK_FUZZING.md"><code>LEAK_FUZZING.md</code></a>. Each item then needs its own
+    D-005 proposal.</li>
 </ul>
 <hr />
 <h2 id="tier-3-polish-and-long-tail">Tier 3 — Polish and long tail<a class="headerlink" href="#tier-3-polish-and-long-tail" title="Permanent link">&para;</a></h2>

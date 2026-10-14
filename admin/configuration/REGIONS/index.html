@@ -789,6 +789,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1610,7 +1652,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../dev/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1631,7 +1673,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../dev/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -4035,6 +4077,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4474,7 +4579,7 @@
 <td><code>spatialResolution</code></td>
 <td>Integer / String</td>
 <td><code>"auto"</code></td>
-<td>Precision for spatial memory (bad location tracking). Can be <code>"auto"</code> or any positive integer (e.g. <code>1</code>, <code>3</code>, <code>4</code>). Values &gt; 1 in dual-layer shapes also dictate dyadic candidate downsampling grids (e.g. 4 -&gt; 4x4 chunk macro-cells, 8 -&gt; 8x8 macro-cells).</td>
+<td>Precision for spatial memory (bad location tracking). Can be <code>"auto"</code> or any positive integer (e.g. <code>1</code>, <code>3</code>, <code>4</code>). Higher values check fewer, more widely spaced spots (e.g. <code>4</code> = one spot per 4x4 chunks): faster scans and less memory, but small safe pockets can be missed.</td>
 </tr>
 <tr>
 <td><code>displayName</code></td>
@@ -4707,13 +4812,11 @@ However, RTP supports <strong>spatial unit suffixes</strong> on any distance par
 - <code>weight</code>: <code>&gt; 1.0</code> pulls landings toward center; <code>&lt; 1.0</code> pushes toward edges. Applies within the <code>centerRadius</code>-to-<code>radius</code> band; it does not move the bounds themselves.
 - <code>expand</code>: If true, radius grows as locations are used.</p>
 <h4 id="circle_optimized_dual_layer-square_optimized_dual_layer"><code>CIRCLE_OPTIMIZED_DUAL_LAYER</code> / <code>SQUARE_OPTIMIZED_DUAL_LAYER</code><a class="headerlink" href="#circle_optimized_dual_layer-square_optimized_dual_layer" title="Permanent link">&para;</a></h4>
-<p>Optimized dual-layer shapes implementing the continuous spiral-addressed Hilbert key space (ADR-085).
-- Expands coarse spiral points into intra-point Hilbert traversals mapped to travel direction, eliminating run fragmentation across ring seams and drastically reducing memory footprint at one-chunk precision.
-- Backed by hardware-cache segmented secondary tables (<code>SegmentedKeyRunTable</code>), providing up to 2x-11x faster coordinate selection under <code>ACCUMULATE</code> mode.
+<p>Variants of <code>CIRCLE</code> and <code>SQUARE</code> that use less memory at one-chunk precision and pick locations faster (2x-11x in my benchmarks under <code>ACCUMULATE</code> mode).
 - Accepts the exact same parameters as <code>CIRCLE</code> and <code>SQUARE</code> (<code>radius</code>, <code>centerRadius</code>, <code>centerX</code>, <code>centerZ</code>, <code>weight</code>, <code>uniquePlacements</code>, <code>expand</code>, <code>mode</code>).</p>
 <h4 id="circle_deprecated_pure_spiral-square_deprecated_pure_spiral"><code>CIRCLE_DEPRECATED_PURE_SPIRAL</code> / <code>SQUARE_DEPRECATED_PURE_SPIRAL</code><a class="headerlink" href="#circle_deprecated_pure_spiral-square_deprecated_pure_spiral" title="Permanent link">&para;</a></h4>
 <p>Legacy pure 1D Archimedean spiral mapping shapes.
-- Preserved for backwards compatibility, regression testing, and side-by-side performance benchmarking against dual-layer Hilbert shapes.
+- Preserved for backwards compatibility, regression testing, and side-by-side benchmarks against the newer shapes.
 - Accepts identical parameters to <code>CIRCLE</code> and <code>SQUARE</code>.</p>
 <h4 id="circle_normal-square_normal"><code>CIRCLE_NORMAL</code> / <code>SQUARE_NORMAL</code><a class="headerlink" href="#circle_normal-square_normal" title="Permanent link">&para;</a></h4>
 <p>Gaussian distribution variants.

@@ -783,6 +783,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1262,7 +1304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1283,7 +1325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3687,6 +3729,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4085,12 +4190,12 @@
 <tr>
 <td>"cold cache" / "cold queue" / "L2"</td>
 <td><code>RegionQueueManager.unkeptLocations</code> (<code>LockFreeLocationBuffer</code>)</td>
-<td>Pre-verified locations with released chunks; re-loaded on promotion to L1.</td>
+<td>Locations with released chunks: cold-fill results and pre-filter-accepted backlog entries. Re-loaded on promotion to L1, which runs vert, border, biome, safety and claims (<code>Region#promotionChecks</code>).</td>
 </tr>
 <tr>
 <td>"backlog cache" / "L3" / "binned cache"</td>
 <td><code>RegionQueueManager.backlogLocations</code> (<code>BacklogLocationBuffer</code>); <a href="../../adr/ADR-028-l3-backlog-cache/">ADR-028</a></td>
-<td>Unverified FIFO buffer screened one 32x32 bin per pulse. Not persisted to DB.</td>
+<td>Unverified FIFO buffer screened by region-file bin; never loads a chunk. <code>VALIDATED</code> entries drain to cold; <code>UNKNOWN</code> (no disk data) ones go to the cold fill one at a time. Not persisted to DB.</td>
 </tr>
 <tr>
 <td>"login cache" / "login reserve"</td>

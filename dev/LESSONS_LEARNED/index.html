@@ -783,6 +783,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1262,7 +1304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1283,7 +1325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3687,6 +3729,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4026,6 +4131,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#region-file-decode-that-drops-data-must-answer-unknown-not-all-air-2026-10-13" class="md-nav__link">
+    <span class="md-ellipsis">
+      Region-file decode that drops data must answer UNKNOWN, not "all air" (2026-10-13)
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4045,6 +4159,15 @@
   <a href="#calling-essentialsx-tpr-causes-teleport-timeouts-on-spigot-under-stresstestrtp-2026-05-02" class="md-nav__link">
     <span class="md-ellipsis">
       Calling EssentialsX /tpr causes teleport timeouts on Spigot under StressTestRTP (2026-05-02)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#leak-fuzzing-what-a-verdict-does-and-does-not-mean-2026-10-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      Leak fuzzing: what a verdict does and does not mean (2026-10-11)
     </span>
   </a>
   
@@ -4302,6 +4425,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#2026-10-12-folia-benchmark-chunk-systemio-threads-1-is-one-io-thread" class="md-nav__link">
+    <span class="md-ellipsis">
+      2026-10-12 - Folia benchmark: chunk-system.io-threads: -1 is one IO thread
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#git-workspace-safety" class="md-nav__link">
     <span class="md-ellipsis">
       Git &amp; Workspace Safety
@@ -4534,6 +4666,15 @@
 <li>The <code>unloadChunk</code> portion of the helper is kept because it is cheap and harmless, and it picks up the small tail of chunks Chunky has already released. The <code>world.save()</code> portion is load-bearing.</li>
 </ul>
 <p>See <code>helpers/PeriodicWorldSaver/README.md</code> for the runtime model. Folia is excluded because the main-thread sweep would hit <code>ThreadAccessException</code>; a <code>RegionScheduler</code> variant remains future work.</p>
+<h3 id="region-file-decode-that-drops-data-must-answer-unknown-not-all-air-2026-10-13">Region-file decode that drops data must answer UNKNOWN, not "all air" (2026-10-13)<a class="headerlink" href="#region-file-decode-that-drops-data-must-answer-unknown-not-all-air-2026-10-13" title="Permanent link">&para;</a></h3>
+<p>On a Paper 26.3 world (DataVersion 5023, <code>region-file-compression=lz4</code>), <code>/rtp scan</code> ran at about 9,000 chunks/s with 0.1% land and generated nothing (FINE counters: every probe was <code>scanShortCircuit</code>). Two causes, both in <code>AnvilReader</code>:</p>
+<ul>
+<li><strong>The block palette format changed in 26.3.</strong> A state with no properties is a bare string (<code>"minecraft:stone"</code>). A state with properties is <code>{id, properties}</code>, not <code>{Name, Properties}</code>. When a list mixes both, Minecraft wraps each string as <code>{"": "minecraft:stone"}</code>. The decoder only knew <code>{Name}</code>, so it dropped every section without an error. The column probe then read an empty chunk as all air, and the vertical adjustor returned <code>SCAN_MISS</code>, a final reject. <code>AnvilPrefilter</code> already treated an empty decode as <code>UNKNOWN:no-sections</code>, but the column probe had no matching check. Biome palettes, which were always bare strings, still decoded, so the probe looked healthy.</li>
+<li><strong>Proto-chunks.</strong> Paper saves chunks that stopped part-way through generation (<code>Status</code> such as <code>structure_starts</code>, <code>biomes</code>, <code>terrain</code>) beside the generated area. They fill the region header, so they count as generated, and they read as air. Only a native load finishes them. On this world 86% of saved chunks were proto-chunks.</li>
+</ul>
+<p>The bug stayed hidden until LZ4 support (2026-10-05): before that, every LZ4 chunk threw in the decoder, fell through to a full load, and was correct but slow.</p>
+<p>Lessons: a decoder that drops data shall make the read UNKNOWN, never return a partial view that callers trust. Check <code>Status</code> before trusting a chunk's blocks. Add a real fixture for every new DataVersion: the 26.1 fixture (4788) still used <code>{Name}</code>. Before guessing at a cause, count <code>Status</code> values and dump one chunk's NBT from the real <code>.mca</code> files.</p>
+<p>Guards: <code>anvil/real/26_3_R1/r.0.0.mca</code> (LZ4; one full chunk and two proto-chunks at their original slots). <code>AnvilFixtureParityTest#realFixtureDecodesTerrain</code> requires non-air blocks from every real fixture, and <code>realProtoChunksAreUnknown</code> requires UNKNOWN for proto-chunks. <code>ScanTaskAdvancedCoverageTest#nullProbeOnGeneratedChunk_loadsChunkWithoutMarkingBad</code> requires a null probe to load the chunk. Reverting the palette fix fails five fixture tests.</p>
 <hr />
 <h2 id="stress-testing">Stress Testing<a class="headerlink" href="#stress-testing" title="Permanent link">&para;</a></h2>
 <h3 id="calling-essentialsx-tpr-causes-teleport-timeouts-on-spigot-under-stresstestrtp-2026-05-02">Calling EssentialsX <code>/tpr</code> causes teleport timeouts on Spigot under StressTestRTP (2026-05-02)<a class="headerlink" href="#calling-essentialsx-tpr-causes-teleport-timeouts-on-spigot-under-stresstestrtp-2026-05-02" title="Permanent link">&para;</a></h3>
@@ -4546,6 +4687,16 @@
 <li>If <code>/tpr</code> must remain in the roster (e.g., to measure interaction), document it explicitly in the run's CSV header / notes so the numbers aren't compared against rosters where it was excluded.</li>
 </ul>
 <p>Recorded as a potential third-party interaction worth a deeper investigation when stress-testing priorities allow; an <code>EXTERNAL_HOOKS.md</code> row is <strong>not</strong> warranted yet because RTP adds no reflection or soft-depend for EssentialsX — the interference is purely runtime event ordering when <code>/tpr</code> is dispatched on Spigot.</p>
+<h3 id="leak-fuzzing-what-a-verdict-does-and-does-not-mean-2026-10-11">Leak fuzzing: what a verdict does and does not mean (2026-10-11)<a class="headerlink" href="#leak-fuzzing-what-a-verdict-does-and-does-not-mean-2026-10-11" title="Permanent link">&para;</a></h3>
+<p>Full methodology and findings: <a href="https://github.com/DailyStruggle/RTP/blob/V3/helpers/StressTestRTP/LEAK_FUZZING.md"><code>helpers/StressTestRTP/LEAK_FUZZING.md</code></a>.</p>
+<ul>
+<li><strong>A cached record that holds a live <code>Player</code> is a leak for as long as the cache lives.</strong> LeafRTP's last-teleport cache (cooldowns, <code>/rtp back</code>) held the sender; the cleanup-time <code>toPureData()</code> copy re-attached on the next permission or message call, <code>clone()</code> copied the live player, and Folia never detached. Detaching at one exit path is not enough: hold the player only through a <code>WeakReference</code> so no path can pin it (3.3.0 fix).</li>
+<li><strong>Score against a control from the same run.</strong> <code>direct</code> (no plugin) is what separates vanilla structure-template and chunk growth from the plugin's. A target run without it counts everything the server does against the plugin.</li>
+<li><strong>Use growth per repetition, not a long idle wait.</strong> A cache that fills once and a leak both show <code>+N</code> after one episode; only the slope over repeated runs separates them. A 240 s wait cost about 5 minutes per episode and per shrink probe.</li>
+<li><strong>INCONCLUSIVE and PASS are budget statements.</strong> BetterRTP's confirmed leak came out INCONCLUSIVE when a tool bug rejected every rung above 8 bots, and PASS in an 8-episode screening run because the race reproduces only some of the time.</li>
+<li><strong>Check the units behind a score.</strong> Counts the control cannot have (a plugin's own live instances) default to a noise of 1 object, so 1 KB of objects produced "3 of 3" candidates and scores of +700/min while live bytes matched the control.</li>
+<li><strong>The histogram says what is retained, not who holds it.</strong> Take the heap dump before any restart; reading the plugin's bytecode along the shrunk reproducer is a fast cross-check of the GC root path.</li>
+</ul>
 <hr />
 <h2 id="build-environment">Build &amp; Environment<a class="headerlink" href="#build-environment" title="Permanent link">&para;</a></h2>
 <h3 id="gradle-daemon-java-version-mismatch">Gradle daemon / Java version mismatch<a class="headerlink" href="#gradle-daemon-java-version-mismatch" title="Permanent link">&para;</a></h3>
@@ -5484,6 +5635,8 @@ tp-core first (specifically the RTP constructor and     asks.tick package) befor
 - <strong>Do not introduce 2D geodesic blobbing passes prior to run merging in the space-filling curve.</strong> The Hilbert traversal inside coarse spiral points already projects 2D locality directly into the 1D key sequence. Simply bounding run lengths by observable distance (within 3 chunks / vanilla ticket window) aligns naturally with the curve's coalescing tolerance and player-perceptible bounds without paying for expensive morphological clustering.
 - <strong>Hard complexity limit:</strong> Spatial index representations in the memory shape pipeline have reached an empirical boundary where additional geometric pre-processing steps cost substantially more compute than any marginal compaction can save.</p>
 <hr />
+<h2 id="2026-10-12-folia-benchmark-chunk-systemio-threads-1-is-one-io-thread">2026-10-12 - Folia benchmark: <code>chunk-system.io-threads: -1</code> is one IO thread<a class="headerlink" href="#2026-10-12-folia-benchmark-chunk-systemio-threads-1-is-one-io-thread" title="Permanent link">&para;</a></h2>
+<p>Paper/Folia <code>paper-global.yml</code> <code>chunk-system.io-threads: -1</code> runs a single chunk IO thread (any value below zero). At 200+ TP/s every arrival queues ~25 chunk reads, and a villager in the fresh destination region blocks its region thread in <code>AcquirePoi</code> -&gt; <code>PoiManager.getOrLoad</code> -&gt; <code>ChunkHolderManager.loadPoiChunk</code> (<code>LockSupport.park</code>) until that one IO thread reaches it; the Folia watchdog logged 6-16 s stalls and 44 s slow teleports. Parked time reads as idle in spark, so region threads looked 83% idle. Set <code>io-threads</code> explicitly (16 on a 32-core host) for high-rate Folia benchmarks. <code>worker-threads: -1</code> already scales (half the physical cores).</p>
 <h2 id="git-workspace-safety">Git &amp; Workspace Safety<a class="headerlink" href="#git-workspace-safety" title="Permanent link">&para;</a></h2>
 <h3 id="working-tree-protection-and-destructive-git-operations-2026-06-14">Working tree protection and destructive git operations (2026-06-14)<a class="headerlink" href="#working-tree-protection-and-destructive-git-operations-2026-06-14" title="Permanent link">&para;</a></h3>
 <p>The user's working tree often contains uncommitted in-progress work across multiple modules. An agent must never run destructive git operations (<code>git stash</code>, <code>git reset --hard</code>, <code>git restore</code>, <code>git checkout --</code>, <code>git clean -fd</code>, <code>git push --force</code>) without explicit written approval in the current session.</p>

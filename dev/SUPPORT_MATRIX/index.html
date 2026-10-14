@@ -783,6 +783,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1262,7 +1304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1283,7 +1325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3687,6 +3729,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3846,8 +3951,8 @@
 <h2 id="1-classification-definitions">1. Classification Definitions<a class="headerlink" href="#1-classification-definitions" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Tested:</strong> Verified by continuous or scheduled automated CI pipelines (including the nightly multi-node devstack acceptance harness, dedicated carrier compilation/unit suites, or multi-release ArchUnit/mock gates). Regressions in tested environments block release.</li>
-<li><em>Devstack Scheduled Acceptance (Nightly):</em> Paper, Folia, Fabric, and Velocity on Java 21 LTS (multi-node containerized integration with Redis, cross-server token flow, and lifecycle verification).</li>
-<li><em>CI Build &amp; Adapter Gates (Every Commit):</em> Compiles, tests, and enforces architectural invariants across all active carrier modules.</li>
+<li><em>Devstack Scheduled Acceptance (Nightly):</em> Velocity (Java 25), Paper (1.21.11, Java 25), Folia (1.21.11, Java 25), Fabric (1.21.11, Java 25), and NeoForge (1.21.1, Java 21) across multi-node containerized integration with Redis, cross-server token flow, and lifecycle verification.</li>
+<li><em>CI Build &amp; Adapter Gates (Every Commit):</em> Compiles, tests, and enforces architectural invariants across all active carrier modules (Java 21 base bytecode, Java 25 experimental/unobf).</li>
 <li><strong>Best-effort:</strong> Compatible architecture or downstream fork sharing the execution path of a tested platform, but lacking dedicated automated end-to-end integration runs in CI on every commit/night. Community bug reports are accepted and addressed, but fixes are prioritized behind tested platforms.</li>
 <li><strong>Unsupported:</strong> Incompatible threading models, missing required platform APIs, unsupported Java versions (&lt; 21), or platforms explicitly declared out of scope (e.g. legacy Forge &lt;= 1.20.1, Sponge, Bedrock-native). Bug reports on unsupported platforms are closed without investigation.</li>
 </ul>
@@ -3919,7 +4024,7 @@
 <td style="text-align: center;"><strong>Tested</strong></td>
 <td style="text-align: center;"><strong>Best-effort</strong></td>
 <td style="text-align: center;"><strong>Tested</strong></td>
-<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Tested</strong></td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>MC 1.20.5 - 1.20.6</strong></td>
@@ -3962,7 +4067,7 @@
 <li><strong>Status:</strong> <strong>Tested</strong> (1.20.x, 1.21.x, 26.x via Loom carrier build suites, Java 25 toolchain gates, and nightly devstack).</li>
 <li>First-class Loom-remapped obf and Mojmap-unobf carrier modules with native async chunk futures (<code>ServerLevel.getChunkSource().getChunkFuture</code>) and <code>FabricScheduler</code>.</li>
 <li><strong>NeoForge:</strong></li>
-<li><strong>Status:</strong> <strong>Best-effort</strong> (1.21.x, 26.x; compiles via <code>rtp-neoforge</code> ModDevGradle carrier and passes unit suites; scheduled live container acceptance is pending devstack phase 2).</li>
+<li><strong>Status:</strong> <strong>Tested</strong> (1.21.1 via automated ModDevGradle carrier suites, and nightly acceptance devstack node on Java 21); <strong>Best-effort</strong> (26.x tracking).</li>
 <li>Native ModDevGradle Mojmap runtime mod with <code>NeoForgeScheduler</code> and Brigadier command adapter (ADR-033). Legacy Forge (&lt;= 1.20.1) is explicitly <strong>Unsupported</strong>.</li>
 </ul>
 <hr />
@@ -4046,7 +4151,7 @@
 <li><strong>ArchUnit Prohibition Enforcement:</strong></li>
 <li>Verifies architectural boundaries: no platform leaks into <code>rtp-core</code> or <code>rtp-api</code>, zero main-thread synchronous chunk loading (S-005), and strict thread scheduling compliance.</li>
 <li><strong>Multi-Server Acceptance Devstack:</strong></li>
-<li>Boots multi-node Docker Compose network: 1 Redis + 2 Velocity proxies + 2 Paper backends + 1 Folia backend + 1 Fabric backend.</li>
+<li>Boots multi-node Docker Compose network: 1 Redis + 2 Velocity proxies + 2 Paper lobbies + 1 Paper backend + 1 Folia backend + 1 Fabric backend + 1 NeoForge backend.</li>
 <li>Executes cross-server reservation token redemption, timeout reaping, and failover validation.</li>
 </ol>
 

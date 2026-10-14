@@ -789,6 +789,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1430,7 +1472,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../dev/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1451,7 +1493,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../dev/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3855,6 +3897,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4045,7 +4150,7 @@
 <p>Historically, all bad-location entries were permanent: once marked bad, an area remained blacklisted until an operator ran <code>/rtp scan reset</code> or reconfigured region shapes. While this permanence is ideal for static natural terrain (such as oceans or lava lakes), it creates problems for dynamic world state:
 - <strong>Player claims:</strong> If a player claims land, RTP records the area as an invalid destination under <code>safetyExternal</code>. If the player later abandons or unclaims the plot, the land would remain locked out permanently.
 - <strong>Unique placement buffers:</strong> Landing spots reserved under <code>uniquePlacements</code> would stay blacklisted indefinitely.</p>
-<p>With cause-based TTL (ADR-079), spatial memory segments are assigned retention lifecycles based on their rejection cause. When dynamic entries reach their expiration threshold, they enter a staged probation window and naturally cycle back into circulation without requiring manual cache resets.</p>
+<p>With cause-based TTL, spatial memory segments are assigned retention lifecycles based on their rejection cause. When dynamic entries reach their expiration threshold, they enter a staged probation window and naturally cycle back into circulation without requiring manual cache resets.</p>
 <hr />
 <h2 id="updating-settings">Updating Settings<a class="headerlink" href="#updating-settings" title="Permanent link">&para;</a></h2>
 <p>You can update TTL configuration through:
@@ -4168,17 +4273,17 @@
 <p>RTP compresses spatial memory using Run-Length Encoded (RLE) intervals on an Archimedean spiral.
 To prevent data corruption:
 - <strong>Static runs ($\text{TTL} = \infty$) never merge with dynamic runs.</strong> A permanent ocean boundary will never accidentally inherit a temporary claim's expiration date.
-- <strong>Dynamic runs merge cleanly:</strong> When two dynamic runs touch, the combined interval inherits the maximum TTL of both runs ($\max(\text{TTL}_A, \text{TTL}_B)$), minimizing memory fragmentation while preventing premature expiration.</p>
+- <strong>Touching entries merge:</strong> when two remembered stretches touch, the merged one keeps the longer of the two TTLs, so nothing expires early.</p>
 <h3 id="staged-probation-buffer">Staged Probation Buffer<a class="headerlink" href="#staged-probation-buffer" title="Permanent link">&para;</a></h3>
 <p>When a dynamic entry reaches its expiration date ($t \ge \text{TTL}$):
 1. <strong>Phase 1 (Active -&gt; Probation):</strong> The segment is removed from the active candidate-avoidance index and moved to a parallel sorted probation array. The coordinate becomes candidate-eligible again for players.
 2. <strong>Phase 2 (Candidate Selection):</strong>
    - <strong>If still claimed:</strong> If RTP selects a candidate in that area and the claim plugin rejects it again, the entire probationary interval is immediately restored with a refreshed TTL in $O(\log M)$ time with zero heap allocation.
    - <strong>If unclaimed / safe:</strong> If the candidate passes verification, the location is used for teleportation and the probation record is naturally dropped on the next off-tick rebuild.
-3. <strong>Phase 3 (Eviction):</strong> Segments that pass twice their TTL ($t \ge 2 \times \text{TTL}$) without re-occurrence are permanently purged from memory.</p>
+3. <strong>Phase 3 (Eviction):</strong> Segments that pass twice their TTL (twice their TTL) without re-occurrence are permanently purged from memory.</p>
 <h3 id="disk-persistence-bin_version-3">Disk Persistence (<code>BIN_VERSION 3</code>)<a class="headerlink" href="#disk-persistence-bin_version-3" title="Permanent link">&para;</a></h3>
 <p>Spatial memory cache files (<code>.bin</code> under region storage) store non-overlapping 1D spiral intervals alongside their 64-bit expiration timestamps.
-- <strong>Offline Decay:</strong> If the server is offline or shut down for weeks, expired claims are evaluated against real-world wall-clock time on server startup and cleanly routed to probation or pruned immediately.
+- <strong>Offline Decay:</strong> If the server is offline or shut down for weeks, expired claims are evaluated against real-world wall-clock time on server startup and moved to probation or removed right away.
 - <strong>Backward Compatibility:</strong> Legacy cache files (<code>BIN_VERSION 1</code> or <code>2</code>) are loaded seamlessly, treating all entries as static ($\text{TTL} = \infty$).</p>
 
 

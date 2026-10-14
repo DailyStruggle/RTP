@@ -783,6 +783,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1262,7 +1304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1283,7 +1325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3687,6 +3729,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4870,7 +4975,7 @@ platforms/rtp-fabric/    -- FabricMetricsBinding (server tick callbacks)
 <h3 id="phase-m2-folia-fabric">Phase M2 — Folia + Fabric<a class="headerlink" href="#phase-m2-folia-fabric" title="Permanent link">&para;</a></h3>
 <ul>
 <li>[ ] <code>FoliaMetricsBinding</code> with the <code>max</code> / <code>mean</code> defaults from <em>Folia Aggregation</em> and the <code>metrics.folia.aggregation.*</code> config keys.</li>
-<li>[ ] <code>FabricMetricsBinding</code> using the server tick callback chain wired in Step E2 of <code>MULTI_PLATFORM_PLAN.md</code>.</li>
+<li>[ ] <code>FabricMetricsBinding</code> using the server tick callback chain wired in the Fabric adapter (<code>FabricScheduler</code>).</li>
 <li>[ ] Per-platform smoke tests confirming <code>MetricsSnapshot</code> returns sane values on each runtime.</li>
 <li>[ ] <strong>Extend <code>InfoCmd</code></strong> with the per-region <em>Health — cache</em> table (L1/L2/login fills + status flag), the verbose Folia per-region TPS/MSPT table, and the <em>load-balancer inputs</em> sub-block (<code>cacheServeRateLast60s</code>, <code>coldServeRatio</code>, <code>pregenSaturation</code>, <code>sustainableRatePerMin</code>). Add the <code>/rtp info json</code> output path emitting the full <code>MetricsSnapshot</code> record.</li>
 <li>[ ] <strong>Real-time per-tick CPU budget</strong> (per <em>Real-Time Per-Tick CPU Budget</em>): persist per-iteration WCET constants in <code>rtp-core/.../metrics/TickCpuWcet.java</code>; ship <code>tickCpuBudgetMsAnalytical</code> / <code>tickCpuMsP99</code> / <code>tickCpuMsP999</code> / <code>tickCpuOvershoots</code> catalogue rows; wire per-tick <code>nanoTime()</code> measurement around each <code>TickConsumer</code>; add the verbose <code>/rtp info</code> sub-block; land <code>TickCpuWcetRegressionTest</code>. Folia aggregation defaults to <code>max</code>. Gated on the dedicated ADR (<code>docs/adr/ADR-NNN-rtp-per-tick-cpu-budget-contract.md</code>) being ratified before the implementation PR lands.</li>
@@ -5224,7 +5329,7 @@ platforms/rtp-fabric/    -- FabricMetricsBinding (server tick callbacks)
 <h2 id="cross-references_1">Cross-References<a class="headerlink" href="#cross-references_1" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../MULTI_SERVER_PLAN/"><code>MULTI_SERVER_PLAN.md</code></a> — primary downstream consumer (telemetry publisher).</li>
-<li><a href="../MULTI_PLATFORM_PLAN/"><code>MULTI_PLATFORM_PLAN.md</code></a> — Fabric Step E2 tick-callback hook is the basis for <code>FabricMetricsBinding</code>.</li>
+<li><a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a> — Fabric tick-callback hook (<code>FabricScheduler</code>) is the basis for <code>FabricMetricsBinding</code>.</li>
 <li><a href="../LESSONS_LEARNED/"><code>LESSONS_LEARNED.md</code></a> — any platform-specific surprise from sampler implementation lands here.</li>
 <li><a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>AGENTS.md &gt; Domain Analogies &amp; Aliases</code></a> — informal terms (<code>mspt</code>, <code>tps</code>, <code>the snapshot</code>) route here.</li>
 </ul>

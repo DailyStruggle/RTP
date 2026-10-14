@@ -12,7 +12,7 @@
         <meta name="author" content="DailyStruggle">
       
       
-        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/DEVSTACK_COVERAGE_PLAN/">
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/BENCHMARK_ANALYSIS/">
       
       
       
@@ -22,7 +22,7 @@
     
     
       
-        <title>Devstack Runtime Coverage & Real-Client Verification Plan - LeafRTP</title>
+        <title>Paper 26.2 Benchmark Analysis: Effective Safe Max & Resource Breakdown - LeafRTP</title>
       
     
     
@@ -74,7 +74,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#devstack-runtime-coverage-real-client-verification-plan" class="md-skip">
+        <a href="#paper-262-benchmark-analysis-effective-safe-max-resource-breakdown" class="md-skip">
           Skip to content
         </a>
       
@@ -108,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Devstack Runtime Coverage &amp; Real-Client Verification Plan
+              Paper 26.2 Benchmark Analysis: Effective Safe Max &amp; Resource Breakdown
             
           </span>
         </div>
@@ -783,6 +783,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1262,7 +1304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1283,7 +1325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3687,6 +3729,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3735,19 +3840,37 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#0-why-this-document-exists" class="md-nav__link">
+  <a href="#1-effective-safe-maximum-throughput-across-tested-plugins" class="md-nav__link">
     <span class="md-ellipsis">
-      0. Why this document exists
+      1. Effective Safe Maximum Throughput Across Tested Plugins
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="0. Why this document exists">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-rigorous-chunk-metrics-selection-vs-landing-footprint" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Rigorous Chunk Metrics: Selection vs Landing Footprint
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Rigorous Chunk Metrics: Selection vs Landing Footprint">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#what-already-exists-this-is-a-wiringplan-job-not-a-build-job" class="md-nav__link">
+  <a href="#chunk-load-breakdown-at-20-tps-1199-attempts-over-60s" class="md-nav__link">
     <span class="md-ellipsis">
-      What already exists (this is a wiring/plan job, not a build job)
+      Chunk Load Breakdown at 20 TP/s (1,199 Attempts over 60s)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#key-chunk-inferences" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Chunk Inferences
     </span>
   </a>
   
@@ -3759,46 +3882,28 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#1-track-a-intermediate-release-prompt-sequence" class="md-nav__link">
+  <a href="#3-rigorous-cpu-metrics-plugin-logic-vs-chunk-engine-vs-fixed-idle" class="md-nav__link">
     <span class="md-ellipsis">
-      1. Track A - intermediate release prompt sequence
+      3. Rigorous CPU Metrics: Plugin Logic vs Chunk Engine vs Fixed Idle
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="1. Track A - intermediate release prompt sequence">
+    <nav class="md-nav" aria-label="3. Rigorous CPU Metrics: Plugin Logic vs Chunk Engine vs Fixed Idle">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#prompt-a1-re-scope-criterion-1-in-the-readiness-doc" class="md-nav__link">
+  <a href="#cpu-consumption-breakdown-at-20-tps-1199-attempts-over-60s" class="md-nav__link">
     <span class="md-ellipsis">
-      Prompt A1 - re-scope criterion #1 in the readiness doc
+      CPU Consumption Breakdown at 20 TP/s (1,199 Attempts over 60s)
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#prompt-a2-ratchet-the-rtp-core-floors-to-measured-values" class="md-nav__link">
+  <a href="#key-cpu-inferences" class="md-nav__link">
     <span class="md-ellipsis">
-      Prompt A2 - ratchet the rtp-core floors to measured values
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#prompt-a3-do-the-same-for-rtp-proxy-common" class="md-nav__link">
-    <span class="md-ellipsis">
-      Prompt A3 - do the same for rtp-proxy-common
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#prompt-a4-cut-the-intermediate-release" class="md-nav__link">
-    <span class="md-ellipsis">
-      Prompt A4 - cut the intermediate release
+      Key CPU Inferences
     </span>
   </a>
   
@@ -3810,78 +3915,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#2-track-b-devstack-real-client-runtime-test-plan" class="md-nav__link">
+  <a href="#4-architectural-bottleneck-profiles" class="md-nav__link">
     <span class="md-ellipsis">
-      2. Track B - devstack real-client runtime test plan
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="2. Track B - devstack real-client runtime test plan">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#21-preconditions-one-time-per-machine" class="md-nav__link">
-    <span class="md-ellipsis">
-      2.1 Preconditions (one-time per machine)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#22-headless-coverage-sweep-no-client-needed" class="md-nav__link">
-    <span class="md-ellipsis">
-      2.2 Headless coverage sweep (no client needed)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#23-real-client-roundtrip-the-one-manual-step" class="md-nav__link">
-    <span class="md-ellipsis">
-      2.3 Real-client roundtrip (the one manual step)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#24-merge-report-and-diff" class="md-nav__link">
-    <span class="md-ellipsis">
-      2.4 Merge, report, and diff
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#25-acceptance-criteria-evidence-artifacts" class="md-nav__link">
-    <span class="md-ellipsis">
-      2.5 Acceptance criteria &amp; evidence artifacts
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#3-positioning-trade-offs-keep-honest" class="md-nav__link">
-    <span class="md-ellipsis">
-      3. Positioning &amp; trade-offs (keep honest)
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#4-see-also" class="md-nav__link">
-    <span class="md-ellipsis">
-      4. See also
+      4. Architectural Bottleneck Profiles
     </span>
   </a>
   
@@ -3905,223 +3941,251 @@
   
 
 
-<h1 id="devstack-runtime-coverage-real-client-verification-plan">Devstack Runtime Coverage &amp; Real-Client Verification Plan<a class="headerlink" href="#devstack-runtime-coverage-real-client-verification-plan" title="Permanent link">&para;</a></h1>
-<p>Status: approved 2026-09-15. Owner: enterprise-readiness criterion #1 (see
-<a href="../ENTERPRISE_READINESS/"><code>ENTERPRISE_READINESS.md</code></a>).</p>
-<h2 id="0-why-this-document-exists">0. Why this document exists<a class="headerlink" href="#0-why-this-document-exists" title="Permanent link">&para;</a></h2>
-<p>Chasing pure-unit 90/80 on <code>rtp-core</code> has hit diminishing returns. The remaining
-~26.6k missed instructions are concentrated in code that a plain-JVM harness
-cannot reach honestly: the <code>RTP</code> constructor's server-bound bootstrap lambdas,
-platform-adapter seams, and the full teleport/dispatch pipelines that only exist
-at runtime. The devstack already exercises exactly that code with a JaCoCo
-<code>-javaagent</code> attached to every backend/lobby, so runtime-attested coverage is the
-more honest way to close the last mile.</p>
-<p>This plan splits the work into two independent tracks:</p>
-<ul>
-<li><strong>Track A - Intermediate release</strong> (product/versioning). Ship today's strong
-  state; lock in floors; re-scope criterion #1's definition of done.</li>
-<li><strong>Track B - Devstack + real-client runtime verification</strong> (evidence/coverage).
-  Close the remaining criterion #1 gap with runtime proof instead of increasingly
-  artificial unit tests.</li>
-</ul>
-<p>Do Track A first (cheap, unblocks shipping). Then run Track B as the ongoing
-last mile.</p>
-<h3 id="what-already-exists-this-is-a-wiringplan-job-not-a-build-job">What already exists (this is a wiring/plan job, not a build job)<a class="headerlink" href="#what-already-exists-this-is-a-wiringplan-job-not-a-build-job" title="Permanent link">&para;</a></h3>
-<ul>
-<li><code>devstack/docker-compose.coverage.yml</code> attaches
-  <code>-javaagent:jacocoagent.jar=...,includes=io.github.dailystruggle.rtp.*,dumponexit=true</code>
-  to all 3 backends + 2 lobbies, writing <code>./jacoco/&lt;service&gt;.exec</code>.</li>
-<li><code>devstack/run-acceptance.ps1 -Coverage</code> layers that overlay and runs
-  <code>:jacocoServerReport</code> at the end (registered in root <code>build.gradle</code>, merges
-  <code>devstack/jacoco/*.exec</code> into <code>build/reports/jacoco/server/</code>).</li>
-<li>The acceptance harness drives <code>boot</code>, <code>heartbeat</code>, <code>killmidflight</code>,
-  <code>killswitch</code>, and <code>rtptest</code> <strong>headlessly</strong> (Redis introspection + <code>rcon</code>/console).
-  Only <code>roundtrip</code> needs a live client - the pipeline is gated on
-  <code>PlayerJoinEvent</code>, which cannot be synthesized headlessly.</li>
-<li><code>/rtp test accessor</code> / <code>/rtp test full</code> force a mid-session <code>.exec</code> dump, so a
-  client session's coverage is captured without stopping the stack.</li>
-</ul>
+<h1 id="paper-262-benchmark-analysis-effective-safe-max-resource-breakdown">Paper 26.2 Benchmark Analysis: Effective Safe Max &amp; Resource Breakdown<a class="headerlink" href="#paper-262-benchmark-analysis-effective-safe-max-resource-breakdown" title="Permanent link">&para;</a></h1>
+<p>Analysis of the 86 benchmark runs (stepped ramp tests from 5 to 160 TP/s and 100 TP/s saturation bursts) executed on the Paper 26.2 server atop an AMD Ryzen Threadripper 7970X (32 cores / 64 threads @ up to 5.35 GHz, 128 GiB RAM, Samsung 990 PRO NVMe).</p>
 <hr />
-<h2 id="1-track-a-intermediate-release-prompt-sequence">1. Track A - intermediate release prompt sequence<a class="headerlink" href="#1-track-a-intermediate-release-prompt-sequence" title="Permanent link">&para;</a></h2>
-<p>Run these prompts one per session (or in order within a session). Each is written
-to be self-contained and to end with a concrete, verifiable artifact.</p>
-<h3 id="prompt-a1-re-scope-criterion-1-in-the-readiness-doc">Prompt A1 - re-scope criterion #1 in the readiness doc<a class="headerlink" href="#prompt-a1-re-scope-criterion-1-in-the-readiness-doc" title="Permanent link">&para;</a></h3>
-<blockquote>
-<p>In <code>docs/dev/ENTERPRISE_READINESS.md</code>, re-scope criterion #1's definition of
-done: strict 90/80 <strong>unit</strong> JaCoCo floors remain the bar for the pure-logic
-modules (already met by 7/9), while the platform/pipeline seams in <code>rtp-core</code>
-(the <code>RTP</code> bootstrap lambdas, teleport/dispatch pipeline, adapter glue) are
-credited by <strong>runtime-attested</strong> devstack coverage instead. Keep criterion #1
-marked PARTIAL, add a short subsection pointing at
-<code>docs/dev/DEVSTACK_COVERAGE_PLAN.md</code>, and state that the intermediate release
-is cut at the current measured state. Docs-only change; verify with a mojibake
-scan of the diff.</p>
-</blockquote>
-<h3 id="prompt-a2-ratchet-the-rtp-core-floors-to-measured-values">Prompt A2 - ratchet the rtp-core floors to measured values<a class="headerlink" href="#prompt-a2-ratchet-the-rtp-core-floors-to-measured-values" title="Permanent link">&para;</a></h3>
-<blockquote>
-<p>Run <code>:rtp-core:test :rtp-core:jacocoTestReport -Pcoverage</code>, read the fresh
-module + per-package numbers from <code>build/reports/jacoco/test/jacocoTestReport.xml</code>,
-then use <code>scripts/ratchet-coverage.py</code> (monotonic-upward only) to raise
-<code>coverageFloors[':rtp-core']</code> in root <code>build.gradle</code> from the current
-<code>0.69/0.54</code> toward the measured <code>~0.816/0.658</code> (leave the documented ~1-2 pt
-stale-exec margin; never lower a floor). Keep the safety-package rules at or
-above the new module floor. Verify with
-<code>:rtp-core:jacocoTestCoverageVerification -Pcoverage</code> green, then update the
-floor comment in <code>build.gradle</code> with the new measured baseline.</p>
-</blockquote>
-<h3 id="prompt-a3-do-the-same-for-rtp-proxy-common">Prompt A3 - do the same for rtp-proxy-common<a class="headerlink" href="#prompt-a3-do-the-same-for-rtp-proxy-common" title="Permanent link">&para;</a></h3>
-<blockquote>
-<p>Repeat the ratchet for <code>:rtp-proxy:rtp-proxy-common</code>: measure via
-<code>jacocoTestReport -Pcoverage</code>, raise its <code>0.78/0.65</code> floor toward the measured
-value with <code>scripts/ratchet-coverage.py</code>, and confirm
-<code>jacocoTestCoverageVerification -Pcoverage</code> stays green.</p>
-</blockquote>
-<h3 id="prompt-a4-cut-the-intermediate-release">Prompt A4 - cut the intermediate release<a class="headerlink" href="#prompt-a4-cut-the-intermediate-release" title="Permanent link">&para;</a></h3>
-<blockquote>
-<p>Prepare the intermediate release: update <code>CHANGELOG.md</code> (diff against the last
-released tag, tag Pro-exclusive lines with <code>**(Pro)**</code>, absolute phrasing), bump
-the version per the project convention, and confirm the CI gates
-(<code>build shadowJar -Pcoverage -PstaticAnalysis</code>, <code>diff-coverage.py</code>,
-<code>dependency-check</code>) are green. Do NOT commit or tag unless I explicitly ask.
-Report the release-ready state and any remaining blockers.</p>
-<p>Note: <code>:rtp-core:spotbugsMain</code> currently carries a pre-existing 841-finding
-backlog on <code>src/main</code> (unrelated to test-only work). If a full <code>build</code> is
-required for the release gate, treat that backlog as a separate, tracked item -
-do not attempt to clear it inside the release-cut prompt.</p>
-</blockquote>
-<hr />
-<h2 id="2-track-b-devstack-real-client-runtime-test-plan">2. Track B - devstack real-client runtime test plan<a class="headerlink" href="#2-track-b-devstack-real-client-runtime-test-plan" title="Permanent link">&para;</a></h2>
-<p>Goal: produce a merged runtime JaCoCo report that credits the platform/pipeline
-seams, and a repeatable evidence trail, then diff it against the unit report to
-show exactly which <code>rtp-core</code> classes the devstack uniquely covers.</p>
-<h3 id="21-preconditions-one-time-per-machine">2.1 Preconditions (one-time per machine)<a class="headerlink" href="#21-preconditions-one-time-per-machine" title="Permanent link">&para;</a></h3>
-<ol>
-<li>Docker Desktop running (Docker Engine 29+, min API 1.40 - same daemon the
-   Testcontainers SQL tier now uses).</li>
-<li>Build + stage jar from repo root:
-   <div class="highlight"><pre><span></span><code><span class="p">.\</span><span class="n">gradlew</span><span class="p">.</span><span class="n">bat</span> <span class="p">:</span><span class="n">rtp-plugin</span><span class="p">:</span><span class="n">remapJar</span>
-<span class="nb">Copy-Item</span> <span class="n">rtp-plugin</span><span class="p">\</span><span class="n">build</span><span class="p">\</span><span class="n">libs</span><span class="p">\</span><span class="n">LeafRTP-Pro</span><span class="p">-*.</span><span class="n">jar</span> <span class="n">devstack</span><span class="p">\</span><span class="n">jars</span><span class="p">\</span><span class="n">plugin</span><span class="p">\</span>
-</code></pre></div></li>
-<li>Provision secrets (once):
-   <div class="highlight"><pre><span></span><code><span class="nb">cd </span><span class="n">devstack</span>
-<span class="nb">Copy-Item</span> <span class="p">.</span><span class="n">env</span><span class="p">.</span><span class="n">example</span> <span class="p">.</span><span class="n">env</span>            <span class="c"># set RTP_NET_SECRET to a 32-byte base64 string</span>
-<span class="nb">Copy-Item</span> <span class="n">shared</span><span class="p">\</span><span class="n">forwarding</span><span class="p">.</span><span class="n">secret</span><span class="p">.</span><span class="n">example</span> <span class="n">shared</span><span class="p">\</span><span class="n">forwarding</span><span class="p">.</span><span class="n">secret</span>
-</code></pre></div></li>
-<li>Ensure the JaCoCo agent jar is present in <code>devstack/jacoco/</code> (the overlay
-   mounts <code>./jacoco</code> and references <code>jacocoagent.jar</code>). Stage it from the JaCoCo
-   toolchain if missing.</li>
-</ol>
-<h3 id="22-headless-coverage-sweep-no-client-needed">2.2 Headless coverage sweep (no client needed)<a class="headerlink" href="#22-headless-coverage-sweep-no-client-needed" title="Permanent link">&para;</a></h3>
-<p>Captures dispatch, heartbeat, reservation reap, kill-switch, and per-service
-<code>/rtp test accessor</code> with the agent attached:</p>
-<div class="highlight"><pre><span></span><code><span class="nb">cd </span><span class="n">devstack</span>
-<span class="p">.\</span><span class="n">run-acceptance</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-Coverage</span> <span class="n">-Scenario</span> <span class="n">boot</span>
-<span class="p">.\</span><span class="n">run-acceptance</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-Coverage</span> <span class="n">-Scenario</span> <span class="n">heartbeat</span>
-<span class="p">.\</span><span class="n">run-acceptance</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-Coverage</span> <span class="n">-Scenario</span> <span class="n">rtptest</span>
-<span class="p">.\</span><span class="n">run-acceptance</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-Coverage</span> <span class="n">-Scenario</span> <span class="n">killmidflight</span>
-<span class="p">.\</span><span class="n">run-acceptance</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-Coverage</span> <span class="n">-Scenario</span> <span class="n">killswitch</span>
-</code></pre></div>
-<p>Expected verdicts (from the README headless-evidence table):</p>
+<h2 id="1-effective-safe-maximum-throughput-across-tested-plugins">1. Effective Safe Maximum Throughput Across Tested Plugins<a class="headerlink" href="#1-effective-safe-maximum-throughput-across-tested-plugins" title="Permanent link">&para;</a></h2>
+<p>Each plugin was evaluated across 5 sequential stepped ramp test rounds (offering 5, 10, 20, 40, 80, 160, and 320 TP/s for 60 seconds per stage) and sustained 100 TP/s saturation bursts (120 seconds).</p>
+<p>The <strong>Effective Safe Max</strong> represents the highest offered throughput stage where the plugin met all SLA stability criteria:
+- <strong>Achieved Throughput:</strong> &gt;= 95% of offered load
+- <strong>Tick Health:</strong> MSPT P95 &lt;= 50.0 ms (stable 20.0 TPS line)
+- <strong>Failure / Timeout Rate:</strong> &lt;= 1.0% failures
+- <strong>Low-TPS Abort Line:</strong> No drop below 5 TPS</p>
 <table>
 <thead>
 <tr>
-<th>Scenario</th>
-<th>Pass condition</th>
+<th>Plugin</th>
+<th>Tested Command</th>
+<th>Effective Safe Max</th>
+<th>Bottleneck / Limiting Factor</th>
+<th>Performance at Safe Max</th>
+<th>Peak Throughput Observed</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>boot</td>
-<td><code>docker compose ps</code> reports all eight services <code>Up</code></td>
+<td><strong>LeafRTP Pro</strong></td>
+<td><code>rtp:rtp</code></td>
+<td><strong>40 TP/s</strong></td>
+<td>Main-thread tick budget (MSPT &gt; 50 ms at 80 TP/s)</td>
+<td>39.97 TP/s @ 40 TP/s (MSPT P95 = 48.1 ms, 0.00% fail)</td>
+<td>107.4 TP/s (ramp 160) / 99.3 TP/s (100 burst)</td>
 </tr>
 <tr>
-<td>heartbeat</td>
-<td><code>redis-cli</code> lists 5 backend + 2 proxy keys</td>
+<td><strong>HuskHomes</strong></td>
+<td><code>huskhomes:rtp</code></td>
+<td><strong>40 TP/s</strong></td>
+<td>Internal queue throttle cap (~43-45 TP/s ceiling)</td>
+<td>38.37 TP/s @ 40 TP/s (MSPT P95 = 42.0 ms, 0.00% fail)</td>
+<td>44.9 TP/s (ramp 160) / 43.1 TP/s (100 burst)</td>
 </tr>
 <tr>
-<td>rtptest</td>
-<td><code>[RTP test/accessor] pass=true</code> per backend + lobby</td>
+<td><strong>JustRTP</strong></td>
+<td><code>justrtp:justrtp</code></td>
+<td><strong>20 TP/s</strong></td>
+<td>Internal pipeline saturation cap (~25.5 TP/s ceiling)</td>
+<td>19.98 TP/s @ 20 TP/s (MSPT P95 = 34.7 ms, 0.00% fail)</td>
+<td>25.6 TP/s (ramp 40) / 25.3 TP/s (100 burst)</td>
 </tr>
 <tr>
-<td>killmidflight</td>
-<td>reservation row clears within <code>reservation.ttlMs + reapInterval</code></td>
+<td><strong>JakesRTP</strong></td>
+<td><code>jakesrtp:forcertp</code></td>
+<td><strong>20 TP/s</strong></td>
+<td>Main-thread tick collapse (MSPT 96ms @ 40, 295ms @ 80)</td>
+<td>19.98 TP/s @ 20 TP/s (MSPT P95 = 41.2 ms, 0.00% fail)</td>
+<td>74.5 TP/s (aborted: MSPT 295ms, &lt; 5 TPS)</td>
 </tr>
 <tr>
-<td>killswitch</td>
-<td>Lua claim returns <code>KILL_SWITCH</code>; proxy log line asserted</td>
+<td><strong>EzRTP</strong></td>
+<td><code>ezrtp:forcertp</code></td>
+<td><strong>5 TP/s</strong></td>
+<td>High candidate failure/timeout rate (26-36% fails)</td>
+<td>4.98 TP/s @ 5 TP/s (MSPT P95 = 21.5 ms, 0.00% fail)</td>
+<td>8.4 TP/s (ramp 20) / 8.3 TP/s (100 burst)</td>
+</tr>
+<tr>
+<td><strong>BetterRTP</strong></td>
+<td><code>betterrtp:betterrtp</code></td>
+<td><strong>None (0 TP/s)</strong></td>
+<td>Command/permission dispatch issue (100% timeouts)</td>
+<td>0.00 TP/s @ 5 TP/s (100% timeouts)</td>
+<td>0.0 TP/s (untestable via player dispatch)</td>
 </tr>
 </tbody>
 </table>
-<h3 id="23-real-client-roundtrip-the-one-manual-step">2.3 Real-client roundtrip (the one manual step)<a class="headerlink" href="#23-real-client-roundtrip-the-one-manual-step" title="Permanent link">&para;</a></h3>
-<p>The cross-server <code>/rtp</code> pipeline is gated on <code>PlayerJoinEvent</code>; a live 1.21.x
-Minecraft client is required. Run once on Pro, once on Lite.</p>
-<p>Pro path:
-1. <code>.\run-acceptance.ps1 -Coverage -Scenario roundtrip</code> (boots the stack with the
-   agent attached and waits for the manual step).
-2. Connect a 1.21.x client to <code>localhost:25577</code> (proxy-a). You land on <code>lobby-a</code>.
-3. <code>/server backend-a</code>, then <code>/rtp</code>. Confirm the teleport in-client and confirm
-   the destination backend log shows the local teleport-pipeline arrival line.
-4. <code>/server backend-b</code> and <code>/server backend-c</code>, run <code>/rtp</code> on each (exercises both
-   scheduler families - Paper on a, Folia on b/c).
-5. Before disconnecting, on each backend run <code>/rtp test full</code> to force an <code>.exec</code>
-   dump (belt-and-suspenders alongside <code>dumponexit</code>).
-6. Disconnect.</p>
-<p>Lite path (DB-free plugin-message transport):
-1. <code>.\run-acceptance.ps1 -Coverage -Lite -Scenario roundtrip</code>.
-2. Connect to <code>:25577</code>, then <code>/server backend-b</code> and <code>/server backend-c</code> once each
-   to seed availability gossip (a backend only emits heartbeat/auto-detects once a
-   player connection exists on it).
-3. <code>/rtp</code> and confirm the cross-server move + destination-log arrival line.
-   Evidence here is visual + log-based (reservation tokens are empty by design on
-   lite).</p>
-<h3 id="24-merge-report-and-diff">2.4 Merge, report, and diff<a class="headerlink" href="#24-merge-report-and-diff" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><span class="c"># run-acceptance.ps1 -Coverage already calls this at the end; run manually if needed:</span>
-<span class="p">.\</span><span class="n">gradlew</span><span class="p">.</span><span class="n">bat</span> <span class="p">:</span><span class="n">jacocoServerReport</span>
-</code></pre></div>
-<ul>
-<li>HTML/XML land in <code>build/reports/jacoco/server/</code>.</li>
-<li>Parse <code>jacocoServerReport.xml</code> for module + <code>common.tasks.teleport</code>,
-  <code>common.selection.region</code>, root <code>RTP</code>, and <code>network</code>/dispatch packages.</li>
-<li>Diff the runtime report against the unit report
-  (<code>rtp-core/build/reports/jacoco/test/jacocoTestReport.xml</code>) to identify classes
-  covered <strong>only</strong> at runtime. That delta is the evidence that closes the honest
-  part of criterion #1.</li>
-</ul>
-<h3 id="25-acceptance-criteria-evidence-artifacts">2.5 Acceptance criteria &amp; evidence artifacts<a class="headerlink" href="#25-acceptance-criteria-evidence-artifacts" title="Permanent link">&para;</a></h3>
-<ul>
-<li>All §2.2 headless scenarios pass with the verdicts above.</li>
-<li>Both §2.3 roundtrips (Pro + Lite) succeed: in-client teleport + destination-log
-  arrival line.</li>
-<li><code>jacocoServerReport</code> shows the <code>RTP</code> bootstrap/pipeline/adapter classes covered
-  at runtime that the unit report misses (record the class list + before/after
-  numbers).</li>
-<li>Evidence retained: <code>devstack/acceptance-evidence.log</code>, <code>docker compose ps</code>
-  output, the merged <code>jacocoServerReport</code> HTML, and the runtime-vs-unit diff.</li>
-<li>Cite the merged numbers in <code>ENTERPRISE_READINESS.md</code> section 2 and flip the
-  runtime-attested portion of criterion #1 accordingly.</li>
-</ul>
 <hr />
-<h2 id="3-positioning-trade-offs-keep-honest">3. Positioning &amp; trade-offs (keep honest)<a class="headerlink" href="#3-positioning-trade-offs-keep-honest" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Devstack coverage is <strong>not</strong> deterministically per-PR gateable (needs Docker +
-  one manual client hop for <code>roundtrip</code>). Treat it as <strong>scheduled/nightly +
-  release-gate evidence</strong>, mirroring how <code>-PfullTests</code> is already handled - not a
-  per-PR blocker.</li>
-<li>Unit JaCoCo floors stay the fast per-PR gate; the devstack report is the
-  release-time attestation for the runtime-only seams.</li>
-<li>Do not pretend the god-class bootstrap is unit-coverable: credit it via the
-  runtime report, and say so in the scorecard.</li>
-</ul>
-<h2 id="4-see-also">4. See also<a class="headerlink" href="#4-see-also" title="Permanent link">&para;</a></h2>
-<ul>
-<li><a href="https://github.com/DailyStruggle/RTP/blob/V3/devstack/README.md"><code>devstack/README.md</code></a> - topology, coverage overlay,
-  lite/lobby-world overlays, acceptance harness.</li>
-<li><a href="../admin/proxies/CROSS_SERVER_VERIFICATION.md"><code>docs/admin/proxies/CROSS_SERVER_VERIFICATION.md</code></a></li>
-<li>operator-facing manual verification for the same scenarios.</li>
-<li><a href="../ENTERPRISE_READINESS/"><code>docs/dev/ENTERPRISE_READINESS.md</code></a> - scorecard and
-  criterion #1.</li>
-<li><a href="../MULTI_SERVER_PLAN/"><code>docs/dev/MULTI_SERVER_PLAN.md</code></a> - phase status.</li>
-</ul>
+<h2 id="2-rigorous-chunk-metrics-selection-vs-landing-footprint">2. Rigorous Chunk Metrics: Selection vs Landing Footprint<a class="headerlink" href="#2-rigorous-chunk-metrics-selection-vs-landing-footprint" title="Permanent link">&para;</a></h2>
+<p>The previously cited figure of ~2 to ~16 chunks touched per attempt reflected only <strong>coordinate selection probing</strong> (<code>chunks_selection_per_attempt</code>), omitting the landing footprint.</p>
+<p>As documented in the StressTestRTP schema notes:
+<code>phases CSV chunks_inclusive_per_attempt (all loads / attempts) is the chunk figure to publish across plugins.</code></p>
+<p>When a player teleports, Paper loads a square of chunks around the landing location (<code>(2 * viewDistance + 1)^2</code>) so the player's client can render the world. At server view distance 4, this adds ~80 chunks per successful teleport.</p>
+<h3 id="chunk-load-breakdown-at-20-tps-1199-attempts-over-60s">Chunk Load Breakdown at 20 TP/s (1,199 Attempts over 60s)<a class="headerlink" href="#chunk-load-breakdown-at-20-tps-1199-attempts-over-60s" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Plugin</th>
+<th>Selection Chunks / Attempt</th>
+<th>Landing Chunks / Attempt</th>
+<th>Total Chunks / Attempt (<code>chunks_inclusive</code>)</th>
+<th>Total Phase Chunks Loaded</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LeafRTP Pro</strong></td>
+<td>16.7</td>
+<td>55.8</td>
+<td><strong>80.8</strong></td>
+<td>96,910</td>
+</tr>
+<tr>
+<td><strong>HuskHomes</strong></td>
+<td>3.5</td>
+<td>79.2</td>
+<td><strong>82.8</strong></td>
+<td>99,269</td>
+</tr>
+<tr>
+<td><strong>JakesRTP</strong></td>
+<td>2.0</td>
+<td>81.8</td>
+<td><strong>84.0</strong></td>
+<td>100,695</td>
+</tr>
+<tr>
+<td><strong>JustRTP</strong></td>
+<td>30.8</td>
+<td>80.1</td>
+<td><strong>111.1</strong></td>
+<td>133,156</td>
+</tr>
+<tr>
+<td><strong>EzRTP</strong></td>
+<td>45.1</td>
+<td>9.0</td>
+<td><strong>54.3</strong></td>
+<td>42,858</td>
+</tr>
+<tr>
+<td><strong>BetterRTP</strong></td>
+<td>0.0</td>
+<td>0.0</td>
+<td><strong>0.0</strong></td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<h3 id="key-chunk-inferences">Key Chunk Inferences<a class="headerlink" href="#key-chunk-inferences" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Total Chunk Footprint is Constant Across Functional Plugins (~80 to 84 chunks):</strong>
+   Every player teleporting to an unloaded destination incurs an unavoidable ~80 chunk load footprint for client view distance.</li>
+<li><strong>Selection Strategies Differ:</strong></li>
+<li><strong>JakesRTP &amp; HuskHomes:</strong> Perform minimal pre-checks (2 to 3.5 chunks) and rely on late placement checks, shifting chunk loading entirely to the landing event.</li>
+<li><strong>LeafRTP Pro:</strong> Performs ~16 selection checks asynchronously (decompression, Anvil bin verification, vertical column safety) to guarantee safe arrival, which also pre-populates the landing neighborhood (reducing fresh landing loads to 55.8 chunks).</li>
+<li><strong>JustRTP:</strong> Over-probes selection candidates (30.8 chunks per attempt), ballooning total chunk loads to 111.1 chunks per teleport.</li>
+<li><strong>EzRTP:</strong> Rejects candidates excessively (45.1 selection checks), and because 36% of teleports time out or fail, landing loads drop to 9.0 chunks.</li>
+</ol>
+<hr />
+<h2 id="3-rigorous-cpu-metrics-plugin-logic-vs-chunk-engine-vs-fixed-idle">3. Rigorous CPU Metrics: Plugin Logic vs Chunk Engine vs Fixed Idle<a class="headerlink" href="#3-rigorous-cpu-metrics-plugin-logic-vs-chunk-engine-vs-fixed-idle" title="Permanent link">&para;</a></h2>
+<p>The previously reported figure of ~215 to 230 ms of "Process CPU per Attempt" conflated three distinct operational layers:
+1. <strong>The Plugin's Own Code:</strong> Bukkit async scheduler tasks and Anvil reader threads.
+2. <strong>The Minecraft Chunk Engine:</strong> Asynchronous worker threads decompressing, generating, and preparing the 80+ chunks per teleport.
+3. <strong>The Idle Server Baseline:</strong> A Paper server with 48 connected player bots consumes ~21 to 24 seconds of server thread CPU every 60 seconds (~35% to 40% of one core) completely at idle.</p>
+<h3 id="cpu-consumption-breakdown-at-20-tps-1199-attempts-over-60s">CPU Consumption Breakdown at 20 TP/s (1,199 Attempts over 60s)<a class="headerlink" href="#cpu-consumption-breakdown-at-20-tps-1199-attempts-over-60s" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Plugin</th>
+<th>Plugin Code CPU / Attempt</th>
+<th>Chunk System CPU / Attempt</th>
+<th>Server Thread CPU / Attempt (Raw)</th>
+<th>Marginal Server CPU / Attempt (Net)</th>
+<th>Total Process CPU / Attempt</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LeafRTP Pro</strong></td>
+<td><strong>2.03 ms</strong> (0.07ms sched + 1.96ms Anvil)</td>
+<td>161.29 ms</td>
+<td>30.23 ms</td>
+<td><strong>~10.6 ms</strong></td>
+<td>254.03 ms</td>
+</tr>
+<tr>
+<td><strong>HuskHomes</strong></td>
+<td><strong>0.36 ms</strong> (0.36ms sched)</td>
+<td>170.91 ms</td>
+<td>28.80 ms</td>
+<td><strong>~9.2 ms</strong></td>
+<td>256.29 ms</td>
+</tr>
+<tr>
+<td><strong>JakesRTP</strong></td>
+<td><strong>0.03 ms</strong> (0.03ms cache)</td>
+<td>155.58 ms</td>
+<td>29.93 ms</td>
+<td><strong>~10.3 ms</strong></td>
+<td>238.65 ms</td>
+</tr>
+<tr>
+<td><strong>JustRTP</strong></td>
+<td><strong>0.00 ms</strong> (minimal async)</td>
+<td>172.28 ms</td>
+<td>32.10 ms</td>
+<td><strong>~12.5 ms</strong></td>
+<td>265.91 ms</td>
+</tr>
+<tr>
+<td><strong>EzRTP</strong></td>
+<td><strong>0.00 ms</strong> (minimal async)</td>
+<td>108.01 ms</td>
+<td>36.25 ms</td>
+<td><strong>~16.6 ms</strong></td>
+<td>178.18 ms</td>
+</tr>
+<tr>
+<td><strong>BetterRTP</strong></td>
+<td><strong>0.00 ms</strong> (idle)</td>
+<td>0.08 ms</td>
+<td>70.90 ms (at 5tps idle)</td>
+<td>N/A</td>
+<td>96.39 ms (idle bots)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="key-cpu-inferences">Key CPU Inferences<a class="headerlink" href="#key-cpu-inferences" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>Plugin Code Execution is Extremely Light (0.03 ms to 2.0 ms per attempt):</strong>
+   The plugins themselves do NOT consume 200+ ms of CPU. LeafRTP spends ~1.96 ms in background <code>RTP-Anvil-IO</code> worker threads performing region-file pre-filtering, while HuskHomes spends ~0.36 ms in scheduler tasks.</li>
+<li><strong>Chunk Loading Dominates Process CPU (~155 to 175 ms per attempt):</strong>
+   Over 65% to 70% of total JVM CPU time is consumed by Paper's <code>cpu_chunk_system_ms</code> threads decompressing, parsing, and lighting the ~81 landing chunks.</li>
+<li><strong>Marginal Server Thread Cost is ~10 to 11 ms per Teleport:</strong>
+   When a player is detached, repositioned, synchronized across the network, and re-registered with tracking chunks, Paper spends ~10 to 11 ms of main tick thread time.</li>
+<li><strong>Why Raw Server CPU / Attempt Varies with Rate:</strong>
+   Because idle bots burn ~23.5 seconds of server CPU per 60s window:</li>
+<li>At 5 TP/s (299 attempts): <code>(23.5s idle + 2.3s RTP) / 299 = 86.2 ms / attempt</code></li>
+<li>At 20 TP/s (1,199 attempts): <code>(23.5s idle + 12.7s RTP) / 1,199 = 30.2 ms / attempt</code></li>
+<li>At 40 TP/s (2,398 attempts): <code>(23.5s idle + 29.1s RTP) / 2,398 = 21.9 ms / attempt</code></li>
+<li>At 80 TP/s (4,797 attempts): <code>(23.5s idle + 31.7s RTP) / 4,797 = 11.5 ms / attempt</code>
+   At high throughput, fixed idle cost amortizes away, revealing the true marginal cost of ~10 to 11.5 ms per teleport.</li>
+</ol>
+<hr />
+<h2 id="4-architectural-bottleneck-profiles">4. Architectural Bottleneck Profiles<a class="headerlink" href="#4-architectural-bottleneck-profiles" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>LeafRTP Pro (Pipelined Engine):</strong></li>
+<li><strong>Architecture:</strong> Zero-tick cached handoff from asynchronous pre-generation queues.</li>
+<li><strong>Bottleneck:</strong> Not worker threads or chunk I/O, but strictly the <strong>50 ms server tick budget</strong>. At 80 TP/s, serving 80 players on the main thread pushes MSPT to ~96 ms (~10.5 TPS). Safe limit is 40 to 45 TP/s.</li>
+<li><strong>HuskHomes &amp; JustRTP (Throttled Engines):</strong></li>
+<li><strong>Architecture:</strong> Synchronous command intake throttled by internal rate limiters.</li>
+<li><strong>Bottleneck:</strong> Protects server TPS by flatlining intake at ~43 TP/s (HuskHomes) and ~25.5 TP/s (JustRTP). When offered load exceeds this, queues back up and player wait times swell to 1.8 - 3.0 seconds.</li>
+<li><strong>JakesRTP (Unbounded Engine):</strong></li>
+<li><strong>Architecture:</strong> Dispatches fast but lacks Paper 26.2 asynchronous thread isolation.</li>
+<li><strong>Bottleneck:</strong> At &gt;= 40 TP/s, synchronous chunk and placement work spills onto the main server thread, causing severe tick dilation (MSPT 96 ms at 40 TP/s, 295 ms at 80 TP/s) and crashing TPS below 5.</li>
+<li><strong>EzRTP (Inefficient Sampling Engine):</strong></li>
+<li><strong>Architecture:</strong> Simple random trial-and-error sampling.</li>
+<li><strong>Bottleneck:</strong> Candidate rejection rate spikes at higher loads (26% to 36% fails), making it unable to sustain even 10 TP/s.</li>
+</ol>
 
 
 

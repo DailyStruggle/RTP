@@ -789,6 +789,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1268,7 +1310,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1289,7 +1331,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3954,6 +3996,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4236,7 +4341,8 @@
 
 
 <h1 id="adr-016-anvil-read-only-subsystem-prefilter-backed-chunk-view-shared-module">ADR-016 — Anvil Read-Only Subsystem (Prefilter, Backed Chunk View, Shared Module)<a class="headerlink" href="#adr-016-anvil-read-only-subsystem-prefilter-backed-chunk-view-shared-module" title="Permanent link">&para;</a></h1>
-<p><strong>Status:</strong> Accepted</p>
+<p><strong>Status:</strong> Accepted
+<strong>Extended by:</strong> <a href="../ADR-109-measured-cost-probe-first-gate/">ADR-109</a> (measured-cost gate on whether the center-column probe runs); <a href="../ADR-110-purpose-gated-live-loads/">ADR-110</a> (speculative fill resolves through the region-file view first; live fallback pinned when a kept slot is free, else unpinned without the success ring)</p>
 <h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
 <p>RTP's selection pipeline samples blocks, biomes, heightmaps, and sky-light for candidate chunks. On vanilla Spigot, only <code>Consumer</code>-based async chunk APIs exist and they dispatch the load back onto the tick thread; Paper/Folia expose <code>World#getChunkAtAsync(int,int)</code> returning a <code>CompletableFuture</code> that resolves off-tick. Even with the async overload, Folia's region-thread affinity forces each live-chunk read onto the owning region scheduler, and every platform pays a full generation pass for candidates that will be rejected.</p>
 <p>For a chunk already persisted on disk, the block / biome / heightmap / sky-light data RTP needs is in the Anvil region file (<code>&lt;world&gt;/region/r.&lt;x&gt;.&lt;z&gt;.mca</code>). Reading it is pure file I/O — no tick or region thread is required. The on-disk palette is also <em>strictly more accurate</em> than the live view: closed enums (<code>org.bukkit.Material</code>, <code>org.bukkit.block.Biome</code>) collapse modded and generator-native identifiers (<code>create:crushing_wheel</code>, <code>iris:volcanic_ash_plains</code>) to their nearest vanilla cousin, while the <code>.mca</code> palette preserves full namespaced identifiers. Persisted palettes also remain consistent with what the client renders after a Minecraft version upgrade shifts Mojang's seed-based biome assignment; live <code>getBiome(...)</code> does not.</p>

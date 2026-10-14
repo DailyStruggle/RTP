@@ -789,6 +789,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1268,7 +1310,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1289,7 +1331,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3903,6 +3945,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4137,7 +4242,7 @@
 <p><strong>Status:</strong> Accepted
 <strong>Date:</strong> 2026-05-23
 <strong>Supersedes:</strong> <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-013-network-mode-bootstrap-parity.md">rtp-fabric-ADR-013</a> (was Proposed 2026-05-22; the rejected-alternatives analysis in that ADR is based on an incorrect coupling estimate, see Context below)
-<strong>Related:</strong> <a href="../ADR-036-network-mode-multi-server-multi-proxy/">ADR-036</a> (umbrella network-mode ADR), <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-014-backend-owned-rtp-with-network-queue.md">rtp-proxy-ADR-014</a>, <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md">rtp-proxy-ADR-015</a>, <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a> (Fabric in scope), <a href="../../dev/MULTI_SERVER_PLAN/"><code>MULTI_SERVER_PLAN.md</code></a>, <a href="../../dev/MULTI_PLATFORM_PLAN/"><code>MULTI_PLATFORM_PLAN.md</code></a> Step J.</p>
+<strong>Related:</strong> <a href="../ADR-036-network-mode-multi-server-multi-proxy/">ADR-036</a> (umbrella network-mode ADR), <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-014-backend-owned-rtp-with-network-queue.md">rtp-proxy-ADR-014</a>, <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md">rtp-proxy-ADR-015</a>, <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a> (Fabric in scope), <a href="../../dev/MULTI_SERVER_PLAN/"><code>MULTI_SERVER_PLAN.md</code></a>, <a href="../dev/MULTI_PLATFORM_PLAN.md"><code>MULTI_PLATFORM_PLAN.md</code></a> Step J.</p>
 <h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
 <p>Network-mode multi-server support landed end-to-end on Paper in this cycle (user-confirmed working 2026-05-22). The Phase 1 SPI in <code>rtp-proxy-common</code> is platform-agnostic and already reachable from any backend JVM, but the Phase 2 backend integration currently lives under <code>rtp-plugin/src/main/java/io/github/dailystruggle/rtp/bukkit/network/</code> (<code>NetworkModeBootstrap</code> and twelve neighbouring classes). A Velocity-routed player arriving on a Fabric backend with a reservation token has no listener to redeem it: the lookup happens but the redeem-side handler is Bukkit-only. The cross-server flow therefore silently degrades on Fabric, violating the Phase 2 acceptance criterion in <code>MULTI_SERVER_PLAN.md</code> that says "a backend that advertises <code>RtpTriggerSource</code> MUST redeem reservation tokens on join".</p>
 <p><a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-013-network-mode-bootstrap-parity.md">rtp-fabric-ADR-013</a> proposed solving this by reimplementing <code>NetworkModeBootstrap</code> as a parallel <code>FabricNetworkModeBootstrap</code>. Its central rejection of the refactor path leaned on the claim that the Bukkit class has "eight independent coupling points to <code>org.bukkit.*</code> (<code>Plugin</code>, <code>BukkitScheduler</code>, <code>PluginManager</code>, <code>Listener</code>, <code>PlayerJoinEvent</code>, <code>EventHandler</code>, <code>EventPriority</code>, <code>Bukkit.getOnlinePlayers()</code>)" and that a base-class refactor would produce "a near-equal amount of Fabric-side code anyway".</p>
@@ -4380,7 +4485,7 @@ public interface PlayerLifecycleHook {
 <li><a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002 - Platform in scope</a></li>
 <li><a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md">rtp-fabric-ADR-009 - Obf / unobf common split</a></li>
 <li><a href="../../dev/MULTI_SERVER_PLAN/"><code>MULTI_SERVER_PLAN.md</code></a></li>
-<li><a href="../../dev/MULTI_PLATFORM_PLAN/"><code>MULTI_PLATFORM_PLAN.md</code></a> Step J</li>
+<li><a href="../dev/MULTI_PLATFORM_PLAN.md"><code>MULTI_PLATFORM_PLAN.md</code></a> Step J</li>
 </ul>
 
 

@@ -954,6 +954,48 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1433,7 +1475,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1454,7 +1496,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../dev/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3858,6 +3900,69 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4044,13 +4149,12 @@
 
 
 <h1 id="web-workspace-visual-editor-guide">Web Workspace &amp; Visual Editor Guide<a class="headerlink" href="#web-workspace-visual-editor-guide" title="Permanent link">&para;</a></h1>
-<p><strong>Architecture Record:</strong> <a href="https://github.com/DailyStruggle/RTP/blob/V3/adr/ADR-104-ephemeral-web-editor-and-packed-docs-integration.md">ADR-104</a> (Ephemeral Web Editor and In-Game Packed Docs Integration)
-<strong>Related Prohibitions:</strong> S-004 (no silent failures), S-005 (zero main-thread chunk/network I/O), S-006 (fail-closed API contract)</p>
+<p><strong>Design notes:</strong> <a href="https://github.com/DailyStruggle/RTP/blob/V3/adr/ADR-104-ephemeral-web-editor-and-packed-docs-integration.md">ADR-104</a> (Ephemeral Web Editor and In-Game Packed Docs Integration)</p>
 <p>The LeafRTP Web Workspace is a browser-based visual cartography and configuration staging application (<code>docs/editor/</code> or hosted <code>/editor/</code>). It allows server operators to inspect engine diagnostics, adjust region boundary geometry, and configure plugin YAML with live documentation hints on a secondary monitor while retaining active gameplay on their primary display.</p>
 <hr />
 <h2 id="1-problem-statement-the-simultaneous-view-edit-dilemma">1. Problem Statement: The Simultaneous View &amp; Edit Dilemma<a class="headerlink" href="#1-problem-statement-the-simultaneous-view-edit-dilemma" title="Permanent link">&para;</a></h2>
 <p>Traditional server management confronts operators with screen conflicts and accessibility hurdles:
-- <strong>Screen Lock:</strong> Opening in-game books (<code>/rtp docs</code>, ADR-045) or inventory menus locks the Minecraft client screen. Operators cannot comfortably cross-reference documentation while tweaking complex configuration files or command arguments.
+- <strong>Screen Lock:</strong> Opening in-game books (<code>/rtp docs</code>) or inventory menus locks the Minecraft client screen. Operators cannot comfortably cross-reference documentation while tweaking complex configuration files or command arguments.
 - <strong>Port-Forwarding &amp; Remote Hosting Restrictions:</strong> Running an embedded HTTP listener inside the Minecraft JVM requires inbound firewall ports, which are frequently blocked by shared hosting environments or home NATs. Embedded servers also introduce network attack surfaces (e.g. CSRF, unauthenticated sockets).
 - <strong>Geometric Complexity:</strong> Manually hand-typing coordinates for multi-vertex polygons (<code>POLYGON</code>) or inner exclusion rings (<code>centerRadius</code>) is error-prone and unintuitive.</p>
 <p>LeafRTP resolves these issues using an <strong>outbound ephemeral session architecture</strong> modeled after <code>spark</code> and <code>LuckPerms</code>, paired with offline in-game book lowering.</p>
@@ -4059,7 +4163,7 @@
 <div class="highlight"><pre><span></span><code>+---------------------------------------------------------------------------------------------------+
 | PRIMARY SCREEN: Minecraft Client (In-Game)                                                        |
 |                                                                                                   |
-|   /rtp editor (or /rtp admin -&gt; [🌐 Web Editor])                                                  |
+|   /rtp editor (or /rtp admin -&gt; [🌐 Web Editor])                                                   |
 |       │                                                                                           |
 |       ▼                                                                                           |
 |   Emits ephemeral link: https://dailystruggle.github.io/RTP/editor#&lt;128-bit-token&gt;                |
@@ -4071,15 +4175,15 @@
 | SECONDARY SCREEN: Dedicated Web Workspace (Browser)                                               |
 |                                                                                                   |
 |   ┌───────────────────────────────────────────────┬───────────────────────────────────────────┐   |
-|   │ 🗺 2D Vector Cartography Canvas               │ 📋 Staging Diff &amp; Validation Inspector    │   |
+|   │ 🗺 2D Vector Cartography Canvas               │ 📋 Staging Diff &amp; Validation Inspector    │     |
 |   │ - Polygon vertex dragging &amp; simplification    │ - Live YAML mutations across files        │   |
-|   │ - Donut (centerRadius) &amp; Box boundary gizmos  │ - ADR-034 non-self-intersection guard     │   |
+|   │ - Donut (centerRadius) &amp; Box boundary gizmos  │ - polygon self-intersection guard        │    |
 |   │ - Live Biome &amp; Bad-Location Overlays          │ - Context-tracking schema documentation   │   |
 |   └───────────────────────────────────────────────┴───────────────────────────────────────────┘   |
 |                                       │                                                           |
-|                                       │ Click [⚡ Hot-Apply / Copy]                               |
+|                                       │ Click [⚡ Hot-Apply / Copy]                                |
 |                                       ▼                                                           |
-|   Outbound WebSocket commit OR Copy-to-clipboard: /rtp editor apply &lt;token&gt;                      |
+|   Outbound WebSocket commit OR Copy-to-clipboard: /rtp editor apply &lt;token&gt;                       |
 +---------------------------------------------------------------------------------------------------+
                                         │
                                         │ (WebSocket push or operator pastes /rtp editor apply &lt;token&gt;)
@@ -4087,19 +4191,19 @@
 +---------------------------------------------------------------------------------------------------+
 | SERVER VERIFICATION &amp; COMMIT PIPELINE                                                             |
 |                                                                                                   |
-|   1. Async fetch/receive session payload via outbound HTTPS/WebSocket (S-005)                     |
+|   1. Async fetch/receive session payload via outbound HTTPS/WebSocket                             |
 |   2. Validate payload SHA-256 integrity and authorization token                                   |
-|   3. Validate geometry invariants (ADR-034 non-self-intersection &amp; world border bounds)           |
+|   3. Validate geometry (no self-intersecting polygons, inside world border)                       |
 |   4. Off-thread disk backup of affected configuration files (.bak)                                |
 |   5. Atomic in-memory config swap and disk flush on async worker                                  |
-|   6. Notify operator in chat with exact diff summary (S-004)                                      |
+|   6. Notify operator in chat with exact diff summary                                              |
 +---------------------------------------------------------------------------------------------------+
 </code></pre></div>
 <h3 id="security-safeguards">Security Safeguards<a class="headerlink" href="#security-safeguards" title="Permanent link">&para;</a></h3>
 <ol>
 <li><strong>Zero Inbound Attack Surface:</strong> The server opens no listening network sockets, HTTP daemons, or open ports. All network traffic is outbound HTTPS/WebSocket to the ephemeral byte store.</li>
 <li><strong>Cryptographic Tokens:</strong> Sessions use cryptographically random 128-bit hex tokens (<code>SecureRandom</code>). Tokens expire automatically and are invalidated once applied.</li>
-<li><strong>Fail-Closed Geometry Validation:</strong> Proposed region boundaries are validated against ADR-034 non-self-intersection rules and world borders before any config file is updated on disk.</li>
+<li><strong>Fail-Closed Geometry Validation:</strong> Proposed region boundaries are checked for self-intersecting polygons and world-border limits before any config file is updated on disk.</li>
 <li><strong>Non-Destructive Backups:</strong> The server automatically writes <code>.bak</code> copies of all affected configuration files prior to applying modifications.</li>
 <li><strong>Secrets Stay on the Server:</strong> Passwords and other secret values are uploaded as <code>&lt;redacted&gt;</code>. Applying a file that still shows <code>&lt;redacted&gt;</code> keeps the value already on disk.</li>
 <li><strong>Trusted Browsers:</strong> A new browser has to be trusted once in-game with <code>/rtp editor trust &lt;code&gt;</code>. The code matches the one shown on the page and expires after 5 minutes. To revoke trust, run <code>/rtp editor untrust key=&lt;fingerprint prefix&gt;</code>, or <code>key=all</code> to revoke every browser.</li>
@@ -4145,13 +4249,14 @@ https://dailystruggle.github.io/RTP/editor#e4d2a90f1b2c3d4e
 <ul>
 <li><strong>Panel 1: 🗺 Visual Region Editor</strong></li>
 <li><strong>Pan &amp; Zoom:</strong> Scroll to zoom; drag empty map space (or right / middle drag, Shift / Ctrl + drag) to pan.</li>
+<li><strong>Pick a World:</strong> The <strong>World</strong> dropdown under the region selector lists every world the server detected (one <code>definitions/worlds/&lt;name&gt;.yml</code> each), including the nether and the end. Choosing one sets the region's <code>world:</code> key and switches the map to that world's land. An index such as <code>[0]</code> stays listed with the world it resolves to.</li>
 <li><strong>Move a Region:</strong> Drag the round centre handle to move the region. <code>centerX</code> / <code>centerZ</code> snap to whole chunks (or the 🧲 Snap grid) and keep the unit you wrote (<code>4096b</code> stays in blocks, <code>256c</code> / <code>256</code> stay in chunks). For a polygon, drag the centre handle or anywhere inside the shape to shift every vertex.</li>
 <li><strong>Resize a Region:</strong> Drag the square handles on the outer edge to change <code>radius</code> (<code>ELLIPSE</code>: <code>radius</code> on the X axis, <code>radius2</code> on the Z axis; <code>RECTANGLE</code>: <code>width</code> / <code>height</code> from the edges, both from the corners). Drag the pink handles on the inner ring to change <code>centerRadius</code> / <code>centerRadius2</code> (the deadzone hole). The hole always stays smaller than the outer edge. For a polygon, the outer handles scale every vertex about the centre, and a scale that would collapse or cross the outline is refused.</li>
 <li><strong>Live Values:</strong> The cursor changes over a handle, and a label shows the value as you drag (e.g. <code>radius 260c (4160 b)</code>). The YAML diff updates while you drag; the server path preview is requested once, when you let go.</li>
-<li><strong>Drag Vertices:</strong> Click and drag polygon vertices to adjust region perimeters. Vertices take priority over the move / resize handles. Redundant collinear points are simplified dynamically (ADR-099).</li>
+<li><strong>Drag Vertices:</strong> Click and drag polygon vertices to adjust region perimeters. Vertices take priority over the move / resize handles. Redundant collinear points are simplified dynamically.</li>
 <li><strong>Type Exact Values:</strong> Every value a handle changes can also be typed in the shape settings form, which uses the same staging path.</li>
 <li>
-<p><strong>Visualization Layers:</strong> Toggle overlays for chunk-resolution pregenerated land (biome data streamed progressively to maintain &gt; 5 FPS), rejected candidate blocks (<code>bad-locations</code>), and 1D Archimedean spiral walk traces (ADR-001).</p>
+<p><strong>Visualization Layers:</strong> Toggle overlays for chunk-resolution pregenerated land (biome data streamed progressively to maintain &gt; 5 FPS), rejected candidate blocks (<code>bad-locations</code>), and 1D Archimedean spiral walk traces.</p>
 </li>
 <li>
 <p><strong>Panel 2: 📊 Diagnostics &amp; Telemetry</strong></p>
@@ -4181,7 +4286,7 @@ Every modification is staged as an explicit delta:
 <span class="p p-Indicator">-</span><span class="w">   </span><span class="nt">centerRadius</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64c</span>
 <span class="nt">+   centerRadius</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">80c</span>
 </code></pre></div>
-The <strong>Math Invariant Guard</strong> confirms that all geometric shapes satisfy ADR-034 requirements (non-self-intersecting polygons, valid radii, coordinates within world borders).</p>
+The <strong>Math Invariant Guard</strong> confirms that all geometric shapes are valid (non-self-intersecting polygons, valid radii, coordinates within world borders).</p>
 <h3 id="step-4-apply-changes">Step 4: Apply Changes<a class="headerlink" href="#step-4-apply-changes" title="Permanent link">&para;</a></h3>
 <p>Click <strong>[⚡ Hot-Apply / Copy]</strong> in the top navigation bar.
 1. <strong>Direct Outbound Apply (Connected Mode):</strong> If a bi-directional WebSocket session is active between the server and byte store, the changes commit directly. The server reloads regions instantly and logs a diff summary in chat.
@@ -4191,7 +4296,7 @@ The <strong>Math Invariant Guard</strong> confirms that all geometric shapes sat
    Paste this command into your Minecraft chat or console to execute the atomic commit.</p>
 <hr />
 <h2 id="5-air-gapped-local-offline-mode-file">5. Air-Gapped &amp; Local Offline Mode (<code>file:///</code>)<a class="headerlink" href="#5-air-gapped-local-offline-mode-file" title="Permanent link">&para;</a></h2>
-<p>For environments without outbound internet connectivity or where external byte stores are unreachable (ADR-104 §4.4):</p>
+<p>For environments without outbound internet connectivity or where external byte stores are unreachable:</p>
 <ol>
 <li>Generate a self-contained offline HTML bundle via console or chat:
    <div class="highlight"><pre><span></span><code>/rtp editor local

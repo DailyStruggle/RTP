@@ -918,6 +918,11 @@
           <button id="btn-remove-region" type="button" class="btn" onclick="removeCurrentRegion()" title="The default region is protected and cannot be removed" disabled style="background:rgba(243,139,168,0.15); border:1px solid var(--red); color:var(--red); padding:6px 12px; font-size:0.8rem; white-space:nowrap;">🗑 Remove</button>
         </div>
       </div>
+      <!-- Options: worlds with a detected definitions/worlds/<name>.yml, see syncWorldSelect -->
+      <div class="control-group">
+        <label>World:</label>
+        <select id="reg-world-select" class="control-input" onchange="updateRegionWorld(this.value)" title="The region's world: key; the map shows this world's land"></select>
+      </div>
       <div class="control-group">
         <label>Geometric Shape Algorithm:</label>
         <!-- Options: the server's registered shapes (payload.schema), see populateShapeSelect -->
@@ -1504,6 +1509,10 @@ function applyHistorySnapshot(snapshot) {
     profile.shape = snapshot.shape;
     profile.settings = Object.assign({}, snapshot.settings || {});
     profile.vertices = Array.isArray(snapshot.vertices) ? snapshot.vertices.map(v => [Number(v[0]), Number(v[1])]) : [];
+    // Only world entries carry a world (updateRegionWorld); geometry entries leave it alone
+    if (typeof snapshot.world === 'string' && snapshot.world && typeof setRegionWorld === 'function') {
+      setRegionWorld(profile, snapshot.world, snapshot.worldResolved);
+    }
   }
   if (typeof regionState !== 'undefined' && regionState && regionState.name !== regionName && typeof changeRegionProfile === 'function' && typeof regionProfiles !== 'undefined' && regionProfiles && regionProfiles[regionName]) {
     changeRegionProfile(regionName);
@@ -1514,6 +1523,7 @@ function applyHistorySnapshot(snapshot) {
   }
   const current = typeof regionState !== 'undefined' && regionState ? regionState : profile;
   if (typeof populateShapeSelect === 'function' && current) populateShapeSelect(current.shape);
+  if (typeof syncWorldSelect === 'function') syncWorldSelect();
   if (typeof syncShapeSpecificControls === 'function' && current) syncShapeSpecificControls(current);
   if (typeof renderShapeSettingsForm === 'function' && current) renderShapeSettingsForm(current);
   if (typeof renderPolygonVerticesList === 'function') renderPolygonVerticesList();
@@ -7084,6 +7094,7 @@ function syncRegionProfiles() {
       else regionProfiles[regionName] = Object.assign({ name: regionName }, g);
       recordInitialRegionSnapshot(regionProfiles[regionName]);
     }
+    if (regionName && regionProfiles[regionName]) applyYamlWorld(regionProfiles[regionName], configs[fileName]);
   }
 
   // Populate #reg-profile-select
@@ -7183,6 +7194,7 @@ function changeRegionProfile(profileKey) {
     document.getElementById('hud-region').textContent = regionState.name;
     document.getElementById('hud-shape').textContent = regionState.shape || '-';
     populateShapeSelect(regionState.shape);
+    syncWorldSelect();
     syncShapeSpecificControls(regionState);
     renderShapeSettingsForm(regionState);
     const selectEl = document.getElementById('reg-profile-select');
@@ -7222,6 +7234,86 @@ function syncShapeSpecificControls(region) {
     renderPolygonVerticesList();
     syncPolygonAABB();
   }
+}
+
+// Worlds the server detected: one definitions/worlds/<name>.yml each (default.yml is the fallback)
+function detectedWorldNames() {
+  const names = new Set();
+  for (const f of Object.keys(configs)) {
+    const m = /^(?:definitions\/)?worlds\/([^\/]+)\.yml$/i.exec(f);
+    if (m && m[1].toLowerCase() !== 'default') names.add(m[1]);
+  }
+  return [...names].sort((a, b) => a.localeCompare(b));
+}
+
+// "[n]" index tokens and "@file" references name no world themselves: the server resolves them
+function isWorldToken(v) {
+  return /^\[\d+\]$/.test(String(v || '').trim()) || isInheritedReferenceToken(v);
+}
+
+// The region file's top-level world: as written ("world_nether", "[0]"), or ''
+function readRegionWorld(text) {
+  return yamlScalarAt(text || '', 'world') || '';
+}
+
+// A world named in the file is the region's world; a token keeps the server-resolved one
+function applyYamlWorld(profile, text) {
+  const w = readRegionWorld(text);
+  if (profile && w && !isWorldToken(w)) profile.world = w;
+}
+
+// Writes `raw` as the region file's world: key; `resolved` names the world a token stands for
+function setRegionWorld(region, raw, resolved) {
+  const file = regionFileFor(region.name);
+  if (configs[file] === undefined && region.shape) configs[file] = computeCurrentRegionYaml(region);
+  if (configs[file] !== undefined) {
+    configs[file] = yamlSetScalar(configs[file], ['world'], JSON.stringify(String(raw)));
+    if (currentConfigFile === file && cfgEditor) cfgEditor.value = configs[file];
+  }
+  if (!isWorldToken(raw)) region.world = raw;
+  else if (resolved) region.world = resolved;
+}
+
+// World dropdown = detected worlds; the region's current value stays listed when no file names it
+function syncWorldSelect() {
+  const sel = document.getElementById('reg-world-select');
+  if (!sel || !regionState) return;
+  const file = regionFileFor(regionState.name);
+  const raw = readRegionWorld(configs[file] !== undefined ? configs[file] : (shippedConfigs[file] || ''));
+  const names = detectedWorldNames();
+  const current = (raw && isWorldToken(raw)) ? raw : (regionState.world || raw || '');
+  sel.textContent = '';
+  let count = 0;
+  const add = (value, label) => {
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = label;
+    sel.appendChild(opt);
+    count++;
+  };
+  if (current && !names.includes(current)) {
+    const resolved = isWorldToken(current) && regionState.world ? ` (${regionState.world})` : '';
+    add(current, current + (isWorldToken(current) ? resolved : ' (no world config detected)'));
+  }
+  for (const n of names) add(n, n);
+  if (count === 0) add('', 'No worlds detected');
+  sel.value = current;
+}
+
+// Moves the region to another world: its world: key, the land map and the server's survey focus
+function updateRegionWorld(val) {
+  if (!regionState || !val) return;
+  const file = regionFileFor(regionState.name);
+  const prevRaw = readRegionWorld(configs[file] !== undefined ? configs[file] : '') || regionState.world || '';
+  if (val === prevRaw) return;
+  const before = Object.assign(cloneRegionSnapshot(regionState), { world: prevRaw, worldResolved: regionState.world || '' });
+  setRegionWorld(regionState, val);
+  const after = Object.assign(cloneRegionSnapshot(regionState), { world: val, worldResolved: regionState.world || '' });
+  syncWorldSelect();
+  renderBiomeDistribution();
+  drawMap();
+  updateStagingDiff();
+  EditorHistoryManager.push(new HistoryEntry(`Move to World ${val}`, regionState.name, before, after));
 }
 
 // Settings the new shape does not take stay in the model (switching back restores them); the
@@ -7724,6 +7816,9 @@ function stageRegionGeometry(region) {
 function applyYamlGeometry(name, text) {
   const profile = regionProfiles[name];
   if (!profile) return;
+  const world = profile.world;
+  applyYamlWorld(profile, text);
+  if (profile.world !== world && profile === regionState) syncWorldSelect();
   const g = readRegionGeometry(text);
   if (!g.local) return;
   delete g.local;
@@ -8253,7 +8348,7 @@ var EditorChannelClient = (() => {
     retryMs: 1000, retryTimer: null, pingTimer: null, missedPongs: 0, dropped: 0, lastDrop: '',
     inChain: Promise.resolve(), outChain: Promise.resolve(), stopped: false,
     sentAt: [], outQueue: [], pumpTimer: null, feedAt: 0,
-    protocol: null, extensions: [], ignored: 0
+    protocol: null, extensions: [], ignored: 0, linkSecret: '', linkProof: ''
   };
 
   const b64 = (buf) => {
@@ -8289,7 +8384,7 @@ var EditorChannelClient = (() => {
           + (st.persistent ? '' : ' This browser cannot store its key, so it must be trusted again next time.')],
       connected: feedStale()
         ? ['● LINK · FEED STALE (' + Math.round((Date.now() - st.feedAt) / 1000) + 's)', 'var(--yellow)',
-          'Linked, but the server sent no live update for over ' + (CHANNEL_FEED_STALE_MS / 1000) + ' s (it sends one at least every 60 s); its live feed may have stopped. The page keeps working from its snapshot.']
+          'Linked, but the server sent no live update for over ' + (CHANNEL_FEED_STALE_MS / 1000) + ' s (it sends one at least every 40 s); its live feed may have stopped. The page keeps working from its snapshot.']
         : ['● LINK · CONNECTED', 'var(--green)', 'Signed channel to the plugin: live updates and Hot-Apply are on.'],
       reconnecting: ['● LINK · RECONNECTING', 'var(--yellow)', 'Channel lost (' + st.reason + '); retrying. The page keeps working from its snapshot.'],
       snapshot: ['● SNAPSHOT ONLY' + (st.reason ? ' (' + st.reason + ')' : ''), 'var(--subtext)', 'No live channel: drawing works from the snapshot.']
@@ -8380,6 +8475,7 @@ var EditorChannelClient = (() => {
       const pub = await crypto.subtle.exportKey('spki', st.keys.publicKey);
       st.myPub = b64(pub);
       st.myFp = hex(await crypto.subtle.digest('SHA-256', pub));
+      st.linkProof = st.linkSecret ? await linkProofFor(cfg.id, st.myFp) : '';
     } catch (e) {
       setStatus('snapshot', 'key setup failed');
       return;
@@ -8514,9 +8610,19 @@ var EditorChannelClient = (() => {
     return Math.ceil(expire / CHANNEL_PAGE_FRAMES) * CHANNEL_FRAME_WINDOW_MS;
   }
 
+  // ADR-106 §5.10: HMAC-SHA256 keyed with the link secret over context, channel and this key's
+  // fingerprint; the secret itself never leaves the page
+  async function linkProofFor(channelId, fp) {
+    const raw = unb64(st.linkSecret.replace(/-/g, '+').replace(/_/g, '/') + '=');
+    const key = await crypto.subtle.importKey('raw', raw, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+    return b64(await crypto.subtle.sign('HMAC', key, enc.encode('rtp-editor-link|' + channelId + '|' + fp)));
+  }
+
   function sendHello() {
     st.hid = hex(crypto.getRandomValues(new Uint8Array(8)));
-    enqueue({ type: 'hello', channel: st.cfg.id, from: st.myFp, hid: st.hid, publicKey: st.myPub });
+    const hello = { type: 'hello', channel: st.cfg.id, from: st.myFp, hid: st.hid, publicKey: st.myPub };
+    if (st.linkProof) hello.linkProof = st.linkProof;
+    enqueue(hello);
   }
 
   async function receive(text) {
@@ -8649,6 +8755,8 @@ var EditorChannelClient = (() => {
 
   return {
     start, stop, send, fits, queuedWaitMs,
+    // Before start: the session link's #k= secret (43 base64url characters), memory only
+    setLinkSecret: (s) => { st.linkSecret = typeof s === 'string' && /^[A-Za-z0-9_-]{43}$/.test(s) ? s : ''; },
     on: (type, fn) => { handlers[type] = fn; },
     onNamespace: (id, fn) => { namespaces[id] = fn; },
     setProtocol: (p, extensions) => {
@@ -9996,6 +10104,19 @@ window.__rtpLivePathTile = function (r, tx, tz, tile) {
   }
   if (region === regionState.name) requestMapRedraw();
 };
+
+// ADR-106 §5.10: #k=<secret> proves this browser opened the operator's link, so its key is trusted
+// for the session without a code. Read before any channel starts; memory only, out of the address bar.
+(function captureLinkSecret() {
+  const link = /^#k=([A-Za-z0-9_-]{43})$/.exec(window.location.hash);
+  if (!link) return;
+  if (EditorChannelClient) EditorChannelClient.setLinkSecret(link[1]);
+  try {
+    history.replaceState(history.state, '', window.location.pathname + window.location.search);
+  } catch (e) {
+    console.warn('[RTP Web Editor] Could not remove the session link secret from the address bar:', e);
+  }
+})();
 
 // ADR-104: `/rtp editor local` embeds the live payload as inert JSON so the
 // workspace opens fully populated from file:// with no network access.
