@@ -25,6 +25,7 @@
       --teal: #94e2d5;
       --blue: #89b4fa;
       --dark: #11111b;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     }
     * { box-sizing: border-box; }
     body {
@@ -93,6 +94,7 @@
     .btn:disabled:hover { border-color: var(--overlay); }
     .btn-primary { background: var(--green); color: var(--dark); border: none; }
     .btn-primary:hover { opacity: 0.9; }
+    .btn kbd { font-size: 0.7rem; background: rgba(255,255,255,0.1); padding: 1px 4px; border-radius: 3px; }
     #workspace { flex: 1; display: flex; overflow: hidden; position: relative; }
     .panel-view { display: none; width: 100%; height: 100%; }
     .panel-view.active { display: flex; }
@@ -108,7 +110,7 @@
       padding: 8px 14px;
       border-radius: 6px;
       border: 1px solid var(--overlay);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-family: var(--mono);
       font-size: 0.82rem;
       pointer-events: none;
     }
@@ -121,10 +123,24 @@
       border-radius: 6px;
       border: 1px solid var(--overlay);
       display: flex;
-      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
       font-size: 0.8rem;
     }
-    #map-layers label { cursor: pointer; display: flex; align-items: center; gap: 4px; user-select: none; }
+    /* Layer toggles as chips: on = filled accent, off = dimmed outline, readable at a glance */
+    #map-layers label {
+      cursor: pointer; display: flex; align-items: center; gap: 5px; user-select: none;
+      padding: 2px 9px 2px 6px; border-radius: 12px; border: 1px solid var(--overlay);
+      color: var(--subtext); opacity: 0.6; transition: background 0.12s, border-color 0.12s, opacity 0.12s;
+    }
+    #map-layers label:hover { opacity: 1; border-color: var(--accent); }
+    #map-layers label input { margin: 0; accent-color: var(--accent); cursor: pointer; }
+    #map-layers label:has(input:checked) {
+      opacity: 1; color: var(--text); font-weight: 600;
+      background: rgba(137, 180, 250, 0.2); border-color: var(--accent);
+    }
+    #map-layers label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
     #region-sidebar {
       width: 400px;
       background: var(--surface);
@@ -139,7 +155,7 @@
       border-radius: 6px;
       padding: 12px;
       border: 1px solid var(--overlay);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-family: var(--mono);
       font-size: 0.8rem;
       white-space: pre-wrap;
       line-height: 1.45;
@@ -360,7 +376,7 @@
       border: none;
       cursor: pointer;
       font-size: 0.83rem;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-family: var(--mono);
       transition: all 0.12s ease;
     }
     .cfg-file-btn:hover { background: var(--surface); color: var(--text); }
@@ -387,7 +403,7 @@
       padding: 18px 8px 18px 4px;
       background: #161622;
       color: rgba(166, 173, 200, 0.45);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-family: var(--mono);
       font-size: 0.88rem;
       line-height: 1.5;
       text-align: right;
@@ -416,7 +432,7 @@
       background: rgba(166, 227, 161, 0.16);
       border: 1px solid rgba(166, 227, 161, 0.45);
       color: var(--green);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-family: var(--mono);
       font-size: 0.74rem;
       line-height: 1.5;
       pointer-events: auto;
@@ -429,13 +445,102 @@
       color: var(--text);
       border: none;
       padding: 18px;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-family: var(--mono);
       font-size: 0.88rem;
       resize: none;
       outline: none;
       line-height: 1.5;
       box-sizing: border-box;
       white-space: pre;
+    }
+    #cfg-textarea-mirror {
+      position: absolute;
+      top: 0;
+      left: 58px;
+      visibility: hidden;
+      pointer-events: none;
+      white-space: pre;
+      word-wrap: normal;
+      overflow: hidden;
+      font-family: var(--mono);
+      font-size: 0.88rem;
+      line-height: 1.5;
+      padding: 18px;
+      box-sizing: border-box;
+      z-index: -9999;
+    }
+    #cfg-autocomplete-popup {
+      position: absolute;
+      z-index: 100;
+      min-width: 220px;
+      max-width: 380px;
+      max-height: 220px;
+      background: #181825;
+      border: 1px solid var(--overlay);
+      border-radius: 6px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+      overflow-y: auto;
+      font-family: var(--mono);
+      font-size: 0.83rem;
+      color: var(--text);
+    }
+    .cfg-ac-item {
+      display: flex;
+      align-items: center;
+      padding: 6px 10px;
+      cursor: pointer;
+      gap: 8px;
+      user-select: none;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+    .cfg-ac-item:last-child {
+      border-bottom: none;
+    }
+    .cfg-ac-item:hover, .cfg-ac-item.active {
+      background: rgba(137, 180, 250, 0.16);
+      color: var(--accent);
+    }
+    .cfg-ac-icon {
+      font-size: 0.8rem;
+      width: 16px;
+      text-align: center;
+      color: var(--subtext);
+      flex-shrink: 0;
+    }
+    .cfg-ac-item.active .cfg-ac-icon {
+      color: var(--accent);
+    }
+    .cfg-ac-label {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .cfg-ac-badge {
+      font-size: 0.68rem;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: var(--overlay);
+      color: var(--subtext);
+      opacity: 0.85;
+      flex-shrink: 0;
+    }
+    .cfg-quick-fix-btn {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 1px 6px;
+      font-size: 0.72rem;
+      border-radius: 4px;
+      background: rgba(166, 227, 161, 0.15);
+      border: 1px solid rgba(166, 227, 161, 0.4);
+      color: var(--green);
+      cursor: pointer;
+      font-family: var(--mono);
+      transition: background 0.1s ease;
+    }
+    .cfg-quick-fix-btn:hover {
+      background: rgba(166, 227, 161, 0.3);
+      color: #fff;
     }
     #config-doc-tracker {
       width: 380px;
@@ -507,7 +612,7 @@
       border: none;
       cursor: pointer;
       font-size: 0.82rem;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-family: var(--mono);
     }
     .doc-item-btn:hover { background: var(--surface); color: var(--text); }
     .doc-item-btn.active { background: var(--overlay); color: var(--accent); font-weight: bold; }
@@ -728,10 +833,10 @@
     <button class="nav-tab" onclick="switchPanel('panel-docs', this)">📖 Shipped Docs</button>
   </nav>
   <div class="nav-actions">
-    <button class="btn" style="border-color:var(--accent); color:var(--accent);" onclick="openSearchModal()">⌖ Quick Find <kbd style="font-size:0.7rem; background:rgba(255,255,255,0.1); padding:1px 4px; border-radius:3px;">Ctrl+K</kbd></button>
+    <button class="btn" style="border-color:var(--accent); color:var(--accent);" onclick="openSearchModal()">⌖ Quick Find <kbd>Ctrl+K</kbd></button>
     <button class="btn" onclick="exportPng()">📷 Snapshot</button>
-    <button id="btn-undo" class="btn" onclick="EditorHistoryManager.undo()" disabled title="Undo (Ctrl+Z)">↶ Undo <kbd style="font-size:0.7rem; background:rgba(255,255,255,0.1); padding:1px 4px; border-radius:3px;">Ctrl+Z</kbd></button>
-    <button id="btn-redo" class="btn" onclick="EditorHistoryManager.redo()" disabled title="Redo (Ctrl+Y)">↷ Redo <kbd style="font-size:0.7rem; background:rgba(255,255,255,0.1); padding:1px 4px; border-radius:3px;">Ctrl+Y</kbd></button>
+    <button id="btn-undo" class="btn" onclick="EditorHistoryManager.undo()" disabled title="Undo (Ctrl+Z)">↶ Undo <kbd>Ctrl+Z</kbd></button>
+    <button id="btn-redo" class="btn" onclick="EditorHistoryManager.redo()" disabled title="Redo (Ctrl+Y)">↷ Redo <kbd>Ctrl+Y</kbd></button>
     <button class="btn" onclick="resetStaging()">↺ Revert</button>
     <button class="btn btn-primary" onclick="commitChanges()">⚡ Commit / Apply</button>
   </div>
@@ -752,8 +857,7 @@
         <label><input type="checkbox" id="chk-bins" checked onchange="drawMap()"> P-Bins (<span id="layer-p-label">P=32</span>)</label>
         <label><input type="checkbox" id="chk-bounds" checked onchange="drawMap()"> Boundaries</label>
         <label><input type="checkbox" id="chk-pregen" checked onchange="drawMap()"> Pregen Land</label>
-        <label><input type="checkbox" id="chk-spiral" checked onchange="drawMap()"> Walk Path (Hilbert / Spiral)</label>
-        <label><input type="checkbox" id="chk-hazards" checked onchange="drawMap()"> Bad Spots</label>
+        <label title="The selection curve; stretches over learned bad spots are drawn red"><input type="checkbox" id="chk-spiral" onchange="drawMap()"> Walk Path + <span style="color:#ff556e;">Bad Spots</span></label>
         <label><input type="checkbox" id="chk-heat" checked onchange="drawMap()"> Landings</label>
         <div style="display:inline-flex; align-items:center; gap:4px; margin-left:6px; border-left:1px solid rgba(255,255,255,0.15); padding-left:8px;">
           <span style="font-size:0.75rem; color:var(--accent); font-weight:600;">🧲 Snap:</span>
@@ -811,7 +915,7 @@
             <option value="default">default (Default Region)</option>
             <option value="__add_region__">➕ Add Region...</option>
           </select>
-          <button id="btn-remove-region" type="button" class="btn" onclick="removeCurrentRegion()" title="The default region is protected and cannot be removed" disabled style="background:rgba(243,139,168,0.15); border:1px solid var(--red); color:var(--red); padding:6px 12px; font-size:0.8rem; cursor:not-allowed; opacity:0.4; white-space:nowrap;">🗑 Remove</button>
+          <button id="btn-remove-region" type="button" class="btn" onclick="removeCurrentRegion()" title="The default region is protected and cannot be removed" disabled style="background:rgba(243,139,168,0.15); border:1px solid var(--red); color:var(--red); padding:6px 12px; font-size:0.8rem; white-space:nowrap;">🗑 Remove</button>
         </div>
       </div>
       <div class="control-group">
@@ -1167,6 +1271,8 @@
       <div id="cfg-editor-wrap">
         <div id="cfg-gutter">1</div>
         <textarea id="cfg-editor" class="code-editor" spellcheck="false"></textarea>
+        <div id="cfg-textarea-mirror" aria-hidden="true"></div>
+        <div id="cfg-autocomplete-popup" role="listbox" style="display:none;"></div>
         <div id="cfg-unit-chip" class="cfg-unit-chip" style="display:none;"></div>
       </div>
       <aside id="config-doc-tracker" style="overflow-y:auto; max-height:calc(100vh - 120px);">
@@ -2210,7 +2316,7 @@ function shippedBlockKeys(kind) {
  */
 function diagnoseYaml(file, text) {
   const issues = [];
-  const add = (line, severity, msg) => issues.push({ line, severity, msg });
+  const add = (line, severity, msg, fix = null) => issues.push({ line, severity, msg, ...(fix ? { fix } : {}) });
   const recs = parseYamlLines(text);
   const shipped = shippedConfigs[file];
   const shippedRecs = typeof shipped === 'string' ? parseYamlLines(shipped) : [];
@@ -2262,10 +2368,33 @@ function diagnoseYaml(file, text) {
       const source = (ann.source || '').toLowerCase();
       const regKind = (r.key === 'name' && (parent === 'shape' || parent === 'vert')) ? parent
         : (source === 'shape' || source === 'vert') ? source : null;
-      if (regKind && r.value && !r.value.startsWith('@') && registryNames(regKind).length > 0 && !registryHas(regKind, r.value)) {
-        const names = registryNames(regKind);
-        add(r.line, 'error', `Unknown ${REGISTRY_LABEL[regKind]} '${r.value}' (registered: ${names.slice(0, 14).join(', ')}${names.length > 14 ? ', ...' : ''})`);
-        continue;
+      if (regKind && r.value && !r.value.startsWith('@')) {
+        const names = registryNames(regKind).length > 0
+          ? registryNames(regKind)
+          : (regKind === 'shape' ? getAvailableShapeNames() : getAvailableVertNames());
+        if (names.length > 0 && !names.some(n => n.toUpperCase() === r.value.toUpperCase())) {
+          const valUpper = r.value.toUpperCase();
+          let bestCandidate = null;
+          let bestDist = Infinity;
+          for (const name of names) {
+            const dist = computeLevenshtein(valUpper, name.toUpperCase());
+            if (dist < bestDist) {
+              bestDist = dist;
+              bestCandidate = name;
+            }
+          }
+          if (bestCandidate && bestDist <= 2) {
+            add(r.line, 'warning', `Unrecognized ${REGISTRY_LABEL[regKind] || regKind} '${r.value}'. Did you mean '${bestCandidate}'?`, {
+              label: `Replace with '${bestCandidate}'`,
+              line: r.line,
+              original: r.value,
+              replacement: bestCandidate
+            });
+          } else {
+            add(r.line, 'error', `Unknown ${REGISTRY_LABEL[regKind] || regKind} '${r.value}' (registered: ${names.slice(0, 14).join(', ')}${names.length > 14 ? ', ...' : ''})`);
+          }
+          continue;
+        }
       }
     }
 
@@ -2277,7 +2406,26 @@ function diagnoseYaml(file, text) {
       if (ann.options && (type === 'enum' || type === 'list<enum>')) {
         const opts = parseAnnotationList(ann.options);
         if (opts.length && !opts.some(o => o.toLowerCase() === v.toLowerCase())) {
-          add(r.line, 'error', `'${v}' is not one of: ${opts.join(', ')}`);
+          const valUpper = v.toUpperCase();
+          let bestCandidate = null;
+          let bestDist = Infinity;
+          for (const opt of opts) {
+            const dist = computeLevenshtein(valUpper, opt.toUpperCase());
+            if (dist < bestDist) {
+              bestDist = dist;
+              bestCandidate = opt;
+            }
+          }
+          if (bestCandidate && bestDist <= 2) {
+            add(r.line, 'warning', `Unrecognized option '${v}'. Did you mean '${bestCandidate}'?`, {
+              label: `Replace with '${bestCandidate}'`,
+              line: r.line,
+              original: v,
+              replacement: bestCandidate
+            });
+          } else {
+            add(r.line, 'error', `'${v}' is not one of: ${opts.join(', ')}`);
+          }
           continue;
         }
       }
@@ -2323,6 +2471,34 @@ function collectSchemaIssues() {
   return out;
 }
 
+function applyDiagnosticFix(fix) {
+  if (!fix || !cfgEditor) return;
+  const text = cfgEditor.value || '';
+  const lines = text.split(/\r?\n/);
+  const lineIdx = fix.line - 1;
+  if (lineIdx < 0 || lineIdx >= lines.length) return;
+
+  const line = lines[lineIdx];
+  let replacedLine = line;
+  if (line.includes(fix.original)) {
+    replacedLine = line.replace(fix.original, fix.replacement);
+  } else {
+    const re = new RegExp(fix.original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    replacedLine = line.replace(re, fix.replacement);
+  }
+
+  lines[lineIdx] = replacedLine;
+  cfgEditor.value = lines.join('\n');
+  if (currentConfigFile) configs[currentConfigFile] = cfgEditor.value;
+
+  const editedRegion = regionNameOfFile(currentConfigFile);
+  if (editedRegion) applyYamlGeometry(editedRegion, cfgEditor.value);
+  trackCurrentConfigLine();
+  updateGutterAndDiagnostics();
+  if (currentConfigFile) updateStagingDiff();
+  cfgEditor.focus();
+}
+
 let configIssues = [];
 let gutterSig = '';
 function updateGutterAndDiagnostics() {
@@ -2334,10 +2510,11 @@ function updateGutterAndDiagnostics() {
   const byLine = new Map();
   for (const is of configIssues) {
     const cur = byLine.get(is.line);
-    if (!cur) byLine.set(is.line, { severity: is.severity, msgs: [is.msg] });
+    if (!cur) byLine.set(is.line, { severity: is.severity, msgs: [is.msg], fix: is.fix || null });
     else {
       cur.msgs.push(is.msg);
       if (is.severity === 'error') cur.severity = 'error';
+      if (!cur.fix && is.fix) cur.fix = is.fix;
     }
   }
   // A spacer as tall as the editor's horizontal scrollbar keeps the numbers aligned at the bottom
@@ -2348,17 +2525,24 @@ function updateGutterAndDiagnostics() {
     const parts = new Array(total);
     for (let i = 1; i <= total; i++) {
       const d = byLine.get(i);
+      const fixIcon = (d && d.fix) ? ' ✎' : '';
       parts[i - 1] = d
-        ? `<div class="gutter-${d.severity === 'error' ? 'err' : 'warn'}" title="${escapeHtml(d.msgs.join('\n'))}">${d.severity === 'error' ? '⛔' : '⚠'} ${i}</div>`
+        ? `<div class="gutter-${d.severity === 'error' ? 'err' : 'warn'}" style="cursor:pointer;" data-gutter-line="${i}" title="${escapeHtml(d.msgs.join('\n')) + (d.fix ? '\n[Click to inspect Quick Fix]' : '')}">${d.severity === 'error' ? '⛔' : '⚠'}${fixIcon} ${i}</div>`
         : `<div>${i}</div>`;
     }
     gutter.innerHTML = parts.join('') + `<div style="height:${hbar}px"></div>`;
+    gutter.querySelectorAll('[data-gutter-line]').forEach(el => {
+      el.addEventListener('click', () => {
+        const lineNo = parseInt(el.getAttribute('data-gutter-line'), 10);
+        focusEditorLine(lineNo);
+      });
+    });
   }
   gutter.scrollTop = cfgEditor.scrollTop;
   renderConfigIssueList();
 }
 
-// Issue list in the doc tracker; each entry moves the cursor to its line
+// Issue list in the doc tracker; each entry moves the cursor to its line or applies a quick fix
 function renderConfigIssueList() {
   const box = document.getElementById('cfg-issues-box');
   if (!box) return;
@@ -2370,8 +2554,22 @@ function renderConfigIssueList() {
   const errs = configIssues.filter(x => x.severity === 'error').length;
   box.style.display = 'block';
   box.innerHTML = `<div style="font-weight:600; color:${errs ? 'var(--red)' : 'var(--yellow)'}; margin-bottom:4px;">${errs} error(s), ${configIssues.length - errs} warning(s)</div>`
-    + configIssues.slice(0, 40).map(x => `<div class="cfg-issue" data-line="${x.line}" style="cursor:pointer; color:${x.severity === 'error' ? 'var(--red)' : 'var(--yellow)'};">L${x.line}: ${escapeHtml(x.msg)}</div>`).join('');
-  box.querySelectorAll('.cfg-issue').forEach(el => el.addEventListener('click', () => focusEditorLine(parseInt(el.getAttribute('data-line'), 10))));
+    + configIssues.slice(0, 40).map((x, idx) => {
+        const fixBtn = x.fix ? `<button class="cfg-quick-fix-btn" data-fix-idx="${idx}" title="${escapeHtml(x.fix.label)}">⚡ Fix</button>` : '';
+        return `<div class="cfg-issue" data-line="${x.line}" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:3px; color:${x.severity === 'error' ? 'var(--red)' : 'var(--yellow)'};"><span class="cfg-issue-text" style="cursor:pointer; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">L${x.line}: ${escapeHtml(x.msg)}</span>${fixBtn}</div>`;
+      }).join('');
+  box.querySelectorAll('.cfg-issue-text').forEach(el => {
+    el.addEventListener('click', () => focusEditorLine(parseInt(el.parentElement.getAttribute('data-line'), 10)));
+  });
+  box.querySelectorAll('.cfg-quick-fix-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.getAttribute('data-fix-idx'), 10);
+      if (configIssues[idx] && configIssues[idx].fix) {
+        applyDiagnosticFix(configIssues[idx].fix);
+      }
+    });
+  });
 }
 
 // Number + spatial unit value of a raw YAML line ("  radius: 256c # note"), with its char span.
@@ -2616,6 +2814,7 @@ cfgEditor.addEventListener('scroll', () => {
 let cfgInputTimer = null;
 cfgEditor.addEventListener('input', () => {
   if (currentConfigFile) configs[currentConfigFile] = cfgEditor.value;
+  checkAndTriggerAutocomplete(false);
   clearTimeout(cfgInputTimer);
   cfgInputTimer = setTimeout(() => {
     cfgInputTimer = null;
@@ -2632,6 +2831,455 @@ cfgEditor.addEventListener('keyup', () => {
   if (!cfgInputTimer) trackCurrentConfigLine();
 });
 cfgEditor.addEventListener('click', trackCurrentConfigLine);
+
+// ---------------------------------------------------------------------------
+// Web IDE Autocomplete & Caret Tracking Subsystem (ADR-104 / Tri-State Model)
+// ---------------------------------------------------------------------------
+let acVisible = false;
+let acItems = [];
+let acSelectedIndex = 0;
+let currentAcContext = null;
+
+function getAvailableShapeNames() {
+  const reg = registryNames('shape');
+  if (reg && reg.length > 0) return reg;
+  return ['CIRCLE', 'SQUARE', 'RECTANGLE', 'POLYGON'];
+}
+
+function getAvailableVertNames() {
+  const reg = registryNames('vert');
+  if (reg && reg.length > 0) return reg;
+  return ['LINEAR', 'JUMP'];
+}
+
+function hideAutocomplete() {
+  const popup = document.getElementById('cfg-autocomplete-popup');
+  if (popup) popup.style.display = 'none';
+  acVisible = false;
+  acItems = [];
+  acSelectedIndex = 0;
+  currentAcContext = null;
+}
+
+function calculateCaretPixelPosition() {
+  const mirror = document.getElementById('cfg-textarea-mirror');
+  if (!mirror || !cfgEditor) return { x: 0, y: 0 };
+
+  const text = cfgEditor.value || '';
+  const cursorPos = cfgEditor.selectionStart || 0;
+  const textBefore = text.substring(0, cursorPos);
+
+  const style = window.getComputedStyle(cfgEditor);
+  mirror.style.width = cfgEditor.clientWidth + 'px';
+  mirror.style.fontFamily = style.fontFamily;
+  mirror.style.fontSize = style.fontSize;
+  mirror.style.lineHeight = style.lineHeight;
+  mirror.style.padding = style.padding;
+  mirror.style.boxSizing = style.boxSizing;
+
+  mirror.textContent = textBefore;
+  const marker = document.createElement('span');
+  marker.textContent = '|';
+  mirror.appendChild(marker);
+
+  const rect = cfgEditor.getBoundingClientRect();
+  const wrap = document.getElementById('cfg-editor-wrap');
+  const wrapRect = wrap ? wrap.getBoundingClientRect() : { left: 0, top: 0, width: 800, height: 600 };
+
+  const editorOffsetLeft = rect.left - wrapRect.left;
+  const editorOffsetTop = rect.top - wrapRect.top;
+
+  const x = editorOffsetLeft + marker.offsetLeft - cfgEditor.scrollLeft;
+  const y = editorOffsetTop + marker.offsetTop - cfgEditor.scrollTop;
+
+  return { x, y };
+}
+
+function getAutocompleteContext() {
+  if (!cfgEditor) return null;
+  const text = cfgEditor.value || '';
+  const pos = cfgEditor.selectionStart || 0;
+  const lineStart = text.lastIndexOf('\n', pos - 1) + 1;
+  const lineText = text.substring(lineStart, pos);
+
+  // Skip comment lines
+  if (lineText.trim().startsWith('#')) return null;
+
+  const colonIdx = lineText.indexOf(':');
+  const indent = lineText.length - lineText.trimStart().length;
+
+  // Determine parent hierarchy by parsing previous non-comment lines
+  const lines = text.substring(0, pos).split('\n');
+  const currentLineIdx = lines.length - 1;
+  const parentStack = [];
+  for (let i = 0; i < currentLineIdx; i++) {
+    const l = lines[i];
+    const lt = l.trim();
+    if (!lt || lt.startsWith('#')) continue;
+    const lIndent = l.length - l.trimStart().length;
+    const m = lt.match(/^([a-zA-Z0-9_.-]+)\s*:/);
+    if (m) {
+      while (parentStack.length > 0 && parentStack[parentStack.length - 1].indent >= lIndent) {
+        parentStack.pop();
+      }
+      parentStack.push({ indent: lIndent, key: m[1] });
+    }
+  }
+  while (parentStack.length > 0 && parentStack[parentStack.length - 1].indent >= indent) {
+    parentStack.pop();
+  }
+  const parentPath = parentStack.map(p => p.key);
+  const immediateParent = parentPath.length > 0 ? parentPath[parentPath.length - 1] : null;
+
+  if (colonIdx === -1 || pos <= lineStart + colonIdx) {
+    // Mode: KEY completion
+    const keyMatch = lineText.match(/([a-zA-Z0-9_.-]*)$/);
+    const token = keyMatch ? keyMatch[1] : '';
+    const replaceStart = pos - token.length;
+    const replaceEnd = pos;
+
+    return {
+      mode: 'key',
+      token,
+      replaceStart,
+      replaceEnd,
+      indent,
+      immediateParent,
+      parentPath
+    };
+  } else {
+    // Mode: VALUE completion
+    const keyPart = lineText.substring(0, colonIdx).trim();
+    const valPart = lineText.substring(colonIdx + 1);
+    const valMatch = valPart.match(/([a-zA-Z0-9_.-@]*)$/);
+    const token = valMatch ? valMatch[1] : '';
+    const replaceStart = pos - token.length;
+    const replaceEnd = pos;
+
+    return {
+      mode: 'value',
+      key: keyPart,
+      token,
+      replaceStart,
+      replaceEnd,
+      indent,
+      immediateParent,
+      parentPath
+    };
+  }
+}
+
+function collectAutocompleteCandidates(ctx) {
+  if (!ctx) return [];
+  const candidates = [];
+
+  if (ctx.mode === 'key') {
+    if (ctx.immediateParent === 'shape') {
+      let activeShape = null;
+      const text = cfgEditor.value || '';
+      const lines = text.split('\n');
+      const curLineIdx = text.substring(0, ctx.replaceStart).split('\n').length - 1;
+      for (let i = curLineIdx; i >= 0; i--) {
+        const l = lines[i];
+        if (l.trim().startsWith('shape:')) break;
+        const m = l.match(/^\s*name:\s*([a-zA-Z0-9_.-]+)/i);
+        if (m) { activeShape = m[1].toUpperCase(); break; }
+      }
+      if (!activeShape) {
+        for (let i = curLineIdx; i < Math.min(lines.length, curLineIdx + 10); i++) {
+          const l = lines[i];
+          const m = l.match(/^\s*name:\s*([a-zA-Z0-9_.-]+)/i);
+          if (m) { activeShape = m[1].toUpperCase(); break; }
+        }
+      }
+
+      const pKeys = activeShape ? registryKeys('shape', activeShape) : null;
+      const knownKeys = new Set(['name']);
+      if (pKeys) pKeys.forEach(k => knownKeys.add(k));
+      else {
+        ['name', 'radius', 'centerRadius', 'center_radius', 'minRadius', 'min_radius', 'weight', 'expand'].forEach(k => knownKeys.add(k));
+        const shippedKeys = shippedBlockKeys('shape');
+        if (shippedKeys) shippedKeys.forEach(k => knownKeys.add(k));
+      }
+
+      knownKeys.forEach(k => {
+        candidates.push({ label: k + ':', insertText: k + ': ', type: 'property', icon: '⚙', badge: 'shape' });
+      });
+    } else if (ctx.immediateParent === 'vert') {
+      const knownKeys = new Set(['name']);
+      const shippedKeys = shippedBlockKeys('vert');
+      if (shippedKeys) shippedKeys.forEach(k => knownKeys.add(k));
+      else ['name', 'step', 'requireSkyLight'].forEach(k => knownKeys.add(k));
+      knownKeys.forEach(k => {
+        candidates.push({ label: k + ':', insertText: k + ': ', type: 'property', icon: '⚙', badge: 'vert' });
+      });
+    } else {
+      const shipped = shippedConfigs[currentConfigFile];
+      if (shipped) {
+        const shippedRecs = parseYamlLines(shipped);
+        const set = new Set();
+        shippedRecs.forEach(r => {
+          if (ctx.indent === 0 && r.indent === 0 && r.key) set.add(r.key);
+          else if (ctx.immediateParent && r.path[r.path.length - 1] === ctx.immediateParent && r.key) set.add(r.key);
+        });
+        set.forEach(k => {
+          candidates.push({ label: k + ':', insertText: k + ': ', type: 'property', icon: '⌖', badge: 'config' });
+        });
+      }
+      if (candidates.length === 0 && ctx.indent === 0) {
+        ['region', 'regions', 'defaults', 'safety', 'teleportDelay', 'cancelOnMove', 'price', 'logging'].forEach(k => {
+          candidates.push({ label: k + ':', insertText: k + ': ', type: 'property', icon: '⌖', badge: 'config' });
+        });
+      }
+    }
+  } else if (ctx.mode === 'value') {
+    const k = ctx.key.toLowerCase();
+
+    if (k === 'name' && ctx.immediateParent === 'shape') {
+      getAvailableShapeNames().forEach(s => {
+        candidates.push({ label: s, insertText: s, type: 'shape', icon: '⬡', badge: 'shape' });
+      });
+    } else if (k === 'name' && ctx.immediateParent === 'vert') {
+      getAvailableVertNames().forEach(v => {
+        candidates.push({ label: v, insertText: v, type: 'adjustor', icon: '⇅', badge: 'adjustor' });
+      });
+    } else if (k === 'boundary') {
+      ['SUBSPACE', 'REGION', 'LEASH', 'SHAPE', 'NONE'].forEach(b => {
+        candidates.push({ label: b, insertText: b, type: 'enum', icon: '◈', badge: 'boundary' });
+      });
+    } else if (k === 'type') {
+      ['STRING', 'NUMBER', 'PLAYER', 'COORDINATE', 'BOOLEAN'].forEach(t => {
+        candidates.push({ label: t, insertText: t, type: 'enum', icon: '◈', badge: 'type' });
+      });
+    } else if (k.includes('icon') || k.includes('material') || k.includes('filler')) {
+      const commonMaterials = [
+        'COMPASS', 'GLASS', 'STONE', 'DIAMOND', 'DIAMOND_SWORD', 'EMERALD',
+        'BOOK', 'CLOCK', 'BARRIER', 'NETHER_STAR', 'CHEST', 'ENDER_PEARL',
+        'GRASS_BLOCK', 'OBSIDIAN', 'BEACON', 'GOLD_INGOT', 'IRON_INGOT', 'AIR'
+      ];
+      commonMaterials.forEach(m => {
+        candidates.push({ label: m, insertText: m, type: 'material', icon: '❖', badge: 'material' });
+      });
+    } else if (k.includes('enabled') || k.includes('permission') || k.includes('override') || k.includes('cancel') || k.includes('require')) {
+      candidates.push({ label: 'true', insertText: 'true', type: 'boolean', icon: '✓', badge: 'bool' });
+      candidates.push({ label: 'false', insertText: 'false', type: 'boolean', icon: '✗', badge: 'bool' });
+    } else if (k.includes('radius') || k.includes('distance') || k.includes('height')) {
+      ['b', 'c', 'r', 'km'].forEach(u => {
+        candidates.push({ label: u, insertText: u, type: 'unit', icon: '📏', badge: 'unit' });
+      });
+    }
+
+    if (ctx.token.startsWith('@') || ctx.token === '') {
+      ['@config', '@default'].forEach(ref => {
+        candidates.push({ label: ref, insertText: ref, type: 'reference', icon: '🔗', badge: 'reference' });
+      });
+    }
+
+    const shipped = shippedConfigs[currentConfigFile];
+    if (shipped) {
+      const shippedRecs = parseYamlLines(shipped);
+      for (const r of shippedRecs) {
+        if (r.key && r.key.toLowerCase() === k && r.ann && r.ann.options) {
+          const opts = parseAnnotationList(r.ann.options);
+          opts.forEach(opt => {
+            if (!candidates.some(c => c.label === opt)) {
+              candidates.push({ label: opt, insertText: opt, type: 'enum', icon: '◈', badge: 'option' });
+            }
+          });
+        }
+      }
+    }
+  }
+
+  const token = ctx.token.toLowerCase().trim();
+  if (!token) {
+    return candidates.slice(0, 15);
+  }
+
+  const prefixHits = [];
+  const fuzzyHits = [];
+
+  for (const c of candidates) {
+    const rawLabel = c.label.replace(/:$/, '').toLowerCase();
+    if (rawLabel === token) {
+      prefixHits.unshift(c);
+    } else if (rawLabel.startsWith(token)) {
+      prefixHits.push(c);
+    } else if (token.length >= 2) {
+      const dist = computeLevenshtein(token, rawLabel);
+      if (dist <= 2) {
+        fuzzyHits.push({ cand: c, dist });
+      }
+    }
+  }
+
+  fuzzyHits.sort((a, b) => a.dist - b.dist);
+  const result = [...prefixHits, ...fuzzyHits.map(h => h.cand)];
+
+  const seen = new Set();
+  const deduped = [];
+  for (const item of result) {
+    if (!seen.has(item.label)) {
+      seen.add(item.label);
+      deduped.push(item);
+    }
+  }
+  return deduped.slice(0, 15);
+}
+
+function updateActiveAcItem() {
+  const popup = document.getElementById('cfg-autocomplete-popup');
+  if (!popup) return;
+  const items = popup.querySelectorAll('.cfg-ac-item');
+  items.forEach((item, idx) => {
+    const isAct = idx === acSelectedIndex;
+    item.classList.toggle('active', isAct);
+    if (isAct) {
+      item.scrollIntoView({ block: 'nearest' });
+    }
+  });
+}
+
+function renderAutocomplete(items, ctx) {
+  const popup = document.getElementById('cfg-autocomplete-popup');
+  if (!popup || !items || items.length === 0) {
+    hideAutocomplete();
+    return;
+  }
+
+  acItems = items;
+  acSelectedIndex = 0;
+  popup.textContent = '';
+
+  items.forEach((item, index) => {
+    const el = document.createElement('div');
+    el.className = 'cfg-ac-item' + (index === 0 ? ' active' : '');
+    el.setAttribute('role', 'option');
+
+    const iconEl = document.createElement('span');
+    iconEl.className = 'cfg-ac-icon';
+    iconEl.textContent = item.icon || '⌖';
+
+    const labelEl = document.createElement('span');
+    labelEl.className = 'cfg-ac-label';
+    labelEl.textContent = item.label;
+
+    const badgeEl = document.createElement('span');
+    badgeEl.className = 'cfg-ac-badge';
+    badgeEl.textContent = item.badge || item.type;
+
+    el.appendChild(iconEl);
+    el.appendChild(labelEl);
+    el.appendChild(badgeEl);
+
+    el.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      applyAutocompleteChoice(item, ctx);
+    });
+
+    popup.appendChild(el);
+  });
+
+  const pos = calculateCaretPixelPosition();
+  const wrap = document.getElementById('cfg-editor-wrap');
+  const wrapRect = wrap ? wrap.getBoundingClientRect() : { width: 800, height: 600 };
+
+  let left = pos.x;
+  let top = pos.y + 24;
+
+  popup.style.display = 'block';
+  const popupRect = popup.getBoundingClientRect();
+
+  if (top + popupRect.height > wrapRect.height) {
+    top = Math.max(10, pos.y - popupRect.height - 4);
+  }
+  if (left + popupRect.width > wrapRect.width) {
+    left = Math.max(10, wrapRect.width - popupRect.width - 20);
+  }
+
+  popup.style.left = Math.max(10, left) + 'px';
+  popup.style.top = Math.max(10, top) + 'px';
+  acVisible = true;
+}
+
+function applyAutocompleteChoice(item, ctx) {
+  if (!item || !ctx || !cfgEditor) return;
+  const insertText = item.insertText || item.label;
+  const text = cfgEditor.value || '';
+  const before = text.substring(0, ctx.replaceStart);
+  const after = text.substring(ctx.replaceEnd);
+
+  cfgEditor.value = before + insertText + after;
+  const newPos = before.length + insertText.length;
+  cfgEditor.selectionStart = newPos;
+  cfgEditor.selectionEnd = newPos;
+
+  if (currentConfigFile) configs[currentConfigFile] = cfgEditor.value;
+  hideAutocomplete();
+  cfgEditor.focus();
+
+  cfgEditor.dispatchEvent(new Event('input'));
+}
+
+function checkAndTriggerAutocomplete(explicitTrigger = false) {
+  const ctx = getAutocompleteContext();
+  currentAcContext = ctx;
+  if (!ctx) {
+    hideAutocomplete();
+    return false;
+  }
+  if (explicitTrigger || ctx.token.length >= 1 || (ctx.mode === 'value' && ctx.token.length >= 0)) {
+    const candidates = collectAutocompleteCandidates(ctx);
+    if (candidates.length > 0) {
+      renderAutocomplete(candidates, ctx);
+      return true;
+    }
+  }
+  hideAutocomplete();
+  return false;
+}
+
+cfgEditor.addEventListener('keydown', (e) => {
+  if (acVisible && acItems.length > 0) {
+    if (e.key === 'Tab' || e.key === 'Enter') {
+      e.preventDefault();
+      applyAutocompleteChoice(acItems[acSelectedIndex], currentAcContext);
+      return;
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      acSelectedIndex = (acSelectedIndex + 1) % acItems.length;
+      updateActiveAcItem();
+      return;
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      acSelectedIndex = (acSelectedIndex - 1 + acItems.length) % acItems.length;
+      updateActiveAcItem();
+      return;
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      hideAutocomplete();
+      return;
+    }
+  }
+
+  if (e.key === 'Tab') {
+    const triggered = checkAndTriggerAutocomplete(true);
+    if (triggered) {
+      e.preventDefault();
+    }
+  } else if ((e.ctrlKey || e.metaKey) && e.key === ' ') {
+    e.preventDefault();
+    checkAndTriggerAutocomplete(true);
+  }
+});
+
+// Hide autocomplete on scroll or click outside
+window.addEventListener('click', (e) => {
+  if (acVisible && !e.target.closest('#cfg-autocomplete-popup') && e.target !== cfgEditor) {
+    hideAutocomplete();
+  }
+});
 
 // Shipped and live YAML document every key in the comment block directly above it
 // (prose + @type/@default/@range/@options annotations). Used when docTrackerDb has no entry.
@@ -3385,20 +4033,6 @@ function decodeBinRuns(bytes) {
   return forEachBinRun(bytes, (v, at, len) => cells.fill(v, at, at + len)) ? cells : null;
 }
 
-function encodeBinRuns(cells) {
-  const out = [];
-  const put = (v) => { while (v > 0x7f) { out.push((v & 0x7f) | 0x80); v = Math.floor(v / 128); } out.push(v); };
-  for (let i = 0; i < BIN_CELLS;) {
-    const v = cells[i];
-    let j = i + 1;
-    while (j < BIN_CELLS && cells[j] === v) j++;
-    put(v);
-    put(j - i);
-    i = j;
-  }
-  return Uint8Array.from(out);
-}
-
 // value -> cell count, summed from runs without expanding them; cached until the bin changes
 function binHistogram(bin) {
   if (bin.hist) return bin.hist;
@@ -3455,34 +4089,6 @@ function requestMapRedraw() {
   mapRedrawPending = true;
   const run = () => { mapRedrawPending = false; drawMap(); };
   if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(run); else setTimeout(run, 16);
-}
-
-// Pushed chunk rows [cx, cz, biome] (hosted WebSocket transport) merge into the same bins at full
-// detail. Pinned: they cannot be re-fetched from a live directory.
-function ingestLandChunkRows(world, rows) {
-  if (!Array.isArray(rows) || rows.length === 0) return;
-  const store = landStore(world);
-  const touched = new Map();
-  for (const r of rows) {
-    if (!Array.isArray(r) || r.length < 3 || !Number.isInteger(r[0]) || !Number.isInteger(r[1])) continue;
-    const rx = r[0] >> 5, rz = r[1] >> 5, key = rx + ',' + rz;
-    let cells = touched.get(key);
-    if (!cells) {
-      const prev = store.bins.get(key);
-      cells = (prev && decodeBinRuns(prev.runs)) || new Uint16Array(BIN_CELLS);
-      touched.set(key, cells);
-    }
-    const name = String(r[2]);
-    let idx = store.palette.indexOf(name);
-    if (idx < 0) { store.palette.push(name); idx = store.palette.length - 1; }
-    cells[HILBERT_XZ2D[(r[1] & 31) * BIN_EDGE + (r[0] & 31)]] = idx + 1;
-  }
-  for (const [key, cells] of touched) {
-    const [rx, rz] = key.split(',').map(Number);
-    putLandBin(world, store, rx, rz, 2, encodeBinRuns(cells));
-  }
-  requestMapRedraw();
-  scheduleBiomeRecompute();
 }
 
 // payload.worldBiomes: {world: {palette, layers: {y: [[rx, rz, level, base64Runs], ...]}}}
@@ -3569,18 +4175,12 @@ function landColorFn(store) {
   };
 }
 
-const HAZARD_RGBA = [243, 139, 168, 170];
-function hazardColor(v) {
-  return v > 0 ? HAZARD_RGBA : null;
-}
-
 // Landing bucket 1 + floor(log2(count)), 1..15: blue (few) to red (many)
 function heatColor(v) {
   if (v <= 0) return null;
   const t = Math.min(1, (v - 1) / 10);
   return [Math.round(137 + 106 * t), Math.round(180 - 41 * t), Math.round(250 - 82 * t), 210];
 }
-
 
 // Bins draw from cached group atlases: ATLAS_GROUP x ATLAS_GROUP bins per canvas, each bin at r x r
 // pixels (r = power of two >= its screen size, at most the bin's 32 chunks). One canvas per bin cost
@@ -3689,12 +4289,16 @@ let lastFocusSig = '';
 // Set when a land-ref upload could not be fetched or verified (ingestLandRef)
 let landResyncWanted = false;
 
+// Regions whose applied curve the helper reproduced. Staged geometry edits leave an entry in place:
+// editing only stages, so it never changes what the page reports to the plugin
+const appliedCurveVerified = new Set();
+
 // ADR-106 §5.3 focus extras: regions drawn from a verified helper (no tiles needed) and the hazard
 // version each region holds (-1 = lost a delta; the plugin answers another version with a reset)
 function focusPageState() {
   const verified = [];
-  for (const [name, m] of curveModels) {
-    if (m && m.status === 'ready' && m.inputs && m.inputs.exact && !m.inputs.preview && verified.length < 256) verified.push(name);
+  for (const name of appliedCurveVerified) {
+    if (verified.length < 256) verified.push(name);
   }
   const hazardVersions = {};
   for (const [name, prof] of Object.entries(regionProfiles)) {
@@ -3737,122 +4341,6 @@ function sendFocus(world, vis) {
   }, 250);
 }
 
-// Walk path of edited / unapplied geometry: the plugin builds the shape through its factory and
-// replies with the seed polyline for exactly that geometry (signed channel only).
-let walkPathStatus = '';
-let walkPathTimer = null;
-let lastWalkPathReq = '';
-
-// {name, key: raw scalar text, vertices: [[x, z], ...] in chunks}: the region's shape block (or the
-// block its "@<file>" reference inherits) with the canvas geometry on top, keys the shape takes only.
-// Values stay unquoted ("256 c", "1,5"): the plugin parses them as it parses the file's scalars.
-function walkPathShapeRequest(region) {
-  const { shape, set, takes } = regionGeometryValues(region);
-  const recs = parseYamlLines(configs[regionFileFor(region.name)] || '');
-  const top = recs.find(r => r.key === 'shape' && r.path.length === 0);
-  let block = recs.filter(r => r.key && r.path.length === 1 && r.path[0] === 'shape');
-  if (top && top.value && isInheritedReferenceToken(top.value)) {
-    const file = top.value.replace(/^["']|["']$/g, '').substring(1) + '.yml';
-    block = parseYamlLines(configs[file] || shippedConfigs[file] || '')
-      .filter(r => r.key && r.path.length === 2 && r.path[0] === 'defaults' && r.path[1] === 'shape');
-  }
-  const out = {};
-  const drop = new Set(Object.keys(set).concat(['name', 'vertices']).map(k => k.toLowerCase()));
-  for (const r of block) if (r.value && !drop.has(r.key.toLowerCase()) && takes(r.key)) out[r.key] = r.value;
-  for (const k of Object.keys(set)) {
-    out[k] = k === 'vertices' ? (region.vertices || []).map(p => [p[0], p[1]]) : String(region.settings[k]).trim();
-  }
-  out.name = shape;
-  return out;
-}
-
-function requestWalkPath(region) {
-  if (!region || !region.shape) {
-    walkPathStatus = '';
-    return;
-  }
-  if (!channelConnected()) {
-    const ch = EditorChannelClient ? EditorChannelClient.info() : { status: 'off' };
-    walkPathStatus = ch.status === 'awaiting-trust'
-      ? 'Walk path: trust this browser in game first (/rtp editor trust nonce=' + (ch.nonce || '<code>') + ')'
-      : ch.status === 'connecting' || ch.status === 'reconnecting' ? 'Walk path: waiting for the server link'
-        : 'Walk path: shown for applied geometry only (preview needs a live server link)';
-    return;
-  }
-  const key = region.name + '|' + regionGeometrySig(region);
-  if (key === lastWalkPathReq) return;
-  // Live canvas grip drag: geometry changes per mousemove; asked once on mouseup
-  if (regionHandleDrag) return;
-  walkPathStatus = 'Walk path: computing on the server...';
-  if (walkPathTimer) clearTimeout(walkPathTimer);
-  walkPathTimer = setTimeout(() => {
-    walkPathTimer = null;
-    const sig = regionGeometrySig(region);
-    lastWalkPathReq = region.name + '|' + sig;
-    if (!EditorChannelClient.send('walkpath', { region: region.name, sig, shape: walkPathShapeRequest(region) })) {
-      lastWalkPathReq = '';
-      walkPathStatus = 'Walk path: preview request too large for the live link';
-    }
-  }, 300);
-}
-
-// {type:'walkpath', region, sig, data | error}: kept only while the geometry still matches sig
-function ingestWalkPathReply(msg) {
-  if (typeof msg.region !== 'string' || typeof msg.sig !== 'string') return;
-  const prof = regionProfiles[msg.region];
-  if (!prof || regionGeometrySig(prof) !== msg.sig) return;
-  const d = msg.data;
-  if (msg.error || !d || d.units !== 'block' || !Array.isArray(d.points)) {
-    walkPathStatus = 'Walk path: ' + String(msg.error || 'no path for this shape').slice(0, 160);
-  } else {
-    // preview: the live path tiles describe the applied shape, not this one
-    prof.walkPathData = Object.assign({}, d, { _sig: msg.sig, preview: true });
-    walkPathStatus = '';
-  }
-  requestMapRedraw();
-}
-
-// ADR-106 §5.3 curve-state: the plugin's exact {params, state, hash} for edited settings, replacing
-// the helper's estimated state; kept only while the geometry still matches the request
-let curveStateSeq = 0;
-const curveStatePending = new Map(); // reqId -> {region, sig}
-const curveStateAsked = new Map();   // region -> geometry sig last requested
-const curveStateTimers = new Map();
-function requestCurveState(region) {
-  if (!region || typeof region.name !== 'string' || !channelConnected()) return;
-  const name = region.name;
-  const sig = regionGeometrySig(region);
-  if (curveStateAsked.get(name) === sig) return;
-  if (regionHandleDrag) return;
-  curveStateAsked.set(name, sig);
-  clearTimeout(curveStateTimers.get(name));
-  // Settings typed into the form arrive per keystroke: ask for the last one only
-  curveStateTimers.set(name, setTimeout(() => {
-    curveStateTimers.delete(name);
-    const prof = regionProfiles[name];
-    if (!prof || regionGeometrySig(prof) !== sig || !channelConnected()) { curveStateAsked.delete(name); return; }
-    const reqId = 'cs' + (++curveStateSeq);
-    curveStatePending.set(reqId, { region: name, sig });
-    if (curveStatePending.size > 16) curveStatePending.delete(curveStatePending.keys().next().value);
-    if (!EditorChannelClient.send('curve-state', { reqId, region: name, shape: walkPathShapeRequest(prof) })) {
-      curveStatePending.delete(reqId);
-    }
-  }, 300));
-}
-
-function ingestCurveStateReply(msg) {
-  const req = typeof msg.reqId === 'string' ? curveStatePending.get(msg.reqId) : null;
-  if (!req) return;
-  curveStatePending.delete(msg.reqId);
-  const prof = regionProfiles[req.region];
-  if (!prof || regionGeometrySig(prof) !== req.sig) return;
-  // An error (no helper, unbuildable shape) leaves the estimate in place
-  if (msg.error || typeof msg.hash !== 'string' || typeof msg.shape !== 'string' || !msg.params || typeof msg.params !== 'object') return;
-  prof.curvePreview = { shape: msg.shape, params: msg.params,
-    state: (msg.state && typeof msg.state === 'object') ? msg.state : {}, hash: msg.hash, _sig: req.sig };
-  requestMapRedraw();
-}
-
 function canonicalJson(v) {
   if (Array.isArray(v)) return '[' + v.map(canonicalJson).join(',') + ']';
   if (v && typeof v === 'object') return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + canonicalJson(v[k])).join(',') + '}';
@@ -3875,9 +4363,11 @@ function ingestCurveUpdate(msg) {
       && canonicalJson(old.params || {}) === canonicalJson(params)) {
     sig = sigNow;
   } else {
-    const rebuilt = curveInputs(Object.assign({}, prof, { curve: null, curvePreview: null }));
+    const rebuilt = curveInputs(Object.assign({}, prof, { curve: null }));
     if (rebuilt && canonicalJson(rebuilt.params) === canonicalJson(params)) sig = sigNow;
   }
+  // A new applied curve is reported verified again once the helper reproduces it
+  if (!old || old.hash !== c.hash) appliedCurveVerified.delete(msg.region);
   prof.curve = { shape: c.shape, params, state: (c.state && typeof c.state === 'object') ? c.state : {}, hash: c.hash, _sig: sig };
   curveShapeVerdicts.clear();
   requestMapRedraw();
@@ -4033,12 +4523,11 @@ async function ingestLandRef(msg) {
   ingestLandPush(body);
 }
 
-function drawWalkPathStatus(cssW, cssH) {
-  if (!walkPathStatus) return;
+function drawWalkPathStatus(cssH, text) {
   ctx.save();
   ctx.font = '11px sans-serif';
   ctx.fillStyle = 'rgba(205, 214, 244, 0.75)';
-  ctx.fillText(walkPathStatus, 10, cssH - 10);
+  ctx.fillText(text, 10, cssH - 10);
   ctx.restore();
 }
 
@@ -4176,7 +4665,6 @@ const CURVE_REASONS = new Set(['no-helper', 'sha256', 'load-error', 'throw', 'ti
   'hash-mismatch', 'sandbox-unavailable']);
 const CURVE_HASH_SAMPLES = 256;
 const CURVE_OVERVIEW_SAMPLES = 65536;
-const CURVE_RUN_SAMPLES = 16384;
 const CURVE_VIEW_MAX_CHUNKS = 131072;
 const CURVE_EXACT_MIN_CHUNK_PX = 2;
 // Overview blocks narrower than this on screen merge 4 at a time (ring of P-bins when zoomed out)
@@ -4684,12 +5172,6 @@ function curveInputs(region) {
       && curve._sig === regionGeometrySig(region) && typeof curve.hash === 'string') {
     return { shape: name, params: curve.params || {}, state: curve.state || {}, exact: true, hash: curve.hash };
   }
-  // Edited geometry the plugin evaluated (curve-state): exact, but not the geometry the hazard runs describe
-  const pv = region.curvePreview;
-  if (pv && typeof pv === 'object' && String(pv.shape || '').toUpperCase() === name.toUpperCase()
-      && pv._sig === regionGeometrySig(region) && typeof pv.hash === 'string') {
-    return { shape: name, params: pv.params || {}, state: pv.state || {}, exact: true, preview: true, hash: pv.hash };
-  }
   const keys = curveParamsFor(name) || (curve && curve.params ? Object.keys(curve.params) : []);
   const params = {};
   for (const k of keys) {
@@ -4713,12 +5195,11 @@ function curveModelFor(region) {
   if (!region || !region.shape) return null;
   const inputs = curveInputs(region);
   if (!inputs) return { status: 'failed', reason: 'no-helper', inputs: null };
-  if (!inputs.exact) requestCurveState(region);
   const key = [inputs.shape, JSON.stringify(inputs.params), JSON.stringify(inputs.state), inputs.exact ? inputs.hash : '~'].join('|');
   let m = curveModels.get(region.name);
   if (m && m.key === key && !(m.status === 'failed' && m.reason === 'restart')) return m;
   m = { key, inputs, status: 'pending', reason: '', range: 0, invertible: false, estimated: !inputs.exact,
-    overview: null, view: null, viewBusy: false, runSamples: null, runBusy: false };
+    overview: null, view: null, viewBusy: false };
   curveModels.set(region.name, m);
   const name = region.name;
   // Settings typed into the form arrive per keystroke: evaluate only the last one
@@ -4744,10 +5225,14 @@ async function prepareCurveModel(name, m) {
     m.overview = { pos, xz, stride, pen: curveOverviewPen(xz, back, stride) };
     m.status = 'ready';
     // Verified: the plugin can stop writing this region's path / hazard tiles
-    if (exact && !m.inputs.preview) sendPageState();
+    if (exact && !appliedCurveVerified.has(name)) {
+      appliedCurveVerified.add(name);
+      sendPageState();
+    }
   } catch (e) {
     m.status = 'failed';
     m.reason = curveReasonOf(e);
+    if (exact) appliedCurveVerified.delete(name);
   }
   if (curveModels.get(name) === m) requestMapRedraw();
 }
@@ -4891,13 +5376,15 @@ async function computeCurveView(m, r) {
     outside.forEach((j, k) => { if (!(back[k] < m.range)) { next[2 * j] = NaN; next[2 * j + 1] = NaN; } });
   }
   const segs = new Float64Array(withNext.length * 4);
+  const segPos = new Float64Array(withNext.length);
   withNext.forEach((i, j) => {
     segs[4 * j] = r.x0 + (i % w);
     segs[4 * j + 1] = r.z0 + Math.floor(i / w);
     segs[4 * j + 2] = next[2 * j];
     segs[4 * j + 3] = next[2 * j + 1];
+    segPos[j] = locs[i];
   });
-  m.view = { x0: r.x0, x1: r.x1, z0: r.z0, z1: r.z1, w, h, locs, segs, hazardImg: null, hazardSrc: '' };
+  m.view = { x0: r.x0, x1: r.x1, z0: r.z0, z1: r.z1, w, h, locs, segs, segPos, haz: null, hazFor: null, hazVer: 0 };
 }
 
 // Cached exact view covering the screen, or null (computing it in the background when possible)
@@ -4920,12 +5407,14 @@ function curveViewFor(m, wox, woy, scale, cssW, cssH) {
 }
 
 // Follows the model's cached pen flags (curveOverviewPen), merged per zoom: no sandbox call per frame
-function strokeCurveOverview(ov, wox, woy, scale, t0) {
+function strokeCurveOverview(ov, wox, woy, scale, t0, hz) {
   const xz = ov.xz;
   const s16 = 16 * scale, ox = wox + 8 * scale, oz = woy + 8 * scale;
   const d = curveOverviewFactor(ov.stride, s16, xz.length >> 1);
   if (!ov.merged || ov.merged.d !== d) ov.merged = Object.assign({ d }, curveOverviewMerge(xz, ov.pen, ov.stride, d));
   const pen = ov.merged.pen, idx = ov.merged.idx;
+  const frac = hz ? curveOverviewHazards(ov, hz) : null;
+  const red = frac ? hazardPaths() : null;
   ctx.beginPath();
   let lx = 0, lz = 0;
   for (let c = 0; c < pen.length; c++) {
@@ -4933,33 +5422,50 @@ function strokeCurveOverview(ov, wox, woy, scale, t0) {
     if (p === 0) continue;
     const i = idx ? idx[c] : c;
     const px = ox + xz[2 * i] * s16, pz = oz + xz[2 * i + 1] * s16;
-    if (p === 2) { ctx.moveTo(px, pz); lx = px; lz = pz; continue; }
+    if (p === 2) {
+      ctx.moveTo(px, pz);
+      if (red) addHazardSeg(red, frac[c], px, pz, px, pz);
+      lx = px; lz = pz;
+      continue;
+    }
+    if (red) addHazardSeg(red, frac[c], lx, lz, px, pz);
     if (Math.abs(px - lx) < 0.75 && Math.abs(pz - lz) < 0.75) continue;
     ctx.lineTo(px, pz);
     lx = px; lz = pz;
     if ((c & 8191) === 0 && performance.now() - t0 > CURVE_PATH_BUDGET_MS) break;
   }
   ctx.stroke();
+  if (red) strokeHazardPaths(red, scale);
 }
 
-function strokeCurveView(v, wox, woy, scale, t0) {
+function strokeCurveView(v, wox, woy, scale, t0, hz) {
   const s = v.segs;
   const s16 = 16 * scale, ox = wox + 8 * scale, oz = woy + 8 * scale;
+  const frac = hz ? curveViewHazards(v, hz) : null;
+  const red = frac ? hazardPaths() : null;
   ctx.beginPath();
-  for (let i = 0; i < s.length; i += 4) {
-    if (s[i + 2] !== s[i + 2]) continue;
-    ctx.moveTo(ox + s[i] * s16, oz + s[i + 1] * s16);
-    ctx.lineTo(ox + s[i + 2] * s16, oz + s[i + 3] * s16);
+  for (let i = 0, j = 0; i < s.length; i += 4, j++) {
+    const ax = ox + s[i] * s16, az = oz + s[i + 1] * s16;
+    if (s[i + 2] !== s[i + 2]) {
+      // Last on-domain chunk: no next to join, a bad one still shows as a dot
+      if (red) addHazardSeg(red, frac[j], ax, az, ax, az);
+      continue;
+    }
+    const bx = ox + s[i + 2] * s16, bz = oz + s[i + 3] * s16;
+    ctx.moveTo(ax, az);
+    ctx.lineTo(bx, bz);
+    if (red) addHazardSeg(red, frac[j], ax, az, bx, bz);
     if ((i & 32767) === 0 && performance.now() - t0 > CURVE_PATH_BUDGET_MS) break;
   }
   ctx.stroke();
+  if (red) strokeHazardPaths(red, scale);
 }
 
 /**
  * Walk path from the region's helper. {state: none | pending | ready | failed, reason, model};
  * draws only for ready models (verified, or estimated after an edit).
  */
-function drawCurvePath(wox, woy, scale, cssW, cssH) {
+function drawCurvePath(wox, woy, scale, cssW, cssH, hz) {
   const m = curveModelFor(regionState);
   if (!m) return { state: 'none', reason: '', model: null };
   if (m.status !== 'ready') return { state: m.status, reason: m.reason, model: m };
@@ -4969,8 +5475,8 @@ function drawCurvePath(wox, woy, scale, cssW, cssH) {
   ctx.strokeStyle = m.estimated ? 'rgba(249, 226, 175, 0.75)' : 'rgba(166, 227, 161, 0.75)';
   // Chunk-by-chunk only once a chunk is legible; below that the merged overview reads better
   const view = 16 * scale >= CURVE_OVERVIEW_MIN_BLOCK_PX ? curveViewFor(m, wox, woy, scale, cssW, cssH) : null;
-  if (view) strokeCurveView(view, wox, woy, scale, t0);
-  else if (m.overview) strokeCurveOverview(m.overview, wox, woy, scale, t0);
+  if (view) strokeCurveView(view, wox, woy, scale, t0, hz);
+  else if (m.overview) strokeCurveOverview(m.overview, wox, woy, scale, t0, hz);
   ctx.restore();
   return { state: 'ready', reason: '', model: m };
 }
@@ -4983,7 +5489,7 @@ function setCurveBadge(status, text, reason) {
   el.dataset.reason = reason || '';
   el.textContent = text;
   el.style.color = status === 'verified' ? 'var(--green)' : (status === 'estimated' ? 'var(--yellow)'
-    : (status === 'pending' ? 'var(--subtext)' : 'var(--red)'));
+    : (status === 'pending' || status === 'hidden' ? 'var(--subtext)' : 'var(--red)'));
 }
 
 // Status badge: names the shape, whether the path is verified / estimated, else the fallback and its reason
@@ -5008,32 +5514,10 @@ function decodedCurveRuns(region) {
   const hr = region && region.hazardRuns;
   if (!hr || typeof hr !== 'object' || hr.v !== 1 || typeof hr.runs !== 'string') return null;
   if (region._runsDecoded && region._runsDecoded.src === hr.runs) return region._runsDecoded;
-  const bytes = base64ToBytes(hr.runs);
-  if (!bytes) return null;
-  let pos = 0;
-  const varint = () => {
-    let v = 0;
-    for (let mul = 1, i = 0; i < 10; i++, mul *= 128) {
-      if (pos >= bytes.length) return -1;
-      const b = bytes[pos++];
-      v += (b & 0x7f) * mul;
-      if (!(b & 0x80)) return v;
-    }
-    return -1;
-  };
-  const starts = [], ends = [], values = [];
-  let prevEnd = 0;
-  while (pos < bytes.length) {
-    const d = varint(), len = varint(), value = varint();
-    if (d < 0 || len <= 0 || value < 0) return null;
-    const start = prevEnd + d;
-    starts.push(start);
-    ends.push(start + len);
-    values.push(value);
-    prevEnd = start + len;
-  }
-  region._runsDecoded = { src: hr.runs, starts: Float64Array.from(starts), ends: Float64Array.from(ends),
-    values: Uint16Array.from(values, v => Math.min(v, 65535)), n: starts.length };
+  const t = decodeRunTriples(hr.runs);
+  if (!t) return null;
+  region._runsDecoded = { src: hr.runs, starts: Float64Array.from(t, r => r[0]), ends: Float64Array.from(t, r => r[0] + r[1]),
+    values: Uint16Array.from(t, r => Math.min(r[2], 65535)), n: t.length };
   return region._runsDecoded;
 }
 
@@ -5047,142 +5531,265 @@ function curveRunValue(runs, p) {
   return k >= 0 && p < runs.ends[k] ? runs.values[k] : 0;
 }
 
-const CURVE_HAZARD_PALETTE = [[243, 139, 168], [250, 179, 135], [249, 226, 175], [203, 166, 247],
-  [137, 180, 250], [148, 226, 213], [245, 194, 231], [235, 160, 172]];
-function curveHazardRgb(value) {
-  return CURVE_HAZARD_PALETTE[(Math.max(1, value) - 1) % CURVE_HAZARD_PALETTE.length];
-}
+/*
+ * Bad spots ride the walk path (ADR-106 §4.7): stretches over learned hazards stroke red, more
+ * opaque the larger their bad share. One sampler per frame over the source that applies: live chunk
+ * bins, else the helper's curve-position runs (snapshot geometry only, where the runs' positions
+ * belong to the curve), else the export-time 2D grid. chunkFrac(x, z, side): bad share of the
+ * aligned side x side chunk square holding chunk (x, z); posFrac(p, span): bad share of positions
+ * [p, p + span). src / ver key the per-view caches. null: no hazard source.
+ */
+const PATH_HAZARD_RGB = '255, 85, 110';
+const PATH_HAZARD_ALPHA = [0.4, 0.6, 0.8, 1];
 
-// Stratified positions inside the runs (at least one per run) mapped through the helper, once per model
-function ensureRunSamples(m, runs) {
-  if (m.runSamples && m.runSamples.src === runs.src) return m.runSamples;
-  if (m.runBusy) return null;
-  m.runBusy = true;
-  const stride = Math.max(1, m.range / CURVE_OVERVIEW_SAMPLES);
-  const pos = [], val = [];
-  for (let k = 0; k < runs.n && pos.length < CURVE_RUN_SAMPLES; k++) {
-    const len = runs.ends[k] - runs.starts[k];
-    const cnt = Math.max(1, Math.min(64, Math.round(len / stride)));
-    for (let j = 0; j < cnt && pos.length < CURVE_RUN_SAMPLES; j++) {
-      const p = runs.starts[k] + Math.floor(j * len / cnt);
-      if (p < m.range) { pos.push(p); val.push(runs.values[k]); }
-    }
-  }
-  const { shape, params, state } = m.inputs;
-  CurveSandbox.toXZ(shape, params, state, Float64Array.from(pos))
-    .then(xz => { m.runSamples = { src: runs.src, xz, val: Uint16Array.from(val) }; })
-    .catch(() => { m.runSamples = { src: runs.src, xz: new Float64Array(0), val: new Uint16Array(0) }; })
-    .finally(() => { m.runBusy = false; requestMapRedraw(); });
+function pathHazardSampler(region, m) {
+  if (!region) return null;
+  const r = liveRegionIds[region.name];
+  const live = r !== undefined ? overlayBins.hazard[r] : null;
+  if (live) return { src: live, ver: live.hzVer || 0, chunkFrac: (x, z, side) => liveHazardFrac(live, x, z, side), posFrac: null };
+  const runs = !region.hazardRunsSkipped && m && m.status === 'ready' && m.inputs && m.inputs.exact
+    ? decodedCurveRuns(region) : null;
+  if (runs) return { src: runs, ver: 0, chunkFrac: null, posFrac: (p, span) => curveRunFrac(runs, p, span) };
+  const grid = exportHazardGrid();
+  if (grid) return { src: grid, ver: 0, chunkFrac: (x, z) => exportHazardAt(grid, x, z), posFrac: null };
   return null;
 }
 
-let curveCoverageCanvas = null;
-function blitCurveImage(img, dx, dy, dw, dh) {
-  if (!curveCoverageCanvas) curveCoverageCanvas = document.createElement('canvas');
-  const c = curveCoverageCanvas;
-  if (c.width !== img.width || c.height !== img.height) { c.width = img.width; c.height = img.height; }
-  c.getContext('2d').putImageData(img, 0, 0);
+// Bad share of one path stretch: by curve position when the sampler has positions, else by chunk
+function hazardFracAt(hz, x, z, side, p, span) {
+  if (hz.posFrac && p === p) return hz.posFrac(p, span);
+  return hz.chunkFrac && x === x ? hz.chunkFrac(x, z, side) : 0;
+}
+
+// Share of positions [p, p + span) inside a run; runs are sorted and disjoint
+function curveRunFrac(runs, p, span) {
+  if (span <= 1) return curveRunValue(runs, p) ? 1 : 0;
+  const end = p + span;
+  let lo = 0, hi = runs.n - 1, k = runs.n;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (runs.ends[mid] > p) { k = mid; hi = mid - 1; } else lo = mid + 1;
+  }
+  let hit = 0;
+  for (; k < runs.n && runs.starts[k] < end && hit < span; k++) {
+    hit += Math.min(end, runs.ends[k]) - Math.max(p, runs.starts[k]);
+  }
+  return Math.min(1, hit / span);
+}
+
+// Bad-chunk counts of one live bin as a quadtree: level k counts each aligned 2^k x 2^k chunk square
+function binHazardMip(bin) {
+  if (bin.mip) return bin.mip;
+  const base = new Uint16Array(BIN_CELLS);
+  forEachBinRun(bin.runs, (v, at, len) => {
+    if (v <= 0) return;
+    for (let d = at; d < at + len; d++) base[HILBERT_D2Z[d] * BIN_EDGE + HILBERT_D2X[d]] = 1;
+  });
+  const levels = [base];
+  for (let e = BIN_EDGE >> 1; e >= 1; e >>= 1) {
+    const prev = levels[levels.length - 1], pe = e * 2, cur = new Uint16Array(e * e);
+    for (let z = 0; z < e; z++) {
+      for (let x = 0; x < e; x++) {
+        const a = 2 * z * pe + 2 * x;
+        cur[z * e + x] = prev[a] + prev[a + 1] + prev[a + pe] + prev[a + pe + 1];
+      }
+    }
+    levels.push(cur);
+  }
+  return (bin.mip = levels);
+}
+
+// Squares wider than a bin sum whole bins, cached per level until the store changes (store.coarse)
+function liveHazardFrac(store, x, z, side) {
+  const k = Math.max(0, Math.ceil(Math.log2(Math.max(1, side))));
+  const e = 2 ** k;
+  const qx = Math.floor(x / e), qz = Math.floor(z / e);
+  if (e <= BIN_EDGE) {
+    const rx = Math.floor(x / BIN_EDGE), rz = Math.floor(z / BIN_EDGE);
+    const bin = store.get(rx + ',' + rz);
+    if (!bin) return 0;
+    const le = BIN_EDGE / e;
+    return binHazardMip(bin)[k][(qz - rz * le) * le + (qx - rx * le)] / (e * e);
+  }
+  const coarse = store.coarse || (store.coarse = new Map());
+  let sums = coarse.get(k);
+  if (!sums) {
+    sums = new Map();
+    const be = e / BIN_EDGE;
+    for (const bin of store.values()) {
+      const n = binHazardMip(bin)[5][0];
+      if (!n) continue;
+      const key = Math.floor(bin.rx / be) + ',' + Math.floor(bin.rz / be);
+      sums.set(key, (sums.get(key) || 0) + n);
+    }
+    coarse.set(k, sums);
+  }
+  return (sums.get(qx + ',' + qz) || 0) / (e * e);
+}
+
+// Export-time hazard stream (hazardRuns / hazardBounds) as a dense grid, rebuilt when either changes
+let exportHazardCache = { runs: null, bounds: null, grid: null };
+function exportHazardGrid() {
+  if (!Array.isArray(hazardRuns) || hazardRuns.length === 0) return null;
+  const b = hazardBounds;
+  if (exportHazardCache.runs === hazardRuns && exportHazardCache.bounds === b) return exportHazardCache.grid;
+  const n = b.gridSize;
+  let grid = null;
+  if (Number.isInteger(n) && n > 0 && n <= 4096 && b.maxX > b.minX && b.maxZ > b.minZ) {
+    const cells = new Uint8Array(n * n);
+    let budget = n * n;
+    for (const run of hazardRuns) {
+      for (let i = 0; i < run.len && budget > 0; i++, budget--) {
+        const pt = hilbertToXY(run.start + i, n);
+        if (pt[0] >= 0 && pt[1] >= 0 && pt[0] < n && pt[1] < n) cells[pt[1] * n + pt[0]] = 1;
+      }
+    }
+    grid = { cells, n, b, chunkUnits: b.units === 'chunk' };
+  }
+  exportHazardCache = { runs: hazardRuns, bounds: b, grid };
+  return grid;
+}
+
+function exportHazardAt(grid, x, z) {
+  const b = grid.b;
+  const ux = grid.chunkUnits ? x + 0.5 : x * 16 + 8, uz = grid.chunkUnits ? z + 0.5 : z * 16 + 8;
+  const gx = Math.floor((ux - b.minX) / (b.maxX - b.minX) * grid.n);
+  const gz = Math.floor((uz - b.minZ) / (b.maxZ - b.minZ) * grid.n);
+  return gx >= 0 && gz >= 0 && gx < grid.n && gz < grid.n ? grid.cells[gz * grid.n + gx] : 0;
+}
+
+// Red stretches bucketed by sqrt(bad share), so a stretch with a single bad chunk stays faint but visible
+function hazardPaths() {
+  return PATH_HAZARD_ALPHA.map(() => new Path2D());
+}
+
+// A stretch whose ends coincide still draws, as a dot: a tiny circle the stroke width fills in
+// (zero-length segments are pruned, and Chrome drops near-zero ones too)
+function addHazardSeg(paths, frac, x0, y0, x1, y1) {
+  if (!(frac > 0)) return;
+  const p = paths[Math.min(paths.length - 1, Math.floor(Math.sqrt(frac) * paths.length))];
+  if (Math.abs(x1 - x0) < 0.5 && Math.abs(y1 - y0) < 0.5) {
+    p.moveTo(x0 + 1, y0);
+    p.arc(x0, y0, 1, 0, Math.PI * 2);
+    return;
+  }
+  p.moveTo(x0, y0);
+  p.lineTo(x1, y1);
+}
+
+function strokeHazardPaths(paths, scale) {
   ctx.save();
-  ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(c, dx, dy, dw, dh);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(2.6, Math.min(6, 16 * scale * 0.35));
+  paths.forEach((p, b) => {
+    ctx.strokeStyle = `rgba(${PATH_HAZARD_RGB}, ${PATH_HAZARD_ALPHA[b]})`;
+    ctx.stroke(p);
+  });
   ctx.restore();
 }
 
-/**
- * Hazard runs through the helper's locationToXZ (ADR-106 §4.7): chunks painted by cause in the
- * exact view, else screen cells painted by coverage. Only for the snapshot's own geometry, where
- * the runs' positions belong to the curve. True when this layer was drawn.
- */
-function drawCurveHazards(wox, woy, scale, cssW, cssH) {
-  const region = regionState;
-  if (!region || region.hazardRunsSkipped) return false;
-  const runs = decodedCurveRuns(region);
-  if (!runs) return false;
-  const m = curveModelFor(region);
-  if (!m || m.status !== 'ready' || !m.inputs || !m.inputs.exact || m.inputs.preview) return false;
-  if (runs.n === 0) return true;
-  const vis = visibleChunkRect(wox, woy, scale, cssW, cssH);
-  const v = m.view;
-  if (vis && viewCovers(v, vis)) {
-    if (v.hazardSrc !== runs.src) {
-      const img = new ImageData(v.w, v.h);
-      for (let i = 0; i < v.locs.length; i++) {
-        const p = v.locs[i];
-        if (p !== p) continue;
-        const val = curveRunValue(runs, p);
-        if (!val) continue;
-        const rgb = curveHazardRgb(val);
-        img.data.set([rgb[0], rgb[1], rgb[2], 165], i * 4);
-      }
-      v.hazardImg = img;
-      v.hazardSrc = runs.src;
-    }
-    const s16 = 16 * scale;
-    blitCurveImage(v.hazardImg, wox + v.x0 * s16, woy + v.z0 * s16, v.w * s16, v.h * s16);
-    return true;
-  }
-  const ov = m.overview;
-  if (!ov) return true;
-  const cell = 4;
-  const cols = Math.max(1, Math.ceil(cssW / cell)), rows = Math.max(1, Math.ceil(cssH / cell));
-  const total = new Uint32Array(cols * rows), hit = new Uint32Array(cols * rows), val = new Uint16Array(cols * rows);
-  const s16 = 16 * scale, ox = wox + 8 * scale, oz = woy + 8 * scale;
-  const cellOf = (x, z) => {
-    const cx = Math.floor((ox + x * s16) / cell), cz = Math.floor((oz + z * s16) / cell);
-    return cx < 0 || cz < 0 || cx >= cols || cz >= rows ? -1 : cz * cols + cx;
-  };
-  for (let i = 0; i < ov.pos.length; i++) {
-    const x = ov.xz[2 * i];
-    if (x !== x) continue;
-    const c = cellOf(x, ov.xz[2 * i + 1]);
-    if (c < 0) continue;
-    total[c]++;
-    const rv = curveRunValue(runs, ov.pos[i]);
-    if (rv) { hit[c]++; val[c] = rv; }
-  }
-  const rs = ensureRunSamples(m, runs);
-  if (rs) {
-    for (let j = 0; j < rs.val.length; j++) {
-      const x = rs.xz[2 * j];
-      if (x !== x) continue;
-      const c = cellOf(x, rs.xz[2 * j + 1]);
-      if (c >= 0 && !val[c]) val[c] = rs.val[j];
-    }
-  }
-  const img = new ImageData(cols, rows);
-  for (let c = 0; c < val.length; c++) {
-    if (!val[c]) continue;
-    const cov = total[c] ? Math.min(1, hit[c] / total[c]) : 0;
-    const rgb = curveHazardRgb(val[c]);
-    img.data.set([rgb[0], rgb[1], rgb[2], Math.round(255 * (0.3 + 0.5 * cov))], c * 4);
-  }
-  blitCurveImage(img, 0, 0, cols * cell, rows * cell);
-  return true;
+// Bad share per exact-view segment (its start chunk), cached until the sampler's source changes
+function curveViewHazards(v, hz) {
+  if (v.haz && v.hazFor === hz.src && v.hazVer === hz.ver) return v.haz;
+  const s = v.segs, n = s.length >> 2, out = new Float32Array(n);
+  for (let j = 0; j < n; j++) out[j] = hazardFracAt(hz, s[4 * j], s[4 * j + 1], 1, v.segPos[j], 1);
+  v.haz = out;
+  v.hazFor = hz.src;
+  v.hazVer = hz.ver;
+  return out;
 }
 
-// Live hazard (learned bad spots) and landing bins of the current region; true when hazards were drawn.
-function drawRegionOverlays(wox, woy, scale, cssW, cssH, showHazards, showHeat) {
+// Bad share per drawn overview block: merged sample c stands for positions [c * span, (c + 1) * span)
+function curveOverviewHazards(ov, hz) {
+  const mg = ov.merged;
+  if (mg.haz && mg.hazFor === hz.src && mg.hazVer === hz.ver) return mg.haz;
+  const span = ov.stride * mg.d, side = Math.max(1, Math.round(Math.sqrt(span)));
+  const xz = ov.xz, out = new Float32Array(mg.pen.length);
+  for (let c = 0; c < mg.pen.length; c++) {
+    if (mg.pen[c] === 0) continue;
+    const i = mg.idx ? mg.idx[c] : c;
+    out[c] = hazardFracAt(hz, xz[2 * i], xz[2 * i + 1], side, c * span, span);
+  }
+  mg.haz = out;
+  mg.hazFor = hz.src;
+  mg.hazVer = hz.ver;
+  return out;
+}
+
+// Landings stay legible zoomed out: below this many px per chunk each landing is a fixed-size dot,
+// the hottest per LANDING_DOT_GRID_PX screen cell; above it the chunk squares themselves
+const LANDING_DOT_MIN_CHUNK_PX = 6;
+const LANDING_DOT_GRID_PX = 7;
+function drawLandingDots(store, wox, woy, scale, cssW, cssH, vis) {
+  const s16 = 16 * scale, g = LANDING_DOT_GRID_PX;
+  const cols = Math.ceil(cssW / g), rows = Math.ceil(cssH / g);
+  if (cols <= 0 || rows <= 0) return;
+  const best = new Uint16Array(cols * rows), at = new Float32Array(cols * rows * 2);
+  for (const bin of store.values()) {
+    if (bin.rx < vis.minRx || bin.rx > vis.maxRx || bin.rz < vis.minRz || bin.rz > vis.maxRz) continue;
+    const bx = bin.rx * BIN_EDGE, bz = bin.rz * BIN_EDGE;
+    forEachBinRun(bin.runs, (v, start, len) => {
+      if (v <= 0) return;
+      for (let d = start; d < start + len; d++) {
+        const px = wox + (bx + HILBERT_D2X[d] + 0.5) * s16, pz = woy + (bz + HILBERT_D2Z[d] + 0.5) * s16;
+        if (px < 0 || pz < 0 || px >= cssW || pz >= cssH) continue;
+        const c = Math.floor(pz / g) * cols + Math.floor(px / g);
+        if (v <= best[c]) continue;
+        best[c] = v;
+        at[2 * c] = px;
+        at[2 * c + 1] = pz;
+      }
+    });
+  }
+  const byValue = new Map();
+  for (let c = 0; c < best.length; c++) {
+    if (!best[c]) continue;
+    if (!byValue.has(best[c])) byValue.set(best[c], []);
+    byValue.get(best[c]).push(c);
+  }
+  ctx.save();
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = '#11111b';
+  // Few landings first, so the hottest dots end up on top
+  for (const v of [...byValue.keys()].sort((a, b) => a - b)) {
+    const col = heatColor(v);
+    const rad = 3 + Math.min(2, (v - 1) / 4);
+    ctx.fillStyle = `rgb(${col[0]}, ${col[1]}, ${col[2]})`;
+    ctx.beginPath();
+    for (const c of byValue.get(v)) {
+      ctx.moveTo(at[2 * c] + rad, at[2 * c + 1]);
+      ctx.arc(at[2 * c], at[2 * c + 1], rad, 0, Math.PI * 2);
+    }
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// Live bins of the current region: hazard bins load while loadHazards (the walk path samples them);
+// landings draw, on top of the other layers
+function drawRegionOverlays(wox, woy, scale, cssW, cssH, loadHazards, showHeat) {
   const r = liveRegionIds[regionState.name];
-  if (r === undefined) return false;
+  if (r === undefined) return;
   const tilePx = LAND_TILE_BLOCKS * scale;
   const vis = visibleBinRect(wox, woy, scale, cssW, cssH);
-  let hazardsDrawn = false;
+  const heat = overlayBins.heat[r];
+  const request = kind => requestVisibleGroups(kind, String(r), vis, (gx, gz) => kind + '-' + r + '_' + gx + '_' + gz + '.js');
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  for (const [kind, show, colorOf] of [['heat', showHeat, heatColor], ['hazard', showHazards, hazardColor]]) {
-    if (!show) continue;
-    const store = overlayBins[kind][r];
-    if (kind === 'hazard' && store) hazardsDrawn = true;
-    if (store) drawBinLayer(kind, String(r), store, wox, woy, tilePx, vis, colorOf, () => 1);
-    requestVisibleGroups(kind, String(r), vis, (gx, gz) => kind + '-' + r + '_' + gx + '_' + gz + '.js');
+  if (loadHazards) request('hazard');
+  if (showHeat) {
+    if (heat && 16 * scale >= LANDING_DOT_MIN_CHUNK_PX) drawBinLayer('heat', String(r), heat, wox, woy, tilePx, vis, heatColor, () => 1);
+    else if (heat) drawLandingDots(heat, wox, woy, scale, cssW, cssH, vis);
+    request('heat');
   }
   ctx.restore();
-  return hazardsDrawn;
 }
 
 // Full-resolution path of the current region from loaded tiles: each on-curve chunk joins the
 // chunk holding the next curve location. Returns true when every visible tile was drawn in detail.
-function drawWalkPathTiles(wox, woy, scale, cssW, cssH) {
+function drawWalkPathTiles(wox, woy, scale, cssW, cssH, hz) {
   const store = walkPathTiles[regionState.name];
   if (!store || store.index.size === 0 || 16 * scale < PATH_DETAIL_MIN_CHUNK_PX) return false;
   const n = store.tileChunks;
@@ -5196,11 +5803,13 @@ function drawWalkPathTiles(wox, woy, scale, cssW, cssH) {
   }
   if (visible.length === 0 || visible.length > MAX_LOADED_PATH_TILES) return false;
   const missing = [];
+  const red = hz ? hazardPaths() : null;
   ctx.beginPath();
   for (const v of visible) {
     const tile = store.loaded.get(v.key);
     if (!tile) { missing.push(v); continue; }
     tile.seen = mapFrame;
+    const frac = hz ? pathTileHazards(tile, n, hz) : null;
     for (let i = 0; i < tile.locs.length; i++) {
       const loc = tile.locs[i];
       if (loc < 0) continue;
@@ -5208,17 +5817,35 @@ function drawWalkPathTiles(wox, woy, scale, cssW, cssH) {
       if (!next) continue;
       const ax = tile.tx * n + (i % n), az = tile.tz * n + Math.floor(i / n);
       if (Math.abs(next[0] - ax) > 2 || Math.abs(next[1] - az) > 2) continue;
-      ctx.moveTo(wox + (ax * 16 + 8) * scale, woy + (az * 16 + 8) * scale);
-      ctx.lineTo(wox + (next[0] * 16 + 8) * scale, woy + (next[1] * 16 + 8) * scale);
+      const x0 = wox + (ax * 16 + 8) * scale, y0 = woy + (az * 16 + 8) * scale;
+      const x1 = wox + (next[0] * 16 + 8) * scale, y1 = woy + (next[1] * 16 + 8) * scale;
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      if (red) addHazardSeg(red, frac[i], x0, y0, x1, y1);
     }
   }
   ctx.stroke();
+  if (red) strokeHazardPaths(red, scale);
   const r = liveRegionIds[regionState.name];
   if (r !== undefined) requestVisibleTiles(store, missing, m => 'path-' + r + '_' + m.tx + '_' + m.tz + '.js');
   evictTiles(store.loaded, MAX_LOADED_PATH_TILES, tile => {
     for (const loc of tile.locs) if (loc >= 0) store.byLoc.delete(loc);
   });
   return missing.length === 0;
+}
+
+// Bad share per on-curve chunk of a path tile, by chunk: tile locations are the applied geometry's
+// curve, which the snapshot's position runs need not describe
+function pathTileHazards(tile, n, hz) {
+  if (tile.haz && tile.hazFor === hz.src && tile.hazVer === hz.ver) return tile.haz;
+  const out = new Float32Array(tile.locs.length);
+  for (let i = 0; i < tile.locs.length; i++) {
+    if (tile.locs[i] >= 0) out[i] = hazardFracAt(hz, tile.tx * n + (i % n), tile.tz * n + Math.floor(i / n), 1, NaN, 1);
+  }
+  tile.haz = out;
+  tile.hazFor = hz.src;
+  tile.hazVer = hz.ver;
+  return out;
 }
 
 function biomeColor(name) {
@@ -5405,8 +6032,7 @@ function drawMap() {
   const showBins = document.getElementById('chk-bins')?.checked ?? true;
   const showBounds = document.getElementById('chk-bounds')?.checked ?? true;
   const showPregen = document.getElementById('chk-pregen')?.checked ?? true;
-  const showSpiral = document.getElementById('chk-spiral')?.checked ?? true;
-  const showHazards = document.getElementById('chk-hazards')?.checked ?? true;
+  const showSpiral = document.getElementById('chk-spiral')?.checked ?? false;
 
   // Grid & Coordinate Labels
   if (showGrid) {
@@ -5486,157 +6112,135 @@ function drawMap() {
     }
   }
 
-  // 1. Walk Path (Continuous full range trajectory across the shape space)
-  // Order (ADR-106 §4.6): shape helper -> live path tiles -> 2,048-point sketch -> server preview / none
+  // 1. Walk path, bad spots red along it
+  // Order (ADR-106 §4.6): shape helper -> live path tiles -> 2,048-point sketch -> none until Hot-Apply
   if (showSpiral) {
     try {
       ctx.lineWidth = 1.3;
-      const shape = regionState.shape;
-
       const wpd = regionState.walkPathData;
       const sigNow = regionGeometrySig(regionState);
-      const fromCode = drawCurvePath(wox, woy, scale, cssW, cssH);
-      const applied = !!wpd && !wpd.preview && wpd._sig === sigNow;
+      const hz = pathHazardSampler(regionState, curveModelFor(regionState));
+      const fromCode = drawCurvePath(wox, woy, scale, cssW, cssH, hz);
+      const applied = !!wpd && wpd._sig === sigNow;
       const hasSketch = !!wpd && wpd.units === 'block' && Array.isArray(wpd.points) && wpd.points.length > 1 && wpd._sig === sigNow;
       let fallback = '';
       ctx.strokeStyle = 'rgba(166, 227, 161, 0.7)';
       if (fromCode.state === 'ready') {
         // drawn from the shape's helper (ADR-106)
-      } else if (applied && drawWalkPathTiles(wox, woy, scale, cssW, cssH)) {
+      } else if (applied && drawWalkPathTiles(wox, woy, scale, cssW, cssH, hz)) {
         // Full-res live tiles (local feed) of the applied geometry
         fallback = 'path tiles';
       } else if (hasSketch) {
         // Server walk path (ADR-104): absolute block coordinates along the real 1D curve. Only valid
-        // for the geometry it was computed from; edits request the plugin's path for the new geometry.
+        // for the geometry it was computed from; edited geometry gets its path after Hot-Apply.
         ctx.strokeStyle = wpd.isHilbert ? 'rgba(166, 227, 161, 0.7)' : 'rgba(249, 226, 175, 0.6)';
+        // Sketch points carry no curve position: bad spots by chunk, each stretch as wide as its step
+        const red = hz && hz.chunkFrac ? hazardPaths() : null;
         ctx.beginPath();
         for (let i = 0; i < wpd.points.length; i++) {
           const pt = wpd.points[i];
           const px = wox + pt[0] * scale;
           const pz = woy + pt[1] * scale;
-          if (i === 0) ctx.moveTo(px, pz);
-          else ctx.lineTo(px, pz);
+          if (i === 0) {
+            ctx.moveTo(px, pz);
+            continue;
+          }
+          ctx.lineTo(px, pz);
+          if (red) {
+            const prev = wpd.points[i - 1];
+            const side = Math.max(1, Math.round(Math.max(Math.abs(pt[0] - prev[0]), Math.abs(pt[1] - prev[1])) / 16));
+            addHazardSeg(red, hz.chunkFrac(Math.floor(pt[0] / 16), Math.floor(pt[1] / 16), side),
+              wox + prev[0] * scale, woy + prev[1] * scale, px, pz);
+          }
         }
         ctx.stroke();
-        fallback = wpd.preview ? 'server preview' : 'sketch';
+        if (red) strokeHazardPaths(red, scale);
+        fallback = 'sketch';
       } else if (fromCode.state !== 'pending') {
-        // No helper and no path for this geometry: the plugin computes it over the loopback
-        requestWalkPath(regionState);
-        drawWalkPathStatus(cssW, cssH);
+        // No helper and no path for this geometry: staged only, the applied path arrives after Hot-Apply
+        if (regionState.shape) drawWalkPathStatus(cssH, 'Walk path: shown after Hot-Apply (staged geometry has no path yet)');
         fallback = 'no path';
       }
       updateCurveBadge(fromCode, fallback);
     } catch (walkErr) {
       console.warn('Walk path render exception:', walkErr);
     }
+  } else {
+    // Layer off: the helper model stays warm, so the plugin learns the region is verified (stops
+    // writing path tiles) and re-enabling the layer draws at once
+    curveModelFor(regionState);
+    setCurveBadge('hidden', 'Path: hidden', '');
   }
 
-  // 2. Shading out the parts outside the active shape / donut
-  // A. Outer Exclusion Shading: everything outside the outer boundary is shaded dark
+  // 2. Boundaries: outside the shape shaded (evenodd cut-out), the donut hole tinted, the outline
+  // stroked. Shapes the page cannot outline (addon shapes) get no shading, so the path stays legible.
   if (showBounds) {
-    ctx.save();
-    ctx.fillStyle = 'rgba(17, 17, 27, 0.65)';
-    ctx.beginPath();
-    // Outer canvas rectangle in CSS coordinates
-    ctx.rect(0, 0, cssW, cssH);
-
-    // Cut out inner valid shape geometry using evenodd winding
-    const shape = regionState.shape;
-    if (shape === 'CIRCLE' || shape === 'CIRCLE_NORMAL' || shape === 'CIRCLE_OPTIMIZED_DUAL_LAYER' || shape === 'CIRCLE_DEPRECATED_PURE_SPIRAL') {
-      ctx.arc(cx, cy, rBlocks * scale, 0, Math.PI * 2, true);
-    } else if (shape === 'SQUARE' || shape === 'SQUARE_NORMAL' || shape === 'SQUARE_OPTIMIZED_DUAL_LAYER' || shape === 'SQUARE_DEPRECATED_PURE_SPIRAL') {
-      const sz = rBlocks * 2 * scale;
-      ctx.rect(cx + rBlocks * scale, cy - rBlocks * scale, -sz, sz);
-    } else if (shape === 'RECTANGLE') {
-      const w = rxBlocks * 2 * scale;
-      const h = rzBlocks * 2 * scale;
-      ctx.rect(cx + rxBlocks * scale, cy - rzBlocks * scale, -w, h);
-    } else if (shape === 'ELLIPSE') {
-      ctx.ellipse(cx, cy, rxBlocks * scale, rzBlocks * scale, 0, 0, Math.PI * 2, true);
-    } else if (shape === 'POLYGON' && regionState.vertices && regionState.vertices.length >= 3) {
-      // Cut out polygon interior (vertices are chunk coordinates, offset to chunk center blocks)
-      for (let i = regionState.vertices.length - 1; i >= 0; i--) {
-        const v = regionState.vertices[i];
-        const vx = wox + (v[0] * 16 + 8) * scale;
-        const vy = woy + (v[1] * 16 + 8) * scale;
-        if (i === regionState.vertices.length - 1) ctx.moveTo(vx, vy);
-        else ctx.lineTo(vx, vy);
+    const fam = regionShapeFamily(regionState.shape);
+    const verts = fam === 'polygon' && Array.isArray(regionState.vertices) && regionState.vertices.length >= 3 ? regionState.vertices : null;
+    // Polygon vertices are chunk coordinates, drawn at chunk centres
+    const vertexPx = v => [wox + (v[0] * 16 + 8) * scale, woy + (v[1] * 16 + 8) * scale];
+    // Adds the outline at half-extents (rx, rz) blocks about the centre; false when there is none
+    const outline = (rx, rz) => {
+      if (fam === 'square' || fam === 'rectangle') {
+        ctx.rect(cx - rx * scale, cy - rz * scale, 2 * rx * scale, 2 * rz * scale);
+      } else if (fam === 'circle' || fam === 'ellipse') {
+        ctx.moveTo(cx + rx * scale, cy);
+        ctx.ellipse(cx, cy, rx * scale, rz * scale, 0, 0, Math.PI * 2);
+      } else if (verts) {
+        verts.forEach((v, i) => { const [x, y] = vertexPx(v); if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y); });
+        ctx.closePath();
+      } else {
+        return false;
       }
-      ctx.closePath();
+      return true;
+    };
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, cssW, cssH);
+    if (outline(rxBlocks, rzBlocks)) {
+      ctx.fillStyle = 'rgba(17, 17, 27, 0.65)';
+      ctx.fill('evenodd');
     }
-    ctx.fill('evenodd');
-    ctx.restore();
-
-    // B. Inner Donut Exclusion Shading (shade out the donut hole < crBlocks)
-    if (crBlocks > 0 && shape !== 'POLYGON') {
-      ctx.save();
+    if (crBlocks > 0 && (fam === 'circle' || fam === 'square' || fam === 'ellipse')) {
       ctx.fillStyle = 'rgba(243, 139, 168, 0.28)';
       ctx.strokeStyle = '#f38ba8';
       ctx.lineWidth = 1.8;
       ctx.beginPath();
-      if (shape === 'CIRCLE' || shape === 'CIRCLE_NORMAL' || shape === 'CIRCLE_OPTIMIZED_DUAL_LAYER' || shape === 'CIRCLE_DEPRECATED_PURE_SPIRAL') {
-        ctx.arc(cx, cy, crBlocks * scale, 0, Math.PI * 2);
-      } else if (shape === 'SQUARE' || shape === 'SQUARE_NORMAL' || shape === 'SQUARE_OPTIMIZED_DUAL_LAYER' || shape === 'SQUARE_DEPRECATED_PURE_SPIRAL') {
-        ctx.rect(cx - crBlocks * scale, cy - crBlocks * scale, crBlocks * 2 * scale, crBlocks * 2 * scale);
-      } else if (shape === 'ELLIPSE') {
-        ctx.ellipse(cx, cy, crxBlocks * scale, crzBlocks * scale, 0, 0, Math.PI * 2);
-      }
+      outline(crxBlocks, crzBlocks);
       ctx.fill();
       ctx.stroke();
-      ctx.restore();
     }
-
-    // C. Outer Boundary Stroke
-    ctx.save();
     ctx.strokeStyle = '#89b4fa';
     ctx.lineWidth = 2;
-    ctx.beginPath();
-    if (shape === 'CIRCLE' || shape === 'CIRCLE_NORMAL' || shape === 'CIRCLE_OPTIMIZED_DUAL_LAYER' || shape === 'CIRCLE_DEPRECATED_PURE_SPIRAL') {
-      ctx.arc(cx, cy, rBlocks * scale, 0, Math.PI * 2);
-      ctx.stroke();
-    } else if (shape === 'SQUARE' || shape === 'SQUARE_NORMAL' || shape === 'SQUARE_OPTIMIZED_DUAL_LAYER' || shape === 'SQUARE_DEPRECATED_PURE_SPIRAL') {
-      ctx.strokeRect(cx - rBlocks * scale, cy - rBlocks * scale, rBlocks * 2 * scale, rBlocks * 2 * scale);
-    } else if (shape === 'RECTANGLE') {
-      ctx.strokeRect(cx - rxBlocks * scale, cy - rzBlocks * scale, rxBlocks * 2 * scale, rzBlocks * 2 * scale);
-    } else if (shape === 'ELLIPSE') {
-      ctx.ellipse(cx, cy, rxBlocks * scale, rzBlocks * scale, 0, 0, Math.PI * 2);
-      ctx.stroke();
-    } else if (shape === 'POLYGON' && regionState.vertices && regionState.vertices.length >= 3) {
-      // Draw AABB bounding box dashed line (Square base class of Polygon in chunk extents)
-      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-      for (const v of regionState.vertices) {
-        minX = Math.min(minX, v[0]);
-        maxX = Math.max(maxX, v[0]);
-        minZ = Math.min(minZ, v[1]);
-        maxZ = Math.max(maxZ, v[1]);
-      }
+    if (verts) {
+      // Polygon.java's bounding square, dashed
+      const aabb = polygonAabb(verts);
       ctx.save();
       ctx.strokeStyle = 'rgba(137, 180, 250, 0.4)';
       ctx.setLineDash([4, 4]);
-      ctx.strokeRect(wox + (minX * 16) * scale, woy + (minZ * 16) * scale, ((maxX - minX + 1) * 16) * scale, ((maxZ - minZ + 1) * 16) * scale);
+      ctx.strokeRect(wox + aabb.minX * 16 * scale, woy + aabb.minZ * 16 * scale, (aabb.maxX - aabb.minX + 1) * 16 * scale, (aabb.maxZ - aabb.minZ + 1) * 16 * scale);
       ctx.restore();
-
-      // Draw polygon boundary stroke
-      ctx.beginPath();
-      for (let i = 0; i < regionState.vertices.length; i++) {
-        const v = regionState.vertices[i];
-        const vx = wox + (v[0] * 16 + 8) * scale;
-        const vy = woy + (v[1] * 16 + 8) * scale;
-        if (i === 0) ctx.moveTo(vx, vy);
-        else ctx.lineTo(vx, vy);
-      }
-      ctx.closePath();
-      ctx.stroke();
-
+    }
+    ctx.beginPath();
+    if (outline(rxBlocks, rzBlocks)) ctx.stroke();
+    if (verts) {
       // Vertex drag handles
-      for (let i = 0; i < regionState.vertices.length; i++) {
-        const v = regionState.vertices[i];
-        const vx = wox + (v[0] * 16 + 8) * scale;
-        const vy = woy + (v[1] * 16 + 8) * scale;
+      for (let i = 0; i < verts.length; i++) {
+        const [vx, vy] = vertexPx(verts[i]);
         const active = draggingVertex === i || selectedVertex === i;
+        if (active) {
+          // Halo: the selected handle stays visible over land, hazard and path layers
+          ctx.beginPath();
+          ctx.arc(vx, vy, 12, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(249, 226, 175, 0.25)';
+          ctx.fill();
+          ctx.strokeStyle = '#f9e2af';
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
         ctx.fillStyle = active ? '#f9e2af' : '#a6e3a1';
         ctx.beginPath();
-        ctx.arc(vx, vy, active ? 7 : 6, 0, Math.PI * 2);
+        ctx.arc(vx, vy, active ? 8 : 6, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = '#11111b';
         ctx.lineWidth = 1.5;
@@ -5646,24 +6250,8 @@ function drawMap() {
     ctx.restore();
   }
 
-  // Live hazard and landing bins; the export-time hazard stream draws until live hazards arrive
-  const showHeat = document.getElementById('chk-heat')?.checked ?? true;
-  const liveHazards = drawRegionOverlays(wox, woy, scale, cssW, cssH, showHazards, showHeat);
-  // Curve-space hazard runs map through the helper; the 2D export-time grid is the fallback
-  const curveHazards = showHazards && !liveHazards && drawCurveHazards(wox, woy, scale, cssW, cssH);
-  if (showHazards && !liveHazards && !curveHazards && hazardRuns && hazardRuns.length > 0) {
-    ctx.fillStyle = 'rgba(243, 139, 168, 0.6)';
-    const hzMult = hazardBounds.units === 'chunk' ? 16 : 1;
-    const hzCell = Math.max(3, ((hazardBounds.maxX - hazardBounds.minX) / hazardBounds.gridSize) * hzMult * scale);
-    for (const run of hazardRuns) {
-      for (let i = 0; i < run.len; i++) {
-        const pt = hilbertToXy(run.start + i, hazardBounds.order);
-        const bx = hazardBounds.minX + (pt[0] / hazardBounds.gridSize) * (hazardBounds.maxX - hazardBounds.minX);
-        const bz = hazardBounds.minZ + (pt[1] / hazardBounds.gridSize) * (hazardBounds.maxZ - hazardBounds.minZ);
-        ctx.fillRect(wox + bx * hzMult * scale, woy + bz * hzMult * scale, hzCell, hzCell);
-      }
-    }
-  }
+  // Landings on top; hazard bins load only for the walk path, which draws the bad spots
+  drawRegionOverlays(wox, woy, scale, cssW, cssH, showSpiral, document.getElementById('chk-heat')?.checked ?? true);
 
   // Move / resize grips above every layer (screen-px sized, same layout the mouse hit-tests)
   drawRegionHandles(wox, woy, scale, cssW, cssH);
@@ -5797,7 +6385,7 @@ function snapCoordinate(val) {
 
 // Region grips: a centre move grip and resize grips on the outer / inner edge, sized in screen px.
 // Settings edits go through applyShapeSetting and POLYGON vertex edits through the vertex path, so a
-// drag is staged exactly like a typed edit; walk-path / curve-state requests wait for mouseup.
+// drag is staged exactly like a typed edit.
 // Keys whose unit style a grip copies when the dragged key is absent from the shape block
 const REGION_HANDLE_STYLE_KEYS = {
   centerx: ['centerZ'], centerz: ['centerX'],
@@ -6100,7 +6688,7 @@ function startRegionHandleDrag(h, mx, my, t) {
   drawMap();
 }
 
-// Live drag: the drawing and the staged YAML follow the cursor; previews wait for mouseup
+// Live drag: the drawing and the staged YAML follow the cursor
 function dragRegionHandle(worldX, worldZ) {
   const d = regionHandleDrag, h = d.handle, step = handleSnapStepChunks();
   const px = worldX + d.grabDX, pz = worldZ + d.grabDZ;
@@ -6525,21 +7113,16 @@ function syncRegionProfiles() {
     selectEl.value = regionProfiles[curVal] ? curVal : 'default';
   }
 
-  // Update remove button state
+  syncRemoveRegionButton();
+}
+
+// The default region cannot be removed (.btn:disabled dims the button)
+function syncRemoveRegionButton() {
   const removeBtn = document.getElementById('btn-remove-region');
-  if (removeBtn) {
-    const isDefault = !regionState || regionState.name === 'default';
-    removeBtn.disabled = isDefault;
-    if (isDefault) {
-      removeBtn.title = 'The default region is protected and cannot be removed';
-      removeBtn.style.opacity = '0.4';
-      removeBtn.style.cursor = 'not-allowed';
-    } else {
-      removeBtn.title = `Remove region "${regionState.name}"`;
-      removeBtn.style.opacity = '1.0';
-      removeBtn.style.cursor = 'pointer';
-    }
-  }
+  if (!removeBtn) return;
+  const isDefault = !regionState || regionState.name === 'default';
+  removeBtn.disabled = isDefault;
+  removeBtn.title = isDefault ? 'The default region is protected and cannot be removed' : `Remove region "${regionState.name}"`;
 }
 
 // ADR-104 §4.6 source order: (1) biomes sampled by this region's teleport attempts,
@@ -6605,20 +7188,7 @@ function changeRegionProfile(profileKey) {
     const selectEl = document.getElementById('reg-profile-select');
     if (selectEl && selectEl.value !== profileKey) selectEl.value = profileKey;
 
-    const removeBtn = document.getElementById('btn-remove-region');
-    if (removeBtn) {
-      const isDefault = regionState.name === 'default';
-      removeBtn.disabled = isDefault;
-      if (isDefault) {
-        removeBtn.title = 'The default region is protected and cannot be removed';
-        removeBtn.style.opacity = '0.4';
-        removeBtn.style.cursor = 'not-allowed';
-      } else {
-        removeBtn.title = `Remove region "${regionState.name}"`;
-        removeBtn.style.opacity = '1.0';
-        removeBtn.style.cursor = 'pointer';
-      }
-    }
+    syncRemoveRegionButton();
 
     hazardRuns = [];
     const hz = regionState.hazards;
@@ -6930,9 +7500,6 @@ function validateGeometry(state) {
 }
 
 function segmentsIntersect(p1, p2, p3, p4) {
-  function ccw(a, b, c) {
-    return (c[1] - a[1]) * (b[0] - a[0]) > (b[1] - a[1]) * (c[0] - a[0]);
-  }
   function onSegment(p, q, r) {
     return q[0] <= Math.max(p[0], r[0]) && q[0] >= Math.min(p[0], r[0]) &&
            q[1] <= Math.max(p[1], r[1]) && q[1] >= Math.min(p[1], r[1]);
@@ -7364,7 +7931,16 @@ function hotApplyWebSocket() {
   }
   if (EditorChannelClient.send('apply', body)) {
     hotApplyPending = files;
-    show('var(--green)', '⚡ Commit of ' + names.join(', ') + ' sent to the server, awaiting confirmation...');
+    const sentText = '⚡ Commit of ' + names.join(', ') + ' sent to the server, awaiting confirmation...';
+    const wait = EditorChannelClient.queuedWaitMs('apply');
+    if (wait > 0) {
+      // Hosted relay frame share used up (pings, view focus): the commit leaves first once a slot frees
+      show('var(--yellow)', '⏳ Commit of ' + names.join(', ') + ' queued: the public relay allows ' + CHANNEL_PAGE_FRAMES
+        + ' page frames per 2 minutes, so it goes out in about ' + Math.ceil(wait / 1000) + ' s. Keep this tab open.');
+      setTimeout(() => { if (hotApplyPending === files) show('var(--green)', sentText); }, wait + 100);
+    } else {
+      show('var(--green)', sentText);
+    }
   } else {
     show('var(--red)', '❌ The live link is not ready; run the command below instead.');
   }
@@ -7462,10 +8038,6 @@ function decodeHilbertRle(base64Str) {
     }
     return runs;
   } catch (e) { return []; }
-}
-
-function hilbertToXy(d, order) {
-  return hilbertToXY(d, 1 << order);
 }
 
 function derivePointEdgeChunks(radiusChunks) {
@@ -7656,6 +8228,10 @@ const CHANNEL_FEED_STALE_MS = 90000;
 const CHANNEL_FRAME_WINDOW_MS = 120000;
 const CHANNEL_PAGE_FRAMES = 10;
 const CHANNEL_MAX_QUEUED = 32;
+// Queued sends a newer one of the same type replaces: a later Hot-Apply carries every file the earlier one did
+const CHANNEL_SUPERSEDED = new Set(['focus', 'apply']);
+// Operator commits go out ahead of queued view updates on a paced relay
+const CHANNEL_PRIORITY = new Set(['apply']);
 // ADR-107 §5.1: undotted core types, dotted <extension>.<type>
 const CHANNEL_TYPE_RE = /^[a-z][a-z0-9_-]{0,31}(\.[a-z][a-z0-9_-]{0,31})?$/;
 // Control frames never travel inside a paced channel's {type:'bundle', items:[..]} frame
@@ -7714,7 +8290,7 @@ var EditorChannelClient = (() => {
       connected: feedStale()
         ? ['● LINK · FEED STALE (' + Math.round((Date.now() - st.feedAt) / 1000) + 's)', 'var(--yellow)',
           'Linked, but the server sent no live update for over ' + (CHANNEL_FEED_STALE_MS / 1000) + ' s (it sends one at least every 60 s); its live feed may have stopped. The page keeps working from its snapshot.']
-        : ['● LINK · CONNECTED', 'var(--green)', 'Signed channel to the plugin: previews and Hot-Apply are live.'],
+        : ['● LINK · CONNECTED', 'var(--green)', 'Signed channel to the plugin: live updates and Hot-Apply are on.'],
       reconnecting: ['● LINK · RECONNECTING', 'var(--yellow)', 'Channel lost (' + st.reason + '); retrying. The page keeps working from its snapshot.'],
       snapshot: ['● SNAPSHOT ONLY' + (st.reason ? ' (' + st.reason + ')' : ''), 'var(--subtext)', 'No live channel: drawing works from the snapshot.']
     };
@@ -7857,7 +8433,7 @@ var EditorChannelClient = (() => {
     clearTimeout(st.retryTimer);
     clearInterval(st.pingTimer);
     clearTimeout(st.pumpTimer);
-    st.outQueue.length = 0;
+    discardQueue(reason || 'link closed');
     const ws = st.ws;
     st.ws = null;
     st.challenge = null;
@@ -7881,13 +8457,23 @@ var EditorChannelClient = (() => {
     return now;
   }
 
+  // A Hot-Apply that never left the page fails visibly (S-004) instead of awaiting an ack forever
+  function applyNotSent(reason) {
+    dispatch({ type: 'apply_ack', success: false, error: 'not sent (' + reason + '); run Hot-Apply again' });
+  }
+
+  function discardQueue(reason) {
+    const lost = st.outQueue.splice(0);
+    if (lost.some(q => q.type === 'apply')) applyNotSent(reason);
+  }
+
   // Queued sends in order, as far as the frame share allows; seq and challenge are bound at send time
   function pump() {
     clearTimeout(st.pumpTimer);
     st.pumpTimer = null;
     const now = pruneSent();
     while (st.outQueue.length && (!paced() || st.sentAt.length < CHANNEL_PAGE_FRAMES)) {
-      if (st.status !== 'connected' || !st.ws || !st.challenge) { st.outQueue.length = 0; return; }
+      if (st.status !== 'connected' || !st.ws || !st.challenge) { discardQueue('live link lost'); return; }
       const q = st.outQueue.shift();
       const obj = frameFields(q.type, q.body);
       st.seq = obj.seq;
@@ -7900,11 +8486,32 @@ var EditorChannelClient = (() => {
     st.sentAt.push(Date.now());
     st.outChain = st.outChain.then(async () => {
       const ws = st.ws;
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        if (obj.type === 'apply') applyNotSent('live link lost');
+        return;
+      }
       const frame = await signFrame(obj);
-      if (utf8Len(frame) > CHANNEL_MAX_FRAME) { drop('outbound ' + obj.type + ' over the frame cap'); return; }
+      if (utf8Len(frame) > CHANNEL_MAX_FRAME) {
+        drop('outbound ' + obj.type + ' over the frame cap');
+        if (obj.type === 'apply') applyNotSent('over the frame cap');
+        return;
+      }
       ws.send(frame);
-    }).catch((e) => console.warn('[RTP] editor channel send failed', e));
+    }).catch((e) => {
+      console.warn('[RTP] editor channel send failed', e);
+      if (obj.type === 'apply') applyNotSent('send failed: ' + (e && e.message ? e.message : e));
+    });
+  }
+
+  /** Milliseconds until the queued {@code type} frame may leave under the relay's frame share; 0 when not queued. */
+  function queuedWaitMs(type) {
+    const i = st.outQueue.findIndex(q => q.type === type);
+    if (i < 0 || !paced()) return 0;
+    const now = pruneSent();
+    const expire = st.sentAt.length + i + 1 - CHANNEL_PAGE_FRAMES;
+    if (expire <= 0) return 0;
+    if (expire <= st.sentAt.length) return Math.max(0, st.sentAt[expire - 1] + CHANNEL_FRAME_WINDOW_MS - now);
+    return Math.ceil(expire / CHANNEL_PAGE_FRAMES) * CHANNEL_FRAME_WINDOW_MS;
   }
 
   function sendHello() {
@@ -8024,18 +8631,24 @@ var EditorChannelClient = (() => {
     if (st.status !== 'connected' || !st.ws || !st.challenge || !fits(type, body)) return false;
     // Extension types only to a plugin that routes them (ADR-107 §5.2)
     if (type.indexOf('.') > 0 && protocolOf(st.protocol) < 2) return false;
-    if (type === 'focus') {
-      const queued = st.outQueue.find(q => q.type === 'focus');
+    if (CHANNEL_SUPERSEDED.has(type)) {
+      const queued = st.outQueue.find(q => q.type === type);
       if (queued) { queued.body = body; return true; }
     }
     if (st.outQueue.length >= CHANNEL_MAX_QUEUED) return false;
-    st.outQueue.push({ type, body });
+    if (CHANNEL_PRIORITY.has(type)) {
+      let at = 0;
+      while (at < st.outQueue.length && CHANNEL_PRIORITY.has(st.outQueue[at].type)) at++;
+      st.outQueue.splice(at, 0, { type, body });
+    } else {
+      st.outQueue.push({ type, body });
+    }
     pump();
     return true;
   }
 
   return {
-    start, stop, send, fits,
+    start, stop, send, fits, queuedWaitMs,
     on: (type, fn) => { handlers[type] = fn; },
     onNamespace: (id, fn) => { namespaces[id] = fn; },
     setProtocol: (p, extensions) => {
@@ -8483,8 +9096,6 @@ function initWebSocket() {
   EditorChannelClient.on('feed', (msg) => {
     if (msg.data && typeof msg.data === 'object') ingestChannelFeed(msg.data);
   });
-  EditorChannelClient.on('walkpath', ingestWalkPathReply);
-  EditorChannelClient.on('curve-state', ingestCurveStateReply);
   EditorChannelClient.on('curve', ingestCurveUpdate);
   EditorChannelClient.on('hazard-delta', (msg) => { ingestHazardDelta(msg).catch(() => {}); });
   EditorChannelClient.on('land', ingestLandPush);
@@ -8506,8 +9117,6 @@ function initWebSocket() {
   EditorChannelClient.onStatus((status) => {
     if (status === 'connected') {
       lastFocusSig = '';
-      lastWalkPathReq = '';
-      curveStateAsked.clear();
       requestMapRedraw();
     }
     updateLiveBadge();
@@ -9338,6 +9947,9 @@ window.__rtpLiveOverlayGroup = function (kind, r, gx, gz, data) {
   markGroupLoaded(kind, String(r), gx, gz);
   if (liveRegionByIndex[r] === undefined) return;
   const store = overlayBins[kind][r] || (overlayBins[kind][r] = new Map());
+  // Walk-path hazard caches (pathHazardSampler) key on this version; coarse sums are rebuilt
+  store.hzVer = (store.hzVer || 0) + 1;
+  store.coarse = null;
   const gb = liveFeed.groupBins;
   for (const [key, bin] of store) {
     if (Math.floor(bin.rx / gb) !== gx || Math.floor(bin.rz / gb) !== gz) continue;
