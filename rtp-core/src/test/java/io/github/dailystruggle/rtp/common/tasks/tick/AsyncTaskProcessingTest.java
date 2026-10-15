@@ -45,6 +45,8 @@ class AsyncTaskProcessingTest {
         RTP.getInstance().cancelTasks.start();
         RTP.getInstance().miscAsyncTasks.clear();
         RTP.getInstance().miscAsyncTasks.start();
+        AsyncTaskProcessing.resetRotationForTesting();
+        TickBudget.clear();
     }
 
     @AfterEach
@@ -198,9 +200,80 @@ class AsyncTaskProcessingTest {
     }
 
     @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    @DisplayName("performance.yml period: a single region refills exactly once per `period` pulses")
+    void period_singleRegion_runsOncePerPeriod() {
+        AtomicInteger executions = new AtomicInteger();
+        Region base = newRegion("countingRegion");
+        Region counting = new Region("countingRegion", base.getSettings()) {
+            @Override
+            public void execute(long allottedTime) {
+                executions.incrementAndGet();
+            }
+        };
+        RTP.selectionAPI.permRegionLookup.put("countingRegion", counting);
+
+        long period = TickBudget.periodTicks();
+        assertTrue(period > 1, "precondition: default period spans several pulses");
+        for (long i = 0; i < period * 3; i++) new AsyncTaskProcessing(Long.MAX_VALUE).run();
+
+        assertEquals(3, executions.get(), "one turn per period, not per period-1");
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    @DisplayName("asyncAllottedTime: region budget never exceeds the documented 25 ms ceiling")
+    void regionBudget_isClampedToCeiling() {
+        long[] seen = {-1L};
+        Region base = newRegion("budgetRegion");
+        Region probe = new Region("budgetRegion", base.getSettings()) {
+            @Override
+            public void execute(long allottedTime) {
+                seen[0] = allottedTime;
+            }
+        };
+        RTP.selectionAPI.permRegionLookup.put("budgetRegion", probe);
+
+        new AsyncTaskProcessing(Long.MAX_VALUE).run();
+
+        assertTrue(seen[0] > 0, "region must receive a positive budget");
+        assertTrue(seen[0] <= TimeUnit.MILLISECONDS.toNanos(TickBudget.MAX_ALLOTTED_MS),
+                "budget " + seen[0] + "ns exceeds the ceiling");
+    }
+
+    @Test
     @DisplayName("sparkFrameName tag returns rtp_async_task_drain")
     void testSparkFrameName() {
         AsyncTaskProcessing proc = new AsyncTaskProcessing(100L);
         assertEquals("rtp_async_task_drain", proc.sparkFrameName());
+    }
+
+    @Test
+    @DisplayName("SelectionAPI compute drains urgent and standard pipelines, tolerating task errors")
+    void selectionApi_compute_drainsPipelines() {
+        AtomicInteger urgentRan = new AtomicInteger();
+        AtomicInteger standardRan = new AtomicInteger();
+        RTP.selectionAPI.selectionPipelineUrgent.add(urgentRan::incrementAndGet);
+        RTP.selectionAPI.selectionPipelineUrgent.add(() -> { throw new RuntimeException("simulated task error"); });
+        RTP.selectionAPI.selectionPipeline.add(standardRan::incrementAndGet);
+
+        assertDoesNotThrow(() -> RTP.selectionAPI.compute());
+
+        assertEquals(1, urgentRan.get());
+        assertEquals(1, standardRan.get());
+        assertTrue(RTP.selectionAPI.selectionPipelineUrgent.isEmpty());
+        assertTrue(RTP.selectionAPI.selectionPipeline.isEmpty());
+    }
+
+    @Test
+    @DisplayName("AsyncTaskProcessing uses availableTime fallback when configs is null")
+    void run_usesConstructorTimeWhenConfigsNull() {
+        io.github.dailystruggle.rtp.common.configuration.Configs saved = RTP.configs;
+        RTP.configs = null;
+        try {
+            assertDoesNotThrow(() -> new AsyncTaskProcessing(1_000_000L).run());
+        } finally {
+            RTP.configs = saved;
+        }
     }
 }

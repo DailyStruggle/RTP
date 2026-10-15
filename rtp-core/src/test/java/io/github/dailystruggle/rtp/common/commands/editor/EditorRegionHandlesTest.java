@@ -338,9 +338,8 @@ class EditorRegionHandlesTest {
         String set = functionSource(html, "setRegionHandleSetting");
         assertTrue(set.contains("applyShapeSetting(key, value, row);"), "grip edits use the typed-edit path");
 
-        for (String fn : new String[]{"requestWalkPath", "requestCurveState"}) {
-            assertTrue(functionSource(html, fn).contains("if (regionHandleDrag) return;"), fn + " waits for mouseup");
-        }
+        assertFalse(html.contains("EditorChannelClient.send('walkpath'") || html.contains("EditorChannelClient.send('curve-state'"),
+                "geometry edits only stage: no preview request leaves the page");
         for (String fn : new String[]{"dragRegionHandle", "startRegionHandleDrag", "setRegionHandleSetting"}) {
             String src = functionSource(html, fn);
             assertFalse(src.contains("EditorChannelClient") || src.contains("requestWalkPath(") || src.contains("requestCurveState("),

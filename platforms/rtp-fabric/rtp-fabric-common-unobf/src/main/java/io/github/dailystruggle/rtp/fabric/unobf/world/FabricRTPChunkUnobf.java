@@ -2,32 +2,22 @@ package io.github.dailystruggle.rtp.fabric.unobf.world;
 
 import io.github.dailystruggle.rtp.anvil.AnvilChunkView;
 import io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer;
-import io.github.dailystruggle.rtp.api.safety.CompiledUnsafeSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
-import net.minecraft.world.level.levelgen.Heightmap;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Fabric {@link RTPChunk}. Dual-mode:
@@ -142,23 +132,8 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
     }
 
     @Override
-    public boolean isGenerated() {
-        // An Anvil view exists only because the region file entry for the chunk
-        // existed, which is the definition of "generated and persisted". Live
-        // path: a constructed FabricRTPChunkUnobf wraps a ChunkAccess obtained at
-        // ChunkStatus.FULL - by definition generated. Defensive on null.
-        if (anvilView != null) return true;
-        return chunk != null;
-    }
-
-    @Override
     public boolean isLoaded() {
-        // An Anvil-backed chunk is by construction NOT loaded - that's the whole
-        // point. Downstream callers needing a loaded chunk (e.g. teleport commit)
-        // re-fetch via FabricRTPWorldUnobf.getChunkAt to trigger a live load.
         if (anvilView != null) return false;
-        // Cheap, non-loading lookup; matches the FabricRTPWorldUnobf#isChunkLoaded
-        // path used by the ADR-015 stale-chunk guard.
         try {
             return level != null && level.getChunkSource().hasChunk(cx, cz);
         } catch (Throwable ignored) {
@@ -168,48 +143,25 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
 
     @Override
     public void keep(boolean keep) {
-        if (anvilView != null) {
-            // No-op: Anvil-backed chunks own no chunk ticket. When the pipeline
-            // decides to keep a candidate, it re-fetches the live chunk at commit
-            // time, which creates the FabricRTPChunkUnobf over the live ChunkAccess
-            // and then keep(true) applies the plugin ticket. Preserves
-            // REQ-RTP-S-002 (nothing to release here).
-            return;
-        }
-        // Route through the world's ref-counted ticket map so multi-caller
-        // hand-offs are safe; FabricRTPWorldUnobf.setForceLoadedImpl performs the
-        // server-thread hop.
+        if (anvilView != null) return;
         RTPWorld<?> w = getWorld();
         if (w instanceof FabricRTPWorldUnobf fw) {
-            if (keep) {
-                fw.keepChunkAt(cx, cz);
-            } else {
-                fw.forgetChunkAt(cx, cz);
-            }
+            if (keep) fw.keepChunkAt(cx, cz);
+            else fw.forgetChunkAt(cx, cz);
         }
     }
 
     @Override
     public void unload() {
-        if (anvilView != null) return; // Nothing to unload - see keep().
-        // Vanilla Fabric has no analogue to Bukkit's Chunk#unload(false) -
-        // chunk eviction is driven by the ticket system. Releasing our keep()
-        // ticket is the closest approximation; if no caller is keeping this
-        // chunk, the chunk system will evict it on its own schedule.
         keep(false);
     }
 
-    // ---------------------------------------------------------------------------
-    // Block-data queries
-    // ---------------------------------------------------------------------------
-
-    /**
-     * Returns the upper-cased {@code namespace:path} block id for the block at
-     * the given chunk-local coords (Y is absolute world Y). Live-mode only -
-     * anvil-mode queries route through {@link AnvilChunkView} which speaks the
-     * already-reconciled form. Returns {@code ""} on registry lookup failure.
-     */
-    private String materialNameAt(int x, int y, int z) {
+    @Override
+    public String materialNameAt(int x, int y, int z) {
+        if (anvilView != null) {
+            String id = anvilView.blockIdAt(x & 0xF, y, z & 0xF);
+            return (id != null) ? id.toUpperCase(Locale.ROOT) : "AIR";
+        }
         if (chunk == null) return "";
         try {
             BlockState state = chunk.getBlockState(new BlockPos(
@@ -219,86 +171,6 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
             return id.toString().toUpperCase(Locale.ROOT);
         } catch (Throwable t) {
             return "";
-        }
-    }
-
-    /**
-     * Process-wide cache of the reconciled {@code safety.airBlocks} set, mirroring
-     * {@code BukkitRTPChunk.AIR_BLOCKS_CACHE} / {@code FabricRTPChunk.AIR_BLOCKS_CACHE}.
-     * See those for rationale; this is the unobf (Mojang-mapped 26.1+) twin.
-     */
-    private static final AtomicReference<Set<String>> AIR_BLOCKS_CACHE =
-            new AtomicReference<>(Collections.emptySet());
-
-    /**
-     * Resolve {@code safety.airBlocks} to a reconciled set with {@code #namespace:tag}
-     * tokens flattened via {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor#blockTagSnapshot()}.
-     * Direct port of {@code FabricRTPChunk.reconciledAirBlocks()}.
-     */
-    @SuppressWarnings("unchecked")
-    private static Set<String> reconciledAirBlocks() {
-        Set<String> cached = AIR_BLOCKS_CACHE.get();
-        try {
-            if (RTP.configs == null) return cached;
-            Object value = RTP.configs.getConfigValue(BlocksKeys.airBlocks, new ArrayList<>());
-            if (!(value instanceof Collection<?> coll)) return cached;
-            Map<String, Set<String>> tagSnapshot = Collections.emptyMap();
-            if (RTP.serverAccessor != null) {
-                try {
-                    Map<String, Set<String>> s = RTP.serverAccessor.blockTagSnapshot();
-                    if (s != null) tagSnapshot = s;
-                } catch (Throwable ignoredTag) {
-                    // best-effort
-                }
-            }
-            Set<String> raw = new HashSet<>();
-            for (Object o : coll) {
-                if (o == null) continue;
-                String token = o.toString().trim();
-                if (token.isEmpty()) continue;
-                if (token.charAt(0) == '#') {
-                    String tagId = token.substring(1);
-                    if (tagId.indexOf(':') < 0) tagId = "minecraft:" + tagId;
-                    tagId = tagId.toLowerCase(Locale.ROOT);
-                    Set<String> members = tagSnapshot.get(tagId);
-                    if (members != null && !members.isEmpty()) {
-                        raw.addAll(members);
-                        continue;
-                    }
-                    raw.add(token);
-                } else {
-                    raw.add(token);
-                }
-            }
-            Set<String> reconciled = (RTP.serverAccessor != null)
-                ? RTP.serverAccessor.reconcilePaletteIdentifiers(raw)
-                : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalizeAll(raw);
-            AIR_BLOCKS_CACHE.set(reconciled);
-            return reconciled;
-        } catch (Throwable ignored) {
-            return cached;
-        }
-    }
-
-    @Override
-    public boolean isAir(int x, int y, int z) {
-        Set<String> airSet = reconciledAirBlocks();
-        if (anvilView != null) {
-            return anvilView.isAir(x & 0xF, y, z & 0xF, airSet);
-        }
-        if (chunk == null) return true;
-        try {
-            BlockState state = chunk.getBlockState(new BlockPos(
-                    (cx << 4) + (x & 0xF), y, (cz << 4) + (z & 0xF)));
-            if (state.isAir()) return true;
-            if (airSet.isEmpty()) return false;
-            Block block = state.getBlock();
-            Identifier id = BuiltInRegistries.BLOCK.getKey(block);
-            return (RTP.serverAccessor != null)
-                ? RTP.serverAccessor.matchesPaletteIdentifier(id.toString(), airSet)
-                : airSet.contains(io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(id.toString()));
-        } catch (Throwable t) {
-            return false;
         }
     }
 
@@ -320,80 +192,6 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
             }
         }
         return super.getBiome(x, y, z);
-    }
-
-    @Override
-    public int getSkyLight(int x, int y, int z) {
-        if (anvilView != null) {
-            // Anvil-backed snapshots do not parse SkyLight nibbles. Report the
-            // vanilla "absent tag → fully lit" default; the live re-check at
-            // teleport-commit time remains authoritative for any sky-light gating.
-            return 15;
-        }
-        if (level == null) return 0;
-        try {
-            return level.getBrightness(LightLayer.SKY, new BlockPos(
-                    (cx << 4) + (x & 0xF), y, (cz << 4) + (z & 0xF)));
-        } catch (Throwable t) {
-            return 0;
-        }
-    }
-
-    @Override
-    public int getSurfaceHeight(int x, int z) {
-        x = Math.max(0, Math.min(15, x));
-        z = Math.max(0, Math.min(15, z));
-        if (anvilView != null) {
-            return anvilView.getSurfaceHeight(x, z);
-        }
-        if (chunk == null) return 0;
-        try {
-            // Mojang's MOTION_BLOCKING_NO_LEAVES maps directly to Bukkit's
-            // HeightMap.MOTION_BLOCKING_NO_LEAVES - the same height map used
-            // by BukkitRTPChunk#getSurfaceHeight.
-            return chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
-        } catch (Throwable t) {
-            return 0;
-        }
-    }
-
-    @Override
-    public boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks) {
-        if (anvilView != null) {
-            // Prefer the pre-reconciled set we were constructed with; if absent,
-            // reconcile per-call to stay in sync with the raw config form
-            // (back-compat for ad-hoc callers that construct an Anvil-backed
-            // chunk without supplying a reconciled set).
-            Set<String> set = (reconciledUnsafe != null)
-                    ? reconciledUnsafe
-                    : ((RTP.serverAccessor != null)
-                        ? RTP.serverAccessor.reconcilePaletteIdentifiers(unsafeBlocks)
-                        : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalizeAll(unsafeBlocks));
-            return anvilView.isSafe(x & 0xF, y, z & 0xF, set);
-        }
-        if (unsafeBlocks == null || unsafeBlocks.isEmpty()) return true;
-        String name = materialNameAt(x, y, z);
-        // S-001: an unresolvable block id fails closed rather than passing the unsafe scan.
-        if (name.isEmpty()) return false;
-        // Match either the bare path (e.g. "STONE") or the full id ("MINECRAFT:STONE").
-        if (unsafeBlocks.contains(name)) return false;
-        int colon = name.indexOf(':');
-        if (colon > 0 && unsafeBlocks.contains(name.substring(colon + 1))) return false;
-        return true;
-    }
-
-    /**
-     * Compiled-form safety check (ADR-017). Plain-material bucket only on
-     * Fabric for now - see class-level note. Hot-path fast exits mirror the
-     * Bukkit implementation: empty compiled set short-circuits to safe with
-     * zero allocations. Anvil-backed instances also delegate to the plain
-     * bucket via {@link #isSafe(int, int, int, Set)}
-     * (state predicates against Anvil palette data are not yet supported).
-     */
-    @Override
-    public boolean isSafe(int x, int y, int z, CompiledUnsafeSet unsafeBlocks) {
-        if (unsafeBlocks == null || unsafeBlocks.isEmpty()) return true;
-        return isSafe(x, y, z, unsafeBlocks.plainMaterials());
     }
 
     /**

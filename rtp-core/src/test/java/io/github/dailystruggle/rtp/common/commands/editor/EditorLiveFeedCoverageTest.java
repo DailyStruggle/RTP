@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
+import com.google.gson.JsonObject;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.ChannelPageStub;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorChannel;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorKeys;
@@ -178,19 +179,6 @@ class EditorLiveFeedCoverageTest {
     }
 
     @Test
-    @DisplayName("Walk-path requests with no reply sink, no JSON or oversize JSON are ignored; junk is skipped")
-    void walkPathRequestBounds() throws IOException {
-        EditorLiveFeed feed = newFeed(3_600_000L);
-        List<String> replies = new ArrayList<>();
-        feed.offerWalkPathRequest("c", null, "{}");
-        feed.offerWalkPathRequest("c", replies::add, null);
-        feed.offerWalkPathRequest("c", replies::add, "x".repeat(EditorWalkPathPreview.MAX_MESSAGE_CHARS + 1));
-        for (int i = 0; i < 30; i++) feed.offerWalkPathRequest("c" + i, replies::add, "not json");
-        assertTrue(feed.tick(), "stopped: " + feed.stopReason());
-        assertTrue(replies.isEmpty(), replies.toString());
-    }
-
-    @Test
     @DisplayName("landKey joins world, layer and bin coordinates")
     void landKeyFormat() {
         assertEquals("world|64|-1,2", EditorLiveFeed.landKey("world", 64, -1, 2));
@@ -252,6 +240,66 @@ class EditorLiveFeedCoverageTest {
         channel.close("page gone");
         assertFalse(feed.tick());
         assertTrue(feed.stopReason().startsWith("editor channel closed"), feed.stopReason());
+    }
+
+    @Test
+    @DisplayName("ADR-106 §5.10: a hosted feed pushes stats-only heads (at once, changed ones every 20 s, a 40 s heartbeat)")
+    void hostedPushesHeads() throws IOException {
+        openChannel();
+        AtomicLong depth = new AtomicLong();
+        EditorLiveFeed feed = new EditorLiveFeed(tempDir.resolve("hosted"), false, List.of(), null, null,
+                () -> "{\"queueDepth\":" + depth.get() + "}", 3_600_000L, clock::get);
+        feed.attachChannel(channel, null);
+        assertTrue(feed.tick(), "stopped: " + feed.stopReason());
+        assertEquals(1, page.count("feed"), "the page sees the feed alive at once");
+        JsonObject data = page.last("feed").getAsJsonObject("data");
+        assertEquals(0, data.getAsJsonObject("telemetry").get("queueDepth").getAsInt());
+        for (String local : List.of("groups", "palettes", "pathBatches", "groupBins")) {
+            assertFalse(data.has(local), local + " names local files");
+        }
+
+        depth.set(1);
+        clock.addAndGet(5_000L);
+        assertTrue(feed.tick());
+        assertEquals(1, page.count("feed"), "a changed head waits for the hosted gap");
+        clock.addAndGet(EditorLiveFeed.HOSTED_HEAD_MIN_MILLIS);
+        assertTrue(feed.tick());
+        assertEquals(2, page.count("feed"));
+        clock.addAndGet(EditorLiveFeed.HOSTED_HEAD_MIN_MILLIS);
+        assertTrue(feed.tick());
+        assertEquals(2, page.count("feed"), "unchanged: no head before the heartbeat");
+        clock.addAndGet(EditorLiveFeed.FEED_HEARTBEAT_MILLIS);
+        assertTrue(feed.tick());
+        assertEquals(3, page.count("feed"), "heartbeat");
+        feed.offerClientMessage("{\"type\":\"focus\",\"world\":\"world\",\"y\":64,\"minRx\":0,\"minRz\":0,\"maxRx\":0,\"maxRz\":0}");
+        assertTrue(feed.tick());
+        assertEquals(4, page.count("feed"), "a focus forces the next head");
+    }
+
+    @Test
+    @DisplayName("ADR-106 §5.10: on a paced channel the feed tick flushes held pushes once their bundle gap passed")
+    void pacedTickFlushesHeld() throws IOException {
+        InMemoryTransport[] pair = InMemoryTransport.pair();
+        pair[0].withFramesPerWindow(18);
+        EditorKeys keys = EditorKeys.generate();
+        channel = new EditorChannel(EditorChannel.newChannelId(), keys, TrustedEditors.inMemory(), pair[0],
+                (nonce, fp) -> { }, clock::get);
+        channel.start();
+        page = new ChannelPageStub(pair[1], channel.id(), keys.publicKey());
+        page.hello();
+        channel.trust(page.nonce);
+        EditorLiveFeed feed = new EditorLiveFeed(tempDir.resolve("hosted"), false, List.of(), null, null,
+                () -> "{}", 3_600_000L, clock::get);
+        feed.attachChannel(channel, null);
+        assertTrue(feed.tick(), "stopped: " + feed.stopReason());
+        assertEquals(1, page.count("feed"), "first bundle leaves at once");
+
+        clock.addAndGet(1_000L);
+        assertTrue(channel.send("{\"type\":\"curve\",\"region\":\"alpha\"}"));
+        assertEquals(0, page.count("curve"), "held inside the bundle gap");
+        clock.addAndGet(EditorChannel.BUNDLE_INTERVAL_MILLIS);
+        assertTrue(feed.tick());
+        assertEquals(1, page.count("curve"), "the tick sent it without another push");
     }
 
     @Test

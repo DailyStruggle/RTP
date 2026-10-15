@@ -1591,13 +1591,11 @@ public class ScanTask extends RTPRunnable {
                         return;
                       }
 
-                      GlobalRegionVerifiers.VerifierCheckResult verResult = null;
-                      if (pass) {
-                        verResult = GlobalRegionVerifiers.checkGlobalRegionVerifiersDetailed(localCursor.toImmutable()).join();
-                        pass = (verResult != null && verResult.passed());
-                      }
-
-                      if (pass) {
+                      // Claim verifiers may complete on another thread: continue from their
+                      // future instead of join()ing, which blocked this tick thread (S-005).
+                      java.util.function.BiConsumer<Boolean, GlobalRegionVerifiers.VerifierCheckResult> finish =
+                          (ok, verResult) -> { try {
+                      if (ok) {
                         fullLoadOutcomeAccept.incrementAndGet();
                         res.complete(true);
                       } else {
@@ -1656,6 +1654,33 @@ public class ScanTask extends RTPRunnable {
                         fullLoadOutcomeSafetyScan.incrementAndGet();
                         res.complete(false);
                       }
+                      } catch (Throwable t) {
+                        RTP.log(Level.SEVERE, "[ScanTask] Verifier verdict crashed at location " + pos, t);
+                        shape.addBadChunk(pos);
+                        fullLoadOutcomeCrashed.incrementAndGet();
+                        res.complete(false);
+                      } };
+
+                      if (!pass) {
+                        finish.accept(false, null);
+                        return;
+                      }
+                      CompletableFuture<GlobalRegionVerifiers.VerifierCheckResult> verdict =
+                          GlobalRegionVerifiers.checkGlobalRegionVerifiersDetailed(localCursor.toImmutable());
+                      if (verdict == null) {
+                        finish.accept(false, null);
+                        return;
+                      }
+                      verdict.whenComplete((vr, ex) -> {
+                        if (ex != null) {
+                          RTP.log(Level.SEVERE, "[ScanTask] Claim verifier failed at location " + pos, ex);
+                          shape.addBadChunk(pos);
+                          fullLoadOutcomeCrashed.incrementAndGet();
+                          res.complete(false);
+                          return;
+                        }
+                        finish.accept(vr != null && vr.passed(), vr);
+                      });
                     } catch (Throwable t) {
                       RTP.log(Level.SEVERE, "[ScanTask] Validation crashed on Region Thread at location " + pos, t);
                       // addBadChunk: chunk-uniform - within a chunk the per-column

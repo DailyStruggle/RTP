@@ -275,64 +275,8 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
             return result;
         }
 
-        final int inFlightNow = liveLoadInFlight.incrementAndGet();
-        totalChunkLoads.incrementAndGet();
-
-        // Trace the live-load dispatch end to end at FINER: whether the
-        // server.execute runnable runs on the tick thread, what the adapter
-        // handed back, and whether the chunk future ultimately resolves.
         final long dispatchStartNanos = System.nanoTime();
-        RTP.log(java.util.logging.Level.FINER,
-                "[RTP][NeoForge] dispatch SUBMIT world=" + name
-                        + " chunk=(" + chunkX + "," + chunkZ + ") inFlight=" + inFlightNow
-                        + " serverThread.isSameThread=" + server.isSameThread());
-
-        CompletableFuture<CompletableFuture<ChunkAccess>> bridge = new CompletableFuture<>();
-        server.execute(() -> {
-            RTP.log(java.util.logging.Level.FINER,
-                    "[RTP][NeoForge] dispatch RUN (on tick thread) world=" + name
-                            + " chunk=(" + chunkX + "," + chunkZ + ") waitedMs="
-                            + ((System.nanoTime() - dispatchStartNanos) / 1_000_000L));
-            try {
-                CompletableFuture<ChunkAccess> adapterFuture = adapter.requestFullChunkAsync(world, chunkX, chunkZ);
-                RTP.log(java.util.logging.Level.FINER,
-                        "[RTP][NeoForge] adapter.requestFullChunkAsync RETURNED future="
-                                + (adapterFuture == null ? "null" : "id@" + System.identityHashCode(adapterFuture)
-                                        + " done=" + adapterFuture.isDone())
-                                + " world=" + name + " chunk=(" + chunkX + "," + chunkZ + ")");
-                if (adapterFuture != null) {
-                    adapterFuture.whenComplete((ca, ex) -> RTP.log(java.util.logging.Level.FINER,
-                            "[RTP][NeoForge] adapter future COMPLETE world=" + name
-                                    + " chunk=(" + chunkX + "," + chunkZ + ") chunk="
-                                    + (ca == null ? "null" : ca.getClass().getSimpleName())
-                                    + (ex == null ? "" : " ex=" + ex.getClass().getSimpleName() + ":" + ex.getMessage())
-                                    + " elapsedMs=" + ((System.nanoTime() - dispatchStartNanos) / 1_000_000L)));
-                }
-                bridge.complete(adapterFuture);
-            } catch (Throwable t) {
-                RTP.log(java.util.logging.Level.WARNING,
-                        "[RTP][NeoForge] adapter.requestFullChunkAsync THREW world=" + name
-                                + " chunk=(" + chunkX + "," + chunkZ + "): "
-                                + t.getClass().getSimpleName() + ": " + t.getMessage());
-                bridge.completeExceptionally(t);
-            }
-        });
-        // NO short pre-dispatch timeout here. The bridge only completes once the
-        // server.execute runnable actually runs on the tick thread and returns
-        // the adapter's (pending) chunk future. A previous bridge.orTimeout(1_500ms)
-        // failed the whole load whenever the tick thread was momentarily behind:
-        // when the server logs "Running NNNNms behind" (e.g. first-chunk worldgen
-        // bursts), the execute runnable cannot start within 1.5s, so the bridge
-        // timed out and PregenTask attributed a spurious TimeoutException - L1
-        // never promoted and /rtp never landed. The proven Fabric 26.1 carrier has
-        // no such short pre-dispatch deadline; the only deadline is the generation
-        // bound below. We rely solely on the LIVE_LOAD_DEADLINE_MS deadline applied
-        // to the composed chain, which still bounds a genuinely dead dispatch.
-        CompletableFuture<ChunkAccess> dispatch =
-                bridge.thenCompose(f -> f == null ? CompletableFuture.completedFuture(null) : f);
-        dispatch = dispatch.orTimeout(LIVE_LOAD_DEADLINE_MS, TimeUnit.MILLISECONDS);
-        dispatch.whenComplete((chunk, error) -> {
-            liveLoadInFlight.decrementAndGet();
+        dispatchFullChunk(server, adapter, chunkX, chunkZ).whenComplete((chunk, error) -> {
             inFlightLiveLoads.remove(key, result);
             if (error != null) {
                 Throwable cause = (error instanceof CompletionException && error.getCause() != null)
@@ -388,6 +332,80 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
             result.complete(key);
         });
         return result;
+    }
+
+    /**
+     * Native-load dispatch for {@link #loadLiveChunk}:
+     * hops onto the tick thread, issues the adapter's non-blocking FULL request (S-005) and
+     * bounds the chain by {@link #LIVE_LOAD_DEADLINE_MS}. Counts one {@code totalChunkLoads}.
+     * Stores nothing; callers decide whether the chunk is cached.
+     */
+    private CompletableFuture<ChunkAccess> dispatchFullChunk(
+            MinecraftServer server, NeoForgeVersionAdapter adapter, int chunkX, int chunkZ) {
+        final int inFlightNow = liveLoadInFlight.incrementAndGet();
+        totalChunkLoads.incrementAndGet();
+
+        // Trace the live-load dispatch end to end at FINER: whether the
+        // server.execute runnable runs on the tick thread, what the adapter
+        // handed back, and whether the chunk future ultimately resolves.
+        final long dispatchStartNanos = System.nanoTime();
+        RTP.log(java.util.logging.Level.FINER,
+                "[RTP][NeoForge] dispatch SUBMIT world=" + name
+                        + " chunk=(" + chunkX + "," + chunkZ + ") inFlight=" + inFlightNow
+                        + " serverThread.isSameThread=" + server.isSameThread());
+
+        CompletableFuture<CompletableFuture<ChunkAccess>> bridge = new CompletableFuture<>();
+        Runnable dispatchOnTick = () -> {
+            RTP.log(java.util.logging.Level.FINER,
+                    "[RTP][NeoForge] dispatch RUN (on tick thread) world=" + name
+                            + " chunk=(" + chunkX + "," + chunkZ + ") waitedMs="
+                            + ((System.nanoTime() - dispatchStartNanos) / 1_000_000L));
+            try {
+                CompletableFuture<ChunkAccess> adapterFuture = adapter.requestFullChunkAsync(world, chunkX, chunkZ);
+                RTP.log(java.util.logging.Level.FINER,
+                        "[RTP][NeoForge] adapter.requestFullChunkAsync RETURNED future="
+                                + (adapterFuture == null ? "null" : "id@" + System.identityHashCode(adapterFuture)
+                                        + " done=" + adapterFuture.isDone())
+                                + " world=" + name + " chunk=(" + chunkX + "," + chunkZ + ")");
+                if (adapterFuture != null) {
+                    adapterFuture.whenComplete((ca, ex) -> RTP.log(java.util.logging.Level.FINER,
+                            "[RTP][NeoForge] adapter future COMPLETE world=" + name
+                                    + " chunk=(" + chunkX + "," + chunkZ + ") chunk="
+                                    + (ca == null ? "null" : ca.getClass().getSimpleName())
+                                    + (ex == null ? "" : " ex=" + ex.getClass().getSimpleName() + ":" + ex.getMessage())
+                                    + " elapsedMs=" + ((System.nanoTime() - dispatchStartNanos) / 1_000_000L)));
+                }
+                bridge.complete(adapterFuture);
+            } catch (Throwable t) {
+                RTP.log(java.util.logging.Level.WARNING,
+                        "[RTP][NeoForge] adapter.requestFullChunkAsync THREW world=" + name
+                                + " chunk=(" + chunkX + "," + chunkZ + "): "
+                                + t.getClass().getSimpleName() + ": " + t.getMessage());
+                bridge.completeExceptionally(t);
+            }
+        };
+        // A rejected submit (server stopping) fails the bridge so the in-flight count and the
+        // callers' futures still settle.
+        try {
+            server.execute(dispatchOnTick);
+        } catch (Throwable rejected) {
+            bridge.completeExceptionally(rejected);
+        }
+        // NO short pre-dispatch timeout here. The bridge only completes once the
+        // server.execute runnable actually runs on the tick thread and returns
+        // the adapter's (pending) chunk future. A previous bridge.orTimeout(1_500ms)
+        // failed the whole load whenever the tick thread was momentarily behind:
+        // when the server logs "Running NNNNms behind" (e.g. first-chunk worldgen
+        // bursts), the execute runnable cannot start within 1.5s, so the bridge
+        // timed out and PregenTask attributed a spurious TimeoutException - L1
+        // never promoted and /rtp never landed. The proven Fabric 26.1 carrier has
+        // no such short pre-dispatch deadline; the only deadline is the generation
+        // bound below. We rely solely on the LIVE_LOAD_DEADLINE_MS deadline applied
+        // to the composed chain, which still bounds a genuinely dead dispatch.
+        CompletableFuture<ChunkAccess> dispatch =
+                bridge.thenCompose(f -> f == null ? CompletableFuture.completedFuture(null) : f);
+        return dispatch.orTimeout(LIVE_LOAD_DEADLINE_MS, TimeUnit.MILLISECONDS)
+                .whenComplete((chunk, error) -> liveLoadInFlight.decrementAndGet());
     }
 
     @Override

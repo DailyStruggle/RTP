@@ -1,11 +1,17 @@
-# Requisito mínimo de TPS
-# TPS mínimo do servidor antes de enfileirar uma nova localização para o cache.
-# Faixa: 0.0 - 20.0.
-# Impacto: BAIXO - evita que o plugin adicione lag quando o servidor está com problemas.
+# Pausa o preenchimento do cache em segundo plano se os TPS caírem abaixo deste valor.
+# No Folia, conta a região mais lenta. Jogadores aguardando continuam sendo atendidos. 0 = desativado.
 # @type: number
 # @range: [0.0, 20.0]
 # @default: 19.0
 tpsMinimo: 19.0
+
+# Pausa o preenchimento do cache em segundo plano se um tick levar mais que este valor (ms).
+# Detecta lag oculto pelos TPS (permanecem em 20 até 50 ms). 0 = desativado.
+# @type: number
+# @range: [0.0, null]
+# @unit: ms
+# @default: 45.0
+maxMSPT: 45.0
 
 # Uso máximo do heap da JVM (% do máximo) antes de pausar o preenchimento do
 # cache em segundo plano. Locais já em cache continuam servidos. 0 ou 100 desativa.
@@ -24,32 +30,26 @@ maxHeapPorcentagem: 85.0
 # @default: 32
 tentativasMaximas: 10
 
-# Frequência de seleção (ticks do jogo)
-# Tempo entre buscas por novas localizações para preencher os caches de região.
-# ( 20 ticks = 1 segundo ).
-# Impacto: MÉDIO - valores menores preenchem o cache mais rápido mas usam mais CPU.
+# Ticks entre recargas da mesma região. As regiões se alternam.
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
 # @default: 20
 periodo: 20
 
-# Tempo alocado por tarefa (milissegundos)
-# Tempo máximo (ms) dedicado a tarefas do RTP por tick.
-# Faixa: 0 - 50.
-# Impacto: MÉDIO - valores altos permitem processar mais rápido, ao custo do tempo de tick.
+# Máximo de ms por tick para o trabalho na thread principal. Limitado a 25.
 # @type: integer
-# @range: [1, null]
+# @range: [1, 25]
 # @unit: ms
-# @default: 50
-tempoAlocadoSincrono: 50
+# @default: 5
+tempoAlocadoSincrono: 5
 
-# Milissegundos máximos por tick gastos em tarefas assíncronas.
+# Máximo de ms por pulso para o trabalho em segundo plano. Limitado a 25.
 # @type: integer
-# @range: [1, null]
+# @range: [1, 25]
 # @unit: ms
-# @default: 50
-tempoAlocadoAssincrono: 50
+# @default: 25
+tempoAlocadoAssincrono: 25
 
 # Pré-carregamento de destino (chunks)
 # Raio de chunks a pré-carregar ao redor do destino.

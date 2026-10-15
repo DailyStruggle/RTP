@@ -185,6 +185,77 @@ public class RTP {
   public static TreeCommand baseCommand;
   public static AtomicBoolean reloading = new AtomicBoolean(false);
 
+  private static final java.util.concurrent.atomic.AtomicReference<Set<String>> AIR_BLOCKS_CACHE =
+      new java.util.concurrent.atomic.AtomicReference<>(Collections.emptySet());
+
+  /**
+   * Returns the reconciled configured air blocks set from {@code BlocksKeys.airBlocks}.
+   */
+  public static Set<String> getAirBlocks() {
+    Set<String> cached = AIR_BLOCKS_CACHE.get();
+    try {
+      if (configs == null) return cached;
+      Object value = configs.getConfigValue(
+          io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys.airBlocks,
+          new ArrayList<>());
+      if (!(value instanceof Collection<?> coll)) return cached;
+      Map<String, Set<String>> tagSnapshot = Collections.emptyMap();
+      if (serverAccessor != null) {
+        try {
+          Map<String, Set<String>> s = serverAccessor.blockTagSnapshot();
+          if (s != null) tagSnapshot = s;
+        } catch (Throwable ignoredTag) {
+          // best-effort
+        }
+      }
+      Set<String> raw = new HashSet<>();
+      for (Object o : coll) {
+        if (o == null) continue;
+        String token = o.toString().trim();
+        if (token.isEmpty()) continue;
+        if (token.charAt(0) == '#') {
+          String tagId = token.substring(1);
+          if (tagId.indexOf(':') < 0) tagId = "minecraft:" + tagId;
+          tagId = tagId.toLowerCase(Locale.ROOT);
+          Set<String> members = tagSnapshot.get(tagId);
+          if (members != null && !members.isEmpty()) {
+            raw.addAll(members);
+            continue;
+          }
+          raw.add(token);
+        } else {
+          raw.add(token);
+        }
+      }
+      Set<String> reconciled = io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(raw);
+      AIR_BLOCKS_CACHE.set(reconciled);
+      return reconciled;
+    } catch (Throwable ignored) {
+      return cached;
+    }
+  }
+
+  /**
+   * Checks if the given material name represents air (either vanilla air or configured air blocks).
+   *
+   * @param materialName material or block identifier
+   * @return {@code true} if air, {@code false} otherwise
+   */
+  public static boolean isAir(String materialName) {
+    if (materialName == null || materialName.isEmpty()) return false;
+    String upper = materialName.toUpperCase(Locale.ROOT);
+    int colon = upper.indexOf(':');
+    String bare = (colon >= 0) ? upper.substring(colon + 1) : upper;
+    if (bare.equals("AIR") || bare.equals("CAVE_AIR") || bare.equals("VOID_AIR")) {
+      return true;
+    }
+    Set<String> air = getAirBlocks();
+    if (air != null && !air.isEmpty()) {
+      return air.contains(bare) || air.contains(upper);
+    }
+    return false;
+  }
+
   /**
    * Reload all plugin configurations and regions.
    *
@@ -192,6 +263,7 @@ public class RTP {
    */
   public static boolean reload() {
     reloading.set(true);
+    AIR_BLOCKS_CACHE.set(Collections.emptySet());
     try {
       if (configs == null) return false;
       return configs.reload();
@@ -234,6 +306,7 @@ public class RTP {
     // internals. See docs/dev/EXTERNAL_HOOKS.md.
     io.github.dailystruggle.rtp.api.RTPAPI.hooks =
         new io.github.dailystruggle.rtp.common.hooks.DefaultRTPHooks();
+    io.github.dailystruggle.rtp.api.RTPAPI.isAirDelegate = RTP::isAir;
 
     triggerManager.start();
 
@@ -1544,7 +1617,8 @@ public class RTP {
         1200L,
         1200L));
 
-    long syncTime = TimeUnit.MILLISECONDS.toNanos(5);
+    // Both pulses fire every tick; per-pulse budgets come from TickBudget (performance.yml).
+    long syncTime = TimeUnit.MILLISECONDS.toNanos(io.github.dailystruggle.rtp.common.tasks.tick.TickBudget.DEFAULT_SYNC_MS);
     trackedTasks.add(scheduler.runTaskTimer(new io.github.dailystruggle.rtp.common.tasks.tick.SyncTaskProcessing(syncTime), 1, 1));
 
     // Drive the world-scan on-screen progress bar from a platform-neutral main/server-thread
@@ -1553,7 +1627,7 @@ public class RTP {
     trackedTasks.add(scheduler.runTaskTimer(
         io.github.dailystruggle.rtp.common.tasks.tick.ScanProgressBars::update, 20, 20));
 
-    long asyncTime = TimeUnit.MILLISECONDS.toNanos(25); // Bumped to 5ms since async has more headroom
+    long asyncTime = TimeUnit.MILLISECONDS.toNanos(io.github.dailystruggle.rtp.common.tasks.tick.TickBudget.DEFAULT_ASYNC_MS);
     trackedTasks.add(scheduler.runTaskTimerAsynchronously(new io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing(asyncTime), 1, 1));
 
     // Discover and load platform-agnostic addons once core init has settled. Deferred via a

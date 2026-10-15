@@ -566,7 +566,6 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     return Collections.unmodifiableMap(out);
   }
 
-
   private Object plugin;
 
   // ADR-049 - platform-agnostic player join/quit dispatcher. Constructed lazily

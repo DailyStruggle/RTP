@@ -113,4 +113,19 @@ public interface RTPScheduler {
    * @param delay delay in ticks
    */
   void runTaskLater(RTPWorld<?> world, int cx, int cz, Runnable task, long delay);
+
+  /**
+   * Whether new background work aimed at this chunk should wait because the tick loop that owns
+   * it is backlogged or unhealthy (ADR-087 regional circuit breaker). Callers pick another
+   * candidate or leave the work in its cache tier; player-facing work is never gated on this.
+   * Single-loop platforms return {@code false}: their server-wide gates already cover it.
+   *
+   * @param world world of chunk
+   * @param cx chunk X
+   * @param cz chunk Z
+   * @return {@code true} when background work for this chunk should be deferred
+   */
+  default boolean isRegionSaturated(RTPWorld<?> world, int cx, int cz) {
+    return false;
+  }
 }

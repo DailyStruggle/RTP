@@ -18,8 +18,8 @@ public final class LowPerformance {
             "Underpowered hosts / shared-CPU VPSes: longer pulse, smaller caches, login cache off.",
             Map.of(
                     "period", 60,
-                    "syncAllottedTime", 20,
-                    "asyncAllottedTime", 30,
+                    "syncAllottedTime", 3,
+                    "asyncAllottedTime", 15,
                     "minTPS", 19.5,
                     "loginCacheEnabled", false
             ),

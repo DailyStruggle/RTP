@@ -235,12 +235,23 @@ public class LocationGenerator implements ILocationGenerator {
 
     /**
      * Pregen path with an explicit {@link LoadPurpose} (ADR-110). {@link LoadPurpose#SPECULATIVE}
-     * verifies from resident chunks and region-file reads only; a native load is allowed only
-     * when its result is pinned (returned with a reservation the caller must hand to the kept
-     * queue or close).
+     * verifies from resident chunks and region-file reads first; a native load returns a pinned
+     * result (with a reservation the caller must hand to the kept queue or close) when a kept slot
+     * is free, else an unpinned result without the success ring.
      */
     public static CompletableFuture<GenerationResult> getLocationFuture(
             Region region, @Nullable Set<String> biomeNames, LoadPurpose purpose) {
+        return getLocationFuture(region, biomeNames, purpose, null);
+    }
+
+    /**
+     * As above; with a non-null {@code backlog}, each attempt takes the backlog's oldest UNKNOWN
+     * entry instead of a shape draw (ADR-028). The shape is drawn only while the backlog is empty;
+     * the run completes without coordinates when entries exist but none is UNKNOWN.
+     */
+    static CompletableFuture<GenerationResult> getLocationFuture(
+            Region region, @Nullable Set<String> biomeNames, LoadPurpose purpose,
+            @Nullable BacklogLocationBuffer backlog) {
         CfDiag.locationGenPregenEntry.increment();
         CfDiag.ensureStarted();
         CompletableFuture<GenerationResult> result = new CompletableFuture<>();
@@ -252,6 +263,7 @@ public class LocationGenerator implements ILocationGenerator {
                 return result;
             }
             state.purpose = (purpose == null) ? LoadPurpose.IMMEDIATE : purpose;
+            state.backlog = backlog;
             PregenTask task = new PregenTask(state, result, 1L);
             RTP.serverAccessor.getScheduler().runTaskAsynchronously(task);
         } catch (Throwable t) {

@@ -47,9 +47,8 @@ import java.util.regex.Pattern;
  * old tiles are deleted, so the page drops ids that leave {@code feed.js}. Tiles are written before
  * the feed head lists them; writes are tmp-file + atomic move so the page never reads a torn file.
  * An optional push sink (the signed {@link EditorChannel}) receives each head, and viewport requests
- * arrive through {@link #offerClientMessage}; walk paths of edited geometry are answered per client
- * through {@link #offerWalkPathRequest} ({@link EditorWalkPathPreview}). The feed expires after
- * {@link #DEFAULT_TTL_MILLIS}; repeated write failures stop it with a logged reason (S-004).
+ * arrive through {@link #offerClientMessage}. The feed expires after {@link #DEFAULT_TTL_MILLIS};
+ * repeated write failures stop it with a logged reason (S-004).
  *
  * <p>Over the session's signed channel (ADR-106 §5.3, local and hosted alike) the feed also pushes
  * {@code curve} when a region's helper inputs change (settings, or state such as {@code expand}'s
@@ -57,7 +56,8 @@ import java.util.regex.Pattern;
  * (a reset when the page reports another version, through bytebin by key when a reset exceeds a
  * frame) and focus-driven {@code land} bins. Regions the page reports verified (drawn from their
  * helper) get no walk-path or hazard tiles. A hosted feed ({@link #startHosted}) writes no files:
- * the channel is its only output, and it stops when the channel closes.
+ * the channel is its only output, and it stops when the channel closes. Its head (stats only: no
+ * tile versions, which name local files) is pushed like a local one, so the page sees the feed alive.
  */
 public final class EditorLiveFeed {
 
@@ -85,9 +85,6 @@ public final class EditorLiveFeed {
     /** Curve samples per learned-biome histogram. */
     static final int REGION_BIOME_SAMPLES = 4_096;
     static final int MAX_CONSECUTIVE_WRITE_FAILURES = 5;
-    /** Walk-path previews answered per tick (2,048 curve samples each); queued beyond, newest kept. */
-    static final int WALK_PATHS_PER_TICK = 4;
-    static final int MAX_PENDING_WALK_PATHS = 16;
     /** {@code land} frames per tick (one frame is about {@link #LAND_FRAME_TARGET_CHARS}). */
     static final int LAND_FRAMES_PER_TICK = 2;
     static final int LAND_FRAME_TARGET_CHARS = 24 * 1024;
@@ -100,6 +97,11 @@ public final class EditorLiveFeed {
      * delay: the relay's proxy drops a page socket that receives nothing for about that long.
      */
     static final long FEED_HEARTBEAT_MILLIS = 40_000L;
+    /**
+     * Hosted (paced relay): a changed head goes out at most this often. Survey progress changes every
+     * tick; each head costs part of a counted relay frame.
+     */
+    static final long HOSTED_HEAD_MIN_MILLIS = 20_000L;
     /**
      * Hosted land (bytebin hand-off): at most one upload this often, none while no bin in view
      * changed. Each costs one {@code land-ref} item on the relay, whatever its size.
@@ -201,10 +203,6 @@ public final class EditorLiveFeed {
     private final String sessionId;
     private final AtomicBoolean ticking = new AtomicBoolean();
     private final Queue<String> clientMessages = new ConcurrentLinkedQueue<>();
-    /** One page request: the client it came from (identity), where the reply goes, the raw JSON. */
-    record WalkPathJob(Object client, Consumer<String> replyTo, String json) {
-    }
-    private final Queue<WalkPathJob> walkPathJobs = new ConcurrentLinkedQueue<>();
     /** {@code "<kind>|<layer>|<gx>|<gz>"} to version (feed seq it was written at). */
     private final Map<String, Long> groupVersions = new LinkedHashMap<>();
     private volatile Consumer<String> push;
@@ -305,15 +303,14 @@ public final class EditorLiveFeed {
     }
 
     private static WorldLandSurvey liveSurvey(String world, Integer y) {
-        RTPWorld<?> w = regionWorlds().get(world);
+        RTPWorld<?> w = surveyWorlds().get(world);
         return (w == null) ? null : WorldLandSurvey.of(w, y);
     }
 
     /**
      * Hosted session producers (ADR-106 §5.3): a file-less feed whose only output is {@code ch}
-     * ({@code curve}, {@code hazard-delta}, focus-driven {@code land}, and the walk-path / curve-state
-     * replies of {@link EditorChannelWiring}). It lives as long as the channel, at most
-     * {@link #DEFAULT_TTL_MILLIS}, and replaces any running feed. Off the main thread only.
+     * ({@code curve}, {@code hazard-delta} and focus-driven {@code land}). It lives as long as the
+     * channel, at most {@link #DEFAULT_TTL_MILLIS}, and replaces any running feed. Off the main thread only.
      *
      * @param handoff uploads a message too large for one frame to bytebin, completing with its key
      * @throws IllegalStateException when the scheduler is not initialised (S-006)
@@ -346,6 +343,8 @@ public final class EditorLiveFeed {
     void attachChannel(EditorChannel ch, Function<String, CompletableFuture<String>> handoff) {
         this.ownChannel = ch;
         this.handoff = handoff;
+        // The page marks the link stale without heads (ADR-106 §5.5): hosted pages need them too
+        if (push == null) push = ch::send;
         // A (re)connected page holds the snapshot only: earlier uploads must go again
         ch.onTrustedHello(() -> landHeldReset = true);
     }
@@ -498,10 +497,37 @@ public final class EditorLiveFeed {
         if (ch != null) ch.close(reason);
     }
 
-    /** One world-wide survey at the default sample Y per distinct live world with a configured region. */
+    /** One world-wide survey at the default sample Y per live world ({@link #surveyWorlds}). */
     static List<WorldLandSurvey> planSurveys() {
         List<WorldLandSurvey> out = new ArrayList<>();
-        for (RTPWorld<?> w : regionWorlds().values()) out.add(WorldLandSurvey.of(w, WorldBiomeStore.DEFAULT_Y));
+        for (RTPWorld<?> w : surveyWorlds().values()) out.add(WorldLandSurvey.of(w, WorldBiomeStore.DEFAULT_Y));
+        return out;
+    }
+
+    /**
+     * Worlds the land map covers, by name: region worlds first (surveyed first), then every other
+     * live world, so a region can be placed in a dimension no region uses yet (nether, end).
+     */
+    static Map<String, RTPWorld<?>> surveyWorlds() {
+        Map<String, RTPWorld<?>> worlds = regionWorlds();
+        List<RTPWorld<?>> live;
+        try {
+            live = (RTP.serverAccessor == null) ? List.of() : RTP.serverAccessor.getRTPWorlds();
+        } catch (RuntimeException e) {
+            RTP.log(Level.FINE, "[editor] world list unavailable; land covers region worlds only: " + e.getMessage());
+            live = List.of();
+        }
+        return withWorlds(worlds, live);
+    }
+
+    /** {@code first} followed by the named worlds of {@code more} it lacks, in order. */
+    static Map<String, RTPWorld<?>> withWorlds(Map<String, RTPWorld<?>> first, List<RTPWorld<?>> more) {
+        Map<String, RTPWorld<?>> out = new LinkedHashMap<>(first);
+        if (more == null) return out;
+        for (RTPWorld<?> w : more) {
+            String name = (w == null) ? null : w.name();
+            if (name != null && !name.isEmpty()) out.putIfAbsent(name, w);
+        }
         return out;
     }
 
@@ -580,53 +606,6 @@ public final class EditorLiveFeed {
     }
 
     /**
-     * Queues a walk-path or curve-state preview request ({@link EditorWalkPathPreview}) for the next
-     * tick; the reply goes to {@code replyTo}. Per client, type and region only the newest request is
-     * answered; both types share the {@link #WALK_PATHS_PER_TICK} budget.
-     */
-    public void offerWalkPathRequest(Object client, Consumer<String> replyTo, String json) {
-        if (replyTo == null || json == null || json.length() > EditorWalkPathPreview.MAX_MESSAGE_CHARS) return;
-        while (walkPathJobs.size() >= MAX_PENDING_WALK_PATHS) walkPathJobs.poll();
-        walkPathJobs.offer(new WalkPathJob(client, replyTo, json));
-    }
-
-    private void handleWalkPathRequests() {
-        if (walkPathJobs.isEmpty()) return;
-        Map<List<Object>, Map.Entry<WalkPathJob, Object>> newest = new LinkedHashMap<>();
-        WalkPathJob job;
-        while ((job = walkPathJobs.poll()) != null) {
-            Object req = EditorWalkPathPreview.parse(job.json());
-            String region;
-            if (req instanceof EditorWalkPathPreview.Request walk) {
-                region = walk.region();
-            } else {
-                EditorWalkPathPreview.CurveStateRequest cs = EditorWalkPathPreview.parseCurveState(job.json());
-                if (cs == null) continue;
-                req = cs;
-                region = cs.region();
-            }
-            List<Object> key = Arrays.asList(job.client(), req.getClass(), region);
-            newest.remove(key);
-            newest.put(key, Map.entry(job, req));
-        }
-        int answered = 0;
-        for (Map.Entry<WalkPathJob, Object> e : newest.values()) {
-            if (answered++ >= WALK_PATHS_PER_TICK) {
-                // The rest wait for the next tick, still newest-only
-                walkPathJobs.offer(e.getKey());
-                continue;
-            }
-            try {
-                e.getKey().replyTo().accept(e.getValue() instanceof EditorWalkPathPreview.Request walk
-                        ? EditorWalkPathPreview.reply(walk, EditorChannel::fitsFrame)
-                        : EditorWalkPathPreview.replyCurveState((EditorWalkPathPreview.CurveStateRequest) e.getValue()));
-            } catch (RuntimeException ex) {
-                RTP.log(Level.FINE, "[editor] walk path reply failed: " + ex.getMessage());
-            }
-        }
-    }
-
-    /**
      * Advances surveys and layers by one budgeted step and rewrites the feed head. Re-entrant calls
      * are skipped.
      *
@@ -650,7 +629,6 @@ public final class EditorLiveFeed {
             }
             seq++;
             handleClientMessages();
-            handleWalkPathRequests();
             if (regionSource != null && (seq == 1 || seq % REGION_CHECK_TICKS == 0)) syncRegions();
             publishCurves();
             publishHazards();
@@ -686,22 +664,30 @@ public final class EditorLiveFeed {
             if (seq % SAVE_TICKS == 0) WorldBiomeStore.saveAll();
 
             Consumer<String> sink = push;
-            // A hosted page has no live directory: the head (tile versions, telemetry) is local-only
+            // A hosted head carries no tile versions (they name local files)
             String head = (files || sink != null) ? feedJson(now, telemetryJson.get()) : null;
             if (files) write(liveDir.resolve(FEED_FILE), feedScript(head));
             if (sink != null) {
                 // Only a visible change, or the heartbeat, costs a relay frame (bytesocks counts per IP)
                 FeedSignature sig = FeedSignature.of(head);
-                if (sig.changedFrom(lastPushed) || now - lastPushedAt >= FEED_HEARTBEAT_MILLIS) {
+                long gap = now - lastPushedAt;
+                boolean changed = sig.changedFrom(lastPushed)
+                        && (files || lastPushed == null || gap >= HOSTED_HEAD_MIN_MILLIS);
+                if (changed || gap >= FEED_HEARTBEAT_MILLIS) {
                     lastPushed = sig;
                     lastPushedAt = now;
+                    String msg = "{\"type\":\"feed\",\"data\":" + head + "}";
+                    // A head over the frame cap would never arrive: the heartbeat goes without telemetry
+                    if (!EditorChannel.fitsFrame(msg)) msg = "{\"type\":\"feed\",\"data\":" + feedJson(now, null) + "}";
                     try {
-                        sink.accept("{\"type\":\"feed\",\"data\":" + head + "}");
+                        sink.accept(msg);
                     } catch (RuntimeException e) {
                         RTP.log(Level.FINE, "[editor] live feed push failed: " + e.getMessage());
                     }
                 }
             }
+            // Paced channel: held pushes leave once their bundle gap passed, not only on the next send
+            if (own != null) own.flush();
             consecutiveFailures = 0;
             return true;
         } catch (IOException e) {
@@ -1389,12 +1375,14 @@ public final class EditorLiveFeed {
         m.put("expiresAt", expiresAt);
         m.put("stopped", stopped);
         m.put("reason", stopReason);
-        m.put("groupBins", GROUP_BINS);
-        m.put("pathBatches", pathBatches);
-        m.put("palettes", palettes);
+        if (files) {
+            m.put("groupBins", GROUP_BINS);
+            m.put("pathBatches", pathBatches);
+            m.put("palettes", palettes);
+        }
         m.put("surveys", surveyRows);
         m.put("regions", regionRows);
-        m.put("groups", groups);
+        if (files) m.put("groups", groups);
         String json = EditorSessionManager.mapToJson(m);
         return json.substring(0, json.length() - 1) + ",\"telemetry\":" + (telemetry == null ? "null" : telemetry) + "}";
     }

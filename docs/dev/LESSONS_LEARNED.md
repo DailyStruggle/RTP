@@ -276,6 +276,19 @@ Implications:
 
 See `helpers/PeriodicWorldSaver/README.md` for the runtime model. Folia is excluded because the main-thread sweep would hit `ThreadAccessException`; a `RegionScheduler` variant remains future work.
 
+### Region-file decode that drops data must answer UNKNOWN, not "all air" (2026-10-13)
+
+On a Paper 26.3 world (DataVersion 5023, `region-file-compression=lz4`), `/rtp scan` ran at about 9,000 chunks/s with 0.1% land and generated nothing (FINE counters: every probe was `scanShortCircuit`). Two causes, both in `AnvilReader`:
+
+- **The block palette format changed in 26.3.** A state with no properties is a bare string (`"minecraft:stone"`). A state with properties is `{id, properties}`, not `{Name, Properties}`. When a list mixes both, Minecraft wraps each string as `{"": "minecraft:stone"}`. The decoder only knew `{Name}`, so it dropped every section without an error. The column probe then read an empty chunk as all air, and the vertical adjustor returned `SCAN_MISS`, a final reject. `AnvilPrefilter` already treated an empty decode as `UNKNOWN:no-sections`, but the column probe had no matching check. Biome palettes, which were always bare strings, still decoded, so the probe looked healthy.
+- **Proto-chunks.** Paper saves chunks that stopped part-way through generation (`Status` such as `structure_starts`, `biomes`, `terrain`) beside the generated area. They fill the region header, so they count as generated, and they read as air. Only a native load finishes them. On this world 86% of saved chunks were proto-chunks.
+
+The bug stayed hidden until LZ4 support (2026-10-05): before that, every LZ4 chunk threw in the decoder, fell through to a full load, and was correct but slow.
+
+Lessons: a decoder that drops data shall make the read UNKNOWN, never return a partial view that callers trust. Check `Status` before trusting a chunk's blocks. Add a real fixture for every new DataVersion: the 26.1 fixture (4788) still used `{Name}`. Before guessing at a cause, count `Status` values and dump one chunk's NBT from the real `.mca` files.
+
+Guards: `anvil/real/26_3_R1/r.0.0.mca` (LZ4; one full chunk and two proto-chunks at their original slots). `AnvilFixtureParityTest#realFixtureDecodesTerrain` requires non-air blocks from every real fixture, and `realProtoChunksAreUnknown` requires UNKNOWN for proto-chunks. `ScanTaskAdvancedCoverageTest#nullProbeOnGeneratedChunk_loadsChunkWithoutMarkingBad` requires a null probe to load the chunk. Reverting the palette fix fails five fixture tests.
+
 ---
 
 ## Stress Testing

@@ -19,7 +19,7 @@ import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.tasks.ScanTask;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
-import io.github.dailystruggle.rtp.common.tasks.tick.SyncTaskProcessing;
+import io.github.dailystruggle.rtp.common.tasks.tick.TickBudget;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import java.io.File;
 import java.util.*;
@@ -83,7 +83,7 @@ public class Configs {
       else logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
       configParserMap.put(((ConfigParser<?>) instance).myClass, (ConfigParser<?>) instance);
       if (((ConfigParser<?>) instance).myClass.equals(PerformanceKeys.class)) {
-        SyncTaskProcessing.updateConfig();
+        TickBudget.refresh();
       }
     } else if (instance instanceof MultiConfigParser<?>) {
       logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
@@ -801,7 +801,7 @@ public class Configs {
     RTP.log(Level.FINE, "[RTP] reloadConfigs(): atomic swap of configParserMap/multiConfigParserMap");
     this.configParserMap = newConfigParserMap;
     this.multiConfigParserMap = newMultiConfigParserMap;
-    SyncTaskProcessing.updateConfig();
+    TickBudget.refresh();
     // The logging parser is now visible via RTP.configs.getParser(LoggingKeys.class),
     // so the platform sink can resolve logging.yml#min_level. Replay any sub-INFO
     // records buffered during bootstrap so the configured threshold gates them

@@ -460,8 +460,31 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
             io.github.dailystruggle.rtp.common.metrics.ChunkLoadProfile.GLOBAL
                 .record(chunkGenerated, System.nanoTime() - chunkLoadStartNanos);
           }
-        });
+        })
+        .thenApplyAsync(java.util.function.Function.identity(), OFF_REGION);
   }
+
+  /**
+   * Completes RTP's chunk futures off the region thread (ADR-112). Folia completes
+   * {@code getChunkAtAsync} on the owning region thread, so every continuation chained on it
+   * (candidate evaluation, retries, claims, teleport orchestration) would otherwise run there
+   * unbudgeted, stacking many players' work on one region. Continuations that must read live
+   * blocks re-enter through {@code RTPScheduler.runTask}, which divides them per region within
+   * {@code syncAllottedTime}. Falls back to the completing thread when the plugin is gone or
+   * the async scheduler rejects, so dependents are never stranded.
+   */
+  static final java.util.concurrent.Executor OFF_REGION = task -> {
+    Object handle = RTP.serverAccessor != null ? RTP.serverAccessor.getPlugin() : null;
+    if (handle instanceof org.bukkit.plugin.Plugin plugin && plugin.isEnabled()) {
+      try {
+        org.bukkit.Bukkit.getAsyncScheduler().runNow(plugin, st -> task.run());
+        return;
+      } catch (Throwable t) {
+        RTP.log(java.util.logging.Level.FINE, "[RTP] off-region chunk hop rejected; continuing inline: " + t);
+      }
+    }
+    task.run();
+  };
 
   /**
    * ADR-016 section 11 applicability gate - mirrors
@@ -630,7 +653,7 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
               + " chunk=(" + cx + "," + cz + ")",
           ex);
       return null;
-    });
+    }).thenApplyAsync(java.util.function.Function.identity(), OFF_REGION);
   }
 
   /**

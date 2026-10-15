@@ -21,18 +21,31 @@ public class TimeBoundTaskPipe extends RTPTaskPipe {
         return execute(availableTime);
     }
 
+    /**
+     * Drains due tasks until the predicted next task would overrun {@code availableTime}.
+     * A positive budget always runs at least one due task (progress); a budget of zero or less
+     * runs nothing, so an exhausted tick is never overrun.
+     */
     @Override
     public boolean execute(long availableTime) {
         if (stop) return true;
         if (runnables.isEmpty()) return true;
+        if (availableTime <= 0) return false;
         long dt = 0;
         long start = System.nanoTime();
+        boolean ranAny = false;
 
         List<Runnable> delayedRunnables = new ArrayList<>(runnables.size());
 
-        do {
+        while (!runnables.isEmpty() && (!ranAny || (dt + avgTime) < availableTime)) {
             try {
                 accessGuard.acquire();
+            } catch (InterruptedException e) {
+                // Re-acquiring would throw again forever; leave the rest for the next pulse.
+                Thread.currentThread().interrupt();
+                break;
+            }
+            try {
                 if (stop) return true;
                 Runnable runnable = runnables.poll();
                 if (runnable == null) continue;
@@ -54,23 +67,20 @@ public class TimeBoundTaskPipe extends RTPTaskPipe {
                     else runnable.run();
                 } catch (Throwable throwable) {
                     RTP.log(Level.WARNING, throwable.getMessage(), throwable);
-                    continue;
                 }
                 long localStop = System.nanoTime();
+                ranAny = true;
 
                 long diff = localStop - localStart;
                 avgTime = ((avgTime / 8) * 7) + (diff / 8);
 
                 dt = localStop - start;
-            } catch (InterruptedException ignored) {
-                Thread.currentThread().interrupt();
             } catch (Throwable t) {
                 RTP.log(Level.WARNING, t.getMessage(), t);
             } finally {
                 accessGuard.release();
             }
-
-        } while (!runnables.isEmpty() && (dt + avgTime) < availableTime);
+        }
 
         for (Runnable runnable : delayedRunnables) {
             ((RTPDelayable) runnable).setDelay(((RTPDelayable) runnable).getDelay() - 1);

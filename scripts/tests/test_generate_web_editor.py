@@ -92,11 +92,13 @@ class GenerateWebEditorTest(unittest.TestCase):
         self.assertEqual(1, html.count("</html>"), "Nothing may follow the document end")
         self.assertTrue(html.rstrip().endswith("</html>"))
 
-    def test_template_decodes_hilbert_bins_and_requests_walk_paths(self):
+    def test_template_decodes_hilbert_bins_and_draws_pushed_walk_paths(self):
+        # ADR-106: walk paths flow plugin to page only; the page never requests one
         html = _template()
         self.assertIn("function derivePointEdgeChunks(radiusChunks)", html)
         self.assertIn("function hilbertToXY(d, n)", html)
-        self.assertIn("function requestWalkPath(region)", html)
+        self.assertIn("function drawWalkPathTiles(", html)
+        self.assertNotIn("function requestWalkPath(", html)
 
     def test_template_contains_zoom_and_shape_controls(self):
         html = _template()

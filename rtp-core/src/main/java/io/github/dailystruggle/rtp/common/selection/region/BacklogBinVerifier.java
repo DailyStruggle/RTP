@@ -21,7 +21,7 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 
 /**
- * Batched backlog verification: one {@link Provider#classifyBatch} call per region-file bin,
+ * Batched backlog pre-filter: one {@link Provider#classifyBatch} call per region-file bin,
  * dispatched to {@link AnvilIoPool} so the async pulse never blocks on region-file I/O (S-005).
  *
  * <p>Each {@link #pulse} first applies every finished batch on the calling (pulse) thread - all
@@ -31,8 +31,11 @@ import java.util.logging.Level;
  * Depth 0 classifies inline on the pulse thread (one bin per pulse).</p>
  *
  * <p>Bins are claimed world-wide in {@link WorldBacklogBinIndex} so regions sharing a world never
- * read the same file concurrently. A batch exceeding {@link #TIMEOUT_NANOS} is abandoned and its
- * entries fall back to live load as UNKNOWN (S-004). Not thread-safe beyond its own monitor.</p>
+ * read the same file concurrently. ACCEPT validates the entry and REJECT invalidates it. Anything
+ * else (UNKNOWN, missing, failed, or a batch abandoned after {@link #TIMEOUT_NANOS}) marks it
+ * {@link BacklogLocationBuffer.Validity#UNKNOWN}: no on-disk data, so the cold fill checks it with
+ * a chunk load (S-004). ACCEPT screens surface blocks only; promotion to hot runs the rest of the
+ * check. Not thread-safe beyond its own monitor.</p>
  */
 final class BacklogBinVerifier {
 
@@ -76,8 +79,8 @@ final class BacklogBinVerifier {
   }
 
   /**
-   * One verification step. {@code provider == null} keeps the provider-less behaviour: the oldest
-   * unverified bin is validated without disk reads.
+   * One pre-filter step. {@code provider == null}: nothing reads the disk, so every unverified
+   * entry of {@code backlog} is marked UNKNOWN at once.
    *
    * @param onReject invoked on the pulse thread for each entry a batch invalidates
    */
@@ -87,10 +90,9 @@ final class BacklogBinVerifier {
     drain(now, onReject);
     if (backlog == null || index == null) return;
     if (provider == null) {
-      BacklogLocationBuffer.BacklogEntry oldest = backlog.peekOldestUnverified(e -> claimed(index, e, now));
-      if (oldest == null) return;
-      for (BacklogLocationBuffer.BacklogEntry e : binEntries(index, oldest)) {
-        e.setValidity(BacklogLocationBuffer.Validity.VALIDATED);
+      // O(n), no claims needed.
+      for (BacklogLocationBuffer.BacklogEntry e : backlog.snapshot()) {
+        if (unverified(e)) e.setValidity(BacklogLocationBuffer.Validity.UNKNOWN);
       }
       return;
     }
@@ -120,7 +122,7 @@ final class BacklogBinVerifier {
         Executor exec = (executor != null) ? executor : AnvilIoPool.get();
         future = CompletableFuture.supplyAsync(() -> classify(provider, world, chunks), exec);
       } catch (RuntimeException e) {
-        // Rejected submit: fail closed to UNKNOWN (live load) rather than leave the bin stuck.
+        // Rejected submit: the bin goes UNKNOWN (cold fill checks) rather than stay stuck.
         future = CompletableFuture.completedFuture(Collections.emptyMap());
       }
       SUBMITTED.incrementAndGet();
@@ -128,7 +130,7 @@ final class BacklogBinVerifier {
     }
   }
 
-  /** Applies finished batches; abandons ones past the timeout as UNKNOWN. */
+  /** Applies finished batches; abandons ones past the timeout (entries go UNKNOWN). */
   private void drain(long now, Consumer<BacklogLocationBuffer.BacklogEntry> onReject) {
     for (Iterator<Batch> it = inFlight.iterator(); it.hasNext(); ) {
       Batch b = it.next();
@@ -143,7 +145,7 @@ final class BacklogBinVerifier {
         TIMED_OUT.incrementAndGet();
         RTP.log(Level.WARNING, "[RTP] Backlog batch for region file " + b.key() + " exceeded "
             + (TIMEOUT_NANOS / 1_000_000L) + " ms; " + b.entries().size()
-            + " candidate(s) fall back to live load");
+            + " candidate(s) left to the cold fill's chunk-load check");
         results = Collections.emptyMap();
       } else {
         continue;
@@ -174,7 +176,7 @@ final class BacklogBinVerifier {
       CHUNKS.addAndGet(chunks.size());
       return (out == null) ? Collections.emptyMap() : out;
     } catch (Throwable t) {
-      RTP.log(Level.FINE, "[RTP] Backlog classifyBatch failed; batch falls back to live load: " + t);
+      RTP.log(Level.FINE, "[RTP] Backlog classifyBatch failed; batch left to the cold fill's check: " + t);
       return Collections.emptyMap();
     }
   }
@@ -182,7 +184,7 @@ final class BacklogBinVerifier {
   private static void apply(List<BacklogLocationBuffer.BacklogEntry> entries, Map<ChunkCoord, Decision> results,
                             Consumer<BacklogLocationBuffer.BacklogEntry> onReject) {
     for (BacklogLocationBuffer.BacklogEntry e : entries) {
-      if (e.validity() != BacklogLocationBuffer.Validity.UNVERIFIED) continue;
+      if (!unverified(e)) continue;
       Decision d = results.get(chunkOf(e));
       if (d == Decision.REJECT) {
         e.setValidity(BacklogLocationBuffer.Validity.INVALIDATED);
@@ -190,11 +192,17 @@ final class BacklogBinVerifier {
         Consumer<BacklogLocationBuffer.BacklogEntry> sink = e.ownerOnReject();
         if (sink == null) sink = onReject;
         if (sink != null) sink.accept(e);
-      } else {
-        // ACCEPT, UNKNOWN, missing or failed: live load stays authoritative.
+      } else if (d == Decision.ACCEPT) {
         e.setValidity(BacklogLocationBuffer.Validity.VALIDATED);
+      } else {
+        // UNKNOWN, missing or failed: no disk data, the cold fill's live check decides (S-004).
+        e.setValidity(BacklogLocationBuffer.Validity.UNKNOWN);
       }
     }
+  }
+
+  private static boolean unverified(BacklogLocationBuffer.BacklogEntry e) {
+    return e != null && e.validity() == BacklogLocationBuffer.Validity.UNVERIFIED;
   }
 
   private static boolean claimed(WorldBacklogBinIndex index, BacklogLocationBuffer.BacklogEntry e, long now) {
@@ -207,7 +215,7 @@ final class BacklogBinVerifier {
     List<BacklogLocationBuffer.BacklogEntry> out = new ArrayList<>();
     boolean sawOldest = false;
     for (BacklogLocationBuffer.BacklogEntry e : index.snapshot(RegionFileCoord.of(oldest.location().coords()))) {
-      if (e.validity() != BacklogLocationBuffer.Validity.UNVERIFIED) continue;
+      if (!unverified(e)) continue;
       out.add(e);
       sawOldest |= (e == oldest);
     }

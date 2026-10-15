@@ -90,6 +90,49 @@ class SyncTaskProcessingTest {
     }
 
     @Test
+    @DisplayName("syncAllottedTime: commands are charged first; an exhausted budget still runs one misc task")
+    void commandsChargedAgainstBudget_miscKeepsProgress() {
+        java.util.concurrent.atomic.AtomicInteger miscRan = new java.util.concurrent.atomic.AtomicInteger();
+        RTP.getInstance().miscSyncTasks.clear();
+        RTP.getInstance().miscSyncTasks.start();
+        for (int i = 0; i < 3; i++) RTP.getInstance().miscSyncTasks.add(miscRan::incrementAndGet);
+
+        AtomicBoolean ran = new AtomicBoolean(false);
+        CommandsAPICommand slowCmd = new CommandsAPICommand() {
+            @Override public String name() { return "slow"; }
+            @Override public String permission() { return null; }
+            @Override public String description() { return ""; }
+            @Override public CommandsAPICommand parent() { return null; }
+            @Override public void msgBadParameter(UUID callerId, String parameterName, String parameterValue) {}
+            @Override public void msgInvalidCommand(UUID callerId, String argument) {}
+            @Override public long avgTime() { return 0; }
+            @Override public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
+                ran.set(true);
+                long until = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(3);
+                while (System.nanoTime() < until) Thread.onSpinWait();
+                return true;
+            }
+            @Override public CompletableFuture<Boolean> onCommand(UUID callerId, java.util.function.Predicate<String> permissionCheckMethod, java.util.function.Consumer<String> messageMethod, String[] args, int i, Map<String, io.github.dailystruggle.commandsapi.common.CommandParameter> tempParameters) { return CompletableFuture.completedFuture(true); }
+            @Override public List<String> onTabComplete(UUID callerId, java.util.function.Predicate<String> permissionCheckMethod, String[] args, int i, Map<String, io.github.dailystruggle.commandsapi.common.CommandParameter> tempParameters) { return List.of(); }
+            @Override public List<String> help(UUID callerId, java.util.function.Predicate<String> permissionCheckMethod) { return List.of(); }
+        };
+        CommandsAPI.commandPipeline.add(new CommandExecutor(slowCmd, UUID.randomUUID(), Map.of(), null, s -> {}, new CompletableFuture<>()));
+
+        @SuppressWarnings("unchecked")
+        ConfigParser<PerformanceKeys> parser = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        org.junit.jupiter.api.Assumptions.assumeTrue(parser != null, "harness has no performance parser");
+        parser.set(PerformanceKeys.syncAllottedTime, 1);
+        TickBudget.refresh();
+
+        new SyncTaskProcessing(50_000_000L).run();
+
+        assertTrue(ran.get(), "player command must run even when it alone overruns the budget");
+        assertEquals(1, miscRan.get(), "misc pipe gets only the leftover budget, floored at one task");
+        new SyncTaskProcessing(50_000_000L).run();
+        assertTrue(miscRan.get() >= 2, "deferred misc tasks run on later ticks");
+    }
+
+    @Test
     @DisplayName("SyncTaskProcessing caches syncAllottedTime and updates on config reload")
     void testConfigCachingAndUpdate() {
         SyncTaskProcessing.updateConfig();
@@ -105,5 +148,49 @@ class SyncTaskProcessingTest {
         }
 
         assertDoesNotThrow(task::run);
+    }
+
+    @Test
+    @DisplayName("SyncTaskProcessing updates tracking when trackingId is present")
+    void testTrackingIdUpdate() throws Exception {
+        SyncTaskProcessing task = new SyncTaskProcessing(50_000_000L);
+        java.lang.reflect.Field field = io.github.dailystruggle.rtp.common.tasks.RTPRunnable.class.getDeclaredField("trackingId");
+        field.setAccessible(true);
+        field.set(task, UUID.randomUUID());
+        assertDoesNotThrow(task::run);
+    }
+
+    @Test
+    @DisplayName("SyncTaskProcessing catches and survives CommandsAPI execution failure")
+    void testCommandsApiExceptionSurvives() {
+        CommandsAPICommand failingCmd = new CommandsAPICommand() {
+            @Override public String name() { return "fail"; }
+            @Override public String permission() { return null; }
+            @Override public String description() { return ""; }
+            @Override public CommandsAPICommand parent() { return null; }
+            @Override public void msgBadParameter(UUID callerId, String parameterName, String parameterValue) {}
+            @Override public void msgInvalidCommand(UUID callerId, String argument) {}
+            @Override public long avgTime() { throw new RuntimeException("simulated command execution failure"); }
+            @Override public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) { return false; }
+            @Override public CompletableFuture<Boolean> onCommand(UUID callerId, java.util.function.Predicate<String> permissionCheckMethod, java.util.function.Consumer<String> messageMethod, String[] args, int i, Map<String, io.github.dailystruggle.commandsapi.common.CommandParameter> tempParameters) { return CompletableFuture.completedFuture(false); }
+            @Override public List<String> onTabComplete(UUID callerId, java.util.function.Predicate<String> permissionCheckMethod, String[] args, int i, Map<String, io.github.dailystruggle.commandsapi.common.CommandParameter> tempParameters) { return List.of(); }
+            @Override public List<String> help(UUID callerId, java.util.function.Predicate<String> permissionCheckMethod) { return List.of(); }
+        };
+        CommandsAPI.commandPipeline.add(new CommandExecutor(failingCmd, UUID.randomUUID(), Map.of(), null, s -> {}, new CompletableFuture<>()));
+        SyncTaskProcessing task = new SyncTaskProcessing(50_000_000L);
+        assertDoesNotThrow(task::run);
+    }
+
+    @Test
+    @DisplayName("SyncTaskProcessing ticks ActionManager when present")
+    void testActionManagerTick() {
+        io.github.dailystruggle.rtp.common.action.ActionManager normalManager = new io.github.dailystruggle.rtp.common.action.ActionManager();
+        RTP.actionManager = normalManager;
+        try {
+            SyncTaskProcessing task = new SyncTaskProcessing(50_000_000L);
+            assertDoesNotThrow(task::run);
+        } finally {
+            RTP.actionManager = null;
+        }
     }
 }

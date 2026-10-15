@@ -16,7 +16,7 @@ scansioneInCorso: "&c[P0] scansione già in corso per le regioni: [scan_regions]
 scansioneNonInCorso: "&c[P0] scansione non in corso per le regioni: [scan_regions]"
 
 # segnaposto: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-statoScansione: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 terra &8| &7ETA #7E9CC8[scan_eta]"
+statoScansione: "[P0] &8> &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 terra &8| &7ETA #7E9CC8[scan_eta]"
 
 # Titolo della boss-bar mostrato ai giocatori con il permesso rtp.scan mentre è in corso una scansione del mondo.
 # Impostare su stringa vuota per disabilitare la boss-bar.
@@ -414,11 +414,11 @@ mapResolverMissing: "&c[P0] nessun resolver di grafici registrato per questa ric
 # Inviato quando un resolver viene eseguito ma la fonte dati sottostante non è disponibile
 # per la destinazione richiesta (regione sconosciuta, nessun dato ancora disponibile, mondo scaricato).
 # Segnaposto: [region] - il nome della regione richiesta (può essere vuoto).
-mapUnavailable: "&e[P1] i dati del grafico non sono disponibili al momento."
+mapUnavailable: "&e[P0] i dati del grafico non sono disponibili al momento."
 
 # Inviato quando il servizio mappe non può allocare una mappa in questo momento (es. è stato
 # raggiunto un limite per spettatore).
-mapBusy: "&e[P1] il servizio mappe è occupato; riprova tra poco."
+mapBusy: "&e[P0] il servizio mappe è occupato; riprova tra poco."
 
 # Etichetta per la riga del menu cliccabile "/rtp info" che genera una mappa termica delle
 # posizioni non sicure note della regione corrente. Nascosta quando il rendering delle mappe
@@ -496,7 +496,7 @@ docsExportFailed: "&c[RTP] Impossibile esportare il pacchetto della documentazio
 
 # NON MODIFICARE IL NUMERO DI VERSIONE
 # --- Web editor channel (ADR-106) ---
-editorTrustPrompt: "&e[P1] Una pagina dell'editor web chiede l'accesso con il codice &b[nonce]&e. Se la tua pagina mostra lo stesso codice, clicca qui per considerare attendibile questo browser."
+editorTrustPrompt: "&e[P0] Una pagina dell'editor web chiede l'accesso con il codice &b[nonce]&e. Se la tua pagina mostra lo stesso codice, clicca qui per considerare attendibile questo browser."
 editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(chiave [fingerprint])"
 editorTrustAccepted: "&a[P0] Browser attendibile: la pagina dell'editor con il codice [nonce] ora può mostrare anteprime e usare Hot-Apply."
 editorTrustAlready: "&7[P0] Il browser con il codice [nonce] era già attendibile."
@@ -504,7 +504,7 @@ editorTrustUnknown: "&c[P0] Nessuna sessione dell'editor aperta ha emesso il cod
 editorTrustExpired: "&c[P0] Il codice [nonce] è scaduto. Ricarica la pagina dell'editor per ottenerne uno nuovo."
 editorTrustUsage: "&c[P0] Uso: /rtp editor trust nonce=<codice mostrato dalla pagina dell'editor>"
 editorChannelOpened: "&a[P0] Canale dell'editor web aperto. Quando richiesto, considera attendibile il browser per attivare anteprime e Hot-Apply."
-editorChannelLost: "&e[P1] Canale dell'editor web perso: [reason]. La pagina continua a funzionare dalla sua istantanea."
+editorChannelLost: "&e[P0] Canale dell'editor web perso: [reason]. La pagina continua a funzionare dalla sua istantanea."
 editorChannelExpired: "&7[P0] Il canale dell'editor web è scaduto dopo [minutes] minuti. Esegui di nuovo il comando dell'editor per riprendere."
 editorTrustRateLimited: "&c[P0] Troppi codici di fiducia dell'editor errati. Attendi un minuto e riprova."
 editorUntrustUsage: "&c[P0] Uso: /rtp editor untrust key=<prefisso dell'impronta, almeno 4 caratteri | all>"
@@ -512,6 +512,6 @@ editorUntrustRemoved: "&a[P0] Fiducia revocata a [count] browser dell'editor web
 editorUntrustNone: "&7[P0] Nessun browser attendibile dell'editor corrisponde a [key]."
 editorUntrustFailed: "&c[P0] Impossibile aggiornare l'elenco degli editor attendibili: [reason]"
 editorApplyDigestMissing: "&c[P0] Il payload dell'editor non ha un checksum sha256, quindi non è stato applicato. Conferma di nuovo da una pagina dell'editor aggiornata."
-editorApplyFileUnreadable: "&e[P1] Impossibile leggere il file di applicazione offline ([reason]); provo con l'archivio di byte."
+editorApplyFileUnreadable: "&e[P0] Impossibile leggere il file di applicazione offline ([reason]); provo con l'archivio di byte."
 
 version: 1.0

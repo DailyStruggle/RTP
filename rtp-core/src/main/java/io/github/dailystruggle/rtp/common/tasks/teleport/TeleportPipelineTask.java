@@ -558,12 +558,13 @@ public final class TeleportPipelineTask extends RTPRunnable {
       if (locationFuture.isDone()) {
         processGenerationResult(locationFuture.join());
       } else {
-        locationFuture.thenAccept(this::processGenerationResult).exceptionally(e -> {
-          SupportLogger.logException(Level.WARNING, "Error in getLocationFuture", e);
-          currentPhase = Phase.CLEANUP;
-          runCleanup();
-          return null;
-        });
+        locationFuture.thenAcceptAsync(this::processGenerationResult, TeleportPipelineTask::continueOffRegion)
+            .exceptionally(e -> {
+              SupportLogger.logException(Level.WARNING, "Error in getLocationFuture", e);
+              currentPhase = Phase.CLEANUP;
+              runCleanup();
+              return null;
+            });
       }
     } catch (Exception e) {
       SupportLogger.logException(Level.WARNING, "Error in runSetup", e);
@@ -571,6 +572,25 @@ public final class TeleportPipelineTask extends RTPRunnable {
       currentPhase = Phase.CLEANUP;
       runCleanup();
     }
+  }
+
+  /**
+   * Folia completes generation results on whichever region thread finished the last chunk read;
+   * the result handling (messages, addon hooks, destination chunk-set setup) has no region
+   * affinity, so it continues off that thread instead of stacking on it (ADR-112). Elsewhere
+   * it runs inline, as before.
+   */
+  static void continueOffRegion(Runnable r) {
+    try {
+      if (RTP.serverAccessor != null && RTP.scheduler != null
+          && "Folia".equals(RTP.serverAccessor.getPlatform()) && RTP.serverAccessor.isPrimaryThread()) {
+        RTP.scheduler.runTaskAsynchronously(r);
+        return;
+      }
+    } catch (Throwable t) {
+      RTP.log(Level.FINE, "[RTP] off-region hop unavailable; continuing inline: " + t);
+    }
+    r.run();
   }
 
   @SuppressWarnings("java:S2093") // ChunkReservation ownership is transferred into this instance; closing in try-with-resources would invalidate chunk reservations

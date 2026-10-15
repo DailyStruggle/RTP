@@ -55,6 +55,8 @@ class LiveLoadGateTest {
         g.onPinnedLoad();
         g.onPinnedHandoff(true);
         g.onPinnedHandoff(false);
+        g.onUnpinnedLoad();
+        g.onUnpinnedLoad();
         g.onRingSkipped();
         g.onUse(false, true);
         g.onUse(false, false);
@@ -69,6 +71,7 @@ class LiveLoadGateTest {
         assertEquals(1, r.pinnedLoads());
         assertEquals(1, r.pinnedKept());
         assertEquals(1, r.pinnedOverflow());
+        assertEquals(2, r.unpinnedLoads());
         assertEquals(1, r.ringsSkipped());
         assertEquals(1, r.usedResident());
         assertEquals(1, r.usedEvicted());

@@ -133,6 +133,68 @@ class SparkMetricsBindingTest {
         assertEquals(55.0, b.mspt(), 1e-9);
     }
 
+    @Test
+    @org.junit.jupiter.api.DisplayName("minTPS/maxMSPT gate: worst readings combine spark with the delegate's worst region")
+    void worst_readings_take_the_worse_of_spark_and_delegate() {
+        MetricsBinding regional = new MetricsBinding() {
+            @Override public double tps1m() { return 19.9; }
+            @Override public double worstTps1m() { return 14.0; }
+            @Override public double worstMspt() { return 70.0; }
+        };
+        SparkMetricsBinding b = new SparkMetricsBinding(regional, spark(true, 19.5, 19.5, 19.5, 30.0));
+        assertEquals(14.0, b.worstTps1m(), 1e-9, "one slow Folia region must not hide behind spark's TPS");
+        assertEquals(70.0, b.worstMspt(), 1e-9);
+
+        SparkMetricsBinding unsampledDelegate = new SparkMetricsBinding(MetricsBinding.NOOP,
+                spark(true, 18.0, 18.0, 18.0, 40.0));
+        assertEquals(18.0, unsampledDelegate.worstTps1m(), 1e-9);
+        assertEquals(40.0, unsampledDelegate.worstMspt(), 1e-9);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("ADR-087 regional circuit breaker: a regional delegate's region readings pass through unchanged")
+    void region_readings_delegate_to_regional_binding() {
+        java.util.UUID world = java.util.UUID.randomUUID();
+        MetricsBinding folia = new MetricsBinding() {
+            @Override public boolean regionalTicking() { return true; }
+            @Override public double regionTps1m(java.util.UUID w, int x, int z) { return x == 0 ? 19.9 : 1.4; }
+            @Override public double regionMspt(java.util.UUID w, int x, int z) {
+                return x == 0 ? MetricsSnapshot.UNSAMPLED : 700.0;
+            }
+        };
+        // spark's server-wide 12 TPS / 80 MSPT must not mark the healthy region unhealthy.
+        SparkMetricsBinding b = new SparkMetricsBinding(folia, spark(true, 12.0, 12.0, 12.0, 80.0));
+        assertTrue(b.regionalTicking());
+        assertEquals(19.9, b.regionTps1m(world, 0, 0), 1e-9);
+        assertTrue(Double.isNaN(b.regionMspt(world, 0, 0)));
+        assertEquals(1.4, b.regionTps1m(world, 64, 0), 1e-9);
+        assertEquals(700.0, b.regionMspt(world, 64, 0), 1e-9);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("ADR-087 regional circuit breaker: single-loop region readings take the worse of spark and the delegate")
+    void region_readings_combine_on_single_loop() {
+        java.util.UUID world = java.util.UUID.randomUUID();
+        SparkMetricsBinding b = new SparkMetricsBinding(nativeDelegate(), spark(true, 19.5, 19.5, 19.5, 60.0));
+        assertFalse(b.regionalTicking());
+        assertEquals(18.0, b.regionTps1m(world, 0, 0), 1e-9, "delegate 18 TPS is worse than spark 19.5");
+        assertEquals(60.0, b.regionMspt(world, 0, 0), 1e-9, "spark 60 MSPT is worse than delegate 55");
+
+        SparkMetricsBinding noDelegate = new SparkMetricsBinding(MetricsBinding.NOOP, spark(true, 17.0, 17.0, 17.0, 40.0));
+        assertEquals(17.0, noDelegate.regionTps1m(world, 0, 0), 1e-9);
+        assertEquals(40.0, noDelegate.regionMspt(world, 0, 0), 1e-9);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("a wrapped platform binding still recognises itself as installed")
+    void wraps_recognises_the_delegate() {
+        MetricsBinding inner = nativeDelegate();
+        SparkMetricsBinding b = new SparkMetricsBinding(inner, spark(false, 0, 0, 0, 0));
+        assertTrue(b.wraps(inner));
+        assertTrue(b.wraps(b));
+        assertFalse(b.wraps(nativeDelegate()));
+    }
+
     interface DummySparkMetadataProvider {
         java.util.Map<String, Object> provide();
     }

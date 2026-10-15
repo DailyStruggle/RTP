@@ -5,11 +5,12 @@ package io.github.dailystruggle.rtp.common.metrics;
  *
  * @param region             region name
  * @param readResolved       speculative candidates served from a resident chunk or the region file
- * @param deferredCenter     speculative candidates deferred: center chunk needed a native load and no pin slot
- * @param deferredNeighbour  speculative candidates deferred: a safety neighbour needed a native load
+ * @param deferredCenter     speculative candidates deferred: center chunk needed a native load under heap pressure
+ * @param deferredNeighbour  speculative candidates deferred: a safety neighbour needed a native load under heap pressure
  * @param pinnedLoads        speculative candidates escalated to a pinned native load
  * @param pinnedKept         pinned results accepted into the kept (pinned) queue
  * @param pinnedOverflow     pinned results the kept queue refused (reservation closed, stored unpinned)
+ * @param unpinnedLoads      speculative candidates natively loaded without a pin (no slot free; no ring)
  * @param ringsSkipped       success rings not preloaded because the result was not pinned
  * @param pinsInFlight       pin slots currently held by in-flight attempts
  * @param usedResident       consumed locations whose chunk was still resident in RTP's cache
@@ -25,6 +26,7 @@ public record LiveLoadGateRow(
         long pinnedLoads,
         long pinnedKept,
         long pinnedOverflow,
+        long unpinnedLoads,
         long ringsSkipped,
         int pinsInFlight,
         long usedResident,

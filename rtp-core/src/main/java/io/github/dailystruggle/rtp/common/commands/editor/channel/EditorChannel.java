@@ -4,8 +4,11 @@ import io.github.dailystruggle.rtp.api.editor.EditorDelivery;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.editor.EditorLoopbackJson;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.PublicKey;
 import java.security.SecureRandom;
@@ -40,6 +43,8 @@ import java.util.regex.Pattern;
  * {@code hello-reply {to, hid, state, challenge, nonce?}} carries a fresh 128-bit challenge that every
  * later page message must carry, with {@code seq} from 1. An untrusted key gets a single-use 8-character
  * nonce and one operator prompt per nonce lifetime; {@code /rtp editor trust nonce=<nonce>} trusts it.
+ * A hello carrying {@code linkProof} (§5.10: HMAC of the session link's {@link #linkSecret()} over
+ * channel id and key fingerprint) trusts its key for this channel only, once per channel, with no prompt.
  * From untrusted keys only {@code hello} and {@code ping} are accepted; anything else needs a trusted
  * key, a valid signature, a live challenge and a higher {@code seq}, and is routed by {@code type}.
  * Forged, replayed, unknown-type and oversized frames are dropped and logged, one line per key per minute.
@@ -75,6 +80,9 @@ public final class EditorChannel {
     static final long LOG_INTERVAL_MILLIS = 60_000L;
     static final String NONCE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
     static final int NONCE_LENGTH = 8;
+    /** Session link secret bytes (§5.10). */
+    static final int LINK_SECRET_BYTES = 32;
+    private static final String LINK_PROOF_CONTEXT = "rtp-editor-link";
     /** Pushes the next push replaces; skipped first when the outbound budget runs out. */
     static final Set<String> DROPPABLE = Set.of("feed", "land", "hazard-delta");
     /** Deferred first (§5.5): skipped once this share of the minute's budget is used. */
@@ -200,6 +208,11 @@ public final class EditorChannel {
     private volatile long lastFrameAt = Long.MIN_VALUE / 2;
     private volatile String lastDropReason;
     private volatile String closeReason;
+    /** Travels only in the operator's link fragment: never in the snapshot, a frame or a log. */
+    private final byte[] linkSecret = new byte[LINK_SECRET_BYTES];
+    private final AtomicBoolean linkUsed = new AtomicBoolean();
+    /** Keys trusted by the session link: this channel only, never persisted. */
+    private final TrustedEditors linkTrusted = TrustedEditors.inMemory();
 
     public EditorChannel(String id, EditorKeys keys, TrustedEditors trusted, ChannelTransport transport,
                          Notifier notifier, LongSupplier clock) {
@@ -210,6 +223,7 @@ public final class EditorChannel {
         this.transport = Objects.requireNonNull(transport, "transport");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.clock = Objects.requireNonNull(clock, "clock");
+        RANDOM.nextBytes(linkSecret);
     }
 
     /** 128-bit hex id for transports that do not assign one (loopback, in-memory). */
@@ -413,7 +427,7 @@ public final class EditorChannel {
                 if (transport.framesPerWindow() <= 0 || now - lastFrameAt >= PONG_SKIP_MILLIS) send("{\"type\":\"pong\"}", from);
                 return;
             }
-            if (!trusted.isTrusted(from)) {
+            if (!isTrusted(from)) {
                 drop(from, type + " from an untrusted key");
                 return;
             }
@@ -469,7 +483,8 @@ public final class EditorChannel {
         reply.put("type", "hello-reply");
         if (hid != null) reply.put("hid", hid);
         reply.put("challenge", challenge);
-        boolean isTrusted = trusted.isTrusted(from);
+        boolean isTrusted = isTrusted(from);
+        if (!isTrusted && msg.get("linkProof") instanceof String proof) isTrusted = trustByLink(from, proof, now);
         if (isTrusted) {
             reply.put("state", "trusted");
         } else {
@@ -493,6 +508,66 @@ public final class EditorChannel {
         }
         send(isTrusted ? withHelloExtras(json(reply)) : json(reply), from);
         if (isTrusted) runAll(trustedHelloListeners, "trusted hello");
+    }
+
+    /** Under {@link #lock}: the first key proving the session link is trusted for this channel. */
+    private boolean trustByLink(String from, String proof, long now) {
+        byte[] got;
+        try {
+            got = Base64.getDecoder().decode(proof);
+        } catch (IllegalArgumentException e) {
+            got = new byte[0];
+        }
+        if (!MessageDigest.isEqual(linkProofBytes(linkSecret, id, from), got)) {
+            logLimited("link|" + from, Level.WARNING, "[editor] channel " + shortId() + ": session link proof from "
+                    + from.substring(0, 16) + " did not verify; that key needs a trust code");
+            return false;
+        }
+        if (!linkUsed.compareAndSet(false, true)) {
+            logLimited("link|used", Level.WARNING, "[editor] channel " + shortId() + ": session link already used; editor key "
+                    + from.substring(0, 16) + " needs a trust code");
+            return false;
+        }
+        try {
+            linkTrusted.add(from, now);
+        } catch (IOException e) {
+            return false; // in memory: never thrown
+        }
+        RTP.log(Level.INFO, "[editor] channel " + shortId() + ": editor key " + from.substring(0, 16)
+                + " trusted for this session by its session link");
+        return true;
+    }
+
+    private boolean isTrusted(String fingerprint) {
+        return trusted.isTrusted(fingerprint) || linkTrusted.isTrusted(fingerprint);
+    }
+
+    /**
+     * The chat link's {@code #k=} value: base64url, no padding. It proves the page was opened from
+     * the operator's link; it works once and for this channel only.
+     */
+    public String linkSecret() {
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(linkSecret);
+    }
+
+    /**
+     * The page's {@code hello.linkProof}: base64 HMAC-SHA256 keyed with the link secret (base64url)
+     * over {@code "rtp-editor-link|<channel>|<fingerprint>"}. Bound to one key, so a relay observer
+     * cannot reuse it for another.
+     */
+    public static String linkProof(String secretBase64Url, String channelId, String fingerprint) {
+        return Base64.getEncoder().encodeToString(linkProofBytes(Base64.getUrlDecoder().decode(secretBase64Url),
+                channelId, fingerprint));
+    }
+
+    private static byte[] linkProofBytes(byte[] secret, String channelId, String fingerprint) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret, "HmacSHA256"));
+            return mac.doFinal((LINK_PROOF_CONTEXT + "|" + channelId + "|" + fingerprint).getBytes(StandardCharsets.UTF_8));
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("HmacSHA256 unavailable", e); // required of every JRE
+        }
     }
 
     private void evictOldestPeer() {
@@ -562,7 +637,10 @@ public final class EditorChannel {
      */
     public static Set<String> untrustAny(String selector) {
         Set<String> removed = new java.util.LinkedHashSet<>();
-        for (EditorChannel c : List.copyOf(OPEN)) removed.addAll(c.trusted.forget(selector));
+        for (EditorChannel c : List.copyOf(OPEN)) {
+            removed.addAll(c.trusted.forget(selector));
+            removed.addAll(c.linkTrusted.forget(selector));
+        }
         if (!removed.isEmpty()) RTP.log(Level.INFO, "[editor] " + removed.size() + " editor key(s) untrusted in open channels");
         return removed;
     }

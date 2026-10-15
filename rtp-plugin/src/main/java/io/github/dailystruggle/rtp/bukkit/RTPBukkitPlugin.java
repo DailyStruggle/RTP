@@ -15,9 +15,7 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.ChunkUnloadProcessor;
-import io.github.dailystruggle.rtp.bukkitplatform.server.AsyncTeleportProcessing;
 import io.github.dailystruggle.rtp.common.server.DatabaseProcessing;
-import io.github.dailystruggle.rtp.bukkitplatform.server.SyncTeleportProcessing;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -468,16 +466,6 @@ public final class RTPBukkitPlugin extends JavaPlugin {
       commandProcessing.cancel();
     }
 
-    try {
-      RTP.log(java.util.logging.Level.FINER, "[RTP] onDisable AsyncTeleportProcessing.kill");
-      AsyncTeleportProcessing.kill();
-    } catch (NoClassDefFoundError ignored) {
-    }
-    try {
-      RTP.log(java.util.logging.Level.FINER, "[RTP] onDisable SyncTeleportProcessing.kill");
-      SyncTeleportProcessing.kill();
-    } catch (NoClassDefFoundError ignored) {
-    }
     try {
       RTP.log(java.util.logging.Level.FINER, "[RTP] onDisable ScanTask.kill + clear scan progress bars");
       io.github.dailystruggle.rtp.common.tasks.ScanTask.kill();

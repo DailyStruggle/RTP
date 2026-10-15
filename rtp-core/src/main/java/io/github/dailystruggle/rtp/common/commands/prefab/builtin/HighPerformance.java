@@ -18,8 +18,8 @@ public final class HighPerformance {
             "Dedicated hardware / large player counts: short pulse, large caches, login cache on.",
             Map.of(
                     "period", 10,
-                    "syncAllottedTime", 50,
-                    "asyncAllottedTime", 50,
+                    "syncAllottedTime", 10,
+                    "asyncAllottedTime", 25,
                     "loginCacheEnabled", true,
                     "postTeleportQueueing", true
             ),

@@ -16,9 +16,12 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Network model diagrams (multi-server / multi-proxy topology, `/rtp` sequence, reservation-token state machine) | [`../architecture/12-network-model.md`](../architecture/12-network-model.md) |
 | Dual-layer shape architecture, spatial memory & L3 backlog selection diagrams | [`../architecture/13-dual-layer-shape-architecture-and-l3-selection.md`](../architecture/13-dual-layer-shape-architecture-and-l3-selection.md) |
 | Action Engine & subspace placement diagrams (anchors, multi-slot separation, confinement) | [`../architecture/14-group-placement-anchor-flow.md`](../architecture/14-group-placement-anchor-flow.md) ([ADR-093](../adr/ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement.md), [ADR-095](../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives.md)) |
+| Cost-governed chunk resolution & native admission diagrams (purpose-gating, deduplication threshold, MCA checks) | [`../architecture/15-cost-governed-chunk-reads-and-native-admission.md`](../architecture/15-cost-governed-chunk-reads-and-native-admission.md) ([ADR-110](../adr/ADR-110-purpose-gated-live-loads.md), [ADR-114](../adr/ADR-114-cost-governed-on-demand-chunk-reads.md)) |
+| Full visual architecture catalog & diagram index | [`../architecture/README.md`](../architecture/README.md) |
 | `/rtp config` command semantics + save mechanics (target spec) | [`CONFIG_COMMAND_SPEC.md`](CONFIG_COMMAND_SPEC.md) ([ADR-037](../adr/ADR-037-harden-rtp-config-commands.md) decision, [ADR-041](../adr/ADR-041-config-command-and-save-implementation.md) implementation) |
 | What absolute rules apply? | [`REQUIREMENTS.md section 3`](REQUIREMENTS.md#3-prohibition-requirements) (S-001 … S-007) |
 | Where does my code go? | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| Implementing a new server adapter (SPI requirements & functions) | [`SERVER_ADAPTER_GUIDE.md`](SERVER_ADAPTER_GUIDE.md) |
 | Threading / Folia / chunk I/O | [`DESIGN.md#threading`](DESIGN.md#threading) |
 | Memory lifecycle | [`DESIGN.md#memorytracker`](DESIGN.md#memorytracker) |
 | Domain term meaning | [`GLOSSARY.md`](GLOSSARY.md) |
@@ -80,6 +83,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | [`COVERAGE_PLAN.md`](COVERAGE_PLAN.md) | JaCoCo baseline and targets. |
 | [`ENTERPRISE_READINESS.md`](ENTERPRISE_READINESS.md) | Repo-wide plan to make the quality and compatibility claims externally verifiable: measured per-module coverage baseline, enforced gates, supply chain, support matrix. |
 | [`SUPPORT_MATRIX.md`](SUPPORT_MATRIX.md) | Platform family x Minecraft version x Java version support matrix. |
+| [`SERVER_ADAPTER_GUIDE.md`](SERVER_ADAPTER_GUIDE.md) | Server adapter requirements specification, SPI function catalog, threading, and checklist. |
 | [`SEMVER.md`](SEMVER.md) | Semantic versioning contract: public API vs internal boundaries, deprecation rules. |
 | [`LICENSING.md`](LICENSING.md) | All-MIT licensing (ADR-108), per-module licence matrix, Pro (support tier) vs Lite editions. |
 | [`DEPRECATION_POLICY.md`](DEPRECATION_POLICY.md) | Deprecation lifecycle, notice window, and compiler annotation policy. |

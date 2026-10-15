@@ -82,7 +82,7 @@ class PrefabApplierTest {
 
         Map<String, Object> newPerf = r.newTrees().get("advanced/performance");
         assertEquals(60, newPerf.get("period"));
-        assertEquals(20, newPerf.get("syncAllottedTime"));
+        assertEquals(3, newPerf.get("syncAllottedTime"));
         assertEquals(false, newPerf.get("loginCacheEnabled"));
         // preserved keys
         assertEquals(false, newPerf.get("postTeleportQueueing"));

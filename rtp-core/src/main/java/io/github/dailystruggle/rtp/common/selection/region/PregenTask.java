@@ -53,6 +53,11 @@ final class PregenTask implements Runnable {
 
     // ADR-110: true while this attempt holds a pin slot (native loads allowed, result pinned).
     private final java.util.concurrent.atomic.AtomicBoolean pinHeld = new java.util.concurrent.atomic.AtomicBoolean();
+    // ADR-110: true once this attempt fell back to an unpinned native load (no slot free). The
+    // attempt stays readOnly() so its result skips the ring and lands unpinned in the cold queue.
+    private final java.util.concurrent.atomic.AtomicBoolean unpinnedLoad = new java.util.concurrent.atomic.AtomicBoolean();
+    // ADR-028: backlog entry this attempt took; returned to the backlog if the attempt defers.
+    private volatile BacklogLocationBuffer.BacklogEntry takenFromBacklog;
 
     PregenTask(PregenState state, CompletableFuture<GenerationResult> result, long initialAttempt) {
         this.state = state;
@@ -97,12 +102,46 @@ final class PregenTask implements Runnable {
     }
 
     /**
+     * Grants this attempt native loads: a pin slot first, else an unpinned load of center and
+     * safety neighbours. Fresh worlds have no region file to read, and the load also generates
+     * the chunk, so a pin-only rule left the cold queue permanently empty. Refused only under heap
+     * pressure. Idempotent per attempt.
+     */
+    private boolean tryNativeLoad() {
+        if (pinHeld.get() || unpinnedLoad.get()) return true;
+        if (tryPin()) return true;
+        if (io.github.dailystruggle.rtp.common.tools.HeapPressureMonitor.underPressure()) return false;
+        if (unpinnedLoad.compareAndSet(false, true)) gate().onUnpinnedLoad();
+        return true;
+    }
+
+    /**
+     * Ends the run without the exhaustion dump: the candidate needs a native load, refused under
+     * heap pressure. A backlog entry goes back as UNKNOWN; a later fill retries it.
+     */
+    private void completeDeferred() {
+        releasePin();
+        Region r = state.region;
+        RTP.log(Level.FINE, "[RTP] [" + ((r == null) ? "" : r.name)
+                + "] speculative fill deferred (" + state.purpose + ") at attempt " + i);
+        BacklogLocationBuffer.BacklogEntry taken = takenFromBacklog;
+        takenFromBacklog = null;
+        if (taken != null && state.backlog != null) {
+            BacklogLocationBuffer.BacklogEntry back = state.backlog.offerUnverified(taken.location());
+            if (back != null) back.setValidity(BacklogLocationBuffer.Validity.UNKNOWN);
+        }
+        result.complete(new GenerationResult(null, i, null));
+    }
+
+    /**
      * Advance to the next attempt. Synchronous paths set a flag for the loop in {@link #run()};
      * async callback paths submit a fresh task to prevent {@link CompletableFuture} graph growth.
      */
     private void rescheduleNextAttempt() {
         i++;
         releasePin();
+        unpinnedLoad.set(false);
+        takenFromBacklog = null;
         if (result.isDone()) return;
         CfDiag.pregenReschedule.increment();
         if (inRunAttempt) {
@@ -156,6 +195,8 @@ final class PregenTask implements Runnable {
             io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL.recordSuccess();
             return;
         }
+        // Run-control breadcrumbs, not verdicts: the candidate was neither accepted nor rejected.
+        if (token.equals("deferred") || token.equals("drained")) return;
         LocationGenerator.FailTypes cause;
         try {
             cause = LocationGenerator.FailTypes.valueOf(token);
@@ -533,7 +574,25 @@ final class PregenTask implements Runnable {
         // --- shape select + biomeRecall ---
         long l = -1;
         int[] select;
-        if (state.shape instanceof MemoryShape<?> memoryShape) {
+        // ADR-028: the backlog's UNKNOWN entries (no on-disk data) are checked here instead of a
+        // shape draw. Entries but none UNKNOWN: the rest await the prefilter or the cold drain.
+        BacklogLocationBuffer.BacklogEntry backlogEntry = (state.backlog != null)
+                ? state.backlog.pollOldest(BacklogLocationBuffer.Validity.UNKNOWN) : null;
+        if (backlogEntry == null && state.backlog != null && state.backlog.size() > 0) {
+            recordOutcome("drained/backlog");
+            result.complete(new GenerationResult(null, i, null));
+            return;
+        }
+        final boolean fromBacklog = backlogEntry != null;
+        takenFromBacklog = backlogEntry;
+        if (fromBacklog) {
+            select = new int[] {backlogEntry.location().coords().x() >> 4,
+                    backlogEntry.location().coords().z() >> 4};
+            if (state.shape instanceof MemoryShape<?> memoryShape) {
+                memoryShape.flushAndRebuildIfNeeded(state.resolution);
+                l = memoryShape.xzToLocation(select[0], select[1]);
+            }
+        } else if (state.shape instanceof MemoryShape<?> memoryShape) {
             // Amortized: the attempt loop dirties the same flags it reads (every rejection marks
             // a bad chunk, every success records a biome), so an unconditional rebuild here cost
             // a full O(recorded runs) copy-on-write merge per attempt. Staleness is safe -
@@ -628,7 +687,8 @@ final class PregenTask implements Runnable {
         } catch (Throwable t) {
             pregenPref = 0.0d;
         }
-        if (pregenPref > 0.0d && !state.world.isChunkGenerated(cx, cz)) {
+        // Backlog candidates already passed this draw at refill (Region.pregenPrefRejects).
+        if (pregenPref > 0.0d && !fromBacklog && !state.world.isChunkGenerated(cx, cz)) {
             double clamped = Math.min(1.0d, pregenPref);
             if (clamped >= 1.0d || java.util.concurrent.ThreadLocalRandom.current().nextDouble() < clamped) {
                 if (state.verbose) {
@@ -811,8 +871,8 @@ final class PregenTask implements Runnable {
     private void requestChunk(int cx, int cz, long finalL, int staleRetries,
                               @org.jetbrains.annotations.Nullable ProbeFirstGovernor gov, boolean afterProbe) {
         if (readOnly()) {
-            // ADR-110: speculative fill reads resident chunks / region files only. A native load
-            // happens only with a pin slot (result held until teleport); otherwise defer.
+            // ADR-110: speculative fill reads resident chunks / region files first. A miss loads
+            // natively, pinned when a slot is free, else unpinned; defers only under heap pressure.
             final long readStart = System.nanoTime();
             state.world.getOrReadChunk(cx, cz).whenComplete((chunk, ex) -> {
                 if (ex == null && chunk != null) {
@@ -821,14 +881,14 @@ final class PregenTask implements Runnable {
                     continueInline(() -> onChunkResolved(cx, cz, finalL, chunk, staleRetries));
                     return;
                 }
-                if (tryPin()) {
+                if (tryNativeLoad()) {
                     // Native-load time is not a region-file read: keep it out of ADR-109.
                     continueInline(() -> loadChunk(cx, cz, finalL, staleRetries, null, afterProbe));
                     return;
                 }
                 gate().onDeferredCenter();
                 recordOutcome("deferred/needsLive chunk=(" + cx + "," + cz + ")");
-                continueInline(this::rescheduleNextAttempt);
+                completeDeferred();
             });
             return;
         }
@@ -1055,13 +1115,13 @@ final class PregenTask implements Runnable {
 
     /**
      * safetyCheck: load the (2r+1)² neighbour grid, then y-scan. ADR-110: while speculative and
-     * unpinned, neighbours resolve from resident chunks / region files only; a miss escalates to
-     * a pin slot (re-run with native loads) or defers the candidate.
+     * without native-load rights, neighbours resolve from resident chunks / region files only; a
+     * miss escalates to native loads (pinned or unpinned) and re-runs, or defers under heap pressure.
      */
     private void loadSafetyNeighbours(int cx, int cz, long finalL, int finalX, int finalY, int finalZ,
                                       String resBiome, RTPChunk<?> chunk,
                                       @org.jetbrains.annotations.Nullable ChunkReservation reservation) {
-        final boolean readOnlyNow = readOnly();
+        final boolean readOnlyNow = readOnly() && !unpinnedLoad.get();
         int safe = state.safetyRadius;
         int L = safe * 2 + 1;
         int centerChunkX = chunk.x();
@@ -1128,7 +1188,7 @@ final class PregenTask implements Runnable {
                         localChunks[neighbourIdx.get(idxI)[0]] = nchunk;
                     }
                     if (!ok && readOnlyNow) {
-                        if (tryPin()) {
+                        if (tryNativeLoad()) {
                             continueInline(() -> loadSafetyNeighbours(
                                     cx, cz, finalL, finalX, finalY, finalZ, resBiome, chunk, reservation));
                             return;
@@ -1136,7 +1196,7 @@ final class PregenTask implements Runnable {
                         gate().onDeferredNeighbour();
                         recordOutcome("deferred/neighbourNeedsLive chunk=(" + cx + "," + cz + ")");
                         closeIfPresent(reservation);
-                        continueInline(this::rescheduleNextAttempt);
+                        completeDeferred();
                         return;
                     }
                     if (!ok) {
@@ -1149,10 +1209,47 @@ final class PregenTask implements Runnable {
                         continueInline(this::rescheduleNextAttempt);
                         return;
                     }
-                    continueInline(() -> evaluateSafety(
+                    Runnable eval = () -> evaluateSafety(
                             cx, cz, finalL, finalX, finalY, finalZ, resBiome,
-                            localChunks, L, centerChunkX, centerChunkZ, reservation));
+                            localChunks, L, centerChunkX, centerChunkZ, reservation);
+                    if (reservation != null && isFoliaPlatform()) {
+                        // Folia neighbour loads complete off the region thread (ADR-112): live
+                        // block reads re-enter the owning region through the budgeted scheduler.
+                        dispatchToRegion(cx, cz, reservation, eval);
+                    } else {
+                        continueInline(eval);
+                    }
                 });
+    }
+
+    /** Runs {@code body} on the region owning chunk (cx, cz); a failure rejects the candidate (S-004). */
+    private void dispatchToRegion(int cx, int cz, ChunkReservation reservation, Runnable body) {
+        io.github.dailystruggle.rtp.api.world.RTPLocation at =
+                new io.github.dailystruggle.rtp.api.world.RTPLocation(
+                        state.world, (cx << 4) + 7, 0, (cz << 4) + 7);
+        try {
+            RTP.serverAccessor.getScheduler().runTask(at, () -> {
+                try {
+                    body.run();
+                } catch (Throwable t) {
+                    RTP.log(Level.WARNING, "[RTP] Region-thread safety scan threw: " + t, t);
+                    closeIfPresent(reservation);
+                    RTP.serverAccessor.getScheduler().runTaskAsynchronously(this::rescheduleNextAttempt);
+                }
+            });
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING, "[RTP] Failed to dispatch region-thread safety scan: " + t, t);
+            closeIfPresent(reservation);
+            continueInline(this::rescheduleNextAttempt);
+        }
+    }
+
+    private static boolean isFoliaPlatform() {
+        try {
+            return RTP.serverAccessor != null && "Folia".equals(RTP.serverAccessor.getPlatform());
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     private void evaluateSafety(int cx, int cz, long finalL, int finalX, int finalY, int finalZ,

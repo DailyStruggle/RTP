@@ -1,8 +1,6 @@
 package io.github.dailystruggle.rtp.common.tasks.tick;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
-import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
@@ -72,6 +70,12 @@ public final class AsyncTaskProcessing extends RTPRunnable {
     return pulseActive.get();
   }
 
+  /** Restarts the region rotation so the next pulse takes a turn; visible for tests. */
+  static void resetRotationForTesting() {
+    step.set(0L);
+    betweenStep.set(0L);
+  }
+
   private void runPulse() {
     if (trackingId != null) {
       io.github.dailystruggle.rtp.common.tools.MemoryTracker.updateTracking(trackingId);
@@ -101,22 +105,11 @@ public final class AsyncTaskProcessing extends RTPRunnable {
     if (isCancelled()) return;
     long start = System.nanoTime();
 
-    long currentAvailableTime = availableTime; // fallback
-    long period = 0;
-
-    if (RTP.configs != null) {
-      ConfigParser<PerformanceKeys> perf =
-              (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
-      if (perf != null) {
-        Object periodObj = perf.getConfigValue(PerformanceKeys.period, 0);
-        period = ConfigParser.parseDurationTicks(periodObj, 0L);
-
-        long configMs = perf.getNumber(PerformanceKeys.asyncAllottedTime, 10).longValue();
-        // Cap async time to prevent saturating the background thread pool
-        configMs = Math.min(configMs, 25);
-        currentAvailableTime = java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(configMs);
-      }
-    }
+    // Before configs load, the constructor budget applies (clamped like the configured one).
+    long currentAvailableTime = (RTP.configs == null && availableTime > 0L)
+        ? Math.min(availableTime, TimeUnit.MILLISECONDS.toNanos(TickBudget.MAX_ALLOTTED_MS))
+        : TickBudget.asyncNanos();
+    long period = TickBudget.periodTicks();
 
     RTP.getInstance().cancelTasks.execute(Long.MAX_VALUE);
     if (isCancelled()) return;
@@ -124,8 +117,7 @@ public final class AsyncTaskProcessing extends RTPRunnable {
     if (isCancelled()) return;
 
     // Diagram 02 (PulseTrigger): drain SelectionAPI urgent + standard pipelines.
-//    RTP.log(Level.FINER, "[Pulse] selectionAPI.compute() invoked");
-    RTP.selectionAPI.compute();
+    RTP.selectionAPI.compute(currentAvailableTime - (System.nanoTime() - start));
 
     // Avoid copying the whole region collection into a fresh ArrayList on every
     // pulse: only one region (at index `step`) is ever used, and only when
@@ -139,18 +131,19 @@ public final class AsyncTaskProcessing extends RTPRunnable {
     }
     if (period < size) period = size;
 
-    long betweenTime = Math.max((period / size) - 1, 0);
+    // One region turn every `interval` pulses, so each region refills once per `period` ticks.
+    long interval = Math.max(period / size, 1L);
     long betweenStep;
     long step;
     try {
       stepSemaphore.acquire();
-      if (betweenTime <= 0) betweenStep = 0;
-      else betweenStep = AsyncTaskProcessing.betweenStep.incrementAndGet() % betweenTime;
+      // Post-increment: the first pulse takes a turn, then one turn every `interval` pulses.
+      betweenStep = AsyncTaskProcessing.betweenStep.get() % interval;
+      AsyncTaskProcessing.betweenStep.set((betweenStep + 1) % interval);
 
       step = AsyncTaskProcessing.step.get();
       if (betweenStep == 0) step = (step + 1) % size;
 
-      AsyncTaskProcessing.betweenStep.set(betweenStep);
       AsyncTaskProcessing.step.set(step);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();

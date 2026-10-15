@@ -62,6 +62,13 @@ public class ConfigurableMockChunk extends RTPChunk<Object> {
     public int z() { return chunkZ; }
 
     @Override
+    public String materialNameAt(int x, int y, int z) {
+        if (solidY.contains(y)) return "LAVA";
+        if (solidSafeY.contains(y)) return "STONE";
+        return "AIR";
+    }
+
+    @Override
     public boolean isAir(int x, int y, int z) {
         return !solidY.contains(y) && !solidSafeY.contains(y);
     }
@@ -69,11 +76,6 @@ public class ConfigurableMockChunk extends RTPChunk<Object> {
     @Override
     public int getSkyLight(int x, int y, int z) {
         return 15;
-    }
-
-    @Override
-    public int getSurfaceHeight(int x, int z) {
-        return 64;
     }
 
     @Override

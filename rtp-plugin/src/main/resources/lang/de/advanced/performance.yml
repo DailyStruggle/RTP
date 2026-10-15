@@ -1,9 +1,17 @@
-# Mindest-Server-TPS, die zum Fortführen der Hintergrund-Warteschlange nötig ist.
-# Hintergrundarbeit pausiert, wenn die TPS unter diesen Schwellenwert fallen.
+# Hintergrund-Cache-Füllung pausieren, wenn die TPS unter diesen Wert fallen.
+# Auf Folia zählt die langsamste Region. Wartende Spieler werden weiterhin bedient. 0 = aus.
 # @type: number
 # @range: [0.0, 20.0]
 # @default: 19.0
 minimaleTPS: 19.0
+
+# Hintergrund-Cache-Füllung pausieren, wenn ein Tick länger als dieser Wert dauert (ms).
+# Erfasst Lag, den TPS verbergen (TPS bleiben bis 50 ms bei 20). 0 = aus.
+# @type: number
+# @range: [0.0, null]
+# @unit: ms
+# @default: 45.0
+maxMSPT: 45.0
 
 # Max. JVM-Heap-Nutzung (% des Maximums), bevor das Hintergrund-Cache-Füllen
 # pausiert. Bereits gecachte Orte werden weiter bedient. 0 oder 100 deaktiviert es.
@@ -20,26 +28,26 @@ maxHeapProzent: 85.0
 # @default: 32
 maxVersuche: 32
 
-# Ticks zwischen Hintergrund-Cache-Zyklen (Regions-Vorbefüllung, Warteschlangen-Auffüllung).
+# Ticks zwischen dem Auffüllen derselben Region. Die Regionen wechseln sich ab.
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
 # @default: 20
 intervall: 20
 
-# Maximale Millisekunden pro Tick für synchrone Aufgaben.
+# Max. ms pro Tick für Arbeit im Hauptthread. Begrenzt auf 25.
 # @type: integer
-# @range: [1, null]
+# @range: [1, 25]
 # @unit: ms
-# @default: 50
-syncZugeteilteZeit: 50
+# @default: 5
+syncZugeteilteZeit: 5
 
-# Maximale Millisekunden pro Tick für asynchrone Aufgaben.
+# Max. ms pro Puls für Hintergrundarbeit. Begrenzt auf 25.
 # @type: integer
-# @range: [1, null]
+# @range: [1, 25]
 # @unit: ms
-# @default: 50
-asyncZugeteilteZeit: 50
+# @default: 25
+asyncZugeteilteZeit: 25
 
 # Chunk-Radius, der während der Auswahl rund um einen Kandidatenort geladen wird.
 # 0 lädt nur den Kandidaten-Chunk.

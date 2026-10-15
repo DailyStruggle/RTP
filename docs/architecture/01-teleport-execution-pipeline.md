@@ -13,7 +13,7 @@
 
 ## Executive Overview (Macro Pipeline)
 
-This high-level overview shows the core execution flow of an `/rtp` request. Pre-verified locations are served immediately from cache, while cache misses trigger asynchronous background candidate generation and safety checks before handing off to the player teleport stage.
+This high-level overview shows the core execution flow of an `/rtp` request. Pre-verified locations are served immediately from cache, while cache misses trigger asynchronous on-demand candidate generation (`LoadPurpose.IMMEDIATE`) using governed deduplication (ADR-114) and safety verification before handing off to player teleportation.
 
 ```mermaid
 flowchart LR
@@ -23,8 +23,8 @@ flowchart LR
     B -- "Yes [Instant]" --> C["Hot L1 Cache<br/>(Pre-verified Location)"]
 
     %% Async Generation Path
-    B -- "No [Async Fill]" --> D["Spiral Generator<br/>(Archimedean 1D Math)"]
-    D --> E["Anvil Disk Probe<br/>(Read .mca Off-Tick)"]
+    B -- "No [On-Demand Fill]" --> D["Spiral Generator<br/>(Archimedean 1D Math)"]
+    D --> E["Governed Deduplication<br/>(Tier 2 Anvil vs Direct Load)"]
     E --> F["Safety & Claim Scan<br/>(Lava, Void, Claims)"]
     F --> C
 
@@ -63,12 +63,13 @@ stateDiagram-v2
     }
 
     state Async_Worker_Context {
-        GenRandom : [SETUP Stage] Generate (X,Z)
-        ReqTicket : [LOAD Stage] addPluginChunkTicket()
+        GenRandom : [SETUP Stage] Generate (X,Z) ~ f(x,z)
+        GovernLoad : [LOAD Stage] Governed Deduplication & Semaphore (ADR-114)
+        ReqTicket : addPluginChunkTicket() & ChunkReservation
     }
 
     state Region_Thread_Context {
-        EvalBlocks : Evaluate Safety (isSafe)
+        EvalBlocks : Evaluate Safety (isSafe) & Stale Guard
     }
 
     state Entity_Scheduler_Context {
@@ -92,18 +93,20 @@ stateDiagram-v2
 %% Public Queue Loop
     perm_check --> QueueWait : Lacks 'unqueued' perm
     QueueWait --> QueueWait : Loop while Cache Empty
-    QueueWait --> ReqTicket : Location Prepared (Spawn Async Worker)
+    QueueWait --> ReqTicket : Location Prepared by Refill (diagram 02)
 
-%% Unqueued Path
-    perm_check --> GenRandom : Has 'unqueued' perm (Start SETUP)
+%% Unqueued / Immediate Path (ADR-110, ADR-114)
+    perm_check --> GenRandom : Has 'unqueued' perm (LoadPurpose.IMMEDIATE)
 
 %% Generation & Ticket Pipeline
-    GenRandom --> ReqTicket : Coords Generated
-    ReqTicket --> EvalBlocks : CompletableFuture.thenAccept(...)
+    GenRandom --> GovernLoad : Coords Generated
+    GovernLoad --> ReqTicket : Dedup Bypass or Safe Prefilter (Permit Acquired)
+    GovernLoad --> Teardown : In-Flight Timeout / Backpressure (msgBusy)
+    ReqTicket --> EvalBlocks : Future Completes (ADR-112 Async-to-Sync Handoff)
 
 %% Evaluation Branches
     EvalBlocks --> MovePlayer : Safe Landing Found
-    EvalBlocks --> GenRandom : Unsafe (Retry Search Loop)
+    EvalBlocks --> GenRandom : Unsafe (Resample s_i+1 ~ f(x,z))
     EvalBlocks --> Teardown : Max Retries Exhausted
 
 %% Finalization
@@ -116,7 +119,23 @@ stateDiagram-v2
     classDef data    fill:#fff2b3,stroke:#8a6d1f,color:#3a2f0b;
     classDef cleanup fill:#e2e2e2,stroke:#555555,color:#111111;
     class MovePlayer success
-    class GenRandom,ReqTicket,EvalBlocks async
+    class GenRandom,GovernLoad,ReqTicket,EvalBlocks async
     class QueryCache,QueueWait data
     class Teardown cleanup
 ```
+
+---
+
+## Architectural Notes & Cross-References
+
+- **Hot cache vs unqueued dispatch:** Serving pre-verified locations from the L1 queue (`keptLocations`) avoids all generation latency. When a player possesses `rtp.unqueued` or when the public queue is depleted, `PregenTask` runs under `LoadPurpose.IMMEDIATE`.
+- **Governed on-demand deduplication (ADR-114):** Immediate tasks do not blindly trigger unconstrained native chunk loads. The `ImmediateLoadGovernor` evaluates the thread-weighted threshold ($P_{\text{reject}} > \frac{C_{\text{file, async}}}{C_{\text{native, async}} + W_{\text{tick}}(\text{MSPT}) \cdot C_{\text{native, sync}}}$). In safe terrain under stable ticks, it deduplicates by bypassing Anvil and dispatching directly to native loading, eliminating duplicate decompression and NBT decoding. In hazardous terrain or under tick distress, it engages off-thread Anvil pre-filtering to shed bad candidates without consuming main-thread tick budget.
+- **In-flight generation bounding:** Live native generation during unqueued bursts is strictly bounded by regional (max 1) and global (max 2) semaphores, protecting the shared tick loop from sudden MSPT spikes and watchdog timeouts.
+- **Asynchronous regional handoff (ADR-112):** On Folia, chunk futures complete off the region thread. `TeleportPipelineTask` continues generation results asynchronously before handing off to the regional entity scheduler within the regional token bucket for arrival validation and teleportation.
+- **Guaranteed teardown (S-002, S-004):** Chunk reservations are tracked in `MemoryTracker` and closed on every exit path (successful teleport, hazard rejection, timeout, or cancellation).
+
+Related documentation:
+- Companion deep-dive on chunk resolution: [`docs/architecture/15-cost-governed-chunk-reads-and-native-admission.md`](15-cost-governed-chunk-reads-and-native-admission.md).
+- Candidate selection per attempt: [`docs/architecture/08-location-selection-per-attempt.md`](08-location-selection-per-attempt.md).
+- Chunk ticket lifecycle: [`docs/architecture/03-chunk-ticket-lifecycle.md`](03-chunk-ticket-lifecycle.md).
+- Governing ADRs: [ADR-001](../adr/ADR-001-archimedean-spiral-1d-mapping.md), [ADR-015](../adr/ADR-015-stale-chunk-guard-countbound-pipes.md), [ADR-110](../adr/ADR-110-purpose-gated-live-loads.md), [ADR-112](../adr/ADR-112-per-region-work-division-on-folia.md), [ADR-114](../adr/ADR-114-cost-governed-on-demand-chunk-reads.md).

@@ -106,7 +106,7 @@ After the shape dropdown, the page builds one input per declared setting:
 - integers and numbers get number inputs with the suggestions as presets;
 - booleans get a checkbox, and enums a select.
 
-Settings the shape doesn't declare are not shown. Add-on shapes get a form the same way. An edit to a setting in `curveParams` redraws the path from the helper immediately. When the channel is connected, a `curve-state` request (section 5.3) replaces the estimated state with the exact one.
+Settings the shape doesn't declare are not shown. Add-on shapes get a form the same way. An edit to a setting in `curveParams` redraws the path from the helper immediately, labelled "estimated". The edit is only staged; the exact state arrives as a `curve` push (section 5.3) once Hot-Apply commits it.
 
 ### 4.4 Snapshot fields and the curve hash
 - **`curveCode: {SHAPE: {sha256, js, sample?}}`** at the payload top level, one entry per registered shape name with a helper, whether or not a region uses it, keyed by that name. `sha256` is the lowercase hex SHA-256 of the UTF-8 `js`. Each source is sent once per snapshot, however many regions use it.
@@ -193,6 +193,7 @@ A **run layer** is per-region data in curve-position space, `{v, runs}`. `runs` 
 4. `/rtp editor trust <nonce>` (`TrustCmd`, permission `rtp.editor`) adds the fingerprint to `TrustedEditors`. That is persisted as `<dataFolder>/editor/trusted-editors.json` with an atomic replace. The plugin then sends `hello-reply {state: "trusted"}`.
    - An expired or unknown nonce is refused with a configurable message.
    - A corrupt trusted-editors file is logged and treated as empty, and it is replaced on the next successful trust write.
+   - A hosted page opened from the operator's own link skips the nonce: its `hello` carries a session link proof (section 5.10).
 5. **Acceptance rules (plugin side):** from untrusted keys the plugin accepts only `hello` and `ping`. Any other message needs a trusted key, a valid signature, the current challenge and a higher `seq`. Forged, replayed, out-of-order, unknown-type and oversized messages are dropped and logged, rate-limited to one line per key per minute.
 6. The trust prompt, trusted / rejected replies, and channel opened / lost / expired notices are configurable in `messages.yml`, with locale parity (REQ-RTP-F-013, S-007).
 
@@ -204,16 +205,14 @@ A **run layer** is per-region data in curve-position space, `{v, runs}`. `runs` 
 | `ping` / `pong` | both | keepalive: the page checks every 15 s and, on a paced relay, pings only after 40 s without sending (any verified plugin frame counts as a pong); 3 missed pongs mark the link lost. The relay's proxy drops a socket silent for about a minute, so `BytesocksTransport` also sends a WebSocket ping control frame every 20 s, which bytesocks does not count as a message |
 | `feed` | plugin -> page | local feed head push (ADR-104 section 4.6 item 6), unchanged in meaning; pushed only when it changes, after a `focus`, or as a 40 s heartbeat (section 5.5), which keeps the page's socket under the proxy's idle limit. A hosted page applies its telemetry, survey progress and region stats; its tile versions name local files |
 | `curve` | plugin -> page | `{region, curve: {shape, params, state, hash}}` when a region's settings or state change (for example `expand` grows `rEff`); the page re-verifies and redraws |
-| `curve-state` | page -> plugin, reply plugin -> page | request `{reqId, region, shape: {name, key: YAML scalar}}` for edited settings; reply `{reqId, state, hash, range}` or `{reqId, error}`; evaluated on a temporary shape built as `EditorWalkPathPreview` builds one, under its build limits (4 per feed tick, newest per client and region, 1,024 vertices, scalar values only) and the section 5.5 frame cap |
 | `hazard-delta` | plugin -> page | `{region, base, version, add: runs, remove: runs}` against hazard version `base`; `{region, version, reset: true, runs}` when the page's version is unknown or stale |
 | `land` | plugin -> page | `{world, y, palette, bins}`: focus-driven land bins `[rx, rz, level, base64Runs]` (`BiomeBinCodec`, ADR-104 section 4.6 item 1); every frame carries the world's whole palette, so a page that connects late or misses a frame still names every cell. A `focus` repeating the current view pushes its bins again unless they are still queued. Bins go out in walk order: those inside a tracked region by the earliest curve position of five probe chunks (centre outward along the region's curve), the rest after them by Chebyshev ring around the view centre |
 | `land-ref` | plugin -> page | sessions with a bytebin hand-off (hosted): `{world, y, bins, bytebinKey, sha256}`; the bytebin body is a `land` message `{world, y, palette, bins}`. The plugin uploads the bins of the page's view plus 2 bins of padding whose version the page does not hold (the snapshot's embed, then earlier uploads), in walk order, at most one upload per 30 s and none while nothing in view changed. A failed upload is retried with the next period; a trusted hello or a `focus` with `landReset: true` (the page could not fetch or verify a `land-ref`) drops everything but the snapshot from what the page holds, so it is sent again. A hosted session sends no `land` frames |
 | `focus` | page -> plugin | debounced view rectangle `{world, y, minRx, minRz, maxRx, maxRz}`, plus `verified: [regions]`, `hazardVersions: {region: v}` and, after a lost `land-ref`, `landReset: true` |
-| `walkpath` | page -> plugin, reply plugin -> page | walk-path preview of edited geometry (ADR-104 section 4.6 item 6), for shapes without a verified helper; a reply over the frame cap is handed off through bytebin (section 5.5) |
 | `apply` / `apply_ack` | page -> plugin / plugin -> page | Hot-Apply: `{files}` inline (every staged file that differs from the server copy: worlds, regions, config), or `{bytebinKey, sha256}` above the frame cap; runs the full `/rtp editor apply` validation pipeline; acknowledged with the result, after which the page treats the sent text as the server copy |
 | `bundle` | plugin -> page | paced transports only (section 5.5): `{items: [..]}` of held `feed`, `curve`, `land`, `land-ref` and `hazard-delta` pushes, signed once; the page dispatches each item to its own handler and ignores any other item type |
 
-The handlers (`EditorWalkPathPreview`, `EditorLoopbackApply`, the feed's focus queue) register with `EditorChannel` by `type` instead of parsing loopback frames themselves.
+The handlers (`EditorLoopbackApply`, the feed's focus queue) register with `EditorChannel` by `type` instead of parsing loopback frames themselves. The page shall send the plugin only `focus` (its view rectangle) and `apply` (a Hot-Apply commit), besides the handshake and keepalive and the addon types of ADR-107. Walk paths and curve state shall flow plugin -> page only, for applied geometry; any other page type is dropped as unknown (section 5.2 item 5).
 
 ### 5.4 Transports
 `EditorChannel` owns the envelope, signing and verification, trust, the challenge and `seq` checks, routing by `type` and the outbound caps. `ChannelTransport` is only `send(String)`, an inbound callback and a state / close callback. There are three implementations:
@@ -225,7 +224,7 @@ The handlers (`EditorWalkPathPreview`, `EditorLoopbackApply`, the feed's focus q
 - **`LoopbackTransport` (local):** wraps `EditorLoopbackChannel`. The loopback handshake rules (loopback peer and Host, Origin check, token, at most 4 clients) stay as defence in depth. The local export's `channel.relay` is the loopback `ws://127.0.0.1:<port>/rtp-editor-ws?token=...` address, so the page runs the identical handshake and messages.
 - **`InMemoryTransport` (tests):** a connected pair, so JUnit drives the full protocol, including a page stub, without sockets.
 
-The page has one `EditorChannelClient` (keys, signing, verification, handshake, reconnect) that connects to `snapshot.channel.relay`. The existing `focus` / `walkpath` / `apply` callers move onto it.
+The page has one `EditorChannelClient` (keys, signing, verification, handshake, reconnect) that connects to `snapshot.channel.relay`. The `focus` and `apply` callers use it.
 
 ### 5.5 Caps and the bytebin hand-off
 - Frames are capped at **32 KiB** (the envelope included) on every transport, so local runs test the hosted limits. Larger inbound frames are refused and logged.
@@ -234,7 +233,8 @@ The page has one `EditorChannelClient` (keys, signing, verification, handshake, 
 - Frame pacing: bytesocks counts frames per IP (30 per 2 minutes by default, all channels together), closes a socket over the limit with 1008 and deletes a channel once its last client has left. A transport may therefore declare a frame share per 2-minute window (`ChannelTransport.framesPerWindow`). The bytesocks transport declares 18 and the page keeps to 10 on any `wss://` relay, since page and server often share one IP; loopback and in-memory transports are unpaced.
   - On a paced channel, replies go first and wait in order when the share is used up. Broadcast pushes are held (newest `feed`, newest `curve` per region, `land` and `hazard-delta` in order) and leave as one `bundle` at most every 8 s, leaving 4 frames of the share for replies. A new push is refused while a frame's worth is already held, so its producer resends later. `bye` is never held.
   - The page coalesces queued `focus` messages, counts every outbound frame (hello and ping included), and treats any verified plugin frame as proof of liveness. The plugin skips a `pong` within 10 s of other outbound traffic.
-  - On every channel the feed pushes a head only when the page would see something new: `seq` and `timestamp` alone do not count, and the telemetry gauges count only beyond their jitter (TPS 0.5, MSPT 1 ms or 20 %, tick budget 5 %, heap 0.25 GiB, measured against the last pushed value). A `focus` (sent first by a page that has just connected) forces the next head, and an unchanged head is still pushed every 60 s as a heartbeat. An idle session therefore costs about 2 plugin frames per 2 minutes instead of a bundle every 8 s; the local `feed.js` file is still rewritten every tick.
+  - On every channel the feed pushes a head only when the page would see something new: `seq` and `timestamp` alone do not count, and the telemetry gauges count only beyond their jitter (TPS 0.5, MSPT 1 ms or 20 %, tick budget 5 %, heap 0.25 GiB, measured against the last pushed value). A `focus` (sent first by a page that has just connected) forces the next head, and an unchanged head is still pushed every 40 s as a heartbeat. An idle session therefore costs about 3 plugin frames per 2 minutes instead of a bundle every 8 s; the local `feed.js` file is still rewritten every tick.
+  - A hosted feed pushes a changed head at most every 20 s (survey progress changes every tick), and its head carries no tile versions or palettes, which name local files. A head over the frame cap goes without telemetry.
   - The page marks a connected link `feed stale` when no head has arrived for 90 s (heartbeat plus a bundle gap and margin).
 
 ### 5.6 Relay failure behaviour (S-004)
@@ -258,6 +258,18 @@ The page has one `EditorChannelClient` (keys, signing, verification, handshake, 
 - **Sessions:** sessions expire after 30 minutes, at most 32 are open at once, and tokens are logged by prefix only. The key file and local exports are owner-only, Windows included. Each local export closes the previous loopback socket and opens a new one with a fresh token.
 - **Hosted page:** `no-referrer` and a CSP meta tag; `?token=` is removed from the address bar after load; fetched docs HTML is sanitised, and links are limited to an allow-list.
 
+### 5.9 Amendment (2026-10-13): Page sends only its view and Hot-Apply
+- The `walkpath` and `curve-state` page -> plugin requests are removed, together with `EditorWalkPathPreview`. Each geometry edit cost relay frames from the page's 10-frame share (section 5.5), so a later Hot-Apply waited behind them.
+- Geometry and setting edits only stage. Staged geometry is drawn from the page's helper estimate ("estimated"), or shows no path for shapes without a helper, until Hot-Apply; the plugin then pushes the applied `curve`, path and hazards.
+- The plugin accepts from the page only `focus`, `apply`, the handshake / keepalive and ADR-107 addon types.
+
+### 5.10 Amendment (2026-10-14): Session link trust, hosted feed heads
+- **Session link secret:** each channel holds 256 random bits (`EditorChannel.linkSecret`). `/rtp editor` appends them to the operator's link as `#k=<base64url>`. Browsers send no fragment to the site or the relay, the snapshot does not carry it, and the page removes it from the address bar on load and keeps it in memory only.
+- **Proof:** the page's `hello` carries `linkProof`, base64 HMAC-SHA256 keyed with the secret over `rtp-editor-link|<channel id>|<key fingerprint>`. It is bound to one key, so a relay observer can't reuse it for another key, and it reveals nothing about the secret.
+- **Trust:** the first key whose proof verifies (constant-time compare) is trusted for this channel only, in memory, never written to `trusted-editors.json`, and without a prompt. The secret then counts as used; a later key, or a proof that does not verify, gets the nonce flow of section 5.2 (logged, rate-limited). `/rtp editor untrust` also drops link-trusted keys. A key that connects without the link (anyone who knows the channel id) is never trusted automatically.
+- The trust ends with the channel (30 minutes), so a console log or screenshot of the link exposes nothing once the session is over or the link was used.
+- **Hosted feed heads:** hosted feeds push the `feed` head over the channel as local ones do (section 5.3). Without it a hosted page marked its link `feed stale` 90 s after trust. On a paced channel the feed also flushes held pushes every tick, so a bundle leaves once its 8 s gap has passed instead of waiting for the next send.
+
 ---
 
 ## 6. Snapshot Size
@@ -278,7 +290,7 @@ The page has one `EditorChannelClient` (keys, signing, verification, handshake, 
 ### Positive
 - The hosted page draws the complete walk path and hazards at any zoom from the snapshot alone, for every shape that ships a helper, add-ons included.
 - Setting edits redraw the path locally with no server request. The typed settings form works for any registered shape.
-- Hosted sessions become two-way: live curve changes, hazard deltas, focus-driven land detail, walk-path previews and Hot-Apply, with in-game trust.
+- Hosted sessions become two-way: live curve changes, hazard deltas, focus-driven land detail and Hot-Apply, with in-game trust.
 - Local, hosted and test runs share one protocol, so a local session and the in-memory tests exercise everything hosted mode does except the relay hop.
 - Snapshots shrink for regions drawn from code.
 
@@ -314,6 +326,6 @@ The page has one `EditorChannelClient` (keys, signing, verification, handshake, 
 
 ## 10. References
 - `MemoryShape`, `AbstractDualLayerShape`, `CircleOptimizedDualLayer`, `SquareOptimizedDualLayer` (`rtp-core/.../selection/region/selectors/memory/shapes/`).
-- `EditorSessionManager`, `EditorHttpTransport`, `EditorCmd`, `EditorLiveFeed`, `EditorLoopbackChannel`, `EditorWalkPathPreview`, `EditorLoopbackApply`, `WalkPathTiles`, `HazardTiles`, `BiomeBinCodec` (`rtp-core/.../commands/editor/`).
+- `EditorSessionManager`, `EditorHttpTransport`, `EditorCmd`, `EditorLiveFeed`, `EditorLoopbackChannel`, `EditorLoopbackApply`, `WalkPathTiles`, `HazardTiles`, `BiomeBinCodec` (`rtp-core/.../commands/editor/`).
 - `docs/editor/index.html` (hosted and packaged editor page).
 - LuckPerms web editor socket protocol (bytesocks relay, `{msg, signature}` envelope, in-game trust).

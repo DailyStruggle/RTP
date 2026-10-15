@@ -72,12 +72,18 @@ public final class ChannelPageStub {
     }
 
     public void hello() {
+        hello(null);
+    }
+
+    /** A hello carrying {@code linkProof} (ADR-106 §5.10), or none when {@code null}. */
+    public void hello(String linkProof) {
         JsonObject m = new JsonObject();
         m.addProperty("type", "hello");
         m.addProperty("channel", channelId);
         m.addProperty("from", fingerprint());
         m.addProperty("hid", hid);
         m.addProperty("publicKey", keys.publicKeyBase64());
+        if (linkProof != null) m.addProperty("linkProof", linkProof);
         sendSigned(m.toString(), keys);
     }
 

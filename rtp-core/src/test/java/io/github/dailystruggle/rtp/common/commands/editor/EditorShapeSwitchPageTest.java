@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -45,8 +44,7 @@ class EditorShapeSwitchPageTest {
     private static final String[] PAGE_FUNCTIONS = {"isInheritedReferenceToken", "registryNames", "registryHas",
             "registryParams", "registryKeys", "stripYamlValue", "parseYamlLines", "regionFileFor", "normaliseSetting",
             "settingKeyOf", "settingValue", "yamlScalar", "parseVertexCoord", "shapeTakesKey",
-            "regionGeometryValues", "readRegionGeometry", "yamlKeyExtent", "patchRegionShape",
-            "walkPathShapeRequest"};
+            "regionGeometryValues", "readRegionGeometry", "yamlKeyExtent", "patchRegionShape"};
 
     /** Session schema as the server builds it (shape keys from each implementation's keys()). */
     private static String serverSchema;
@@ -118,7 +116,7 @@ class EditorShapeSwitchPageTest {
               }
               configs[regionFileFor('r')] = out;
               const keys = parseYamlLines(out).filter(r => r.key && r.path.length === 1 && r.path[0] === 'shape').map(r => r.key);
-              return JSON.stringify({ out, keys, back: readRegionGeometry(out), walk: walkPathShapeRequest(region), settings: region.settings });
+              return JSON.stringify({ out, keys, back: readRegionGeometry(out), settings: region.settings });
             })""";
 
     private static final Set<String> POLYGON_KEYS = Set.of("name", "mode", "vertices", "weight", "uniqueplacements");
@@ -301,23 +299,5 @@ class EditorShapeSwitchPageTest {
         assertFalse(keys.contains("vertices"), out);
         assertTrue(keys.containsAll(List.of("name", "radius", "centerRadius", "expand")), out);
         assertTrue(out.contains("\n  radius: \"256 c\""), "original radius text kept:\n" + out);
-    }
-
-    @Test
-    @DisplayName("walk-path / curve-state request carries raw setting text and numeric chunk vertices")
-    void walkPathRequestRaw() {
-        JsonObject circle = run(LOCAL_CIRCLE, "[]", null, null, serverSchema).getAsJsonObject("walk");
-        assertEquals("256 c", circle.get("radius").getAsString());
-        assertEquals("1,5", circle.get("weight").getAsString());
-        assertEquals("auto", circle.get("uniquePlacements").getAsString());
-        assertEquals("CIRCLE", circle.get("name").getAsString());
-        assertFalse(circle.has("vertices"));
-
-        JsonObject poly = run(LOCAL_CIRCLE, "[\"POLYGON\"]", SQUARE, null, serverSchema).getAsJsonObject("walk");
-        assertEquals("POLYGON", poly.get("name").getAsString());
-        assertEquals(JsonParser.parseString(SQUARE), poly.get("vertices"));
-        for (String k : poly.keySet()) assertTrue(POLYGON_KEYS.contains(k.toLowerCase(Locale.ROOT)), "walk request keeps '" + k + "': " + poly);
-        JsonArray first = poly.getAsJsonArray("vertices").get(0).getAsJsonArray();
-        assertTrue(first.get(0).getAsJsonPrimitive().isNumber(), "vertices sent as numbers");
     }
 }

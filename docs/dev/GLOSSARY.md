@@ -47,8 +47,8 @@ Informal shorthand and developer nicknames frequently used in code reviews, disc
 |----------------|-----------------------------|-------|
 | "fast cache" | `RegionQueueManager.fastLocations` (`ConcurrentHashMap<UUID, CompletableFuture<RTPLocation>>`) | Per-player prefilled future for already-online players. Not the general pool. |
 | "kept cache" / "hot queue" / "L1" | `RegionQueueManager.keptLocations` (`LockFreeLocationBuffer`) | General hot region pool with loaded `keep(true)` chunks. Polled by `/rtp`. |
-| "cold cache" / "cold queue" / "L2" | `RegionQueueManager.unkeptLocations` (`LockFreeLocationBuffer`) | Pre-verified locations with released chunks; re-loaded on promotion to L1. |
-| "backlog cache" / "L3" / "binned cache" | `RegionQueueManager.backlogLocations` (`BacklogLocationBuffer`); [ADR-028](../adr/ADR-028-l3-backlog-cache.md) | Unverified FIFO buffer screened one 32x32 bin per pulse. Not persisted to DB. |
+| "cold cache" / "cold queue" / "L2" | `RegionQueueManager.unkeptLocations` (`LockFreeLocationBuffer`) | Locations with released chunks: cold-fill results and pre-filter-accepted backlog entries. Re-loaded on promotion to L1, which runs vert, border, biome, safety and claims (`Region#promotionChecks`). |
+| "backlog cache" / "L3" / "binned cache" | `RegionQueueManager.backlogLocations` (`BacklogLocationBuffer`); [ADR-028](../adr/ADR-028-l3-backlog-cache.md) | Unverified FIFO buffer screened by region-file bin; never loads a chunk. `VALIDATED` entries drain to cold; `UNKNOWN` (no disk data) ones go to the cold fill one at a time. Not persisted to DB. |
 | "login cache" / "login reserve" | `RegionQueueManager.loginLocations` (ADR-023) | Default-world reserve for join-time RTP (`rtp.onevent.join`). |
 | "personal queue" / "personal bucket" | `RegionQueueManager.perPlayerLocationQueue` (ADR-043) | Per-UUID bucket opened under `rtp.personalqueue`. Distinct from waitlist `playerQueue`. |
 | "the pipeline" / "teleport pipeline" | `TeleportPipelineTask` (`rtp-core`) | Full per-attempt pipeline (shape -> chunk -> vert -> biome -> safety). Tracked in `MemoryTracker`. |

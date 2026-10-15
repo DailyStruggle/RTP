@@ -8,13 +8,15 @@ import org.junit.jupiter.api.Test;
 public class BukkitServerProviderVersionResolutionTest {
 
     @Test
-    @DisplayName("REQ-RTP-SYS-001: 26.1, 26.2, and 26.3 versions resolve to modern 26.x server adapters")
+    @DisplayName("REQ-RTP-SYS-001: 26.1, 26.2, 26.3, and 26.4 versions resolve to modern 26.x server adapters")
     public void testVersionResolution26() {
         String[] versions = new String[] {
             "26.1-R0.1-SNAPSHOT",
             "git-Paper-10 (MC: 26.2)",
             "git-Paper-25 (MC: 26.3)",
-            "26.3-SNAPSHOT"
+            "git-Paper-50 (MC: 26.4)",
+            "26.3-SNAPSHOT",
+            "26.4-R0.1-SNAPSHOT"
         };
 
         for (String v : versions) {

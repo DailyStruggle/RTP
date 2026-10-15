@@ -79,4 +79,10 @@ class ProfilingRTPSchedulerTest {
         assertEquals(0L, RtpSchedulerProfile.GLOBAL.syncRuns());
         assertEquals(0L, RtpSchedulerProfile.GLOBAL.asyncRuns());
     }
+
+    @Test
+    @DisplayName("isRegionSaturated delegates to wrapped scheduler")
+    void isRegionSaturated_delegates() {
+        org.junit.jupiter.api.Assertions.assertFalse(scheduler.isRegionSaturated(null, 0, 0));
+    }
 }

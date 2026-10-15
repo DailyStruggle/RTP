@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.fabric.v26_2_R1;
 
-import io.github.dailystruggle.rtp.api.safety.CompiledUnsafeSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -9,14 +8,11 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
-import net.minecraft.world.level.levelgen.Heightmap;
 
 import java.util.Locale;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -56,11 +52,6 @@ public final class V26_2_R1FabricRTPChunk extends RTPChunk<ChunkAccess> {
     }
 
     @Override
-    public boolean isGenerated() {
-        return chunk != null;
-    }
-
-    @Override
     public boolean isLoaded() {
         try {
             return level != null && level.getChunkSource().hasChunk(cx, cz);
@@ -86,7 +77,8 @@ public final class V26_2_R1FabricRTPChunk extends RTPChunk<ChunkAccess> {
         keep(false);
     }
 
-    private String materialNameAt(int x, int y, int z) {
+    @Override
+    public String materialNameAt(int x, int y, int z) {
         if (chunk == null) return "";
         try {
             BlockState state = chunk.getBlockState(new BlockPos(
@@ -98,59 +90,6 @@ public final class V26_2_R1FabricRTPChunk extends RTPChunk<ChunkAccess> {
         } catch (Throwable t) {
             return "";
         }
-    }
-
-    @Override
-    public boolean isAir(int x, int y, int z) {
-        if (chunk == null) return true;
-        try {
-            BlockState state = chunk.getBlockState(new BlockPos(
-                    (cx << 4) + (x & 0xF), y, (cz << 4) + (z & 0xF)));
-            return state.isAir();
-        } catch (Throwable t) {
-            return false;
-        }
-    }
-
-    @Override
-    public int getSkyLight(int x, int y, int z) {
-        if (level == null) return 0;
-        try {
-            return level.getBrightness(LightLayer.SKY, new BlockPos(
-                    (cx << 4) + (x & 0xF), y, (cz << 4) + (z & 0xF)));
-        } catch (Throwable t) {
-            return 0;
-        }
-    }
-
-    @Override
-    public int getSurfaceHeight(int x, int z) {
-        x = Math.max(0, Math.min(15, x));
-        z = Math.max(0, Math.min(15, z));
-        if (chunk == null) return 0;
-        try {
-            return chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
-        } catch (Throwable t) {
-            return 0;
-        }
-    }
-
-    @Override
-    public boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks) {
-        if (unsafeBlocks == null || unsafeBlocks.isEmpty()) return true;
-        String name = materialNameAt(x, y, z);
-        // S-001: an unresolvable block id fails closed rather than passing the unsafe scan.
-        if (name.isEmpty()) return false;
-        if (unsafeBlocks.contains(name)) return false;
-        int colon = name.indexOf(':');
-        if (colon > 0 && unsafeBlocks.contains(name.substring(colon + 1))) return false;
-        return true;
-    }
-
-    @Override
-    public boolean isSafe(int x, int y, int z, CompiledUnsafeSet unsafeBlocks) {
-        if (unsafeBlocks == null || unsafeBlocks.isEmpty()) return true;
-        return isSafe(x, y, z, unsafeBlocks.plainMaterials());
     }
 
     public ServerLevel level() { return level; }

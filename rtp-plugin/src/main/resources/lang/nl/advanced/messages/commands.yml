@@ -14,7 +14,7 @@ scanActief: "&c[P0] er is al een scantaak actief voor regio's: [scan_regions]"
 scanNietActief: "&c[P0] er is geen scantaak actief voor regio's: [scan_regions]"
 
 # placeholder: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-scanStatus: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 land &8| &7ETA #7E9CC8[scan_eta]"
+scanStatus: "[P0] &8> &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 land &8| &7ETA #7E9CC8[scan_eta]"
 
 # Baasbalktitel getoond aan spelers met rtp.scan-toestemming terwijl een wereldscan actief is.
 # Stel in op een lege string om de baasbalk uit te schakelen.
@@ -406,11 +406,11 @@ mapResolverMissing: "&c[P0] geen grafiekresolver geregistreerd voor dit verzoek.
 # Verzonden wanneer een resolver wordt uitgevoerd maar de onderliggende gegevensbron niet beschikbaar is
 # voor het gevraagde doel (onbekende regio, nog geen gegevens, wereld ontladen).
 # Plaatshouder: [region] - de gevraagde regionaam (kan leeg zijn).
-mapUnavailable: "&e[P1] grafiekgegevens zijn op dit moment niet beschikbaar."
+mapUnavailable: "&e[P0] grafiekgegevens zijn op dit moment niet beschikbaar."
 
 # Verzonden wanneer de kaartdienst op dit moment geen kaart kan toewijzen (bijv. een
 # limiet per kijker is bereikt).
-mapBusy: "&e[P1] de kaartdienst is bezig; probeer het zo dadelijk opnieuw."
+mapBusy: "&e[P0] de kaartdienst is bezig; probeer het zo dadelijk opnieuw."
 
 # Label voor de klikbare menurij in "/rtp info" die een heatmap rendert van
 # de bekende onveilige locaties van de huidige regio. Verborgen wanneer kaartweergave
@@ -488,7 +488,7 @@ docsExportFailed: "&c[RTP] Kan documentatiebundel niet exporteren: [reason]."
 
 # RAAK HET VERSIENUMMER NIET AAN
 # --- Web editor channel (ADR-106) ---
-editorTrustPrompt: "&e[P1] Een webeditorpagina vraagt toegang met code &b[nonce]&e. Toont je pagina dezelfde code, klik dan hier om deze browser te vertrouwen."
+editorTrustPrompt: "&e[P0] Een webeditorpagina vraagt toegang met code &b[nonce]&e. Toont je pagina dezelfde code, klik dan hier om deze browser te vertrouwen."
 editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(sleutel [fingerprint])"
 editorTrustAccepted: "&a[P0] Browser vertrouwd: de editorpagina met code [nonce] kan nu voorbeelden tonen en Hot-Apply gebruiken."
 editorTrustAlready: "&7[P0] De browser met code [nonce] werd al vertrouwd."
@@ -496,7 +496,7 @@ editorTrustUnknown: "&c[P0] Geen open editorsessie heeft code [nonce] uitgegeven
 editorTrustExpired: "&c[P0] Code [nonce] is verlopen. Herlaad de editorpagina voor een nieuwe."
 editorTrustUsage: "&c[P0] Gebruik: /rtp editor trust nonce=<code die de editorpagina toont>"
 editorChannelOpened: "&a[P0] Webeditorkanaal geopend. Vertrouw je browser wanneer daarom wordt gevraagd om voorbeelden en Hot-Apply in te schakelen."
-editorChannelLost: "&e[P1] Webeditorkanaal verloren: [reason]. De pagina blijft werken vanuit haar momentopname."
+editorChannelLost: "&e[P0] Webeditorkanaal verloren: [reason]. De pagina blijft werken vanuit haar momentopname."
 editorChannelExpired: "&7[P0] Webeditorkanaal verlopen na [minutes] minuten. Voer het editorcommando opnieuw uit om verder te gaan."
 editorTrustRateLimited: "&c[P0] Te veel foute vertrouwenscodes voor de editor. Wacht een minuut en probeer het opnieuw."
 editorUntrustUsage: "&c[P0] Gebruik: /rtp editor untrust key=<begin van de vingerafdruk, minstens 4 tekens | all>"
@@ -504,6 +504,6 @@ editorUntrustRemoved: "&a[P0] Vertrouwen ingetrokken voor [count] webeditor-brow
 editorUntrustNone: "&7[P0] Geen vertrouwde editorbrowser komt overeen met [key]."
 editorUntrustFailed: "&c[P0] De lijst met vertrouwde editors kon niet worden bijgewerkt: [reason]"
 editorApplyDigestMissing: "&c[P0] De editorpayload heeft geen sha256-controlesom en is niet toegepast. Bevestig opnieuw vanaf een bijgewerkte editorpagina."
-editorApplyFileUnreadable: "&e[P1] Het offline toepassingsbestand kon niet worden gelezen ([reason]); de bytestore wordt geprobeerd."
+editorApplyFileUnreadable: "&e[P0] Het offline toepassingsbestand kon niet worden gelezen ([reason]); de bytestore wordt geprobeerd."
 
 version: 1.0

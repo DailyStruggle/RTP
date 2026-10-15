@@ -64,6 +64,28 @@ public class RTPAPI {
   /** Scripted actions service delegate populated by core during {@code onEnable} (ADR-093). */
   public static volatile io.github.dailystruggle.rtp.api.action.ActionService actionService = null;
 
+  /** Air check predicate delegate populated by core during initialization. */
+  public static volatile Predicate<String> isAirDelegate = null;
+
+  /**
+   * Checks if the given material name represents air (either vanilla air or configured air blocks).
+   *
+   * @param materialName material or block identifier (e.g. {@code "AIR"}, {@code "minecraft:cave_air"})
+   * @return {@code true} if air, {@code false} otherwise
+   */
+  @PublicApi
+  public static boolean isAir(String materialName) {
+    if (materialName == null || materialName.isEmpty()) return false;
+    Predicate<String> delegate = isAirDelegate;
+    if (delegate != null) {
+      return delegate.test(materialName);
+    }
+    String upper = materialName.toUpperCase(java.util.Locale.ROOT);
+    int colon = upper.indexOf(':');
+    String bare = (colon >= 0) ? upper.substring(colon + 1) : upper;
+    return bare.equals("AIR") || bare.equals("CAVE_AIR") || bare.equals("VOID_AIR");
+  }
+
   /**
    * Sets the platform-specific server accessor (write-once).
    *

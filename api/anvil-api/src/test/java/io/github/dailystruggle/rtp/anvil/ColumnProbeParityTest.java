@@ -32,13 +32,15 @@ import static org.junit.jupiter.api.Assertions.fail;
 class ColumnProbeParityTest {
 
     @ParameterizedTest(name = "{0}")
-    @CsvSource({"1_20_R1", "1_21_R1", "26_1_R1"})
+    @CsvSource({"1_20_R1", "1_21_R1", "26_1_R1", "26_3_R1"})
     @DisplayName("readColumnProbe yields the same answers as readChunkView at the center column for every Y")
     void probeParityAgainstFullView(String dirName) throws IOException {
         byte[] regionBytes = loadRealFixture(dirName);
 
-        AnvilChunkView view = AnvilReader.readChunkView(regionBytes, 0, 0);
-        assertNotNull(view, () -> "real fixture " + dirName + " must carry chunk (0,0)");
+        AnvilReader.ChunkEntry entry = AnvilReader.readChunkEntry(regionBytes, 0, 0);
+        assertNotNull(entry, () -> "real fixture " + dirName + " must carry chunk (0,0)");
+        AnvilChunkView view = AnvilReader.toView(entry.root);
+        assertNotNull(view, () -> "real fixture " + dirName + " must produce a view");
 
         // Pick a Y window covering every section the view decoded. Sections are stored
         // in on-disk order; take the min/max section-Y to avoid relying on the order.
@@ -48,7 +50,8 @@ class ColumnProbeParityTest {
             if (s.sectionY() < minSectionY) minSectionY = s.sectionY();
             if (s.sectionY() > maxSectionY) maxSectionY = s.sectionY();
         }
-        assertNotNull(view.motionBlockingNoLeaves(),
+        long[] heightmap = AnvilReader.getMotionBlockingNoLeaves(entry.root);
+        assertNotNull(heightmap,
                 () -> "real fixture " + dirName + " must carry MOTION_BLOCKING_NO_LEAVES");
         if (minSectionY == Integer.MAX_VALUE) {
             fail("real fixture " + dirName + " has no decoded sections — unexpected for a populated chunk");
@@ -59,12 +62,13 @@ class ColumnProbeParityTest {
         ColumnProbe probe = AnvilReader.readColumnProbe(regionBytes, 0, 0, minY, maxY);
         assertNotNull(probe, () -> "probe must be produced for the same chunk as the view");
 
-        // Heightmap top at (8,8) must match AnvilChunkView's surface height.
-        int viewSurface = view.getSurfaceHeight(ColumnProbe.CENTER_LOCAL_X, ColumnProbe.CENTER_LOCAL_Z);
+        // Heightmap top at (8,8) must match decoded heightmap entry.
+        int expectedSurface = AnvilReader.readHeightmapEntry(
+                heightmap, ColumnProbe.CENTER_LOCAL_X, ColumnProbe.CENTER_LOCAL_Z, minSectionY * 16);
         assertAll("heightmap parity for " + dirName,
                 () -> assertEquals(true, probe.hasHeightmap(),
                         "fixture has MOTION_BLOCKING_NO_LEAVES, so probe must expose it"),
-                () -> assertEquals(viewSurface, probe.heightmapTopY(),
+                () -> assertEquals(expectedSurface, probe.heightmapTopY(),
                         "heightmap top at (8,8) must match"));
 
         // Per-Y block + biome identifier parity across the whole window.
@@ -85,16 +89,19 @@ class ColumnProbeParityTest {
     }
 
     @ParameterizedTest(name = "{0}")
-    @CsvSource({"1_20_R1", "1_21_R1", "26_1_R1"})
+    @CsvSource({"1_20_R1", "1_21_R1", "26_1_R1", "26_3_R1"})
     @DisplayName("readColumnProbe respects the [minY,maxY] window: queries outside return null")
     void probeWindowBounds(String dirName) throws IOException {
         byte[] regionBytes = loadRealFixture(dirName);
         AnvilChunkView view = AnvilReader.readChunkView(regionBytes, 0, 0);
         assertNotNull(view);
 
-        // Choose a small window anchored at the heightmap's surface so we definitely hit
-        // at least one populated section and have out-of-window Ys on both sides.
-        int surface = view.getSurfaceHeight(ColumnProbe.CENTER_LOCAL_X, ColumnProbe.CENTER_LOCAL_Z);
+        AnvilReader.ChunkEntry entry = AnvilReader.readChunkEntry(regionBytes, 0, 0);
+        assertNotNull(entry);
+        long[] heightmap = AnvilReader.getMotionBlockingNoLeaves(entry.root);
+        int surface = (heightmap != null)
+                ? AnvilReader.readHeightmapEntry(heightmap, ColumnProbe.CENTER_LOCAL_X, ColumnProbe.CENTER_LOCAL_Z, view.minHeight())
+                : 64;
         int minY = surface - 8;
         int maxY = surface + 8;
         ColumnProbe probe = AnvilReader.readColumnProbe(regionBytes, 0, 0, minY, maxY);

@@ -398,7 +398,7 @@ public final class AnvilReader implements RegionFileReader {
      * {@link ColumnProbe} covering the caller-supplied world-Y window {@code [minY, maxY]}.
      *
      * <p>Semantically equivalent to {@code readChunkView(...).blockIdAt(8, y, 8)} /
-     * {@code .getBiomeAt(8, y, 8)} / {@code .getSurfaceHeight(8, 8)} for every Y in the
+     * {@code .getBiomeAt(8, y, 8)} / {@code readHeightmapEntry(...)} for every Y in the
      * window - the probe exists to make those queries cheaper, not to change what they
      * answer. Internally the NBT parse skips every root child we do not need
      * ({@code block_entities}, {@code structures},
@@ -429,6 +429,8 @@ public final class AnvilReader implements RegionFileReader {
 
     private static ColumnProbe columnProbeFrom(LinkedHashMap<String, Object> root, int minY, int maxY)
             throws IOException {
+        // Proto-chunks read as air; only a native load finishes them. UNKNOWN, not SCAN_MISS.
+        if (isIncompleteChunk(root)) return null;
         long[] heightmap = getMotionBlockingNoLeaves(root);
         Nbt.NbtList sections = getSections(root);
         List<PaletteSection> sectionsOut;
@@ -447,6 +449,9 @@ public final class AnvilReader implements RegionFileReader {
             }
         }
 
+        // No decodable block section: answering "all air" would reject the chunk without a
+        // load. UNKNOWN, matching AnvilPrefilter's UNKNOWN:no-sections.
+        if (sectionsOut.isEmpty()) return null;
         int heightmapTop = computeHeightmapTop(heightmap, sectionsOut);
         return new ColumnProbe(minY, maxY, heightmapTop,
                 Collections.unmodifiableList(sectionsOut),
@@ -456,7 +461,7 @@ public final class AnvilReader implements RegionFileReader {
     /**
      * Selective-parser decision for {@link #readColumnProbe}. Keeps only the subset of
      * the chunk root that center-column queries need: {@code DataVersion} (for future
-     * version-gating), {@code Heightmaps.MOTION_BLOCKING_NO_LEAVES}, and each section's
+     * version-gating), {@code Status} (proto-chunk gate), {@code Heightmaps.MOTION_BLOCKING_NO_LEAVES}, and each section's
      * {@code Y}/{@code block_states}/{@code biomes}. Everything else is skipped without
      * allocation. Sections outside the probe's Y window are dropped entirely.
      */
@@ -468,6 +473,7 @@ public final class AnvilReader implements RegionFileReader {
             if ("sections".equals(name) && type == Nbt.TAG_LIST) return Nbt.SelectiveFilter.Decision.RECURSE;
             if ("Heightmaps".equals(name) && type == Nbt.TAG_COMPOUND) return Nbt.SelectiveFilter.Decision.RECURSE;
             if ("DataVersion".equals(name)) return Nbt.SelectiveFilter.Decision.KEEP;
+            if ("Status".equals(name) && type == Nbt.TAG_STRING) return Nbt.SelectiveFilter.Decision.KEEP;
             // Position guard for sector-only reads (verifyPosition).
             if ("xPos".equals(name) || "zPos".equals(name)) return Nbt.SelectiveFilter.Decision.KEEP;
             return Nbt.SelectiveFilter.Decision.SKIP;
@@ -511,9 +517,7 @@ public final class AnvilReader implements RegionFileReader {
 
     /**
      * Extracts the surface Y at {@code (8, 8)} from a decoded {@code MOTION_BLOCKING_NO_LEAVES}
-     * heightmap, using the same bit-packing + floor convention as
-     * {@link AnvilChunkView#getSurfaceHeight(int, int)}. Returns {@link Integer#MIN_VALUE}
-     * when the heightmap or sections list is absent/empty.
+     * heightmap. Returns {@link Integer#MIN_VALUE} when the heightmap or sections list is absent/empty.
      */
     private static int computeHeightmapTop(long[] heightmap, List<PaletteSection> sectionsOut) {
         if (heightmap == null || heightmap.length == 0) return Integer.MIN_VALUE;
@@ -523,9 +527,18 @@ public final class AnvilReader implements RegionFileReader {
         }
         if (floor == Integer.MAX_VALUE) return Integer.MIN_VALUE;
         int minHeight = floor * 16;
+        return readHeightmapEntry(heightmap, ColumnProbe.CENTER_LOCAL_X, ColumnProbe.CENTER_LOCAL_Z, minHeight);
+    }
+
+    /**
+     * Reads a single heightmap entry at local coordinates {@code (localX, localZ)} from a
+     * packed {@code MOTION_BLOCKING_NO_LEAVES} heightmap long array.
+     */
+    public static int readHeightmapEntry(long[] heightmap, int localX, int localZ, int minHeight) {
+        if (heightmap == null || heightmap.length == 0) return minHeight;
         int bits = 9;
         int entriesPerLong = 64 / bits;
-        int columnIndex = (ColumnProbe.CENTER_LOCAL_Z & 15) * 16 + (ColumnProbe.CENTER_LOCAL_X & 15);
+        int columnIndex = (localZ & 15) * 16 + (localX & 15);
         int longIdx = columnIndex / entriesPerLong;
         if (longIdx >= heightmap.length) return Integer.MIN_VALUE;
         int slot = columnIndex - longIdx * entriesPerLong;
@@ -546,7 +559,6 @@ public final class AnvilReader implements RegionFileReader {
      */
     public static AnvilChunkView toView(LinkedHashMap<String, Object> root) {
         int dataVersion = getDataVersion(root);
-        long[] heightmap = getMotionBlockingNoLeaves(root);
         Nbt.NbtList sections = getSections(root);
         List<PaletteSection> out;
         List<BiomePaletteSection> biomeOut;
@@ -569,7 +581,6 @@ public final class AnvilReader implements RegionFileReader {
         return new AnvilChunkView(
                 dataVersion,
                 Collections.unmodifiableList(out),
-                heightmap,
                 Collections.unmodifiableList(biomeOut));
     }
 
@@ -593,16 +604,43 @@ public final class AnvilReader implements RegionFileReader {
 
         List<String> paletteNames = new ArrayList<>(palList.items.size());
         for (Object entry : palList.items) {
-            if (!(entry instanceof Map)) return null;
-            Object name = ((Map<String, Object>) entry).get("Name");
-            if (!(name instanceof String)) return null;
-            paletteNames.add((String) name);
+            String name = blockStateName(entry);
+            if (name == null) return null;
+            paletteNames.add(name);
         }
 
         Object dataObj = blockStates.get("data");
         long[] data = (dataObj instanceof long[]) ? (long[]) dataObj : null;
 
         return new PaletteSection(sectionY, Collections.unmodifiableList(paletteNames), data);
+    }
+
+    /**
+     * Block id of one {@code block_states.palette} entry. Accepts the legacy
+     * {@code {Name, Properties}} compound and the DataVersion 5023+ forms: a bare string
+     * for a property-less state, {@code {id, properties}} otherwise, and {@code {"": id}}
+     * where a mixed list wraps its string entries. Returns {@code null} for anything else.
+     */
+    @SuppressWarnings("unchecked")
+    static String blockStateName(Object entry) {
+        if (entry instanceof String s) return s;
+        if (!(entry instanceof Map)) return null;
+        Map<String, Object> m = (Map<String, Object>) entry;
+        Object name = m.get("Name");
+        if (name == null) name = m.get("id");
+        if (name == null) name = m.get("");
+        return (name instanceof String s) ? s : null;
+    }
+
+    /**
+     * True when the root carries a generation {@code Status} other than full: a proto-chunk
+     * Paper saved while generating a neighbour. Its blocks are not final (often all air).
+     * Roots without {@code Status} count as complete.
+     */
+    public static boolean isIncompleteChunk(Map<String, Object> root) {
+        Object status = (root == null) ? null : root.get("Status");
+        if (!(status instanceof String s)) return false;
+        return !("minecraft:full".equals(s) || "full".equals(s));
     }
 
     /**

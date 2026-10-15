@@ -174,6 +174,8 @@ public final class ProxyDirectWire {
 
     /** Request header refused before any body byte is read. */
     public static final class FrameRejectedException extends IOException {
+        private static final long serialVersionUID = 1L;
+
         /** Why the header was refused. */
         public enum Reason { UNKNOWN_OPCODE, UNSUPPORTED_FRAME_VERSION, MALFORMED_HEADER }
 

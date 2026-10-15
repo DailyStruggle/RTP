@@ -14,7 +14,7 @@
 스캔미실행: "&c[P0] 다음 리전에는 현재 스캔 작업이 없습니다: [scan_regions]"
 
 # 자리표시자: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-스캔상태: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 육지 &8| &7ETA #7E9CC8[scan_eta]"
+스캔상태: "[P0] &8> &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 육지 &8| &7ETA #7E9CC8[scan_eta]"
 
 # 월드 스캔이 실행되는 동안 rtp.scan 권한을 가진 플레이어에게 표시되는 보스바 제목.
 # 보스바를 비활성화하려면 빈 문자열로 설정하세요.
@@ -395,10 +395,10 @@ mapResolverMissing: "&c[P0] 이 요청에 등록된 차트 리졸버가 없습�
 # 리졸버가 실행되었지만 요청된 대상에 대한 기본 데이터 소스를 사용할 수 없을 때 전송됩니다
 # (알 수 없는 리전, 아직 데이터 없음, 월드 언로드됨).
 # 자리표시자: [region] - 요청된 리전 이름 (비어 있을 수 있음).
-mapUnavailable: "&e[P1] 현재 차트 데이터를 사용할 수 없습니다."
+mapUnavailable: "&e[P0] 현재 차트 데이터를 사용할 수 없습니다."
 
 # 맵 서비스가 지금 맵을 할당할 수 없을 때 전송됩니다 (예: 뷰어당 한도에 도달함).
-mapBusy: "&e[P1] 맵 서비스가 사용 중입니다. 잠시 후 다시 시도하세요."
+mapBusy: "&e[P0] 맵 서비스가 사용 중입니다. 잠시 후 다시 시도하세요."
 
 # 현재 리전의 알려진 부적합 위치의 히트맵을 렌더링하는 클릭 가능한 "/rtp info" 메뉴 행의 라벨.
 # 이 서버에서 맵 렌더링을 사용할 수 없는 경우 숨겨집니다.
@@ -475,7 +475,7 @@ docsExportFailed: "&c[RTP] 문서 번들을 내보내지 못했습니다: [reaso
 
 # 버전 번호는 변경하지 마세요
 # --- Web editor channel (ADR-106) ---
-editorTrustPrompt: "&e[P1] 웹 편집기 페이지가 코드 &b[nonce]&e(으)로 접근을 요청합니다. 페이지에 같은 코드가 보이면 여기를 클릭해 이 브라우저를 신뢰하세요."
+editorTrustPrompt: "&e[P0] 웹 편집기 페이지가 코드 &b[nonce]&e(으)로 접근을 요청합니다. 페이지에 같은 코드가 보이면 여기를 클릭해 이 브라우저를 신뢰하세요."
 editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(키 [fingerprint])"
 editorTrustAccepted: "&a[P0] 브라우저 신뢰됨: 코드 [nonce]의 편집기 페이지에서 이제 미리보기와 Hot-Apply를 사용할 수 있습니다."
 editorTrustAlready: "&7[P0] 코드 [nonce]의 브라우저는 이미 신뢰되어 있습니다."
@@ -483,7 +483,7 @@ editorTrustUnknown: "&c[P0] 코드 [nonce]을(를) 발급한 열린 편집기 �
 editorTrustExpired: "&c[P0] 코드 [nonce]이(가) 만료되었습니다. 편집기 페이지를 새로 고쳐 새 코드를 받으세요."
 editorTrustUsage: "&c[P0] 사용법: /rtp editor trust nonce=<편집기 페이지에 표시된 코드>"
 editorChannelOpened: "&a[P0] 웹 편집기 채널이 열렸습니다. 요청이 오면 브라우저를 신뢰해 미리보기와 Hot-Apply를 켜세요."
-editorChannelLost: "&e[P1] 웹 편집기 채널 연결 끊김: [reason]. 페이지는 스냅샷으로 계속 동작합니다."
+editorChannelLost: "&e[P0] 웹 편집기 채널 연결 끊김: [reason]. 페이지는 스냅샷으로 계속 동작합니다."
 editorChannelExpired: "&7[P0] 웹 편집기 채널이 [minutes]분 후 만료되었습니다. 계속하려면 편집기 명령을 다시 실행하세요."
 editorTrustRateLimited: "&c[P0] 잘못된 에디터 신뢰 코드가 너무 많습니다. 1분 후에 다시 시도하세요."
 editorUntrustUsage: "&c[P0] 사용법: /rtp editor untrust key=<지문 접두사, 4자 이상 | all>"
@@ -491,6 +491,6 @@ editorUntrustRemoved: "&a[P0] 웹 에디터 브라우저 [count]개의 신뢰를
 editorUntrustNone: "&7[P0] [key]와 일치하는 신뢰된 에디터 브라우저가 없습니다."
 editorUntrustFailed: "&c[P0] 신뢰된 에디터 목록을 업데이트할 수 없습니다: [reason]"
 editorApplyDigestMissing: "&c[P0] 에디터 페이로드에 sha256 체크섬이 없어 적용되지 않았습니다. 최신 에디터 페이지에서 다시 커밋하세요."
-editorApplyFileUnreadable: "&e[P1] 오프라인 적용 파일을 읽을 수 없습니다([reason]). 바이트 저장소를 시도합니다."
+editorApplyFileUnreadable: "&e[P0] 오프라인 적용 파일을 읽을 수 없습니다([reason]). 바이트 저장소를 시도합니다."
 
 version: 1.0

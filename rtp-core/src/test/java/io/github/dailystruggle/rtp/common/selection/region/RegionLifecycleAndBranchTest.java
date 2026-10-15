@@ -405,23 +405,14 @@ public class RegionLifecycleAndBranchTest {
                 }
             };
             assertDoesNotThrow(() -> diagMethod.invoke(region, loc, brokenBiomeChunk, 0, 0));
-
-            // 6. chunk where getSurfaceHeight throws Throwable (handled by outer catch)
-            MockRTPChunk brokenSurfaceChunk = new MockRTPChunk(0, 0, world) {
-                @Override
-                public int getSurfaceHeight(int x, int z) {
-                    throw new RuntimeException("Simulated surface read error");
-                }
-            };
-            assertDoesNotThrow(() -> diagMethod.invoke(region, loc, brokenSurfaceChunk, 0, 0));
         } catch (Exception e) {
             fail("Reflection call logPromotionDropDiag failed: " + e.getMessage());
         }
     }
 
     @Test
-    @DisplayName("processBacklog drains candidate head into unkept within time slices and respects cold cap")
-    void processBacklog_populatesAndDrainsCandidatesWithinTimeSlice() throws Exception {
+    @DisplayName("ADR-028: prefilter ACCEPT drains to cold without a load, REJECT is dropped, UNKNOWN waits for the cold fill")
+    void processBacklog_prefilterOutcomesRouteEntries() throws Exception {
         RegionSettings settings = new RegionSettings(
                 "backlog_drain_reg",
                 world,
@@ -429,7 +420,7 @@ public class RegionLifecycleAndBranchTest {
                 new LinearAdjustor(new ArrayList<>()),
                 false,
                 false,
-                5L,    // cold cap: 5
+                2L,    // cold cap: 2
                 20L,   // backlog cap: 20
                 0L,
                 10,
@@ -438,38 +429,92 @@ public class RegionLifecycleAndBranchTest {
                 "",
                 false);
         Region region = new Region("backlog_drain_reg", settings);
-        assertNotNull(region.queueManager.backlogLocations);
+        BacklogLocationBuffer backlog = region.queueManager.backlogLocations;
+        assertNotNull(backlog);
 
+        String worldName = world.name();
+        WorldBacklogBinIndex binIndex = RegionQueueManager.binIndexFor(worldName);
+        List<BacklogLocationBuffer.BacklogEntry> entries = new ArrayList<>();
+        for (int i = 0; i < 9; i++) {
+            RTPCoords coords = new RTPCoords(worldName, (i << 4) + 8, 64, 8);
+            BacklogLocationBuffer.BacklogEntry entry = backlog.offerUnverified(new RTPLocation(coords, 0L));
+            assertNotNull(entry);
+            binIndex.insert(RegionFileCoord.of(coords), entry);
+            entries.add(entry);
+        }
+
+        // chunk x % 3: 0 on disk and accepted, 1 rejected, 2 not on disk.
+        io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry.Provider provider = (w, cx, cz) -> switch (Math.floorMod(cx, 3)) {
+            case 0 -> io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry.Provider.Decision.ACCEPT;
+            case 1 -> io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry.Provider.Decision.REJECT;
+            default -> io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry.Provider.Decision.UNKNOWN;
+        };
+        io.github.dailystruggle.rtp.api.RTPAPI.hooks().anvilPrefilter().bind(provider);
+        try {
+            Method processBacklogMethod = Region.class.getDeclaredMethod("processBacklog", long.class, long.class);
+            processBacklogMethod.setAccessible(true);
+
+            // Zero budget: no refill. The bin batch runs on AnvilIoPool and lands on a later pulse.
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            do {
+                processBacklogMethod.invoke(region, 0L, System.nanoTime());
+                if (entries.stream().noneMatch(e -> e.validity() == BacklogLocationBuffer.Validity.UNVERIFIED)) break;
+                Thread.sleep(5L);
+            } while (System.nanoTime() < deadline);
+            processBacklogMethod.invoke(region, 0L, System.nanoTime());
+
+            assertEquals(1, region.queueManager.unkeptLocations.size(),
+                    "head-ordered drain: the UNKNOWN entry at chunk 2 blocks the validated ones behind it");
+            assertEquals(5, backlog.size(), "rejected entries leave the backlog; UNKNOWN ones stay");
+            assertEquals(3, backlog.unknownSize());
+            assertEquals(2, backlog.validatedSize());
+            assertEquals(0, world.chunkAsyncLoadCount.get(), "the backlog never loads a chunk (S-005)");
+            assertEquals(0, world.getActiveTicketCount(), "the backlog never tickets a chunk (S-002)");
+
+            // The cold fill takes the head UNKNOWN entry; the next pulse drains the validated one behind it.
+            BacklogLocationBuffer.BacklogEntry taken = backlog.pollOldest(BacklogLocationBuffer.Validity.UNKNOWN);
+            assertEquals(2, taken.location().coords().x() >> 4);
+            processBacklogMethod.invoke(region, 0L, System.nanoTime());
+            assertEquals(2, region.queueManager.unkeptLocations.size(), "cold takes validated entries up to its cap");
+            assertEquals(1, backlog.validatedSize(), "the next validated entry waits once cold is full");
+        } finally {
+            io.github.dailystruggle.rtp.api.RTPAPI.hooks().anvilPrefilter().clear();
+        }
+    }
+
+    @Test
+    @DisplayName("ADR-028: unverified picks fill to cap within one pulse budget; without a provider they go UNKNOWN, never validated")
+    void processBacklog_refillIsTimeBoundedNotCountPaced() throws Exception {
+        RegionSettings settings = new RegionSettings(
+                "backlog_pace_reg", world, new Circle(), new LinearAdjustor(new ArrayList<>()),
+                false, false, 5L, 1000L, 0L, 10, 0.0, 1L, "", false);
+        Region region = new Region("backlog_pace_reg", settings);
+        BacklogLocationBuffer backlog = region.queueManager.backlogLocations;
+        assertNotNull(backlog);
         Method processBacklogMethod = Region.class.getDeclaredMethod("processBacklog", long.class, long.class);
         processBacklogMethod.setAccessible(true);
 
-        // Pre-populate backlogLocations with 10 unverified candidates
-        String worldName = world.name();
-        WorldBacklogBinIndex binIndex = RegionQueueManager.binIndexFor(worldName);
-        for (int i = 0; i < 10; i++) {
-            RTPCoords coords = new RTPCoords(worldName, (i * 32) + 8, 64, 8);
-            RTPLocation loc = new RTPLocation(coords, 0L);
-            BacklogLocationBuffer.BacklogEntry entry = region.queueManager.backlogLocations.offerUnverified(loc);
-            assertNotNull(entry);
-            binIndex.insert(RegionFileCoord.of(coords), entry);
-        }
+        // Exhausted budget: no time left past the headroom line, so nothing is picked.
+        processBacklogMethod.invoke(region, 0L, System.nanoTime());
+        assertEquals(0, backlog.size());
 
-        assertEquals(10, region.queueManager.backlogLocations.size());
-        assertEquals(0, region.queueManager.unkeptLocations.size());
+        long t0 = System.nanoTime();
+        processBacklogMethod.invoke(region, TimeUnit.SECONDS.toNanos(5), System.nanoTime());
+        long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - t0);
+        assertEquals(backlog.capacity(), backlog.size(), "shape-only picks reach the cap in one pulse");
+        assertTrue(elapsedMs < 2_000L, "1000 picks are cheap, took " + elapsedMs + " ms");
+        assertEquals(0, backlog.validatedSize(), "no disk data was read, so nothing counts as validated");
+        assertEquals(backlog.capacity(), backlog.unknownSize(), "no provider: every pick waits for the cold fill");
+        assertEquals(0, region.queueManager.unkeptLocations.size(), "nothing reaches cold unchecked");
+        assertEquals(0, world.chunkAsyncLoadCount.get(), "the backlog never loads a chunk (S-005)");
+        assertEquals(0, world.getActiveTicketCount(), "the backlog never tickets a chunk (S-002)");
+    }
 
-        // Call processBacklog with generous time budget (100ms)
-        long budgetNanos = 100_000_000L;
-        long startNanos = System.nanoTime();
-        processBacklogMethod.invoke(region, budgetNanos, startNanos);
-
-        // Drained candidates should be moved to unkeptLocations up to cold capacity (5)
-        assertEquals(5, region.queueManager.unkeptLocations.size(), "Should drain up to cold cap (5)");
-        // Remaining in backlog: initially 10, up to 5 drained (or more refilled depending on refillBudget)
-        assertTrue(region.queueManager.backlogLocations.size() > 0, "Backlog should retain items");
-
-        // When unkept is already at cold cap, further processBacklog call should drain 0
-        processBacklogMethod.invoke(region, budgetNanos, System.nanoTime());
-        assertEquals(5, region.queueManager.unkeptLocations.size());
+    @Test
+    @DisplayName("ADR-028: refill deadline keeps 20% of the remaining pulse budget as headroom")
+    void refillDeadline_keepsHeadroom() {
+        assertEquals(1_000L + 8_000L, Region.refillDeadline(11_000L, 0L, 1_000L));
+        assertEquals(500L, Region.refillDeadline(400L, 0L, 500L), "overrun budget: deadline is now");
     }
 
     @Test
@@ -538,7 +583,7 @@ public class RegionLifecycleAndBranchTest {
 
             // Also check that shape recorded bad chunk for these coordinates
             for (BacklogLocationBuffer.BacklogEntry e : entries) {
-                long loc1D = shape.xzToLocation(e.location().coords().x(), e.location().coords().z());
+                long loc1D = shape.xzToLocation(e.location().coords().x() >> 4, e.location().coords().z() >> 4);
                 if (loc1D >= 0) {
                     assertTrue(shape.isKnownBad(loc1D),
                             "MemoryShape should have registered badChunk on prefilter rejection");
@@ -605,6 +650,8 @@ public class RegionLifecycleAndBranchTest {
         world.nullChunkKeyPredicate = k -> true;
         try {
             region.execute(0L);
+            // Tick-thread chunk callbacks queue verify on the budgeted sync pipe; drain it.
+            RTP.getInstance().miscSyncTasks.execute(Long.MAX_VALUE);
             // getCachedChunk returned null -> logPromotionDropDiag(coldLoc, null, cx, cz) was invoked
             // and coldLoc2 was returned to unkept
             assertEquals(1, region.queueManager.unkeptLocations.size(),
@@ -647,15 +694,6 @@ public class RegionLifecycleAndBranchTest {
                 }
             };
             assertDoesNotThrow(() -> diagMethod.invoke(region, coldLoc1, brokenBiomeChunk, 1, 1));
-
-            // Chunk that throws on getSurfaceHeight
-            MockRTPChunk brokenSurfaceChunk = new MockRTPChunk(1, 1, world) {
-                @Override
-                public int getSurfaceHeight(int x, int z) {
-                    throw new RuntimeException("surface read error");
-                }
-            };
-            assertDoesNotThrow(() -> diagMethod.invoke(region, coldLoc1, brokenSurfaceChunk, 1, 1));
 
             // Normal successful diagnostic log
             MockRTPChunk normalChunk = new MockRTPChunk(1, 1, world);

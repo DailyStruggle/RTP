@@ -356,6 +356,13 @@ public final class AnvilPrefilter {
         return new ProbeResult(Verdict.UNKNOWN, null);
       }
 
+      if (AnvilReader.isIncompleteChunk(entry.root)) {
+        // Proto-chunk: a published view would read as air and skip the live load that
+        // finishes generating it.
+        diagLog("UNKNOWN:incomplete-status", worldFolder, dimensionSubpath, cx, cz);
+        return new ProbeResult(Verdict.UNKNOWN, null);
+      }
+
       int dataVersion = AnvilReader.getDataVersion(entry.root);
       if (!DataVersionSupport.isSupported(dataVersion)) {
         diagLog("UNKNOWN:unsupported-dataversion=" + dataVersion,

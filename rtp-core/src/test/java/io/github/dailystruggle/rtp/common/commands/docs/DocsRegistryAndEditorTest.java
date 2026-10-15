@@ -92,8 +92,12 @@ class DocsRegistryAndEditorTest {
         assertTrue(content.contains("Contextual Doc Tracker"));
         assertTrue(content.contains("trackCurrentConfigLine"));
         assertTrue(content.contains("decodeHilbertRle"));
-        assertTrue(content.contains("chk-hazards"));
+        // Bad spots draw on the walk path layer (chk-spiral); no separate hazard toggle
+        assertTrue(content.contains("pathHazardSampler"));
+        assertFalse(content.contains("chk-hazards"));
+        assertFalse(content.contains("paintHazards"), "bad spots never paint as cells off the walk path");
         assertTrue(content.contains("chk-spiral"));
+        assertTrue(content.contains("drawLandingDots"));
         assertTrue(content.contains("generateYamlDiff"));
         assertTrue(content.contains("validateGeometry"));
         assertTrue(content.contains("segmentsIntersect"));

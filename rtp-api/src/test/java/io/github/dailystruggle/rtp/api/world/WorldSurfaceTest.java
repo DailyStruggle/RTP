@@ -359,7 +359,6 @@ class WorldSurfaceTest {
         @Override public int z() { return 0; }
         @Override public boolean isAir(int x, int y, int z) { return false; }
         @Override public int getSkyLight(int x, int y, int z) { return 15; }
-        @Override public int getSurfaceHeight(int x, int z) { return 64; }
         @Override public boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks) { return false; }
         @Override public RTPWorld<?> getWorld() { return world; }
         @Override public boolean isGenerated() { return true; }

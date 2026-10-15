@@ -157,8 +157,8 @@ class BacklogBinVerifierTest {
   }
 
   @Test
-  @DisplayName("S-004: a failing or empty batch result fails closed to live load (VALIDATED), never INVALIDATED")
-  void failingBatch_validatesForLiveLoad() {
+  @DisplayName("S-004: a failing or empty batch marks its entries UNKNOWN for the cold fill's chunk-load check, never VALIDATED or INVALIDATED")
+  void failingBatch_marksUnknown() {
     System.setProperty(BacklogBinVerifier.DEPTH_PROPERTY, "2");
     List<BacklogLocationBuffer.BacklogEntry> a = stage(0, 0, 3);
     ManualExecutor io = new ManualExecutor();
@@ -177,7 +177,9 @@ class BacklogBinVerifierTest {
     v.pulse(null, backlog, index, throwing, e -> { });
     io.runAll();
     v.pulse(null, backlog, index, throwing, e -> { });
-    assertEquals(3, count(a, BacklogLocationBuffer.Validity.VALIDATED));
+    assertEquals(3, count(a, BacklogLocationBuffer.Validity.UNKNOWN));
+    assertEquals(0, backlog.validatedSize(), "no disk data, so nothing counts as validated");
+    assertEquals(0, backlog.invalidatedSize());
   }
 
   @Test
@@ -223,12 +225,15 @@ class BacklogBinVerifierTest {
   }
 
   @Test
-  @DisplayName("Without a provider the oldest bin validates without disk reads")
-  void noProvider_validatesOldestBin() {
+  @DisplayName("S-004: without a provider every entry goes UNKNOWN in one pulse, never counted as validated")
+  void noProvider_marksAllUnknown() {
     List<BacklogLocationBuffer.BacklogEntry> a = stage(0, 0, 2);
     List<BacklogLocationBuffer.BacklogEntry> b = stage(1, 0, 2);
-    new BacklogBinVerifier(new ManualExecutor()).pulse(null, backlog, index, null, e -> { });
-    assertEquals(2, count(a, BacklogLocationBuffer.Validity.VALIDATED));
-    assertEquals(2, count(b, BacklogLocationBuffer.Validity.UNVERIFIED));
+    ManualExecutor io = new ManualExecutor();
+    new BacklogBinVerifier(io).pulse(null, backlog, index, null, e -> { });
+    assertEquals(2, count(a, BacklogLocationBuffer.Validity.UNKNOWN));
+    assertEquals(2, count(b, BacklogLocationBuffer.Validity.UNKNOWN));
+    assertEquals(0, backlog.validatedSize());
+    assertTrue(io.queue.isEmpty(), "no pool hand-off without a provider");
   }
 }

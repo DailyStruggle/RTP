@@ -176,13 +176,16 @@ PROBE_JS = r"""<script>
     const t = Date.now();
     while (Date.now() - t < ms) {
       const b = badge();
-      if (b !== 'pending' && b !== '' && b !== 'missing') return b;
+      if (b !== 'pending' && b !== '' && b !== 'missing' && b !== 'hidden') return b;
       requestMapRedraw();
       await sleep(50);
     }
     return badge();
   };
   try {
+    // The walk path layer ships off; the badge reports the helper only while it is drawn
+    const spiral = document.getElementById('chk-spiral');
+    if (spiral) spiral.checked = true;
     out.badge = await settle(8000);
     out.text = document.getElementById('hud-curve').textContent;
     out.worker = CurveSandbox.usesWorker();

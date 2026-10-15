@@ -71,8 +71,13 @@ class EditorChannelPageContractTest {
         String html = page();
         assertEquals(1, count(html, "new WebSocket("), "only EditorChannelClient opens a socket");
         assertTrue(html.contains("EditorChannelClient.send('focus'"), "focus over the channel");
-        assertTrue(html.contains("EditorChannelClient.send('walkpath'"), "walk-path preview over the channel");
         assertTrue(html.contains("EditorChannelClient.send('apply', body)"), "Hot-Apply over the channel");
+        assertFalse(html.contains("EditorChannelClient.send('walkpath'") || html.contains("EditorChannelClient.send('curve-state'"),
+                "geometry edits only stage; only Hot-Apply sends them");
+        int ps = html.indexOf("function focusPageState()");
+        assertTrue(ps > 0, "focus page state present");
+        assertFalse(html.substring(ps, html.indexOf("\n}\n", ps)).contains("curveModels"),
+                "the focus verified list follows applied curves, so a staged edit sends no focus");
         assertFalse(html.contains("action: 'apply'"), "no unsigned token-form apply");
         assertFalse(html.contains("searchParams.get('token')"), "the loopback token never travels in a message");
         assertFalse(html.contains("wsLoopbackUrl") || html.contains("wsClient"), "legacy socket state removed");
@@ -134,7 +139,9 @@ class EditorChannelPageContractTest {
         assertTrue(enqueue > 0 && html.indexOf("st.sentAt.push(Date.now());", enqueue) - enqueue < 80,
                 "every outbound frame (hello, ping, queued sends) is counted");
         assertTrue(html.contains("if (st.sentAt.length >= CHANNEL_PAGE_FRAMES) return;"), "a ping never overruns the share");
-        assertTrue(html.contains("const queued = st.outQueue.find(q => q.type === 'focus');"), "focus updates coalesce");
+        assertTrue(html.contains("const CHANNEL_SUPERSEDED = new Set(['focus', 'apply']);")
+                && html.contains("const queued = st.outQueue.find(q => q.type === type);"), "queued focus and Hot-Apply coalesce");
+        assertTrue(html.contains("const CHANNEL_PRIORITY = new Set(['apply']);"), "a Hot-Apply is queued ahead of view updates");
     }
 
     @Test

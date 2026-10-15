@@ -61,18 +61,46 @@ class TimeBoundTaskPipeTest {
     }
 
     @Test
-    void execute_withZeroTime_yieldsAfterFirstTask() {
+    @org.junit.jupiter.api.DisplayName("syncAllottedTime: an exhausted (zero) budget runs nothing, so the tick is not overrun")
+    void execute_withZeroTime_runsNothing() {
         TimeBoundTaskPipe pipe = new TimeBoundTaskPipe(0);
         AtomicInteger count = new AtomicInteger(0);
         for (int i = 0; i < 5; i++) {
             pipe.add(count::incrementAndGet);
         }
-        // With 0 available time, should yield (return false) after first task
-        boolean completed = pipe.execute();
-        // At least one task ran, but not necessarily all
-        assertTrue(count.get() >= 1);
-        // If not all ran, result is false
-        if (count.get() < 5) assertFalse(completed);
+        assertFalse(pipe.execute());
+        assertEquals(0, count.get());
+        assertEquals(5, pipe.size(), "unrun tasks stay queued for the next pulse");
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("a positive budget smaller than one task still runs exactly one (progress)")
+    void execute_withTinyTime_runsExactlyOne() {
+        TimeBoundTaskPipe pipe = new TimeBoundTaskPipe(1L);
+        AtomicInteger count = new AtomicInteger(0);
+        for (int i = 0; i < 5; i++) {
+            pipe.add(count::incrementAndGet);
+        }
+        assertFalse(pipe.execute());
+        assertEquals(1, count.get());
+    }
+
+    @Test
+    @org.junit.jupiter.api.Timeout(5)
+    @org.junit.jupiter.api.DisplayName("an interrupted worker leaves the pipe instead of spinning on the access guard")
+    void execute_interruptedThread_returnsWithoutSpinning() {
+        TimeBoundTaskPipe pipe = new TimeBoundTaskPipe(Long.MAX_VALUE);
+        AtomicInteger count = new AtomicInteger(0);
+        pipe.add(count::incrementAndGet);
+        pipe.add(count::incrementAndGet);
+        Thread.currentThread().interrupt();
+        try {
+            assertFalse(pipe.execute());
+            assertTrue(Thread.currentThread().isInterrupted(), "interrupt status must be preserved");
+        } finally {
+            Thread.interrupted();
+        }
+        assertEquals(0, count.get());
     }
 
     @Test

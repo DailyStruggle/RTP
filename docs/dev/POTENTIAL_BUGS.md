@@ -93,6 +93,56 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Linear:** RTP-21
 
 
+### 2026-10-14 - Folia safety scan reads live neighbour chunks off-thread when the centre is an Anvil view
+
+- **Severity:** Medium
+- **Status:** Open
+- **Discovered during:** dividing Folia region-thread work per region (ADR-112)
+- **Location:** `rtp-core/.../selection/region/PregenTask.java` `loadSafetyNeighbours` / `evaluateSafety` (~1157-1300)
+- **Symptom / hypothesis:** When the centre chunk is an Anvil view (`reservation == null`), `evaluateSafety` runs on the async worker, but neighbour slots can hold live resident chunks whose `isSafe` reads touch live block state. Neighbours that belong to another Folia region than the centre were also read from the centre's thread before ADR-112.
+- **Impact:** Possible `ThreadAccessException` or racy reads at `safetyRadius > 0` near loaded areas; candidates are rejected rather than accepted, so S-001 holds.
+- **Suggested next step:** Read neighbours from Anvil views or snapshots only, or dispatch each live neighbour's column check to its own region and join the results off-thread.
+
+### 2026-10-14 - Folia arrival platform writes blocks in one unbudgeted destination-region task
+
+- **Severity:** Medium
+- **Status:** Open
+- **Discovered during:** dividing Folia region-thread work per region (ADR-112)
+- **Location:** `platforms/rtp-folia/rtp-folia-common/.../entity/FoliaRTPPlayer.java` `teleportAsync(...).thenCompose` (~188-228); `FoliaRTPWorld#platform` (~1029-1105)
+- **Symptom / hypothesis:** After `teleportAsync` completes on the destination region, the emergency platform is built inline with nested `runTask` per chunk and `setType` loops sized by `platformRadius`. It is player-facing, so the new per-region budget only charges it.
+- **Impact:** Many simultaneous arrivals in one region with large platforms can still extend that region's tick.
+- **Suggested next step:** Measure with the stress harness; if it shows, split block writes across ticks per chunk or cap writes per tick.
+
+### 2026-10-14 - FoliaRegionProcessor is never constructed
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** auditing Folia tick-health sampling
+- **Location:** `platforms/rtp-folia/rtp-folia-common/.../FoliaRegionProcessor.java`
+- **Symptom / hypothesis:** Dead class; per-region samples now come from `FoliaMetricsBinding#observeRegion` probes, and the queue-depth field it would feed stays 0.
+- **Impact:** None at runtime; `foliaRegions()` reports `queueDepth = 0`.
+- **Suggested next step:** Delete it, or feed `regionQueueDepths` from `FoliaSchedulerImpl` cell depths.
+
+### 2026-10-14 - LocationGenerator.joinSafely waits on work queued to the same pool
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** bounding the Fabric/NeoForge async pools
+- **Location:** `rtp-core/.../selection/region/LocationGenerator.java` `joinSafely`
+- **Symptom / hypothesis:** Blocks a pool thread on a future whose work is submitted to the same bounded pool. Only tests call it today, and it has a timeout.
+- **Impact:** None in production; a future production caller could stall a bounded pool until the timeout.
+- **Suggested next step:** Remove it or make callers compose the future instead of joining.
+
+### 2026-10-13 - FabricRTPWorldUnobf.getMaxHeight returns the inclusive getMaxY()
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** fixing the same bound in the v26 Fabric world adapters
+- **Location:** `platforms/rtp-fabric/rtp-fabric-common-unobf/src/main/java/io/github/dailystruggle/rtp/fabric/unobf/world/FabricRTPWorldUnobf.java` `getMaxHeight` (~1560-1569)
+- **Symptom / hypothesis:** Returns `world.getMaxY()` (the top block, inclusive). The `RTPWorld` contract and the Bukkit, NeoForge, intermediary Fabric and v26 adapters return an exclusive bound, and core callers (`AbstractVerticalAdjustor`, `LinearAdjustor`, `FixedAdjustor`) subtract from it.
+- **Impact:** On worlds served by the unobf carrier, vertical scans skip the top block row and headroom checks are one block too strict.
+- **Suggested next step:** Return `world.getMaxY() + 1` and fix the comment, as done in `V26_x_R1FabricRTPWorld`.
+
 ### 2026-10-06 — Pregen biome extraction reads surface biomes with the Anvil probe for every format
 
 - **Severity:** Low

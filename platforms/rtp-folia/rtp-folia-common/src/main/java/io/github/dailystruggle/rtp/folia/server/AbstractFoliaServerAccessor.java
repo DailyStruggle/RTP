@@ -485,7 +485,9 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
 
   @Override
   public Object createCachePipe() { // @AnyThread - factory method, no Bukkit state
-    return new CountBoundTaskPipe((Plugin) plugin, 2);
+    // Drained on the async worker, so asyncAllottedTime bounds it; the cap only limits how many
+    // chunk loads one region turn starts (matches Region.MAX_PROMOTIONS_PER_PULSE).
+    return new CountBoundTaskPipe((Plugin) plugin, 8);
   }
 
   @Override

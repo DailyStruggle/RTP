@@ -177,6 +177,34 @@ class FoliaRTPWorldChunkTicketTest {
   }
 
   @Test
+  @DisplayName("ADR-112: chunk-load continuations run on the async scheduler, not the region thread that loaded")
+  void chunkFutureContinuationsLeaveTheRegionThread() {
+    when(org.bukkit.Bukkit.getServer().getAsyncScheduler()).thenReturn(asyncScheduler);
+    when(RTP.serverAccessor.getPlugin()).thenReturn(plugin);
+    java.util.concurrent.atomic.AtomicReference<String> ranOn = new java.util.concurrent.atomic.AtomicReference<>();
+
+    rtpWorld.getChunkAtAsync(3, 4).thenAccept(set -> ranOn.set(Thread.currentThread().getName()));
+    preload.complete(Mockito.mock(Chunk.class)); // Folia completes this on the owning region thread
+
+    assertEquals(null, ranOn.get(), "the continuation must not run on the completing region thread");
+    assertTrue(asyncScheduler.executeAll() > 0, "the continuation is handed to the async scheduler");
+    assertTrue(ranOn.get() != null);
+    assertEquals(1, rtpWorld.getCacheSize(), "the region thread still caches the live chunk");
+  }
+
+  @Test
+  @DisplayName("ADR-112: with the plugin gone the chunk future completes inline instead of stranding dependents")
+  void chunkFutureCompletesInlineWithoutPlugin() {
+    when(RTP.serverAccessor.getPlugin()).thenReturn(null);
+    java.util.concurrent.atomic.AtomicBoolean ran = new java.util.concurrent.atomic.AtomicBoolean();
+
+    rtpWorld.getChunkAtAsync(3, 4).thenAccept(set -> ran.set(true));
+    preload.complete(Mockito.mock(Chunk.class));
+
+    assertTrue(ran.get());
+  }
+
+  @Test
   @DisplayName("S-005: keepChunkAt never loads synchronously; failed async load keeps nothing")
   void keepChunkAtFailedLoadKeepsNothing() {
     rtpWorld.keepChunkAt(3, 4);

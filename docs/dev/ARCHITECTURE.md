@@ -20,15 +20,17 @@ The RTP (Random Teleport) plugin is built with a multi-module architecture to en
 * **effects-api**: A unified visual/particle effects framework (formerly external) now integrated for cross-platform visual consistency.
 
 ### Platform Adapters
-These modules implement platform-specific features to maximize performance on their respective servers while maintaining a unified core codebase.
+These modules implement platform-specific features to maximize performance on their respective servers while maintaining a unified core codebase. For detailed requirements, function specifications, and lifecycle contracts when creating a new server adapter, see [SERVER_ADAPTER_GUIDE.md](SERVER_ADAPTER_GUIDE.md).
 * **rtp-bukkit**: The adapter for standard Spigot servers, implementing Bukkit/Spigot-specific event handling and chunk loading.
 * **rtp-paper**: The adapter for Paper servers, utilizing Paper-specific APIs for enhanced performance, such as asynchronous chunk loading.
 * **rtp-folia**: The adapter for Folia servers, handling Folia's unique region-based multithreading to ensure teleports and tasks run safely on the correct regional thread.
-* **rtp-fabric** (Planned): The adapter for Fabric servers, bridging the core logic to the Fabric modding environment and Minecraft's Brigadier command system.
+* **rtp-fabric**: The adapter for Fabric servers, bridging the core logic to the Fabric modding environment and Minecraft's Brigadier command system.
+* **rtp-neoforge**: The adapter for NeoForge servers, bridging the core logic to the NeoForge modding environment and Minecraft's Brigadier command system.
 
 ### Plugin Entry Points
 * **rtp-plugin**: The main entry point for Bukkit-based platforms (Spigot, Paper, Folia). It bridges `rtp-core` and the platform-specific adapters.
-* **rtp-fabric** (Planned): Acts as its own entry point for the Fabric modding environment.
+* **rtp-fabric**: Acts as its own entry point for the Fabric modding environment.
+* **rtp-neoforge**: Acts as its own entry point for the NeoForge modding environment.
 
 ### Addons
 * **addons**: A directory containing subprojects that integrate RTP with external plugins. The canonical template is `LeafRTPCountdownAddon`, which demonstrates how to utilize `rtp-api` to extend the plugin's capabilities. Note: Several common integrations (such as claim plugins) are now folded directly into the core plugin (ADR-019); the standalone `RTP_Glide` addon was folded into `effects-api` as the `GLIDE` effect (effects-api-ADR-001); the experimental `RTP_Iris_integration` addon has been removed (no dedicated integration is required to teleport into Iris-generated worlds).
@@ -44,7 +46,8 @@ graph TD
     rtp-bukkit --> rtp-plugin
     rtp-paper --> rtp-plugin
     rtp-folia --> rtp-plugin
-    rtp-core -.-> rtp-fabric
+    rtp-core --> rtp-fabric
+    rtp-core --> rtp-neoforge
     rtp-api --> addons
 ```
 
