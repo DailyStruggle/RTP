@@ -265,6 +265,20 @@ public final class FoliaMetricsBinding implements MetricsBinding {
         sampler.tick();
     }
 
+    @Override
+    public void observeRegion(Object world, int cx, int cz) {
+        if (world instanceof RTPWorld<?> rtpWorld) {
+            observeRegion(rtpWorld, cx, cz);
+        } else if (world instanceof org.bukkit.World bukkitWorld) {
+            if (RTP.serverAccessor != null) {
+                RTPWorld<?> rtpWorld = RTP.serverAccessor.getRTPWorld(bukkitWorld.getUID());
+                if (rtpWorld != null) {
+                    observeRegion(rtpWorld, cx, cz);
+                }
+            }
+        }
+    }
+
     /**
      * Note that RTP dispatched work to chunk {@code (cx, cz)}; starts a bounded 1-tick probe on
      * that region if none is live. Non-blocking, any thread.

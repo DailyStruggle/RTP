@@ -139,4 +139,50 @@ class RegionFileResolverTest {
         Set<String> got = coords.stream().map(c -> c[0] + "," + c[1]).collect(Collectors.toSet());
         assertEquals(Set.of("0,0", "-3,12"), got);
     }
+
+    @Test
+    @DisplayName("listRegionCoords lists and deduplicates coordinates across registered formats")
+    void listRegionCoordsAcrossFormats(@TempDir Path world) throws IOException {
+        Path regionDir = Files.createDirectories(world.resolve("region"));
+        Files.write(regionDir.resolve("r.0.0.mca"), new byte[8]);
+        Files.write(regionDir.resolve("r.0.0.linear"), new byte[8]); // Duplicate coord, different format
+        Files.write(regionDir.resolve("r.-3.12.linear"), new byte[8]);
+        Files.write(regionDir.resolve("r.5.5.mca"), new byte[8]);
+        Files.write(regionDir.resolve("r.1.1.linear"), new byte[0]); // Zero-length stub skipped
+        Files.write(regionDir.resolve("r.9.9.unregistered"), new byte[8]); // Unregistered extension skipped
+
+        List<int[]> coords = RegionFileResolver.listRegionCoords(regionDir);
+        Set<String> got = coords.stream().map(c -> c[0] + "," + c[1]).collect(Collectors.toSet());
+        assertEquals(Set.of("0,0", "-3,12", "5,5"), got);
+    }
+
+    @Test
+    @DisplayName("resolve defaults to .linear when directory profile is pure LINEAR")
+    void resolveDefaultsToLinearInLinearWorld(@TempDir Path world) throws IOException {
+        Path regionDir = Files.createDirectories(world.resolve("region"));
+        Files.write(regionDir.resolve("r.0.0.linear"), new byte[8]);
+
+        RegionFileResolver.invalidateMemo();
+        // Unallocated chunk (32, 32) -> region r.1.1
+        RegionFileResolver.ResolvedRegion res = RegionFileResolver.resolve(world, "", 32, 32);
+        assertNotNull(res);
+        assertEquals(regionDir.resolve("r.1.1.linear"), res.path());
+        assertSame(LinearRegionReader.INSTANCE, res.reader());
+    }
+
+    @Test
+    @DisplayName("Fast path in pure MCA directory does not probe .linear")
+    void fastPathPureMcaDirectory(@TempDir Path world) throws IOException {
+        Path regionDir = Files.createDirectories(world.resolve("region"));
+        Path mca = Files.write(regionDir.resolve("r.0.0.mca"), new byte[8]);
+
+        RegionFileResolver.invalidateMemo();
+        RegionFileResolver.ResolvedRegion res = RegionFileResolver.resolveExisting(world, "", 0, 0);
+        assertNotNull(res);
+        assertEquals(mca, res.path());
+        assertSame(AnvilReader.INSTANCE, res.reader());
+
+        // Absent chunk in pure MCA directory returns null directly
+        assertNull(RegionFileResolver.resolveExisting(world, "", 64, 64));
+    }
 }

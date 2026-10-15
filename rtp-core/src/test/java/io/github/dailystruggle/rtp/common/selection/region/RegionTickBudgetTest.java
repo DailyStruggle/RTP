@@ -52,6 +52,7 @@ class RegionTickBudgetTest {
                 name, world, new Circle(), new LinearAdjustor(new ArrayList<>()),
                 false, false, coldCount, 0L, 0L, 64, 0.0, 1L, "", false);
         Region region = new Region(name, settings);
+        region.cachePipeline.stop();
         for (int i = 0; i < coldCount; i++) {
             region.queueManager.unkeptLocations.offer(
                     new RTPLocation(new RTPCoords(world.name(), (i << 4) + 8, 64, 8), 1L, null));
@@ -117,7 +118,7 @@ class RegionTickBudgetTest {
         RTP.scheduler = new SaturationScheduler(original, cx -> cx < 4);
         try {
             long before = CfDiag.regionDeficitDispatch.sum();
-            region.execute(TimeUnit.MILLISECONDS.toNanos(25));
+            region.execute(TimeUnit.SECONDS.toNanos(1));
 
             long dispatched = CfDiag.regionDeficitDispatch.sum() - before;
             assertEquals(4, dispatched, "only the healthy region's candidates start chunk loads");

@@ -26,7 +26,8 @@ import java.util.zip.InflaterInputStream;
  * mode {@code 2} (zlib-wrapped Deflate). Mode {@code 1} (gzip) is supported for forward
  * compatibility. Mode {@code 3} (uncompressed) is supported. Mode {@code 4} (LZ4, written when
  * {@code region-file-compression=lz4}) is lz4-java's {@code LZ4BlockOutputStream} stream format,
- * not the LZ4 frame format, decoded in-house by {@link Lz4BlockDecoder}. Unknown modes and the
+ * not the LZ4 frame format, decoded in-house by {@link Lz4BlockDecoder}. Mode {@code 5} (Zstandard)
+ * is decoded via {@link DynamicZstdBinding}. Unknown modes and the
  * {@code 0x80}-or'd "external" variants are rejected with
  * {@link UnsupportedAnvilFormatException} so the pre-filter returns
  * {@link Verdict#UNKNOWN} and the live load path takes over.
@@ -318,6 +319,13 @@ public final class AnvilReader implements RegionFileReader {
                 // Vanilla RegionFileVersion.VERSION_LZ4 = LZ4BlockOutputStream ("LZ4Block" magic).
                 // In-house decoder: caps declared size before allocating, no JNI/Unsafe.
                 return Lz4BlockDecoder.decode(src, off, len, MAX_DECOMPRESSED_CHUNK_BYTES);
+            case 5:
+                // Future-proof 27.x / third-party Anvil Mode 5 (Zstandard)
+                if (!DynamicZstdBinding.isAvailable()) {
+                    throw new UnsupportedAnvilFormatException("Anvil Mode 5 (Zstandard) requires host Zstd runtime: "
+                            + DynamicZstdBinding.pbitResult().diagnosticMessage());
+                }
+                return DynamicZstdBinding.decompress(src, off, len, MAX_DECOMPRESSED_CHUNK_BYTES);
             default:
                 throw new UnsupportedAnvilFormatException("Unknown Anvil compression mode " + mode);
         }

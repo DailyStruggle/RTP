@@ -1,12 +1,14 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.predict.BudgetPacer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 
 public class TimeBoundTaskPipe extends RTPTaskPipe {
     private long availableTime = Long.MAX_VALUE;
+    protected final BudgetPacer pacer = BudgetPacer.ofTaskPipe(avgTime);
 
     public TimeBoundTaskPipe() {
 
@@ -14,6 +16,10 @@ public class TimeBoundTaskPipe extends RTPTaskPipe {
 
     public TimeBoundTaskPipe(long availableTime) {
         this.availableTime = availableTime;
+    }
+
+    public BudgetPacer pacer() {
+        return pacer;
     }
 
     @Override
@@ -37,7 +43,7 @@ public class TimeBoundTaskPipe extends RTPTaskPipe {
 
         List<Runnable> delayedRunnables = new ArrayList<>(runnables.size());
 
-        while (!runnables.isEmpty() && (!ranAny || (dt + avgTime) < availableTime)) {
+        while (!runnables.isEmpty() && pacer.canExecute(dt, availableTime, ranAny)) {
             try {
                 accessGuard.acquire();
             } catch (InterruptedException e) {
@@ -72,7 +78,8 @@ public class TimeBoundTaskPipe extends RTPTaskPipe {
                 ranAny = true;
 
                 long diff = localStop - localStart;
-                avgTime = ((avgTime / 8) * 7) + (diff / 8);
+                pacer.recordDuration(diff);
+                avgTime = pacer.predictedCostNanos();
 
                 dt = localStop - start;
             } catch (Throwable t) {

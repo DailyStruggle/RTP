@@ -17,7 +17,7 @@ import io.github.dailystruggle.rtp.api.schematic.SchematicSource;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabSchematicInstaller;
-import io.github.dailystruggle.rtp.common.commands.prefab.builtin.Skyblock;
+import io.github.dailystruggle.rtp.common.commands.prefab.Skyblock;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import java.io.File;
 import java.io.InputStream;

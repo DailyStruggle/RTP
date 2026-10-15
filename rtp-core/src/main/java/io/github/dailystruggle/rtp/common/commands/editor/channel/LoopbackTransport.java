@@ -1,7 +1,5 @@
 package io.github.dailystruggle.rtp.common.commands.editor.channel;
 
-import io.github.dailystruggle.rtp.common.commands.editor.EditorLoopbackChannel;
-
 import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;

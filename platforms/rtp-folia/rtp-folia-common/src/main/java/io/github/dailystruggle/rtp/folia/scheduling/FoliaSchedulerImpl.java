@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.folia.scheduling;
 
-import io.github.dailystruggle.metrics.api.MetricsBinding;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask;
@@ -8,7 +7,6 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.tasks.tick.TickBudget;
 import io.github.dailystruggle.rtp.common.tools.ServerHealthGate;
-import io.github.dailystruggle.rtp.folia.metrics.FoliaMetricsBinding;
 import io.github.dailystruggle.rtp.folia.world.FoliaRTPWorld;
 import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
 import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
@@ -552,13 +550,9 @@ public class FoliaSchedulerImpl implements RTPScheduler {
 
   private static void observeRegionForMetrics(RTPWorld<?> world, int cx, int cz) {
     try {
-      MetricsBinding binding = RTP.metrics.getBinding();
-      if (binding instanceof FoliaMetricsBinding foliaBinding) {
-        foliaBinding.observeRegion(world, cx, cz);
-      }
+      RTP.metrics.getBinding().observeRegion(world, cx, cz);
     } catch (Throwable t) {
-      RTP.log(Level.FINER, "[RTP] Folia region metrics observe failed: "
-          + t.getClass().getSimpleName() + ": " + t.getMessage());
+      RTP.log(Level.FINER, "[RTP] Folia region metrics observe failed: " + t);
     }
   }
 

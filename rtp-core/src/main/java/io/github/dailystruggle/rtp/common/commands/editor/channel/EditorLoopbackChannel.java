@@ -1,4 +1,6 @@
-package io.github.dailystruggle.rtp.common.commands.editor;
+package io.github.dailystruggle.rtp.common.commands.editor.channel;
+
+import java.util.concurrent.CompletableFuture;
 
 import io.github.dailystruggle.rtp.common.RTP;
 
@@ -50,7 +52,7 @@ import java.util.regex.Pattern;
  * {@code GET /rtp-editor-ws?token=<hex>}, loopback peer, loopback {@code Host}, {@code Origin}
  * absent / {@code null} / http(s) localhost, constant-time token compare. Production sockets carry
  * the signed {@code EditorChannel} protocol and pass every text frame to the {@link Listener}
- * untouched; only a channel opened with an {@link EditorLoopbackApply} handles token-form
+ * untouched; only a channel opened with an {@link ApplyHandler} handles token-form
  * {@code apply} messages itself.
  * {@link #send} / {@link #broadcast} are thread-safe: they enqueue, the next poll flushes.
  */
@@ -58,14 +60,14 @@ public final class EditorLoopbackChannel implements AutoCloseable {
 
     public static final String PATH = "/rtp-editor-ws";
     public static final long POLL_PERIOD_TICKS = 2L;
-    static final int MAX_CLIENTS = 4;
+    public static final int MAX_CLIENTS = 4;
     /** Sockets still handshaking on top of {@link #MAX_CLIENTS}; beyond this, refused at accept. */
     static final int MAX_PENDING = 4;
-    static final int MAX_HANDSHAKE_BYTES = 8 * 1024;
+    public static final int MAX_HANDSHAKE_BYTES = 8 * 1024;
     static final long HANDSHAKE_TIMEOUT_MILLIS = 10_000L;
     /** Upper bound on flushing a close frame / error response before the socket is torn down. */
     static final long CLOSE_LINGER_MILLIS = 2_000L;
-    static final int MAX_MESSAGE_BYTES = 256 * 1024;
+    public static final int MAX_MESSAGE_BYTES = 256 * 1024;
     static final long MAX_OUTBOUND_BYTES = 2L * 1024 * 1024;
     static final int MAX_EVENTS_PER_POLL = 64;
     static final int MAX_ACCEPTS_PER_POLL = 8;
@@ -96,6 +98,16 @@ public final class EditorLoopbackChannel implements AutoCloseable {
         }
 
         default void onClose(Connection c) {
+        }
+    }
+
+    /** Handler contract for token-form hot-apply requests. */
+    @FunctionalInterface
+    public interface ApplyHandler {
+        CompletableFuture<String> handle(Map<?, ?> message);
+
+        default boolean isApply(Object message) {
+            return message instanceof Map<?, ?> m && "apply".equals(m.get("action"));
         }
     }
 
@@ -146,7 +158,7 @@ public final class EditorLoopbackChannel implements AutoCloseable {
     private final byte[] token;
     private final String tokenText;
     private final Listener listener;
-    private final EditorLoopbackApply apply;
+    private final ApplyHandler apply;
     private final LongSupplier clock;
     private final Selector selector;
     private final ServerSocketChannel server;
@@ -158,7 +170,7 @@ public final class EditorLoopbackChannel implements AutoCloseable {
     private final ByteBuffer readBuf = ByteBuffer.allocate(READ_CHUNK);
     private volatile Object taskHandle;
 
-    EditorLoopbackChannel(String token, Listener listener, EditorLoopbackApply apply, LongSupplier clock)
+    EditorLoopbackChannel(String token, Listener listener, ApplyHandler apply, LongSupplier clock)
             throws IOException {
         Objects.requireNonNull(token, "token");
         if (!TOKEN.matcher(token).matches()) {
@@ -210,7 +222,7 @@ public final class EditorLoopbackChannel implements AutoCloseable {
     }
 
     /** Test / manual-drive entry: no timer; the caller invokes {@link #poll()}. */
-    static EditorLoopbackChannel open(String token, Listener listener, EditorLoopbackApply apply) throws IOException {
+    public static EditorLoopbackChannel open(String token, Listener listener, ApplyHandler apply) throws IOException {
         return new EditorLoopbackChannel(token, listener, apply, System::currentTimeMillis);
     }
 
@@ -226,7 +238,7 @@ public final class EditorLoopbackChannel implements AutoCloseable {
         return HexFormat.of().formatHex(b);
     }
 
-    static boolean tokenEquals(byte[] expected, String provided) {
+    public static boolean tokenEquals(byte[] expected, String provided) {
         return provided != null && MessageDigest.isEqual(expected, provided.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -566,7 +578,7 @@ public final class EditorLoopbackChannel implements AutoCloseable {
     }
 
     @SuppressWarnings("java:S4790") // RFC 6455 Section 4.2.2 mandates SHA-1 for Sec-WebSocket-Accept handshake
-    static String acceptKey(String key) {
+    public static String acceptKey(String key) {
         try {
             byte[] sha = MessageDigest.getInstance("SHA-1").digest((key + WS_GUID).getBytes(StandardCharsets.ISO_8859_1));
             return Base64.getEncoder().encodeToString(sha);
@@ -707,7 +719,7 @@ public final class EditorLoopbackChannel implements AutoCloseable {
                 // not an apply request; falls through to the listener unchanged
                 RTP.log(Level.FINE, "[editor] loopback message is not JSON: " + notJson.getMessage());
             }
-            if (EditorLoopbackApply.isApply(parsed)) {
+            if (apply.isApply(parsed)) {
                 apply.handle((Map<?, ?>) parsed).whenComplete((ack, t) -> {
                     if (ack != null) {
                         if (!send(c, ack)) {

@@ -21,7 +21,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -83,7 +82,7 @@ class PregenTaskLoadPurposeTest {
 
     private GenerationResult run(Region r, LoadPurpose purpose, long maxAttempts,
                                  BacklogLocationBuffer backlog) throws Exception {
-        PregenState state = PregenState.build(r, Set.of("PLAINS"));
+        PregenState state = PregenState.build(r, null);
         assertNotNull(state);
         state.maxAttempts = maxAttempts;
         state.purpose = purpose;

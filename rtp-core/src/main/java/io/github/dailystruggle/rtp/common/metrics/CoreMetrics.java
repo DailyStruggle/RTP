@@ -235,7 +235,8 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
                 queueGrowthThreshold,
                 regionQueueStatus,
                 io.github.dailystruggle.rtp.common.selection.region.ProbeFirstGovernor.snapshotAll(),
-                io.github.dailystruggle.rtp.common.selection.region.LiveLoadGate.snapshotAll()
+                io.github.dailystruggle.rtp.common.selection.region.LiveLoadGate.snapshotAll(),
+                io.github.dailystruggle.rtp.common.selection.region.ImmediateLoadGovernor.snapshotAll()
         ));
         // Compose sibling-plugin extensions registered via Metrics.registerExtension(...).
         // Suppliers are evaluated in registration order; nulls are skipped; failures are swallowed.

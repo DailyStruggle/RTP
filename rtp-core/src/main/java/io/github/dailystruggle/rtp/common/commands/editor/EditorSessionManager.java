@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.commands.editor;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.docs.DocsRegistry;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorKeys;
+import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopbackJson;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
 import io.github.dailystruggle.rtp.common.selection.region.Region;

@@ -132,6 +132,13 @@ class MetricsRegistryTest {
         assertFalse(b.wraps(MetricsBinding.NOOP));
     }
 
+    @Test
+    @DisplayName("MetricsBinding default observeRegion is a safe no-op")
+    void observeRegionDefaultNoop() {
+        assertDoesNotThrow(() -> MetricsBinding.NOOP.observeRegion(new Object(), 0, 0));
+        assertDoesNotThrow(() -> MetricsBinding.NOOP.observeRegion(null, -5, 12));
+    }
+
     static final class Ext implements MetricsExtension<Ext> {
     }
 }

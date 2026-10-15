@@ -42,8 +42,18 @@ public final class RegionFileResolver {
         Path dir = regionDirectoryFor(worldFolder, dimensionSubpath);
         String baseName = "r." + (cx >> 5) + "." + (cz >> 5);
         ResolvedRegion found = resolveOnDisk(dir, baseName);
-        // Neither exists on disk - default to .mca path and Anvil reader
-        return found != null ? found : new ResolvedRegion(dir.resolve(baseName + ".mca"), AnvilReader.INSTANCE);
+        if (found != null) {
+            return found;
+        }
+        // Neither exists on disk - default to the primary format extension and reader
+        RegionFormatDetector.WorldFormatProfile profile = RegionFormatDetector.INSTANCE.detectProfile(dir);
+        if (profile.primaryFormat() == RegionFormatDetector.PrimaryFormat.LINEAR) {
+            RegionFileReader linearReader = RegionFormatRegistry.getReader(".linear");
+            if (linearReader != null) {
+                return new ResolvedRegion(dir.resolve(baseName + ".linear"), linearReader);
+            }
+        }
+        return new ResolvedRegion(dir.resolve(baseName + ".mca"), AnvilReader.INSTANCE);
     }
 
     /** Memo entry; {@code region == null} records that no region file existed. */
@@ -93,11 +103,39 @@ public final class RegionFileResolver {
         synchronized (MEMO) {
             MEMO.clear();
         }
+        RegionFormatDetector.INSTANCE.invalidateCache();
     }
 
     /** Existing region file for {@code baseName} in {@code dir}, or {@code null}. */
     private static ResolvedRegion resolveOnDisk(Path dir, String baseName) {
-        // Registered non-Anvil formats first: a server that converted its world keeps stale .mca files.
+        if (dir == null || !Files.isDirectory(dir)) {
+            return null;
+        }
+
+        RegionFormatDetector.WorldFormatProfile profile = RegionFormatDetector.INSTANCE.detectProfile(dir);
+
+        // Fast-path 1: Pure MCA world (99%+ of servers) - probe .mca directly, zero .linear syscalls
+        if (profile.primaryFormat() == RegionFormatDetector.PrimaryFormat.MCA && !profile.hasMixedFormats()) {
+            Path mcaPath = dir.resolve(baseName + ".mca");
+            if (Files.isRegularFile(mcaPath)) {
+                return new ResolvedRegion(mcaPath, AnvilReader.INSTANCE);
+            }
+            return null;
+        }
+
+        // Fast-path 2: Pure Linear world - probe .linear directly, zero .mca syscalls
+        if (profile.primaryFormat() == RegionFormatDetector.PrimaryFormat.LINEAR && !profile.hasMixedFormats()) {
+            RegionFileReader linearReader = RegionFormatRegistry.getReader(".linear");
+            if (linearReader != null) {
+                Path linearPath = dir.resolve(baseName + ".linear");
+                if (Files.isRegularFile(linearPath)) {
+                    return new ResolvedRegion(linearPath, linearReader);
+                }
+            }
+            return null;
+        }
+
+        // Mixed or custom formats, or EMPTY directory: probe registered non-Anvil formats first, then .mca
         Set<String> extensions = RegionFormatRegistry.getRegisteredExtensions();
         for (String ext : extensions) {
             if (".mca".equalsIgnoreCase(ext)) continue;
@@ -128,6 +166,46 @@ public final class RegionFileResolver {
     }
 
     private static final Pattern ANVIL_FILE = Pattern.compile("r\\.(-?\\d{1,7})\\.(-?\\d{1,7})\\.mca");
+    private static final Pattern ANY_REGION_FILE = Pattern.compile("r\\.(-?\\d{1,7})\\.(-?\\d{1,7})\\..+");
+
+    /**
+     * Coordinates {@code [rx, rz]} of every non-empty region file in {@code regionDir}
+     * matching any registered format in {@link RegionFormatRegistry}.
+     * Coordinates are deduplicated across multiple formats.
+     * Directory listing only; never opens a file. Blocking: call off the tick thread (S-005).
+     *
+     * @return coordinates in listing order; empty when the directory does not exist
+     * @throws IOException when the directory exists but cannot be listed
+     */
+    public static List<int[]> listRegionCoords(Path regionDir) throws IOException {
+        List<int[]> out = new ArrayList<>();
+        if (regionDir == null || !Files.isDirectory(regionDir)) return out;
+        Set<String> extensions = RegionFormatRegistry.getRegisteredExtensions();
+        Set<Long> seen = new java.util.HashSet<>();
+        try (DirectoryStream<Path> files = Files.newDirectoryStream(regionDir, "r.*.*")) {
+            for (Path p : files) {
+                String fileName = p.getFileName().toString();
+                boolean matchesRegistered = false;
+                for (String ext : extensions) {
+                    if (fileName.endsWith(ext)) {
+                        matchesRegistered = true;
+                        break;
+                    }
+                }
+                if (!matchesRegistered) continue;
+                Matcher m = ANY_REGION_FILE.matcher(fileName);
+                if (!m.matches()) continue;
+                if (Files.size(p) <= 0L) continue;
+                int rx = Integer.parseInt(m.group(1));
+                int rz = Integer.parseInt(m.group(2));
+                long key = (((long) rx) << 32) | (rz & 0xFFFFFFFFL);
+                if (seen.add(key)) {
+                    out.add(new int[]{rx, rz});
+                }
+            }
+        }
+        return out;
+    }
 
     /**
      * Coordinates {@code [rx, rz]} of every non-empty {@code r.X.Z.mca} in {@code regionDir}.

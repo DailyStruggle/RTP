@@ -2,7 +2,6 @@ package io.github.dailystruggle.rtp.common.commands.editor.channel;
 
 import io.github.dailystruggle.rtp.api.editor.EditorDelivery;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.editor.EditorLoopbackJson;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;

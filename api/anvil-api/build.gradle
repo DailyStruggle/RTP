@@ -14,5 +14,8 @@ dependencies {
     // lz4-java is a test-only reference encoder/decoder for differential tests of the
     // in-house Lz4BlockDecoder (mode 4). Never on the runtime classpath.
     testImplementation 'at.yawk.lz4:lz4-java:1.11.1'
+    // zstd-jni is a test-only reference engine for testing DynamicZstdBinding and
+    // LinearRegionReader in test runs. Never on the runtime classpath.
+    testImplementation 'com.github.luben:zstd-jni:1.5.6-3'
     testImplementation rootProject.libs.jazzer.junit
 }

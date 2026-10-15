@@ -26,6 +26,7 @@ public final class RegionFormatRegistry {
 
     static {
         REGISTRY.put(".mca", AnvilReader.INSTANCE);
+        LinearRegionReader.registerIfAvailable();
         // Discover any SPI providers on classpath
         loadServiceProviders();
     }
@@ -60,6 +61,7 @@ public final class RegionFormatRegistry {
         Objects.requireNonNull(reader, "reader");
         String normalized = normalizeExtension(extension);
         REGISTRY.put(normalized, reader);
+        RegionFileResolver.invalidateMemo();
     }
 
     /**
@@ -74,7 +76,11 @@ public final class RegionFormatRegistry {
         if (".mca".equals(normalized)) {
             return null; // Cannot unregister built-in Anvil reader
         }
-        return REGISTRY.remove(normalized);
+        RegionFileReader removed = REGISTRY.remove(normalized);
+        if (removed != null) {
+            RegionFileResolver.invalidateMemo();
+        }
+        return removed;
     }
 
     /**
@@ -109,7 +115,9 @@ public final class RegionFormatRegistry {
     public static void reset() {
         REGISTRY.clear();
         REGISTRY.put(".mca", AnvilReader.INSTANCE);
+        LinearRegionReader.registerIfAvailable();
         loadServiceProviders();
+        RegionFileResolver.invalidateMemo();
     }
 
     private static String normalizeExtension(String ext) {

@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.folia.metrics;
 
 import io.github.dailystruggle.metrics.api.FoliaRegionSample;
+import io.github.dailystruggle.metrics.api.MetricsBinding;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import io.github.dailystruggle.rtp.folia.tasks.RegionKey;
 import org.junit.jupiter.api.DisplayName;
@@ -508,5 +509,30 @@ final class FoliaMetricsBindingTest {
             b.observeRegion(w, i << 5, 0);
         }
         assertEquals(FoliaMetricsBinding.MAX_REGION_PROBES, b.probeCount());
+    }
+
+    @Test
+    @DisplayName("ADR-087: observeRegion via MetricsBinding interface and spark-like decorator starts probe")
+    void observe_region_via_interface_and_decorator() {
+        FakeTimers timers = new FakeTimers();
+        FoliaMetricsBinding b = new FoliaMetricsBinding(System::nanoTime, () -> 0, () -> 0, timers);
+        io.github.dailystruggle.rtp.api.world.RTPWorld<?> w = world(UUID.randomUUID());
+
+        // Call via MetricsBinding interface reference with Object world
+        MetricsBinding mb = b;
+        mb.observeRegion((Object) w, 0, 0);
+        assertEquals(1, b.probeCount());
+        assertEquals(1, timers.ticks.size());
+
+        // Call via a decorating MetricsBinding
+        MetricsBinding decorator = new MetricsBinding() {
+            @Override
+            public void observeRegion(Object world, int cx, int cz) {
+                b.observeRegion(world, cx, cz);
+            }
+        };
+        decorator.observeRegion((Object) w, 64, 0);
+        assertEquals(2, b.probeCount());
+        assertEquals(2, timers.ticks.size());
     }
 }

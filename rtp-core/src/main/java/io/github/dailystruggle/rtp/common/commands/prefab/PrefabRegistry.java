@@ -1,13 +1,5 @@
 package io.github.dailystruggle.rtp.common.commands.prefab;
 
-import io.github.dailystruggle.rtp.common.commands.prefab.builtin.FoliaTuned;
-import io.github.dailystruggle.rtp.common.commands.prefab.builtin.HighPerformance;
-import io.github.dailystruggle.rtp.common.commands.prefab.builtin.LowPerformance;
-import io.github.dailystruggle.rtp.common.commands.prefab.builtin.MultiWorld;
-import io.github.dailystruggle.rtp.common.commands.prefab.builtin.OneBlock;
-import io.github.dailystruggle.rtp.common.commands.prefab.builtin.Skyblock;
-import io.github.dailystruggle.rtp.common.commands.prefab.builtin.SurvivalDefault;
-
 import java.util.List;
 import java.util.Optional;
 

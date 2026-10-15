@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.api.editor.EditorWidget;
 import io.github.dailystruggle.rtp.api.hooks.EditorExtensionRegistry;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorChannel;
+import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopbackJson;
 
 import java.io.IOException;
 import java.io.InputStream;

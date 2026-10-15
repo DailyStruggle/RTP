@@ -195,6 +195,21 @@ class SparkMetricsBindingTest {
         assertFalse(b.wraps(nativeDelegate()));
     }
 
+    @Test
+    @org.junit.jupiter.api.DisplayName("observeRegion forwards to the delegate so Folia region probes start under spark")
+    void observeRegion_forwards_to_delegate() {
+        java.util.concurrent.atomic.AtomicBoolean observed = new java.util.concurrent.atomic.AtomicBoolean(false);
+        MetricsBinding folia = new MetricsBinding() {
+            @Override
+            public void observeRegion(Object w, int x, int z) {
+                observed.set(true);
+            }
+        };
+        SparkMetricsBinding b = new SparkMetricsBinding(folia, spark(false, 0, 0, 0, 0));
+        b.observeRegion(new Object(), 10, 20);
+        assertTrue(observed.get(), "spark decorator must forward observeRegion to delegate");
+    }
+
     interface DummySparkMetadataProvider {
         java.util.Map<String, Object> provide();
     }
