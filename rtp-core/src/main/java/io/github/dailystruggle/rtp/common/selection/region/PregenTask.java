@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.world.*;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.tools.CfDiag;
+import io.github.dailystruggle.rtp.common.tools.ServerHealthGate;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 
@@ -56,6 +57,8 @@ final class PregenTask implements Runnable {
     // ADR-110: true once this attempt fell back to an unpinned native load (no slot free). The
     // attempt stays readOnly() so its result skips the ring and lands unpinned in the cold queue.
     private final java.util.concurrent.atomic.AtomicBoolean unpinnedLoad = new java.util.concurrent.atomic.AtomicBoolean();
+    // ADR-114: permit held during on-demand native load / generation.
+    private final java.util.concurrent.atomic.AtomicReference<ImmediateLoadGovernor.GenerationPermit> immediatePermit = new java.util.concurrent.atomic.AtomicReference<>(null);
     // ADR-028: backlog entry this attempt took; returned to the backlog if the attempt defers.
     private volatile BacklogLocationBuffer.BacklogEntry takenFromBacklog;
 
@@ -63,7 +66,10 @@ final class PregenTask implements Runnable {
         this.state = state;
         this.result = result;
         this.i = initialAttempt;
-        result.whenComplete((r, ex) -> releasePin());
+        result.whenComplete((r, ex) -> {
+            releasePin();
+            releaseImmediatePermit();
+        });
     }
 
     private boolean speculative() {
@@ -101,6 +107,11 @@ final class PregenTask implements Runnable {
         if (pinHeld.compareAndSet(true, false)) gate().releasePin();
     }
 
+    private void releaseImmediatePermit() {
+        ImmediateLoadGovernor.GenerationPermit p = immediatePermit.getAndSet(null);
+        if (p != null) p.close();
+    }
+
     /**
      * Grants this attempt native loads: a pin slot first, else an unpinned load of center and
      * safety neighbours. Fresh worlds have no region file to read, and the load also generates
@@ -121,6 +132,7 @@ final class PregenTask implements Runnable {
      */
     private void completeDeferred() {
         releasePin();
+        releaseImmediatePermit();
         Region r = state.region;
         RTP.log(Level.FINE, "[RTP] [" + ((r == null) ? "" : r.name)
                 + "] speculative fill deferred (" + state.purpose + ") at attempt " + i);
@@ -140,8 +152,13 @@ final class PregenTask implements Runnable {
     private void rescheduleNextAttempt() {
         i++;
         releasePin();
+        releaseImmediatePermit();
         unpinnedLoad.set(false);
         takenFromBacklog = null;
+        if (state.purpose == LoadPurpose.IMMEDIATE) {
+            ImmediateLoadGovernor immGov = immediateGovernor();
+            if (immGov != null) immGov.recordOutcome(true);
+        }
         if (result.isDone()) return;
         CfDiag.pregenReschedule.increment();
         if (inRunAttempt) {
@@ -718,6 +735,11 @@ final class PregenTask implements Runnable {
         return (r == null) ? null : ProbeFirstGovernor.of(r.name, ProbeFirstGovernor.Path.FILL);
     }
 
+    private @org.jetbrains.annotations.Nullable ImmediateLoadGovernor immediateGovernor() {
+        Region r = state.region;
+        return (r == null) ? null : ImmediateLoadGovernor.of(r.name);
+    }
+
     /**
      * Probe-first gate (ADR-016 section 13). Attempts early reject using a lean
      * {@link io.github.dailystruggle.rtp.api.world.ChunkColumnProbe}.
@@ -892,7 +914,92 @@ final class PregenTask implements Runnable {
             });
             return;
         }
+
+        if (state.purpose == LoadPurpose.IMMEDIATE) {
+            requestChunkImmediate(cx, cz, finalL, staleRetries, gov, afterProbe);
+            return;
+        }
+
         loadChunk(cx, cz, finalL, staleRetries, speculative() ? null : gov, afterProbe);
+    }
+
+    private void requestChunkImmediate(int cx, int cz, long finalL, int staleRetries,
+                                       @org.jetbrains.annotations.Nullable ProbeFirstGovernor gov, boolean afterProbe) {
+        ImmediateLoadGovernor immGov = immediateGovernor();
+        boolean isPredicateConstrained = (!state.defaultBiomes && state.biomeNames != null && !state.biomeNames.isEmpty());
+        boolean hasAnvil = (state.world.anvilWorldFolder() != null);
+
+        // Fast zero-decode MCA occupancy check (< 1 µs)
+        boolean isGenerated = state.world.isChunkGenerated(cx, cz);
+
+        if (!isGenerated) {
+            // Mode B: Predicate-constrained queries (/rtp biome:...) prune ungenerated chunks off-thread
+            if (isPredicateConstrained) {
+                if (state.verbose) {
+                    state.failMap.get(LocationGenerator.FailTypes.ungenerated)
+                            .compute("reason=prunedUngeneratedPredicate", (s, a) -> (a == null) ? 1L : ++a);
+                }
+                recordOutcome("ungenerated/prunedUngeneratedPredicate chunk=(" + cx + "," + cz + ")");
+                continueInline(this::rescheduleNextAttempt);
+                return;
+            }
+
+            // Mode A: Blind Wilderness Teleports (pregenPref == 0.0, default)
+            // Preserve 2D spatial distribution: do NOT discard ungenerated chunks.
+            // Proceed to Tier 3 native generation under governor permit bounds.
+            admitNativeLoadWithPermit(cx, cz, finalL, staleRetries, immGov, gov, afterProbe);
+            return;
+        }
+
+        // Chunk is generated on disk: evaluate thread-weighted deduplication threshold
+        double mspt = ServerHealthGate.lastMspt();
+        boolean shouldPrefilter = hasAnvil && (immGov != null) && immGov.shouldPrefilter(isPredicateConstrained, mspt);
+
+        if (!shouldPrefilter) {
+            // Deduplication bypass: direct native load (eliminates duplicate decode on safe chunks)
+            admitNativeLoadWithPermit(cx, cz, finalL, staleRetries, immGov, gov, afterProbe);
+            return;
+        }
+
+        // Tier 2: Off-Thread Anvil Pre-Filter Engaged (hazard shedding / tick distress)
+        final long readStart = System.nanoTime();
+        state.world.getOrReadChunk(cx, cz).whenComplete((chunk, ex) -> {
+            long readDuration = System.nanoTime() - readStart;
+            if (immGov != null && ex == null) {
+                immGov.recordFileRead(readDuration / 1_000_000.0);
+            }
+            if (ex == null && chunk != null && chunk.isSelfContained()) {
+                if (gov != null) gov.recordLoad(afterProbe, readDuration);
+                // Safe Anvil candidate verified: proceed to Tier 3 native load for player placement
+                admitNativeLoadWithPermit(cx, cz, finalL, staleRetries, immGov, gov, afterProbe);
+                return;
+            }
+            // Fallback to native load if file read returns null/fails
+            admitNativeLoadWithPermit(cx, cz, finalL, staleRetries, immGov, gov, afterProbe);
+        });
+    }
+
+    private void admitNativeLoadWithPermit(int cx, int cz, long finalL, int staleRetries,
+                                          @org.jetbrains.annotations.Nullable ImmediateLoadGovernor immGov,
+                                          @org.jetbrains.annotations.Nullable ProbeFirstGovernor gov,
+                                          boolean afterProbe) {
+        if (immGov == null) {
+            loadChunk(cx, cz, finalL, staleRetries, gov, afterProbe);
+            return;
+        }
+        immGov.acquirePermit(ServerHealthGate::lastMspt, 1200).whenComplete((permit, ex) -> {
+            if (ex != null) {
+                if (state.verbose) {
+                    state.failMap.get(LocationGenerator.FailTypes.timeout)
+                            .compute("reason=generationThrottledTimeout", (s, a) -> (a == null) ? 1L : ++a);
+                }
+                recordOutcome("timeout/generationThrottledTimeout chunk=(" + cx + "," + cz + ")");
+                completeDeferred();
+                return;
+            }
+            immediatePermit.set(permit);
+            continueInline(() -> loadChunk(cx, cz, finalL, staleRetries, gov, afterProbe));
+        });
     }
 
     private void loadChunk(int cx, int cz, long finalL, int staleRetries,
@@ -905,7 +1012,12 @@ final class PregenTask implements Runnable {
         final long loadStart = System.nanoTime();
         state.world.getOrLoadChunk(cx, cz, "PregenTask.requestChunk")
                 .whenComplete((chunk, ex) -> {
-                    if (gov != null && ex == null) gov.recordLoad(afterProbe, System.nanoTime() - loadStart);
+                    long duration = System.nanoTime() - loadStart;
+                    if (gov != null && ex == null) gov.recordLoad(afterProbe, duration);
+                    ImmediateLoadGovernor immGov = immediateGovernor();
+                    if (immGov != null && ex == null) {
+                        immGov.recordNativeLoad(duration / 1_000_000.0, 1.0);
+                    }
                     if (ex != null) {
                         RTP.log(Level.WARNING,
                                 "[RTP] getOrLoadChunk failed for world=" + state.world.name()
@@ -1345,6 +1457,11 @@ final class PregenTask implements Runnable {
     private void completeSuccess(long finalL, int finalX, int finalY, int finalZ,
                                  String resBiome, RTPCoords resCoords,
                                  ChunkReservation reservation) {
+        releaseImmediatePermit();
+        if (state.purpose == LoadPurpose.IMMEDIATE) {
+            ImmediateLoadGovernor immGov = immediateGovernor();
+            if (immGov != null) immGov.recordOutcome(false);
+        }
         recordOutcome("success (" + finalX + "," + finalY + "," + finalZ + ")");
         if (state.shape instanceof MemoryShape && finalL > 0) {
             ((MemoryShape<?>) state.shape).addBiomeLocation(finalL, state.resolution, resBiome);
@@ -1386,6 +1503,7 @@ final class PregenTask implements Runnable {
     }
 
     private void completeExhausted() {
+        releaseImmediatePermit();
         long reported = Math.min(i, state.maxAttempts);
         // Verbose failure summary - preserves the historical log shape.
         if (state.verbose && i >= state.maxAttempts) {

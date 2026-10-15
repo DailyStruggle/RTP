@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.search;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.editor.EditorLoopbackJson;
+import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopbackJson;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

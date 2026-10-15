@@ -98,16 +98,27 @@ class RegionFormatRegistryTest {
     }
 
     @Test
-    @DisplayName("Only .mca is built in; .linear needs an addon-registered reader")
-    void testLinearNotBuiltIn() {
-        assertFalse(RegionFormatRegistry.isRegistered(".linear"));
-        assertNull(RegionFormatRegistry.getReader(".linear"));
-        assertEquals(java.util.Set.of(".mca"), RegionFormatRegistry.getRegisteredExtensions());
+    @DisplayName("Dynamic Linear registration matches DynamicZstdBinding availability")
+    void testLinearRegistrationState() {
+        if (DynamicZstdBinding.isAvailable()) {
+            assertTrue(RegionFormatRegistry.isRegistered(".linear"));
+            assertEquals(LinearRegionReader.INSTANCE, RegionFormatRegistry.getReader(".linear"));
+            assertTrue(RegionFormatRegistry.getRegisteredExtensions().contains(".linear"));
+
+            // Verify .linear can be unregistered
+            RegionFileReader removed = RegionFormatRegistry.unregister(".linear");
+            assertEquals(LinearRegionReader.INSTANCE, removed);
+            assertFalse(RegionFormatRegistry.isRegistered(".linear"));
+        } else {
+            assertFalse(RegionFormatRegistry.isRegistered(".linear"));
+            assertNull(RegionFormatRegistry.getReader(".linear"));
+        }
     }
 
     @Test
     @DisplayName("Unregistered .linear file is ignored: resolve defaults to .mca, resolveExisting finds nothing")
     void testUnregisteredLinearIgnored(@TempDir Path tempDir) throws IOException {
+        RegionFormatRegistry.unregister(".linear");
         Path regionDir = tempDir.resolve("region");
         Files.createDirectories(regionDir);
         Files.write(regionDir.resolve("r.0.0.linear"), new byte[100]);

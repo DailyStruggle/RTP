@@ -1,7 +1,5 @@
 package io.github.dailystruggle.rtp.common.commands.prefab;
 
-import io.github.dailystruggle.rtp.common.commands.prefab.builtin.HighPerformance;
-import io.github.dailystruggle.rtp.common.commands.prefab.builtin.LowPerformance;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -151,7 +149,7 @@ class PrefabApplierTest {
         base.put("safety", safety);
 
         PrefabApplier.Result r = PrefabApplier.apply(base,
-                io.github.dailystruggle.rtp.common.commands.prefab.builtin.OneBlock.INSTANCE);
+                OneBlock.INSTANCE);
 
         Map<String, Object> newSafety = r.newTrees().get("safety");
         assertEquals(0, newSafety.get("platformRadius"), "platform must be enabled (radius 0)");

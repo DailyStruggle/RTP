@@ -27,6 +27,8 @@ public final class RTPMetricsExtension implements io.github.dailystruggle.metric
     public final Map<String, ProbeGovernorRow> probeGovernors;
     /** ADR-110 purpose gate on native chunk loads, keyed by region; empty until fill runs. */
     public final Map<String, LiveLoadGateRow> liveLoadGates;
+    /** ADR-114 on-demand chunk load governors keyed by region; empty until on-demand runs. */
+    public final Map<String, ImmediateGovernorRow> immediateGovernors;
 
     /**
      * Backward-compatible constructor that leaves the ADR-053 audit counters at zero.
@@ -109,6 +111,27 @@ public final class RTPMetricsExtension implements io.github.dailystruggle.metric
             Map<String, RegionQueueRow> regionQueueStatus,
             Map<String, ProbeGovernorRow> probeGovernors,
             Map<String, LiveLoadGateRow> liveLoadGates) {
+        this(queueDepth, pendingTeleports, memoryTrackerEntries, chunkLoadBacklog,
+                avgPipelineMs, databaseLatencyMs, slowPipelineCount, slowPipelineThresholdMs,
+                queueGrowthWarnCount, queueGrowthWarnThreshold, regionQueueStatus, probeGovernors,
+                liveLoadGates, Collections.emptyMap());
+    }
+
+    public RTPMetricsExtension(
+            int queueDepth,
+            int pendingTeleports,
+            int memoryTrackerEntries,
+            int chunkLoadBacklog,
+            double avgPipelineMs,
+            int databaseLatencyMs,
+            long slowPipelineCount,
+            long slowPipelineThresholdMs,
+            long queueGrowthWarnCount,
+            int queueGrowthWarnThreshold,
+            Map<String, RegionQueueRow> regionQueueStatus,
+            Map<String, ProbeGovernorRow> probeGovernors,
+            Map<String, LiveLoadGateRow> liveLoadGates,
+            Map<String, ImmediateGovernorRow> immediateGovernors) {
         this.queueDepth = queueDepth;
         this.pendingTeleports = pendingTeleports;
         this.memoryTrackerEntries = memoryTrackerEntries;
@@ -128,6 +151,9 @@ public final class RTPMetricsExtension implements io.github.dailystruggle.metric
         this.liveLoadGates = (liveLoadGates == null || liveLoadGates.isEmpty())
                 ? Collections.emptyMap()
                 : Collections.unmodifiableMap(new LinkedHashMap<>(liveLoadGates));
+        this.immediateGovernors = (immediateGovernors == null || immediateGovernors.isEmpty())
+                ? Collections.emptyMap()
+                : Collections.unmodifiableMap(new LinkedHashMap<>(immediateGovernors));
     }
 
     @Override
@@ -146,6 +172,7 @@ public final class RTPMetricsExtension implements io.github.dailystruggle.metric
                 + ", regionQueueStatus=" + regionQueueStatus
                 + ", probeGovernors=" + probeGovernors
                 + ", liveLoadGates=" + liveLoadGates
+                + ", immediateGovernors=" + immediateGovernors
                 + '}';
     }
 }

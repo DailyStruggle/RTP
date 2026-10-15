@@ -2,6 +2,8 @@ package io.github.dailystruggle.rtp.common.commands.editor;
 
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorChannel;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorKeys;
+import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopbackChannel;
+import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopbackJson;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.LoopbackTransport;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.TrustedEditors;
 import org.junit.jupiter.api.Assumptions;

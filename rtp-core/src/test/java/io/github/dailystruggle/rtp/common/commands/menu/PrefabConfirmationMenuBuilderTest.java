@@ -7,8 +7,8 @@ import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.common.commands.prefab.Prefab;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabApplier;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabRegistry;
-import io.github.dailystruggle.rtp.common.commands.prefab.builtin.LowPerformance;
-import io.github.dailystruggle.rtp.common.commands.prefab.builtin.SurvivalDefault;
+import io.github.dailystruggle.rtp.common.commands.prefab.LowPerformance;
+import io.github.dailystruggle.rtp.common.commands.prefab.SurvivalDefault;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 
 import org.junit.jupiter.api.BeforeEach;

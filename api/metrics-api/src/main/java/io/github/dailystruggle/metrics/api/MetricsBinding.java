@@ -71,6 +71,14 @@ public interface MetricsBinding {
     default boolean regionalTicking() { return false; }
 
     /**
+     * Note that work was dispatched to chunk {@code (cx, cz)} in {@code world}; starts a bounded
+     * tick probe on that region on platforms that support per-region tracking (Folia). Default
+     * is a no-op; decorators (e.g. spark) shall forward this call to their delegate.
+     * Non-blocking, any thread.
+     */
+    default void observeRegion(Object world, int cx, int cz) {}
+
+    /**
      * Whether this binding is {@code other} or decorates it. Lets a platform binding that
      * is wrapped (e.g. by a spark decorator) recognise that it is still the installed one.
      */

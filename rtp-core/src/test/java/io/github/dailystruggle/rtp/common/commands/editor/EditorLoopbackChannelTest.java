@@ -1,7 +1,10 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopbackChannel;
+import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopbackJson;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.LoopbackTransport;
+
+import io.github.dailystruggle.rtp.common.RTP;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;

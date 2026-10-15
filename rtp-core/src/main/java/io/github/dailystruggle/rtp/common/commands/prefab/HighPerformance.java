@@ -1,6 +1,5 @@
-package io.github.dailystruggle.rtp.common.commands.prefab.builtin;
+package io.github.dailystruggle.rtp.common.commands.prefab;
 
-import io.github.dailystruggle.rtp.common.commands.prefab.Prefab;
 
 import java.util.Map;
 

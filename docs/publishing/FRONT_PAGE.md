@@ -48,7 +48,7 @@ Zone 2: Operational On-Ramp & Zero-Friction Migration (Immediate Action)
 Zone 3: Architectural Proof & Technical Transparency (Deep Foundation)
   - Audience: Folia operators, network architects, skeptics, and engineers.
   - Scope: Full benchmark tables (harness in helpers/StressTestRTP/), scatter
-    charts, spatial memory benchmarks, Anvil .mca pre-filter, quality gates, and FAQ.
+    charts, spatial memory benchmarks, region-file pre-filter (.mca and .linear), quality gates, and FAQ.
   - Rule: Retain 100% mathematical and technical precision. Never dilute or
     summarize; keep deep derivations inside collapsible <details> blocks or
     docs site links so rigor is fully preserved without imposing cognitive load
@@ -245,7 +245,7 @@ Most of an rtp plugin's work happens inside server API calls, so a profiler list
 Both LeafRTP downloads are built from the same code, and the LeafRTP rows apply to either.
 <!-- /only -->
 
-I compare throughput under load, latency from `/rtp` to arrival, and tick stability. On Paper, world ticking runs on a single main thread, while on Folia, world ticking is distributed across independent regional worker threads. LeafRTP checks candidates against `.mca` region files off-tick and keeps a queue of verified destinations, avoiding synchronous chunk loading and main-thread stalls.
+I compare throughput under load, latency from `/rtp` to arrival, and tick stability. On Paper, world ticking runs on a single main thread, while on Folia, world ticking is distributed across independent regional worker threads. LeafRTP checks candidates against region files (`.mca` and `.linear`) off-tick and keeps a queue of verified destinations, avoiding synchronous chunk loading and main-thread stalls.
 
 **Paper 26.2 & Folia 26.2 Performance Under Load (Linux Threadripper 7970X, 48 bot clients, 16k radius):**
 
@@ -285,7 +285,7 @@ About 35-65% of typical Minecraft terrain is ocean, lava or void. LeafRTP rememb
 
 ### Region-file pre-filter
 
-An Anvil (`.mca`) pre-filter reads biome and block data directly from region files on disk. Unloaded candidates are checked and rejected off-tick without chunk loading. The files hold the actual terrain, so custom generators (Iris, Terra, datapacks) and edited ground are checked as they are. When the pre-filter cannot answer (unpopulated chunk, unknown format), it falls back to the server engine's async chunk API within a strict tick budget.
+A region-file pre-filter reads biome and block data directly from `.mca` (Anvil) and `.linear` (Linear v1/v2) region files on disk. Unloaded candidates are checked and rejected off-tick without chunk loading. The files hold the actual terrain, so custom generators (Iris, Terra, datapacks) and edited ground are checked as they are. Dynamic binding connects to the host server's Zstandard decompressor on Linear worlds with zero added dependencies, and a startup canary test verifies decoder health before candidates are probed. When the pre-filter cannot answer (unpopulated chunk, unknown format, or missing host decompressor), it falls back to the server engine's async chunk API within a strict tick budget.
 
 ### Pre-verified cache
 
@@ -312,7 +312,7 @@ LeafRTP includes a standalone map renderer (`maps-api`) that generates live in-g
 
 - **Paper** and forks such as Purpur and Pufferfish: `World#getChunkAtAsync`; falls back to a main-thread load only if async loading returns no chunk.
 - **Folia**: Pre-filter runs before the Region Scheduler; rejected candidates never hop a thread. Safe candidates load through Folia's async API and teleport through the Entity Scheduler.
-- **Spigot** (and Arclight / Mohist): `.mca` pre-filter off-tick. Throughput is capped by Spigot's chunk generator, and unreadable candidates cost one on-tick chunk load.
+- **Spigot** (and Arclight / Mohist): Region-file pre-filter off-tick. Throughput is capped by Spigot's chunk generator, and unreadable candidates cost one on-tick chunk load.
 - **Fabric** and **NeoForge**: In-tree adapters running the same core engine.
 
 <details>
@@ -556,7 +556,7 @@ A: No, but they work well together. `/rtp scan` walks a region off-tick, verifie
 A: Yes. Region files are read directly: modded and namespaced IDs are kept, and `/rtp biome=<x>` matches what's on disk. Plugins that use the live noise-map lookup get this wrong after a version migration. Chunks that were never populated fall back to a live load.
 
 **Q: What about the Linear (.linear) region format?**
-A: Region pre-filtering reads standard Anvil (`.mca`) files directly because 4 KiB sectors allow random-access chunk checks without decompressing whole regions or shading third-party libraries. For `.linear` or any other unsupported format, the pre-filter returns `UNKNOWN` and falls back to live chunk loading on the server engine. No `.linear` reader ships yet, built in or as an addon. An addon can add one through the `RegionFileReader` SPI, registered with `RegionFormatRegistry`.
+A: Supported out of the box. LeafRTP reads both standard Anvil (`.mca`) and Linear (`.linear`, v1 and v2) region files directly. On Linear servers (such as Leaves, Gale, LinearPaper, or Fabric with the Linear Region Format mod), it dynamically binds to the host's existing Zstandard decompressor through lightweight method handles, so the jar stays zero-dependency with no shaded libraries or native binary conflicts. A startup canary test verifies decompressor health on boot, and reads enforce continuous bounds and signature tripwires. If the host environment lacks Zstandard or a file is corrupted, the pre-filter returns `UNKNOWN` and falls back cleanly to the server engine's async chunk loader.
 
 **Q: I'm on NeoForge.**
 A: There's a native NeoForge adapter for 1.21.x / 26.x running the same core as every other platform. I test it less than the Bukkit family and Fabric, and broader testing on the 26.x carrier is still ongoing. If you hit something there, it goes to the front of my list.

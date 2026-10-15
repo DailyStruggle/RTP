@@ -278,6 +278,11 @@ public final class SparkMetricsBinding implements MetricsBinding {
         return this == other || delegate.wraps(other);
     }
 
+    @Override
+    public void observeRegion(Object world, int cx, int cz) {
+        delegate.observeRegion(world, cx, cz);
+    }
+
     /** NaN-aware min (TPS) or max (MSPT); NaN only when both sides are unsampled. */
     static double worse(double a, double b, boolean higherIsWorse) {
         if (Double.isNaN(a)) return b;

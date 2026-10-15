@@ -1,7 +1,6 @@
-package io.github.dailystruggle.rtp.common.commands.prefab.builtin;
+package io.github.dailystruggle.rtp.common.commands.prefab;
 
 import io.github.dailystruggle.rtp.common.commands.menu.multiconfig.NetherEndConfigAmender;
-import io.github.dailystruggle.rtp.common.commands.prefab.Prefab;
 
 import java.util.LinkedHashMap;
 import java.util.List;

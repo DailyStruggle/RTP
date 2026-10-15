@@ -178,6 +178,7 @@ class AnvilCorruptedRegionHardeningTest {
     @DisplayName("Scenario 3: Region file in an unregistered format fails closed without Anvil decoding")
     void testUnregisteredFormatFailsClosed(@TempDir Path tempDir) throws IOException {
         RegionFormatRegistry.reset();
+        RegionFormatRegistry.unregister(".linear");
         Path regionDir = tempDir.resolve("region");
         Files.createDirectories(regionDir);
         byte[] garbage = new byte[8192 + 4096];

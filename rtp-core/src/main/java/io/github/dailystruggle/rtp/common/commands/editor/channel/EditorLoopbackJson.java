@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.common.commands.editor;
+package io.github.dailystruggle.rtp.common.commands.editor.channel;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

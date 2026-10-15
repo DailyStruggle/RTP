@@ -21,6 +21,7 @@ import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.predict.BudgetPacer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
@@ -104,6 +105,9 @@ public class Region extends FactoryValue<RegionKeys> {
 
   /** Share of the remaining pulse budget the backlog refill leaves for later stages and other plugins. */
   static final double BACKLOG_HEADROOM = 0.2d;
+
+  /** Pacer for backlog pick operations. */
+  private final BudgetPacer backlogPacer = BudgetPacer.ofTaskPipe(0L);
 
   /** EWMA of one refill pick (ns); predicts whether the next pick still fits the budget. */
   private long backlogPickNanos = 0L;
@@ -1283,7 +1287,7 @@ public class Region extends FactoryValue<RegionKeys> {
       while (true) {
         long now = System.nanoTime();
         if (pickStart != 0L) recordPickCost(now - pickStart);
-        if (backlog.size() >= backlog.capacity() || now + backlogPickNanos >= deadline) break;
+        if (backlog.size() >= backlog.capacity() || now + backlogPacer.predictedCostNanos() >= deadline) break;
         pickStart = now;
         int[] sel;
         try {
@@ -1379,7 +1383,8 @@ public class Region extends FactoryValue<RegionKeys> {
 
   /** Folds one pick's cost into {@link #backlogPickNanos} (7/8 decay, as in TimeBoundTaskPipe). */
   private void recordPickCost(long cost) {
-    backlogPickNanos = (backlogPickNanos == 0L) ? cost : (backlogPickNanos / 8L) * 7L + cost / 8L;
+    backlogPacer.recordDuration(cost);
+    backlogPickNanos = backlogPacer.predictedCostNanos();
   }
 
   /**

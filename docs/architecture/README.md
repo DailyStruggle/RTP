@@ -25,6 +25,7 @@ For a narrative walkthrough of how these diagrams connect to diagnose runtime is
 | **13** | [`13-dual-layer-shape-architecture-and-l3-selection.md`](13-dual-layer-shape-architecture-and-l3-selection.md) | Dual-layer shape coordinate mapping, Chebyshev tiles, Hilbert curve, and L3 backlog | `CircleOptimizedDualLayer`, `SquareOptimizedDualLayer`, `SegmentedKeyRunTable` | [ADR-001](../adr/ADR-001-archimedean-spiral-1d-mapping.md), [ADR-028](../adr/ADR-028-l3-backlog-cache.md), [ADR-034](../adr/ADR-034-memory-shape-catalog.md), [ADR-085](../adr/ADR-085-spiral-addressed-hilbert-key-space.md), [ADR-088](../adr/ADR-088-configurable-downsampling-stride-filter.md) | S-001, S-004 |
 | **14** | [`14-group-placement-anchor-flow.md`](14-group-placement-anchor-flow.md) | Multi-participant action placement, group anchor draw, and separated slot allocation | `GroupPlacementDispatcher`, `SubspaceAnchorResolver`, `ActionManager` | [ADR-093](../adr/ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement.md), [ADR-095](../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives.md), [ADR-097](../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries.md) | S-002, S-004 |
 | **15** | [`15-cost-governed-chunk-reads-and-native-admission.md`](15-cost-governed-chunk-reads-and-native-admission.md) | Purpose-gated chunk resolution, thread-weighted deduplication, and in-flight admission | `ImmediateLoadGovernor`, `LiveLoadGate`, `ProbeFirstGovernor`, `AnvilRegionOccupancyCache` | [ADR-016](../adr/ADR-016-anvil-subsystem.md), [ADR-067](../adr/ADR-067-adaptive-scan-rate-and-mca-header-generation-check.md), [ADR-109](../adr/ADR-109-measured-cost-probe-first-gate.md), [ADR-110](../adr/ADR-110-purpose-gated-live-loads.md), [ADR-112](../adr/ADR-112-per-region-work-division-on-folia.md), [ADR-114](../adr/ADR-114-cost-governed-on-demand-chunk-reads.md) | S-001, S-002, S-004, S-005 |
+| **16** | [`16-package-dag-and-decision-preservation-graph.md`](16-package-dag-and-decision-preservation-graph.md) | Core package hierarchy, 4-tier DAG architecture, and decision traceability hypergraph | `RTPArchitectureTest`, `RTP`, `MemoryTracker`, `CoreCommandTreeBuilder` | [ADR-000](../adr/ADR-000-development-workflow.md), [ADR-008](../adr/ADR-008-memory-tracker-active-gc.md), [ADR-094](../adr/ADR-094-quality-engineering-gates.md), [ADR-115](../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph.md) | S-001..S-007 |
 
 ---
 
@@ -56,6 +57,9 @@ The diagrams form an interconnected state machine covering distinct architectura
 ### 5. Multi-Server Networking & Admin Tools
 - **[`12`](12-network-model.md) Network Model:** Specifies multi-server proxy communication, heartbeat synchronization, reservation token lifecycle, and packet flows.
 - **[`05`](05-scan-task-crawler.md) Scan Task Crawler:** Drives asynchronous background pre-exploration (`/rtp scan`) to populate persistent spatial memory with bounded tick budgets.
+
+### 6. Package Architecture, Modularity & Decision Traceability
+- **[`16`](16-package-dag-and-decision-preservation-graph.md) Core Package Architecture & Decision Traceability Map:** Visual specification of the 4-tier package DAG in `rtp-core`, acyclic dependency rules (0.0% SonarQube package tangles), decoupled structural seams, and class-to-ADR decision traceability.
 
 ---
 

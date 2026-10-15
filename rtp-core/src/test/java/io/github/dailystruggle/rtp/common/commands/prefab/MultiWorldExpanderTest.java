@@ -1,7 +1,5 @@
 package io.github.dailystruggle.rtp.common.commands.prefab;
 
-import io.github.dailystruggle.rtp.common.commands.prefab.builtin.LowPerformance;
-import io.github.dailystruggle.rtp.common.commands.prefab.builtin.MultiWorld;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

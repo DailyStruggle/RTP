@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.editor.channel;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.editor.EditorLoopbackJson;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

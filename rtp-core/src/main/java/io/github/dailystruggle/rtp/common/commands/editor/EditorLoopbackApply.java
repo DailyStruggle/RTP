@@ -1,6 +1,8 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopbackChannel;
+import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopbackJson;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -34,7 +36,7 @@ import java.util.logging.Level;
  * {@code {"type":"apply","region":..,"timestamp":..,"bytebinKey":..,"sha256":..}} names a bytebin
  * upload of {@code {"files":{..}}}; it is fetched, its SHA-256 checked, then handled as if inline.
  */
-public final class EditorLoopbackApply {
+public final class EditorLoopbackApply implements EditorLoopbackChannel.ApplyHandler {
 
     public static final String ACTION = "apply";
     public static final String ACK_TYPE = "apply_ack";
@@ -50,11 +52,11 @@ public final class EditorLoopbackApply {
     private final Function<String, CompletableFuture<String>> fetcher;
     private final AtomicBoolean inFlight = new AtomicBoolean();
 
-    EditorLoopbackApply(String token, Function<String, CompletableFuture<Void>> applier) {
+    public EditorLoopbackApply(String token, Function<String, CompletableFuture<Void>> applier) {
         this(token, applier, null);
     }
 
-    EditorLoopbackApply(String token, Function<String, CompletableFuture<Void>> applier,
+    public EditorLoopbackApply(String token, Function<String, CompletableFuture<Void>> applier,
                         Function<String, CompletableFuture<String>> fetcher) {
         this.token = token == null ? null : token.getBytes(StandardCharsets.UTF_8);
         this.applier = Objects.requireNonNull(applier, "applier");
@@ -62,7 +64,7 @@ public final class EditorLoopbackApply {
     }
 
     /** Production wiring: {@link EditorSessionManager#applyPayload(String)} (validates, writes, reloads). */
-    static EditorLoopbackApply forSessionManager(String token) {
+    public static EditorLoopbackApply forSessionManager(String token) {
         return new EditorLoopbackApply(token, json -> EditorSessionManager.getInstance().applyPayload(json));
     }
 
@@ -76,7 +78,8 @@ public final class EditorLoopbackApply {
         return new EditorLoopbackApply(null, json -> EditorSessionManager.getInstance().applyPayload(json), http::fetchPayload);
     }
 
-    static boolean isApply(Object message) {
+    @Override
+    public boolean isApply(Object message) {
         return message instanceof Map<?, ?> m && ACTION.equals(m.get("action"));
     }
 
@@ -84,7 +87,8 @@ public final class EditorLoopbackApply {
      * Validates the message shape, hands the rebuilt payload to the apply pipeline and resolves to
      * the {@code apply_ack} JSON. Never completes exceptionally.
      */
-    CompletableFuture<String> handle(Map<?, ?> message) {
+    @Override
+    public CompletableFuture<String> handle(Map<?, ?> message) {
         Long timestamp = message.get("timestamp") instanceof Number n ? n.longValue() : null;
         String region = message.get("region") instanceof String r ? r : "?";
         if (token == null || !(message.get("token") instanceof String provided)
@@ -197,7 +201,7 @@ public final class EditorLoopbackApply {
      * {@code escapeJson} so its reader round-trips; header fields precede {@code files} because that
      * reader locates fields by first occurrence.
      */
-    static String payloadJson(Map<String, String> files, Long timestamp) {
+    public static String payloadJson(Map<String, String> files, Long timestamp) {
         List<String> keys = new ArrayList<>(files.keySet());
         Collections.sort(keys);
         StringBuilder sb = new StringBuilder("{\"version\":1,\"pluginVersion\":\"loopback\",\"sha256\":\"")
