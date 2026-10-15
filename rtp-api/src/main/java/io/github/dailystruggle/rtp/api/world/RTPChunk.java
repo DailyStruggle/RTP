@@ -2,8 +2,6 @@ package io.github.dailystruggle.rtp.api.world;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.safety.CompiledUnsafeSet;
-import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
