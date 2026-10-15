@@ -16,10 +16,10 @@ import java.util.List;
  * measurement and a behavioural model are not the same kind of number, and blending them in one
  * table is how benchmarks become marketing.
  */
-final class SimulationReport {
+public final class SimulationReport {
 
   /** How a number was obtained. Mandatory on every emitted row. */
-  enum Provenance {
+  public enum Provenance {
     /** Timed or counted on this machine, this run, against shipped code. */
     MEASURED,
     /** Arithmetic over MEASURED inputs, no behavioural assumption added. */
@@ -33,27 +33,27 @@ final class SimulationReport {
   private final List<Row> rows = new ArrayList<>();
   private final List<String> notes = new ArrayList<>();
 
-  void add(String section, String subject, String metric, String value, Provenance tier) {
+  public void add(String section, String subject, String metric, String value, Provenance tier) {
     rows.add(new Row(section, subject, metric, value, tier));
     System.out.printf(
         "[DEBUG_LOG] %-22s %-26s %-34s %18s  %s%n", section, subject, metric, value, tier);
   }
 
-  void add(String section, String subject, String metric, double value, Provenance tier) {
+  public void add(String section, String subject, String metric, double value, Provenance tier) {
     add(section, subject, metric, String.format("%.3f", value), tier);
   }
 
-  void note(String text) {
+  public void note(String text) {
     notes.add(text);
     System.out.println("[DEBUG_LOG] note: " + text);
   }
 
-  int size() {
+  public int size() {
     return rows.size();
   }
 
   /** Writes markdown + CSV + JSON and registers rows for baseline regression analysis. Never throws. */
-  void write(String fileStem) {
+  public void write(String fileStem) {
     SimulationBaselineRegressionComparator.registerReportRows(fileStem, rows);
     String dir = System.getProperty("rtp.simulation.reportDir");
     if (dir == null || dir.isBlank()) {

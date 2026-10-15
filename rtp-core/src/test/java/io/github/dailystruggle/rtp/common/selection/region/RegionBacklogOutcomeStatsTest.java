@@ -68,7 +68,7 @@ class RegionBacklogOutcomeStatsTest {
                     : AnvilPrefilterRegistry.Provider.Decision.ACCEPT;
         });
 
-        long initialFailures = RtpOutcomeStats.GLOBAL.failureCount(LocationGenerator.FailTypes.biome);
+        long initialFailures = RtpOutcomeStats.GLOBAL.failureCount(LocationGenerator.FailTypes.prefilterBlock);
         long initialSuccesses = RtpOutcomeStats.GLOBAL.successCount();
 
         // First pulse fills the backlog and submits bin batches; later pulses apply them and promote.
@@ -77,13 +77,13 @@ class RegionBacklogOutcomeStatsTest {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         do {
             region.execute(TimeUnit.MILLISECONDS.toNanos(50));
-            deltaFailures = RtpOutcomeStats.GLOBAL.failureCount(LocationGenerator.FailTypes.biome) - initialFailures;
+            deltaFailures = RtpOutcomeStats.GLOBAL.failureCount(LocationGenerator.FailTypes.prefilterBlock) - initialFailures;
             deltaSuccesses = RtpOutcomeStats.GLOBAL.successCount() - initialSuccesses;
             if (deltaFailures > 0 && deltaSuccesses > 0) break;
             Thread.sleep(5L);
         } while (System.nanoTime() < deadline);
 
-        assertTrue(deltaFailures > 0, "failures must be recorded for Anvil rejections");
+        assertTrue(deltaFailures > 0, "prefilter rejections are recorded as prefilterBlock, not biome");
         assertTrue(deltaSuccesses > 0, "successes must be recorded for cold promotions");
     }
 }

@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection;
 
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -212,8 +211,18 @@ public class SelectionAPI {
    * generation process.
    */
   public void compute() {
-    RTPServerAccessor serverAccessor = RTP.serverAccessor;
+    compute(io.github.dailystruggle.rtp.common.tasks.tick.TickBudget.asyncNanos());
+  }
 
+  /**
+   * Drains the urgent queue, then the standard queue, until {@code availableNanos} is spent.
+   * {@link RTP#minRTPExecutions} tasks always run so selection progresses under load.
+   *
+   * @param availableNanos budget for this drain in nanoseconds
+   */
+  public void compute(long availableNanos) {
+    if (selectionPipelineUrgent.isEmpty() && selectionPipeline.isEmpty()) return;
+    long deadline = System.nanoTime() + Math.max(0L, availableNanos);
     int req = RTP.minRTPExecutions;
 
     // Diagram 02: drain the urgent (private/biome) queue first, then the
@@ -222,22 +231,22 @@ public class SelectionAPI {
     int urgentRan = 0;
     int standardRan = 0;
 
-    while (serverAccessor.overTime() < 0 || req > 0) {
+    while (req > 0 || System.nanoTime() < deadline) {
       Runnable task = selectionPipelineUrgent.poll();
       if (task == null) break;
       RTP.log(java.util.logging.Level.FINER,
           "[SelectionAPI] running urgent pipeline task " + task.getClass().getSimpleName());
-      task.run();
+      runSelectionTask(task);
       urgentRan++;
       req--;
     }
 
-    while (serverAccessor.overTime() < 0 || req > 0) {
+    while (req > 0 || System.nanoTime() < deadline) {
       Runnable task = selectionPipeline.poll();
       if (task == null) break;
       RTP.log(java.util.logging.Level.FINER,
           "[SelectionAPI] running standard pipeline task " + task.getClass().getSimpleName());
-      task.run();
+      runSelectionTask(task);
       standardRan++;
       req--;
     }
@@ -248,6 +257,15 @@ public class SelectionAPI {
               + " standard=" + standardRan
               + " urgentRemaining=" + selectionPipelineUrgent.size()
               + " standardRemaining=" + selectionPipeline.size());
+    }
+  }
+
+  private static void runSelectionTask(Runnable task) {
+    try {
+      task.run();
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[SelectionAPI] selection task " + task.getClass().getSimpleName() + " failed", t);
     }
   }
 

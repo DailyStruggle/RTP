@@ -105,8 +105,8 @@ Set it too high and you waste memory holding locations nobody will use. Set it t
 ### Will RTP lag my server?
 
 Candidate checks and chunk loading run off the main thread. The main-thread work left is the teleport itself and the arriving player's first ticks. In my Paper benchmark there were no ticks over 50 ms across 4,096 paced teleports, but your hardware and world will differ. If you notice lag spikes, check:
-- `minTPS` in `performance.yml`; RTP throttles background work when TPS drops below this value.
-- `syncAllottedTime`, which limits how long per tick the synchronous portion of a teleport can take.
+- `minTPS` and `maxMSPT` in `performance.yml`; RTP pauses background cache filling when TPS drops below `minTPS` or a tick takes longer than `maxMSPT`. On Folia a slow region is handled on its own: RTP slows its work there and fills from other regions instead.
+- `syncAllottedTime`, which limits how long per tick RTP's main-thread work can take (capped at 25 ms). On Folia the limit applies to each region thread separately.
 
 ### My TPS is dropping when players teleport. What do I check?
 

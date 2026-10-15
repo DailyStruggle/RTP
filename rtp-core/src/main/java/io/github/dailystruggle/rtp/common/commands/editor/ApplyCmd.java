@@ -145,7 +145,7 @@ public class ApplyCmd extends BaseRTPCmdImpl {
                 // S-004: an unreadable drop file falls through to the byte store, but is reported
                 RTP.log(Level.WARNING, "[editor] offline apply file for session " + shown + " unreadable: " + e.getMessage(), e);
                 sendMessage(callerId, EditorChannelWiring.message("editorApplyFileUnreadable",
-                        "[P1] The offline apply file could not be read ([reason]); trying the byte store.")
+                        "[P0] The offline apply file could not be read ([reason]); trying the byte store.")
                         .replace("[reason]", String.valueOf(e.getMessage())));
             }
         }

@@ -2,11 +2,20 @@
 # Documentation: plugins/RTP/docs/admin/configuration/PERFORMANCE.md
 
 # --- Server health ---
-# Pause background work when server TPS drops below this.
+# Pause background cache filling when TPS drops below this. On Folia the
+# slowest region counts. Waiting players are still served. 0 = off.
 # @type: number
 # @range: [0.0, 20.0]
 # @default: 19.0
 minTPS: 19.0
+
+# Pause background cache filling when a tick takes longer than this (ms).
+# Catches lag that TPS hides (TPS stays 20 up to 50 ms). 0 = off.
+# @type: number
+# @range: [0.0, null]
+# @unit: ms
+# @default: 45.0
+maxMSPT: 45.0
 
 # Pause cache filling when memory use passes this %. 0/100 = off.
 # @type: number
@@ -20,26 +29,26 @@ maxHeapPercent: 85.0
 # @default: 32
 maxAttempts: 32
 
-# Ticks between background cache refills.
+# Ticks between refills of the same region. Regions take turns.
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
 # @default: 20
 period: 20
 
-# Max ms per tick for main-thread work.
+# Max ms per tick for main-thread work. Capped at 25.
 # @type: integer
-# @range: [1, null]
+# @range: [1, 25]
 # @unit: ms
-# @default: 50
-syncAllottedTime: 50
+# @default: 5
+syncAllottedTime: 5
 
-# Max ms per tick for background work.
+# Max ms per pulse for background work. Capped at 25.
 # @type: integer
-# @range: [1, null]
+# @range: [1, 25]
 # @unit: ms
-# @default: 50
-asyncAllottedTime: 50
+# @default: 25
+asyncAllottedTime: 25
 
 # --- View-distance smoothing ---
 # Chunks loaded around a spot while searching. 0 = just the spot.

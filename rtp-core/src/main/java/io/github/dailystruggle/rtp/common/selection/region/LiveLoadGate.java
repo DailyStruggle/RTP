@@ -20,9 +20,11 @@ import java.util.logging.Level;
  *
  * <p>A native load costs the server memory (full chunk, light, entities), scheduling (generation
  * workers, Folia region ownership) and region-file cache churn that RTP's own timings never see.
- * Speculative fill therefore verifies only from resident chunks and region-file reads; a native
- * load is allowed only when its result is pinned until teleport, bounded by the kept queue's
- * capacity ({@code activeChunkCap}). Pin slots are counted here so concurrent attempts cannot
+ * Speculative fill therefore verifies from resident chunks and region-file reads first; a native
+ * load prefers a pin slot (result held until teleport), bounded by the kept queue's capacity
+ * ({@code activeChunkCap}). With no slot free it loads unpinned (center and safety neighbours, no
+ * ring) unless the heap is under pressure: on fresh worlds the load is also the generation that
+ * makes the chunk file-readable later. Pin slots are counted here so concurrent attempts cannot
  * overcommit the kept queue.</p>
  *
  * <p>Counters feed {@code RTPMetricsExtension.liveLoadGates} and a temporary
@@ -82,6 +84,7 @@ public final class LiveLoadGate {
     final LongAdder pinnedLoads = new LongAdder();
     final LongAdder pinnedKept = new LongAdder();
     final LongAdder pinnedOverflow = new LongAdder();
+    final LongAdder unpinnedLoads = new LongAdder();
     final LongAdder ringsSkipped = new LongAdder();
     final LongAdder usedResident = new LongAdder();
     final LongAdder usedEvicted = new LongAdder();
@@ -143,6 +146,11 @@ public final class LiveLoadGate {
         maybeSummarize();
     }
 
+    public void onUnpinnedLoad() {
+        unpinnedLoads.increment();
+        maybeSummarize();
+    }
+
     public void onPinnedHandoff(boolean kept) {
         (kept ? pinnedKept : pinnedOverflow).increment();
     }
@@ -164,7 +172,8 @@ public final class LiveLoadGate {
     public LiveLoadGateRow snapshot() {
         return new LiveLoadGateRow(region,
                 readResolved.sum(), deferredCenter.sum(), deferredNeighbour.sum(),
-                pinnedLoads.sum(), pinnedKept.sum(), pinnedOverflow.sum(), ringsSkipped.sum(),
+                pinnedLoads.sum(), pinnedKept.sum(), pinnedOverflow.sum(), unpinnedLoads.sum(),
+                ringsSkipped.sum(),
                 pinsInFlight.get(),
                 usedResident.sum(), usedEvicted.sum(),
                 usedPinnedResident.sum(), usedPinnedEvicted.sum());
@@ -187,6 +196,7 @@ public final class LiveLoadGate {
                 + " pinned=" + r.pinnedLoads()
                 + " kept=" + r.pinnedKept()
                 + " overflow=" + r.pinnedOverflow()
+                + " unpinned=" + r.unpinnedLoads()
                 + " ringsSkipped=" + r.ringsSkipped()
                 + " pinsInFlight=" + r.pinsInFlight()
                 + " used(resident/evicted)=" + r.usedResident() + "/" + r.usedEvicted()

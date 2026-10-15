@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-04-18
-**Extended by:** [ADR-110](ADR-110-purpose-gated-live-loads.md) (speculative fill takes a native load only under a kept-queue pin)
+**Extended by:** [ADR-110](ADR-110-purpose-gated-live-loads.md) (speculative fill prefers a kept-queue pin for native loads; unpinned loads skip the success ring)
 
 ## Context
 

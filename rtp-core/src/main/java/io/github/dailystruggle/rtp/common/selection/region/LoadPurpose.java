@@ -8,9 +8,9 @@ public enum LoadPurpose {
     /** A player is waiting on the result: native loads and generation allowed. */
     IMMEDIATE,
     /**
-     * Queue or backlog fill: resident chunks and region-file reads only. A native load is
-     * allowed only when its result is pinned (reservation held until teleport) and a kept slot
-     * is free; otherwise the candidate is deferred.
+     * Queue or backlog fill: resident chunks and region-file reads first. A miss loads natively,
+     * pinned (reservation held until teleport) when a kept slot is free, else unpinned without
+     * the success ring; deferred only under heap pressure.
      */
     SPECULATIVE
 }

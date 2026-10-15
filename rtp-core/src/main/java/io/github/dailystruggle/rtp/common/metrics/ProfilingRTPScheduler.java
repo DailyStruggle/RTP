@@ -104,4 +104,9 @@ public final class ProfilingRTPScheduler implements RTPScheduler {
     public void runTaskLater(RTPWorld<?> world, int cx, int cz, Runnable task, long delay) {
         delegate.runTaskLater(world, cx, cz, timedSync(task), delay);
     }
+
+    @Override
+    public boolean isRegionSaturated(RTPWorld<?> world, int cx, int cz) {
+        return delegate.isRegionSaturated(world, cx, cz);
+    }
 }

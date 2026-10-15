@@ -16,7 +16,7 @@ scanLaeuft: "&c[P0] Scan-Aufgabe läuft bereits für Regionen: [scan_regions]"
 scanLaeuftNicht: "&c[P0] Scan-Aufgabe läuft nicht für Regionen: [scan_regions]"
 
 # Platzhalter: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-scanStatus: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 Land &8| &7ETA #7E9CC8[scan_eta]"
+scanStatus: "[P0] &8> &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 Land &8| &7ETA #7E9CC8[scan_eta]"
 
 # Boss-Bar-Titel, der Spielern mit der Berechtigung rtp.scan angezeigt wird, während ein Welt-Scan läuft.
 # Auf leere Zeichenkette setzen, um die Boss-Bar zu deaktivieren.
@@ -409,11 +409,11 @@ karteResolverFehlt: "&c[P0] für diese Anfrage ist kein Karten-Resolver registri
 # Wird gesendet, wenn ein Resolver läuft, aber die zugrunde liegende Datenquelle für
 # das angeforderte Ziel nicht verfügbar ist (unbekannte Region, noch keine Daten, Welt entladen).
 # Platzhalter: [region] - der angeforderte Regionsname (kann leer sein).
-karteNichtVerfuegbar: "&e[P1] Kartendaten sind derzeit nicht verfügbar."
+karteNichtVerfuegbar: "&e[P0] Kartendaten sind derzeit nicht verfügbar."
 
 # Wird gesendet, wenn der Kartendienst derzeit keine Karte zuweisen kann
 # (z. B. Obergrenze pro Betrachter erreicht).
-karteBeschaeftigt: "&e[P1] der Kartendienst ist beschäftigt; bitte versuche es gleich erneut."
+karteBeschaeftigt: "&e[P0] der Kartendienst ist beschäftigt; bitte versuche es gleich erneut."
 
 # Bezeichnung der anklickbaren "/rtp info"-Menüzeile, die eine Heatmap der
 # bekannten schlechten Orte der aktuellen Region rendert. Ausgeblendet, wenn die
@@ -490,7 +490,7 @@ docsExportSuccess: "&a[RTP] Dokumentations-HTML-Paket erfolgreich nach [path] ex
 docsExportFailed: "&c[RTP] Dokumentationspaket konnte nicht exportiert werden: [reason]."
 
 # --- Web editor channel (ADR-106) ---
-editorTrustPrompt: "&e[P1] Eine Web-Editor-Seite bittet mit dem Code &b[nonce]&e um Zugriff. Zeigt deine Seite denselben Code, klicke hier, um diesem Browser zu vertrauen."
+editorTrustPrompt: "&e[P0] Eine Web-Editor-Seite bittet mit dem Code &b[nonce]&e um Zugriff. Zeigt deine Seite denselben Code, klicke hier, um diesem Browser zu vertrauen."
 editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(Schlüssel [fingerprint])"
 editorTrustAccepted: "&a[P0] Browser vertraut: Die Editor-Seite mit Code [nonce] kann jetzt Vorschauen anzeigen und Hot-Apply nutzen."
 editorTrustAlready: "&7[P0] Dem Browser mit Code [nonce] wurde bereits vertraut."
@@ -498,7 +498,7 @@ editorTrustUnknown: "&c[P0] Keine offene Editor-Sitzung hat den Code [nonce] aus
 editorTrustExpired: "&c[P0] Code [nonce] ist abgelaufen. Lade die Editor-Seite neu, um einen neuen zu erhalten."
 editorTrustUsage: "&c[P0] Verwendung: /rtp editor trust nonce=<Code der Editor-Seite>"
 editorChannelOpened: "&a[P0] Web-Editor-Kanal geöffnet. Vertraue deinem Browser, wenn du gefragt wirst, um Vorschauen und Hot-Apply zu aktivieren."
-editorChannelLost: "&e[P1] Web-Editor-Kanal verloren: [reason]. Die Seite arbeitet mit ihrem Snapshot weiter."
+editorChannelLost: "&e[P0] Web-Editor-Kanal verloren: [reason]. Die Seite arbeitet mit ihrem Snapshot weiter."
 editorChannelExpired: "&7[P0] Web-Editor-Kanal nach [minutes] Minuten abgelaufen. Führe den Editor-Befehl erneut aus, um fortzufahren."
 editorTrustRateLimited: "&c[P0] Zu viele falsche Vertrauenscodes für den Editor. Warte eine Minute und versuche es dann erneut."
 editorUntrustUsage: "&c[P0] Verwendung: /rtp editor untrust key=<Fingerprint-Präfix, mindestens 4 Zeichen | all>"
@@ -506,7 +506,7 @@ editorUntrustRemoved: "&a[P0] [count] Web-Editor-Browser nicht mehr vertraut; si
 editorUntrustNone: "&7[P0] Kein vertrauter Editor-Browser passt zu [key]."
 editorUntrustFailed: "&c[P0] Die Liste vertrauter Editoren konnte nicht aktualisiert werden: [reason]"
 editorApplyDigestMissing: "&c[P0] Die Editor-Nutzlast hat keine sha256-Prüfsumme und wurde nicht angewendet. Übernimm die Änderungen erneut von einer aktuellen Editor-Seite."
-editorApplyFileUnreadable: "&e[P1] Die Offline-Apply-Datei konnte nicht gelesen werden ([reason]); versuche den Byte-Store."
+editorApplyFileUnreadable: "&e[P0] Die Offline-Apply-Datei konnte nicht gelesen werden ([reason]); versuche den Byte-Store."
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

@@ -243,6 +243,33 @@ See [Declarative Action Engine](ACTIONS.md) for full configuration.
 
 ---
 
+## Curated biome lists per world or region
+
+**What you want:** let players pick from a fixed set of biomes (for example `MEADOW`, `PLAINS`, `FOREST`), with a different set per world or region, without handing out `rtp.biome.*`.
+
+**The LeafRTP way:** run the teleport at console privilege on the player's behalf. The console passes every `rtp.biome.<biome>` check, so players only need permission for whatever runs the command (an action, an NPC, a sign, or a menu entry).
+
+```text
+rtp player=<name> region=default biome=MEADOW,PLAINS,FOREST
+```
+
+- `biome=` takes a comma-separated list. The destination may be any of the listed biomes.
+- Add `toggletargetperms=true` to charge the target player's own cooldown, delay, and price instead of the console's.
+- Use one command per world or region, each with its own biome list. Put any extra conditions in the runner (for example action `gate:` checks).
+- Leave `rtp.biome.*` at its `default: op`, so players can't skip the list by typing `/rtp biome=<x>` themselves.
+
+In an action, the command is a `CONSOLE:` script entry, the same form the bundled `arena.yml` uses for `/duel leave`:
+
+```yaml
+run:
+  - CONSOLE: "rtp player=[player_name] region=default biome=MEADOW,PLAINS,FOREST"
+```
+
+!!! warning "Always pass `region=`"
+    Without `region=`, the region comes from the target player's current world. If that region has no record yet of the **first** biome in the list, LeafRTP may switch to another region that has seen it, and that region can be in a different world. When the command runs from the console, that fallback skips every region with `requirePermission: true`, even when the target player holds `rtp.regions.<name>`. Passing `region=` pins the destination and avoids both effects.
+
+---
+
 ## At a glance
 
 | You want RTP to... | LeafRTP-native solution |
@@ -256,6 +283,7 @@ See [Declarative Action Engine](ACTIONS.md) for full configuration.
 | Kill player before RTP (death screen) | Use `DEATH` effect on `preteleport` stage or grant `rtp.effect.preteleport.death` |
 | Avoid teleporting into claims | `integrations.yml` `reroll*` toggles |
 | Teleport near another player | Action Engine (`nearplayer.yml`, `anchor: entity`) |
+| Offer a curated biome list per world or region | Console-run `rtp player=<name> region=<r> biome=<a>,<b>` |
 | Symmetrical duels & squad matchmaking | Action Engine (`challenge.yml`, subspace placement) |
 | Show cooldown / queue / region info | Native `%rtp_*%` PlaceholderAPI expansion |
 | Charge money per teleport | `economy.yml` (+ Vault) |

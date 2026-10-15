@@ -37,6 +37,11 @@ public class MockRTPChunk extends RTPChunk<Object> {
         return chunkZ;
     }
 
+    @Override
+    public String materialNameAt(int x, int y, int z) {
+        return (y > 31) ? "AIR" : "STONE";
+    }
+
     /**
      * Blocks at Y &le; 31 are solid (non-air) to simulate a ground layer beneath the
      * default {@link io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor}
@@ -52,12 +57,6 @@ public class MockRTPChunk extends RTPChunk<Object> {
     @Override
     public int getSkyLight(int x, int y, int z) {
         return 15;
-    }
-
-    /** Returns a fixed surface height of 64 (used by sky-light path). */
-    @Override
-    public int getSurfaceHeight(int x, int z) {
-        return 64;
     }
 
     /** All positions are safe - no unsafe-block filtering needed in tests. */

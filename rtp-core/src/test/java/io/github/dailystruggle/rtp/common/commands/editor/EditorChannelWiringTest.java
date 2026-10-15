@@ -39,8 +39,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * ADR-106 §5.3: the editor's handlers on {@link EditorChannel} - Hot-Apply reaches the
- * {@code /rtp editor apply} pipeline only from a trusted key, walk-path previews are answered by the
- * live feed tick over the channel, focus reaches the feed queue - with the in-memory transport.
+ * {@code /rtp editor apply} pipeline only from a trusted key, focus reaches the feed queue, and
+ * nothing else from the page is handled - with the in-memory transport.
  */
 @DisplayName("ADR-106 §5.3: editor handlers registered on the signed channel")
 class EditorChannelWiringTest {
@@ -128,27 +128,21 @@ class EditorChannelWiringTest {
     }
 
     @Test
-    @DisplayName("walkpath / curve-state go through the live feed's queue and its reply returns over the channel")
-    void previewRoutedThroughFeed() throws IOException {
+    @DisplayName("The page sends only its view (focus) and Hot-Apply: walk-path / curve-state requests are dropped unanswered")
+    void pageGeometryRequestsNotHandled() throws IOException {
         open();
         channel.trust(page.nonce);
-        page.send("walkpath", Map.of("region", "default", "sig", "s1", "shape", Map.of("name", "CIRCLE")));
-        JsonObject noFeed = page.last("walkpath");
-        assertNotNull(noFeed, "without a running feed the page still gets an answer");
-        assertEquals("s1", noFeed.get("sig").getAsString());
-        assertTrue(noFeed.has("error"));
-
         EditorLiveFeed live = new EditorLiveFeed(tempDir.resolve("live"), List.of(), List.of(), () -> "{}", 60_000L,
                 System::currentTimeMillis);
         live.prepareDirectory();
         feed.set(live);
-        page.send("curve-state", Map.of("reqId", "r1", "region", "default", "shape", Map.of("name", "CIRCLE")));
-        assertNull(page.last("curve-state"), "answered on the feed tick, not on the socket thread");
-        assertTrue(live.tick());
-        JsonObject cs = page.last("curve-state");
-        assertNotNull(cs, "the tick's reply travels back signed");
-        assertEquals("r1", cs.get("reqId").getAsString());
-        assertEquals(page.fingerprint(), cs.get("to").getAsString());
+        for (String type : List.of("walkpath", "curve-state")) {
+            page.send(type, Map.of("reqId", "r1", "region", "default", "sig", "s1", "shape", Map.of("name", "CIRCLE")));
+            assertTrue(live.tick(), "stopped: " + live.stopReason());
+            assertNull(page.last(type), type + " is not answered");
+            assertEquals("unknown type " + type, channel.lastDropReason());
+        }
+        assertTrue(channel.isOpen(), "a stale page sending them keeps its channel");
     }
 
     @Test
@@ -318,42 +312,6 @@ class EditorChannelWiringTest {
             assertEquals(sample.get("hash"), ((Map<?, ?>) entry.get("sample")).get("hash"));
         } finally {
             shapes.remove("SAMPLE_CIRCLE_TEST");
-        }
-    }
-
-    @Test
-    @DisplayName("Walk-path replies are thinned (recorded as data.thinned) to fit one 32 KiB frame")
-    @SuppressWarnings("unchecked")
-    void walkPathReplyFitsFrame() {
-        Factory<Shape<?>> shapes = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
-        if (shapes == null) {
-            shapes = new Factory<>();
-            RTP.factoryMap.put(RTP.factoryNames.shape, shapes);
-        }
-        shapes.add("channel_thin_test", new Square());
-        try {
-            EditorWalkPathPreview.Request req = new EditorWalkPathPreview.Request("r", "s",
-                    Map.of("name", "CHANNEL_THIN_TEST", "radius", "4096c", "centerRadius", "0c", "centerX", "-20000", "centerZ", "20000"));
-            String full = EditorWalkPathPreview.reply(req);
-            String fitted = EditorWalkPathPreview.reply(req, EditorChannel::fitsFrame);
-            assertTrue(EditorChannel.fitsFrame(fitted), "every reply fits a frame");
-            Map<?, ?> data = (Map<?, ?>) ((Map<?, ?>) EditorLoopbackJson.parse(fitted)).get("data");
-            assertNotNull(data, fitted.substring(0, Math.min(300, fitted.length())));
-            int fullPoints = ((List<?>) ((Map<?, ?>) ((Map<?, ?>) EditorLoopbackJson.parse(full)).get("data")).get("points")).size();
-            int kept = ((List<?>) data.get("points")).size();
-            if (EditorChannel.fitsFrame(full)) {
-                assertEquals(fullPoints, kept, "a reply that fits is not thinned");
-            } else {
-                assertTrue(data.get("thinned") instanceof Number, "thinning is recorded");
-                assertTrue(kept >= 64 && kept < fullPoints, kept + " of " + fullPoints);
-            }
-            String tiny = EditorWalkPathPreview.reply(req, json -> json.length() < 4_000);
-            assertTrue(tiny.length() < 4_000 || tiny.contains("\"error\""), "a hard cap thins further or errors");
-            assertTrue(((Map<?, ?>) EditorLoopbackJson.parse(tiny)).get("data") != null
-                    && ((Map<?, ?>) ((Map<?, ?>) EditorLoopbackJson.parse(tiny)).get("data")).get("thinned") instanceof Number,
-                    "forced thinning: " + tiny.substring(0, Math.min(200, tiny.length())));
-        } finally {
-            shapes.remove("channel_thin_test");
         }
     }
 }

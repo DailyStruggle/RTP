@@ -21,13 +21,22 @@ public final class BacklogLocationBuffer {
   private static final BacklogEntry[] EMPTY = new BacklogEntry[0];
   private static final int MAX_CAS_RETRIES = 64;
 
-  /** Tri-state per-entry validity tag. */
+  /** Per-entry validity tag, set by the region-file pre-filter. */
   public enum Validity {
-    /** Not yet examined by the Anvil pre-filter. Blocks promotion at the head. */
+    /** Not yet examined by the pre-filter. Blocks promotion at the head. */
     UNVERIFIED,
-    /** Passed the Anvil pre-filter; eligible for promotion. */
+    /**
+     * Pre-filter accepted the on-disk surface; drained into cold without a chunk load. Promotion
+     * to hot runs the rest of the check (vertical adjustor, biome, safety, claims) on the chunk.
+     */
     VALIDATED,
-    /** Failed the Anvil pre-filter; dropped from the head, never promoted. */
+    /**
+     * No on-disk data to decide from (not generated, unreadable, or no pre-filter bound). The
+     * cold fill takes it with {@link #pollOldest} and checks it with a chunk load. Blocks
+     * promotion at the head until taken.
+     */
+    UNKNOWN,
+    /** Pre-filter rejected; dropped, never promoted. */
     INVALIDATED
   }
 
@@ -243,7 +252,7 @@ public final class BacklogLocationBuffer {
 
   /**
    * Drains contiguous {@link Validity#VALIDATED} entries from head, dropping {@link Validity#INVALIDATED} entries.
-   * Stops at the first unverified entry or once {@code maxN} entries are drained.
+   * Stops at the first unverified or unknown entry or once {@code maxN} entries are drained.
    *
    * @param maxN maximum validated entries to return (non-negative)
    * @return validated entries in insertion order (never null)
@@ -267,7 +276,7 @@ public final class BacklogLocationBuffer {
           headIdx++;
           continue;
         }
-        if (v == Validity.UNVERIFIED) break;
+        if (v == Validity.UNVERIFIED || v == Validity.UNKNOWN) break;
         // VALIDATED
         if (out.size() >= maxN) break;
         out.add(head);
@@ -287,6 +296,30 @@ public final class BacklogLocationBuffer {
       }
     }
     return Collections.emptyList();
+  }
+
+  /**
+   * Removes and returns the oldest entry tagged {@code validity}, nulling its slot for reuse.
+   *
+   * @return the oldest matching entry, or {@code null} if none
+   */
+  public BacklogEntry pollOldest(Validity validity) {
+    for (int retry = 0; retry < MAX_CAS_RETRIES; retry++) {
+      BacklogEntry[] curr = state.get();
+      int idx = -1;
+      for (int i = 0; i < curr.length; i++) {
+        BacklogEntry e = curr[i];
+        if (e != null && e.validity() == validity) {
+          idx = i;
+          break;
+        }
+      }
+      if (idx < 0) return null;
+      BacklogEntry[] next = curr.clone();
+      next[idx] = null;
+      if (state.compareAndSet(curr, next)) return curr[idx];
+    }
+    return null;
   }
 
   /**
@@ -348,6 +381,20 @@ public final class BacklogLocationBuffer {
     int n = 0;
     for (BacklogEntry e : curr) {
       if (e != null && e.validity() == Validity.VALIDATED) n++;
+    }
+    return n;
+  }
+
+  /**
+   * Returns the number of entries currently tagged {@link Validity#UNKNOWN}.
+   *
+   * @return number of entries waiting for the cold fill's check
+   */
+  public int unknownSize() {
+    BacklogEntry[] curr = state.get();
+    int n = 0;
+    for (BacklogEntry e : curr) {
+      if (e != null && e.validity() == Validity.UNKNOWN) n++;
     }
     return n;
   }

@@ -730,7 +730,7 @@ public final class RTPFabricMod implements ModInitializer {
         if (adapterFqn == null) {
             throw new IllegalStateException(
                     "No Fabric version adapter is mapped for running MC version '" + mcVersion
-                            + "'. Supported lines: 1.20.x, 1.21.x, 26.1.x, 26.2.x, 26.3.x. See rtp-fabric-ADR-001.");
+                            + "'. Supported lines: 1.20.x, 1.21.x, 26.1.x, 26.2.x, 26.3.x, 26.4.x. See rtp-fabric-ADR-001.");
         }
 
         try {
@@ -780,7 +780,7 @@ public final class RTPFabricMod implements ModInitializer {
      * needs its own adapter (e.g. {@code v26_2_R1}), add a row here and
      * create the matching submodule.</p>
      */
-    private static String adapterFqnFor(String mcVersion) {
+    static String adapterFqnFor(String mcVersion) {
         if (mcVersion == null) return null;
         if (mcVersion.startsWith("1.20")) {
             return "io.github.dailystruggle.rtp.fabric.v1_20_R1.V1_20_R1FabricVersionAdapter";
@@ -820,6 +820,11 @@ public final class RTPFabricMod implements ModInitializer {
             // MC 26.3 line (rtp-fabric-ADR-015). Java 25 bytecode - never
             // named on a Java 21 JVM, so never resolved there.
             return "io.github.dailystruggle.rtp.fabric.v26_3_R1.V26_3_R1FabricVersionAdapter";
+        }
+        if (mcVersion.startsWith("26.4")) {
+            // MC 26.4 line (rtp-fabric-ADR-017). Java 25 bytecode - never
+            // named on a Java 21 JVM, so never resolved there.
+            return "io.github.dailystruggle.rtp.fabric.v26_4_R1.V26_4_R1FabricVersionAdapter";
         }
         return null;
     }

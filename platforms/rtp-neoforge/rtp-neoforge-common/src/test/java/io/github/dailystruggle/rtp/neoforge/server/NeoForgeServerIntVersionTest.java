@@ -28,6 +28,7 @@ class NeoForgeServerIntVersionTest {
     void modernStringsUseMajor() {
         assertEquals(26, NeoForgeServerAccessor.parseIntVersion("26.1.2"));
         assertEquals(26, NeoForgeServerAccessor.parseIntVersion("26.2"));
+        assertEquals(26, NeoForgeServerAccessor.parseIntVersion("26.4"));
     }
 
     @Test

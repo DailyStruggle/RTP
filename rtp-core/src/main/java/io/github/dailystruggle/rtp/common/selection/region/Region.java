@@ -64,6 +64,12 @@ public class Region extends FactoryValue<RegionKeys> {
 
   public RTPTaskPipe cachePipeline;
   public RTPTaskPipe miscPipeline;
+  /**
+   * Cold->hot chunk loads started per pulse. Each completion costs tick-thread time outside any
+   * RTP budget (chunk promotion), so a large hot deficit refills over several pulses instead of
+   * landing activeChunkCap loads on one tick.
+   */
+  static final int MAX_PROMOTIONS_PER_PULSE = 8;
   protected RTPWorld<?> savedWorld = null;
   private long lastValidationTime = 0;
 
@@ -96,16 +102,22 @@ public class Region extends FactoryValue<RegionKeys> {
    */
   private volatile boolean backlogRefillActive = true;
 
+  /** Share of the remaining pulse budget the backlog refill leaves for later stages and other plugins. */
+  static final double BACKLOG_HEADROOM = 0.2d;
+
+  /** EWMA of one refill pick (ns); predicts whether the next pick still fits the budget. */
+  private long backlogPickNanos = 0L;
+
   /** Batched backlog bin verification; per instance (reset by {@link #clone()}). */
   private BacklogBinVerifier binVerifier = new BacklogBinVerifier();
 
-  /** Records a backlog entry this region staged as rejected and teaches its bad-chunk table. */
+  /** Records a backlog entry the region-file pre-filter denied and teaches its bad-chunk table. */
   void onBacklogReject(BacklogLocationBuffer.BacklogEntry e) {
-    RtpOutcomeStats.GLOBAL.recordFailure(LocationGenerator.FailTypes.biome);
+    RtpOutcomeStats.GLOBAL.recordFailure(LocationGenerator.FailTypes.prefilterBlock);
     if (this.shape instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape ms) {
-      long loc1D = ms.xzToLocation(e.location().coords().x(), e.location().coords().z());
+      long loc1D = ms.xzToLocation(e.location().coords().x() >> 4, e.location().coords().z() >> 4);
       if (loc1D >= 0) {
-        ms.addBadChunk(loc1D, LocationGenerator.FailTypes.biome);
+        ms.addBadChunk(loc1D, LocationGenerator.FailTypes.prefilterBlock);
       }
     }
   }
@@ -459,55 +471,93 @@ public class Region extends FactoryValue<RegionKeys> {
       io.github.dailystruggle.rtp.api.world.RTPChunk<?> rtpChunk,
       int cx, int cz) {
     try {
+      RTPCoords coords = (coldLoc != null) ? coldLoc.coords() : null;
+      int lx = (coords != null) ? (coords.x() & 15) : 7;
+      int lz = (coords != null) ? (coords.z() & 15) : 7;
+      int chosenY = (coords != null) ? coords.y() : 64;
+
       if (rtpChunk == null) {
         // Transient null: returned to unkept queue for retry.
         RTP.log(Level.FINE,
-            "[RTP][PROMOTE_DIAG] region=" + name + " cold=(" + coldLoc.coords().x() + ","
-                + coldLoc.coords().y() + "," + coldLoc.coords().z() + ") chunk=(" + cx + "," + cz
-                + ") transient: getCachedChunk returned null "
+            "[RTP][PROMOTE_DIAG] region=" + name + " cold=(" + (coords != null ? coords.x() : ((cx << 4) + lx)) + ","
+                + chosenY + "," + (coords != null ? coords.z() : ((cz << 4) + lz)) + ") chunk=(" + cx + "," + cz
+                + ") col=(" + lx + "," + lz + ")"
+                + " transient: getCachedChunk returned null "
                 + "(chunk not retained through the verify window; returned to unkept for retry).");
         return;
       }
-      int surfaceY = rtpChunk.getSurfaceHeight(8, 8);
+
+      // Derive highest non-air block on column (lx, lz) using block checks (top-down),
+      // never using heightmaps (which are not used for placement and may be unpopulated).
+      io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = (rtpChunk.getWorld() != null) ? rtpChunk.getWorld() : getWorld();
+      int worldMax = (world != null) ? world.getMaxHeight() : 320;
+      int worldMin = (world != null) ? world.getMinHeight() : -64;
+      int columnSurfaceY = Integer.MIN_VALUE;
+      try {
+        for (int y = worldMax - 1; y >= worldMin; y--) {
+          if (!rtpChunk.isAir(lx, y, lz)) {
+            columnSurfaceY = y;
+            break;
+          }
+        }
+      } catch (Throwable t) {
+        // block read failure on column scan
+      }
+
       String biome;
       try {
-        biome = rtpChunk.getBiome(8, surfaceY, 8);
+        biome = rtpChunk.getBiome(lx, chosenY, lz);
       } catch (Throwable t) {
         biome = "<biome-read-threw:" + t.getClass().getSimpleName() + ">";
       }
+
       boolean airBelow;
       boolean airAt;
       boolean airAbove;
       try {
-        airBelow = rtpChunk.isAir(8, surfaceY - 1, 8);
-        airAt = rtpChunk.isAir(8, surfaceY, 8);
-        airAbove = rtpChunk.isAir(8, surfaceY + 1, 8);
+        airBelow = rtpChunk.isAir(lx, chosenY - 1, lz);
+        airAt = rtpChunk.isAir(lx, chosenY, lz);
+        airAbove = rtpChunk.isAir(lx, chosenY + 1, lz);
       } catch (IllegalArgumentException yOutOfRange) {
         RTP.log(Level.FINE,
             "[RTP][PROMOTE_DIAG] region=" + name + " chunk=(" + cx + "," + cz
-                + ") DROPPED vert.adjust=null; surfaceY=" + surfaceY
-                + " is a void/no-surface column (isAir sample Y out of range: "
-                + yOutOfRange.getMessage() + ").");
+                + ") col=(" + lx + "," + lz + ") chosenY=" + chosenY
+                + " DROPPED vert.adjust=null; chosen Y is out of range: "
+                + yOutOfRange.getMessage());
         return;
       } catch (Throwable t) {
         RTP.log(Level.INFO,
             "[RTP][PROMOTE_DIAG] region=" + name + " chunk=(" + cx + "," + cz
-                + ") DROPPED vert.adjust=null but isAir read THREW "
+                + ") col=(" + lx + "," + lz + ") chosenY=" + chosenY
+                + " DROPPED vert.adjust=null but isAir read THREW "
                 + t.getClass().getSimpleName() + ": " + t.getMessage()
                 + " (block reads are broken on this platform chunk).");
         return;
       }
+
+      int skyLight = -1;
+      try {
+        skyLight = rtpChunk.getSkyLight(lx, chosenY, lz);
+      } catch (Throwable ignored) {
+        // best-effort
+      }
+
       RTP.log(Level.FINE,
           "[RTP][PROMOTE_DIAG] region=" + name + " chunk=(" + cx + "," + cz
-              + ") DROPPED vert.adjust=null"
+              + ") cold=(" + (coords != null ? coords.x() : ((cx << 4) + lx)) + ","
+              + chosenY + "," + (coords != null ? coords.z() : ((cz << 4) + lz)) + ")"
+              + " col=(" + lx + "," + lz + ")"
+              + " DROPPED vert.adjust=null"
               + " generated=" + rtpChunk.isGenerated()
               + " loaded=" + rtpChunk.isLoaded()
               + " anvilBacked=" + rtpChunk.isSelfContained()
-              + " surfaceY=" + surfaceY
+              + " chosenY=" + chosenY
+              + " columnSurfaceY=" + (columnSurfaceY == Integer.MIN_VALUE ? "all-air" : columnSurfaceY)
               + " biome=" + biome
               + " isAir[y-1/y/y+1]=" + airBelow + "/" + airAt + "/" + airAbove
-              + " (live+generated+sensible surfaceY -> vertical adjustor issue;"
-              + " anvilBacked or surfaceY==minHeight+all-air -> ungenerated/empty chunk).");
+              + (skyLight >= 0 ? " skyLight=" + skyLight : "")
+              + " (live+generated -> vertical adjustor found no safe standing column;"
+              + " anvilBacked or columnSurfaceY==all-air -> ungenerated/empty chunk).");
     } catch (Throwable diagEx) {
       RTP.log(Level.INFO,
           "[RTP][PROMOTE_DIAG] diagnostic itself failed for region=" + name
@@ -606,6 +656,114 @@ public class Region extends FactoryValue<RegionKeys> {
     });
   }
 
+  /**
+   * Drops a cold location that failed promotion and records the cause. pollSilently skipped the
+   * delete callback; offer+poll fires it so the DB row is purged.
+   */
+  private void dropColdLocation(RTPLocation coldLoc, LocationGenerator.FailTypes cause) {
+    RtpOutcomeStats.GLOBAL.recordFailure(cause);
+    queueManager.unkeptLocations.offer(coldLoc);
+    queueManager.unkeptLocations.poll();
+  }
+
+  /**
+   * Promotion checks after the vertical adjustor placed {@code resolved} on the loaded
+   * {@code center} chunk: world border, biome, safety scan and claims (S-001, S-003). Cold holds
+   * backlog entries the region-file pre-filter only screened for unsafe surface blocks, and
+   * stored locations, so this is their full check. Safety neighbours resolve from resident
+   * chunks or region files first and load natively only on a miss; claims run async (S-005).
+   *
+   * @return {@code null} on pass, else the failing check
+   */
+  CompletableFuture<LocationGenerator.FailTypes> promotionChecks(
+      RTPCoords resolved, io.github.dailystruggle.rtp.api.world.RTPChunk<?> center) {
+    RTPWorld<?> world = getWorld();
+    if (world == null) return CompletableFuture.completedFuture(LocationGenerator.FailTypes.nullChunk);
+
+    Object border = RTP.serverAccessor.getWorldBorder(world.name());
+    if (border instanceof io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder wb
+        && !wb.isInside().apply(new io.github.dailystruggle.rtp.api.world.RTPLocation(
+            world, resolved.x(), resolved.y(), resolved.z()))) {
+      return CompletableFuture.completedFuture(LocationGenerator.FailTypes.worldBorder);
+    }
+
+    Object wl = RTP.configs.getConfigValue(
+        io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys.biomeWhitelist, false);
+    boolean whitelist = (wl instanceof Boolean b) ? b : Boolean.parseBoolean(String.valueOf(wl));
+    Set<String> biomes = new HashSet<>();
+    if (RTP.configs.getConfigValue(
+        io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys.biomes, null) instanceof List<?> list) {
+      for (Object o : list) if (o != null) biomes.add(o.toString().toUpperCase());
+    }
+    String biome = center.getBiome(resolved.x(), resolved.y(), resolved.z());
+    if (BiomeNames.matches(biomes, (biome == null) ? "" : biome.toUpperCase()) != whitelist) {
+      return CompletableFuture.completedFuture(LocationGenerator.FailTypes.biome);
+    }
+
+    int safe = 0;
+    Set<String> unsafe = new HashSet<>();
+    @SuppressWarnings("unchecked")
+    io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys> safety =
+        (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys>)
+            RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.class);
+    if (safety != null) {
+      safe = Math.max(0, safety.getNumber(
+          io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.safetyRadius, 0).intValue());
+    }
+    if (RTP.configs.getConfigValue(
+        io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys.unsafeBlocks,
+        new ArrayList<>()) instanceof java.util.Collection<?> c) {
+      for (Object o : c) if (o != null) unsafe.add(o.toString().toUpperCase());
+    }
+
+    // Neighbour chunks the block radius reaches, indexed as SafetyScan expects.
+    final int r = safe;
+    final int L = 2 * r + 1;
+    final int ccx = center.x();
+    final int ccz = center.z();
+    final io.github.dailystruggle.rtp.api.world.RTPChunk<?>[] grid =
+        new io.github.dailystruggle.rtp.api.world.RTPChunk<?>[L * L];
+    grid[r * L + r] = center;
+    List<CompletableFuture<?>> pending = new ArrayList<>();
+    for (int ncx = (resolved.x() - r) >> 4; ncx <= (resolved.x() + r) >> 4; ncx++) {
+      for (int ncz = (resolved.z() - r) >> 4; ncz <= (resolved.z() + r) >> 4; ncz++) {
+        if (ncx == ccx && ncz == ccz) continue;
+        final int idx = (ncx - ccx + r) * L + (ncz - ccz + r);
+        final int fx = ncx;
+        final int fz = ncz;
+        pending.add(world.getOrReadChunk(fx, fz).thenCompose(read -> {
+          if (read != null) return CompletableFuture.completedFuture(read);
+          world.recordChunkLoadOrigin("Region.promotionSafety");
+          return world.getChunkAt(fx, fz).thenApply(k -> (k != null) ? world.getCachedChunk(k) : null);
+        }).thenAccept(chunk -> grid[idx] = chunk));
+      }
+    }
+    final Set<String> unsafeBlocks = unsafe;
+    java.util.function.Supplier<CompletableFuture<LocationGenerator.FailTypes>> scanThenClaims = () -> {
+      if (!SafetyScan.isColumnSafe(resolved, world, grid, L, ccx, ccz, r, unsafeBlocks)) {
+        return CompletableFuture.completedFuture(LocationGenerator.FailTypes.safety);
+      }
+      CompletableFuture<Boolean> claims = GlobalRegionVerifiers.checkGlobalRegionVerifiers(resolved);
+      if (claims == null) return CompletableFuture.completedFuture(LocationGenerator.FailTypes.safetyExternal);
+      return claims.handle((ok, ex) ->
+          (ex == null && Boolean.TRUE.equals(ok)) ? null : LocationGenerator.FailTypes.safetyExternal);
+    };
+    // Same chunk only: still on the caller's (region) thread.
+    if (pending.isEmpty()) return scanThenClaims.get();
+    return CompletableFuture.allOf(pending.toArray(new CompletableFuture[0]))
+        .orTimeout(KEPT_READY_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+        .thenCompose(v -> {
+          if (!isFoliaPlatform()) return scanThenClaims.get();
+          // Folia: live block reads belong on the chunk's region thread.
+          CompletableFuture<LocationGenerator.FailTypes> out = new CompletableFuture<>();
+          RTP.scheduler.runTask(world, ccx, ccz, () -> scanThenClaims.get().whenComplete((f, e) -> {
+            if (e != null) out.completeExceptionally(e);
+            else out.complete(f);
+          }));
+          return out.orTimeout(KEPT_READY_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+        });
+  }
+
   public void execute(long availableTime) {
     io.github.dailystruggle.rtp.common.tools.CfDiag.regionExecute.increment();
     // Lobby backends advertise regions=[]/acceptingRequests=false
@@ -631,14 +789,15 @@ public class Region extends FactoryValue<RegionKeys> {
 
 //    System.out.println("[RTP-DEBUG] Region '" + name + "' execute() STARTED. Initial budget: " + availableTime + "ns");
 
-    // ADR-028 - backlog cache pulse. Three inline steps (no producer/consumer
-    // split), in order: refill the per-region buffer with shape-only picks
-    // (S-005 safe - no chunk I/O), verify exactly one Anvil-region-file bin via
-    // the bound AnvilPrefilter provider (cross-RTP-region amortization through
-    // the world-shared bin index), and drain the contiguous-VALIDATED head into
-    // unkeptLocations subject to its capacity. Skipped when backlogCacheCap=0
-    // (lite default; backlogLocations is null).
-    processBacklog(availableTime, start);
+    // minTPS / maxMSPT gate: an unhealthy tick pauses refill work (backlog picks, cold->hot
+    // loads, cold fill); serving waiting players below continues regardless.
+    boolean tickUnhealthy = io.github.dailystruggle.rtp.common.tools.ServerHealthGate.shouldPause();
+
+    // ADR-028 - backlog cache pulse: refill with shape-only picks within the pulse
+    // budget, pre-filter region-file bins (no chunk loads, S-005), and drain validated
+    // entries into cold. UNKNOWN entries are taken by the cold fill below
+    // (RegionCacheTask). Skipped when backlogCacheCap=0.
+    processBacklog(tickUnhealthy ? 0L : availableTime, start);
 
     // Region.java - inside execute()
     long activeCap = settings.activeChunkCap();
@@ -662,10 +821,11 @@ public class Region extends FactoryValue<RegionKeys> {
     // waiting players (the playerQueue drain below) continues regardless.
     boolean heapUnderPressure =
         io.github.dailystruggle.rtp.common.tools.HeapPressureMonitor.underPressure();
-    long fillDeficit = heapUnderPressure ? 0 : deficit;
-    if (heapUnderPressure && deficit > 0) {
+    long fillDeficit = (heapUnderPressure || tickUnhealthy) ? 0 : Math.min(deficit, MAX_PROMOTIONS_PER_PULSE);
+    if ((heapUnderPressure || tickUnhealthy) && deficit > 0) {
       RTP.log(Level.FINE,
-          "[Region:" + name + "] hot-cache fill paused (heap pressure); deficit=" + deficit);
+          "[Region:" + name + "] hot-cache fill paused ("
+              + (heapUnderPressure ? "heap pressure" : "tick health") + "); deficit=" + deficit);
     }
 
     // Active shed: under heap pressure, release kept chunk tickets back to unkeptLocations.
@@ -674,6 +834,7 @@ public class Region extends FactoryValue<RegionKeys> {
     }
 
     for (int i = 0; i < fillDeficit; i++) {
+      if (i > 0 && System.nanoTime() - start >= availableTime) break;
       // Silent poll: this location is about to be re-offered to keptLocations under an
       // identical DB composite key (region:world:x:y:z). Firing the delete callback here
       // and the save callback on the kept offer races inside DatabaseAccessor's
@@ -684,12 +845,19 @@ public class Region extends FactoryValue<RegionKeys> {
       RTPLocation coldLoc = queueManager.unkeptLocations.pollSilently();
       if (coldLoc == null) break;
 
+      int cx = coldLoc.coords().x() >> 4;
+      int cz = coldLoc.coords().z() >> 4;
+      // ADR-087 regional circuit breaker: a backlogged or slow region keeps its candidate cold;
+      // the next candidate (usually another region) takes this slot, so load is divided, not stacked.
+      if (RTP.scheduler != null && RTP.scheduler.isRegionSaturated(getWorld(), cx, cz)) {
+        queueManager.unkeptLocations.offerSilently(coldLoc); // silent: the poll kept its DB row
+        continue;
+      }
+
       inFlightCalculations.incrementAndGet();
       RTP.log(Level.FINER,
           "[Region:" + name + "] SpawnWorker for cold (" + coldLoc.coords().x()
               + "," + coldLoc.coords().y() + "," + coldLoc.coords().z() + ")");
-      int cx = coldLoc.coords().x() >> 4;
-      int cz = coldLoc.coords().z() >> 4;
 
       getWorld().recordChunkLoadOrigin("Region.coldPromote");
       io.github.dailystruggle.rtp.common.tools.CfDiag.regionDeficitDispatch.increment();
@@ -723,6 +891,7 @@ public class Region extends FactoryValue<RegionKeys> {
           // Re-runs vertical adjustor against loaded chunk to ensure valid ground placement.
           @SuppressWarnings("java:S2093") // ChunkReservation ownership is transferred on successful offer; closing in try-with-resources would invalidate cached chunks
           Runnable verify = () -> {
+            boolean handedOff = false;
             try {
               RTP.log(Level.FINER,
                   "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
@@ -772,23 +941,47 @@ public class Region extends FactoryValue<RegionKeys> {
                 // ungenerated anvil view) is distinguishable from a genuinely
                 // unsafe column.
                 logPromotionDropDiag(coldLoc, rtpChunk, cx, cz);
-                // Drop the now-unsafe / placeholder-Y location. pollSilently
-                // above skipped the delete callback; fire offer+poll so the
-                // DB row is purged.
-                queueManager.unkeptLocations.offer(coldLoc);
-                queueManager.unkeptLocations.poll();
+                dropColdLocation(coldLoc, LocationGenerator.FailTypes.vert);
                 return;
               }
 
               ChunkReservation reservation = new ChunkReservation(chunkSet, getWorld());
-              // Moves the slot to pendingKeptPromotions before the in-flight release below.
-              offerKeptWhenResident(coldLoc, resolved, reservation, cx, cz);
+              final RTPCoords checked = resolved;
+              CompletableFuture<LocationGenerator.FailTypes> checks;
+              try {
+                checks = promotionChecks(checked, rtpChunk);
+              } catch (Throwable t) {
+                checks = CompletableFuture.failedFuture(t);
+              }
+              handedOff = true;
+              checks.whenComplete((cause, ex) -> {
+                try {
+                  if (ex == null && cause == null) {
+                    // Moves the slot to pendingKeptPromotions before the in-flight release below.
+                    offerKeptWhenResident(coldLoc, checked, reservation, cx, cz);
+                    return;
+                  }
+                  reservation.close();
+                  RTP.log(Level.FINE, "[Region:" + name + "] promotion chunk=(" + cx + "," + cz
+                      + ") dropped: " + (ex != null ? ex.toString() : cause.name()));
+                  dropColdLocation(coldLoc, (ex != null) ? LocationGenerator.FailTypes.misc : cause);
+                } catch (Throwable t) {
+                  reservation.close();
+                  RTP.log(Level.WARNING, "[Region:" + name + "] promotion check failed: " + t, t);
+                } finally {
+                  inFlightCalculations.decrementAndGet();
+                }
+              });
             } finally {
-              inFlightCalculations.decrementAndGet();
+              if (!handedOff) inFlightCalculations.decrementAndGet();
             }
           };
           if (isFoliaPlatform()) {
             RTP.scheduler.runTask(getWorld(), cx, cz, verify);
+          } else if (isOnTickThread()) {
+            // Paper completes chunk futures on the main thread: queue the column re-check and
+            // promotion checks on the budgeted sync pipe instead of running them in the callback.
+            RTP.getInstance().miscSyncTasks.add(verify);
           } else {
             verify.run();
           }
@@ -994,7 +1187,10 @@ public class Region extends FactoryValue<RegionKeys> {
       }
     }
 
-    miscPipeline.execute(availableTime - (System.nanoTime() - start));
+    // Floor of 1 ns keeps the one-task-per-pulse progress guarantee on this async worker.
+    miscPipeline.execute(Math.max(1L, availableTime - (System.nanoTime() - start)));
+
+    if (tickUnhealthy) return;
 
     long cacheCap = settings.cacheCap();
     long totalCap = Math.max(cacheCap + activeCap, queueManager.playerQueue.size());
@@ -1016,7 +1212,7 @@ public class Region extends FactoryValue<RegionKeys> {
         cachePipeline.add(RegionCacheTask.observe(this, availableTime - (System.nanoTime() - start)));
       }
 
-      cachePipeline.execute(availableTime - (System.nanoTime() - start));
+      cachePipeline.execute(Math.max(1L, availableTime - (System.nanoTime() - start)));
     } finally {
       isScanningCache.set(false);
     }
@@ -1024,7 +1220,9 @@ public class Region extends FactoryValue<RegionKeys> {
 
   /**
    * Backlog cache pulse (ADR-028).
-   * Refills unverified buffer, validates one anvil bin, and drains validated head to cold.
+   * Refills unverified picks within the pulse budget, pre-filters region-file bins, drops rejected
+   * entries and drains validated ones into cold without a chunk load. UNKNOWN entries (no on-disk
+   * data) wait for the cold fill, which takes them one at a time and checks them with a chunk load.
    *
    * @param availableTime original pulse budget (ns)
    * @param startNanos    {@code System.nanoTime()} captured at pulse start
@@ -1035,12 +1233,10 @@ public class Region extends FactoryValue<RegionKeys> {
     RTPWorld<?> world = getWorld();
     if (world == null) return;
 
-    // Refill (shape-only, time-sliced).
-    final long refillBudget = Math.max(0L, availableTime / 4L);
     Shape<?> currentShape = this.shape;
     int verticalY;
     {
-      // Placeholder Y clamped to adjustor min/world bounds until cold->hot promotion verifies ground.
+      // Placeholder Y clamped to adjustor min/world bounds; the real Y comes from the chunk check.
       VerticalAdjustor<?> v = getVert();
       if (v != null) {
         int wMin = world.getMinHeight();
@@ -1073,15 +1269,22 @@ public class Region extends FactoryValue<RegionKeys> {
     boolean heapUnderPressure =
         io.github.dailystruggle.rtp.common.tools.HeapPressureMonitor.underPressure();
     if (currentShape != null && backlogRefillActive && !heapUnderPressure) {
-      // Clean invalidated entries if heuristic is met before refilling.
-      backlog.cleanIfHeuristicMet();
+      // Denied entries (possibly by another region's verifier on a shared bin) free capacity first.
+      backlog.removeInvalidated();
       // Bounded rejection sampling: cap consecutive pregenPref rejections per pulse.
       final int maxConsecutivePregenRejects = Math.max(16, backlog.capacity());
       int consecutivePregenRejects = 0;
       boolean binnedStrategy = "BINNED_AMORTIZED".equalsIgnoreCase(readBacklogGenerationStrategy());
 
-      while (backlog.size() < backlog.capacity()
-          && (System.nanoTime() - startNanos) < refillBudget) {
+      // Unverified picks are shape math only (no chunk I/O, ~100 B each): fill toward the cap within
+      // the pulse budget. Stop when the predicted next pick would cross the headroom line.
+      final long deadline = refillDeadline(availableTime, startNanos, System.nanoTime());
+      long pickStart = 0L;
+      while (true) {
+        long now = System.nanoTime();
+        if (pickStart != 0L) recordPickCost(now - pickStart);
+        if (backlog.size() >= backlog.capacity() || now + backlogPickNanos >= deadline) break;
+        pickStart = now;
         int[] sel;
         try {
           if (binnedStrategy
@@ -1139,26 +1342,44 @@ public class Region extends FactoryValue<RegionKeys> {
     }
     // Entries carry their owner's sink; this one only covers entries staged without one.
     binVerifier.pulse(world, backlog, binIndex, provider, this::onBacklogReject);
-    // Clean invalidated entries if heuristic is met to free backlog capacity.
-    backlog.cleanIfHeuristicMet();
 
-    // Drain validated entries into unkeptLocations up to cold capacity.
-    // Under FLAT_STRIDE (default): drains contiguous validated head (FIFO), preserving linear dyadic progression.
-    // Under BINNED_AMORTIZED: drains randomly via slot-nulling to de-cluster candidates from the active bin.
-    long coldCap = settings.cacheCap();
-    long coldFree = Math.max(0L, coldCap - queueManager.unkeptLocations.size());
-    if (coldFree > 0L) {
-      boolean binnedStrategy = "BINNED_AMORTIZED".equalsIgnoreCase(readBacklogGenerationStrategy());
-      List<BacklogLocationBuffer.BacklogEntry> drained = binnedStrategy
-          ? backlog.pollRandomValidated((int) Math.min(coldFree, Integer.MAX_VALUE))
-          : backlog.pollContiguousValidatedHead((int) Math.min(coldFree, Integer.MAX_VALUE));
-      for (BacklogLocationBuffer.BacklogEntry e : drained) {
-        if (!queueManager.unkeptLocations.offer(e.location())) {
-          break;
-        }
-        RtpOutcomeStats.GLOBAL.recordSuccess();
-      }
+    // Rejected entries are dropped this pulse so their capacity goes to new picks.
+    backlog.removeInvalidated();
+
+    // Validated entries need no chunk load: cold takes them as-is up to cacheCap; promotion to hot
+    // runs the rest of the check on the chunk it loads. UNKNOWN entries stay until the cold fill
+    // takes them (RegionCacheTask -> PregenTask).
+    drainValidatedToCold(backlog);
+  }
+
+  /** Moves validated backlog entries into cold up to {@code cacheCap}; FIFO head or random per strategy. */
+  private void drainValidatedToCold(BacklogLocationBuffer backlog) {
+    long room = settings.cacheCap() - queueManager.unkeptLocations.size();
+    if (room <= 0L) return;
+    int n = (int) Math.min(Integer.MAX_VALUE, room);
+    List<BacklogLocationBuffer.BacklogEntry> out =
+        "BINNED_AMORTIZED".equalsIgnoreCase(readBacklogGenerationStrategy())
+            ? backlog.pollRandomValidated(n)
+            : backlog.pollContiguousValidatedHead(n);
+    for (BacklogLocationBuffer.BacklogEntry e : out) {
+      if (!queueManager.unkeptLocations.offer(e.location())) break;
+      RtpOutcomeStats.GLOBAL.recordSuccess();
     }
+  }
+
+  /**
+   * Refill deadline: {@code now} plus the remaining pulse budget less {@link #BACKLOG_HEADROOM}.
+   * The pulse budget is {@code asyncAllottedTime} from performance.yml.
+   */
+  static long refillDeadline(long availableTime, long startNanos, long now) {
+    long remaining = availableTime - (now - startNanos);
+    if (remaining <= 0L) return now;
+    return now + (long) (remaining * (1.0d - BACKLOG_HEADROOM));
+  }
+
+  /** Folds one pick's cost into {@link #backlogPickNanos} (7/8 decay, as in TimeBoundTaskPipe). */
+  private void recordPickCost(long cost) {
+    backlogPickNanos = (backlogPickNanos == 0L) ? cost : (backlogPickNanos / 8L) * 7L + cost / 8L;
   }
 
   /**
@@ -1505,6 +1726,15 @@ public class Region extends FactoryValue<RegionKeys> {
       // Cosmetic only - never let a label lookup break a caller.
     }
     return name;
+  }
+
+  private static boolean isOnTickThread() {
+    try {
+      return RTP.serverAccessor != null && RTP.serverAccessor.isPrimaryThread()
+          && RTP.getInstance() != null && RTP.getInstance().miscSyncTasks != null;
+    } catch (Throwable t) {
+      return false;
+    }
   }
 
   private static boolean isFoliaPlatform() {

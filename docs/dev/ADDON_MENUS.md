@@ -213,10 +213,12 @@ re-skin RTP's own pages.
 - Never load chunks or run blocking work on the main thread - the teleport is async and RTP handles
   it.
 - **Book Menu Color Contrast:** Adventure / Paper `Book` pages render on parchment-yellow backgrounds. Never use yellow (`&e`, `&6`) or white (`&f`) in book menus; prefer high-contrast dark colors (`&0` black, `&1`/`&9` blue, `&4`/`&c` red, `&5` purple, `&8` gray). Chat messages (`SendMessage`) are exempt.
+- **UI Glyphs & Icons:** See [MESSAGES.md#useful-ui-glyphs--icons](../admin/configuration/MESSAGES.md#useful-ui-glyphs--icons) for a catalog of useful icons, Unicode codepoints, console-safe ASCII alternatives, and rendering guidelines.
 
 ## See also
 
 - [FOR_ADDON_DEVELOPERS.md](../FOR_ADDON_DEVELOPERS.md) - the addon-developer landing page.
 - [EXTERNAL_HOOKS.md](EXTERNAL_HOOKS.md) - the root-action hook and the full behavior-modification catalog.
 - [ADDON_CROSS_SERVER.md](ADDON_CROSS_SERVER.md) - offering remote (network-mode) destinations from an addon.
+- [MESSAGES.md](../admin/configuration/MESSAGES.md) - message files, formatting, and the useful UI glyphs reference table.
 - [ADR-045](../adr/ADR-045-rtp-docs-menu-consumer.md), [ADR-048](../adr/ADR-048-menu-builders-behind-server-accessor.md) - the menu SPI design.

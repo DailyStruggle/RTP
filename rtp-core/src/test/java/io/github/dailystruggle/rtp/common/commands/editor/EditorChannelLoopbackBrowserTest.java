@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * ADR-106 §5: the real page's {@code EditorChannelClient} (WebCrypto, IndexedDB key) against the
  * real {@link EditorLoopbackChannel} through {@link LoopbackTransport} - the local export path, run
  * in headless Chrome / Edge from {@code file://}. Covers the handshake, in-game trust, Java/WebCrypto
- * signature interop in both directions, a walk-path reply, Hot-Apply acknowledged, and a forged plugin
+ * signature interop in both directions, Hot-Apply acknowledged, and a forged plugin
  * frame dropped by the page. Skipped when no browser is installed or {@code RTP_BROWSER_TESTS=0}.
  */
 @DisplayName("ADR-106 §5: page EditorChannelClient <-> loopback EditorChannel end to end (headless browser)")
@@ -56,14 +56,10 @@ class EditorChannelLoopbackBrowserTest {
               EditorChannelClient.onStatus((s) => res.states.push(s));
               res.connected = await wait(() => EditorChannelClient.isConnected(), 30000);
               res.badge = (document.getElementById('channel-badge') || {}).dataset ? document.getElementById('channel-badge').dataset.status : '';
-              let wp = null, ack = null, ping = null, forged = false;
-              EditorChannelClient.on('walkpath', (m) => { wp = m; });
+              let ack = null, ping = null, forged = false;
               EditorChannelClient.on('apply_ack', (m) => { ack = m; });
               EditorChannelClient.on('probe-ping', (m) => { ping = m; });
               EditorChannelClient.on('forged', () => { forged = true; });
-              EditorChannelClient.send('walkpath', { region: 'default', sig: 'probe-sig', shape: { name: 'CIRCLE' } });
-              await wait(() => wp, 8000);
-              res.walkpath = wp ? { sig: wp.sig, hasError: !!wp.error } : null;
               EditorChannelClient.send('apply', { region: 'default', timestamp: 7, files: { 'regions/default.yml': 'shape:\\n  name: CIRCLE\\n' } });
               await wait(() => ack, 8000);
               res.ack = ack ? { success: ack.success, to: ack.to } : null;
@@ -138,7 +134,7 @@ class EditorChannelLoopbackBrowserTest {
 
     @Test
     @Timeout(value = 150, unit = TimeUnit.SECONDS)
-    @DisplayName("handshake -> awaiting trust -> trusted; walkpath + Hot-Apply answered; forged plugin frame dropped")
+    @DisplayName("handshake -> awaiting trust -> trusted; Hot-Apply answered; forged plugin frame dropped")
     void pageTalksToLoopbackChannel() throws Exception {
         String browser = browser();
         Assumptions.assumeTrue(browser != null, "no Chrome / Edge installed (or RTP_BROWSER_TESTS=0)");
@@ -218,9 +214,6 @@ class EditorChannelLoopbackBrowserTest {
         assertEquals(channel.pluginFingerprint(), info.get("pluginFingerprint"), "page fingerprints the snapshot key like Java");
         assertEquals("connected", res.get("badge"), "status badge shows the channel state");
 
-        Map<?, ?> wp = (Map<?, ?>) res.get("walkpath");
-        assertNotNull(wp, "walkpath reply reached the page: " + json);
-        assertEquals("probe-sig", wp.get("sig"));
         Map<?, ?> ack = (Map<?, ?>) res.get("ack");
         assertNotNull(ack, "apply_ack reached the page: " + json);
         assertEquals(Boolean.TRUE, ack.get("success"));
@@ -232,5 +225,79 @@ class EditorChannelLoopbackBrowserTest {
         assertEquals(Boolean.FALSE, res.get("forgedHandled"), "frame signed by another key never reached a handler");
         assertTrue(((Number) info.get("dropped")).longValue() >= 1, "the page counted the forged frame as dropped");
         assertEquals("bad signature", info.get("lastDrop"));
+    }
+
+    /** Reports the page's states and whether the link secret left the address bar. */
+    private static final String LINK_PROBE = """
+            <script>
+            (async () => {
+              const res = { states: [] };
+              EditorChannelClient.onStatus((s) => res.states.push(s));
+              const t0 = Date.now();
+              while (!EditorChannelClient.isConnected() && Date.now() - t0 < 30000) await new Promise((ok) => setTimeout(ok, 50));
+              res.connected = EditorChannelClient.isConnected();
+              res.hash = window.location.hash;
+              res.info = EditorChannelClient.info();
+              EditorChannelClient.send('probe-result', { result: JSON.stringify(res) });
+            })().catch((e) => { try { EditorChannelClient.send('probe-result', { result: JSON.stringify({ error: String(e) }) }); } catch (x) {} });
+            </script>
+            """;
+
+    @Test
+    @Timeout(value = 150, unit = TimeUnit.SECONDS)
+    @DisplayName("ADR-106 §5.10: a page opened with #k=<link secret> is trusted with no prompt (WebCrypto HMAC = Java HMAC)")
+    void linkSecretTrustsWithoutPrompt() throws Exception {
+        String browser = browser();
+        Assumptions.assumeTrue(browser != null, "no Chrome / Edge installed (or RTP_BROWSER_TESTS=0)");
+
+        ScheduledExecutorService poller = Executors.newSingleThreadScheduledExecutor();
+        EditorKeys keys = EditorKeys.generate();
+        TrustedEditors trusted = TrustedEditors.inMemory();
+        LoopbackTransport transport = new LoopbackTransport(EditorLoopbackChannel.newToken(), EditorLoopbackChannel::openUnscheduled);
+        List<String> prompts = Collections.synchronizedList(new ArrayList<>());
+        CompletableFuture<String> result = new CompletableFuture<>();
+        EditorChannel channel = new EditorChannel(EditorChannel.newChannelId(), keys, trusted, transport,
+                (nonce, fp) -> prompts.add(nonce), System::currentTimeMillis);
+        channel.register("probe-result", in -> result.complete(String.valueOf(in.body().get("result"))));
+        channel.start();
+        poller.scheduleWithFixedDelay(() -> {
+            try {
+                transport.socket().poll();
+            } catch (RuntimeException e) {
+                result.completeExceptionally(e);
+            }
+        }, 0, 10, TimeUnit.MILLISECONDS);
+
+        Path work = Files.createTempDirectory("rtp-channel-link");
+        Path page = work.resolve("editor").resolve("index.html");
+        Files.createDirectories(page.getParent());
+        String payload = "{\"channel\":" + EditorSessionManager.mapToJson(channel.snapshotBlock()) + "}";
+        String html = EditorSessionManager.embedPayload(template(), payload);
+        int end = html.lastIndexOf("</body>");
+        Files.writeString(page, html.substring(0, end) + LINK_PROBE + html.substring(end), StandardCharsets.UTF_8);
+
+        Process proc = new ProcessBuilder(browser, "--headless=new", "--disable-gpu", "--no-first-run",
+                "--no-default-browser-check", "--disable-extensions", "--user-data-dir=" + work.resolve("profile"),
+                page.toUri() + "#k=" + channel.linkSecret())
+                .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+        String json;
+        try {
+            json = result.get(120, TimeUnit.SECONDS);
+        } finally {
+            killTree(proc);
+            channel.close("test done");
+            poller.shutdownNow();
+            deleteQuietly(work);
+        }
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> res = (Map<String, Object>) EditorLoopbackJson.parse(json);
+        assertNull(res.get("error"), json);
+        assertEquals(Boolean.TRUE, res.get("connected"), "trusted by the link: " + json);
+        assertFalse(((List<?>) res.get("states")).contains("awaiting-trust"), "never asked for a code: " + json);
+        assertTrue(prompts.isEmpty(), "no operator prompt");
+        assertEquals("", res.get("hash"), "the secret left the address bar");
+        String pageFp = String.valueOf(((Map<?, ?>) res.get("info")).get("fingerprint"));
+        assertFalse(trusted.isTrusted(pageFp), "session trust is not persisted");
     }
 }

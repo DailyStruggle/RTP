@@ -17,13 +17,13 @@ For design and implementation details that satisfy these requirements, see [`doc
 
 ### 2.1 Thread Ownership Yielding (Zero-Tick Delay Optimization)
 - **REQ-FOLIA-ARCH-001 — Mandatory Ownership Checks:** Regional task dispatchers shall verify thread ownership before scheduling.
-- **REQ-FOLIA-ARCH-002 — Immediate Execution:** If the current thread already owns the target region, the task shall be executed immediately to avoid unnecessary scheduling overhead.
+- **REQ-FOLIA-ARCH-002 — Immediate Execution:** If the current thread already owns the target region, the task shall be executed immediately to avoid unnecessary scheduling overhead, provided the thread's per-region budget (REQ-FOLIA-ARCH-004) is not spent and no earlier RTP work for that region is queued; otherwise it shall wait for that region's next slice ([ADR-112](../../docs/adr/ADR-112-per-region-work-division-on-folia.md)).
 - **REQ-FOLIA-ARCH-003 — Bounced Execution:** Only when thread ownership is not held shall the task be submitted to the regional scheduler.
 
 ### 2.2 Strict Execution Cap Enforcement (Deterministic Region Ticks)
-- **REQ-FOLIA-ARCH-004 — No Time-Based Yielding in Regional Threads:** Implementations within regional threads shall not use wall-clock time for task-duration-based yielding, as region-based multithreading makes time-based slicing non-deterministic.
-- **REQ-FOLIA-ARCH-005 — Count-Bound Execution:** All iterative background operations within regional threads shall be bounded by a fixed instruction count rather than elapsed time.
-- **REQ-FOLIA-ARCH-006 — Count-Based Slicing:** Task execution shall be bounded per tick to ensure RTP never contributes to tick-skip or tick-extension on any individual Folia region thread.
+- **REQ-FOLIA-ARCH-004 — Per-Region-Thread Budget:** Wall-clock time measured on a regional thread shall only charge that thread's own budget of `syncAllottedTime` per tick, which shall never accumulate beyond one budget, so RTP adds at most about one budget to any region tick ([ADR-112](../../docs/adr/ADR-112-per-region-work-division-on-folia.md)). Elapsed time on one thread shall never bound work on another.
+- **REQ-FOLIA-ARCH-005 — Count-Bound Execution:** All iterative background operations within regional threads shall also be bounded by a fixed task count, so a slice stays bounded when measured costs read as zero.
+- **REQ-FOLIA-ARCH-006 — Per-Region Slicing:** RTP's work for a region shall run in one FIFO slice per region per tick, with leftovers queued behind other regions, to ensure RTP never contributes to tick-skip or tick-extension on any individual Folia region thread. A region that is slow or whose slice ran late shall receive one task per slice.
 
 ### 2.3 Economy Context Isolation (ThreadAccessException Prevention)
 - **REQ-FOLIA-ARCH-007 — Regional Economy Prohibition:** Economy transactions (withdrawals, deposits, balance checks) shall not execute on Folia region threads.

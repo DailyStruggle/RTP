@@ -119,7 +119,8 @@ public class EditorCmd extends BaseRTPCmdImpl {
             }
             // The operator needs the link; logs only carry a token prefix
             RTP.log(Level.FINE, "[editor] hosted session " + EditorSecurity.tokenPrefix(token) + " uploaded");
-            String editorUrl = transport.buildEditorUrl(token);
+            // The browser that opens this link is trusted for the session without a trust code (ADR-106 §5.10)
+            String editorUrl = transport.buildEditorUrl(token, ch == null ? null : ch.linkSecret());
             sendMessage(callerId, "RTP: Editor session created! Open link to edit: " + editorUrl);
             sendMessage(callerId, "RTP: Apply changes back when done using: /rtp editor apply token=" + token);
         }).exceptionally(throwable -> {

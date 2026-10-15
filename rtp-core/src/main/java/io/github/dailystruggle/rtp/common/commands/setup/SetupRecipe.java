@@ -153,8 +153,8 @@ public final class SetupRecipe {
                 "Arena/Minigame configuration: smaller radius, fast respawn pacing, login cache enabled.",
                 Map.of(
                         "period", 10,
-                        "syncAllottedTime", 20,
-                        "asyncAllottedTime", 50,
+                        "syncAllottedTime", 10,
+                        "asyncAllottedTime", 25,
                         "loginCacheEnabled", true
                 ),
                 Map.of(),

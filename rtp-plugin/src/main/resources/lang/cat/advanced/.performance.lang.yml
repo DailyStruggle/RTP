@@ -3,6 +3,7 @@
 # performance.yml (right). Generated from the per-locale TSV; edit the TSV's
 # base_key/key columns and regenerate, do not hand-edit this file.
 minTPS: "minimum_purrs_per_second"
+maxMSPT: "maxMSPT"
 maxHeapPercent: "maxHeapPurrcent"
 maxAttempts: "max_pounces"
 period: "tail_swish_period"

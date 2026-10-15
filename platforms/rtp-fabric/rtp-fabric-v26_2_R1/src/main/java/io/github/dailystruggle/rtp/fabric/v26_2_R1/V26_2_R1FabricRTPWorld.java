@@ -22,7 +22,12 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.storage.LevelResource;
 
+import java.lang.ref.Reference;
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -49,8 +54,43 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
     private final String name;
     private final UUID id;
 
-    /** Cache of recently-loaded chunks keyed by {@code (cz << 32) | cx}. */
-    private final ConcurrentHashMap<Long, V26_2_R1FabricRTPChunk> chunkCache = new ConcurrentHashMap<>();
+    /**
+     * Weak live-chunk cache keyed by {@code (cz << 32) | cx}; vanilla's chunk holder keeps the
+     * referent alive while loaded, so this tier never retains a chunk the server has unloaded.
+     * Cleared referents are expunged via {@link #clearedChunks}. Parity with {@code FabricRTPWorldUnobf}.
+     */
+    private final ConcurrentHashMap<Long, KeyedChunkRef> chunkCache = new ConcurrentHashMap<>();
+    private final ReferenceQueue<ChunkAccess> clearedChunks = new ReferenceQueue<>();
+
+    private static final int RECENT_LOADED_CAP = 1024;
+
+    /**
+     * Bounded strong pin of recent live loads: keeps a fresh chunk resolvable through
+     * {@link #getCachedChunk(long)} after the temp load-ticket lapses (promotion verify window).
+     * Access-order LRU; the eldest pin drops past {@link #RECENT_LOADED_CAP}.
+     */
+    private final Map<Long, V26_2_R1FabricRTPChunk> recentlyLoadedChunks = Collections.synchronizedMap(
+            new LinkedHashMap<Long, V26_2_R1FabricRTPChunk>(64, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<Long, V26_2_R1FabricRTPChunk> eldest) {
+                    return size() > RECENT_LOADED_CAP;
+                }
+            });
+
+    private static final class KeyedChunkRef extends WeakReference<ChunkAccess> {
+        final long key;
+
+        KeyedChunkRef(long key, ChunkAccess chunk, ReferenceQueue<ChunkAccess> queue) {
+            super(chunk, queue);
+            this.key = key;
+        }
+    }
+
+    private void expungeClearedChunks() {
+        for (Reference<? extends ChunkAccess> r; (r = clearedChunks.poll()) != null; ) {
+            chunkCache.remove(((KeyedChunkRef) r).key, r);
+        }
+    }
 
     public V26_2_R1FabricRTPWorld(ServerLevel level) {
         super(level);
@@ -157,9 +197,11 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
         if (server == null) return CompletableFuture.completedFuture(null);
         long k = key(cx, cz);
         // Cache hit short-circuits - keeps getOrLoadChunk's cached path cheap.
-        if (chunkCache.containsKey(k)) {
+        if (getCachedChunk(k) != null) {
             return CompletableFuture.completedFuture(k);
         }
+        // Live-load entry: counted once here (getChunkAtAsync and getOrLoadChunk route through it).
+        totalChunkLoads.incrementAndGet();
         final ChunkPos ticketPos = new ChunkPos(cx, cz);
         // (1) Apply the transient generation load-ticket ON the tick thread, then
         //     (2) invoke requestChunkFuture (the public getChunkFuture) OFF the
@@ -177,7 +219,9 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
                 }, RTP_CONTINUATION_EXECUTOR)
                 .thenApply(ca -> {
                     if (ca == null) return null;
-                    chunkCache.put(k, new V26_2_R1FabricRTPChunk(ca, level, id));
+                    expungeClearedChunks();
+                    chunkCache.put(k, new KeyedChunkRef(k, ca, clearedChunks));
+                    recentlyLoadedChunks.put(k, new V26_2_R1FabricRTPChunk(ca, level, id));
                     return k;
                 })
                 .exceptionally(t -> {
@@ -419,7 +463,16 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public RTPChunk<?> getCachedChunk(long key) {
-        return chunkCache.get(key);
+        V26_2_R1FabricRTPChunk pinned = recentlyLoadedChunks.get(key);
+        if (pinned != null) return pinned;
+        KeyedChunkRef ref = chunkCache.get(key);
+        if (ref == null) return null;
+        ChunkAccess chunk = ref.get();
+        if (chunk == null) {
+            chunkCache.remove(key, ref);
+            return null;
+        }
+        return new V26_2_R1FabricRTPChunk(chunk, world, id);
     }
 
     @Override
@@ -432,7 +485,9 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
         setForceLoaded(cx, cz, false);
         // Drop our cached wrapper so a subsequent load re-enters the server submit
         // path and observes any state changes that happened while unkept.
-        chunkCache.remove(key(cx, cz));
+        long k = key(cx, cz);
+        chunkCache.remove(k);
+        recentlyLoadedChunks.remove(k);
     }
 
     @Override
@@ -447,6 +502,7 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
             }
         });
         chunkCache.clear();
+        recentlyLoadedChunks.clear();
     }
 
     // ---------------------------------------------------------------------------
@@ -892,8 +948,8 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
     @Override
     public int getMaxHeight() {
         try {
-            // LevelHeightAccessor#getMaxY() on MC 26.1.2 - inclusive max build Y.
-            return world.getMaxY();
+            // getMaxY() is the inclusive top block; RTPWorld#getMaxHeight is exclusive.
+            return world.getMaxY() + 1;
         } catch (Throwable t) {
             return 320;
         }
@@ -910,6 +966,7 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public int getCacheSize() {
+        expungeClearedChunks();
         return chunkCache.size();
     }
 

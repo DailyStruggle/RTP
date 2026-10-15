@@ -27,7 +27,6 @@ public class RegionCacheTask extends RTPRunnable {
     private final Region region;
     private final UUID playerId;
     private final long selectRadius;
-    private final long maxNanos;
     /**
      * Observational mode flag. When true, runs only when pregen cache is at/above
      * cacheCap and drops safe candidates, retaining generator side effects.
@@ -51,14 +50,14 @@ public class RegionCacheTask extends RTPRunnable {
      * Creates a new cache task for the general region queue.
      *
      * @param region   The region to cache a location for.
-     * @param maxNanos The maximum time in nanoseconds this task is allowed to run.
+     * @param maxNanos Ignored. One run is one selection attempt plus an async chunk load; the
+     *                 owning pipe ({@code Region.cachePipeline}) enforces the pulse budget.
      */
     public RegionCacheTask(Region region, long maxNanos) {
         super(600000L);
         this.region = region;
         this.playerId = null;
         this.selectRadius = resolveSelectRadius();
-        this.maxNanos = maxNanos;
         this.observationalOnly = false;
     }
 
@@ -67,23 +66,21 @@ public class RegionCacheTask extends RTPRunnable {
      *
      * @param region   The region to cache a location for.
      * @param playerId The UUID of the player.
-     * @param maxNanos The maximum time in nanoseconds this task is allowed to run.
+     * @param maxNanos Ignored; see {@link #RegionCacheTask(Region, long)}.
      */
     public RegionCacheTask(Region region, UUID playerId, long maxNanos) {
         super(600000L);
         this.region = region;
         this.playerId = playerId;
         this.selectRadius = resolveSelectRadius();
-        this.maxNanos = maxNanos;
         this.observationalOnly = false;
     }
 
-    private RegionCacheTask(Region region, long maxNanos, boolean observationalOnly) {
+    private RegionCacheTask(Region region, boolean observationalOnly) {
         super(600000L);
         this.region = region;
         this.playerId = null;
         this.selectRadius = resolveSelectRadius();
-        this.maxNanos = maxNanos;
         this.observationalOnly = observationalOnly;
     }
 
@@ -92,7 +89,7 @@ public class RegionCacheTask extends RTPRunnable {
      * cacheCap, discarding safe candidates while retaining bad-location/biome side effects.
      */
     public static RegionCacheTask observe(Region region, long maxNanos) {
-        return new RegionCacheTask(region, maxNanos, true);
+        return new RegionCacheTask(region, true);
     }
 
     /** Spark-profiler frame tag (diagram 02). See {@link RTPRunnable#sparkFrameName()}. */
@@ -141,12 +138,18 @@ public class RegionCacheTask extends RTPRunnable {
         CfDiag.regionCacheTaskIssue.increment();
         CfDiag.ensureStarted();
         region.inFlightCalculations.incrementAndGet();
+        // ADR-028: the public fill takes the backlog's UNKNOWN entries (no on-disk data) one at a
+        // time and checks them with a chunk load; it draws from the shape only when the backlog is
+        // off or empty. Validated entries reach cold through the backlog drain, not here.
+        BacklogLocationBuffer backlog =
+                (playerId == null && !observationalOnly) ? region.queueManager.backlogLocations : null;
         try {
-            // ADR-110: fill is speculative - verify from resident chunks / region files; native loads
-            // only when pinned into the kept queue. Third-party generators keep their own contract.
+            // ADR-110: fill is speculative - verify from resident chunks / region files first; native
+            // loads pin into the kept queue when it has room, else stay unpinned (no ring) for the
+            // cold queue. Third-party generators keep their own contract.
             Object generator = RTP.serverAccessor.getLocationGenerator();
             CompletableFuture<GenerationResult> locationFuture = (generator instanceof LocationGenerator)
-                    ? LocationGenerator.getLocationFuture(region, null, LoadPurpose.SPECULATIVE)
+                    ? LocationGenerator.getLocationFuture(region, null, LoadPurpose.SPECULATIVE, backlog)
                     : RTP.serverAccessor.getLocationGenerator().getLocation(region, (java.util.Set<String>) null);
 
             locationFuture = locationFuture.exceptionally(e -> {

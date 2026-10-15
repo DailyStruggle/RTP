@@ -1,6 +1,9 @@
 package io.github.dailystruggle.rtp.api.world;
 
+import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.safety.CompiledUnsafeSet;
+import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 
@@ -40,34 +43,52 @@ public abstract class RTPChunk<T> {
   public abstract int z();
 
   /**
+   * Returns the upper-cased {@code namespace:path} or bare material/block name for the block at
+   * the given chunk-local coordinates and absolute world Y.
+   *
+   * <p>Subclasses should implement this to provide the raw or normalized identifier of the block
+   * at the given location (e.g. {@code "MINECRAFT:STONE"}, {@code "AIR"}). Defaults to {@code ""}
+   * on unresolvable coordinates or missing chunk state.
+   *
+   * @param x chunk-local X (0-15)
+   * @param y absolute world Y
+   * @param z chunk-local Z (0-15)
+   * @return upper-cased material or block name, never null
+   */
+  public String materialNameAt(int x, int y, int z) {
+    return "";
+  }
+
+  /**
    * Checks if the block at the specified coordinates within this chunk is air.
+   *
+   * <p>Evaluates whether {@link #materialNameAt(int, int, int)} is air via {@link RTPAPI#isAir(String)}.
    *
    * @param x the block's X coordinate relative to the chunk (0-15)
    * @param y the block's Y coordinate
    * @param z the block's Z coordinate relative to the chunk (0-15)
    * @return {@code true} if the block is air, {@code false} otherwise
    */
-  public abstract boolean isAir(int x, int y, int z);
+  public boolean isAir(int x, int y, int z) {
+    String name = materialNameAt(x, y, z);
+    if (name == null || name.isEmpty()) return false;
+    return RTPAPI.isAir(name);
+  }
 
   /**
    * Returns the sky light level at the specified coordinates within this chunk.
+   *
+   * <p>Selection algorithms derive sky openness directly from block data (e.g.
+   * {@code computeColumnSkyFloor}); this method returns a safe default.
    *
    * @param x the block's X coordinate relative to the chunk (0-15)
    * @param y the block's Y coordinate
    * @param z the block's Z coordinate relative to the chunk (0-15)
    * @return the sky light level
    */
-  public abstract int getSkyLight(int x, int y, int z);
-
-  /**
-   * Returns the Y coordinate of the highest solid block at the specified
-   * coordinates within this chunk.
-   *
-   * @param x the block's X coordinate relative to the chunk (0-15)
-   * @param z the block's Z coordinate relative to the chunk (0-15)
-   * @return the Y coordinate of the highest solid block
-   */
-  public abstract int getSurfaceHeight(int x, int z);
+  public int getSkyLight(int x, int y, int z) {
+    return 15;
+  }
 
   /**
    * Checks whether block at chunk-relative (x, y, z) is safe for teleportation.
@@ -78,7 +99,16 @@ public abstract class RTPChunk<T> {
    * @param unsafeBlocks set of unsafe material names
    * @return true if safe for teleportation
    */
-  public abstract boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks);
+  public boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks) {
+    if (unsafeBlocks == null || unsafeBlocks.isEmpty()) return true;
+    String name = materialNameAt(x, y, z);
+    // S-001: an unresolvable block id fails closed rather than passing the unsafe scan.
+    if (name == null || name.isEmpty()) return false;
+    if (unsafeBlocks.contains(name)) return false;
+    int colon = name.indexOf(':');
+    if (colon > 0 && unsafeBlocks.contains(name.substring(colon + 1))) return false;
+    return true;
+  }
 
   /**
    * Compiled-form overload (ADR-017). Adapters with native tag/property access
@@ -104,7 +134,14 @@ public abstract class RTPChunk<T> {
    *
    * @return {@code true} if the chunk is generated, {@code false} otherwise
    */
-  public abstract boolean isGenerated();
+  public boolean isGenerated() {
+    if (isSelfContained()) return true;
+    RTPWorld<?> world = getWorld();
+    if (world != null) {
+      return world.isChunkGenerated(x(), z());
+    }
+    return chunk != null;
+  }
 
   /**
    * Checks if this chunk is currently loaded in memory.
@@ -123,7 +160,9 @@ public abstract class RTPChunk<T> {
   /**
    * Unloads this chunk from memory.
    */
-  public abstract void unload();
+  public void unload() {
+    keep(false);
+  }
 
   /**
    * Returns biome identifier at world (x, y, z) from this chunk's backing (ADR-016).

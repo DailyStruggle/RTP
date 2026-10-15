@@ -129,6 +129,8 @@ public class RegionPipelineTest {
         region.queueManager.unkeptLocations.offer(new RTPLocation(coords, 1L, null));
 
         region.execute(Long.MAX_VALUE);
+        // Tick-thread chunk callbacks queue verify on the budgeted sync pipe; drain it.
+        RTP.getInstance().miscSyncTasks.execute(Long.MAX_VALUE);
 
         assertFalse(region.queueManager.keptLocations.isEmpty(),
                 "execute() must promote the unkept location to keptLocations");
@@ -152,6 +154,7 @@ public class RegionPipelineTest {
         region.queueManager.unkeptLocations.offer(new RTPLocation(midairCoords, 1L, null));
 
         region.execute(Long.MAX_VALUE);
+        RTP.getInstance().miscSyncTasks.execute(Long.MAX_VALUE);
 
         assertFalse(region.queueManager.keptLocations.isEmpty(),
                 "promotion must succeed when ground exists in the vert window");

@@ -3,6 +3,7 @@
 # performance.yml (right). Generated from the per-locale TSV; edit the TSV's
 # base_key/key columns and regenerate, do not hand-edit this file.
 minTPS: "최소TPS"
+maxMSPT: "maxMSPT"
 maxHeapPercent: "maxHeap백분율"
 maxAttempts: "최대시도횟수"
 period: "주기"

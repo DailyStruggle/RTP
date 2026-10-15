@@ -15,7 +15,7 @@ is rated on four levels:
 | **Low** | Cosmetic or minor inconvenience with no lasting effect |
 
 For the failure-mode view (detection + response details) see [Failure Modes](#failure-modes) below.
-For operator diagnosis and recovery steps see [`RUNBOOK.md`](RUNBOOK.md).
+For operator diagnosis and recovery steps see [`RUNBOOK.md`](../admin/RUNBOOK.md).
 
 ---
 

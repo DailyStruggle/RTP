@@ -100,7 +100,7 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 - **Actions.** Script multi-step teleports in YAML: what happens before, during and after the teleport, what to do on failure or timeout, and conditions that must pass first (permission, balance, cooldown, world, biome, time, server load and more). Destinations can be anchored to a player, a claim, a faction or a world center, and teams can be placed together. Walk-in triggers start an action when a player enters a zone. Commands: `/rtp action` (`rtp.action`; `/rtp trigger` and `/rtp run` are other names for it), `/rtp action cancel` (`rtp.action.cancel`) and `/rtp back` (`rtp.back`). The bundled action addon ships ready-made modes such as arena, KOTH, scatter and teams.
 
-- **Web config editor (`/rtp editor`).** Edit RTP's configs in a browser and apply the changes back to the server. Permission: `rtp.editor`. Passwords, tokens and other secrets are redacted before anything leaves the server and are never overwritten by the editor. Only config files inside the plugin folder can be written, and a browser must be trusted before it can apply changes (revoke with `/rtp editor untrust`; optional expiry with `editor.trust.maxAgeDays` in `advanced/network.yml`).
+- **Web config editor (`/rtp editor`).** Edit RTP's configs in a browser and apply the changes back to the server. Permission: `rtp.editor`. The region map shows the land of every loaded world, including the nether and the end, and a region's world can be picked from the worlds the server detected. Passwords, tokens and other secrets are redacted before anything leaves the server and are never overwritten by the editor. Only config files inside the plugin folder can be written, and a browser must be trusted before it can apply changes (revoke with `/rtp editor untrust`; optional expiry with `editor.trust.maxAgeDays` in `advanced/network.yml`).
 
 - **Addon tabs in the web editor (ADR-107).** Addons can add their own tabs, live status and config files to the editor using built-in widgets, so no addon code runs in the browser. Addon config changes are validated and backed up before they are written. A misbehaving addon is rate-limited and switched off for the session without affecting the rest of the editor, and mixed editor and plugin versions keep working together.
 
@@ -138,7 +138,11 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 - **Location queues renamed to hot, cold and backlog (ADR-078).** The `L1`/`L2`/`L3` names in `/rtp info` and the docs now say what each queue holds. Queues always release the chunks of locations they drop.
 
-- **Background search loads far fewer chunks (ADR-110).** Filling the location queues now checks only chunks that are already loaded or saved on disk, and loads or generates chunks only when a player is likely to use them soon.
+- **Background search loads far fewer chunks (ADR-110).** Filling the location queues first checks chunks that are already loaded or saved on disk. Only locations held ready for teleport get their surrounding view-distance area preloaded. Other spots load just the landing chunk and its safety neighbours, so the cache still fills on fresh, unexplored worlds. Those chunks are checked as they load and RTP doesn't keep them loaded. Fill pauses while the server is short on memory.
+
+- **The backlog queue never loads chunks and feeds the cold queue (ADR-028).** Backlog picks the region-file pre-check accepts move into the cold queue with no chunk load. Picks it cannot read from disk, such as ungenerated land, are checked one at a time by the background search instead of being passed on unchecked. Backlog picks fill within each pulse's time budget (`asyncAllottedTime`, keeping 20% spare for other work). The backlog count in `/rtp info` shows only locations the region-file pre-check accepted; rejected picks are dropped straight away.
+
+- **Queued locations are fully checked before a player gets one (S-001, S-003).** When a cold location is promoted to the ready queue, RTP now checks the world border, biome filter, safety radius and claim plugins on the loaded chunk, after finding the landing height. Locations from the backlog or the database used to skip these checks, so a player could land in a claim or a filtered biome.
 
 - **Region-file pre-check tunes itself (ADR-109).** RTP measures, per region, whether reading candidates straight from region files saves time and turns the pre-check on or off accordingly. Nothing to configure.
 
@@ -155,6 +159,17 @@ One changelog covers both the free and Pro jars, which ship the same code.
 - **`ELLIPSE` turns off `expand: true` with a one-time warning,** as `POLYGON` already did. Expanding pushed picks outside the ellipse, where they were rejected.
 
 - **bStats on every platform, without a bundled bStats library.** Fabric and NeoForge now report too. RTP uses its own small, dependency-free client ([bstats-api-ADR-001](https://github.com/DailyStruggle/RTP/tree/V3/api/bstats-api/docs/adr/bstats-api-ADR-001-dependency-free-client.md)), keeping the same data, opt-out and server ID on Paper, Spigot and Folia.
+
+- **RTP leaves more of each tick to the server and other plugins.** `syncAllottedTime` now defaults to 5 ms and `asyncAllottedTime` to 25 ms, and both are capped at 25 ms. Queued commands, scripted actions and promotion checks for ready-queue locations now count against `syncAllottedTime`, and RTP starts at most 8 chunk loads per region per refill. On Fabric and NeoForge, RTP's end-of-tick work stops at `syncAllottedTime` and background work uses at most half the CPU cores. `period` now means ticks between refills of the same region.
+
+- **`minTPS` now pauses background cache filling,** and the new `maxMSPT` setting (default 45 ms) pauses it when ticks run long even though TPS still reads 20. Players already waiting are still served. On Folia the server-wide pause uses the mean TPS across regions, and a slow region is handled on its own: RTP runs one background task per tick there and fills from other regions instead.
+
+- **Folia divides RTP's work across region threads instead of stacking it on one.** Under heavy `/rtp` load one region could fall to about 1.4 TPS while the mean stayed near 19 (ADR-112).
+  - Location checks, retries, claim checks and teleport setup that followed a chunk load now continue on async workers instead of the region thread that loaded the chunk.
+  - RTP's work for each region runs in order, within `syncAllottedTime` per region thread; anything left waits behind other regions until that region's next tick.
+  - Regions that are slow or backed up get one RTP task per tick, and the ready queue fills from other regions meanwhile.
+  - The limit on concurrent region tasks applies to every kind of region task, and work waiting for a slot runs in order instead of polling.
+  - Folia task queues now always run at least one task per pulse and stop inline work once their time budget is spent. Cold-cache refill per region turn is no longer limited to two tasks.
 
 ### Deprecated
 
@@ -188,6 +203,8 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 - **Worlds using `region-file-compression=lz4` never got the region-file safety check.**
 
+- **`/rtp scan` rejected generated land on Minecraft 26.3 and never finished half-generated chunks.** RTP now reads 26.3's block format from region files. Chunks the server saved mid-generation are loaded so the server can finish them, instead of being marked bad.
+
 - **lz4-java is no longer bundled.** LZ4 region chunks are decoded by RTP's own bounds-checked code, which closes CVE-2025-12183 and CVE-2026-59949 and makes the jar smaller.
 
 - **Corrupt or crafted region chunks could crash the safety check or force huge memory use.** Such chunks are now loaded normally instead.
@@ -202,7 +219,19 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 - **Players who left stayed in memory** through their teleport history and boss bars. RTP now keeps only their ID and the data cooldowns need.
 
+- **Fabric on Minecraft 26.x left live chunk loads out of `/rtp info`, skipped the top block row, and held chunks the server had unloaded.** Live loads are now counted, the height limit includes the top block, and RTP's chunk cache is bounded instead of keeping every chunk it loaded.
+
 - **Repeated hex colors showed a stray `&`** on servers without Adventure.
+
+- **`syncAllottedTime` and `asyncAllottedTime` above 25 were silently capped,** and the `high-performance` and arena presets wrote 50. The cap is now documented, and the presets use values within it.
+
+- **`period` refilled each region one tick early** (every 19 ticks at `period: 20`).
+
+- **Background area scans could stall a tick thread** while waiting for claim plugins to answer.
+
+- **Fabric and NeoForge could start an unlimited number of background threads,** and a slow repeating task could run several copies at once.
+
+- **On Folia, delayed tasks ran immediately, cancelled tasks still ran, and one failing task skipped the rest of that tick's queue.** Chunk tickets were also changed on the wrong thread. With spark installed, RTP also lost its own TPS readings.
 
 ### Security
 

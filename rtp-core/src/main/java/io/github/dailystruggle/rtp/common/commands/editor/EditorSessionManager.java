@@ -811,7 +811,8 @@ public final class EditorSessionManager {
     static final int EMBED_COARSE_BINS_PER_WORLD = 16_384;
 
     /**
-     * World biome bins already in {@link WorldBiomeStore} for each region world (ADR-104 §4.6):
+     * World biome bins already in {@link WorldBiomeStore} for each live world, region worlds first
+     * ({@link EditorLiveFeed#surveyWorlds}, ADR-104 §4.6):
      * {@code {world: {palette:[...], layers:{y:[[rx,rz,level,base64Runs],...]}, bins, truncated}}}.
      * Reads no region file (the store may load its cache file), so the page opens with the map
      * already filled. {@code full} (local export): every bin at its stored detail, up to
@@ -824,7 +825,7 @@ public final class EditorSessionManager {
         Map<String, Object> worlds = new LinkedHashMap<>();
         Map<String, List<int[]>> views = full ? Map.of() : EditorLiveFeed.regionViewsByWorld();
         Map<String, Long> embedded = new HashMap<>();
-        for (String world : EditorLiveFeed.regionWorlds().keySet()) {
+        for (String world : EditorLiveFeed.surveyWorlds().keySet()) {
             WorldBiomeStore store = WorldBiomeStore.of(world);
             List<int[]> rects = views.getOrDefault(world, List.of());
             Map<String, List<Object>> layers = new TreeMap<>();

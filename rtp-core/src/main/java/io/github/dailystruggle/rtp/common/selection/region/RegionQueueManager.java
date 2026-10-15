@@ -490,9 +490,9 @@ public class RegionQueueManager {
         if (bucket != null && !bucket.isEmpty()) return;
         if (!perPlayerInFlight.add(uuid)) return;
 
-        long maxNanos = 50_000_000L; // 50ms cap mirrors other RegionCacheTask budgets
         try {
-            RegionCacheTask fill = new RegionCacheTask(region, uuid, maxNanos);
+            // One selection attempt on an async worker; no tick-thread budget to apply.
+            RegionCacheTask fill = new RegionCacheTask(region, uuid, 0L);
             RTP.scheduler.runTaskAsynchronously(fill);
         } catch (Throwable t) {
             // Never let listener wiring throw: release the guard and log.

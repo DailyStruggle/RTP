@@ -310,7 +310,7 @@ public class LinearAdjustorTest {
      * When {@code requireSkyLight=true} the adjustor performs the same per-Y scan as the
      * non-requireSkyLight path; it merely gates the candidate Y on
      * {@link io.github.dailystruggle.rtp.api.world.RTPChunk#getSkyLight} {@code > 7}.
-     * No {@code getSurfaceHeight} fast-path is used.
+     * No surface-height fast-path is used.
      */
     @Test
     void requireSkyLight_findsLandingViaPerYScan() {

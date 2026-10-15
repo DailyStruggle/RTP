@@ -356,6 +356,15 @@ public class EditorHttpTransport {
         return editorBaseUrl + "?token=" + token;
     }
 
+    /**
+     * As {@link #buildEditorUrl(String)}, plus the channel's session link secret as {@code #k=} (ADR-106
+     * §5.10): browsers send no fragment to the site or the relay, so only the link's holder can prove it.
+     */
+    public String buildEditorUrl(String token, String linkSecret) {
+        String url = buildEditorUrl(token);
+        return (linkSecret == null || linkSecret.isEmpty()) ? url : url + "#k=" + linkSecret;
+    }
+
     private static String extractKeyFromJsonOrPlain(String body) {
         if (body.startsWith("{") && body.endsWith("}")) {
             int keyIdx = body.indexOf("\"key\"");

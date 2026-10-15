@@ -124,7 +124,7 @@ class WebEditorStagingDiffAndWebSocketTest {
 
         // ADR-104 §4.3 & ADR-084: Chunk-resolution pregenerated land map & throttled streaming
         assertTrue(html.contains("chk-pregen"), "Must have chk-pregen checkbox layer control");
-        assertTrue(html.contains("function ingestLandChunkRows"), "Pushed pregen chunk batches merge into location-keyed land tiles");
+        assertTrue(html.contains("function ingestLandBinRows"), "Pregen land bin rows merge into location-keyed land tiles");
         assertTrue(html.contains("BIOME_COLORS"), "Must define BIOME_COLORS desaturated cartography palette");
         // ADR-104 §4.6: frame budget holds because only viewport tiles are drawn and cached
         assertTrue(html.contains("function drawWorldLand") && html.contains("function requestVisibleTiles"),

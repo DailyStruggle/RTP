@@ -149,13 +149,13 @@ public class ReqRtpObservationalCacheTaskTest {
         // saturation. 64 pulses comfortably covers the 8-slot total even
         // with cache-pipeline yielding.
         for (int i = 0; i < 64 && current < totalCap; i++) {
-            region.execute(Long.MAX_VALUE);
+            pulse();
             previous = current;
             current = region.getPublicQueueLength();
             if (current == previous && current >= totalCap - 1) {
                 // Saturation candidate: one more pulse to confirm we're not
                 // mid-promotion (kept polled, awaiting async chunk-load).
-                region.execute(Long.MAX_VALUE);
+                pulse();
                 current = region.getPublicQueueLength();
                 break;
             }
@@ -164,5 +164,11 @@ public class ReqRtpObservationalCacheTaskTest {
                 "with observational mode enabled, [cached] must reach "
                         + "cacheCap + activeChunkCap (regression guard for the "
                         + "off-by-one cache-deficit bug - \"cached: 59\" symptom).");
+    }
+
+    /** One async region pulse plus the sync pulse that runs tick-thread promotion verify. */
+    private void pulse() {
+        region.execute(Long.MAX_VALUE);
+        RTP.getInstance().miscSyncTasks.execute(Long.MAX_VALUE);
     }
 }

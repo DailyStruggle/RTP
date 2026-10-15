@@ -27,9 +27,10 @@ import java.util.logging.Level;
 
 /**
  * Builds the session's {@link EditorChannel} and registers the editor's message handlers on it
- * (ADR-106 §5.3): {@code focus} and {@code walkpath} / {@code curve-state} go to the live feed's
- * bounded queues (answered on its async tick), {@code apply} to the {@code /rtp editor apply}
- * pipeline through {@link EditorLoopbackApply#handleAuthorized}. Operator notices are the
+ * (ADR-106 §5.3): {@code focus} goes to the live feed's bounded queue (read on its async tick),
+ * {@code apply} to the {@code /rtp editor apply} pipeline through
+ * {@link EditorLoopbackApply#handleAuthorized}. Nothing else is accepted from the page: walk paths
+ * and curve state flow server to page only, for applied geometry. Operator notices are the
  * configurable {@link CommandMessages} {@code editor*} keys, sent to the session's creator.
  */
 final class EditorChannelWiring {
@@ -179,17 +180,6 @@ final class EditorChannelWiring {
             EditorLiveFeed f = feed.get();
             if (f != null) f.offerClientMessage(in.json());
         });
-        EditorChannel.Handler preview = in -> {
-            EditorLiveFeed f = feed.get();
-            if (f == null) {
-                in.reply("{\"type\":" + EditorLoopbackJson.quote(in.type()) + ",\"error\":\"live feed stopped\""
-                        + previewEcho(in) + "}");
-                return;
-            }
-            f.offerWalkPathRequest(in.from(), in::reply, in.json());
-        };
-        ch.register(EditorWalkPathPreview.TYPE, preview);
-        ch.register(EditorWalkPathPreview.CURVE_STATE_TYPE, preview);
         ch.register(EditorLoopbackApply.ACTION, in -> apply.handleAuthorized(in.body()).whenComplete((ack, t) -> {
             if (ack == null || !in.reply(ack)) {
                 RTP.log(Level.WARNING, "[editor] apply_ack undeliverable to editor key " + in.from().substring(0, 16)
@@ -198,17 +188,6 @@ final class EditorChannelWiring {
         }));
         // Addon namespaces, push types and the trusted hello-reply's protocol members (ADR-107)
         EditorExtensions.attach(ch);
-    }
-
-    /** Echoes the request's correlation fields so the page can match the error to its request. */
-    private static String previewEcho(EditorChannel.Inbound in) {
-        StringBuilder sb = new StringBuilder();
-        for (String k : new String[]{"region", "sig", "reqId"}) {
-            if (in.body().get(k) instanceof String v && v.length() <= 4096) {
-                sb.append(",\"").append(k).append("\":").append(EditorLoopbackJson.quote(v));
-            }
-        }
-        return sb.toString();
     }
 
     static Path editorDir() {
@@ -266,7 +245,7 @@ final class EditorChannelWiring {
             if (creator == null || RTP.serverAccessor == null) return;
             // Full fingerprint: a 16-hex prefix is cheap to collide for a look-alike key
             String text = message(CommandMessages.editorTrustPrompt,
-                    "[P1] A web editor page asks for access with code [nonce]. If your page shows the same code, click here.")
+                    "[P0] A web editor page asks for access with code [nonce]. If your page shows the same code, click here.")
                     .replace("[nonce]", nonce).replace("[fingerprint]", fingerprint);
             String hover = message(CommandMessages.editorTrustPromptHover, "/rtp editor trust nonce=[nonce] (key [fingerprint])")
                     .replace("[nonce]", nonce).replace("[fingerprint]", fingerprint);
@@ -299,7 +278,7 @@ final class EditorChannelWiring {
                         .replace("[minutes]", String.valueOf(EditorLiveFeed.DEFAULT_TTL_MILLIS / 60_000L)));
             } else {
                 tell(creator, message(CommandMessages.editorChannelLost,
-                        "[P1] Web editor channel lost: [reason]. The page keeps working from its snapshot.")
+                        "[P0] Web editor channel lost: [reason]. The page keeps working from its snapshot.")
                         .replace("[reason]", r));
             }
         }

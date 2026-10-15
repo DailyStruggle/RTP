@@ -111,6 +111,56 @@ class EditorChannelProtocolTest {
     }
 
     @Test
+    @DisplayName("§5.10: a hello with the session link proof is trusted for this channel only, with no prompt and nothing persisted")
+    void linkProofTrustsOnce() {
+        String secret = channel.linkSecret();
+        assertTrue(secret.matches("[A-Za-z0-9_-]{43}"), "256-bit base64url: " + secret);
+        assertFalse(channel.snapshotBlock().toString().contains(secret), "the snapshot never carries the secret");
+
+        page.hello("AAAA");
+        assertEquals("untrusted", page.state, "a proof that does not verify gets the nonce flow");
+        assertEquals(1, prompts.size());
+
+        page.hello(EditorChannel.linkProof(secret, channel.id(), page.fingerprint()));
+        assertEquals("trusted", page.state, "the link's browser skips the trust code");
+        assertEquals(1, prompts.size(), "no further prompt");
+        assertFalse(trusted.isTrusted(page.fingerprint()), "session trust is never written to the trusted list");
+        page.send("echo", Map.of("n", 5));
+        assertEquals(1, routed.size(), "trusted messages route");
+        page.hello();
+        assertEquals("trusted", page.state, "a reconnect without the proof stays trusted for the session");
+
+        // Another browser with the same link: the secret is spent
+        EditorKeys other = EditorKeys.generate();
+        String hello = "{\"type\":\"hello\",\"channel\":\"" + channel.id() + "\",\"from\":\"" + other.fingerprint()
+                + "\",\"publicKey\":\"" + other.publicKeyBase64() + "\",\"linkProof\":\""
+                + EditorChannel.linkProof(secret, channel.id(), other.fingerprint()) + "\"}";
+        page.sendSigned(hello, other);
+        assertEquals(2, prompts.size(), "a second key needs a trust code");
+        assertEquals(other.fingerprint(), prompts.get(1)[1]);
+
+        assertTrue(EditorChannel.untrustAny(page.fingerprint().substring(0, 16)).contains(page.fingerprint()),
+                "untrust drops a link-trusted key");
+        page.send("echo", Map.of("n", 6));
+        assertEquals(1, routed.size(), "refused once untrusted");
+    }
+
+    @Test
+    @DisplayName("§5.10: a link proof is bound to its key and channel: replayed for another key it does not verify")
+    void linkProofBoundToKey() {
+        EditorKeys other = EditorKeys.generate();
+        String stolen = EditorChannel.linkProof(channel.linkSecret(), channel.id(), other.fingerprint());
+        page.hello(stolen);
+        assertEquals("untrusted", page.state, "another key's proof");
+        page.hello("not valid base64 !!!");
+        assertEquals("untrusted", page.state, "malformed base64 proof");
+        page.hello(EditorChannel.linkProof(channel.linkSecret(), "ffffffffffffffff", page.fingerprint()));
+        assertEquals("untrusted", page.state, "another channel's proof");
+        page.hello(EditorChannel.linkProof(channel.linkSecret(), channel.id(), page.fingerprint()));
+        assertEquals("trusted", page.state, "failed proofs do not spend the secret");
+    }
+
+    @Test
     @DisplayName("Untrusted keys may only hello and ping; other types are dropped before any handler")
     void untrustedRefused() {
         page.hello();

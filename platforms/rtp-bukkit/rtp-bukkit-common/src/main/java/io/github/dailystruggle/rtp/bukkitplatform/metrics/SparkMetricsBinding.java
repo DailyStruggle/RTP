@@ -5,6 +5,7 @@ import io.github.dailystruggle.metrics.api.MetricsBinding;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * {@link MetricsBinding} that sources TPS / MSPT from the
@@ -236,5 +237,51 @@ public final class SparkMetricsBinding implements MetricsBinding {
     @Override
     public List<FoliaRegionSample> foliaRegions() {
         return delegate.foliaRegions();
+    }
+
+    /** Worse of spark's server-wide TPS and the delegate's worst loop (a Folia region). */
+    @Override
+    public double worstTps1m() {
+        return worse(tps1m(), delegate.worstTps1m(), false);
+    }
+
+    /** Worse of spark's MSPT and the delegate's worst loop (a Folia region). */
+    @Override
+    public double worstMspt() {
+        return worse(mspt(), delegate.worstMspt(), true);
+    }
+
+    @Override
+    public boolean regionalTicking() {
+        return delegate.regionalTicking();
+    }
+
+    /**
+     * Regional delegate: its own region reading, as-is (spark's server-wide TPS would mark every
+     * region unhealthy). Single loop: worse of spark and the delegate.
+     */
+    @Override
+    public double regionTps1m(UUID worldId, int chunkX, int chunkZ) {
+        double region = delegate.regionTps1m(worldId, chunkX, chunkZ);
+        return delegate.regionalTicking() ? region : worse(tps1m(), region, false);
+    }
+
+    /** See {@link #regionTps1m(UUID, int, int)}. */
+    @Override
+    public double regionMspt(UUID worldId, int chunkX, int chunkZ) {
+        double region = delegate.regionMspt(worldId, chunkX, chunkZ);
+        return delegate.regionalTicking() ? region : worse(mspt(), region, true);
+    }
+
+    @Override
+    public boolean wraps(MetricsBinding other) {
+        return this == other || delegate.wraps(other);
+    }
+
+    /** NaN-aware min (TPS) or max (MSPT); NaN only when both sides are unsampled. */
+    static double worse(double a, double b, boolean higherIsWorse) {
+        if (Double.isNaN(a)) return b;
+        if (Double.isNaN(b)) return a;
+        return higherIsWorse ? Math.max(a, b) : Math.min(a, b);
     }
 }

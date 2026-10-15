@@ -91,6 +91,9 @@ class EditorTransportAndApplyTest {
 
         // Editor URL
         assertEquals("https://editor.rtp?token=" + token, transport.buildEditorUrl(token));
+        // ADR-106 §5.10: the session link secret rides the fragment, never the query
+        assertEquals("https://editor.rtp?token=" + token + "#k=abc", transport.buildEditorUrl(token, "abc"));
+        assertEquals("https://editor.rtp?token=" + token, transport.buildEditorUrl(token, null));
     }
 
     @Test
@@ -301,6 +304,7 @@ class EditorTransportAndApplyTest {
         }
 
         assertTrue(Files.exists(expectedHtml));
+        EditorLiveFeed.stopActive("test end");
     }
 
     @Test

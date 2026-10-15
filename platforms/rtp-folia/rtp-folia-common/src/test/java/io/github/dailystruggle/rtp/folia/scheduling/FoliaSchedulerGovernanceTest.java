@@ -99,15 +99,19 @@ public class FoliaSchedulerGovernanceTest {
     assertEquals(1, scheduler.getInFlightRegionalTasks());
 
     // Task 2 dispatches to region
-    scheduler.runTask(mockWorld, 1, 1, () -> {/* no-op */});
+    scheduler.runTask(mockWorld, 64, 64, () -> {/* no-op */});
     assertEquals(2, scheduler.getInFlightRegionalTasks());
 
-    // Task 3 attempts to dispatch - should be deferred via async scheduler because inflight == 2
-    scheduler.runTask(mockWorld, 2, 2, () -> {/* no-op */});
+    // Task 3 attempts to dispatch - joins the FIFO deferred queue because inflight == 2
+    scheduler.runTask(mockWorld, 128, 128, () -> {/* no-op */}); // distinct cells: same-cell work coalesces
     assertEquals(2, scheduler.getInFlightRegionalTasks());
-    assertEquals(1, asyncScheduler.pendingCount());
+    assertEquals(1, scheduler.getDeferredQueueSize());
+    assertEquals(2, regionScheduler.pendingCount());
 
-    // Complete pending region tasks
+    // Completing the first two releases permits; the deferred task is dispatched on release
+    regionScheduler.executeAll();
+    assertEquals(1, scheduler.getInFlightRegionalTasks());
+    assertEquals(0, scheduler.getDeferredQueueSize());
     regionScheduler.executeAll();
     assertEquals(0, scheduler.getInFlightRegionalTasks());
   }
@@ -117,7 +121,7 @@ public class FoliaSchedulerGovernanceTest {
   void testInteractiveQueuePumping() {
     // Saturate permits with 2 background tasks
     scheduler.runTask(mockWorld, 0, 0, () -> {/* no-op */});
-    scheduler.runTask(mockWorld, 1, 1, () -> {/* no-op */});
+    scheduler.runTask(mockWorld, 64, 64, () -> {/* no-op */});
     assertEquals(2, scheduler.getInFlightRegionalTasks());
 
     // Interactive request submitted - enters queue
@@ -152,7 +156,7 @@ public class FoliaSchedulerGovernanceTest {
   void testInteractiveRequestDeadlineTimeout() {
     // Saturate permits
     scheduler.runTask(mockWorld, 0, 0, () -> {/* no-op */});
-    scheduler.runTask(mockWorld, 1, 1, () -> {/* no-op */});
+    scheduler.runTask(mockWorld, 64, 64, () -> {/* no-op */});
     assertEquals(2, scheduler.getInFlightRegionalTasks());
 
     AtomicBoolean interactiveExecuted = new AtomicBoolean(false);

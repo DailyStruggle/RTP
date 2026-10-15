@@ -185,6 +185,86 @@ class ScanTaskAdvancedCoverageTest {
         assertNotNull(fut);
     }
 
+    /** Generated chunk whose probe answers {@code probe}; records every live-load request. */
+    private Region probeRegion(String name, ChunkColumnProbe probe, AtomicInteger loads,
+                               CompletableFuture<io.github.dailystruggle.rtp.api.world.RTPChunk<?>> loadResult) {
+        MockRTPWorld w = new MockRTPWorld(name + "_world") {
+            @Override
+            public boolean isChunkGenerated(int cx, int cz) {
+                return true;
+            }
+
+            @Override
+            public CompletableFuture<ChunkColumnProbe> probeChunkColumn(int cx, int cz, int minY, int maxY) {
+                return CompletableFuture.completedFuture(probe);
+            }
+
+            @Override
+            public CompletableFuture<io.github.dailystruggle.rtp.api.world.RTPChunk<?>> getOrLoadChunk(int cx, int cz) {
+                loads.incrementAndGet();
+                return loadResult;
+            }
+        };
+        RegionSettings settings = new RegionSettings(
+                name, w, square, region.getVert(),
+                false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
+        return new Region(name, settings);
+    }
+
+    @Test
+    @DisplayName("UNKNOWN (null) probe on a generated chunk loads the chunk and never marks it bad (S-004)")
+    void nullProbeOnGeneratedChunk_loadsChunkWithoutMarkingBad() {
+        // An unfinished (proto) or undecodable region-file chunk probes as null. Only a live load
+        // makes the server finish generating it; a bad mark would skip it on every later scan.
+        AtomicInteger loads = new AtomicInteger();
+        CompletableFuture<io.github.dailystruggle.rtp.api.world.RTPChunk<?>> pending = new CompletableFuture<>();
+        Region r = probeRegion("null_probe_load_region", null, loads, pending);
+        long pos = 10L;
+        assertFalse(square.isKnownBad(pos));
+
+        ScanTask task = new ScanTask(r, 0L);
+        CompletableFuture<Boolean> fut = task.testPos(
+                r, pos, 16, 16, 2,
+                Collections.emptySet(), Collections.emptySet(), false, null);
+
+        assertEquals(1, loads.get(), "null probe must route to the full-load path");
+        assertFalse(fut.isDone(), "verdict waits on the live load");
+        assertFalse(square.isKnownBad(pos), "null probe must not mark the chunk bad");
+        pending.cancel(true);
+    }
+
+    @Test
+    @DisplayName("All-air probe is a SCAN_MISS: marked bad without a load, so decoders must never fake air")
+    void allAirProbe_marksBadWithoutLoad() {
+        // Contrast case for the null-probe test: a decoder that drops sections and answers "all air"
+        // instead of null turns every chunk into this outcome.
+        ChunkColumnProbe air = new ChunkColumnProbe() {
+            @Override public int chunkX() { return 1; }
+            @Override public int chunkZ() { return 1; }
+            @Override public int minY() { return -64; }
+            @Override public int maxY() { return 320; }
+            @Override public OptionalInt heightmapTopY() { return OptionalInt.empty(); }
+            @Override public String blockAt(int y) { return "minecraft:air"; }
+            @Override public String blockAt(int lx, int lz, int y) { return "minecraft:air"; }
+            @Override public String biomeAt(int y) { return "minecraft:plains"; }
+            @Override public boolean isAirAt(int y) { return true; }
+            @Override public boolean isAirAt(int lx, int lz, int y) { return true; }
+        };
+        AtomicInteger loads = new AtomicInteger();
+        Region r = probeRegion("air_probe_region", air, loads, new CompletableFuture<>());
+        long pos = 10L;
+
+        ScanTask task = new ScanTask(r, 0L);
+        CompletableFuture<Boolean> fut = task.testPos(
+                r, pos, 16, 16, 2,
+                Collections.emptySet(), Collections.emptySet(), false, null);
+
+        assertTrue(fut.isDone());
+        assertFalse(fut.join());
+        assertEquals(0, loads.get(), "SCAN_MISS short-circuits the load");
+        assertTrue(square.isKnownBad(pos));
+    }
+
     @Test
     void testTryProbeFirstScan_withExceptionalProbeFuture() {
         MockRTPWorld exProbeWorld = new MockRTPWorld("ex_probe_world") {
