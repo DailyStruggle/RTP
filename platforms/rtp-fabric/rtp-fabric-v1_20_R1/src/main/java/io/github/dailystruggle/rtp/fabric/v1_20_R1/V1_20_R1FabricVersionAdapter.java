@@ -221,7 +221,13 @@ public final class V1_20_R1FabricVersionAdapter implements FabricVersionAdapter 
             }
             final boolean addedTicket = ticketAdded;
 
-            Object raw = getter.invoke(cache, cx, cz, ChunkStatus.FULL, /*create=*/ true);
+            Object raw;
+            try {
+                raw = getter.invoke(cache, cx, cz, ChunkStatus.FULL, /*create=*/ true);
+            } catch (Throwable t) {
+                if (addedTicket) tryRemoveLoadTicket(cache, cp);
+                return CompletableFuture.failedFuture(t);
+            }
             if (!(raw instanceof CompletableFuture<?> cf)) {
                 if (addedTicket) tryRemoveLoadTicket(cache, cp);
                 return CompletableFuture.failedFuture(new IllegalStateException(
