@@ -23,10 +23,10 @@ import java.util.UUID;
 import java.util.Map;
 
 /**
- * Mojmap-unobfuscated counterpart of {@code io.github.dailystruggle.effectsapi.fabric.FabricHandles}.
+ * Mojmap-unobfuscated counterpart of {@code io.github.dailystruggle.rtp.fabric.effects.FabricHandles}.
  *
- * <p>The shared {@code effectsapi.fabric.FabricHandles} lives in the obf
- * {@code :effects-api} module, which Loom remaps to <em>intermediary</em>
+ * <p>The shared {@code rtp.fabric.effects.FabricHandles} lives in the obf
+ * {@code :rtp-fabric:rtp-fabric-common} module, which Loom remaps to <em>intermediary</em>
  * names (e.g. {@code net.minecraft.server.level.ServerPlayer} -&gt;
  * {@code net.minecraft.class_3222}). Those aliases exist on a 1.20/1.21
  * Fabric runtime (the loader remaps intermediary -&gt; runtime at load) but

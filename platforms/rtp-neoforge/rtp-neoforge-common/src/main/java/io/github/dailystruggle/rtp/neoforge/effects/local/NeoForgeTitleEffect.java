@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.neoforge.effects.local;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
-import io.github.dailystruggle.effectsapi.fabric.LocalEffects.enums.FabricTitleKeys;
 import io.github.dailystruggle.rtp.common.RTP;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundSetSubtitleTextPacket;
@@ -19,16 +18,16 @@ import java.util.logging.Level;
  * reflection (the {@code connection} field name / {@code send} method drift
  * across the line). S-004 cosmetic.
  */
-public class NeoForgeTitleEffect extends Effect<FabricTitleKeys> {
+public class NeoForgeTitleEffect extends Effect<NeoForgeTitleKeys> {
 
     public NeoForgeTitleEffect() throws IllegalArgumentException {
-        super(new EnumMap<>(FabricTitleKeys.class));
-        EnumMap<FabricTitleKeys, Object> d = getData();
-        d.put(FabricTitleKeys.TITLE, "");
-        d.put(FabricTitleKeys.SUBTITLE, "");
-        d.put(FabricTitleKeys.FADE_IN, 10);
-        d.put(FabricTitleKeys.STAY, 70);
-        d.put(FabricTitleKeys.FADE_OUT, 20);
+        super(new EnumMap<>(NeoForgeTitleKeys.class));
+        EnumMap<NeoForgeTitleKeys, Object> d = getData();
+        d.put(NeoForgeTitleKeys.TITLE, "");
+        d.put(NeoForgeTitleKeys.SUBTITLE, "");
+        d.put(NeoForgeTitleKeys.FADE_IN, 10);
+        d.put(NeoForgeTitleKeys.STAY, 70);
+        d.put(NeoForgeTitleKeys.FADE_OUT, 20);
         this.data = d;
         this.defaults = d.clone();
     }
@@ -38,11 +37,11 @@ public class NeoForgeTitleEffect extends Effect<FabricTitleKeys> {
         if (!(target instanceof ServerPlayer)) return;
         ServerPlayer player = (ServerPlayer) target;
 
-        String titleStr = String.valueOf(data.getOrDefault(FabricTitleKeys.TITLE, ""));
-        String subStr   = String.valueOf(data.getOrDefault(FabricTitleKeys.SUBTITLE, ""));
-        int fadeIn  = numAsInt(data.get(FabricTitleKeys.FADE_IN),  10);
-        int stay    = numAsInt(data.get(FabricTitleKeys.STAY),     70);
-        int fadeOut = numAsInt(data.get(FabricTitleKeys.FADE_OUT), 20);
+        String titleStr = String.valueOf(data.getOrDefault(NeoForgeTitleKeys.TITLE, ""));
+        String subStr   = String.valueOf(data.getOrDefault(NeoForgeTitleKeys.SUBTITLE, ""));
+        int fadeIn  = numAsInt(data.get(NeoForgeTitleKeys.FADE_IN),  10);
+        int stay    = numAsInt(data.get(NeoForgeTitleKeys.STAY),     70);
+        int fadeOut = numAsInt(data.get(NeoForgeTitleKeys.FADE_OUT), 20);
 
         boolean sent = NeoForgeConnection.send(player,
                 new ClientboundSetTitlesAnimationPacket(fadeIn, stay, fadeOut));
@@ -74,11 +73,11 @@ public class NeoForgeTitleEffect extends Effect<FabricTitleKeys> {
 
     @Override
     public String toPermission() {
-        return data.get(FabricTitleKeys.TITLE) + "."
-                + data.get(FabricTitleKeys.SUBTITLE) + "."
-                + data.get(FabricTitleKeys.FADE_IN) + "."
-                + data.get(FabricTitleKeys.STAY) + "."
-                + data.get(FabricTitleKeys.FADE_OUT);
+        return data.get(NeoForgeTitleKeys.TITLE) + "."
+                + data.get(NeoForgeTitleKeys.SUBTITLE) + "."
+                + data.get(NeoForgeTitleKeys.FADE_IN) + "."
+                + data.get(NeoForgeTitleKeys.STAY) + "."
+                + data.get(NeoForgeTitleKeys.FADE_OUT);
     }
 
     @Override
@@ -86,9 +85,9 @@ public class NeoForgeTitleEffect extends Effect<FabricTitleKeys> {
         applyByType(KEY_ORDER, data);
     }
 
-    private static final FabricTitleKeys[] KEY_ORDER = {
-            FabricTitleKeys.TITLE, FabricTitleKeys.SUBTITLE,
-            FabricTitleKeys.FADE_IN, FabricTitleKeys.STAY, FabricTitleKeys.FADE_OUT
+    private static final NeoForgeTitleKeys[] KEY_ORDER = {
+            NeoForgeTitleKeys.TITLE, NeoForgeTitleKeys.SUBTITLE,
+            NeoForgeTitleKeys.FADE_IN, NeoForgeTitleKeys.STAY, NeoForgeTitleKeys.FADE_OUT
     };
 
     private static int numAsInt(Object o, int fallback) {

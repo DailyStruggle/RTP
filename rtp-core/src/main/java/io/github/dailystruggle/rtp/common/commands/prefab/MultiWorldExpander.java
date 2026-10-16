@@ -150,7 +150,7 @@ public final class MultiWorldExpander {
         return (world, overlay) -> {
             try {
                 Map<String, Object> vertFix =
-                        io.github.dailystruggle.rtp.common.commands.menu.multiconfig.NetherEndConfigAmender
+                        io.github.dailystruggle.rtp.common.commands.base.NetherEndConfigAmender
                                 .createDimensionVert(world);
                 if (vertFix == null) return;
                 Object vertObj = overlay.get("vert");

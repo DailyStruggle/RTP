@@ -378,8 +378,25 @@ public class BukkitRTPPlayer implements RTPPlayer {
       state.setBlockData(parsed);
       states.add(state);
     }
-    if (!states.isEmpty()) {
+    if (states.isEmpty()) return;
+    if (BULK_BLOCK_CHANGES) {
       player.sendBlockChanges(states);
+    } else {
+      for (BlockState state : states) {
+        player.sendBlockChange(state.getLocation(), state.getBlockData());
+      }
+    }
+  }
+
+  /** {@code Player#sendBlockChanges(Collection)} is absent from the 1.18.2 API; older servers send one by one (ADR-113). */
+  private static final boolean BULK_BLOCK_CHANGES = hasBulkBlockChanges();
+
+  private static boolean hasBulkBlockChanges() {
+    try {
+      Player.class.getMethod("sendBlockChanges", java.util.Collection.class);
+      return true;
+    } catch (NoSuchMethodException e) {
+      return false;
     }
   }
 

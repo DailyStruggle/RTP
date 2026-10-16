@@ -28,8 +28,8 @@ import java.util.regex.Pattern;
  * {@code PlayerHandle}/{@code LocationHandle}, etc.), which carries no
  * {@code org.bukkit.*} or {@code net.minecraft.*} imports. Per-platform
  * initialization lives in the sibling subpackages: Bukkit uses this class plus
- * {@code effectsapi.bukkit.BukkitEffectsInitializer}; Fabric uses
- * {@code effectsapi.fabric.FabricEffectsInitializer} (see effects-api-ADR-003).
+ * {@code effectsapi.bukkit.BukkitEffectsInitializer}; Fabric and NeoForge
+ * initialize from their platform carriers (see effects-api-ADR-003).
  * The root-package placement and generic name of this class are retained for
  * back-compat with {@code compileOnly} addons that already link against
  * {@code io.github.dailystruggle.effectsapi.EffectsAPI}; treat its true home as

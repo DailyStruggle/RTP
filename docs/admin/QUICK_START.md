@@ -41,10 +41,10 @@ Or drag the region border on the map in `/rtp editor`, or edit the file by hand 
 
 ## Step 0 — Prerequisites & Pregenerate the World
 
-**Optional.** Only Java 21+ is required. The rest makes the first teleports and the first `/rtp scan` faster: RTP loads chunks off the main thread on demand, so on a world that was never generated those first runs wait on chunk generation.
+**Optional.** Only Java 17+ is required. The rest makes the first teleports and the first `/rtp scan` faster: RTP loads chunks off the main thread on demand, so on a world that was never generated those first runs wait on chunk generation.
 
-1. **Java 21+** is required.
-2. **Pick your platform:** Paper, Spigot, Folia, Fabric, or NeoForge.
+1. **Java 17+** is required, or whatever your Minecraft version needs (Java 21 from 1.20.5, Java 25 on 26.x).
+2. **Pick your platform:** Paper or Spigot 1.18+, Folia 1.21.11+, Fabric 1.20.1 or 1.21+, or NeoForge 1.21.1+, up to 26.3. Bug reports are accepted for 1.21.11 through the latest release; older versions are best effort, except Folia, which is experimental and not supported below 1.21.11 ([support matrix](../dev/SUPPORT_MATRIX.md)).
 3. **Install Vault + an economy plugin first** if you plan to charge for `/rtp` (Step 7).
 4. **Install your claim plugin first** (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, …) if you want claim-aware teleport. RTP autodetects them at load.
 5. **Pregenerate** (optional) each world you'll add to RTP, sized to the region from Step 4. A region with `radius: 4096b` needs 4,096 blocks pregenerated from `centerX, centerZ`, plus a small margin.

@@ -1,5 +1,9 @@
 package io.github.dailystruggle.rtp.common.commands;
 
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.PlatformCommandParameters;
+import io.github.dailystruggle.rtp.common.commands.base.RTPCmd;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;

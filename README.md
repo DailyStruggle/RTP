@@ -2,13 +2,13 @@
 
 The Folia-native, region-aware random teleport plugin for production Minecraft servers. Pre-generated, pre-validated locations resolve in 0-2 ticks with no main-thread chunk I/O and no region thrashing under load.
 
-**Supported:** Spigot, Paper, Folia 1.20+, Fabric 1.20+/1.21+ (all stable), NeoForge 1.21.1+.
+**Supported:** Spigot and Paper 1.18+, Folia 1.21.11+, Fabric 1.20.1 and 1.21+, NeoForge 1.21.1+, up to 26.3. Bug reports are accepted for 1.21.11 through the latest release ([support matrix](docs/dev/SUPPORT_MATRIX.md)).
 
 🔗 **[Get RTP Pro on BuiltByBit](https://builtbybit.com/resources/leafrtp-pro.105418/)** — supports continued development and buys priority support and early-access builds. The code is the same MIT-licensed engine as the free build.
 
 [![Build](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml/badge.svg)](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml)
 [![Release](https://img.shields.io/github/v/release/DailyStruggle/RTP)](https://github.com/DailyStruggle/RTP/releases)
-[![Java](https://img.shields.io/badge/Java-21-blue)](https://adoptium.net/)
+[![Java](https://img.shields.io/badge/Java-17%2B-blue)](https://adoptium.net/)
 [![SpigotMC](https://img.shields.io/badge/SpigotMC-RTP-orange)](https://www.spigotmc.org/resources/leafrtp.94812/)
 [![BuiltByBit](https://img.shields.io/badge/BuiltByBit-RTP%20Pro-blue)](https://builtbybit.com/resources/leafrtp-pro.105418/)
 [![Modrinth](https://img.shields.io/badge/Modrinth-LeafRTP-green)](https://modrinth.com/plugin/leafrtp)
@@ -48,14 +48,14 @@ Legacy random-teleport plugins reroll random coordinates until one lands somewhe
 
 | Platform | Min Version | Notes |
 |---|---|---|
-| Spigot | 1.20 | Baseline adapter |
-| Paper | 1.20 | Uses async chunk loading APIs |
-| Folia | 1.20 | Full regional-thread scheduling support |
-| Fabric | 1.20 | Native mod support - **first-class, stable**, tested regularly, at feature parity with the Bukkit family. Loom-remapped obf/unobf carriers cover 1.20.x, 1.21.x, and MC 26.x ([details](platforms/rtp-fabric/README.md)) |
-| NeoForge | 1.21.1 | Native mod adapter, in-scope. Carriers for 1.21.1 and MC 26.x; the 26.x carrier loads and runs, with broader runtime testing ongoing ([details](docs/dev/NEOFORGE_NOTES.md)). |
+| Spigot | 1.18 | Baseline adapter. No Spigot server runs in CI. |
+| Paper | 1.18 | Uses async chunk loading APIs. Nightly CI on 1.21.11 and 26.3. |
+| Folia | 1.21.11 | Full regional-thread scheduling support. Nightly CI on 1.21.11. Folia is experimental and only its current builds are maintained; older Folia is not supported. |
+| Fabric | 1.20.1 | Native mod support at feature parity with the Bukkit family. Runs on 1.20.1 and 1.21 - 26.3 (not 1.20.2 - 1.20.6); nightly CI on 1.21.11 and 26.3 ([details](platforms/rtp-fabric/README.md)) |
+| NeoForge | 1.21.1 | Native mod adapter, in-scope. Carriers for 1.21.1 and MC 26.x; nightly CI on 1.21.1 only, the 26.x carrier has broader runtime testing ongoing ([details](docs/dev/NEOFORGE_NOTES.md)). |
 | Forge (legacy) | — | No native adapter. Use a Bukkit-compatibility launcher (e.g. **Arclight** or **Mohist**) and run the Spigot/Paper build. |
 
-**Runtime:** Java 21+
+**Runtime:** Java 17+, or newer where Minecraft needs it (Java 21 from 1.20.5, Java 25 on 26.x). Versions below 1.21.11 are best effort; per-version status is in the [support matrix](docs/dev/SUPPORT_MATRIX.md).
 
 ---
 
@@ -63,7 +63,7 @@ Legacy random-teleport plugins reroll random coordinates until one lands somewhe
 
 RTP trades memory for tick time: the pre-warmed location queue, per-region spatial memory, and the Anvil pre-filter caches all cost heap in exchange for teleports that resolve without on-demand chunk loading. On a heap-starved host the JVM will spend its time in garbage collection and the server will appear to hang; that is a deployment-environment limit, not a plugin fault.
 
-- **Java 21+** (hard requirement).
+- **Java 17+** (hard requirement), or newer where Minecraft needs it.
 - **Headroom for the caches.** The queue is bounded by `cacheCap` (per region) and the ticket pool by `activeChunkCap`. Both are *absolute* per-region caps: their heap cost is fixed per region (roughly `cacheCap + activeChunkCap` entries) and scales with your region count, not with radius. Radius affects only the size of the per-region spatial memory (the `MemoryShape` land/bad-sector map), not the queue or ticket pool. RTP includes a built-in heap-pressure gate (`performance.yml` -> `maxHeapPercent`, default 85%) that pauses *background cache generation* while the heap is under pressure and logs a warning, so serving already-cached locations keeps working; a persistently-tripped gate means the host is under-provisioned for the configured `cacheCap`.
 
 **Reference environment (measured, not a certified minimum).** The in-repo devstack and stress harness run on a **Ryzen 9 3900X with 16 GiB allocated to the server**. Treat this as a known-good baseline, not a floor - a single small region needs far less. A properly-sourced minimum (heap per region at a given `cacheCap`) is planned once opt-in telemetry lands to measure real deployments; until then, provision generously and watch for `maxHeapPercent` warnings.

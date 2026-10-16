@@ -41,7 +41,9 @@ public class DropInventoryEffect extends Effect<DropInventoryEffect.DropInventor
     @Override
     public void setData(EnumMap<DropInventoryKeys, Object> data) {
         if (data == null) return;
-        this.data.putAll(data);
+        EnumMap<DropInventoryKeys, Object> copy = (this.defaults != null) ? this.defaults.clone() : new EnumMap<>(DropInventoryKeys.class);
+        copy.putAll(data);
+        this.data = copy;
     }
 
     @Override

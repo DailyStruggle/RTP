@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.bukkit.commands;
 
 import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandFailEvent;
 import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandSuccessEvent;
-import io.github.dailystruggle.rtp.common.commands.RTPCommandEvents;
+import io.github.dailystruggle.rtp.common.commands.base.RTPCommandEvents;
 
 import org.bukkit.Bukkit;
 

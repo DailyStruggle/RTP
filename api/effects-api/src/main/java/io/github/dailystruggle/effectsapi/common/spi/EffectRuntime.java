@@ -4,13 +4,13 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Platform-neutral runtime surface for the effects API. Concrete implementations
- * live in the per-platform subpackages of {@code effects-api}:
+ * live in {@code effects-api}'s Bukkit subpackage or in the platform carrier:
  *
  * <ul>
  *   <li>{@code io.github.dailystruggle.effectsapi.bukkit.BukkitEffectRuntime}
  *       - backed by Bukkit's scheduler, {@code World#playSound}, {@code World#spawnParticle}
  *       and {@code Player#addPotionEffect}.</li>
- *   <li>{@code io.github.dailystruggle.effectsapi.fabric.FabricEffectRuntime}
+ *   <li>{@code io.github.dailystruggle.rtp.fabric.effects.FabricEffectRuntime} (rtp-fabric-common)
  *       - backed by {@code MinecraftServer#execute}, {@code ServerLevel#playSound},
  *       {@code ServerLevel#sendParticles} and clientbound packets.</li>
  * </ul>

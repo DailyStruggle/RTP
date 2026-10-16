@@ -13,6 +13,18 @@ backend-a/plugins/*.jar
 backend-b/plugins/*.jar
 backend-c/mods/*.jar
 backend-d/mods/*.jar
+# Java 17 legacy stack (docker-compose.legacy.yml): staged jar + downloaded mods.
+legacy/*/plugins/*.jar
+legacy/*/mods/*.jar
+legacy/*/plugins/.paper-remapped/
+legacy/*/config/
+# Standalone version stack (docker-compose.versions.yml): same layout as legacy/.
+versions/*/plugins/*.jar
+versions/*/mods/*.jar
+versions/*/plugins/.paper-remapped/
+versions/*/config/
+# Version sweep (docker-compose.sweep.yml): whole per-row /data dirs.
+sweep/
 backend-a/plugins/.paper-remapped/
 backend-b/plugins/.paper-remapped/
 # Paper remap caches for lobby containers (same rationale as backend-*).

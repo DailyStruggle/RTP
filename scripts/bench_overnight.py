@@ -411,6 +411,7 @@ def main() -> int:
     p.add_argument("--margin-s", type=int, default=300)
     p.add_argument("--out-dir", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "tmp"))
     p.add_argument("--dry-run", action="store_true", help="print the plan and exit")
+    p.add_argument("--cmd", nargs="+", help="send a command over RCON, print the reply, and exit")
     a = p.parse_args()
 
     port, password = a.port, a.password
@@ -422,6 +423,13 @@ def main() -> int:
         password = password or props.get("rcon.password", "")
     if not port or not password:
         p.error("need --port and --password (or --server-dir with rcon settings)")
+
+    if a.cmd:
+        cmd_str = " ".join(a.cmd) if isinstance(a.cmd, list) else a.cmd
+        reply = rcon(a.host, port, password, cmd_str)
+        if reply:
+            print(reply)
+        return 0
     if a.isolate and (not a.server_dir or a.no_restart):
         log("isolation needs --server-dir and restarts; disabled")
         a.isolate = False

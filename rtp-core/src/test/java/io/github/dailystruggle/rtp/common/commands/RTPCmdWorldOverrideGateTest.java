@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands;
 
+import io.github.dailystruggle.rtp.common.commands.base.RTPCmd;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

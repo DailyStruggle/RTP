@@ -8,8 +8,8 @@ import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
-import io.github.dailystruggle.rtp.common.commands.menu.MenuBindingSupport;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.MenuRendererDiscovery;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -115,7 +115,7 @@ public class DocsCmd extends BaseRTPCmdImpl {
         }
 
         // Try to render via discovered MenuRenderer
-        MenuRenderer renderer = MenuBindingSupport.discoverRenderer();
+        MenuRenderer renderer = MenuRendererDiscovery.discoverRenderer();
         if (renderer != null && callerId != null && !callerId.equals(RTPAPI.serverId)) {
             try {
                 renderer.render(callerId, model);

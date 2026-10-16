@@ -11,9 +11,9 @@ import io.github.dailystruggle.rtp.api.menu.MenuPage;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.admin.AdminCmd;
+import io.github.dailystruggle.rtp.common.commands.base.SearchCommandHandlerAware;
 import io.github.dailystruggle.rtp.common.commands.menu.multiconfig.DefaultMultiConfigRemovalGuards;
 import io.github.dailystruggle.rtp.common.commands.menu.multiconfig.MultiConfigMenuBuilder;
-import io.github.dailystruggle.rtp.common.commands.prefab.PrefabCommand;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
@@ -480,16 +480,14 @@ final class MenuWiringSupportInstaller {
                 }
             };
         }
-        final AdminCmd adminCmd = new AdminCmd(rtpRoot, openAdminPanel);
-        adminCmd.addSubCommand(new PrefabCommand(adminCmd));
-        adminCmd.addSubCommand(new io.github.dailystruggle.rtp.common.commands.setup.SetupCmd(
-                adminCmd,
-                new io.github.dailystruggle.rtp.common.commands.setup.SetupSessionRegistry(),
-                new io.github.dailystruggle.rtp.common.commands.setup.SetupBookMenuBuilder(),
-                menuRenderer
-        ));
-        if (rtpRoot != null) {
-            rtpRoot.addSubCommand(adminCmd);
+        CommandsAPICommand existing = (rtpRoot != null) ? rtpRoot.getCommandLookup().get("ADMIN") : null;
+        if (existing instanceof AdminCmd adminCmd) {
+            adminCmd.setOpenAdminPanel(openAdminPanel);
+        } else {
+            final AdminCmd adminCmd = new AdminCmd(rtpRoot, openAdminPanel);
+            if (rtpRoot != null) {
+                rtpRoot.addSubCommand(adminCmd);
+            }
         }
     }
 
@@ -507,12 +505,11 @@ final class MenuWiringSupportInstaller {
                 return;
             }
             CommandsAPICommand searchCmd = configTree.getCommandLookup().get("SEARCH");
-            if (!(searchCmd
-                    instanceof io.github.dailystruggle.rtp.common.commands.config.ConfigSearchSubCmd searchLeaf)) {
+            if (!(searchCmd instanceof SearchCommandHandlerAware searchAware)) {
                 return;
             }
             if (finalRenderer == null || finalSearchBuilder == null) return;
-            searchLeaf.setHandler((UUID callerId, String query) -> {
+            searchAware.setSearchHandler((UUID callerId, String query) -> {
                 var model = finalSearchBuilder.buildResults(callerId, query, 1);
                 if (model == null) {
                     RTP.log(Level.WARNING,

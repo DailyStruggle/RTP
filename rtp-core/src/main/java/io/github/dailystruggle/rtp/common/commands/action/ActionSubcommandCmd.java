@@ -8,7 +8,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.action.ActionPlaceholderSanitizer;
 import io.github.dailystruggle.rtp.common.action.ActionSessionImpl;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;

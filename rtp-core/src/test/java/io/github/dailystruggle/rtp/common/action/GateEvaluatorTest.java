@@ -152,7 +152,7 @@ class GateEvaluatorTest {
     io.github.dailystruggle.rtp.common.RTP.serverAccessor = accessor;
 
     // Register a tree command
-    accessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl(null) {
+    accessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl(null) {
       @Override public String name() { return "test_pass"; }
       @Override public String permission() { return "test.use"; }
       @Override public boolean onCommand(UUID callerId, Map<String, java.util.List<String>> parameterValues, io.github.dailystruggle.commandsapi.common.CommandsAPICommand nextCommand) {
@@ -181,7 +181,7 @@ class GateEvaluatorTest {
         new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(new java.io.File("target/test"));
     io.github.dailystruggle.rtp.common.RTP.serverAccessor = accessor;
 
-    accessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl(null) {
+    accessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl(null) {
       @Override public String name() { return "test_pass_map"; }
       @Override public String permission() { return "test.use"; }
       @Override public boolean onCommand(UUID callerId, Map<String, java.util.List<String>> parameterValues, io.github.dailystruggle.commandsapi.common.CommandsAPICommand nextCommand) {
@@ -450,7 +450,7 @@ class GateEvaluatorTest {
         new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(new java.io.File("target/test"));
     io.github.dailystruggle.rtp.common.RTP.serverAccessor = accessor;
 
-    accessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl(null) {
+    accessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl(null) {
       @Override public String name() { return "cmd_one"; }
       @Override public String permission() { return "test.use"; }
       @Override public boolean onCommand(UUID callerId, Map<String, java.util.List<String>> parameterValues, io.github.dailystruggle.commandsapi.common.CommandsAPICommand nextCommand) {
@@ -462,7 +462,7 @@ class GateEvaluatorTest {
       }
     });
 
-    accessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl(null) {
+    accessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl(null) {
       @Override public String name() { return "cmd_two"; }
       @Override public String permission() { return "test.use"; }
       @Override public boolean onCommand(UUID callerId, Map<String, java.util.List<String>> parameterValues, io.github.dailystruggle.commandsapi.common.CommandsAPICommand nextCommand) {

@@ -53,10 +53,14 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
         this.handleRef = new java.lang.ref.WeakReference<>(player);
     }
 
-    private static String resolveName(ServerPlayer player) {
+    /**
+     * Profile name that survives the authlib record change (~1.21.9: {@code GameProfile#getName()}
+     * became {@code name()}). Code compiled against 1.21.1 must not call {@code getName()} unguarded.
+     */
+    public static String resolveName(ServerPlayer player) {
         try {
             return player.getGameProfile().getName();
-        } catch (NoSuchMethodError ignored) {
+        } catch (LinkageError ignored) {
             // authlib record-shape: no getName(); fall through to Entity name.
         }
         return player.getName().getString();

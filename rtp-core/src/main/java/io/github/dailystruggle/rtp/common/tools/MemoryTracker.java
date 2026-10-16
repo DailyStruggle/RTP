@@ -171,7 +171,7 @@ public class MemoryTracker {
       Object target = obj.getTarget();
       if ("TeleportPipelineTask".equals(label)
           || target instanceof io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask
-          || target instanceof io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask) {
+          || target instanceof io.github.dailystruggle.rtp.common.tasks.TrackableTask) {
         tasks++;
       }
     }
@@ -226,7 +226,7 @@ public class MemoryTracker {
           && wrapper.getTask() != null) {
         target = wrapper.getTask();
       }
-      if (target instanceof io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask task) {
+      if (target instanceof io.github.dailystruggle.rtp.common.tasks.TrackableTask task) {
         if (tracked.isLeaking() || task.isCancelled()) {
           continue;
         }
@@ -322,17 +322,19 @@ public class MemoryTracker {
                         }
 
                         // Active Cleanup Injection
-                        if (actualTask instanceof io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask pipelineTask) {
+                        if (actualTask instanceof io.github.dailystruggle.rtp.common.tasks.TrackableTask trackableTask) {
                           // Diagram 04: ForceClose -> DecCounter -> Untrack. FINE because each occurrence
                           // represents a real cleanup action (cancellation + chunk release scheduling).
                           log(Level.FINE,
                                   "[RTP][GC] ForceClose stalled pipeline label={0} ageOverBudgetMs={1}",
                                   label, leakDuration);
                           // Force the abandoned pipeline into its CLEANUP phase
-                          pipelineTask.setCancelled(true);
+                          trackableTask.setCancelled(true);
 
                           // Schedule it on the primary thread to safely release chunks
-                          RTP.scheduler.runTask(pipelineTask);
+                          if (RTP.scheduler != null) {
+                            RTP.scheduler.runTask(trackableTask);
+                          }
 
                           // Return true to instantly purge it from the tracker
                           // to prevent infinite log looping
@@ -455,8 +457,8 @@ public class MemoryTracker {
       long finalPluginForced = pluginForced;
       long finalTrackedTickets = trackedTickets;
       // Post-arrival holds (REQ-RTP-S-005) are owned, time-bounded tickets, not orphans.
-      long arrivalHolds = io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask
-          .pendingArrivalReleaseCount();
+      long arrivalHolds = io.github.dailystruggle.rtp.common.tasks.ChunkTicketHolder
+          .heldChunkTicketCount();
       long finalTotalActiveChunkCap = totalActiveChunkCap;
       long finalTotalLocationQueueSize = totalLocationQueueSize;
       long finalTotalCacheCap = totalCacheCap;
@@ -531,7 +533,7 @@ public class MemoryTracker {
 
           // 3b. Keep chunks pinned by pending post-arrival holds (worlds already being swept)
           for (java.util.Map.Entry<RTPWorld<?>, java.util.Set<Long>> hold
-              : io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask
+              : io.github.dailystruggle.rtp.common.tasks.ChunkTicketHolder
                   .arrivalHoldChunkKeys().entrySet()) {
             java.util.Set<Long> keepAliveKeys = keepAliveByWorld.get(hold.getKey());
             if (keepAliveKeys != null) keepAliveKeys.addAll(hold.getValue());

@@ -3,7 +3,8 @@ package io.github.dailystruggle.rtp.common.commands.config;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.SearchCommandHandlerAware;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
@@ -11,13 +12,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.BiConsumer;
 import java.util.logging.Level;
 
 /**
  * Subcommand {@code /rtp config search query:<text>}.
  * Receives anvil search input from the menu and delegates to the injected {@link Handler}.
  */
-public class ConfigSearchSubCmd extends BaseRTPCmdImpl {
+public class ConfigSearchSubCmd extends BaseRTPCmdImpl implements SearchCommandHandlerAware {
 
     /** Parameter name carried in {@link io.github.dailystruggle.rtp.api.menu.MenuAction.PromptAnvilInput#paramName()}. */
     public static final String PARAM_QUERY = "query";
@@ -76,6 +78,11 @@ public class ConfigSearchSubCmd extends BaseRTPCmdImpl {
      */
     public void setHandler(@Nullable Handler handler) {
         this.handler = handler;
+    }
+
+    @Override
+    public void setSearchHandler(@Nullable BiConsumer<UUID, String> searchHandler) {
+        this.handler = (searchHandler != null) ? searchHandler::accept : null;
     }
 
     @Override

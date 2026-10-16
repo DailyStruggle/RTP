@@ -516,7 +516,7 @@ public class PermissionMigrationTest {
         assertThrows(IllegalArgumentException.class, () -> service.formatGroupSet("bad name", "rtp.use", true, ""));
     }
 
-    private static final class StubRoot extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
+    private static final class StubRoot extends io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl {
         StubRoot() {
             super(null);
         }

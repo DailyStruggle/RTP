@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.bukkit.commands.test;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import io.github.dailystruggle.rtp.common.commands.test.TestAccessorCmd;
 import io.github.dailystruggle.rtp.common.commands.test.TestAnvilPrefilterCmd;

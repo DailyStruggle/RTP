@@ -328,7 +328,7 @@ class MenuConcreteCommandLeavesCoverageTest {
     @Test
     @DisplayName("Region parameter suggestions track the selection API, including absent and throwing APIs")
     void regionParameterValues() {
-        List<io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl> cmds = List.of(
+        List<io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl> cmds = List.of(
                 new VisualizationExportCmd.ExportAllCmd(),
                 new VisualizationExportCmd.ExportComprehensiveCmd(),
                 new VisualizationExportCmd.ExportTypeCmd("walk", ChartSpec.Kind.REGION_WALK_PATH));

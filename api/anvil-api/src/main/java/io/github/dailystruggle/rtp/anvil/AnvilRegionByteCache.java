@@ -71,7 +71,7 @@ public final class AnvilRegionByteCache {
   private static final LinkedHashMap<Path, Entry> CACHE =
       new LinkedHashMap<>(CAPACITY * 2, 0.75f, /* accessOrder = */ true) {
         @Override
-        protected boolean removeEldestEntry(Map.Entry<Path, Entry> eldest) {
+        protected boolean removeEldestEntry(Map.Entry<Path, AnvilRegionByteCache.Entry> eldest) {
           if (size() > CAPACITY) {
             retireLocked(eldest.getValue());
             return true;

@@ -13,9 +13,13 @@ novelty, and delta-debugging shrinking with k of n reproduction.
 """
 from __future__ import annotations
 
+import contextlib
+import io
+import itertools
 import json
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -23,6 +27,7 @@ import tempfile
 import time
 import types
 import unittest
+import unittest.mock
 from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parent.parent
@@ -231,6 +236,14 @@ class CorpusTest(unittest.TestCase):
         self.assertTrue(r["kept"])
         self.assertEqual(r["new_states"], [["quit", "system:x"]])
         self.assertEqual([e["ep"] for e in c.entries], [0, 2])
+
+    def test_corpus_keeps_a_new_coverage_probe_once(self):
+        c = bf.Corpus()
+        self.assertTrue(c.consider(0, [], [], {}, probes=["A#1", "A#2"])["kept"])
+        res = c.consider(1, [], [], {}, probes=["A#2"])
+        self.assertFalse(res["kept"])
+        self.assertNotIn("new_probes", res)
+        self.assertEqual(c.consider(2, [], [], {}, probes=["A#3"])["new_probes"], 1)
 
     def test_count_changes_kept_by_direction_and_magnitude(self):
         c = bf.Corpus()
@@ -1841,6 +1854,27 @@ def planted_trace(line=42, exc="java.lang.IllegalStateException", pkg="com.bette
             "\tat net.minecraft.server.MinecraftServer.tick(MinecraftServer.java:1200)\n")
 
 
+class CoverageReaderTest(unittest.TestCase):
+    """Probe keys from a /rtpstress coverage JSON dump (ADR-111 section 2.6)."""
+
+    def test_probe_keys_from_dump(self):
+        data = {"label": "x", "classes": {"a.B": [0, 3], "a.C": []}}
+        self.assertEqual(bf.coverage_probes(data), {"a.B#0", "a.B#3"})
+        self.assertEqual(bf.coverage_probes({}), set())
+
+    def test_reader_fetches_dump_and_marks_probes_seen(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "coverage-run1.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump({"label": "run1", "classes": {"a.B": [1]}}, f)
+            r = bf.CoverageReader(d)
+            probes = r.fetch("run1", wait_s=0.5)
+            self.assertEqual(probes, {"a.B#1"})
+            self.assertEqual(r.new_probes(probes), ["a.B#1"])
+            self.assertEqual(r.new_probes(probes), [])
+            self.assertIsNone(r.fetch("missing", wait_s=0.1, poll_s=0.05))
+
+
 class FindingSignatureTest(unittest.TestCase):
     """Stable signatures, strict trace parsing and attribution of log findings."""
 
@@ -1957,6 +1991,339 @@ class FindingSignatureTest(unittest.TestCase):
         self.assertEqual({"seed": 1, "ep": 0}, s[0]["first"])
         self.assertTrue(s[0]["reproduced"])
         self.assertEqual({s[0]["signature"]}, set(bf.control_findings(fs)["signatures"]))
+
+
+class FaultModeTest(LoopFixture, unittest.TestCase):
+    """--mode faults: one checkpoint-free run per episode, coverage and finding oracles only."""
+
+    def extra_args(self):
+        return ["--mode", "faults", "--coverage"]
+
+    def test_mode_defaults_to_leak_and_is_faults_only_for_targets(self):
+        self.assertTrue(self.tr.faults)
+        leak = bf.TargetRun(bf.build_parser().parse_args(["--server-dir", self.dir]), self.server, self.swarm,
+                            bf.RunsReader(self.runs), "betterrtp", "20261010-200000", self.tdir)
+        self.assertFalse(leak.faults)
+        control = bf.TargetRun(self.a, self.server, self.swarm, bf.RunsReader(self.runs), bf.DIRECT,
+                               "20261010-200000", self.tdir)
+        self.assertFalse(control.faults)
+
+    def test_episode_makes_no_checkpoint_and_writes_no_deltas(self):
+        plan = bf.plan_episode(1, 0, bf.DEFAULT_PARAMS, bf.Corpus(), self.tr.cfg)
+        rec = self.tr.execute(1, 0, plan, bf.Corpus())
+        self.assertEqual(len(self.swarm.requests), 1)
+        self.assertFalse(any("leakcheck" in c for c in self.server.cmds))
+        self.assertNotIn("excluded", rec)
+        self.assertIsNone(rec["deltas"])
+        self.assertIsNone(self.tr.prev)
+        self.assertFalse(os.path.exists(os.path.join(self.tdir, bf.CLASSES_FILE)))
+        self.assertTrue(any(c.startswith("rtpstress coverage ") for c in self.server.cmds))
+        self.assertEqual(self.records()[0]["ep"], 0)
+
+    def test_run_seed_skips_baseline_and_keeps_every_episode(self):
+        recs = self.tr.run_seed(1)
+        self.assertEqual(len(recs), 4)
+        self.assertEqual(len(self.swarm.requests), 4)
+        self.assertFalse(any("leakcheck" in c for c in self.server.cmds))
+        self.assertTrue(all(r["deltas"] is None for r in recs))
+
+    def test_lingering_bots_still_exclude_the_episode(self):
+        self.server.online, self.server.online_lists = ["fzlinger_0"], 1
+        rec = self.tr.execute(1, 0, bf.plan_episode(1, 0, bf.DEFAULT_PARAMS, bf.Corpus(), self.tr.cfg), bf.Corpus())
+        self.assertEqual(rec["excluded"], "other players online after the episode")
+        self.assertEqual(rec["lingering"], ["fzlinger_0"])
+
+    def write_properties(self):
+        with open(os.path.join(self.dir, "server.properties"), "w", encoding="utf-8") as fh:
+            fh.write("rcon.password=test\nrcon.port=25575\nserver-port=25565\n")
+
+    def test_missing_coverage_flag_is_refused_before_any_server_call(self):
+        self.write_properties()
+        err = io.StringIO()
+        with unittest.mock.patch.object(bf, "FuzzDriver", side_effect=AssertionError("server touched")), \
+                contextlib.redirect_stderr(err), self.assertRaises(SystemExit) as cm:
+            bf.main(["--server-dir", self.dir, "--mode", "faults", "--out-dir", self.dir])
+        self.assertEqual(cm.exception.code, 2)
+        self.assertIn("--mode faults needs --coverage", err.getvalue())
+
+    def test_reps_above_one_runs_one_swarm_request_and_no_repetitions(self):
+        self.a.reps = 3
+        rec = self.tr.execute(1, 0, bf.plan_episode(1, 0, bf.DEFAULT_PARAMS, bf.Corpus(), self.tr.cfg), bf.Corpus())
+        self.assertEqual(len(self.swarm.requests), 1)
+        self.assertNotIn("reps", rec)
+        self.assertNotIn("excluded", rec)
+        self.assertFalse(any("leakcheck" in c for c in self.server.cmds))
+        self.assertIsNone(rec["deltas"])
+
+    def test_lingering_players_exclude_the_next_episode_before_it_starts(self):
+        self.server.online, self.server.online_lists = ["fzlinger_0"], None
+        first = self.tr.execute(1, 0, bf.plan_episode(1, 0, bf.DEFAULT_PARAMS, bf.Corpus(), self.tr.cfg), bf.Corpus())
+        self.assertEqual(first["excluded"], "other players online after the episode")
+        self.assertTrue(self.tr.dirty)
+        second = self.tr.execute(1, 1, bf.plan_episode(1, 1, bf.DEFAULT_PARAMS, bf.Corpus(), self.tr.cfg), bf.Corpus())
+        self.assertEqual(second["excluded"], "other players online before the episode")
+        self.assertEqual(second["lingering"], ["fzlinger_0"])
+        self.assertEqual(len(self.swarm.requests), 1)  # no bots start beside the stray players
+        self.assertTrue(self.tr.dirty)
+        self.server.online = []
+        third = self.tr.execute(1, 2, bf.plan_episode(1, 2, bf.DEFAULT_PARAMS, bf.Corpus(), self.tr.cfg), bf.Corpus())
+        self.assertNotIn("excluded", third)
+        self.assertFalse(self.tr.dirty)
+        self.assertEqual(len(self.swarm.requests), 2)
+
+    def test_replay_in_faults_mode_takes_no_baseline(self):
+        rec = {"ep": 0, "seed": 1, "bots": bf.gen_episode(1, 0, bf.DEFAULT_PARAMS, self.tr.cfg),
+               "params": None, "console": None}
+        self.a.replay_n = 2
+        with unittest.mock.patch.object(bf, "online_names", return_value=[]), \
+                unittest.mock.patch.object(bf.lc, "prepare_target", return_value=True), \
+                unittest.mock.patch.object(bf.time, "sleep"):
+            bf.run_target(self.a, self.server, self.swarm, "betterrtp", [1], self.tdir, "20261010-200000",
+                          unittest.mock.Mock(), replay_rec=rec)
+        self.assertEqual(len(self.swarm.requests), 2)
+        self.assertFalse(any("leakcheck" in c for c in self.server.cmds))
+
+    def test_planted_exception_is_replayed_without_checkpoint_and_confirmed(self):
+        os.makedirs(os.path.join(self.dir, "logs"))
+        log_file = os.path.join(self.dir, "logs", "latest.log")
+        self.swarm.leak_quit = False  # no leak signal: only the planted exception matters
+
+        def plant(req):
+            with open(log_file, "a", encoding="utf-8") as fh:
+                fh.write(planted_trace(41))
+        self.swarm.after = plant
+        self.tr.run_seed(1)
+        replays = bf.read_trace(os.path.join(self.tdir, bf.FINDING_REPLAYS_FILE))
+        self.assertEqual(1, len(replays))
+        self.assertEqual((3, 3, True), (replays[0]["k"], replays[0]["n"], replays[0]["reproduced"]))
+        recs = self.records()
+        replay_recs = [r for r in recs if r["origin"] == "finding"]
+        self.assertEqual(3, len(replay_recs))
+        for r in replay_recs:
+            self.assertTrue(r["replay"])
+            self.assertIsNone(r["deltas"])  # no checkpoint: the replay confirms by signature only
+            self.assertIn(replays[0]["signature"], [f["signature"] for f in r["findings"]])
+        checkpoints = [c.split()[2] for c in self.server.cmds
+                       if c.startswith("rtpstress leakcheck fz")]
+        self.assertTrue(checkpoints)  # the promising episode gets its leak re-run
+        self.assertTrue(all(re.search(r"-(p\d+b|ep\d+)$", label) for label in checkpoints), checkpoints)
+        self.assertEqual(4, self.tr.coverage["planned"])  # replays and re-runs are not planned episodes
+        self.assertGreater(self.tr.coverage["episodes"], self.tr.coverage["planned"])
+        v = self.tr.finish([], [])
+        self.assertEqual("FAIL", v["verdict"])
+        self.assertEqual(["log"], v["confirmed_by"])
+
+    def test_episodes_per_hour_counts_executed_planned_episodes_on_the_exploration_clock(self):
+        ticks = itertools.count()
+        with unittest.mock.patch.object(bf.time, "time", side_effect=lambda: 1000.0 + 0.5 * next(ticks)):
+            self.tr.run_seed(1)
+        cov = self.tr.coverage
+        self.assertGreater(cov["explore_s"], 0)
+        self.assertEqual(cov["executed"], 4)
+        v = self.tr.finish([], [])
+        self.assertEqual(v["coverage"]["executed"], 4)
+        self.assertEqual(v["coverage"]["episodes_per_hour"], bf.episodes_per_hour(4, cov["explore_s"]))
+        self.assertEqual(bf.episodes_per_hour(4, 1800.0), 8.0)
+        self.assertEqual(bf.episodes_per_hour(0, 0.0), None)
+
+    def test_dirty_start_exclusion_is_planned_but_not_executed(self):
+        self.server.online, self.server.online_lists = ["fzlinger_0"], None
+        self.tr.dirty = True
+        self.tr.run_seed(1)
+        cov = self.tr.coverage
+        self.assertEqual(cov["planned"], 4)
+        self.assertEqual(cov["executed"], 0)
+        self.assertEqual(len(self.swarm.requests), 0)  # no bots started beside the stray player
+
+    def promoting_tr(self, probes_by_ep):
+        """TargetRun whose coverage dump reports `probes_by_ep[ep]` (a set) for each episode."""
+        def fake_probes(label):
+            ep = int(label.rsplit("e", 1)[1].rstrip("b"))
+            return set(probes_by_ep.get(ep, ()))
+        self.tr.coverage_probes = fake_probes
+        return self.tr
+
+    def ladder_rows(self):
+        with open(os.path.join(self.tdir, "ladder.jsonl"), encoding="utf-8") as fh:
+            return [json.loads(line) for line in fh]
+
+    def test_promising_episode_gets_exactly_one_leak_rerun(self):
+        tr = self.promoting_tr({0: {"p1", "p2"}})
+        recs = tr.run_seed(1)
+        self.assertEqual(len(tr.promotions), 0)  # drained at the generation end
+        self.assertTrue(recs[0]["kept"])
+        rerun = [r for r in self.records() if r["origin"] == "leakrerun"]
+        self.assertEqual(len(rerun), 1)
+        self.assertNotIn("excluded", rerun[0])
+        self.assertEqual(rerun[0]["parent"], 0)
+        base = "fz20261010-200000-betterrtp-s1-p0b"
+        self.assertEqual(sum(1 for c in self.server.cmds if c == f"rtpstress leakcheck {base} quick"), 1)
+        self.assertEqual(sum(1 for c in self.server.cmds if c == "rtpstress leakcheck fz20261010-200000-betterrtp-s1-ep0 quick"), 1)  # the checkpointed run
+        self.assertIsNotNone(rerun[0]["deltas"])
+        self.assertIn("retained_player_objects", rerun[0]["deltas"])
+        self.assertNotIn("kept", rerun[0])  # re-runs are never offered to the corpus
+        mine = [x for x in self.ladder_rows() if x.get("origin") == "leakrerun"]
+        self.assertEqual(len(mine), 1)
+        self.assertEqual(mine[0]["cand"], "s1e0")
+        self.assertEqual(mine[0]["probes"], 2)
+        self.assertEqual(mine[0]["confirm"], {"status": "pending", "reason": "final confirm only on a ladder climb"})
+
+    def test_leak_reruns_reach_the_fit(self):
+        tr = self.promoting_tr({0: {"p1"}, 1: {"p2"}, 2: {"p3"}, 3: {"p4"}})
+        tr.run_seed(1)
+        with open(os.path.join(self.tdir, "fit.json"), encoding="utf-8") as fh:
+            fit = json.load(fh)["fit"]
+        self.assertEqual(fit["retained_player_objects"]["n"], 4)  # the 4 re-runs; fault episodes have no deltas
+
+    def test_rung_on_a_faults_mode_candidate_takes_checkpointed_runs_and_a_confirm(self):
+        c = {"cand": "s1e0", "seed": 1, "ep": 0, "count": "retained_player_objects", "source": "flag",
+             "shrunk": False, "bots": bf.gen_episode(1, 0, bf.DEFAULT_PARAMS, self.tr.cfg), "console": None,
+             "net0": 1.0, "bots0": 2, "params": None}
+        res = self.tr.run_rung(c, 0, 2, 2, True)
+        self.assertEqual(len(res["nets"]), 2)  # both rung runs were measured
+        for j in range(2):
+            self.assertEqual(sum(1 for x in self.server.cmds if x.startswith("rtpstress leakcheck") and f"L0r{j}" in x), 1)
+        self.assertIn("fail", res["confirm"])
+        self.assertEqual(self.ladder_rows()[-1]["cand"], "s1e0")
+
+    def test_leak_rerun_contamination_blocks_the_next_fault_episode(self):
+        tr = self.promoting_tr({})
+        bots = bf.gen_episode(1, 0, bf.DEFAULT_PARAMS, tr.cfg)
+        tr.promotions.append({"ep": 0, "bots": bots, "console": None, "probes": 1, "signatures": []})
+
+        def leave_player(req):
+            if req["id"].endswith("-ep0"):
+                self.server.online = ["fzlinger_0"]
+
+        self.swarm.after = leave_player
+        reruns, _ = tr.drain_promotions(1, 0)
+        self.assertEqual(len(reruns), 1)
+        self.assertTrue(tr.dirty)
+        requests = len(self.swarm.requests)
+        rec = tr.execute(1, 1, bf.plan_episode(1, 1, bf.DEFAULT_PARAMS, bf.Corpus(), tr.cfg), bf.Corpus())
+        self.assertEqual(rec["excluded"], "other players online before the episode")
+        self.assertEqual(len(self.swarm.requests), requests)
+
+    def test_rung_contamination_blocks_the_next_fault_episode(self):
+        def leave_player(req):
+            if req["id"].endswith("L0r0"):
+                self.server.online = ["fzlinger_0"]
+
+        self.swarm.after = leave_player
+        c = {"cand": "s1e0", "seed": 1, "ep": 0, "count": "retained_player_objects", "source": "flag",
+             "shrunk": False, "bots": bf.gen_episode(1, 0, bf.DEFAULT_PARAMS, self.tr.cfg), "console": None,
+             "net0": 1.0, "bots0": 2, "params": None}
+        rung = self.tr.run_rung(c, 0, 2, 1, False)
+        self.assertEqual(rung["nets"], [])
+        self.assertTrue(self.tr.dirty)
+        requests = len(self.swarm.requests)
+        rec = self.tr.execute(1, 1, bf.plan_episode(1, 1, bf.DEFAULT_PARAMS, bf.Corpus(), self.tr.cfg), bf.Corpus())
+        self.assertEqual(rec["excluded"], "other players online before the episode")
+        self.assertEqual(len(self.swarm.requests), requests)
+
+    def test_leak_reruns_flow_through_fit_pick_and_confirmed_climb(self):
+        tr = self.promoting_tr({i: {f"p{i}"} for i in range(8)})
+        tr.a.episodes = 8
+        recs = tr.run_seed(1)
+        reruns = [r for r in recs if r["origin"] == "leakrerun"]
+        picked = tr.pick_candidates(1, recs, 4)
+        self.assertTrue(reruns)
+        self.assertTrue(any(r["origin"] == "leakrerun" for r, _, _ in picked))
+
+        shrunk = tr.shrink_top(1, recs, 1)
+        candidates = tr.ladder_candidates(1, recs, shrunk)
+        self.assertTrue(candidates)
+        climbed = tr.climb(candidates)
+        self.assertEqual(tr.finish([], climbed)["verdict"], "FAIL")
+        rerun_rows = [r for r in self.ladder_rows() if r.get("origin") == "leakrerun"]
+        rr = {r["climb_cand"] for r in rerun_rows if "climb_cand" in r}  # dropped rows have none
+        self.assertTrue(any(r.get("confirm", {}).get("fail") and r["cand"] in rr for r in climbed))
+
+    def test_rerun_is_never_promoted_again(self):
+        tr = self.promoting_tr({0: {"p1"}, 1: {"p1", "p2"}, 2: {"p1", "p3"}, 3: {"p1", "p4"}})
+        tr.run_seed(1)
+        reruns = [r for r in self.records() if r["origin"] == "leakrerun"]
+        self.assertEqual(len(reruns), 4)  # each fault episode promotes once, never a re-run of a re-run
+        self.assertEqual(sorted(r["parent"] for r in reruns), [0, 1, 2, 3])
+
+    def test_promote_budget_caps_reruns_and_logs_dropped(self):
+        self.a.promote_max = 1
+        logged = []
+        tr = self.promoting_tr({0: {"p1"}, 1: {"p2"}, 2: {"p3"}, 3: {"p4"}})
+        with unittest.mock.patch.object(bf, "log", logged.append):
+            tr.run_seed(1)
+        self.assertEqual(len([r for r in self.records() if r["origin"] == "leakrerun"]), 1)
+        dropped = [x for x in self.ladder_rows() if x.get("dropped") == "budget"]
+        self.assertEqual(len(dropped), 3)
+        self.assertTrue(any("leak re-run dropped (budget)" in m for m in logged))
+
+    def test_foreign_player_at_rerun_baseline_excludes_candidate(self):
+        tr = self.promoting_tr({0: {"p1"}})
+        self.server.online = ["bench_007"]
+        tr.promotions.append({"ep": 0, "bots": [], "console": None, "probes": 1, "signatures": []})
+        logged = []
+        with unittest.mock.patch.object(bf, "log", logged.append):
+            out, surprises = tr.drain_promotions(1, 0)
+        self.assertEqual((out, surprises), ([], []))
+        self.assertFalse(any("leakcheck" in c and "-p0b" in c for c in self.server.cmds))
+        self.assertEqual(self.ladder_rows()[-1]["dropped"], "baseline")
+        self.assertTrue(any("leak re-run dropped (baseline)" in m for m in logged))
+        self.assertTrue(tr.dirty)  # the failed baseline left players online: the next episode settles first
+
+    def test_reps_three_gives_one_baseline_and_three_checkpoints_on_the_rerun(self):
+        self.a.reps = 3
+        tr = self.promoting_tr({0: {"p1"}})
+        tr.run_seed(1)
+        base = "fz20261010-200000-betterrtp-s1-p0b"
+        self.assertEqual(sum(1 for c in self.server.cmds if c == f"rtpstress leakcheck {base} quick"), 1)
+        ck = "fz20261010-200000-betterrtp-s1-ep0"
+        for label in (ck, ck + "k1", ck + "k2"):
+            self.assertEqual(sum(1 for c in self.server.cmds if c == f"rtpstress leakcheck {label} quick"), 1)
+        rerun = next(r for r in self.records() if r["origin"] == "leakrerun")
+        self.assertEqual(rerun["reps"], 3)
+        self.assertTrue(any(k.startswith(bf.SLOPE) for k in rerun["deltas"]))
+        faults = [r for r in self.records() if r["origin"] != "leakrerun"]
+        self.assertTrue(all(r["deltas"] is None for r in faults))
+
+    def test_promote_max_below_zero_is_refused(self):
+        self.write_properties()
+        err = io.StringIO()
+        with unittest.mock.patch.object(bf, "FuzzDriver", side_effect=AssertionError("server touched")), \
+                contextlib.redirect_stderr(err), self.assertRaises(SystemExit) as cm:
+            bf.main(["--server-dir", self.dir, "--mode", "faults", "--coverage", "--promote-max", "-1",
+                     "--out-dir", self.dir])
+        self.assertEqual(cm.exception.code, 2)
+        self.assertIn("need --promote-max >= 0", err.getvalue())
+
+    def test_reps_two_contaminates_next_episode(self):
+        self.a.reps = 2
+        # Contamination at the second repetition (index 1)
+        self.swarm.after = lambda req: setattr(self.server, "online", ["fzlinger_0"]) if "k1" in req["id"] else None
+
+        # leak=True with reps=2 triggers repeat()
+        rec = self.tr.execute(1, 0, bf.plan_episode(1, 0, bf.DEFAULT_PARAMS, bf.Corpus(), self.tr.cfg), bf.Corpus(), leak=True)
+
+        self.assertTrue(self.tr.dirty)
+        self.assertIn("reps_error", rec)  # from the repeat()
+
+        # Next episode should be blocked:
+        second = self.tr.execute(1, 1, bf.plan_episode(1, 1, bf.DEFAULT_PARAMS, bf.Corpus(), self.tr.cfg), bf.Corpus())
+        self.assertEqual(second["excluded"], "other players online before the episode")
+        self.assertEqual(len(self.swarm.requests), 2)  # First episode had 1 run + 1 repetition
+
+    def test_failed_baseline_contaminates_next_episode(self):
+        # Baseline fails
+        self.server.online = ["fzlinger_0"]
+
+        # Execute an episode with leak=True, which triggers baseline()
+        rec = self.tr.execute(1, 0, bf.plan_episode(1, 0, bf.DEFAULT_PARAMS, bf.Corpus(), self.tr.cfg), bf.Corpus(), leak=True)
+
+        self.assertTrue(self.tr.dirty)
+
+        # Next episode should be blocked
+        second = self.tr.execute(1, 1, bf.plan_episode(1, 1, bf.DEFAULT_PARAMS, bf.Corpus(), self.tr.cfg), bf.Corpus())
+        self.assertEqual(second["excluded"], "other players online before the episode")
+        self.assertEqual(len(self.swarm.requests), 0) # No swarm requests at all
 
 
 class FindingLoopTest(LoopFixture, unittest.TestCase):

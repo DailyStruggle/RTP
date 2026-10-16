@@ -90,9 +90,11 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 ## [3.3.0] - Unreleased
 
-> **Upgrade note.** `rtp.servers.*` now defaults to `true` instead of `op`, so in network mode every player can reach open cross-server regions; restrict with negative permissions if you relied on the old default. `CIRCLE` and `SQUARE` now use new selection engines that ignore `weight`; use `CIRCLE_DEPRECATED_PURE_SPIRAL` or `SQUARE_DEPRECATED_PURE_SPIRAL` to keep the 3.2.1 behavior. In `config.yml`, `defaults.shape.uniquePlacements` now defaults to `"auto"` (a radius matching the view distance) instead of `0`, and `defaults.spatialResolution` to `"auto"` (scaled to the region's size) instead of `3`; set `0` and `3` to keep the 3.2.1 values. The Lite jar now requires Minecraft 1.21 or newer, like the full jar. Saved memory and region cache files from 3.2.1 still load, but RTP rewrites them in a new format at the next save or shutdown, and 3.2.1 can't read that format, so back up `plugins/RTP/` if you may need to roll back.
+> **Upgrade note.** `rtp.servers.*` now defaults to `true` instead of `op`, so in network mode every player can reach open cross-server regions; restrict with negative permissions if you relied on the old default. `CIRCLE` and `SQUARE` now use new selection engines that ignore `weight`; use `CIRCLE_DEPRECATED_PURE_SPIRAL` or `SQUARE_DEPRECATED_PURE_SPIRAL` to keep the 3.2.1 behavior. In `config.yml`, `defaults.shape.uniquePlacements` now defaults to `"auto"` (a radius matching the view distance) instead of `0`, and `defaults.spatialResolution` to `"auto"` (scaled to the region's size) instead of `3`; set `0` and `3` to keep the 3.2.1 values. Both jars now load on Minecraft 1.18 or newer with Java 17 or newer; the Lite jar no longer loads on 1.13 - 1.17. Folia is supported only from 1.21.11; older Folia still loads the jar but is no longer supported. Saved memory and region cache files from 3.2.1 still load, but RTP rewrites them in a new format at the next save or shutdown, and 3.2.1 can't read that format, so back up `plugins/RTP/` if you may need to roll back.
 
 ### Added
+
+- **Runs on Spigot and Paper 1.18 - 1.20.6, and on Java 17 ([ADR-113](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-113-java-17-baseline-and-26x-support-boundary.md)).** The full jar now loads on Spigot and Paper 1.18 through 1.20.6, and Fabric 1.20.1 servers can run it on Java 17. These older versions are best-effort and are not covered by automated tests. NeoForge still needs 1.21.1 or newer, and Fabric 1.20.2 - 1.20.6 is not supported. Folia is supported from 1.21.11: it is experimental and only its current builds are maintained, so older Folia builds are not supported and can crash on their own. Bug reports are accepted for Minecraft 1.21.11 through the latest release; the per-version status is in the [support matrix](https://github.com/DailyStruggle/RTP/blob/V3/docs/dev/SUPPORT_MATRIX.md).
 
 - **In-game documentation (`/rtp docs`).** Browse RTP's manuals in game or in the console, matched to the version you run, or export them all to one offline HTML file. Also available from the admin panel. Permission: `rtp.admin.docs`.
 
@@ -171,6 +173,8 @@ One changelog covers both the free and Pro jars, which ship the same code.
   - The limit on concurrent region tasks applies to every kind of region task, and work waiting for a slot runs in order instead of polling.
   - Folia task queues now always run at least one task per pulse and stop inline work once their time budget is spent. Cold-cache refill per region turn is no longer limited to two tasks.
 
+- **For addon developers.** `rtp-api`, `rtp-core` and the shared API modules they pull in (`commands-api`, `effects-api`, `maps-api`, `metrics-api`, `anvil-api`, `yaml-api`, `bstats-api`) are compiled to Java 17 bytecode ([ADR-113](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-113-java-17-baseline-and-26x-support-boundary.md)), so addons that build against them can target Java 17. The bundled addons are Java 17 too.
+
 ### Deprecated
 
 - **For addon developers.** `PaletteIdentifierNormalizer` in `rtp-api` is deprecated; use the one in `anvil-api`.
@@ -179,9 +183,13 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 - **Party and tether addons.** LeafRTPPartyAddon and LeafRTPTetherAddon are no longer built. For group teleports, use the action addon's `teams` and `scatter` modes.
 
-- **For addon developers.** The Bukkit-only classes in `commands-api` (`BukkitCommand`, `BukkitCommandRegistrar`, `BukkitParameter`, `StringCommandDispatcher`, `BukkitTreeCommand` and the `LocalParameters` package) and its `plugin.yml` are removed; use the platform-neutral `commandsapi.common` and `commandsapi.brigadier` packages. The Bukkit command classes and `plugin.yml` in `effects-api` are removed too.
+- **For addon developers.** The Bukkit-only classes in `commands-api` (`BukkitCommand`, `BukkitCommandRegistrar`, `BukkitParameter`, `StringCommandDispatcher`, `BukkitTreeCommand` and the `LocalParameters` package) and its `plugin.yml` are removed; use the platform-neutral `commandsapi.common` and `commandsapi.brigadier` packages. The Bukkit command classes and `plugin.yml` in `effects-api` are removed too. The Fabric effect classes in `io.github.dailystruggle.effectsapi.fabric` moved out of `effects-api` to `io.github.dailystruggle.rtp.fabric.effects` in the Fabric adapter, so `effects-api` no longer needs a Minecraft or Fabric classpath.
 
 ### Fixed
+
+- **RTP could freeze Fabric 1.20.1 and 1.21.1 servers and run them out of memory.** Each chunk load added a chunk ticket that kept a large area around the candidate loaded and was never released, so the server kept generating chunks, partly on the main thread. Loaded chunks were also read as missing, so no locations were found there. Tickets now cover only the area RTP needs and are released after use, and chunks load off the main thread.
+
+- **On Fabric 1.21.5 through 1.21.11, RTP read every chunk it loaded as missing and could release a cached location's chunk early.** Chunk results are now read correctly, and the temporary load ticket no longer removes the ticket that keeps a cached location loaded. Chunk loads now always use the non-blocking path, so they can't stall the main thread.
 
 - **Arriving players could trigger a main-thread chunk load.** On servers that unload chunks immediately, the landing chunk could unload just before the player arrived. It now stays loaded briefly after a teleport.
 

@@ -11,7 +11,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.level.DistanceManager;
+import net.minecraft.server.level.ChunkResult;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.TicketType;
@@ -28,7 +28,6 @@ import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.tags.TagKey;
 import org.jetbrains.annotations.Nullable;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Comparator;
@@ -149,9 +148,12 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
 
     // -------------------------------------------------------------------------
     // Non-blocking chunk-future dispatch - see rtp-fabric-ADR-008.
-    // Structurally resolves ServerChunkCache#getChunkFuture(int, int,
-    // ChunkStatus, boolean) so it works under both Mojmap and Fabric
-    // intermediary mappings on 1.21.x.
+    // Structurally resolves the private ServerChunkCache#getChunkFutureMainThread
+    // (int, int, ChunkStatus, boolean) under both Mojmap and intermediary names.
+    // As on 1.20.1, three declared methods share that signature: the public
+    // getChunkFuture, which managedBlocks the tick thread until generation
+    // finishes (S-005), and a synthetic supplyAsync lambda (method_14098), so
+    // the scan must not depend on declaration order.
     // -------------------------------------------------------------------------
 
     private static volatile Method GET_CHUNK_FUTURE_METHOD;
@@ -165,25 +167,38 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
             Method found = null;
             for (Class<?> c = cache.getClass(); c != null && found == null; c = c.getSuperclass()) {
                 for (Method m : c.getDeclaredMethods()) {
-                    if (!CompletableFuture.class.isAssignableFrom(m.getReturnType())) continue;
-                    Class<?>[] p = m.getParameterTypes();
-                    if (p.length != 4) continue;
-                    if (p[0] != int.class || p[1] != int.class) continue;
-                    if (p[2] != ChunkStatus.class) continue;
-                    if (p[3] != boolean.class) continue;
+                    if (!isNonBlockingChunkFutureMethod(m)) continue;
                     m.setAccessible(true);
                     found = m;
                     break;
                 }
             }
             if (found == null) {
+                // Fail closed: the public getChunkFuture would block the tick thread.
                 throw new NoSuchMethodException(
-                        "ServerChunkCache#getChunkFuture(int,int,ChunkStatus,boolean) not found on "
+                        "ServerChunkCache#getChunkFutureMainThread(int,int,ChunkStatus,boolean) not found on "
                                 + cache.getClass().getName());
             }
+            RTP.log(Level.INFO, "[RTP][Fabric 1.21.1] chunk-future method bound: "
+                    + found.getDeclaringClass().getName() + "#" + found.getName());
             GET_CHUNK_FUTURE_METHOD = found;
             return found;
         }
+    }
+
+    /**
+     * {@code getChunkFutureMainThread} shape: private, non-static, non-synthetic, returns a
+     * {@link CompletableFuture}, takes {@code (int, int, ChunkStatus, boolean)}. Excludes the
+     * public, main-thread-blocking {@code getChunkFuture} and the synthetic lambda.
+     */
+    static boolean isNonBlockingChunkFutureMethod(Method m) {
+        int mod = m.getModifiers();
+        if (!java.lang.reflect.Modifier.isPrivate(mod) || java.lang.reflect.Modifier.isStatic(mod)) return false;
+        if (m.isSynthetic() || m.isBridge()) return false;
+        if (!CompletableFuture.class.isAssignableFrom(m.getReturnType())) return false;
+        Class<?>[] p = m.getParameterTypes();
+        return p.length == 4 && p[0] == int.class && p[1] == int.class
+                && p[2] == ChunkStatus.class && p[3] == boolean.class;
     }
 
     @Override
@@ -196,16 +211,14 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
             ServerChunkCache cache = sl.getChunkSource();
             Method getter = resolveGetChunkFutureMethod(cache);
 
-            // Temporary load-ticket - see V1_20_R1FabricVersionAdapter#requestFullChunkAsync
-            // for the rationale (without an explicit ticket the chunk holder
-            // sits at a level too high for FULL-status generation, so the
-            // future resolves to Either.right(ChunkLoadingFailure) → null).
+            // Temporary load ticket - see V1_20_R1FabricVersionAdapter#requestFullChunkAsync
+            // (without it the holder drops below FULL mid-generation and the future
+            // resolves to a failed ChunkResult). Its own TicketType, so releasing it
+            // cannot collapse with and drop a kept-cache ticket on the same chunk (S-002).
             ChunkPos cp = new ChunkPos(cx, cz);
             boolean ticketAdded = false;
             try {
-                resolveTicketMethodsOnce(cache);
-                Object dm = distanceManager(cache);
-                ADD_TICKET_METHOD.invoke(dm, ticketType(), cp, RTP_TICKET_DISTANCE, cp);
+                cache.addRegionTicket(loadTicketType(), cp, RTP_TICKET_DISTANCE, cp);
                 ticketAdded = true;
             } catch (Throwable t) {
                 RTP.log(Level.WARNING,
@@ -220,10 +233,10 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
                 return CompletableFuture.failedFuture(new IllegalStateException(
                         "getChunkFuture returned non-CompletableFuture: " + (raw == null ? "null" : raw.getClass())));
             }
-            return cf.thenApply(either -> {
-                if (either == null) return null;
-                ChunkAccess chunk = unwrapEitherLeft(either);
-                return chunk == null ? null : RTPChunkHandle.of(chunk);
+            // cf is CompletableFuture<ChunkResult<ChunkAccess>>.
+            return cf.thenApply(result -> {
+                Object value = chunkResultValue(result);
+                return value instanceof ChunkAccess chunk ? RTPChunkHandle.of(chunk) : null;
             }).whenComplete((handle, ex) -> {
                 if (addedTicket) tryRemoveLoadTicket(cache, cp);
             });
@@ -234,8 +247,7 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
 
     private static void tryRemoveLoadTicket(ServerChunkCache cache, ChunkPos cp) {
         try {
-            Object dm = distanceManager(cache);
-            REMOVE_TICKET_METHOD.invoke(dm, ticketType(), cp, RTP_TICKET_DISTANCE, cp);
+            cache.removeRegionTicket(loadTicketType(), cp, RTP_TICKET_DISTANCE, cp);
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
                     "[RTP][Fabric 1.21.1] temp load-ticket release failed for chunk=("
@@ -243,17 +255,14 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
         }
     }
 
-    private static ChunkAccess unwrapEitherLeft(Object either) {
-        try {
-            Method leftMethod = either.getClass().getMethod("left");
-            Object opt = leftMethod.invoke(either);
-            if (opt == null) return null;
-            Method orElse = opt.getClass().getMethod("orElse", Object.class);
-            Object value = orElse.invoke(opt, (Object) null);
-            return (value instanceof ChunkAccess ca) ? ca : null;
-        } catch (Throwable t) {
-            return null;
-        }
+    /**
+     * Success value of a {@link ChunkResult}, {@code null} for a failed result or a
+     * non-ChunkResult. Since 1.20.5 the chunk future yields {@code ChunkResult}, not
+     * DataFixerUpper {@code Either}; the old reflective {@code left()} lookup threw
+     * {@link NoSuchMethodException} and read every loaded chunk as missing.
+     */
+    static Object chunkResultValue(Object result) {
+        return result instanceof ChunkResult<?> r && r.isSuccess() ? r.orElse(null) : null;
     }
 
 
@@ -261,7 +270,7 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
     // Non-persistent chunk-ticket support - see FabricVersionAdapter Javadoc.
     //
     // We allocate a process-wide non-persistent TicketType ("rtp") and hand
-    // it to DistanceManager#addRegionTicket. {@code TicketType.create(name,
+    // it to ServerChunkCache#addRegionTicket. {@code TicketType.create(name,
     // comparator, /*timeout*/ 0)} produces a non-persistent type (the
     // PERSISTENT set in TicketType is opt-in via the deprecated
     // {@code #createPersistent} factory; the public {@code #create} factory
@@ -269,10 +278,14 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
     // lives until removeRegionTicket is called", matching Bukkit's
     // addPluginChunkTicket lifetime contract.
     //
-    // {@code DistanceManager#addRegionTicket} / {@code #removeRegionTicket}
-    // are package-private on Mojmap 1.21.1; we resolve them reflectively at
-    // first use (one-shot, cached) rather than authoring an access-widener.
-    // The reflection target is stable across 1.21.x patch releases.
+    // Tickets go through the public ServerChunkCache#addRegionTicket /
+    // #removeRegionTicket (Loom-remapped). A reflective DistanceManager scan
+    // cannot pick them: DistanceManager declares addTicket / removeTicket
+    // (level) before addRegionTicket / removeRegionTicket (distance), all
+    // (TicketType, ChunkPos, int, T). The scan bound addTicket(level) and, on
+    // intermediary names, a mismatched remove, so tickets went in at level 1
+    // (a radius-32 load area) and were never released (S-002). Callers are
+    // on the server thread.
     // -------------------------------------------------------------------------
 
     /**
@@ -284,24 +297,8 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
      */
     private static volatile TicketType<ChunkPos> RTP_TICKET_TYPE;
 
-    /**
-     * Cached reflective handles for {@code DistanceManager#addRegionTicket}
-     * and {@code #removeRegionTicket}. Resolved on first use; volatile so
-     * worker threads observe a fully-published handle. Both signatures are
-     * {@code (TicketType, ChunkPos, int level, T value)}.
-     */
-    private static volatile Method ADD_TICKET_METHOD;
-    private static volatile Method REMOVE_TICKET_METHOD;
-    private static volatile Method GET_DISTANCE_MANAGER_METHOD;
-    /**
-     * Field fallback for the distance-manager accessor. Under Fabric
-     * intermediary mappings (runtime), {@code ServerChunkCache} (a.k.a.
-     * {@code class_3215}) exposes its {@code DistanceManager} as a field
-     * (e.g. {@code field_17252}) rather than a no-arg method. We scan
-     * declared fields whose type is assignable to {@link DistanceManager}
-     * if the method scan turns up nothing.
-     */
-    private static volatile Field GET_DISTANCE_MANAGER_FIELD;
+    /** Temporary load ticket, distinct from {@link #RTP_TICKET_TYPE} (see requestFullChunkAsync). */
+    private static volatile TicketType<ChunkPos> RTP_LOAD_TICKET_TYPE;
 
     /**
      * Ticket <em>distance</em> (NOT level) we hand to
@@ -348,182 +345,16 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
         }
     }
 
-    /**
-     * Resolve a structural accessor (method or field) for the
-     * {@link DistanceManager} on the given {@link ServerChunkCache}. Returns
-     * {@code null} when only a field accessor was found - in that case
-     * {@link #GET_DISTANCE_MANAGER_FIELD} is populated as a side effect.
-     */
-    private static Method resolveDistanceManagerGetter(ServerChunkCache cache) throws ReflectiveOperationException {
-        // Method scan first: Mojmap `getDistanceManager()`, yarn `getTicketManager()`,
-        // intermediary `method_17293()`, etc.
-        for (Class<?> c = cache.getClass(); c != null; c = c.getSuperclass()) {
-            for (Method m : c.getDeclaredMethods()) {
-                if (m.getParameterCount() != 0) continue;
-                Class<?> rt = m.getReturnType();
-                if (DistanceManager.class.isAssignableFrom(rt)) {
-                    m.setAccessible(true);
-                    return m;
-                }
-            }
-        }
-        // Field fallback: under intermediary the accessor is typically the field
-        // (e.g. `field_17252`) rather than a getter method.
-        for (Class<?> c = cache.getClass(); c != null; c = c.getSuperclass()) {
-            for (Field f : c.getDeclaredFields()) {
-                if (java.lang.reflect.Modifier.isStatic(f.getModifiers())) continue;
-                if (DistanceManager.class.isAssignableFrom(f.getType())) {
-                    f.setAccessible(true);
-                    GET_DISTANCE_MANAGER_FIELD = f;
-                    return null;
-                }
-            }
-        }
-        throw new NoSuchMethodException(
-                "No no-arg method or field of type DistanceManager found on " + cache.getClass().getName());
-    }
-
-    private static void resolveTicketMethodsOnce(ServerChunkCache cache) throws ReflectiveOperationException {
-        if (ADD_TICKET_METHOD != null && REMOVE_TICKET_METHOD != null
-                && (GET_DISTANCE_MANAGER_METHOD != null || GET_DISTANCE_MANAGER_FIELD != null)) return;
+    private static TicketType<ChunkPos> loadTicketType() {
+        TicketType<ChunkPos> t = RTP_LOAD_TICKET_TYPE;
+        if (t != null) return t;
         synchronized (V1_21_R1FabricVersionAdapter.class) {
-            if (ADD_TICKET_METHOD != null && REMOVE_TICKET_METHOD != null
-                    && (GET_DISTANCE_MANAGER_METHOD != null || GET_DISTANCE_MANAGER_FIELD != null)) return;
-            Method getter = resolveDistanceManagerGetter(cache);
-            Object dm = (getter != null) ? getter.invoke(cache) : GET_DISTANCE_MANAGER_FIELD.get(cache);
-            if (dm == null) {
-                throw new IllegalStateException(
-                        "ServerChunkCache distance-manager getter returned null on " + cache.getClass().getName());
-            }
-            // DistanceManager methods are package-private; resolve by signature so this works
-            // under both Mojang and intermediary mappings (where names like `addRegionTicket`
-            // become e.g. `method_17290`).
-            Class<?> dmClass = dm.getClass();
-            // Signature-based scan. The 4th parameter is generic `T` which erases to Object,
-            // but some toolchains may surface it as the bound type - accept any reference type.
-            Method add = null;
-            Method remove = null;
-            for (Class<?> c = dmClass; c != null && (add == null || remove == null); c = c.getSuperclass()) {
-                for (Method m : c.getDeclaredMethods()) {
-                    if (m.getReturnType() != void.class) continue;
-                    Class<?>[] p = m.getParameterTypes();
-                    if (p.length != 4) continue;
-                    if (p[0] != TicketType.class) continue;
-                    if (p[1] != ChunkPos.class) continue;
-                    if (p[2] != int.class) continue;
-                    if (p[3].isPrimitive()) continue;
-                    String n = m.getName();
-                    boolean isAdd = n.contains("add") || n.contains("Add");
-                    boolean isRemove = n.contains("remove") || n.contains("Remove");
-                    if (add == null && isAdd && !isRemove) {
-                        m.setAccessible(true);
-                        add = m;
-                    } else if (remove == null && isRemove && !isAdd) {
-                        m.setAccessible(true);
-                        remove = m;
-                    }
-                }
-            }
-            // Fallback: if name-based discrimination failed (e.g. obfuscated names like
-            // method_17290 / method_17291), pick the two matching-signature methods in
-            // declaration order - addRegionTicket is declared before removeRegionTicket
-            // in DistanceManager on 1.21.1.
-            if (add == null || remove == null) {
-                java.util.List<Method> candidates = new java.util.ArrayList<>();
-                for (Class<?> c = dmClass; c != null; c = c.getSuperclass()) {
-                    for (Method m : c.getDeclaredMethods()) {
-                        if (m.getReturnType() != void.class) continue;
-                        Class<?>[] p = m.getParameterTypes();
-                        if (p.length != 4) continue;
-                        if (p[0] != TicketType.class) continue;
-                        if (p[1] != ChunkPos.class) continue;
-                        if (p[2] != int.class) continue;
-                        if (p[3].isPrimitive()) continue;
-                        candidates.add(m);
-                    }
-                    if (candidates.size() >= 2) break;
-                }
-                if (candidates.size() >= 2) {
-                    candidates.sort(Comparator.comparing(Method::getName));
-                    Method a = candidates.get(0);
-                    Method b = candidates.get(1);
-                    a.setAccessible(true);
-                    b.setAccessible(true);
-                    if (add == null) add = a;
-                    if (remove == null) remove = b;
-                }
-            }
-            // Final fallback: relax parameter-type checks. Accept any 4-arg void
-            // method declared on DistanceManager (or a superclass) where param[2]
-            // is `int` and the other three are reference types. This survives
-            // remapped/reloaded TicketType/ChunkPos classes - at this point we
-            // trust the structural shape because DistanceManager only declares
-            // two such methods (the add/remove pair).
-            if (add == null || remove == null) {
-                java.util.List<Method> loose = new java.util.ArrayList<>();
-                for (Class<?> c = dmClass; c != null; c = c.getSuperclass()) {
-                    for (Method m : c.getDeclaredMethods()) {
-                        if (m.getReturnType() != void.class) continue;
-                        Class<?>[] p = m.getParameterTypes();
-                        if (p.length != 4) continue;
-                        if (p[2] != int.class) continue;
-                        if (p[0].isPrimitive() || p[1].isPrimitive() || p[3].isPrimitive()) continue;
-                        loose.add(m);
-                    }
-                    if (loose.size() >= 2) break;
-                }
-                if (loose.size() >= 2) {
-                    loose.sort(Comparator.comparing(Method::getName));
-                    Method a = loose.get(0);
-                    Method b = loose.get(1);
-                    a.setAccessible(true);
-                    b.setAccessible(true);
-                    if (add == null) add = a;
-                    if (remove == null) remove = b;
-                }
-            }
-            if (add == null || remove == null) {
-                // Diagnostic: dump every declared method on dmClass + superclasses so
-                // the next run reveals the actual runtime signatures. One-shot;
-                // resolveTicketMethodsOnce won't be re-entered after success.
-                StringBuilder sb = new StringBuilder();
-                sb.append("DistanceManager#addRegionTicket / #removeRegionTicket not found on ")
-                  .append(dmClass.getName()).append(" (or any superclass). Declared methods:\n");
-                for (Class<?> c = dmClass; c != null && c != Object.class; c = c.getSuperclass()) {
-                    sb.append("  -- ").append(c.getName()).append(" --\n");
-                    for (Method m : c.getDeclaredMethods()) {
-                        sb.append("    ").append(m.getReturnType().getSimpleName()).append(' ')
-                          .append(m.getName()).append('(');
-                        Class<?>[] p = m.getParameterTypes();
-                        for (int i = 0; i < p.length; i++) {
-                            if (i > 0) sb.append(", ");
-                            sb.append(p[i].getSimpleName());
-                        }
-                        sb.append(")\n");
-                    }
-                }
-                RTP.log(Level.WARNING, sb.toString());
-                throw new NoSuchMethodException(
-                        "DistanceManager#addRegionTicket / #removeRegionTicket not found on "
-                                + dmClass.getName() + " (or any superclass).");
-            }
-            if (getter != null) GET_DISTANCE_MANAGER_METHOD = getter;
-            ADD_TICKET_METHOD = add;
-            REMOVE_TICKET_METHOD = remove;
+            t = RTP_LOAD_TICKET_TYPE;
+            if (t != null) return t;
+            t = TicketType.create("rtp_load", Comparator.comparingLong(ChunkPos::toLong), 0);
+            RTP_LOAD_TICKET_TYPE = t;
+            return t;
         }
-    }
-
-    private static Object distanceManager(ServerChunkCache cache) throws ReflectiveOperationException {
-        Method m = GET_DISTANCE_MANAGER_METHOD;
-        if (m != null) return m.invoke(cache);
-        Field f = GET_DISTANCE_MANAGER_FIELD;
-        if (f != null) return f.get(cache);
-        m = resolveDistanceManagerGetter(cache);
-        if (m != null) {
-            GET_DISTANCE_MANAGER_METHOD = m;
-            return m.invoke(cache);
-        }
-        return GET_DISTANCE_MANAGER_FIELD.get(cache);
     }
 
     @Override
@@ -532,11 +363,8 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
             return CompletableFuture.failedFuture(new IllegalStateException("null ServerLevel"));
         }
         try {
-            ServerLevel sl = level.as(ServerLevel.class);
-            ServerChunkCache cache = sl.getChunkSource();
-            resolveTicketMethodsOnce(cache);
-            Object dm = distanceManager(cache);
-            ADD_TICKET_METHOD.invoke(dm, ticketType(), new ChunkPos(cx, cz), RTP_TICKET_DISTANCE, new ChunkPos(cx, cz));
+            ChunkPos cp = new ChunkPos(cx, cz);
+            level.as(ServerLevel.class).getChunkSource().addRegionTicket(ticketType(), cp, RTP_TICKET_DISTANCE, cp);
             return CompletableFuture.completedFuture(null);
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
@@ -557,11 +385,8 @@ public final class V1_21_R1FabricVersionAdapter implements FabricVersionAdapter 
             return CompletableFuture.completedFuture(null);
         }
         try {
-            ServerLevel sl = level.as(ServerLevel.class);
-            ServerChunkCache cache = sl.getChunkSource();
-            resolveTicketMethodsOnce(cache);
-            Object dm = distanceManager(cache);
-            REMOVE_TICKET_METHOD.invoke(dm, ticketType(), new ChunkPos(cx, cz), RTP_TICKET_DISTANCE, new ChunkPos(cx, cz));
+            ChunkPos cp = new ChunkPos(cx, cz);
+            level.as(ServerLevel.class).getChunkSource().removeRegionTicket(ticketType(), cp, RTP_TICKET_DISTANCE, cp);
             return CompletableFuture.completedFuture(null);
         } catch (Throwable t) {
             RTP.log(Level.WARNING,

@@ -89,3 +89,56 @@ jobs:
         run: |
           cd devstack
           ./run-acceptance.sh --scenario down --purge || true
+
+  # ADR-113: the bug-report window runs to the latest release, which the
+  # multi-server stack above (1.21.11) does not boot. One single-server job per
+  # service in docker-compose.versions.yml; bump VERSION there on each release.
+  versions-smoke:
+    name: Latest release smoke (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - versions-paper-26
+          - versions-fabric-26
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up JDK 21 and 25
+        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+        with:
+          java-version: |
+            21
+            25
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permissions
+        run: |
+          chmod +x gradlew
+          chmod +x devstack/*.sh
+
+      - name: Build plugin jar
+        run: |
+          ./gradlew :rtp-plugin:remapJar --console=plain
+
+      - name: Boot and check ${{ matrix.service }}
+        run: |
+          ./devstack/run-versions-smoke.sh --service "${{ matrix.service }}" --fresh
+
+      - name: Archive server log
+        if: always()
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: versions-smoke-${{ matrix.service }}
+          path: devstack/logs/versions-*/*.log
+          retention-days: 30
+
+      - name: Cleanup containers
+        if: always()
+        run: |
+          docker compose -f devstack/docker-compose.versions.yml down || true

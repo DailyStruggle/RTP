@@ -1119,8 +1119,11 @@ sourceSets {
     }
 }
 
-tasks.named('compileLiteJava') {
+tasks.named('compileLiteJava', JavaCompile) {
     dependsOn tasks.named('compileJava')
+    // ADR-113: the lite entry point loads on 1.18-1.20.4 (Java 17) servers,
+    // matching the main source set's `release = 17` (root build.gradle).
+    options.release = 17
 }
 
 // ADR-024 locale parity: as of the 2026-08-14 config/docs-parity amendment

@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.commands.parameters;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
-import io.github.dailystruggle.rtp.common.commands.RTPCmd;
 import io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser;
+import io.github.dailystruggle.rtp.common.selection.region.util.RelativeCoordinate;
 import io.github.dailystruggle.rtp.common.selection.region.util.SpatialUnit;
 
 import java.util.*;
@@ -32,7 +32,7 @@ public class DistanceParameter extends CommandParameter {
           if (s == null || s.isBlank()) return false;
           if (s.indexOf('~') >= 0) {
             try {
-              RTPCmd.resolveRelativeCoordinate(s, 0L);
+              RelativeCoordinate.resolve(s, 0L);
               return isRelevant.apply(uuid, s);
             } catch (NumberFormatException e) {
               return false;

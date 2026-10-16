@@ -6,8 +6,8 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
-import io.github.dailystruggle.rtp.common.commands.RTPCmd;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.RTPCmd;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -91,9 +91,9 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
       return true;
     }
 
-    RTPPlayer target = realAccessor.getPlayer(playerNames.getFirst());
+    RTPPlayer target = realAccessor.getPlayer(playerNames.get(0));
     if (target == null) {
-      String msg = "&c[RTP test/async-reply] unknown player: " + playerNames.getFirst();
+      String msg = "&c[RTP test/async-reply] unknown player: " + playerNames.get(0);
       realAccessor.sendMessage(callerId, msg);
       RTP.log(Level.WARNING, msg);
       return true;

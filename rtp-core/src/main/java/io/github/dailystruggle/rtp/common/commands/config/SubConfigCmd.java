@@ -6,9 +6,11 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmd;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.ConfigSubtreeRegistrar;
+import io.github.dailystruggle.rtp.common.commands.base.NetherEndConfigAmender;
 import io.github.dailystruggle.rtp.common.commands.parameters.*;
-import io.github.dailystruggle.rtp.common.commands.reload.ReloadCmd;
 import io.github.dailystruggle.rtp.common.commands.config.list.ListCmd;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
@@ -28,7 +30,7 @@ import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
-public class SubConfigCmd extends BaseRTPCmdImpl {
+public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistrar {
 
   /**
    * Thin {@link BaseRTPCmdImpl} alias exposing the target {@link SubConfigCmd}'s parameter and
@@ -124,8 +126,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
         ConfigParser<RegionKeys> regionParser = (ConfigParser<RegionKeys>) configParser;
         RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(parameterValues.get("world").get(0));
         if (rtpWorld != null) {
-          io.github.dailystruggle.rtp.common.commands.menu.multiconfig.NetherEndConfigAmender
-              .amend(parameterValues, regionParser, rtpWorld);
+          NetherEndConfigAmender.amend(parameterValues, regionParser, rtpWorld);
         }
       }
 
@@ -231,9 +232,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
       if (updatedMsg != null) updatedMsg = updatedMsg.replace("[filename]", configParser.name);
       RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updatedMsg);
 
-      CommandsAPICommand reload =
-              RTP.baseCommand.getCommandLookup().getOrDefault("reload", new ReloadCmd(RTP.baseCommand));
-      reload.onCommand(callerId, new HashMap<>(), null);
+      BaseRTPCmd.dispatchReload(callerId);
     } else if (factoryValue instanceof MultiConfigParser) {
       MultiConfigParser<?> parser = (MultiConfigParser<?>) this.factoryValue;
       List<String> remove = parameterValues.getOrDefault("remove", new ArrayList<>());
@@ -264,27 +263,25 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
       for (String target : add) {
         parser.addParser(target);
         ConfigParser<?> configParser = parser.getParser(target);
-        SubConfigCmd subUpdateCmd = new SubConfigCmd(this, configParser.name, configParser);
-        subUpdateCmd.addParameters();
-        addSubCommand(subUpdateCmd);
-        // Parity with flat ConfigCmd.addCommands (lines 56-67) and the
-        // addParameters() initial registration below: also register a
-        // bare (suffix-stripped) {@link Alias} so `/rtp config <kind>
-        // <entry>` resolves without the .yml suffix. Use `addSubCommand`
-        // (the supported registration route) rather than touching
-        // `commandLookup` directly.
-        String bareAdd = configParser.name.replace(".yml", "").replace(".YML", "");
-        if (!bareAdd.equalsIgnoreCase(configParser.name)) {
-          addSubCommand(new Alias(this, bareAdd, subUpdateCmd));
-        }
+        registerChildParser(configParser);
       }
 
-      CommandsAPICommand reload =
-              RTP.baseCommand.getCommandLookup().getOrDefault("reload", new ReloadCmd(RTP.baseCommand));
-      reload.onCommand(callerId, new HashMap<>(), null);
+      BaseRTPCmd.dispatchReload(callerId);
     }
     });
     return true;
+  }
+
+  @Override
+  public void registerChildParser(ConfigParser<?> configParser) {
+    if (configParser == null) return;
+    SubConfigCmd subUpdateCmd = new SubConfigCmd(this, configParser.name, configParser);
+    subUpdateCmd.addParameters();
+    addSubCommand(subUpdateCmd);
+    String bareAdd = configParser.name.replace(".yml", "").replace(".YML", "");
+    if (!bareAdd.equalsIgnoreCase(configParser.name)) {
+      addSubCommand(new Alias(this, bareAdd, subUpdateCmd));
+    }
   }
 
   @Override

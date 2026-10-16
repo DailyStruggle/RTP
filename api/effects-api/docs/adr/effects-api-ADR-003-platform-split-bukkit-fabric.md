@@ -1,6 +1,6 @@
 # effects-api-ADR-003 — In-module platform split: `effectsapi/common` (SPI) + `effectsapi/bukkit` + `effectsapi/fabric`
 
-- **Status:** Accepted (2026-05-06; revised after user feedback the same day)
+- **Status:** Accepted (2026-05-06; revised after user feedback the same day; amended 2026-10-15 - `effectsapi/fabric` moved to the Fabric platform carrier, see *Amendment 2026-10-15*)
 - **Supersedes:** —
 - **Superseded by:** —
 - **Related:**
@@ -148,6 +148,20 @@ public interface EffectRuntime {
     - Add a core test asserting `effectsapi.common.*` has no `org.bukkit.*` / `net.minecraft.*` references (bytecode/import scan).
     - Add a `FabricEffectRuntime#playSound` packet-shape smoke test (mirrors `FabricLegacyTextInteractiveTest` style).
 10. Update `.junie/AGENTS.md` *Domain Analogies & Aliases* if needed (likely not — no new informal terms).
+
+## Amendment 2026-10-15 - Minecraft-typed code lives in the platform carriers
+
+**Driver:** ADR-113 lowers the shared closure (`effects-api` included) to Java 17 bytecode. The `fabric/` subpackage forced Loom and the Java 21 MC 1.21.1 jar onto `effects-api`, and platform code belongs to the platform modules that already own a Minecraft classpath.
+
+**Decision:**
+
+- `effects-api` keeps `common/` (platform-neutral SPI) and `bukkit/` (Spigot 1.20.1 is Java 17 bytecode). It no longer applies `fabric-loom` and carries no `net.minecraft.*` code.
+- The former `effectsapi.fabric.*` classes (`FabricEffectRuntime`, `FabricEffectsInitializer`, `FabricHandles`, `FabricRegistryCompat`, `FabricValueCoercer`) move to `:rtp-fabric:rtp-fabric-common` as `io.github.dailystruggle.rtp.fabric.effects.*`. They implement the existing `effectsapi.common` SPI (`HandleProvider`, `ValueCoercer`, `EffectFactory`); no new SPI or module is introduced.
+- NeoForge stops reusing the Fabric runtime. `rtp-neoforge-common` schedules effects through `NeoForgeHandles.execute` (`MinecraftServer#execute`) and owns its effect key enums (`NeoForge{Sound,Particle,Potion,Title}Keys`). The former `effectsapi.fabric.LocalEffects.enums.Fabric*Keys` had no Fabric consumer.
+- The obf/unobf disjointness guard (effects-api-ADR-006) moves with the obf carrier to `rtp-fabric-common` (`FabricEffectsCarriersDisjointTest`).
+- REQ-FABRIC-ARCH-003 is amended in lockstep: `effects-api` leaves the Loom allow-list; the nested `effects-api-fabric-unobf` carrier stays on it.
+
+**Consequences:** The `effectsapi.fabric` package is removed from the `effects-api` artifact (already excluded from japicmp as non-API). Out-of-tree code that imported it switches to `io.github.dailystruggle.rtp.fabric.effects`.
 
 ## Verification gates (must be green before submit)
 

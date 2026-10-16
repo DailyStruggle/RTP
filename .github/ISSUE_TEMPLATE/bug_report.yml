@@ -8,6 +8,8 @@ body:
       value: |
         > **Solo Developer Disclaimer:** I maintain this project alone with limited time. Reports that are missing logs, version info, or were clearly answered in the docs/FAQ will be closed without a response. Before filing, read [`SUPPORT.md`](../../SUPPORT.md). By participating you agree to the [Code of Conduct](../../CODE_OF_CONDUCT.md).
 
+        > **Minecraft versions:** bug reports are accepted for Minecraft 1.21.11 through the latest release. Reports from older versions are best-effort and may be closed without a fix. Folia below 1.21.11 is not supported, and reports from it are closed.
+
   - type: checkboxes
     id: preflight
     attributes:

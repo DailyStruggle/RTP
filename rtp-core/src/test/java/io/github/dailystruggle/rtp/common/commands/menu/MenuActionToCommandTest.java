@@ -5,6 +5,12 @@ import io.github.dailystruggle.rtp.api.menu.MenuAction;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
@@ -127,6 +133,46 @@ class MenuActionToCommandTest {
                 MenuActionToCommand.toRunCommand(new MenuAction.OpenMultiConfigEntry("region", "custom_nether")));
         assertEquals("/rtp menu multi kind=region entry=custom_nether op=remove",
                 MenuActionToCommand.toRunCommand(new MenuAction.MultiConfigMutate("region", "custom_nether", MenuAction.MultiConfigMutate.Op.REMOVE)));
+    }
+
+    @Test
+    @DisplayName("Every sealed MenuAction variant is mapped (guards the Java 17 instanceof chain)")
+    void toRunCommand_coversEveryPermittedVariant() {
+        MenuAction.InfoScopeToken global = new MenuAction.InfoScopeToken(MenuAction.InfoScopeToken.Kind.GLOBAL, "");
+        List<MenuAction> samples = List.of(
+                new MenuAction.RunRtpCommand(new String[0]),
+                new MenuAction.OpenMenu(new String[0]),
+                new MenuAction.OpenParamPicker(new String[0], "radius"),
+                new MenuAction.ChangePage(0),
+                new MenuAction.SuggestInput("foo"),
+                new MenuAction.PromptAnvilInput(new String[0], "shape", "", MenuAction.Mode.RUN),
+                new MenuAction.OpenExternalUrl(java.net.URI.create("https://example.com")),
+                new MenuAction.OpenConfigSelector(""),
+                new MenuAction.OpenConfigFile("config.yml"),
+                new MenuAction.OpenConfigKey("config.yml", "radius"),
+                new MenuAction.OpenConfigSearchPrompt(),
+                new MenuAction.OpenConfigSearchResults("radius", 0),
+                new MenuAction.OpenConfigSubParamPage("config.yml", "shape", "square"),
+                new MenuAction.OpenAdminPanel(),
+                new MenuAction.OpenVisualizations(),
+                new MenuAction.OpenFrontPage(),
+                new MenuAction.OpenInfo(global),
+                new MenuAction.SwitchInfoToText(global),
+                new MenuAction.StageConfigValue("config.yml", "radius", "500"),
+                new MenuAction.UnstageConfigValue("config.yml", "radius"),
+                new MenuAction.ApplyStagedConfig("config.yml"),
+                new MenuAction.DiscardStagedConfig("config.yml"),
+                new MenuAction.OpenMap(ChartSpec.Kind.values()[0], "default"),
+                new MenuAction.OpenMultiConfigSelector("region"),
+                new MenuAction.OpenMultiConfigEntry("region", "default"),
+                new MenuAction.MultiConfigMutate("region", "default", MenuAction.MultiConfigMutate.Op.values()[0]));
+
+        Set<Class<?>> permitted = Arrays.stream(MenuAction.class.getPermittedSubclasses()).collect(Collectors.toSet());
+        Set<Class<?>> sampled = samples.stream().map(Object::getClass).collect(Collectors.toSet());
+        assertEquals(permitted, sampled, "add a sample (and a mapping in MenuActionToCommand) for every new MenuAction variant");
+        for (MenuAction action : samples) {
+            assertDoesNotThrow(() -> MenuActionToCommand.toRunCommand(action), action.getClass().getSimpleName());
+        }
     }
 
     @Test

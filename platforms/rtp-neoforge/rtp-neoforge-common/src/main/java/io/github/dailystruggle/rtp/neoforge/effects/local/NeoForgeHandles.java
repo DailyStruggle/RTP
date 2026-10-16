@@ -4,7 +4,12 @@ import io.github.dailystruggle.effectsapi.common.spi.HandleProvider;
 import io.github.dailystruggle.effectsapi.common.spi.HandleRegistry;
 import io.github.dailystruggle.effectsapi.common.spi.LocationHandle;
 import io.github.dailystruggle.effectsapi.common.spi.PlayerHandle;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.neoforge.player.NeoForgeRTPPlayer;
+import io.github.dailystruggle.rtp.neoforge.tools.NeoForgeResourceIds;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
@@ -12,6 +17,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
 import java.util.UUID;
+import java.util.logging.Level;
 
 /**
  * NeoForge implementation of {@link HandleProvider} and {@link PlayerHandle}
@@ -42,8 +48,23 @@ public final class NeoForgeHandles implements HandleProvider {
     @SuppressWarnings("java:S3077") // Volatile reference publication for server handle
     private static volatile MinecraftServer cachedServer;
 
-    public static void setServer(MinecraftServer server) {
+    /** Binds the server used by {@link #execute}; pass {@code null} on shutdown. */
+    public static void setServer(@Nullable MinecraftServer server) {
         cachedServer = server;
+    }
+
+    /**
+     * Effect scheduler chokepoint: enqueues {@code task} on the server tick
+     * thread via {@link MinecraftServer#execute} (S-005: never blocks, no chunk
+     * I/O). Before server start or after shutdown the task is dropped.
+     */
+    public static void execute(@NotNull Runnable task) {
+        MinecraftServer server = cachedServer;
+        if (server == null) {
+            RTP.log(Level.FINER, "[RTP][NeoForge] effect scheduled with no bound server; task dropped.");
+            return;
+        }
+        server.execute(task);
     }
 
     @Override
@@ -63,8 +84,76 @@ public final class NeoForgeHandles implements HandleProvider {
         return new PlayerWrapper(player);
     }
 
+    public static LocationHandle wrap(@NotNull Vec3 location, @NotNull String worldName) {
+        return new LocationWrapper(location, worldName);
+    }
+
     public static LocationHandle wrapLocation(@NotNull ServerPlayer player) {
-        return new LocationWrapper(player.position(), player.serverLevel().dimension().location().toString());
+        return new LocationWrapper(new Vec3(player.getX(), player.getY(), player.getZ()), worldNameOf(player));
+    }
+
+    /*
+     * This carrier links against 1.21.1 but also serves 1.21.11, where ServerPlayer#serverLevel(),
+     * Entity#getServer(), GameProfile#getName() and ResourceKey#location() no longer exist. A
+     * NoSuchMethodError from an effect escapes the tick loop and stops the server, so every
+     * drift-prone call below goes through the version-robust helpers.
+     */
+
+    /** Dimension id ({@code namespace:path}) of the player's level, or {@code "unknown"}. */
+    static @NotNull String worldNameOf(@NotNull ServerPlayer player) {
+        ServerLevel level = NeoForgeRTPPlayer.resolveServerLevel(player);
+        String id = level == null ? null : NeoForgeResourceIds.locationString(level.dimension());
+        return id != null ? id : "unknown";
+    }
+
+    /** Bound server, else the player's level server. */
+    static @Nullable MinecraftServer serverOf(@NotNull ServerPlayer player) {
+        MinecraftServer server = cachedServer;
+        if (server != null) return server;
+        ServerLevel level = NeoForgeRTPPlayer.resolveServerLevel(player);
+        return level == null ? null : level.getServer();
+    }
+
+    /**
+     * {@code Entity#kill()} became {@code kill(ServerLevel)} in 1.21.2. The runtime is Mojmap, so
+     * the new overload resolves by name; vanilla {@code /kill <uuid>} is the last resort.
+     */
+    static void killPlayer(@NotNull ServerPlayer player, @Nullable MinecraftServer server) {
+        try {
+            player.kill();
+            return;
+        } catch (LinkageError drift) {
+            RTP.log(Level.FINE, "[RTP][NeoForge] Entity#kill() unavailable on this runtime: " + drift);
+        }
+        ServerLevel level = NeoForgeRTPPlayer.resolveServerLevel(player);
+        if (level != null) {
+            try {
+                player.getClass().getMethod("kill", ServerLevel.class).invoke(player, level);
+                return;
+            } catch (ReflectiveOperationException | RuntimeException e) {
+                RTP.log(Level.FINE, "[RTP][NeoForge] reflective kill(ServerLevel) failed: " + e);
+            }
+        }
+        if (server == null) {
+            RTP.log(Level.WARNING, "[RTP][NeoForge] DEATH effect dropped for " + player.getUUID() + " (no server bound)");
+            return;
+        }
+        server.getCommands().performPrefixedCommand(
+                server.createCommandSourceStack().withSuppressedOutput(), "kill " + player.getUUID());
+    }
+
+    /** Matches {@code worldName} against loaded dimension ids; falls back to the player's level. */
+    private static @Nullable ResourceKey<net.minecraft.world.level.Level> resolveDimension(
+            @NotNull ServerPlayer player, @Nullable MinecraftServer server, @NotNull String worldName) {
+        if (server != null) {
+            for (ServerLevel sl : server.getAllLevels()) {
+                if (worldName.equals(NeoForgeResourceIds.locationString(sl.dimension()))) {
+                    return sl.dimension();
+                }
+            }
+        }
+        ServerLevel own = NeoForgeRTPPlayer.resolveServerLevel(player);
+        return own == null ? null : own.dimension();
     }
 
     private record LocationWrapper(@NotNull Vec3 location, @NotNull String worldName) implements LocationHandle {
@@ -142,7 +231,7 @@ public final class NeoForgeHandles implements HandleProvider {
 
         @Override
         public @NotNull String name() {
-            return player.getGameProfile().getName();
+            return NeoForgeRTPPlayer.resolveName(player);
         }
 
         @Override
@@ -178,10 +267,14 @@ public final class NeoForgeHandles implements HandleProvider {
 
         @Override
         public void performCommand(@NotNull String command) {
-            MinecraftServer server = player.getServer();
-            if (server != null) {
-                server.execute(() -> server.getCommands().performPrefixedCommand(player.createCommandSourceStack(), command));
+            MinecraftServer server = serverOf(player);
+            if (server == null) {
+                RTP.log(Level.WARNING, "[RTP][NeoForge] player command effect dropped (no server): " + command);
+                return;
             }
+            // NeoForgeRTPPlayer builds the CommandSourceStack with drift fallbacks.
+            NeoForgeRTPPlayer sender = new NeoForgeRTPPlayer(player);
+            server.execute(() -> sender.performCommand(null, command));
         }
 
         @Override
@@ -197,35 +290,31 @@ public final class NeoForgeHandles implements HandleProvider {
 
         @Override
         public void kill(boolean setBed, @Nullable LocationHandle respawnLocation) {
-            MinecraftServer server = player.getServer();
+            MinecraftServer server = serverOf(player);
             Runnable task = () -> {
                 try {
                     if (respawnLocation != null) {
                         try {
-                            net.minecraft.server.level.ServerLevel targetLevel = player.serverLevel();
-                            net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> targetDim = targetLevel.dimension();
-                            if (server != null) {
-                                for (net.minecraft.server.level.ServerLevel sl : server.getAllLevels()) {
-                                    if (sl.dimension().location().toString().equals(respawnLocation.worldName())) {
-                                        targetDim = sl.dimension();
-                                        break;
-                                    }
-                                }
-                            }
+                            ResourceKey<net.minecraft.world.level.Level> targetDim =
+                                    resolveDimension(player, server, respawnLocation.worldName());
                             net.minecraft.core.BlockPos pos = new net.minecraft.core.BlockPos(
                                     respawnLocation.x(), respawnLocation.y(), respawnLocation.z());
                             for (java.lang.reflect.Method m : ServerPlayer.class.getMethods()) {
-                                if (!m.getName().equals("setRespawnPosition")) continue;
+                                if (targetDim == null || !m.getName().equals("setRespawnPosition")) continue;
                                 Class<?>[] pt = m.getParameterTypes();
                                 if (pt.length == 5) {
                                     m.invoke(player, targetDim, pos, 0.0f, setBed, false);
                                     break;
                                 }
                             }
-                        } catch (Throwable ignored) {}
+                        } catch (Throwable t) {
+                            RTP.log(Level.FINE, "[RTP][NeoForge] DEATH respawn point not set: " + t);
+                        }
                     }
-                    player.kill();
-                } catch (Throwable ignored) {}
+                    killPlayer(player, server);
+                } catch (Throwable t) {
+                    RTP.log(Level.WARNING, "[RTP][NeoForge] DEATH effect failed for " + player.getUUID(), t);
+                }
             };
             if (server != null) {
                 server.execute(task);

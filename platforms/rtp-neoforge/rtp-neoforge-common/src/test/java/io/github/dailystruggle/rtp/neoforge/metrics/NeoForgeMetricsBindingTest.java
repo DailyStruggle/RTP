@@ -120,17 +120,18 @@ final class NeoForgeMetricsBindingTest {
         assertTrue(throwing.tps1m() > 19.5, "TPS must survive a failing work source");
     }
 
-    /** Zero and negative tick intervals are ignored (no EMA emitted). */
+    /** Zero and negative tick intervals are ignored (EMA stays at previous value). */
     @Test
     void non_progressing_clock_is_ignored() {
         AtomicLong clock = new AtomicLong(1_000_000_000L);
         NeoForgeMetricsBinding b = new NeoForgeMetricsBinding(clock::get, () -> 0, () -> 0);
-        b.tick();
-        b.tick(); // delta = 0
-        assertEquals(MetricsSnapshot.UNSAMPLED, b.tps1m(), 1e-9);
+        b.tick(); // seeds EMA to nominal (20 TPS)
+        assertEquals(20.0, b.tps1m(), 1e-9);
+        b.tick(); // delta = 0, ignored
+        assertEquals(20.0, b.tps1m(), 1e-9); // EMA unchanged
         clock.set(500_000_000L); // regression
         b.tick();
-        assertEquals(MetricsSnapshot.UNSAMPLED, b.tps1m(), 1e-9);
+        assertEquals(20.0, b.tps1m(), 1e-9); // still unchanged
     }
 
     /** PlayerCount / softCap delegate to suppliers and clamp negatives to 0. */

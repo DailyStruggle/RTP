@@ -18,7 +18,9 @@ import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.tasks.ChunkTicketHolder;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
+import io.github.dailystruggle.rtp.common.tasks.TrackableTask;
 import io.github.dailystruggle.rtp.common.tools.SupportLogger;
 import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -35,7 +37,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 
-public final class TeleportPipelineTask extends RTPRunnable {
+public final class TeleportPipelineTask extends RTPRunnable implements TrackableTask {
   public enum Phase {
     SETUP,
     LOAD,
@@ -133,6 +135,11 @@ public final class TeleportPipelineTask extends RTPRunnable {
       keys.computeIfAbsent(e.getValue(), w -> new java.util.HashSet<>()).add(key);
     }
     return keys;
+  }
+
+  static {
+    ChunkTicketHolder.heldChunkTicketCounter = TeleportPipelineTask::pendingArrivalReleaseCount;
+    ChunkTicketHolder.arrivalHoldKeysSupplier = TeleportPipelineTask::arrivalHoldChunkKeys;
   }
 
   /** Pending deferred arrival releases; diagnostics and tests. */
@@ -308,6 +315,11 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
   public Phase getPhase() {
     return this.currentPhase;
+  }
+
+  @Override
+  public String phaseName() {
+    return this.currentPhase != null ? this.currentPhase.name() : "";
   }
 
   public double getDistance() {

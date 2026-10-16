@@ -22,91 +22,112 @@ public final class MenuActionToCommand {
      * @return the literal run-command string, or {@code null} for renderer-only actions
      */
     public static @Nullable String toRunCommand(@Nullable MenuAction action) {
+        // instanceof chain, not a pattern switch: rtp-core targets Java 17
+        // (ADR-113), which has no switch type patterns. The chain loses the
+        // compiler's sealed exhaustiveness check, so an unmapped variant fails
+        // loudly below instead of silently rendering a dead button.
         if (action == null) return null;
-        return switch (action) {
-            case MenuAction.RunRtpCommand run -> buildRunCommand(run);
-            // Empty path = root; omit `path=` entirely because the
-            // commands-api TreeCommand parameter parser rejects any
-            // argument that ends in `=` (empty value) before the leaf's
-            // onCommand runs (TreeCommand.java:224).
-            case MenuAction.OpenMenu open ->
-                    "/rtp menu open" + pathArg(open.path());
-            case MenuAction.OpenParamPicker picker ->
-                    "/rtp menu picker"
-                            + pathArg(picker.parentPath())
-                            + " param=" + picker.paramName();
-            case MenuAction.PromptAnvilInput prompt -> buildAnvilCommand(prompt);
-            // Renderer-only variants: no concrete command. ChangePage is
-            // handled by the book renderer's Adventure changePage(int) click
-            // type; the chat renderer translates it to /rtp menu page n=...
-            // via a separate call to changePageCommand(int) below.
-            case MenuAction.ChangePage ignored -> null;
-            case MenuAction.SuggestInput ignored -> null;
-            case MenuAction.OpenExternalUrl ignored -> null;
-            case MenuAction.OpenConfigSelector sel ->
-                    sel.subDir().isEmpty()
-                            ? "/rtp menu config"
-                            : "/rtp menu config dir=" + sel.subDir();
-            case MenuAction.OpenConfigFile f ->
-                    "/rtp menu config file=" + f.fileName();
-            case MenuAction.OpenConfigKey k ->
-                    "/rtp menu config"
-                            + " file=" + k.fileName()
-                            + " key=" + k.paramName();
-            // No dedicated leaf in core today; ConfigCmd's parameter grammar
-            // discards an unknown `type=` token and falls through to the key
-            // page, which is the existing dispatch behaviour pre-ADR-050.
-            case MenuAction.OpenConfigSubParamPage sp ->
-                    "/rtp menu config"
-                            + " file=" + sp.fileName()
-                            + " key=" + sp.paramName()
-                            + " type=" + sp.typeName();
-            case MenuAction.OpenConfigSearchPrompt ignored ->
-                    "/rtp menu config search";
-            // ConfigSearchCmd accepts 1-indexed `page=`; record stores
-            // 0-indexed page, so +1 on emit.
-            case MenuAction.OpenConfigSearchResults sr ->
-                    "/rtp menu config search"
-                            + " query=" + sr.query()
-                            + " page=" + (sr.page() + 1);
-            case MenuAction.OpenAdminPanel ignored -> "/rtp menu admin";
-            case MenuAction.OpenVisualizations ignored -> "/rtp menu visualizations";
-            case MenuAction.OpenFrontPage ignored -> "/rtp menu front";
-            case MenuAction.OpenInfo info ->
-                    "/rtp menu info scope=" + scopeWire(info.scope());
-            case MenuAction.SwitchInfoToText sw ->
-                    "/rtp menu info"
-                            + " scope=" + scopeWire(sw.scope())
-                            + " text=true";
-            case MenuAction.StageConfigValue st ->
-                    "/rtp menu stage"
-                            + " file=" + st.fileName()
-                            + " key=" + st.paramName()
-                            + " value=" + st.value();
-            case MenuAction.UnstageConfigValue u ->
-                    "/rtp menu unstage"
-                            + " file=" + u.fileName()
-                            + " key=" + u.paramName();
-            case MenuAction.ApplyStagedConfig ap ->
-                    "/rtp menu apply file=" + ap.fileName();
-            case MenuAction.DiscardStagedConfig d ->
-                    "/rtp menu discard file=" + d.fileName();
-            case MenuAction.OpenMultiConfigSelector ms ->
-                    "/rtp menu multi kind=" + ms.parserKind();
-            case MenuAction.OpenMultiConfigEntry me ->
-                    "/rtp menu multi"
-                            + " kind=" + me.parserKind()
-                            + " entry=" + me.entryName();
-            case MenuAction.MultiConfigMutate mm ->
-                    "/rtp menu multi"
-                            + " kind=" + mm.parserKind()
-                            + " entry=" + mm.entryName()
-                            + " op=" + mm.op().name().toLowerCase(Locale.ROOT);
-            // OpenMap dispatches to typed sub-command under /rtp visualization (ADR-050).
-            case MenuAction.OpenMap openMap ->
-                    "/rtp visualization " + visualizationKindLiteral(openMap.kind())
-                            + " region=" + openMap.regionName();
-        };
+        if (action instanceof MenuAction.RunRtpCommand run) return buildRunCommand(run);
+        // Empty path = root; omit `path=` entirely because the
+        // commands-api TreeCommand parameter parser rejects any
+        // argument that ends in `=` (empty value) before the leaf's
+        // onCommand runs (TreeCommand.java:224).
+        if (action instanceof MenuAction.OpenMenu open) {
+            return "/rtp menu open" + pathArg(open.path());
+        }
+        if (action instanceof MenuAction.OpenParamPicker picker) {
+            return "/rtp menu picker"
+                    + pathArg(picker.parentPath())
+                    + " param=" + picker.paramName();
+        }
+        if (action instanceof MenuAction.PromptAnvilInput prompt) return buildAnvilCommand(prompt);
+        // Renderer-only variants: no concrete command. ChangePage is
+        // handled by the book renderer's Adventure changePage(int) click
+        // type; the chat renderer translates it to /rtp menu page n=...
+        // via a separate call to changePageCommand(int) below.
+        if (action instanceof MenuAction.ChangePage
+                || action instanceof MenuAction.SuggestInput
+                || action instanceof MenuAction.OpenExternalUrl) {
+            return null;
+        }
+        if (action instanceof MenuAction.OpenConfigSelector sel) {
+            return sel.subDir().isEmpty()
+                    ? "/rtp menu config"
+                    : "/rtp menu config dir=" + sel.subDir();
+        }
+        if (action instanceof MenuAction.OpenConfigFile f) {
+            return "/rtp menu config file=" + f.fileName();
+        }
+        if (action instanceof MenuAction.OpenConfigKey k) {
+            return "/rtp menu config"
+                    + " file=" + k.fileName()
+                    + " key=" + k.paramName();
+        }
+        // No dedicated leaf in core today; ConfigCmd's parameter grammar
+        // discards an unknown `type=` token and falls through to the key
+        // page, which is the existing dispatch behaviour pre-ADR-050.
+        if (action instanceof MenuAction.OpenConfigSubParamPage sp) {
+            return "/rtp menu config"
+                    + " file=" + sp.fileName()
+                    + " key=" + sp.paramName()
+                    + " type=" + sp.typeName();
+        }
+        if (action instanceof MenuAction.OpenConfigSearchPrompt) return "/rtp menu config search";
+        // ConfigSearchCmd accepts 1-indexed `page=`; record stores
+        // 0-indexed page, so +1 on emit.
+        if (action instanceof MenuAction.OpenConfigSearchResults sr) {
+            return "/rtp menu config search"
+                    + " query=" + sr.query()
+                    + " page=" + (sr.page() + 1);
+        }
+        if (action instanceof MenuAction.OpenAdminPanel) return "/rtp menu admin";
+        if (action instanceof MenuAction.OpenVisualizations) return "/rtp menu visualizations";
+        if (action instanceof MenuAction.OpenFrontPage) return "/rtp menu front";
+        if (action instanceof MenuAction.OpenInfo info) {
+            return "/rtp menu info scope=" + scopeWire(info.scope());
+        }
+        if (action instanceof MenuAction.SwitchInfoToText sw) {
+            return "/rtp menu info"
+                    + " scope=" + scopeWire(sw.scope())
+                    + " text=true";
+        }
+        if (action instanceof MenuAction.StageConfigValue st) {
+            return "/rtp menu stage"
+                    + " file=" + st.fileName()
+                    + " key=" + st.paramName()
+                    + " value=" + st.value();
+        }
+        if (action instanceof MenuAction.UnstageConfigValue u) {
+            return "/rtp menu unstage"
+                    + " file=" + u.fileName()
+                    + " key=" + u.paramName();
+        }
+        if (action instanceof MenuAction.ApplyStagedConfig ap) {
+            return "/rtp menu apply file=" + ap.fileName();
+        }
+        if (action instanceof MenuAction.DiscardStagedConfig d) {
+            return "/rtp menu discard file=" + d.fileName();
+        }
+        if (action instanceof MenuAction.OpenMultiConfigSelector ms) {
+            return "/rtp menu multi kind=" + ms.parserKind();
+        }
+        if (action instanceof MenuAction.OpenMultiConfigEntry me) {
+            return "/rtp menu multi"
+                    + " kind=" + me.parserKind()
+                    + " entry=" + me.entryName();
+        }
+        if (action instanceof MenuAction.MultiConfigMutate mm) {
+            return "/rtp menu multi"
+                    + " kind=" + mm.parserKind()
+                    + " entry=" + mm.entryName()
+                    + " op=" + mm.op().name().toLowerCase(Locale.ROOT);
+        }
+        // OpenMap dispatches to typed sub-command under /rtp visualization (ADR-050).
+        if (action instanceof MenuAction.OpenMap openMap) {
+            return "/rtp visualization " + visualizationKindLiteral(openMap.kind())
+                    + " region=" + openMap.regionName();
+        }
+        throw new IllegalArgumentException("unmapped MenuAction variant: " + action.getClass().getName());
     }
 
     /**

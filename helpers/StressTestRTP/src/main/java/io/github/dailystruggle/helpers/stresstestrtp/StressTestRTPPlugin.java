@@ -49,6 +49,7 @@ public final class StressTestRTPPlugin extends JavaPlugin {
     private SchedulerGauge schedulerGauge;
     private JfrAllocationProfiler jfrProfiler;
     private LeakProbe leakProbe;
+    private CoverageProbe coverageProbe;
     private HarnessTeleporter harnessTeleporter;
 
     @Override
@@ -240,6 +241,8 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         leakProbe = new LeakProbe(this,
                 getDataFolder().toPath().resolve(getConfig().getString("output-subdir", "runs")),
                 getConfig().getString("leak.auto-op-prefix", ""));
+        coverageProbe = new CoverageProbe(
+                getDataFolder().toPath().resolve(getConfig().getString("output-subdir", "runs")));
         leakProbe.register();
         harnessTeleporter = new HarnessTeleporter(this, getConfig().getInt("leak.direct-radius", 10000));
         leakProbe.setTeleporter(harnessTeleporter);
@@ -456,6 +459,7 @@ public final class StressTestRTPPlugin extends JavaPlugin {
 
     public Runner runner() { return runner; }
     public LeakProbe leakProbe() { return leakProbe; }
+    CoverageProbe coverageProbe() { return coverageProbe; }
 
     HarnessTeleporter harnessTeleporter() { return harnessTeleporter; }
     public TpsMsptHeapSampler sampler() { return sampler; }
