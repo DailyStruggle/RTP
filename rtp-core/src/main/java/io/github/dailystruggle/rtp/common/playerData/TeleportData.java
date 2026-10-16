@@ -104,7 +104,11 @@ public class TeleportData implements Cloneable {
       clone.distance = distance;
       clone.distanceFromCenter = distanceFromCenter;
       clone.targetRegion = targetRegion;
-      clone.targetRegionName = (targetRegionName != null) ? targetRegionName : (targetRegion != null ? targetRegion.name : null);
+      if (targetRegionName != null) {
+        clone.targetRegionName = targetRegionName;
+      } else {
+        clone.targetRegionName = (targetRegion != null) ? targetRegion.name : null;
+      }
       clone.time = time;
       clone.cost = cost;
       clone.completed = completed;

@@ -89,13 +89,15 @@ final class V26_4_R1FabricLegacyText {
         sb.append(raw, last, raw.length());
         String s = sb.toString();
         StringBuilder out = new StringBuilder(s.length());
-        for (int i = 0; i < s.length(); i++) {
+        int i = 0;
+        while (i < s.length()) {
             char c = s.charAt(i);
             if (c == '&' && i + 1 < s.length() && byCode(s.charAt(i + 1)) != null) {
                 out.append(SECTION).append(s.charAt(i + 1));
-                i++;
+                i += 2;
             } else {
                 out.append(c);
+                i++;
             }
         }
         return out.toString();

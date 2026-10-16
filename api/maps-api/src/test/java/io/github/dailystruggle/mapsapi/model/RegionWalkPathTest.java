@@ -99,8 +99,11 @@ class RegionWalkPathTest {
         assertEquals(a, a);
         assertEquals(a, b);
         assertEquals(a.hashCode(), b.hashCode());
-        assertNotEquals(a, null);
-        assertNotEquals(a, "r");
+        // a on the left so a.equals(...) is exercised against null and a foreign type
+        Object absent = null;
+        Object foreign = "r";
+        assertNotEquals(a, absent);
+        assertNotEquals(a, foreign);
 
         boolean[] in2 = {true, false};
         int[] bio = {1, 2};

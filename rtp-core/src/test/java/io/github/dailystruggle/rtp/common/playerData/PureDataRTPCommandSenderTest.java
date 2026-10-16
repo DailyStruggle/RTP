@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.playerData;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -45,5 +46,25 @@ class PureDataRTPCommandSenderTest {
     assertEquals("Alex", player.name());
     assertNull(player.getLocation());
     assertFalse(player.isOnline());
+  }
+
+  @Test
+  @DisplayName("Sender and player with the same UUID are equal in both directions")
+  void equalsIsSymmetricAcrossSenderAndPlayer() {
+    UUID uuid = UUID.randomUUID();
+    PureDataRTPCommandSender sender = new PureDataRTPCommandSender(uuid, "Steve", 0L, 0L, Set.of());
+    PureDataRTPPlayer player = new PureDataRTPPlayer(uuid, "Steve", 0L, 0L, Set.of());
+
+    assertEquals(sender, player);
+    assertEquals(player, sender);
+    assertEquals(sender.hashCode(), player.hashCode());
+
+    Set<RTPCommandSender> set = new HashSet<>();
+    set.add(player);
+    assertFalse(set.add(sender));
+
+    PureDataRTPPlayer other = new PureDataRTPPlayer(UUID.randomUUID(), "Steve", 0L, 0L, Set.of());
+    assertNotEquals(sender, other);
+    assertNotEquals(other, sender);
   }
 }

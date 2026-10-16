@@ -40,6 +40,8 @@ import java.util.Map;
  */
 public final class ComprehensiveRegionImageExporter {
 
+  private static final java.util.regex.Pattern FILE_UNSAFE = java.util.regex.Pattern.compile("[^A-Za-z0-9._-]");
+
   private static final Color BG_DARK = new Color(0x0C, 0x10, 0x17);
   private static final Color PANEL_BG = new Color(0x16, 0x1B, 0x22);
   private static final Color PANEL_BORDER = new Color(0x30, 0x36, 0x3D);
@@ -114,7 +116,7 @@ public final class ComprehensiveRegionImageExporter {
         .format(java.time.Instant.now());
     String sanitizedName = (region.name == null || region.name.isBlank())
         ? "region"
-        : region.name.replaceAll("[^A-Za-z0-9._-]", "_");
+        : FILE_UNSAFE.matcher(region.name).replaceAll("_");
     String baseName = sanitizedName + "_all_" + timestamp;
     File imageFile = new File(outputDirectory, baseName + ".png");
     File jsonFile = new File(outputDirectory, baseName + ".json");

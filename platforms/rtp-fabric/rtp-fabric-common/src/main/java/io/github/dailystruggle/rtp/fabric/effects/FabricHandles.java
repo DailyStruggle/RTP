@@ -81,7 +81,9 @@ public final class FabricHandles implements HandleProvider {
                     if (adapter.dispatchConsoleCommand(server, command)) {
                         return;
                     }
-                } catch (Throwable ignored) {}
+                } catch (Throwable ignored) {
+                    // adapter hook failed; fall back to the vanilla dispatcher below
+                }
             }
             server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), command);
         });
@@ -209,12 +211,16 @@ public final class FabricHandles implements HandleProvider {
                     Object val = m.invoke(player.getGameProfile());
                     if (val instanceof String s) return s;
                 }
-            } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {
+                // record-style GameProfile#name() absent; try getName()
+            }
             try {
                 if (player.getGameProfile() != null) {
                     return player.getGameProfile().getName();
                 }
-            } catch (LinkageError ignored) {}
+            } catch (LinkageError ignored) {
+                // getName() removed on newer authlib; try display name
+            }
             try {
                 return player.getName().getString();
             } catch (Throwable ignored) {}
@@ -310,8 +316,7 @@ public final class FabricHandles implements HandleProvider {
 
         @Override
         public void dropInventory(@Nullable LocationHandle dropLocation) {
-            // Entity#getServer() (method_5682) is missing on 1.21.11; ServerLevel#getServer() is stable.
-            net.minecraft.server.MinecraftServer server = player.serverLevel().getServer();
+            net.minecraft.server.MinecraftServer server = server();
             Runnable task = () -> {
                 try {
                     player.getInventory().dropAll();
@@ -326,8 +331,7 @@ public final class FabricHandles implements HandleProvider {
 
         @Override
         public void dropExperience(@Nullable LocationHandle dropLocation) {
-            // Entity#getServer() (method_5682) is missing on 1.21.11; ServerLevel#getServer() is stable.
-            net.minecraft.server.MinecraftServer server = player.serverLevel().getServer();
+            net.minecraft.server.MinecraftServer server = server();
             Runnable task = () -> {
                 try {
                     int pointsToDrop = Math.min(player.experienceLevel * 7, 100);
@@ -352,10 +356,7 @@ public final class FabricHandles implements HandleProvider {
 
         @Override
         public void kill(boolean setBed, @Nullable LocationHandle respawnLocation) {
-            // Entity#getServer() (method_5682) is missing on 1.21.11; ServerLevel#getServer() is stable.
-            net.minecraft.server.MinecraftServer server = player.serverLevel().getServer();
-            if (server == null) server = server();
-            final net.minecraft.server.MinecraftServer srv = server;
+            final net.minecraft.server.MinecraftServer srv = server();
             Runnable task = () -> {
                 try {
                     if (respawnLocation != null) {
@@ -401,8 +402,7 @@ public final class FabricHandles implements HandleProvider {
 
         @Override
         public void performCommand(@NotNull String command) {
-            // Entity#getServer() (method_5682) is missing on 1.21.11; ServerLevel#getServer() is stable.
-            net.minecraft.server.MinecraftServer server = player.serverLevel().getServer();
+            net.minecraft.server.MinecraftServer server = server();
             if (server == null) {
                 RTP.log(Level.WARNING, "[RTP][Fabric] player command effect dropped (no server): " + command);
                 return;
@@ -428,14 +428,18 @@ public final class FabricHandles implements HandleProvider {
                                 server.getCommands().performPrefixedCommand(css, command);
                                 return;
                             }
-                        } catch (Throwable ignored) {}
+                        } catch (Throwable ignored) {
+                            // candidate accessor failed; try the next one
+                        }
                     }
                 }
                 // Direct bytecode call (compiled against 1.21.1 intermediary method_5671)
                 try {
                     server.getCommands().performPrefixedCommand(player.createCommandSourceStack(), command);
                     return;
-                } catch (Throwable ignored) {}
+                } catch (Throwable ignored) {
+                    // linkage drift; fall through to the console-anchored source
+                }
                 // Re-anchor console source on player (stable fallback)
                 try {
                     server.getCommands().performPrefixedCommand(server.createCommandSourceStack().withEntity(player), command);
@@ -471,21 +475,19 @@ public final class FabricHandles implements HandleProvider {
             if (landingTimeoutTicks > 0 && landingTimeoutTicks < Integer.MAX_VALUE) {
                 final UUID id = player.getUUID();
                 net.minecraft.server.MinecraftServer server = player.serverLevel().getServer();
-                if (server != null) {
-                    final long deadline = (long) server.getTickCount() + landingTimeoutTicks;
-                    final Runnable[] watchdog = new Runnable[1];
-                    watchdog[0] = () -> {
-                        if (server.getTickCount() >= deadline) {
-                            ServerPlayer p = server.getPlayerList().getPlayer(id);
-                            if (p != null && p.isFallFlying()) {
-                                p.stopFallFlying(); // force landing
-                            }
-                        } else {
-                            server.execute(watchdog[0]);
+                final long deadline = (long) server.getTickCount() + landingTimeoutTicks;
+                final Runnable[] watchdog = new Runnable[1];
+                watchdog[0] = () -> {
+                    if (server.getTickCount() >= deadline) {
+                        ServerPlayer p = server.getPlayerList().getPlayer(id);
+                        if (p != null && p.isFallFlying()) {
+                            p.stopFallFlying(); // force landing
                         }
-                    };
-                    server.execute(watchdog[0]);
-                }
+                    } else {
+                        server.execute(watchdog[0]);
+                    }
+                };
+                server.execute(watchdog[0]);
             }
         }
 
@@ -498,16 +500,20 @@ public final class FabricHandles implements HandleProvider {
                     if (adapter.teleport(player, level, x, y, z, yaw, pitch)) {
                         return true;
                     }
-                } catch (Throwable ignored) {}
+                } catch (Throwable ignored) {
+                    // adapter teleport failed; try the reflective fallbacks
+                }
             }
-            // Reflective 6-arg ServerPlayer#teleportTo(ServerLevel, double, double, double, float, float)
+            // Reflective 6-arg teleportTo lookup: level, xyz, yaw, pitch
             try {
                 java.lang.reflect.Method m = ServerPlayer.class.getMethod(
                         "teleportTo", ServerLevel.class,
                         double.class, double.class, double.class, float.class, float.class);
                 m.invoke(player, level, x, y, z, yaw, pitch);
                 return true;
-            } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {
+                // name remapped or absent on this runtime
+            }
             // Same-dimension connection packet teleport
             try {
                 if (player.serverLevel() == level) {
@@ -516,14 +522,18 @@ public final class FabricHandles implements HandleProvider {
                     player.setXRot(pitch);
                     return true;
                 }
-            } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {
+                // packet teleport unavailable; fall back to setPos
+            }
             // In-place setPos fallback
             try {
                 player.setPos(x, y, z);
                 player.setYRot(yaw);
                 player.setXRot(pitch);
                 return true;
-            } catch (Throwable ignored) {}
+            } catch (Throwable ignored) {
+                // all paths failed; caller sees false
+            }
             return false;
         }
 

@@ -144,12 +144,8 @@ public final class ActionPlaceholderSanitizer {
             return s.uuid().toString();
           }
         }
-      } else {
-        String fallbackKey = prefix + numSuffix;
-        if (contextTokens.containsKey(fallbackKey)) {
-          return formatValue(contextTokens.get(fallbackKey), isPlayerEntityKey(key));
-        }
       }
+      // Other numbered keys (prefix + numSuffix == key) were already tried by the direct lookup.
     }
 
     return null;

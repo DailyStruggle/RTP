@@ -15,6 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 /**
  * Factory and registry for {@link Effect} prototypes, keyed by name.
@@ -31,6 +32,8 @@ public class EffectFactory {
     private static final ConcurrentHashMap<String, Effect<?>> effectMap = new ConcurrentHashMap<>();
 
     private static final Set<String> warnedUnknownTypes = ConcurrentHashMap.newKeySet();
+
+    private static final Pattern WHITESPACE_RUN = Pattern.compile("\\s+");
 
     /**
      * Clear the cache of warned unknown effect types. Primarily for tests.
@@ -171,7 +174,7 @@ public class EffectFactory {
                 // Whitespace-delimited effect syntax (e.g. "COMMAND CONSOLE say hi" or "DEATH false")
                 type = raw.substring(0, firstSpace);
                 String rest = raw.substring(firstSpace).trim();
-                args = rest.isEmpty() ? new String[0] : rest.split("\\s+");
+                args = rest.isEmpty() ? new String[0] : WHITESPACE_RUN.split(rest);
             } else if (firstDot != -1) {
                 // Dot-delimited permission syntax (e.g. "COMMAND.CONSOLE.say\ a\.b")
                 type = raw.substring(0, firstDot);

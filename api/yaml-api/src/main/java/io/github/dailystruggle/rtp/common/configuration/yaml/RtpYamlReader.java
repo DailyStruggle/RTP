@@ -231,11 +231,17 @@ public final class RtpYamlReader {
         parseMappingBody(mapping, expectedIndent, 0);
     }
 
+    /** Line number at {@code pos}; past EOF the last line, or 1 for empty input. */
+    private int currentLineNo() {
+        if (pos < lines.size()) return lines.get(pos).lineNo;
+        if (lines.isEmpty()) return 1;
+        return lines.get(lines.size() - 1).lineNo;
+    }
+
     private void parseMappingBody(RtpYamlMapping mapping, int expectedIndent, int depth) {
         if (depth > MAX_DEPTH) {
-            int lineNo = pos < lines.size() ? lines.get(pos).lineNo : (lines.isEmpty() ? 1 : lines.get(lines.size() - 1).lineNo);
             throw new RtpYamlParseException("rtpYaml.syntax.maxDepth",
-                    "maximum nesting depth exceeded (max " + MAX_DEPTH + ")", lineNo, expectedIndent);
+                    "maximum nesting depth exceeded (max " + MAX_DEPTH + ")", currentLineNo(), expectedIndent);
         }
         while (pos < lines.size()) {
             RawLine ln = lines.get(pos);
@@ -310,9 +316,8 @@ public final class RtpYamlReader {
      */
     private RtpYamlNode parseChildBlock(int parentIndent, int depth) {
         if (depth > MAX_DEPTH) {
-            int lineNo = pos < lines.size() ? lines.get(pos).lineNo : (lines.isEmpty() ? 1 : lines.get(lines.size() - 1).lineNo);
             throw new RtpYamlParseException("rtpYaml.syntax.maxDepth",
-                    "maximum nesting depth exceeded (max " + MAX_DEPTH + ")", lineNo, parentIndent);
+                    "maximum nesting depth exceeded (max " + MAX_DEPTH + ")", currentLineNo(), parentIndent);
         }
         // Skip blanks/comments to peek at indent of the next content line.
         int peek = pos;
@@ -346,9 +351,8 @@ public final class RtpYamlReader {
 
     private void parseSequenceBody(RtpYamlSequence seq, int expectedIndent, int depth) {
         if (depth > MAX_DEPTH) {
-            int lineNo = pos < lines.size() ? lines.get(pos).lineNo : (lines.isEmpty() ? 1 : lines.get(lines.size() - 1).lineNo);
             throw new RtpYamlParseException("rtpYaml.syntax.maxDepth",
-                    "maximum nesting depth exceeded (max " + MAX_DEPTH + ")", lineNo, expectedIndent);
+                    "maximum nesting depth exceeded (max " + MAX_DEPTH + ")", currentLineNo(), expectedIndent);
         }
         while (pos < lines.size()) {
             RawLine ln = lines.get(pos);

@@ -23,7 +23,9 @@ public class HeadDatabaseAPI {
                 meta.setDisplayName("§e[HeadDatabase] §f" + id);
                 item.setItemMeta(meta);
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+            // best-effort: mock returns an undecorated item if meta is unsupported
+        }
         return item;
     }
 }

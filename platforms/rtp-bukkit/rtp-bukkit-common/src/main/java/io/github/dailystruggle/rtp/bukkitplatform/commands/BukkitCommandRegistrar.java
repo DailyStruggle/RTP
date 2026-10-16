@@ -85,6 +85,7 @@ public final class BukkitCommandRegistrar extends BukkitCommand {
           return cmd;
         }
       } catch (Throwable ignored) {
+        // best-effort: fall through to server-wide lookup
       }
     }
 
@@ -94,6 +95,7 @@ public final class BukkitCommandRegistrar extends BukkitCommand {
         return cmd;
       }
     } catch (Throwable ignored) {
+      // best-effort: fall through to namespaced lookup
     }
 
     if (plugin != null) {
@@ -104,6 +106,7 @@ public final class BukkitCommandRegistrar extends BukkitCommand {
           return cmd;
         }
       } catch (Throwable ignored) {
+        // best-effort: caller falls back to dynamic registration
       }
     }
 
@@ -116,6 +119,7 @@ public final class BukkitCommandRegistrar extends BukkitCommand {
       Object map = m.invoke(Bukkit.getServer());
       if (map instanceof CommandMap cm) return cm;
     } catch (Throwable ignored) {
+      // getCommandMap absent on this server; try plugin-manager field
     }
     try {
       Field f = Bukkit.getServer().getPluginManager().getClass().getDeclaredField("commandMap");
@@ -123,6 +127,7 @@ public final class BukkitCommandRegistrar extends BukkitCommand {
       Object map = f.get(Bukkit.getServer().getPluginManager());
       if (map instanceof CommandMap cm) return cm;
     } catch (Throwable ignored) {
+      // reflection blocked or field missing; no dynamic registration
     }
     return null;
   }
@@ -132,6 +137,7 @@ public final class BukkitCommandRegistrar extends BukkitCommand {
       Method sync = Bukkit.getServer().getClass().getMethod("syncCommands");
       sync.invoke(Bukkit.getServer());
     } catch (Throwable ignored) {
+      // syncCommands is Paper/CraftBukkit-only; clients refresh on relog
     }
   }
 

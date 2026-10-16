@@ -139,7 +139,7 @@ public final class V26_4_R1FabricRTPPlayer implements RTPPlayer,
                 MinecraftServer srv = lvl.getServer();
                 if (srv != null) {
                     java.io.File opsFile = srv.getPlayerList().getOps().getFile();
-                    if (opsFile != null && opsFile.isFile()) {
+                    if (opsFile.isFile()) {
                         String body = new String(java.nio.file.Files.readAllBytes(opsFile.toPath()),
                                 java.nio.charset.StandardCharsets.UTF_8);
                         if (body.contains("\"" + uuid.toString() + "\"")) return true;
@@ -356,6 +356,7 @@ public final class V26_4_R1FabricRTPPlayer implements RTPPlayer,
                 if (ok) return c.newInstance(args);
             }
         } catch (Throwable _) {
+            // no compatible ctor on this runtime; caller logs the missing setter
         }
         return null;
     }
@@ -495,7 +496,7 @@ public final class V26_4_R1FabricRTPPlayer implements RTPPlayer,
 
     private static boolean isLoaded(ServerLevel level, int cx, int cz) {
         try {
-            return level.getChunkSource() != null && level.getChunkSource().hasChunk(cx, cz);
+            return level.getChunkSource().hasChunk(cx, cz);
         } catch (Throwable _) {
             return false;
         }
@@ -518,12 +519,7 @@ public final class V26_4_R1FabricRTPPlayer implements RTPPlayer,
         }
     }
 
-    private static final class DetachedClone implements RTPPlayer {
-        private final UUID uuid;
-        private final String name;
-        DetachedClone(UUID uuid, String name) { this.uuid = uuid; this.name = name; }
-        @Override public UUID uuid() { return uuid; }
-        @Override public String name() { return name; }
+    private record DetachedClone(UUID uuid, String name) implements RTPPlayer {
         @Override public boolean hasPermission(String permission) { return false; }
         @Override public Set<String> getEffectivePermissions() { return Collections.emptySet(); }
         @Override public void sendMessage(String message) { /* offline */ }

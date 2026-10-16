@@ -347,7 +347,7 @@ public class OnDemandChunkReadBenchmarkTest {
 
         // 2. Now run a SPECULATIVE request for comparison:
         int nativeLoadsBefore = world.nativeLoadInvocations.get();
-        GenerationResult speculativeResult = execute(region, LoadPurpose.SPECULATIVE);
+        execute(region, LoadPurpose.SPECULATIVE);
 
         // Speculative tasks properly use getOrReadChunk (ADR-110)
         assertTrue(world.fileReadInvocations.get() > 0,

@@ -713,9 +713,14 @@ public interface RTPCmd extends BaseRTPCmd {
       boolean hasRegionOverride = (regSettings != null && regSettings.cooldownMillis() != null && regSettings.cooldownMillis() >= 0);
       long targetCooldown = RTP.getCooldown(cooldownSubject, regSettings);
       if (targetCooldown > 0) {
-        long lastTpTime = hasRegionOverride
-            ? RTP.getLastRegionTeleportTime(player.uuid(), region.name)
-            : ((data != null && data.time > 0) ? data.time : RTP.getEffectiveLastTeleportTime(player.uuid()));
+        long lastTpTime;
+        if (hasRegionOverride) {
+          lastTpTime = RTP.getLastRegionTeleportTime(player.uuid(), region.name);
+        } else if (data != null && data.time > 0) {
+          lastTpTime = data.time;
+        } else {
+          lastTpTime = RTP.getEffectiveLastTeleportTime(player.uuid());
+        }
         if (hasRegionOverride && lastTpTime <= 0L && data != null && data.completed && (data.targetRegion == null || region.name.equalsIgnoreCase(data.targetRegion.name))) {
           lastTpTime = data.time;
         }

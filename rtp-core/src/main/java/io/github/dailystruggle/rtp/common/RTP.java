@@ -1049,6 +1049,7 @@ public class RTP {
             if (combatRemaining <= 0L) combatRemaining = 1000L;
           }
         } catch (Throwable ignored) {
+          // Defensive: combat hook failure reports not-in-combat; status must not break.
         }
 
         long targetDelay = getDelay(player, regSettings);
@@ -1870,11 +1871,8 @@ public class RTP {
 
   @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the shape Factory under a raw value type
   public static void addShape(Shape<?> shape) {
-    Factory<Shape<?>> shapeFactory = (Factory<Shape<?>>) factoryMap.get(factoryNames.shape);
-    if (shapeFactory == null) {
-      shapeFactory = new Factory<>();
-      factoryMap.put(factoryNames.shape, shapeFactory);
-    }
+    Factory<Shape<?>> shapeFactory =
+        (Factory<Shape<?>>) factoryMap.computeIfAbsent(factoryNames.shape, k -> new Factory<Shape<?>>());
     shapeFactory.add(shape.name, shape);
     if (selectionAPI != null && selectionAPI.shapeFactory == null) {
       selectionAPI.shapeFactory = shapeFactory;
@@ -1883,11 +1881,8 @@ public class RTP {
 
   @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the vert Factory under a raw value type
   public static void addVerticalAdjustor(VerticalAdjustor<?> verticalAdjustor) {
-    Factory<VerticalAdjustor<?>> vertFactory = (Factory<VerticalAdjustor<?>>) factoryMap.get(factoryNames.vert);
-    if (vertFactory == null) {
-      vertFactory = new Factory<>();
-      factoryMap.put(factoryNames.vert, vertFactory);
-    }
+    Factory<VerticalAdjustor<?>> vertFactory = (Factory<VerticalAdjustor<?>>)
+        factoryMap.computeIfAbsent(factoryNames.vert, k -> new Factory<VerticalAdjustor<?>>());
     vertFactory.add(verticalAdjustor.name, verticalAdjustor);
   }
 

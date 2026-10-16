@@ -23,7 +23,7 @@ class FabricSchedulerBudgetTest {
     void asyncPoolIsBounded() throws InterruptedException {
         int expected = Math.max(2, Runtime.getRuntime().availableProcessors() / 2);
         ThreadPoolExecutor pool = FabricScheduler.asyncExecutor();
-        assertEquals(expected, FabricScheduler.ASYNC_MAX_THREADS);
+        assertEquals(FabricScheduler.ASYNC_MAX_THREADS, expected);
         assertEquals(expected, pool.getMaximumPoolSize());
         assertEquals(expected, pool.getCorePoolSize());
         assertTrue(pool.allowsCoreThreadTimeOut(), "idle workers must time out");

@@ -22,7 +22,7 @@ class ProxyDirectReplayCacheTest {
         // Retention covers the whole freshness window on both sides.
         now.addAndGet(2 * ProxyDirectWire.MAX_CLOCK_SKEW_MS - 1);
         assertEquals(ProxyDirectReplayCache.Result.REPLAYED, cache.checkAndRecord("a"));
-        assertEquals(2 * ProxyDirectWire.MAX_CLOCK_SKEW_MS, ProxyDirectReplayCache.DEFAULT_TTL_MS);
+        assertEquals(ProxyDirectReplayCache.DEFAULT_TTL_MS, 2 * ProxyDirectWire.MAX_CLOCK_SKEW_MS);
     }
 
     @Test
@@ -56,7 +56,7 @@ class ProxyDirectReplayCacheTest {
         assertEquals(ProxyDirectReplayCache.Result.ACCEPTED, cache.checkAndRecord("d"));
         assertEquals(2, cache.size());
         assertEquals(ProxyDirectReplayCache.Result.REPLAYED, cache.checkAndRecord("c"));
-        assertEquals(ProxyDirectReplayCache.DEFAULT_MAX_ENTRIES, 65_536);
+        assertEquals(65_536, ProxyDirectReplayCache.DEFAULT_MAX_ENTRIES);
     }
 
     @Test

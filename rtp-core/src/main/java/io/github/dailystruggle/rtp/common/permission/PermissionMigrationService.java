@@ -368,7 +368,7 @@ public class PermissionMigrationService {
                 }
                 // If token contains hyphen-separated metadata like "-  default - 0", split and take first non-empty word
                 if (token.contains(" - ")) {
-                    String[] parts = token.split(" - ");
+                    String[] parts = SPACED_HYPHEN.split(token);
                     for (String part : parts) {
                         String clean = cleanToken(part);
                         if (!clean.isEmpty()) {
@@ -386,6 +386,7 @@ public class PermissionMigrationService {
     }
 
     private static final Pattern GROUP_NAME_PATTERN = Pattern.compile("^[A-Za-z0-9_-]+$");
+    private static final Pattern SPACED_HYPHEN = Pattern.compile(" - ", Pattern.LITERAL);
 
     private static String cleanToken(String token) {
         if (token == null) return "";

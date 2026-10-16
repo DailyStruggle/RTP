@@ -183,7 +183,7 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
         double[] override = null;
         if (args.length >= 4) {
             override = parseRates(args[3]);
-            if (override == null) {
+            if (override.length == 0) {
                 sender.sendMessage("StressTestRTP: rates must be positive numbers, comma-separated (e.g. 100 or 20,50,100).");
                 return true;
             }
@@ -194,8 +194,9 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
             return true;
         }
         List<Double> stages = cfg.getDoubleList("ramp.stages");
-        String stagesText = override != null ? Arrays.toString(override)
-                : stages.isEmpty() ? Arrays.toString(Runner.DEFAULT_RAMP_STAGES) : stages.toString();
+        String stagesText;
+        if (override != null) stagesText = Arrays.toString(override);
+        else stagesText = stages.isEmpty() ? Arrays.toString(Runner.DEFAULT_RAMP_STAGES) : stages.toString();
         sender.sendMessage(String.format(java.util.Locale.ROOT,
                 "StressTestRTP: ramp started \u2014 target=%s, stages=%s TP/s x %ds, warmup=%ds, csv=%s",
                 target.label, stagesText,
@@ -205,18 +206,18 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
-    /** Comma-separated positive TP/s list; null when empty or any entry is invalid. */
+    /** Comma-separated positive TP/s list; empty when blank or any entry is invalid. */
     static double[] parseRates(String raw) {
-        if (raw == null || raw.isBlank()) return null;
+        if (raw == null || raw.isBlank()) return new double[0];
         String[] parts = raw.split(",");
         double[] out = new double[parts.length];
         for (int i = 0; i < parts.length; i++) {
             try {
                 out[i] = Double.parseDouble(parts[i].trim());
             } catch (NumberFormatException e) {
-                return null;
+                return new double[0];
             }
-            if (!(out[i] > 0) || Double.isInfinite(out[i])) return null;
+            if (!(out[i] > 0) || Double.isInfinite(out[i])) return new double[0];
         }
         return out;
     }
@@ -233,9 +234,7 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
     }
 
     private static List<String> targetLabels(List<Targets.Entry> targets) {
-        List<String> out = new java.util.ArrayList<>(targets.size());
-        for (Targets.Entry e : targets) out.add(e.label);
-        return out;
+        return targets.stream().map(e -> e.label).toList();
     }
 
     /** Re-runs the one-ticket footprint probe on demand, for when the

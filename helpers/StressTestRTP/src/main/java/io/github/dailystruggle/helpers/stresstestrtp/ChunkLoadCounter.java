@@ -711,7 +711,7 @@ public final class ChunkLoadCounter implements Listener {
         long loads = phaseTotal();
         if (plugin != null && plugin.getLogger() != null) {
             double usPerLoad = loads > 0 ? (double) nanos / (loads * 1000.0) : 0.0;
-            plugin.getLogger().info(String.format(java.util.Locale.ROOT,
+            plugin.getLogger().info(() -> String.format(java.util.Locale.ROOT,
                     "[StressTestRTP] ChunkLoadCounter listener time for phase '%s': %d ms across %d chunk loads (%.2f \u00b5s/load)",
                     phaseLabel, ms, loads, usPerLoad));
         }

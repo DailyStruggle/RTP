@@ -50,6 +50,7 @@ public abstract class BukkitTreeCommand extends BukkitCommand implements TreeCom
                     command = null;
                 }
             } catch (Throwable ignored) {
+                // best-effort: fall through to server-wide lookup
             }
         }
         if (command == null) {
@@ -59,6 +60,7 @@ public abstract class BukkitTreeCommand extends BukkitCommand implements TreeCom
                     command = null;
                 }
             } catch (Throwable ignored) {
+                // best-effort: fall through to namespaced lookup
             }
         }
         if (command == null && plugin != null) {
@@ -69,6 +71,7 @@ public abstract class BukkitTreeCommand extends BukkitCommand implements TreeCom
                     command = null;
                 }
             } catch (Throwable ignored) {
+                // best-effort: command left unbound
             }
         }
         if(command!=null) {

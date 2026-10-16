@@ -19,7 +19,9 @@ public final class OraxenItems {
                 meta.setDisplayName("§6[Oraxen] §f" + id);
                 item.setItemMeta(meta);
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+            // best-effort: mock returns an undecorated item if meta is unsupported
+        }
         return item;
     }
 }

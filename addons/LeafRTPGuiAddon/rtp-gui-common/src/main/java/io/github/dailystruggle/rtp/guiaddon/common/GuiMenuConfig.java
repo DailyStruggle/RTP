@@ -298,11 +298,10 @@ public final class GuiMenuConfig {
     if (p == null) return fallback;
     Object v = p.getConfigValue(key, fallback);
     if (v instanceof java.util.List<?> list) {
-      java.util.List<String> result = new java.util.ArrayList<>(list.size());
-      for (Object o : list) {
-        if (o != null) result.add(String.valueOf(o));
-      }
-      return result;
+      return list.stream()
+          .filter(java.util.Objects::nonNull)
+          .map(String::valueOf)
+          .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
     }
     return fallback;
   }

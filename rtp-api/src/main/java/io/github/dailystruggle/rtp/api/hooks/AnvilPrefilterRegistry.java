@@ -50,7 +50,7 @@ public interface AnvilPrefilterRegistry {
     default Map<ChunkCoord, Decision> classifyBatch(RTPWorld world, List<ChunkCoord> chunks) {
       Map<ChunkCoord, Decision> out = new LinkedHashMap<>();
       for (ChunkCoord c : chunks) {
-        if (c != null && !out.containsKey(c)) out.put(c, classify(world, c.x(), c.z()));
+        if (c != null) out.computeIfAbsent(c, k -> classify(world, k.x(), k.z()));
       }
       return out;
     }

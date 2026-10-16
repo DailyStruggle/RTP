@@ -37,7 +37,15 @@ public final class DynamicZstdBinding implements BuiltInTestable {
     private static final String CANARY_EXPECTED = "RTP_CANARY_TEST\n";
 
     private interface DecompressorInvoker {
-        byte[] decompress(byte[] src, int srcOff, int srcLen, int maxDecompressedBytes) throws Throwable;
+        byte[] decompress(byte[] src, int srcOff, int srcLen, int maxDecompressedBytes) throws IOException;
+    }
+
+    /** Wraps a non-IO failure from a reflective host call; preserves the cause. */
+    private static IOException invocationFailure(Throwable t) {
+        if (t instanceof IOException io) return io;
+        CorruptRegionEntryException ex = new CorruptRegionEntryException("Zstandard decompression failed: " + t.getMessage());
+        ex.initCause(t);
+        return ex;
     }
 
     private static final DecompressorInvoker INVOKER;
@@ -165,29 +173,33 @@ public final class DynamicZstdBinding implements BuiltInTestable {
                     MethodType.methodType(String.class, long.class));
 
             return (src, srcOff, srcLen, maxDecompressedBytes) -> {
-                long expectedSize = (long) decompressedSize.invokeExact(src, srcOff, srcLen);
-                int targetSize;
-                if (expectedSize > 0 && expectedSize <= maxDecompressedBytes) {
-                    targetSize = (int) expectedSize;
-                } else if (expectedSize <= 0) {
-                    targetSize = Math.min(maxDecompressedBytes, Math.max(8192, srcLen * 4));
-                } else {
-                    throw new CorruptRegionEntryException("Declared Zstd uncompressed size " + expectedSize
-                            + " exceeds limit " + maxDecompressedBytes);
-                }
+                try {
+                    long expectedSize = (long) decompressedSize.invokeExact(src, srcOff, srcLen);
+                    int targetSize;
+                    if (expectedSize > 0 && expectedSize <= maxDecompressedBytes) {
+                        targetSize = (int) expectedSize;
+                    } else if (expectedSize <= 0) {
+                        targetSize = Math.min(maxDecompressedBytes, Math.max(8192, srcLen * 4));
+                    } else {
+                        throw new CorruptRegionEntryException("Declared Zstd uncompressed size " + expectedSize
+                                + " exceeds limit " + maxDecompressedBytes);
+                    }
 
-                byte[] dst = new byte[targetSize];
-                long written = (long) decompressByteArray.invokeExact(dst, 0, targetSize, src, srcOff, srcLen);
-                if ((boolean) isError.invokeExact(written)) {
-                    String err = (String) getErrorName.invokeExact(written);
-                    throw new IOException("Zstd error: " + err);
+                    byte[] dst = new byte[targetSize];
+                    long written = (long) decompressByteArray.invokeExact(dst, 0, targetSize, src, srcOff, srcLen);
+                    if ((boolean) isError.invokeExact(written)) {
+                        String err = (String) getErrorName.invokeExact(written);
+                        throw new IOException("Zstd error: " + err);
+                    }
+                    if (written < dst.length) {
+                        byte[] exact = new byte[(int) written];
+                        System.arraycopy(dst, 0, exact, 0, (int) written);
+                        return exact;
+                    }
+                    return dst;
+                } catch (Throwable t) {
+                    throw invocationFailure(t);
                 }
-                if (written < dst.length) {
-                    byte[] exact = new byte[(int) written];
-                    System.arraycopy(dst, 0, exact, 0, (int) written);
-                    return exact;
-                }
-                return dst;
             };
         } catch (Throwable ignored) {
             // Not present or signature mismatch, continue to next candidate
@@ -202,7 +214,12 @@ public final class DynamicZstdBinding implements BuiltInTestable {
 
             return (src, srcOff, srcLen, maxDecompressedBytes) -> {
                 byte[] dst = new byte[maxDecompressedBytes];
-                int written = (int) decompressMethod.invoke(decompressorInstance, src, srcOff, srcLen, dst, 0, maxDecompressedBytes);
+                int written;
+                try {
+                    written = (int) decompressMethod.invoke(decompressorInstance, src, srcOff, srcLen, dst, 0, maxDecompressedBytes);
+                } catch (Throwable t) {
+                    throw invocationFailure(t);
+                }
                 if (written < dst.length) {
                     byte[] exact = new byte[written];
                     System.arraycopy(dst, 0, exact, 0, written);

@@ -82,7 +82,9 @@ public final class RegionFormatDetector implements BuiltInTestable {
             if (Files.isDirectory(regionDir)) {
                 mtime = Files.getLastModifiedTime(regionDir);
             }
-        } catch (IOException ignored) {}
+        } catch (IOException ignored) {
+            // best-effort: a null mtime only forces a re-survey on the next lookup
+        }
 
         WorldFormatProfile profile = surveyDirectory(regionDir);
         profileCache.put(regionDir, new CachedProfile(profile, now, mtime));

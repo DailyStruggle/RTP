@@ -293,7 +293,7 @@ public final class ProxyDirectWire {
      */
     public static void writeSignedPayload(DataOutputStream out, WireContext ctx, Direction dir, String payload,
                                           HmacVerifier verifier, int schemaVersion) throws IOException {
-        writeBlock(out, ctx, dir, 0, 1, payload, verifier, schemaVersion);
+        writeBlock(out, new BlockSlot(ctx, dir, 0, 1), payload, verifier, schemaVersion);
     }
 
     /**
@@ -307,17 +307,20 @@ public final class ProxyDirectWire {
         return readBlock(in, ctx, dir, 0, 1, verifier);
     }
 
-    private static void writeBlock(DataOutputStream out, WireContext ctx, Direction dir, int index, int count,
-                                   String payload, HmacVerifier verifier, int schemaVersion) throws IOException {
+    /** MAC binding of one block: frame context, direction and position within its list. */
+    private record BlockSlot(WireContext ctx, Direction dir, int index, int count) {}
+
+    private static void writeBlock(DataOutputStream out, BlockSlot slot, String payload,
+                                   HmacVerifier verifier, int schemaVersion) throws IOException {
         if (verifier == null) {
             throw new IllegalStateException(
                     "proxy-direct requires an HmacVerifier (network.secretEnv); refusing to send unsigned payload");
         }
-        Objects.requireNonNull(ctx, "ctx");
-        Objects.requireNonNull(dir, "dir");
+        Objects.requireNonNull(slot.ctx(), "ctx");
+        Objects.requireNonNull(slot.dir(), "dir");
         String p = payload == null ? "" : payload;
         out.writeInt(schemaVersion);
-        out.writeUTF(verifier.sign(schemaVersion, canonical(dir, ctx, index, count, p)));
+        out.writeUTF(verifier.sign(schemaVersion, canonical(slot.dir(), slot.ctx(), slot.index(), slot.count(), p)));
         out.writeUTF(p);
     }
 
@@ -345,7 +348,7 @@ public final class ProxyDirectWire {
         }
         out.writeInt(count);
         for (int i = 0; i < count; i++) {
-            writeBlock(out, ctx, dir, i, count, payloads.get(i), verifier, schemaVersion);
+            writeBlock(out, new BlockSlot(ctx, dir, i, count), payloads.get(i), verifier, schemaVersion);
         }
         out.flush();
     }

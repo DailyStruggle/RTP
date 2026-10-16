@@ -188,7 +188,10 @@ public final class ServerHealthGate {
     DoubleSupplier o = tpsOverride;
     if (o != null) return o.getAsDouble();
     try {
-      double v = binding == null ? Double.NaN : regional ? binding.tps1m() : binding.worstTps1m();
+      double v = Double.NaN;
+      if (binding != null) {
+        v = regional ? binding.tps1m() : binding.worstTps1m();
+      }
       if (!Double.isNaN(v) && v > 0.0) return v;
       if (RTP.serverAccessor != null) {
         double fallback = RTP.serverAccessor.getTPS(20);

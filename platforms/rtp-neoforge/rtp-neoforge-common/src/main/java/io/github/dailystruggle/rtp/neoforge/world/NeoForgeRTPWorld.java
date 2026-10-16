@@ -566,10 +566,11 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
     @Override
     public java.nio.file.Path anvilWorldFolder() {
         ServerLevel level = world;
-        if (level == null || level.getServer() == null) return null;
+        if (level == null) return null;
         try {
             return level.getServer().getWorldPath(LevelResource.ROOT);
         } catch (Throwable t) {
+            // detached level (no server): no world folder
             return null;
         }
     }

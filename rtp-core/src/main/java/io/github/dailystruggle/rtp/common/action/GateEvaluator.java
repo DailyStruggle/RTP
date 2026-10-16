@@ -228,11 +228,7 @@ public final class GateEvaluator {
           if (map.containsKey("elevationDelta")) {
             Double delta = context.elevationDelta();
             if (delta == null) {
-              if (context.currentY() != null && context.anchorY() != null) {
-                delta = Math.abs(context.currentY() - context.anchorY());
-              } else {
-                delta = 0.0;
-              }
+              delta = 0.0; // current or anchor Y unknown
             }
             if (!GateExpressionParser.matches(map.get("elevationDelta").toString(), delta)) {
               return false;
@@ -372,6 +368,8 @@ public final class GateEvaluator {
             }
 
             String substituted = ActionPlaceholderSanitizer.substitute(cmdTemplate, tokens);
+            // Substitution can compose a target placeholder the pre-check could not see,
+            // e.g. "[target_[n]]" -> "[target_1]"; never dispatch it unresolved.
             if (ActionPlaceholderSanitizer.containsUnresolvedPrefix(substituted, "target")) {
               continue; // Wildcard unmapped target passes this command check
             }

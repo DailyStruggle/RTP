@@ -95,9 +95,9 @@ class RampEvaluatorTest {
     @DisplayName("aborted stage fails LOW_TPS_ABORT and stops the ramp immediately")
     void abortedStageStops() {
         var ev = new RampEvaluator(T);
-        assertEquals(RampEvaluator.Decision.CONTINUE, ev.record(healthy(0, 5), false));
+        assertEquals(RampEvaluator.Decision.CONTINUE, ev.recordStage(healthy(0, 5), false));
         var aborted = new RampEvaluator.StageResult(1, 10, 12.0, 120, 120, 0, 0, 0, 0, 20.0, true);
-        assertEquals(RampEvaluator.Decision.STOP, ev.record(aborted, false));
+        assertEquals(RampEvaluator.Decision.STOP, ev.recordStage(aborted, false));
         assertEquals(RampEvaluator.StopReason.LOW_TPS_ABORT, ev.stopReason());
         assertTrue(ev.firstFailure().failed().contains(RampEvaluator.Criterion.LOW_TPS_ABORT));
         assertEquals(0, ev.stressPointIndex());
@@ -107,11 +107,11 @@ class RampEvaluatorTest {
     @DisplayName("stress point is the highest passing stage; first failure records its criterion")
     void stressPointSelection() {
         var ev = new RampEvaluator(T);
-        ev.record(healthy(0, 5), false);
-        ev.record(healthy(1, 10), false);
-        ev.record(healthy(2, 20), false);
-        ev.record(msptBad(3, 40), false);
-        ev.record(msptBad(4, 80), false);
+        ev.recordStage(healthy(0, 5), false);
+        ev.recordStage(healthy(1, 10), false);
+        ev.recordStage(healthy(2, 20), false);
+        ev.recordStage(msptBad(3, 40), false);
+        ev.recordStage(msptBad(4, 80), false);
         assertEquals(2, ev.stressPointIndex());
         assertEquals(20.0, ev.stressPointTps());
         assertEquals(3, ev.firstFailure().stage().index());
@@ -124,9 +124,9 @@ class RampEvaluatorTest {
     @DisplayName("two consecutive failing stages stop the ramp")
     void twoConsecutiveFailuresStop() {
         var ev = new RampEvaluator(T);
-        assertEquals(RampEvaluator.Decision.CONTINUE, ev.record(healthy(0, 5), false));
-        assertEquals(RampEvaluator.Decision.CONTINUE, ev.record(msptBad(1, 10), false));
-        assertEquals(RampEvaluator.Decision.STOP, ev.record(msptBad(2, 20), false));
+        assertEquals(RampEvaluator.Decision.CONTINUE, ev.recordStage(healthy(0, 5), false));
+        assertEquals(RampEvaluator.Decision.CONTINUE, ev.recordStage(msptBad(1, 10), false));
+        assertEquals(RampEvaluator.Decision.STOP, ev.recordStage(msptBad(2, 20), false));
         assertEquals(RampEvaluator.StopReason.CONSECUTIVE_FAILURES, ev.stopReason());
         assertEquals(0, ev.stressPointIndex());
     }
@@ -135,11 +135,11 @@ class RampEvaluatorTest {
     @DisplayName("a pass after a single failure resets the counter and the ramp continues")
     void passAfterSingleFailureContinues() {
         var ev = new RampEvaluator(T);
-        ev.record(healthy(0, 5), false);
-        assertEquals(RampEvaluator.Decision.CONTINUE, ev.record(msptBad(1, 10), false));
-        assertEquals(RampEvaluator.Decision.CONTINUE, ev.record(healthy(2, 20), false));
+        ev.recordStage(healthy(0, 5), false);
+        assertEquals(RampEvaluator.Decision.CONTINUE, ev.recordStage(msptBad(1, 10), false));
+        assertEquals(RampEvaluator.Decision.CONTINUE, ev.recordStage(healthy(2, 20), false));
         assertEquals(0, ev.consecutiveFails());
-        assertEquals(RampEvaluator.Decision.CONTINUE, ev.record(msptBad(3, 40), false));
+        assertEquals(RampEvaluator.Decision.CONTINUE, ev.recordStage(msptBad(3, 40), false));
         assertEquals(2, ev.stressPointIndex(), "a later pass above an earlier failure still raises the stress point");
         assertEquals(1, ev.firstFailure().stage().index(), "first failure is the earliest one, not the latest");
     }
@@ -148,11 +148,11 @@ class RampEvaluatorTest {
     @DisplayName("last configured stage stops with STAGES_EXHAUSTED; no passing stage yields stress point -1")
     void exhaustedAndNoPass() {
         var ev = new RampEvaluator(T);
-        assertEquals(RampEvaluator.Decision.STOP, ev.record(healthy(0, 5), true));
+        assertEquals(RampEvaluator.Decision.STOP, ev.recordStage(healthy(0, 5), true));
         assertEquals(RampEvaluator.StopReason.STAGES_EXHAUSTED, ev.stopReason());
         var none = new RampEvaluator(T);
-        none.record(msptBad(0, 5), false);
-        none.record(msptBad(1, 10), false);
+        none.recordStage(msptBad(0, 5), false);
+        none.recordStage(msptBad(1, 10), false);
         assertEquals(-1, none.stressPointIndex());
         assertEquals(-1.0, none.stressPointTps());
         assertTrue(none.summaryLine("x").contains("none (no stage passed)"));
@@ -162,11 +162,11 @@ class RampEvaluatorTest {
     @DisplayName("operator stop is recorded only when no rule ended the ramp")
     void operatorStop() {
         var ev = new RampEvaluator(T);
-        ev.record(healthy(0, 5), false);
+        ev.recordStage(healthy(0, 5), false);
         ev.markOperatorStop();
         assertEquals(RampEvaluator.StopReason.OPERATOR_STOP, ev.stopReason());
         var ruled = new RampEvaluator(T);
-        ruled.record(healthy(0, 5), true);
+        ruled.recordStage(healthy(0, 5), true);
         ruled.markOperatorStop();
         assertEquals(RampEvaluator.StopReason.STAGES_EXHAUSTED, ruled.stopReason());
     }

@@ -1,7 +1,7 @@
 package io.github.dailystruggle.helpers.stresstestrtp;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,13 +23,13 @@ class StressCommandRampArgsTest {
     @Test
     @DisplayName("ramp rates: empty, non-numeric, zero, negative or empty entries are rejected")
     void invalid() {
-        assertNull(StressCommand.parseRates(""));
-        assertNull(StressCommand.parseRates(null));
-        assertNull(StressCommand.parseRates("abc"));
-        assertNull(StressCommand.parseRates("0"));
-        assertNull(StressCommand.parseRates("-5"));
-        assertNull(StressCommand.parseRates("10,,20"));
-        assertNull(StressCommand.parseRates("NaN"));
-        assertNull(StressCommand.parseRates("Infinity"));
+        assertEquals(0, StressCommand.parseRates("").length);
+        assertEquals(0, StressCommand.parseRates(null).length);
+        assertEquals(0, StressCommand.parseRates("abc").length);
+        assertEquals(0, StressCommand.parseRates("0").length);
+        assertEquals(0, StressCommand.parseRates("-5").length);
+        assertEquals(0, StressCommand.parseRates("10,,20").length);
+        assertEquals(0, StressCommand.parseRates("NaN").length);
+        assertEquals(0, StressCommand.parseRates("Infinity").length);
     }
 }

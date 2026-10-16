@@ -99,7 +99,7 @@ public class CrossPluginDestinationScatterVisualizerTest {
   /** One successful teleport and the harness's block check of where it landed. */
   record Landing(Point2D p, String landingClass, double rawX, double rawZ) {
     Landing(Point2D p, String landingClass) {
-      this(p, landingClass, p.x, p.z);
+      this(p, landingClass, (double) p.x, (double) p.z);
     }
   }
 

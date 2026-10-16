@@ -122,7 +122,7 @@ public final class SchedulerGauge {
     private void emit(Window w, long now) {
         String row = w.row(now);
         if (logRows) {
-            plugin.getLogger().info("[StressTestRTP] sched-gauge inflight=" + w.inflightLast + " (max " + w.inflightMax
+            plugin.getLogger().info(() -> "[StressTestRTP] sched-gauge inflight=" + w.inflightLast + " (max " + w.inflightMax
                     + ", at-cap " + Math.round(100.0 * w.atCap / Math.max(1, w.n)) + "%) cap=" + w.cap
                     + " interactive_queue=" + w.queueLast + " (max " + w.queueMax + ")");
         }
@@ -132,7 +132,7 @@ public final class SchedulerGauge {
             String text = (fresh ? HEADER + "\n" : "") + row + "\n";
             Files.writeString(csv, text, StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         } catch (IOException e) {
-            plugin.getLogger().log(Level.WARNING, "[StressTestRTP] SchedulerGauge: cannot write " + csv, e);
+            plugin.getLogger().log(Level.WARNING, e, () -> "[StressTestRTP] SchedulerGauge: cannot write " + csv);
         }
     }
 
@@ -174,7 +174,8 @@ public final class SchedulerGauge {
             return false;
         }
         scheduler = found;
-        plugin.getLogger().info("[StressTestRTP] SchedulerGauge: reading " + found.getClass().getName() + " -> " + csv);
+        plugin.getLogger().log(Level.INFO, "[StressTestRTP] SchedulerGauge: reading {0} -> {1}",
+                new Object[]{found.getClass().getName(), csv});
         return true;
     }
 

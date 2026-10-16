@@ -2,7 +2,8 @@ package io.github.dailystruggle.rtp.anvil;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -11,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -39,20 +41,36 @@ class LinearRealDataParityTest {
         }
     }
 
-    @ParameterizedTest(name = "real fixture {0} (DataVersion={1}) decodes identically between MCA and Linear")
-    @CsvSource({
-            "1_20_R1, 3465",
-            "1_21_R1, 4671",
-            "26_1_R1, 4788"
-    })
-    @DisplayName("Real Linear fixtures match AnvilReader NBT structure and typed chunk view")
-    void realLinearMatchesAnvilParity(String dirName, int expectedDataVersion) throws IOException {
+    private static Stream<Arguments> realFixtures() {
+        return Stream.of(
+                Arguments.of("1_20_R1", 3465),
+                Arguments.of("1_21_R1", 4671),
+                Arguments.of("26_1_R1", 4788));
+    }
+
+    private static Stream<String> realFixtureDirs() {
+        return realFixtures().map(a -> (String) a.get()[0]);
+    }
+
+    private static AnvilReader.ChunkEntry[] decodeOriginEntries(String dirName) throws IOException {
+        byte[] mcaBytes = loadFixture("/anvil/real/" + dirName + "/r.0.0.mca");
+        byte[] linearBytes = loadFixture("/anvil/real/" + dirName + "/r.0.0.linear");
+        AnvilReader.ChunkEntry mcaEntry = AnvilReader.readChunkEntry(mcaBytes, 0, 0);
+        AnvilReader.ChunkEntry linearEntry = LinearRegionReader.INSTANCE.readChunk(linearBytes, 0, 0);
+        assertNotNull(mcaEntry, "MCA chunk entry (0,0) must not be null");
+        assertNotNull(linearEntry, "Linear chunk entry (0,0) must not be null");
+        return new AnvilReader.ChunkEntry[] {mcaEntry, linearEntry};
+    }
+
+    @ParameterizedTest(name = "real fixture {0} chunk allocation matches between MCA and Linear")
+    @MethodSource("realFixtureDirs")
+    @DisplayName("Real Linear fixtures match AnvilReader chunk allocation status")
+    void realLinearMatchesAnvilAllocation(String dirName) throws IOException {
         byte[] mcaBytes = loadFixture("/anvil/real/" + dirName + "/r.0.0.mca");
         byte[] linearBytes = loadFixture("/anvil/real/" + dirName + "/r.0.0.linear");
 
         LinearRegionReader linearReader = LinearRegionReader.INSTANCE;
 
-        // 1. Allocation status parity
         assertTrue(AnvilReader.INSTANCE.isChunkGenerated(mcaBytes, 0, 0), "MCA chunk (0,0) must be generated");
         assertTrue(linearReader.isChunkGenerated(linearBytes, 0, 0), "Linear chunk (0,0) must be generated");
         assertTrue(linearReader.isChunkGenerated(linearBytes, linearBytes.length, 0, 0));
@@ -61,19 +79,20 @@ class LinearRealDataParityTest {
         assertFalse(linearReader.isChunkGenerated(linearBytes, 0, 1), "Linear chunk (0,1) should not be generated");
         assertFalse(linearReader.isChunkGenerated(linearBytes, 31, 31), "Linear chunk (31,31) should not be generated");
 
-        // 2. Unallocated chunk returns null
+        // Unallocated chunk returns null
         assertNull(linearReader.readChunk(linearBytes, 1, 0));
         assertNull(linearReader.readChunk(linearBytes, 0, 1));
         assertNull(linearReader.readChunk(linearBytes, 31, 31));
+    }
 
-        // 3. Decode chunk entry
-        AnvilReader.ChunkEntry mcaEntry = AnvilReader.readChunkEntry(mcaBytes, 0, 0);
-        AnvilReader.ChunkEntry linearEntry = linearReader.readChunk(linearBytes, 0, 0);
+    @ParameterizedTest(name = "real fixture {0} (DataVersion={1}) decodes identically between MCA and Linear")
+    @MethodSource("realFixtures")
+    @DisplayName("Real Linear fixtures match AnvilReader NBT structure")
+    void realLinearMatchesAnvilNbtStructure(String dirName, int expectedDataVersion) throws IOException {
+        AnvilReader.ChunkEntry[] entries = decodeOriginEntries(dirName);
+        AnvilReader.ChunkEntry mcaEntry = entries[0];
+        AnvilReader.ChunkEntry linearEntry = entries[1];
 
-        assertNotNull(mcaEntry, "MCA chunk entry (0,0) must not be null");
-        assertNotNull(linearEntry, "Linear chunk entry (0,0) must not be null");
-
-        // 4. Structural NBT parity
         int mcaDv = AnvilReader.getDataVersion(mcaEntry.root);
         int linearDv = AnvilReader.getDataVersion(linearEntry.root);
 
@@ -93,8 +112,16 @@ class LinearRealDataParityTest {
         assertNotNull(linearHeightmap, "Linear heightmap must not be null");
         assertNotNull(mcaHeightmap, "MCA heightmap must not be null");
         assertEquals(mcaHeightmap.length, linearHeightmap.length, "Heightmap length parity");
+    }
 
-        // 5. Semantic ChunkView parity
+    @ParameterizedTest(name = "real fixture {0} typed chunk view matches between MCA and Linear")
+    @MethodSource("realFixtureDirs")
+    @DisplayName("Real Linear fixtures match AnvilReader typed chunk view")
+    void realLinearMatchesAnvilChunkView(String dirName) throws IOException {
+        AnvilReader.ChunkEntry[] entries = decodeOriginEntries(dirName);
+        AnvilReader.ChunkEntry mcaEntry = entries[0];
+        AnvilReader.ChunkEntry linearEntry = entries[1];
+
         AnvilChunkView mcaView = AnvilReader.toView(mcaEntry.root);
         AnvilChunkView linearView = AnvilReader.toView(linearEntry.root);
 

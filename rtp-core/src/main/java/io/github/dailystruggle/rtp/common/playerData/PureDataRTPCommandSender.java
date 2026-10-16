@@ -123,6 +123,10 @@ public class PureDataRTPCommandSender implements RTPCommandSender, Cloneable {
     }
   }
 
+  /**
+   * UUID identity against any {@link RTPCommandSender}. Subclasses (e.g. {@link PureDataRTPPlayer})
+   * shall not narrow this, or {@code sender.equals(player)} and {@code player.equals(sender)} disagree.
+   */
   @Override
   public boolean equals(Object obj) {
     if (obj == this) return true;

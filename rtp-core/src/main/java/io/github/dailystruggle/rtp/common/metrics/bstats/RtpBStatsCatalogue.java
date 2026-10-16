@@ -511,6 +511,7 @@ public final class RtpBStatsCatalogue {
                 try {
                     RTP.scheduler.cancelTask(rtpCostSamplerTask);
                 } catch (Throwable ignored) {
+                    // best-effort: scheduler may already be shut down
                 }
             }
             rtpCostSamplerTask = null;

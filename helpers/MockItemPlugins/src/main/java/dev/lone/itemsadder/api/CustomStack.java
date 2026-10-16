@@ -27,7 +27,9 @@ public class CustomStack {
                 meta.setDisplayName("§b[ItemsAdder] §f" + id);
                 item.setItemMeta(meta);
             }
-        } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {
+            // best-effort: mock returns an undecorated item if meta is unsupported
+        }
         return item;
     }
 

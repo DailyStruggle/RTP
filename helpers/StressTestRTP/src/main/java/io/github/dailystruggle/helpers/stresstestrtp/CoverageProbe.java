@@ -17,6 +17,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
+import java.util.regex.Pattern;
 
 /** Reads and resets the JaCoCo agent's execution data in this JVM and writes
  *  the reached probes per class as JSON (ADR-111 section 2.6). Probes are
@@ -24,6 +26,8 @@ import java.util.List;
 final class CoverageProbe {
 
     static final String FILE_PREFIX = "coverage-";
+
+    private static final Pattern UNSAFE_LABEL_CHARS = Pattern.compile("[^A-Za-z0-9._-]");
 
     private final Path outDir;
 
@@ -33,13 +37,13 @@ final class CoverageProbe {
 
     /** True when the -javaagent runtime API or JMX MBean is present on this JVM. */
     static boolean agentAttached() {
-        return getExecutionData(false) != null;
+        return getExecutionData(false).isPresent();
     }
 
     /** Obtains execution data from the JaCoCo agent using multi-classloader
      *  reflection and JMX MBean fallback to avoid ClassLoader isolation issues
-     *  in plugin containers. */
-    static byte[] getExecutionData(boolean reset) {
+     *  in plugin containers. Empty when no agent is reachable. */
+    static Optional<byte[]> getExecutionData(boolean reset) {
         // First attempt: reflectively load org.jacoco.agent.rt.RT across available classloaders
         ClassLoader[] loaders = new ClassLoader[] {
                 ClassLoader.getSystemClassLoader(),
@@ -55,9 +59,10 @@ final class CoverageProbe {
                 Object agent = getAgentMethod.invoke(null);
                 if (agent != null) {
                     Method m = agent.getClass().getMethod("getExecutionData", boolean.class);
-                    return (byte[]) m.invoke(agent, reset);
+                    return Optional.ofNullable((byte[]) m.invoke(agent, reset));
                 }
             } catch (Throwable ignored) {
+                // agent not visible from this loader; try the next one
             }
         }
 
@@ -66,20 +71,21 @@ final class CoverageProbe {
             MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
             ObjectName name = new ObjectName("org.jacoco:type=Runtime");
             if (mbs.isRegistered(name)) {
-                return (byte[]) mbs.invoke(name, "getExecutionData",
-                        new Object[] { reset }, new String[] { "boolean" });
+                return Optional.ofNullable((byte[]) mbs.invoke(name, "getExecutionData",
+                        new Object[] { reset }, new String[] { "boolean" }));
             }
         } catch (Throwable ignored) {
+            // JMX unavailable or MBean not registered: treat as no agent
         }
 
-        return null;
+        return Optional.empty();
     }
 
     /** Dumps and resets the agent's execution data, writes
      *  {@code coverage-<label>.json} and returns its reached-probe totals. */
     Result dumpAndReset(String label) throws IOException {
-        String safe = label.replaceAll("[^A-Za-z0-9._-]", "_");
-        byte[] raw = getExecutionData(true);
+        String safe = UNSAFE_LABEL_CHARS.matcher(label).replaceAll("_");
+        byte[] raw = getExecutionData(true).orElse(null);
         if (raw == null) {
             throw new IOException("JaCoCo execution data unavailable (agent not attached or not accessible)");
         }

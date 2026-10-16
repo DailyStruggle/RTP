@@ -78,7 +78,7 @@ final class V26_4_R1FabricEffectDispatchers {
                                     boolean ambient,
                                     boolean visible,
                                     boolean showIcon) {
-        // 1.20.5+ ctor shape: MobEffectInstance(Holder<MobEffect>, int, int, boolean, boolean, boolean).
+        // 1.20.5+ ctor takes a MobEffect holder, not the raw MobEffect.
         Holder<MobEffect> holder = BuiltInRegistries.MOB_EFFECT.wrapAsHolder(effect);
         player.addEffect(new MobEffectInstance(holder, duration, amplifier, ambient, visible, showIcon));
     }

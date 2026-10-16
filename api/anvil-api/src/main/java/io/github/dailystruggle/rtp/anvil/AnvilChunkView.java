@@ -40,8 +40,11 @@ public final class AnvilChunkView {
     /**
      * Deprecated constructor retained for backward compatibility.
      * The {@code motionBlockingNoLeaves} heightmap array is ignored.
+     *
+     * @deprecated heightmap is no longer stored; use
+     *             {@link #AnvilChunkView(int, List, List)}.
      */
-    @Deprecated
+    @Deprecated(since = "3.3.0", forRemoval = false)
     public AnvilChunkView(int dataVersion,
                           List<PaletteSection> sections,
                           long[] motionBlockingNoLeaves,
@@ -52,8 +55,11 @@ public final class AnvilChunkView {
     /**
      * Deprecated constructor retained for backward compatibility.
      * The {@code motionBlockingNoLeaves} heightmap array is ignored.
+     *
+     * @deprecated heightmap is no longer stored; use
+     *             {@link #AnvilChunkView(int, List)}.
      */
-    @Deprecated
+    @Deprecated(since = "3.3.0", forRemoval = false)
     public AnvilChunkView(int dataVersion, List<PaletteSection> sections, long[] motionBlockingNoLeaves) {
         this(dataVersion, sections, Collections.emptyList());
     }

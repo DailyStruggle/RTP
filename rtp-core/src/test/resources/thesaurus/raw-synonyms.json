@@ -1,0 +1,6 @@
+{
+  "speed": ["velocity", 5, "  ", "--", "rate"],
+  "  ": ["ignored"],
+  "--": ["ignored"],
+  "jump": "not-a-list"
+}

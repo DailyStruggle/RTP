@@ -72,7 +72,7 @@ public final class DestinationPickerGui implements InventoryHolder {
     for (Map.Entry<Integer, MenuEntry> placed : layout.slotEntries().entrySet()) {
       int slot = placed.getKey();
       MenuEntry entry = placed.getValue();
-      gui.inventory.setItem(slot, icon(entry, model));
+      gui.inventory.setItem(slot, icon(entry));
       gui.slotTargets.put(slot, entry.target());
     }
 
@@ -118,7 +118,7 @@ public final class DestinationPickerGui implements InventoryHolder {
     }
   }
 
-  private static ItemStack icon(MenuEntry entry, MenuModel model) {
+  private static ItemStack icon(MenuEntry entry) {
     ItemStack item = BukkitCustomItemResolver.resolve(entry.iconName(), Material.COMPASS);
     ItemMeta meta = item.getItemMeta();
     if (meta != null) {
@@ -201,13 +201,5 @@ public final class DestinationPickerGui implements InventoryHolder {
       text = sb.toString();
     }
     return ChatColor.translateAlternateColorCodes('&', text);
-  }
-
-  private static Material material(String name, Material fallback) {
-    if (name == null || name.isBlank()) {
-      return fallback;
-    }
-    Material m = Material.matchMaterial(name.trim().toUpperCase());
-    return (m == null) ? fallback : m;
   }
 }

@@ -83,7 +83,7 @@ public final class RampWriter {
                 Integer.toString(x.peakInFlight()),
                 Boolean.toString(s.aborted()),
                 Boolean.toString(x.complete()),
-                !x.complete() ? "PARTIAL" : (e.passed() ? "PASS" : "FAIL"),
+                verdict(e, x),
                 e.criteriaString(),
                 Long.toString(x.startEpochMs()),
                 Long.toString(x.endEpochMs()),
@@ -92,6 +92,11 @@ public final class RampWriter {
                 Long.toString(x.repeatingLiveStart()),
                 Long.toString(x.repeatingLiveEnd()),
                 Long.toString(x.repeatingCancelFailures()));
+    }
+
+    private static String verdict(RampEvaluator.Evaluation e, Extras x) {
+        if (!x.complete()) return "PARTIAL";
+        return e.passed() ? "PASS" : "FAIL";
     }
 
     /** Appends and closes; the row is durable when this returns. */

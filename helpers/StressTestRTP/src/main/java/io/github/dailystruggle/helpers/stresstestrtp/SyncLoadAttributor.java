@@ -87,15 +87,12 @@ public final class SyncLoadAttributor {
     private volatile long asyncProbeKey = Long.MIN_VALUE;
     private volatile long residentTicketProbeKey = Long.MIN_VALUE;
     private volatile String syncProbeRequester = null;
-    private volatile boolean syncProbeBlocking = false;
     private volatile boolean syncProbeSeen = false;
     /** Compact probe stack, logged only when the sync probe is misattributed. */
     private volatile String syncProbeTrace = null;
     private volatile String asyncProbeRequester = null;
     private volatile boolean asyncProbeSeen = false;
-    private volatile String residentTicketProbeRequester = null;
     private volatile boolean residentTicketProbeBlocking = false;
-    private volatile boolean residentTicketProbeSeen = false;
 
     public SyncLoadAttributor(Plugin self) {
         this.self = self;
@@ -133,7 +130,6 @@ public final class SyncLoadAttributor {
 
         if (key == syncProbeKey) {
             syncProbeRequester = requester;
-            syncProbeBlocking = blocking;
             syncProbeSeen = true;
             if (requester == null) syncProbeTrace = describeStack();
         }
@@ -142,14 +138,12 @@ public final class SyncLoadAttributor {
             asyncProbeSeen = true;
         }
         if (key == residentTicketProbeKey) {
-            residentTicketProbeRequester = requester;
             residentTicketProbeBlocking = blocking;
-            residentTicketProbeSeen = true;
         }
         if (requester == null || probe) return;
         if (requester.equals(self.getName())) return; // harness's own loads
 
-        long weight = (!probe && stride > 1) ? stride : 1L;
+        long weight = stride > 1 ? stride : 1L;
         if (blocking) {
             phaseSyncLoads.addAndGet(weight);
             phaseByPlugin.computeIfAbsent(requester, k -> new LongAdder()).add(weight);
@@ -211,9 +205,15 @@ public final class SyncLoadAttributor {
                 int[] n = {0};
                 frames.limit(PROBE_MAX_FRAMES).forEach(f -> {
                     ClassLoader cl = f.getDeclaringClass().getClassLoader();
-                    String plugin = cl == selfLoader || isJdkLoader(cl) ? null : pluginNameOf(cl);
-                    String tag = cl == selfLoader ? "H" : isJdkLoader(cl) ? "J"
-                            : plugin != null ? plugin : "S";
+                    String tag;
+                    if (cl == selfLoader) {
+                        tag = "H";
+                    } else if (isJdkLoader(cl)) {
+                        tag = "J";
+                    } else {
+                        String plugin = pluginNameOf(cl);
+                        tag = plugin != null ? plugin : "S";
+                    }
                     if (sb.length() > 0) sb.append(' ');
                     sb.append(tag).append(':').append(f.getMethodName());
                     n[0]++;
@@ -370,10 +370,14 @@ public final class SyncLoadAttributor {
                 }
                 release(world, cx, cz);
                 if (!self.getName().equals(syncProbeRequester)) {
-                    finish(SelfTest.FAIL_SYNC, !syncProbeSeen
-                            ? "sync load event not observed"
-                            : "sync load attributed to " + syncProbeRequester
-                                    + (syncProbeTrace != null ? "; stack " + syncProbeTrace : ""));
+                    String detail;
+                    if (!syncProbeSeen) {
+                        detail = "sync load event not observed";
+                    } else {
+                        detail = "sync load attributed to " + syncProbeRequester
+                                + (syncProbeTrace != null ? "; stack " + syncProbeTrace : "");
+                    }
+                    finish(SelfTest.FAIL_SYNC, detail);
                     return;
                 }
                 tryCandidate(world, idx + 1, true);
