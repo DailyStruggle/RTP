@@ -79,12 +79,10 @@ class FabricHandlesDriftTest {
     @DisplayName("performCommand: carrier dispatchPlayerCommand wins over the void-linked common call (1.20.1)")
     void performCommandPrefersAdapterPlayerDispatch() {
         ServerPlayer player = mock(ServerPlayer.class);
-        ServerLevel level = mock(ServerLevel.class);
         MinecraftServer server = inlineServer();
         Commands commands = mock(Commands.class);
-        when(player.serverLevel()).thenReturn(level);
-        when(level.getServer()).thenReturn(server);
         when(server.getCommands()).thenReturn(commands);
+        FabricEffectRuntime.bindServer(server);
 
         FabricVersionAdapter adapter = mock(FabricVersionAdapter.class);
         when(adapter.dispatchPlayerCommand(player, "me hi")).thenReturn(true);
@@ -100,19 +98,17 @@ class FabricHandlesDriftTest {
     @DisplayName("kill: falls back to a silent /kill <uuid> when Entity#kill() does not link (1.21.2+)")
     void killFallsBackToKillCommand() {
         ServerPlayer player = mock(ServerPlayer.class);
-        ServerLevel level = mock(ServerLevel.class);
         MinecraftServer server = inlineServer();
         Commands commands = mock(Commands.class);
         CommandSourceStack console = mock(CommandSourceStack.class);
         CommandSourceStack silent = mock(CommandSourceStack.class);
         UUID id = UUID.randomUUID();
         when(player.getUUID()).thenReturn(id);
-        when(player.serverLevel()).thenReturn(level);
-        when(level.getServer()).thenReturn(server);
         when(server.getCommands()).thenReturn(commands);
         when(server.createCommandSourceStack()).thenReturn(console);
         when(console.withSuppressedOutput()).thenReturn(silent);
         doThrow(new NoSuchMethodError("Entity.kill()V")).when(player).kill();
+        FabricEffectRuntime.bindServer(server);
 
         FabricHandles.wrap(player).kill(true, null);
 
@@ -151,21 +147,13 @@ class FabricHandlesDriftTest {
     @DisplayName("performCommand: dispatches via reflectively detected CommandSourceStack method")
     void performCommandDispatchesViaReflectiveStack() {
         ServerPlayer player = mock(ServerPlayer.class);
-        ServerLevel level = mock(ServerLevel.class);
-        MinecraftServer server = mock(MinecraftServer.class);
+        MinecraftServer server = inlineServer();
         Commands commands = mock(Commands.class);
         CommandSourceStack css = mock(CommandSourceStack.class);
 
-        when(player.serverLevel()).thenReturn(level);
-        when(level.getServer()).thenReturn(server);
         when(server.getCommands()).thenReturn(commands);
         when(player.createCommandSourceStack()).thenReturn(css);
-
-        doAnswer(invocation -> {
-            Runnable task = invocation.getArgument(0);
-            task.run();
-            return null;
-        }).when(server).execute(any(Runnable.class));
+        FabricEffectRuntime.bindServer(server);
 
         PlayerHandle handle = FabricHandles.wrap(player);
         handle.performCommand("spawn");
