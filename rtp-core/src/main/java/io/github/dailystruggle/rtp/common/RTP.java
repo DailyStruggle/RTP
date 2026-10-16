@@ -813,9 +813,9 @@ public class RTP {
         // Also include observed biomes if available from spatial memory
         try {
           if (player != null) {
-            biomeCandidates.addAll(io.github.dailystruggle.rtp.common.commands.menu.BiomeMenuSource.observedBiomes(player.uuid()));
+            biomeCandidates.addAll(io.github.dailystruggle.rtp.common.selection.region.BiomeMenuSource.observedBiomes(player.uuid()));
           } else {
-            biomeCandidates.addAll(io.github.dailystruggle.rtp.common.commands.menu.BiomeMenuSource.observedBiomes(null));
+            biomeCandidates.addAll(io.github.dailystruggle.rtp.common.selection.region.BiomeMenuSource.observedBiomes(null));
           }
         } catch (Throwable ignored) {
         }
@@ -1273,7 +1273,7 @@ public class RTP {
       }
       case BIOME: {
         // Resolve the best region that observes or accommodates this biome
-        String best = io.github.dailystruggle.rtp.common.commands.menu.BiomeMenuSource.bestRegionForBiome(
+        String best = io.github.dailystruggle.rtp.common.selection.region.BiomeMenuSource.bestRegionForBiome(
             player != null ? player.uuid() : null, target.name(), null);
         if (best != null) {
           Region r = selectionAPI.getRegion(best);

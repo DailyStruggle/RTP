@@ -23,7 +23,7 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBS = Arrays.asList(
             "start", "stop", "status", "burst", "sequence", "ramp", "reset-cold", "export",
-            "probe-footprint", "leakcheck", "churn", "tp");
+            "probe-footprint", "leakcheck", "churn", "tp", "coverage");
 
     private final StressTestRTPPlugin plugin;
 
@@ -52,6 +52,7 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
                 case "leakcheck": return doLeakCheck(sender, args);
                 case "churn": return doChurn(sender, args);
                 case "tp": return doTp(sender, args);
+                case "coverage": return doCoverage(sender, args);
                 default:
                     sender.sendMessage("StressTestRTP: unknown subcommand. Try: " + SUBS);
                     return true;
@@ -299,6 +300,24 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
                 + (quick ? ", quick" : "") + (dump ? " + heap dump" : "")
                 + "); poll /rtpstress leakcheck status, rows land in "
                 + "runs/leak.csv and runs/leak-metrics.csv.");
+        return true;
+    }
+
+    /** {@code /rtpstress coverage [label]}: reads and resets the JaCoCo agent's
+     *  execution data in this JVM and writes the reached probes as JSON into the
+     *  runs folder (ADR-111 section 2.6). Probes are booleans, no hit counts. */
+    @SuppressWarnings("java:S3516")
+    private boolean doCoverage(CommandSender sender, String[] args) throws IOException {
+        CoverageProbe probe = plugin.coverageProbe();
+        if (!CoverageProbe.agentAttached()) {
+            sender.sendMessage("StressTestRTP: coverage unavailable; start the server with the JaCoCo "
+                    + "-javaagent (see devstack/docker-compose.coverage.yml).");
+            return true;
+        }
+        String label = args.length >= 2 ? args[1] : "checkpoint";
+        CoverageProbe.Result r = probe.dumpAndReset(label);
+        sender.sendMessage("StressTestRTP: coverage '" + label + "': " + r.reachedProbes()
+                + " probes reached -> " + r.file().getFileName());
         return true;
     }
 

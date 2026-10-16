@@ -19,6 +19,8 @@
 // Region Scheduler reflectively to avoid a hard compile dep on Folia API.
 plugins {
     id 'java'
+    // Bundles org.jacoco.core for /rtpstress coverage (ADR-111 Stage 2).
+    id 'com.gradleup.shadow'
 }
 
 group = 'io.github.dailystruggle'
@@ -41,6 +43,12 @@ dependencies {
     // unchanged. This mirrors the helpers/ contract: one JAR, no platform fork.
     compileOnly 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
 
+    // ADR-111 Stage 2: the JaCoCo core reads execution data in-process; the
+    // agent runtime API (org.jacoco.agent.rt.RT) is provided by the -javaagent
+    // on the bench server, so it is compileOnly and never bundled.
+    implementation 'org.jacoco:org.jacoco.core:0.8.11'
+    compileOnly 'org.jacoco:org.jacoco.agent:0.8.11:runtime'
+
     // Pure-logic unit tests (probe classifiers, CSV sentinels). No Bukkit
     // runtime is exercised; the Spigot API is on the test classpath only so
     // the classes under test link.
@@ -52,4 +60,14 @@ dependencies {
 
 test {
     useJUnitPlatform()
+}
+
+// The shadow jar is the shippable plugin (JaCoCo core bundled, unrelocated so
+// org.jacoco.core keeps its published package names). The thin jar would emit
+// the same file name, so it is disabled to keep one producer for that path.
+shadowJar {
+    archiveClassifier.set('')
+}
+jar {
+    enabled = false
 }

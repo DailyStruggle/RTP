@@ -5,7 +5,7 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 
 import java.util.ArrayList;
 import java.util.Collections;

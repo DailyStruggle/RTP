@@ -33,38 +33,7 @@ public final class MenuBindingSupport {
    * @return resolved {@link MenuRenderer}, or {@code null}
    */
   public static @Nullable MenuRenderer discoverRenderer() {
-    List<String> ids = configuredRendererIds();
-
-    Map<String, MenuRendererProvider> byId = discoverRendererProviders();
-
-    for (String id : ids) {
-      MenuRendererProvider provider = byId.get(id);
-      if (provider == null) {
-        RTP.log(
-            Level.WARNING,
-            "menu.renderer '" + id + "' has no provider on this platform");
-        continue;
-      }
-      try {
-        MenuRenderer r = provider.create();
-        if (r != null) return r;
-      } catch (RuntimeException | LinkageError ex) {
-        // A universal / lite jar may carry a platform provider whose renderer
-        // class hard-references a runtime type absent on this server (e.g. the
-        // Paper Adventure-Book renderer referencing net.kyori...Component on
-        // plain Spigot). That surfaces as a LinkageError (NoClassDefFoundError),
-        // not a RuntimeException; catch both so discovery degrades to the
-        // configurable menuInvalid fallback rather than aborting plugin enable.
-        RTP.log(
-            Level.WARNING,
-            "failed to instantiate menu.renderer '" + id + "': " + ex,
-            ex);
-      }
-    }
-    RTP.log(
-        Level.WARNING,
-        "menu.renderer list exhausted (" + ids + "); /rtp menu open-page disabled");
-    return null;
+    return io.github.dailystruggle.rtp.common.commands.base.MenuRendererDiscovery.discoverRenderer();
   }
 
   /**

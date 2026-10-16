@@ -31,6 +31,12 @@ public class FabricVersionResolutionTest {
                 RTPFabricMod.adapterFqnFor("26.1"));
         assertEquals("io.github.dailystruggle.rtp.fabric.v1_21_R11.V1_21_R11FabricVersionAdapter",
                 RTPFabricMod.adapterFqnFor("1.21.11"));
+        assertEquals("io.github.dailystruggle.rtp.fabric.v1_21_R11.V1_21_R11FabricVersionAdapter",
+                RTPFabricMod.adapterFqnFor("1.21.10"));
+        assertEquals("io.github.dailystruggle.rtp.fabric.v1_21_R11.V1_21_R11FabricVersionAdapter",
+                RTPFabricMod.adapterFqnFor("1.21.9"));
+        assertEquals("io.github.dailystruggle.rtp.fabric.v1_21_R5.V1_21_R5FabricVersionAdapter",
+                RTPFabricMod.adapterFqnFor("1.21.8"));
         assertEquals("io.github.dailystruggle.rtp.fabric.v1_21_R5.V1_21_R5FabricVersionAdapter",
                 RTPFabricMod.adapterFqnFor("1.21.5"));
         assertEquals("io.github.dailystruggle.rtp.fabric.v1_21_R1.V1_21_R1FabricVersionAdapter",

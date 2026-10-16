@@ -420,8 +420,7 @@ public final class RTPNeoForgeMod {
 
     // effects-api-ADR-003 / ADR-005 - wire the effect layer to the teleport
     // pipeline (SOUND/PARTICLE/TITLE/POTION on the rtp.effect.* lifecycle
-    // hooks, driven by effects/<group>.yml + permissions). Reuses the Mojmap
-    // effectsapi.fabric runtime (shared with Fabric; flagged for rename).
+    // hooks, driven by effects/<group>.yml + permissions).
     try {
       io.github.dailystruggle.rtp.neoforge.effects.NeoForgeEffectsHandler.setupEffects(server);
       RTP.log(Level.INFO, "[RTP][NeoForge] effects layer installed (NeoForgeEffectsHandler).");
@@ -561,10 +560,10 @@ public final class RTPNeoForgeMod {
     } catch (Throwable t) {
       RTP.log(Level.WARNING, "[RTP][NeoForge] RTP.stop() raised on shutdown", t);
     } finally {
-      // Drop the effects runtime's server binding so post-stop effect fires
+      // Drop the effects scheduler's server binding so post-stop effect fires
       // become no-ops instead of dispatching onto a torn-down server.
       try {
-        io.github.dailystruggle.effectsapi.fabric.FabricEffectRuntime.unbindServer();
+        io.github.dailystruggle.rtp.neoforge.effects.local.NeoForgeHandles.setServer(null);
       } catch (Throwable ignored) {
         // effects-api absent or already unbound; nothing to do.
       }
@@ -655,7 +654,8 @@ public final class RTPNeoForgeMod {
     if (event == null || event.getDispatcher() == null) return;
     CommandsAPICommand testCmd = NeoForgeCommandRegistrar.resolveTestCmd(RTP.baseCommand);
     if (testCmd != null) {
-      if (RTP.baseCommand instanceof TreeCommand treeCmd) {
+      TreeCommand treeCmd = RTP.baseCommand;
+      if (treeCmd != null) {
         if (!treeCmd.getCommandLookup().containsKey(testCmd.name().toUpperCase())) {
           treeCmd.addSubCommand(testCmd);
         }

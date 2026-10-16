@@ -10,7 +10,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.bukkitplatform.commands.parameters.OnlinePlayerParameter;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.parameters.IntegerParameter;
 import org.jetbrains.annotations.Nullable;
 

@@ -1178,6 +1178,18 @@ public final class FabricServerAccessor implements RTPServerAccessor {
    */
   private volatile boolean blockTagSnapshotPermanentlyUnavailable = false;
 
+  /**
+   * An empty snapshot is retried by {@code SafetyTokenExpander} every ~2 s; warn once,
+   * then log repeats at FINE.
+   */
+  private volatile boolean blockTagEmptyWarned = false;
+
+  private void warnEmptyBlockTagSnapshot(String message) {
+    Level level = blockTagEmptyWarned ? Level.FINE : Level.WARNING;
+    blockTagEmptyWarned = true;
+    log(level, message);
+  }
+
   @Override
   public Map<String, Set<String>> blockTagSnapshot() {
     Map<String, Set<String>> snap = this.blockTagSnapshot;
@@ -1374,7 +1386,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
       return Collections.emptyMap();
     }
     if (out.isEmpty()) {
-      log(Level.WARNING,
+      warnEmptyBlockTagSnapshot(
           "[RTP][Fabric] Block-tag registry yielded no usable tags"
               + " (BuiltInRegistries.BLOCK may not be populated yet);"
               + " #tag tokens in safety.airBlocks/unsafeBlocks will not be flattened.");
@@ -1532,7 +1544,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
       return Collections.emptyMap();
     }
     if (out.isEmpty()) {
-      log(Level.WARNING,
+      warnEmptyBlockTagSnapshot(
           "[RTP][Fabric] Block-tag registry yielded no usable tags via reflection"
               + " (BuiltInRegistries.BLOCK may not be populated yet);"
               + " #tag tokens in safety.airBlocks/unsafeBlocks will not be flattened.");

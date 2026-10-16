@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.bukkit.commands.test;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;

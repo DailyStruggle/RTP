@@ -48,7 +48,7 @@ public final class FabricEffectsInitializer {
         if (!REGISTERED.compareAndSet(false, true)) return;
 
         // Register the Mojmap-native handle provider. The shared
-        // effectsapi.fabric.FabricHandles is Loom intermediary-remapped
+        // rtp.fabric.effects.FabricHandles is Loom intermediary-remapped
         // (ServerPlayer -> class_3222) and does NOT link on the deobf MC 26.x
         // runtime, so wrapPlayer there raised NoClassDefFoundError the moment a
         // common effect (SOUND / PARTICLE / ...) fired. FabricHandlesUnobf is

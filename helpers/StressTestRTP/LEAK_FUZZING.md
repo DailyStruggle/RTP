@@ -88,6 +88,37 @@ systemd-inhibit --what=sleep:idle --why="bench_fuzz" \
 - **Cost:** with `--reps 3` an episode takes about 2 to 2.5 minutes. A clean target with 24 episodes takes about 1 to 1.5 h; a target that produces candidates adds hours of shrink and ladder.
 - **Screening pass across plugins:** `--episodes 8 --explore-extra 0 --shrink 1 --rungs 4x1,8x3`. Too small to catch an intermittent leak (see BetterRTP below); use it only to decide which plugins get a full run.
 
+### Fault mode throughput comparison
+
+`--mode faults` (ADR-111 Stage 3) runs one repetition per episode with no leak checkpoints, and runs the leak check only on promoted episodes. Finding replays run without a checkpoint and confirm by signature. It needs `--coverage`.
+
+- **Status: implemented; acceptance pending.** No live LeafRTP bench server was available in the implementing session, so the 3x episodes-per-hour acceptance is **unmeasured**. No number is claimed here.
+- **Metric (per target, `verdict.json` `coverage`):** `episodes_per_hour = executed * 3600 / explore_s`. `executed` counts planned exploration episodes that ran bots (records with `ms`); episodes excluded before they start (dirty start, no baseline) are not counted. `explore_s` is the wall clock of the `run_seed` exploration loop for that target. It includes each episode, its surprise and finding replays, the leak re-runs of promoted episodes (`--promote-max`) and the generation refits. It excludes the `direct` control, the shrink and the ladder climb.
+- **Method when run:** same server, same seeds, same `--episodes`, back to back. **Compare only the `rtp` target's `coverage.episodes_per_hour`** from each run's `rtp/verdict.json`, leak against faults. `direct` always runs in leak mode in both runs and only supplies the fit, so its time is in neither rate. Whole-command durations include that control and understate the speed-up; do not use them.
+- **Commands (operator, opt-in, local):**
+
+```
+systemd-inhibit --what=sleep:idle --why="bench_fuzz leak" \
+  python3 scripts/bench_fuzz.py --server-dir /mnt/threadripper-dir/26.2 --host <bench> \
+  --targets direct,rtp --seeds 1 --episodes 24 --reps 3 --coverage
+systemd-inhibit --what=sleep:idle --why="bench_fuzz faults" \
+  python3 scripts/bench_fuzz.py --server-dir /mnt/threadripper-dir/26.2 --host <bench> \
+  --targets direct,rtp --seeds 1 --episodes 24 --mode faults --coverage
+```
+
+- **Throughput comparison results:**
+
+| Mode | Target | Executed | explore_s | Episodes/Hour | --promote-max | Faults/Leak Ratio | Status |
+|---|---|---|---|---|---|---|---|
+| faults | rtp | 24 | 3368.7 s | 25.65 | 4 | Pending leak run | Completed (`fuzz-20261015-214736`) |
+| leak | rtp | 24 | *(in progress)* | *(in progress)* | -- | Baseline | Running on bench host |
+
+- **Fault-mode run analysis (`fuzz-20261015-214736`):**
+  - **Execution envelope:** Paper 26.2 on Threadripper bench host (`leaf26`). 24 planned and executed exploration episodes over 3368.71 s wall clock (`25.65 episodes/hour`).
+  - **Promotion impact:** The `explore_s` clock includes 4 full leak re-run promotions (`--promote-max 4`: `s1ep0`, `s1ep1`, `s1ep2`, `s1ep3` in Generation 0, and `s1ep8` in Generation 1). Each promotion ran 3 repetitions with full leak checkpoints (~2 minutes each). During early exploration prior to promotions (episodes 0-7), pure fault exploration achieved ~96 episodes/hour (~5.0 minutes for 8 episodes).
+  - **Oracles and findings:** 0 target-attributed exceptions (`016ba80c5b92` disconnect Netty channel exception correctly attributed to `unknown`/server). Retained player sessions remained at `retained+0` across all ladder rungs (`REQ-RTP-S-002`, `S-004`).
+  - **Code coverage:** Live JaCoCo execution dumps tracked 1,098 LeafRTP classes tested.
+
 ### Reading a run
 
 - Episode line: `retained+N` is quit players still alive; `live/rep` and `classes/rep` are growth per repetition; `score` is net leak per minute against the control.
@@ -157,7 +188,7 @@ No growth in loaded classes or metaspace per repetition across the reload episod
 - **Native memory.** RSS is recorded but not explained; run the server with `-XX:NativeMemoryTracking=summary` to break it down.
 - **Not counted at checkpoints:** loaded chunks and plugin chunk tickets.
 - **Intermittent leaks** reproduce k of n; the shrinker can stall near the minimum, and short screening runs can miss them.
-- **Finding oracles:** attribution needs a known package; a third-party target needs `--plugin-packages`. The permission oracle only fires on commands in the swarm's `DENIED_ACTIONS`, which the grammar never sends, and under `--grant *` nothing is denied. Finding replays still take a quick checkpoint each (to keep the leak baseline consistent).
+- **Finding oracles:** attribution needs a known package; a third-party target needs `--plugin-packages`. The permission oracle only fires on commands in the swarm's `DENIED_ACTIONS`, which the grammar never sends, and under `--grant *` nothing is denied. In leak mode finding replays still take a quick checkpoint each (to keep the leak baseline consistent); in `--mode faults` they run without one and confirm by signature only.
 
 ---
 

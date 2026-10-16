@@ -4,7 +4,7 @@ import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.parameters.IntegerParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -317,7 +317,7 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
 
   private Region resolveRegion(UUID callerId, Map<String, List<String>> parameterValues) {
     List<String> regionNames = parameterValues.get("region");
-    String regionName = (regionNames == null || regionNames.isEmpty()) ? null : regionNames.getFirst();
+    String regionName = (regionNames == null || regionNames.isEmpty()) ? null : regionNames.get(0);
     Region region;
     if (regionName != null) {
       region = RTP.selectionAPI.getRegionOrDefault(regionName);
@@ -354,7 +354,7 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
   static int parseFirst(List<String> values, int fallback) {
     if (values == null || values.isEmpty()) return fallback;
     try {
-      return Integer.parseInt(values.getFirst().trim().toLowerCase(Locale.ROOT));
+      return Integer.parseInt(values.get(0).trim().toLowerCase(Locale.ROOT));
     } catch (NumberFormatException e) {
       return fallback;
     }

@@ -90,9 +90,10 @@ air, or into a claimed region they cannot build in.
 | Paper | 1.20.x | `rtp-paper-v1_20_R1` |
 | Paper | 1.21.x | `rtp-paper-v1_21_R1` |
 | Paper | 26.1 | `rtp-paper-v26_1_R1` |
-| Folia | 1.20.x | `rtp-folia-v1_20_R1` |
-| Folia | 1.21.x | `rtp-folia-v1_21_R1` |
+| Folia | 1.21.11 | `rtp-folia-v1_21_R1` |
 | Folia | 26.1 | `rtp-folia-v26_1_R1` |
+
+Folia below 1.21.11 is not supported (ADR-113): Folia is experimental and its older builds are not maintained, so a crash there may not come from RTP at all. Upgrade Folia before troubleshooting.
 
 Replace the installed jar with the correct version and restart.
 

@@ -81,6 +81,8 @@ dependencies {
     // ENTERPRISE_READINESS.md item 23: jqwik property-based testing framework
     // for spiral math (ADR-001) and MemoryShape bin arithmetic invariants.
     testImplementation rootProject.libs.jqwik
+    // ADR-102 Tier P: Jazzer @FuzzTest targets for stateless parsers (GateExpressionParser).
+    testImplementation rootProject.libs.jazzer.junit
     // ADR-106: Java/JS parity gate for the editor-curve/*.js shape helpers. Test-only
     // (Java 21 has no built-in JS engine); GraalJS is never shipped in any jar.
     testImplementation 'org.graalvm.polyglot:polyglot:24.1.2'

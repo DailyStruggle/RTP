@@ -48,7 +48,7 @@ final class MenuConcreteCommandLeaves {
     /**
      * Generic, parameterized leaf command class (eliminates duplicated inner leaf classes).
      */
-    public static class MenuActionLeafCmd extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
+    public static class MenuActionLeafCmd extends io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl {
         private final String name;
         private final String permission;
         private final String description;
@@ -156,7 +156,7 @@ final class MenuConcreteCommandLeaves {
      * root menu page (same semantics as {@link MenuAction.OpenMenu} with an
      * empty path array).
      */
-    static final class OpenMenuConcreteCmd extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
+    static final class OpenMenuConcreteCmd extends io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl {
 
         private final MenuRedeemSubcommand owner;
 
@@ -249,7 +249,7 @@ final class MenuConcreteCommandLeaves {
      * {@code /rtp visualization} root command opening the visualizations selector.
      * Hosts per-kind sub-commands; bare invocation opens the selector (gates on {@code rtp.menu.admin}).
      */
-    static final class VisualizationRootCmd extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
+    static final class VisualizationRootCmd extends io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl {
 
         private final MenuRedeemSubcommand owner;
 
@@ -343,7 +343,7 @@ final class MenuConcreteCommandLeaves {
      * Eliminates duplicate parameter registration, selector fallback, logging, and dispatching.
      */
     static abstract class AbstractVisualizationRegionCmd
-            extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
+            extends io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl {
 
         protected final VisualizationDispatch dispatch;
         protected final java.util.function.BiFunction<UUID, Consumer<String>, Boolean> selectorOpener;
@@ -513,7 +513,7 @@ final class MenuConcreteCommandLeaves {
      * Permission gate is {@code rtp.menu.admin}.
      */
     static final class VisualizationSparklineCmd
-            extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
+            extends io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl {
 
         private final VisualizationDispatch dispatch;
 
@@ -563,7 +563,7 @@ final class MenuConcreteCommandLeaves {
      * Renders and exports high-resolution image files to {@code plugins/RTP/charts/}.
      */
     static final class VisualizationExportCmd
-            extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
+            extends io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl {
 
         private static final String PARAM_SIZE = "size";
         private static final String PARAM_WIDTH = "width";
@@ -780,7 +780,7 @@ final class MenuConcreteCommandLeaves {
             return 1.0;
         }
 
-        private static void addSizingParameters(io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl cmd) {
+        private static void addSizingParameters(io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl cmd) {
             cmd.addParameter(PARAM_SIZE, new CommandParameter(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
                     "image size in pixels or resolution (e.g. 512, 1024, 4k, 8k, k, kpx, m, mpx, 1920x1080; metric units supported)",
                     (uuid, value) -> value != null && !value.isEmpty()) {
@@ -850,7 +850,7 @@ final class MenuConcreteCommandLeaves {
         }
 
         static final class ExportComprehensiveCmd
-                extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
+                extends io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl {
 
             ExportComprehensiveCmd() {
                 super(null);
@@ -948,7 +948,7 @@ final class MenuConcreteCommandLeaves {
         }
 
         static final class ExportAllCmd
-                extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
+                extends io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl {
 
             ExportAllCmd() {
                 super(null);
@@ -1102,7 +1102,7 @@ final class MenuConcreteCommandLeaves {
         }
 
         static final class ExportTypeCmd
-                extends io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl {
+                extends io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl {
 
             private final String typeName;
             private final io.github.dailystruggle.rtp.api.maps.ChartSpec.Kind kind;

@@ -31,6 +31,11 @@ final class RegionThreadBudget {
     return clock.getAsLong();
   }
 
+  /** Drops the calling thread's bucket so the thread-local does not outlive this budget. */
+  void release() {
+    state.remove();
+  }
+
   /** Whether the calling thread may start another RTP task this tick. */
   boolean hasBudget() {
     return refill()[1] > 0L;

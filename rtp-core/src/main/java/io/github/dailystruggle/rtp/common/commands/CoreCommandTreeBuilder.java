@@ -2,8 +2,11 @@ package io.github.dailystruggle.rtp.common.commands;
 
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.admin.AdminCmd;
 import io.github.dailystruggle.rtp.common.commands.admin.ClearCmd;
 import io.github.dailystruggle.rtp.common.commands.back.BackCmd;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmd;
+import io.github.dailystruggle.rtp.common.commands.base.PlatformCommandParameters;
 import io.github.dailystruggle.rtp.common.commands.config.ConfigCmd;
 import io.github.dailystruggle.rtp.common.commands.docs.DocsCmd;
 import io.github.dailystruggle.rtp.common.commands.editor.EditorCmd;
@@ -70,6 +73,10 @@ public final class CoreCommandTreeBuilder {
     root.addSubCommand(new ClearCmd(root));
     root.addSubCommand(new EditorCmd(root));
     root.addSubCommand(new DocsCmd(root));
+    AdminCmd adminCmd = new AdminCmd(root);
+    adminCmd.addSubCommand(new io.github.dailystruggle.rtp.common.commands.prefab.PrefabCommand(adminCmd));
+    adminCmd.addSubCommand(new io.github.dailystruggle.rtp.common.commands.setup.SetupCmd(adminCmd));
+    root.addSubCommand(adminCmd);
   }
 
   /**

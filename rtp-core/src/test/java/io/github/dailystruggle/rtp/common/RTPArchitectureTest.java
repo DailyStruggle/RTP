@@ -1,14 +1,17 @@
 package io.github.dailystruggle.rtp.common;
 
+import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
+import com.tngtech.archunit.library.dependencies.SlicesRuleDefinition;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.logging.Logger;
 
 import static com.tngtech.archunit.core.domain.JavaAccess.Predicates.target;
 import static com.tngtech.archunit.core.domain.JavaClass.Predicates.assignableTo;
@@ -25,6 +28,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 )
 public class RTPArchitectureTest {
 
+    private static final Logger REPORT_LOG = Logger.getLogger(RTPArchitectureTest.class.getName());
     private static final String CORE_PACKAGE = "io.github.dailystruggle.rtp.common..";
     private static final String API_PACKAGE = "io.github.dailystruggle.rtp.api..";
 
@@ -285,4 +289,37 @@ public class RTPArchitectureTest {
                     )
                     .because("REQ-RTP-S-005: Zero synchronous chunk loading on main threads. "
                             + "All chunk operations must go through RTPWorld's async methods.");
+
+    /**
+     * Rule 11 - Package Cycle Report (ADR-115, report-only).
+     *
+     * <p>Logs whether the {@code rtp.common} package slices are cycle-free without failing
+     * the build while the tangle remains. Promote to an enforced {@code @ArchTest} rule once
+     * the cycle count reaches zero.
+     */
+    @ArchTest
+    static void report_rtp_common_package_cycles(JavaClasses classes) {
+        ArchRule rule = SlicesRuleDefinition.slices()
+                .matching("io.github.dailystruggle.rtp.common.(*)..")
+                .should().beFreeOfCycles();
+        try {
+            rule.check(classes);
+            REPORT_LOG.info("[ADR-115] rtp.common package slices are cycle-free.");
+        } catch (AssertionError e) {
+            REPORT_LOG.info("[ADR-115 report-only] " + e.getMessage());
+        }
+    }
+
+    /**
+     * Rule 12 - Command Sub-Package Cycles (ADR-115, enforced).
+     *
+     * <p>Enforces that the {@code rtp.common.commands} feature sub-packages are cycle-free.
+     * Feature packages depend downwards on {@code commands.base}, not cyclically on each other.
+     */
+    @ArchTest
+    static final ArchRule rtp_commands_subpackages_must_be_free_of_cycles =
+            SlicesRuleDefinition.slices()
+                    .matching("io.github.dailystruggle.rtp.common.commands.(*)..")
+                    .should().beFreeOfCycles()
+                    .because("ADR-115 Seam 2: Command feature sub-packages must not have cyclic dependencies.");
 }

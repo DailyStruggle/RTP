@@ -11,7 +11,7 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * NeoForge counterpart of {@code effectsapi.fabric.FabricValueCoercer}
+ * NeoForge counterpart of {@code rtp.fabric.effects.FabricValueCoercer}
  * (effects-api-ADR-004), compiled Mojmap in {@code rtp-neoforge-common} so it
  * carries no Fabric-intermediary or {@code ResourceLocation}/{@code Identifier}
  * bytecode references (both fail to link on the NeoForge 1.21.11 runtime).

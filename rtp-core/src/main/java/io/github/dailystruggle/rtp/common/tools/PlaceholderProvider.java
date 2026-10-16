@@ -16,9 +16,9 @@ import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
-import io.github.dailystruggle.rtp.common.tasks.ScanTask;
+import io.github.dailystruggle.rtp.common.tasks.ScanProgressView;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
-import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
+import io.github.dailystruggle.rtp.common.tasks.TrackableTask;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -797,14 +797,13 @@ public class PlaceholderProvider {
                     }
 
                     RTPRunnable nextTask = data.nextTask;
-                    if (nextTask instanceof TeleportPipelineTask) {
-                        TeleportPipelineTask task = (TeleportPipelineTask) nextTask;
-                        switch (task.getPhase()) {
-                            case TELEPORT:
+                    if (nextTask instanceof TrackableTask task) {
+                        switch (task.phaseName()) {
+                            case "TELEPORT":
                                 return RTP.configs.getConfigValue(PlayerMessages.PLAYER_TELEPORTING, "").toString();
-                            case LOAD:
+                            case "LOAD":
                                 return RTP.configs.getConfigValue(PlayerMessages.PLAYER_LOADING, "").toString();
-                            case SETUP:
+                            case "SETUP":
                                 return RTP.configs.getConfigValue(PlayerMessages.PLAYER_SETUP, "").toString();
                             default:
                                 break;
@@ -925,12 +924,12 @@ public class PlaceholderProvider {
                     if (RTP.getInstance() == null) return "0";
                     Region region = RTP.regionContext.get();
                     if (region != null) {
-                        ScanTask task = RTP.getInstance().scanTasks.get(region.name);
-                        return (task != null) ? String.valueOf(task.latestAbsolutePos) : "0";
+                        ScanProgressView task = RTP.getInstance().scanTasks.get(region.name);
+                        return (task != null) ? String.valueOf(task.absolutePos()) : "0";
                     }
                     long total = 0;
-                    for (ScanTask task : RTP.getInstance().scanTasks.values()) {
-                        total += task.latestAbsolutePos;
+                    for (ScanProgressView task : RTP.getInstance().scanTasks.values()) {
+                        if (task != null) total += task.absolutePos();
                     }
                     return String.valueOf(total);
                 });
@@ -940,12 +939,12 @@ public class PlaceholderProvider {
                     if (RTP.getInstance() == null) return "0";
                     Region region = RTP.regionContext.get();
                     if (region != null) {
-                        ScanTask task = RTP.getInstance().scanTasks.get(region.name);
-                        return (task != null) ? String.valueOf(task.latestAbsoluteTotal) : "0";
+                        ScanProgressView task = RTP.getInstance().scanTasks.get(region.name);
+                        return (task != null) ? String.valueOf(task.absoluteTotal()) : "0";
                     }
                     long total = 0;
-                    for (ScanTask task : RTP.getInstance().scanTasks.values()) {
-                        total += task.latestAbsoluteTotal;
+                    for (ScanProgressView task : RTP.getInstance().scanTasks.values()) {
+                        if (task != null) total += task.absoluteTotal();
                     }
                     return String.valueOf(total);
                 });
@@ -955,12 +954,12 @@ public class PlaceholderProvider {
                     if (RTP.getInstance() == null) return "0";
                     Region region = RTP.regionContext.get();
                     if (region != null) {
-                        ScanTask task = RTP.getInstance().scanTasks.get(region.name);
-                        return (task != null) ? String.valueOf(task.latestCps) : "0";
+                        ScanProgressView task = RTP.getInstance().scanTasks.get(region.name);
+                        return (task != null) ? String.valueOf(task.cps()) : "0";
                     }
                     long total = 0;
-                    for (ScanTask task : RTP.getInstance().scanTasks.values()) {
-                        total += task.latestCps;
+                    for (ScanProgressView task : RTP.getInstance().scanTasks.values()) {
+                        if (task != null) total += task.cps();
                     }
                     return String.valueOf(total);
                 });
@@ -976,14 +975,14 @@ public class PlaceholderProvider {
                 "scan_landPercentage",
                 uuid -> {
                     if (RTP.getInstance() == null) return "0.00";
-                    // Read ScanTask's good/(good+bad) tally; MemoryShape bad counts include
+                    // Read ScanProgressView's good/(good+bad) tally; MemoryShape bad counts include
                     // gap-bridged runs and outer-ring preimages, so a shape-derived ratio
                     // drifts or clamps to 0 mid-scan.
                     Region r = RTP.regionContext.get();
                     double pct;
                     if (r != null) {
-                        ScanTask task = RTP.getInstance().scanTasks.get(r.name);
-                        pct = (task != null) ? task.latestLandPercentage : 0.0;
+                        ScanProgressView task = RTP.getInstance().scanTasks.get(r.name);
+                        pct = (task != null) ? task.landPercentage() : 0.0;
                     } else {
                         pct = averageLandPercentage(RTP.getInstance().scanTasks.values());
                     }
@@ -996,14 +995,14 @@ public class PlaceholderProvider {
                         if (RTP.getInstance() == null) return "0s";
                         Region region = RTP.regionContext.get();
                         if (region != null) {
-                            ScanTask task = RTP.getInstance().scanTasks.get(region.name);
-                            long eta = (task != null) ? task.latestEtaSeconds : 0L;
+                            ScanProgressView task = RTP.getInstance().scanTasks.get(region.name);
+                            long eta = (task != null) ? task.etaSeconds() : 0L;
                             return formatEta(eta);
                         }
 
                         long maxEta = 0;
-                        for (ScanTask task : RTP.getInstance().scanTasks.values()) {
-                            if (task.latestEtaSeconds > maxEta) maxEta = task.latestEtaSeconds;
+                        for (ScanProgressView task : RTP.getInstance().scanTasks.values()) {
+                            if (task != null && task.etaSeconds() > maxEta) maxEta = task.etaSeconds();
                         }
 
                         return formatEta(maxEta);
@@ -1278,16 +1277,16 @@ public class PlaceholderProvider {
     }
 
     /**
-     * Mean of {@link ScanTask#latestLandPercentage} across {@code tasks}; {@code 0.0} when empty.
+     * Mean of {@link ScanProgressView#landPercentage} across {@code tasks}; {@code 0.0} when empty.
      * Unweighted: each task's figure is already a per-region good/(good+bad) ratio.
      */
-    public static double averageLandPercentage(java.util.Collection<ScanTask> tasks) {
+    public static double averageLandPercentage(java.util.Collection<? extends ScanProgressView> tasks) {
         if (tasks == null || tasks.isEmpty()) return 0.0;
         double sum = 0.0;
         int n = 0;
-        for (ScanTask task : tasks) {
+        for (ScanProgressView task : tasks) {
             if (task == null) continue;
-            sum += task.latestLandPercentage;
+            sum += task.landPercentage();
             n++;
         }
         return n == 0 ? 0.0 : sum / n;

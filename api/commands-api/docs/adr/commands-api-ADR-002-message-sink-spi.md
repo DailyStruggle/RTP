@@ -41,6 +41,6 @@ This ADR covers only the message-delivery seam. The companion idea of a `Command
 
 - `api/commands-api/src/main/java/.../common/MessageSink.java`
 - `api/commands-api/src/main/java/.../common/CommandsAPI.java` - `setMessageSink` / `getMessageSink` / `messageMethodFor`
-- `rtp-core/src/main/java/.../common/commands/BaseRTPCmd.java` - sink-aware message defaults
+- `rtp-core/src/main/java/.../common/commands/base/BaseRTPCmd.java` - sink-aware message defaults
 - `rtp-plugin/src/main/java/.../bukkit/commands/BukkitMessageSink.java` - Bukkit implementation
 - [commands-api-ADR-001](commands-api-ADR-001-brigadier-bridge.md) - Brigadier bridge (the Fabric / NeoForge delivery path)

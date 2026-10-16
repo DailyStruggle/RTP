@@ -1,8 +1,8 @@
 // rtp-fabric-ADR-001 -- Fabric multiversion v1_20_R1 submodule.
 //
-// Pinned to MC 1.20.1, mojmap, Loom 1.11+, Java 21. Stub adapter -- bodies
-// will be ported in a follow-up Phase 2.5 task once the v1_21_R1 reference
-// implementation is exercised end-to-end.
+// Pinned to MC 1.20.1, mojmap. Built on the Java 21 toolchain but emits
+// Java 17 bytecode (`release = 17`, root build.gradle) because 1.20.1
+// servers run on Java 17 (ADR-113).
 //
 // This module supplies the runtime mod jar for MC 1.20.x servers; common
 // (rtp-fabric-common) carries no MC classes itself (modCompileOnly).

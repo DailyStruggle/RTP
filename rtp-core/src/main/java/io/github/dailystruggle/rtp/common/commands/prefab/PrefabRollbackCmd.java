@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.prefab;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 
 import java.io.File;
 import java.io.IOException;

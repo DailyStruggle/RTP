@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.setup;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.prefab.Prefab;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabApplier;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabDiskIO;

@@ -360,6 +360,7 @@ public final class AnvilReader implements RegionFileReader {
      */
     @SuppressWarnings("unchecked")
     public static long[] getMotionBlockingNoLeaves(LinkedHashMap<String, Object> root) {
+        if (root == null) return null;
         Object heightmaps = root.get("Heightmaps");
         if (!(heightmaps instanceof java.util.Map)) return null;
         Object value = ((java.util.Map<String, Object>) heightmaps).get("MOTION_BLOCKING_NO_LEAVES");

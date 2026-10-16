@@ -32,8 +32,9 @@ import java.util.function.LongSupplier;
  * {@link MetricsBinding} empty list - NeoForge is a single-region runtime.
  *
  * <p>{@link #tick(long)} is intended to be driven once per server tick from
- * {@code RTPNeoForgeMod.onServerTick}. The first call only seeds the timestamp;
- * no EMA is produced until the second call. The clock source is supplied via the
+ * {@code RTPNeoForgeMod.onServerTick}. The first call seeds the timestamp and
+ * initializes the EMA to the nominal tick time (50 ms) so that slow boot ticks
+ * do not contaminate the rolling average. The clock source is supplied via the
  * test-seam constructor; production uses {@link System#nanoTime()} via
  * {@link #tick()}.
  *
@@ -63,6 +64,9 @@ public final class NeoForgeMetricsBinding implements MetricsBinding {
 
     /** Sentinel for "no work sample available this tick". */
     private static final long NO_WORK_SAMPLE = -1L;
+
+    /** Nominal tick interval in nanoseconds ({@code 50ms}); used to seed the EMA on boot. */
+    private static final double NOMINAL_TICK_NANOS = 50_000_000.0;
 
     private final LongSupplier nanoClock;
     private final IntSupplier playerCountSupplier;
@@ -153,7 +157,13 @@ public final class NeoForgeMetricsBinding implements MetricsBinding {
         }
 
         long prev = lastNanos.getAndSet(nowNanos);
-        if (prev == Long.MIN_VALUE) return; // first sample: seed only
+        if (prev == Long.MIN_VALUE) {
+            // Seed EMA with nominal tick time so boot spikes don't contaminate the rolling average.
+            ema1m = NOMINAL_TICK_NANOS;
+            ema5m = NOMINAL_TICK_NANOS;
+            ema15m = NOMINAL_TICK_NANOS;
+            return;
+        }
 
         double deltaNanos = (double) (nowNanos - prev);
         if (deltaNanos <= 0.0) return; // monotonic guard; ignore non-progress

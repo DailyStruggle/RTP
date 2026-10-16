@@ -1,0 +1,86 @@
+# Standalone single-server boots of the bug-report tier (ADR-113): Paper and
+# Fabric on 1.21.11 and on the latest 26.x release, no proxy/Redis. Checks the
+# jar's `api-version: '1.18'` on 1.20.5+ Paper (Commodore enum rewriting) and
+# the Fabric 1.21.11 / 26.x chunk-load paths. Ports 25594-25597.
+#
+# Stage:  Copy-Item rtp-plugin\build\libs\LeafRTP-Pro-<ver>.jar versions\paper-1_21_11\plugins\, versions\paper-26\plugins\, versions\fabric-1_21_11\mods\, versions\fabric-26\mods\
+# Boot:   docker compose -f docker-compose.versions.yml up -d
+# Probe:  docker compose -f docker-compose.versions.yml exec -T versions-paper-1_21_11 rcon-cli "rtp test accessor"
+# Tear:   docker compose -f docker-compose.versions.yml down
+
+x-server-env: &server-env
+  EULA: "TRUE"
+  ONLINE_MODE: "FALSE"
+  SKIP_CHOWN: "TRUE"
+  RUN_AS_UID: "0"
+  RUN_AS_GID: "0"
+  # Vanilla 1.21.2+ stops ticking after 60 s with no players, which parks RTP's
+  # tick-thread probes (`rtp test ...`) and the background cache fill.
+  PAUSE_WHEN_EMPTY_SECONDS: "0"
+
+services:
+  versions-paper-1_21_11:
+    image: itzg/minecraft-server:java21
+    container_name: rtp-devstack-versions-paper-1_21_11
+    environment:
+      <<: *server-env
+      MEMORY: 3G
+      TYPE: PAPER
+      VERSION: "1.21.11"
+    ports:
+      - "127.0.0.1:25594:25565"
+    volumes:
+      - ./versions/paper-1_21_11/plugins:/data/plugins
+      - ./versions/paper-1_21_11/world:/data/world
+      - mc-image-cache:/data/.cache
+
+  versions-paper-26:
+    image: itzg/minecraft-server:java25
+    container_name: rtp-devstack-versions-paper-26
+    environment:
+      <<: *server-env
+      MEMORY: 3G
+      TYPE: PAPER
+      VERSION: "26.3"
+    ports:
+      - "127.0.0.1:25595:25565"
+    volumes:
+      - ./versions/paper-26/plugins:/data/plugins
+      - ./versions/paper-26/world:/data/world
+      - mc-image-cache:/data/.cache
+
+  versions-fabric-1_21_11:
+    image: itzg/minecraft-server:java21
+    container_name: rtp-devstack-versions-fabric-1_21_11
+    environment:
+      <<: *server-env
+      # 3G OOMs during first-boot world generation plus RTP's cache fill.
+      MEMORY: 6G
+      TYPE: FABRIC
+      VERSION: "1.21.11"
+      MODRINTH_PROJECTS: fabric-api
+    ports:
+      - "127.0.0.1:25596:25565"
+    volumes:
+      - ./versions/fabric-1_21_11/mods:/data/mods
+      - ./versions/fabric-1_21_11/world:/data/world
+      - mc-image-cache:/data/.cache
+
+  versions-fabric-26:
+    image: itzg/minecraft-server:java25
+    container_name: rtp-devstack-versions-fabric-26
+    environment:
+      <<: *server-env
+      MEMORY: 6G
+      TYPE: FABRIC
+      VERSION: "26.3"
+      MODRINTH_PROJECTS: fabric-api
+    ports:
+      - "127.0.0.1:25597:25565"
+    volumes:
+      - ./versions/fabric-26/mods:/data/mods
+      - ./versions/fabric-26/world:/data/world
+      - mc-image-cache:/data/.cache
+
+volumes:
+  mc-image-cache:

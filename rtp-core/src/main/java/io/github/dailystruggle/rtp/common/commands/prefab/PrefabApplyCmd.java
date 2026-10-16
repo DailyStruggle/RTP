@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.prefab;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
@@ -210,7 +210,7 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
                 String wn = rtpWorld.name();
                 if (wn == null || !(wn.endsWith("_nether") || wn.endsWith("_the_end"))) return;
                 Map<String, List<String>> pv = new HashMap<>();
-                io.github.dailystruggle.rtp.common.commands.menu.multiconfig.NetherEndConfigAmender
+                io.github.dailystruggle.rtp.common.commands.base.NetherEndConfigAmender
                         .amend(pv, defParser, rtpWorld);
                 Object vertObj = overlay.get("vert");
                 Map<String, Object> vert;

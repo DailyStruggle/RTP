@@ -84,6 +84,52 @@ subprojects {
         options.encoding = 'UTF-8'
     }
 
+    // ADR-113: the platform-neutral shared closure ships Java 17 bytecode
+    // (classfile 61) from the shared toolchain, so `--release 17` also rejects
+    // Java 18+ APIs. The pre-1.20.5 carrier path (Bukkit/Paper/Folia v1_20_R1,
+    // Fabric v1_20_R1, their common modules and rtp-plugin's own classes) is
+    // Java 17 too, so the jar loads on 1.18-1.20.4 servers. The 1.21+ and 26.x
+    // carriers keep the toolchain level; they only load on Java 21+ runtimes.
+    // The bundled addons' Bukkit path is Java 17 so it loads there too, and so
+    // is rtp-neoforge-common: the unified jar's ServiceLoader files list its menu
+    // providers, which every platform instantiates before the family filter.
+    // Tests are not shipped and stay on the toolchain level.
+    def java17Modules = [
+            ':rtp-api', ':rtp-core', ':anvil-api', ':yaml-api', ':commands-api',
+            ':effects-api', ':metrics-api', ':bstats-api', ':maps-api',
+            ':rtp-proxy:rtp-proxy-common',
+            ':rtp-bukkit:rtp-bukkit-common', ':rtp-bukkit:rtp-bukkit-v1_20_R1',
+            ':rtp-paper:rtp-paper-common', ':rtp-paper:rtp-paper-v1_20_R1',
+            ':rtp-folia:rtp-folia-common', ':rtp-folia:rtp-folia-v1_20_R1',
+            ':rtp-fabric:rtp-fabric-common', ':rtp-fabric:rtp-fabric-v1_20_R1',
+            ':rtp-plugin',
+            ':rtp-neoforge:rtp-neoforge-common',
+            ':addons:LeafRTPCountdownAddon', ':addons:LeafRTPRiftAddon',
+            ':addons:LeafRTPClaimAddon', ':addons:LeafRTPActionAddon',
+            ':addons:LeafRTPGuiAddon:rtp-gui-common', ':addons:LeafRTPGuiAddon:rtp-gui-bukkit',
+    ]
+    if (project.path in java17Modules) {
+        tasks.named('compileJava', JavaCompile).configure {
+            options.release = 17
+        }
+    }
+    // These Java 17 modules compile against Java 21 artifacts that only load on
+    // Java 21+ runtimes (1.21+/26.x carriers and Velocity in rtp-plugin, NeoForge
+    // 21.1, WorldGuard 7.0.12), so their classpaths keep requesting JVM 21
+    // variants instead of the JVM 17 that `release = 17` would imply.
+    def java17OnJava21Classpath = [
+            ':rtp-plugin', ':rtp-neoforge:rtp-neoforge-common', ':addons:LeafRTPClaimAddon',
+    ]
+    if (project.path in java17OnJava21Classpath) {
+        ['compileClasspath', 'runtimeClasspath'].each { cfg ->
+            configurations.named(cfg) {
+                attributes {
+                    attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 21)
+                }
+            }
+        }
+    }
+
     // Javadoc strictness is concentrated on the addon-facing surface. rtp-api and
     // rtp-core are consumed by out-of-repo addon authors (see the publishing block
     // below), so they keep the JDK's default doclint checks (missing tags included).
@@ -465,7 +511,7 @@ apiModulesForBinaryCheck.each { modulePath ->
             description = "Checks binary compatibility of ${project.name} against version ${baselineVersion}."
 
             // Compare newly built jar against resolved baseline.
-            // In Loom-managed modules (such as :effects-api), `remapJar` produces the shippable jar
+            // In Loom-managed modules, `remapJar` produces the shippable jar
             // in build/libs, whereas `jar` outputs to build/devlibs/*-dev.jar.
             def jarTask = tasks.findByName('remapJar') ?: tasks.named('jar')
             newClasspath = files(jarTask)
@@ -477,7 +523,9 @@ apiModulesForBinaryCheck.each { modulePath ->
             failOnModification = false
             failOnSourceIncompatibility = false
             ignoreMissingClasses = true
-            // Platform/internal adapter implementation packages are not public API
+            // Platform/internal adapter implementation packages are not public API.
+            // effectsapi.fabric moved to rtp-fabric-common (effects-api-ADR-003
+            // amendment 2026-10-15); kept excluded so the baseline diff stays quiet.
             packageExcludes = [
                     'io.github.dailystruggle.effectsapi.fabric'
             ]
@@ -1014,7 +1062,7 @@ subprojects {
             }
 
             if (project.path == ':effects-api') {
-                property 'sonar.coverage.exclusions', '**/effectsapi/bukkit/**,**/effectsapi/fabric/**'
+                property 'sonar.coverage.exclusions', '**/effectsapi/bukkit/**'
             }
 
             def isVersionAdapterOrCarrier = project.name.matches('v[0-9]+.*') ||

@@ -42,8 +42,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 
 ## Open
 
-
-
 ### 2026-10-08 — Probe governor's probe time includes coalescer queue wait
 
 - **Severity:** Medium
@@ -91,7 +89,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** The fuzzing badge gave false assurance until the workflow ran each target for its configured duration.
 - **Suggested next step:** Fix pending the first scheduled CI run: the workflow runs one job per `@FuzzTest` method with `JAZZER_MAX_DURATION`, the root `Test` config declares the Jazzer env vars as inputs and disables up-to-date checks in fuzz mode, and `fuzzReadChunkView` / `fuzzReadColumnProbe` carry real-region seeds (local 15 s runs of both passed). Remaining: seeds for the LZ4 and NBT targets (needs extracted payloads); crash reproducers go under `<Class>Inputs/`. Remove this entry once a CI run shows all five jobs fuzzing for the set duration.
 - **Linear:** RTP-21
-
 
 ### 2026-10-14 - Folia safety scan reads live neighbour chunks off-thread when the centre is an Anvil view
 

@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.setup;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;

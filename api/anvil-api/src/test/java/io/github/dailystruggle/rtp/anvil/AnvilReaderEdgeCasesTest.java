@@ -17,6 +17,12 @@ import org.junit.jupiter.api.Test;
 class AnvilReaderEdgeCasesTest {
 
   @Test
+  @DisplayName("getMotionBlockingNoLeaves returns null for a null chunk root instead of throwing")
+  void testMotionBlockingNoLeavesNullRoot() {
+    assertNull(AnvilReader.getMotionBlockingNoLeaves(null));
+  }
+
+  @Test
   @DisplayName("readChunkEntry validates coordinates and buffer bounds")
   void testBoundsAndCoordinates() {
     assertThrows(CorruptRegionEntryException.class, () -> AnvilReader.readChunkEntry(null, 0, 0));

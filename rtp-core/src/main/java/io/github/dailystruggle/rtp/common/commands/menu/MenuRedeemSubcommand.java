@@ -11,7 +11,7 @@ import io.github.dailystruggle.rtp.api.menu.MenuOpenRequest;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.maps.MapDispatch;
 import org.jetbrains.annotations.Nullable;
 
@@ -2906,7 +2906,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
             }
             @SuppressWarnings({"unchecked", "rawtypes"})
             io.github.dailystruggle.rtp.common.configuration.ConfigParser raw = region;
-            io.github.dailystruggle.rtp.common.commands.menu.multiconfig.NetherEndConfigAmender
+            io.github.dailystruggle.rtp.common.commands.base.NetherEndConfigAmender
                     .amend(new java.util.HashMap<>(), raw, world);
         } catch (RuntimeException e) {
             RTP.log(Level.WARNING,
@@ -2953,17 +2953,8 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         try {
             io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> child = parser.getParser(entry);
             if (child == null) return;
-            io.github.dailystruggle.rtp.common.commands.config.SubConfigCmd childCmd =
-                    new io.github.dailystruggle.rtp.common.commands.config.SubConfigCmd(
-                            parent, child.name, child);
-            childCmd.addParameters();
-            parent.addSubCommand(childCmd);
-            // Register bare alias so command resolves without .yml suffix.
-            String bare = child.name.replace(".yml", "").replace(".YML", "");
-            if (!bare.equalsIgnoreCase(child.name)) {
-                parent.addSubCommand(
-                        new io.github.dailystruggle.rtp.common.commands.config.SubConfigCmd.Alias(
-                                parent, bare, childCmd));
+            if (parent instanceof io.github.dailystruggle.rtp.common.commands.base.ConfigSubtreeRegistrar registrar) {
+                registrar.registerChildParser(child);
             }
         } catch (RuntimeException e) {
             RTP.log(Level.WARNING,

@@ -80,6 +80,7 @@
 - `--mode faults`: `--reps 1`, no `leakcheck` checkpoints, coverage dump and finding oracles only. Run the leak oracle only on episodes that reached new coverage or a new signature.
 - Finding replays in this mode skip the checkpoint (in leak mode they take a quick one to keep the leak baseline consistent).
 - **Acceptance:** at least 3x more episodes per hour than leak mode on the same server; the same planted exception is still found and confirmed.
+- **Status:** implemented and partially accepted (`--mode faults`, promotion queue with leak re-runs, checkpoint-free finding replays, planted-exception test). The planted-exception test passes (`FaultModeTest`). Live fault-mode throughput measured on Paper 26.2 (`fuzz-20261015-214736`): 24 episodes executed in 3368.7 s (`25.65 episodes/hour` including 4 promotions to 3-rep leak checks; ~96 episodes/hour in pure exploration prior to promotion). Companion leak baseline run is currently executing on the bench server to calculate the final throughput ratio. Details and table in [`LEAK_FUZZING.md`](../../helpers/StressTestRTP/LEAK_FUZZING.md#fault-mode-throughput-comparison).
 
 ### Stage 4: new oracles from data already collected
 

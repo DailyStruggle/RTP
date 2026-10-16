@@ -2,8 +2,6 @@ package io.github.dailystruggle.rtp.fabric.effects;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
 import io.github.dailystruggle.effectsapi.common.EffectFactory;
-import io.github.dailystruggle.effectsapi.fabric.FabricEffectRuntime;
-import io.github.dailystruggle.effectsapi.fabric.FabricEffectsInitializer;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
@@ -99,7 +97,7 @@ public final class FabricEffectsHandler {
             if (!effectParsingEnabled(parser) || task.player() == null) return;
             net.minecraft.world.phys.Vec3 originPos = null;
             if (task.player() instanceof FabricRTPPlayer fp && fp.handle() != null) {
-                originPos = fp.handle().position();
+                originPos = FabricHandles.positionOf(fp.handle());
             }
             net.minecraft.world.phys.Vec3 destPos = null;
             if (task.coords() != null) {
@@ -224,11 +222,11 @@ public final class FabricEffectsHandler {
             if (explicitLocation != null) {
                 Object destHandle = null;
                 if (destinationLocation != null && destWorldName != null) {
-                    destHandle = io.github.dailystruggle.effectsapi.fabric.FabricHandles.wrap(
+                    destHandle = FabricHandles.wrap(
                             destinationLocation, destWorldName);
                 }
                 target = new io.github.dailystruggle.effectsapi.common.spi.EffectTarget(
-                        io.github.dailystruggle.effectsapi.fabric.FabricHandles.wrap(handle),
+                        FabricHandles.wrap(handle),
                         io.github.dailystruggle.effectsapi.common.spi.HandleRegistry.wrapLocation(explicitLocation),
                         destHandle != null ? io.github.dailystruggle.effectsapi.common.spi.HandleRegistry.wrapLocation(destHandle) : null);
             } else {

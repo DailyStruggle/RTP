@@ -263,7 +263,7 @@ class ActionCommandTest {
     serverAccessor.addPlayer(opTarget);
 
     io.github.dailystruggle.commandsapi.common.CommandParameter playerParam =
-        new io.github.dailystruggle.rtp.common.commands.ServerAccessorCommandParameters().playerParameter();
+        new io.github.dailystruggle.rtp.common.commands.base.ServerAccessorCommandParameters().playerParameter();
     assertTrue(playerParam.isRelevant.apply(opCallerId, "OpTarget"),
         "Operator caller with rtp.* must be allowed to target player with rtp.notme");
 
@@ -562,7 +562,7 @@ class ActionCommandTest {
 
     try {
       // Register a mock "execute" command handler so the vanilla execute gate in challenge.yml succeeds in mock tests
-      serverAccessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl(null) {
+      serverAccessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl(null) {
         @Override public String name() { return "execute"; }
         @Override public String permission() { return "rtp.execute"; }
         @Override public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, io.github.dailystruggle.commandsapi.common.CommandsAPICommand subCommand) { return true; }

@@ -35,8 +35,8 @@ public final class AnvilRegionOccupancyCache {
     @Override
     public boolean equals(Object o) {
       if (this == o) return true;
-      if (!(o instanceof Entry(long[] otherBitmap, long otherMtime))) return false;
-      return mtime == otherMtime && java.util.Arrays.equals(bitmap, otherBitmap);
+      if (!(o instanceof Entry other)) return false;
+      return mtime == other.mtime && java.util.Arrays.equals(bitmap, other.bitmap);
     }
 
     @Override
@@ -53,7 +53,7 @@ public final class AnvilRegionOccupancyCache {
   private static final LinkedHashMap<Path, Entry> CACHE =
       new LinkedHashMap<>(CAPACITY * 2, 0.75f, /* accessOrder = */ true) {
         @Override
-        protected boolean removeEldestEntry(Map.Entry<Path, Entry> eldest) {
+        protected boolean removeEldestEntry(Map.Entry<Path, AnvilRegionOccupancyCache.Entry> eldest) {
           return size() > CAPACITY;
         }
       };

@@ -183,6 +183,101 @@ lite stack, verification is **visual + log-based**: confirm the teleport
 in-client and grep the destination backend log for the arrival/teleport line
 rather than looking for a reservation token.
 
+## Java 17 legacy stack (unofficial pre-1.20.5 targets)
+
+`docker-compose.legacy.yml` is a standalone stack (no proxy, no Redis) for the
+unofficial ADR-113 targets: Paper 1.18.2 on `localhost:25591` and Fabric 1.20.1
+on `localhost:25592`, both on the `java17` image so the jar is proven against a
+Java 17 runtime.
+
+```powershell
+cd devstack
+Copy-Item ..\rtp-plugin\build\libs\LeafRTP-Pro-*.jar legacy\paper-1_18\plugins\
+Copy-Item ..\rtp-plugin\build\libs\LeafRTP-Pro-*.jar legacy\fabric-1_20_1\mods\
+docker compose -f docker-compose.legacy.yml up -d
+docker compose -f docker-compose.legacy.yml exec -T legacy-paper-1_18 rcon-cli "rtp test full"
+docker compose -f docker-compose.legacy.yml exec -T legacy-fabric-1_20_1 rcon-cli "rtp test accessor"
+docker compose -f docker-compose.legacy.yml down
+```
+
+Fabric 1.21.1 (Java 21, `localhost:25593`) is opt-in: stage the jar in
+`legacy\fabric-1_21_1\mods\` and add `--profile fabric-1_21_1` to the
+`docker compose` commands.
+
+`rtp test full` is Bukkit-family only. Run console-only on an idle server, it
+reports `commands`, `stress` and `memory-leak` as failed on Paper 1.21.11 as
+well, so compare against that baseline rather than expecting 16/16.
+
+## Bug-report window stack (1.21.11 and latest 26.x)
+
+`docker-compose.versions.yml` is the same standalone layout for the versions
+that accept bug reports (ADR-113): Paper 1.21.11 (`localhost:25594`), Paper 26.3
+(`:25595`), Fabric 1.21.11 (`:25596`) and Fabric 26.3 (`:25597`). It sets
+`PAUSE_WHEN_EMPTY_SECONDS=0`, because vanilla 1.21.2+ stops ticking an empty
+server after 60 s, which also stops RTP's `rtp test` probes and cache fill.
+
+```powershell
+cd devstack
+foreach ($d in 'paper-1_21_11\plugins','paper-26\plugins','fabric-1_21_11\mods','fabric-26\mods') { New-Item -ItemType Directory -Force "versions\$d" | Out-Null; Copy-Item ..\rtp-plugin\build\libs\LeafRTP-Pro-*.jar "versions\$d\" }
+docker compose -f docker-compose.versions.yml up -d
+docker compose -f docker-compose.versions.yml exec -T versions-paper-26 rcon-cli "rtp test full"
+docker compose -f docker-compose.versions.yml exec -T versions-fabric-26 rcon-cli "rtp test accessor"
+docker compose -f docker-compose.versions.yml down
+```
+
+`run-versions-smoke.sh` is the scripted check the nightly `versions-smoke` job
+runs per service (default: `versions-paper-26` and `versions-fabric-26`). It
+stages the Pro jar from `rtp-plugin/build/libs`, boots the services, and fails
+unless `rtp test accessor` passes, `rtp info` shows a non-empty hot or cold
+queue, and the log has no tick-loop crash, OOM or classfile-version error.
+Server logs land in `logs/versions-<stamp>/`. On Windows run it from Git Bash:
+
+```powershell
+& 'C:\Program Files\Git\bin\bash.exe' devstack/run-versions-smoke.sh --fresh
+& 'C:\Program Files\Git\bin\bash.exe' devstack/run-versions-smoke.sh --service versions-fabric-1_21_11
+```
+
+For a player teleport, op the bot and run `clients/mineflayer-bot.js` against a
+port (`--port 25594 --version 1.21.11 --target-region default`). Mineflayer
+speaks up to 26.1, so 26.x player runs need a 26.1.2 server. Fabric lowercases
+offline names in `op`, so pass a lowercase `--username` there. `--assert-effects`
+can report no effects because the bot exits on landing, before the
+`postteleport` effects arrive.
+
+## Version sweep (one server per carrier boundary, with a bot)
+
+`run-version-sweep.sh` walks the matrix at the top of the script (Paper,
+Spigot, Fabric and NeoForge from 1.18.2 to 26.3, Folia from its 1.21.11
+floor; older Folia builds crash on their own and are Unsupported, ADR-113
+amendment 5) one row at a time on
+`docker-compose.sweep.yml` (port 25598, fresh `/data` under `sweep/<slug>/`).
+Each row must pass `rtp test accessor`, fill the hot or cold queue, and log no
+linkage error (`NoSuchMethodError`, `AbstractMethodError`, ...), crash or OOM.
+Rows with a bot version then run `clients/version-probe.js` twice as an opped
+`SweepBot`:
+
+- **effects:** `/rtp region=default` must land and deliver sound, particle and
+  potion packets, a `preteleport` console `COMMAND` and a `postteleport` player
+  `COMMAND`; `GLIDE.ELYTRA` and `FIREWORK` are configured and reported.
+- **death:** after a restart with `DEATH` as the `postteleport` effect and the
+  cooldown at 0, the bot must die, respawn, and see the preteleport and
+  `when: death` console `COMMAND`s.
+
+Mineflayer speaks up to 26.1, so the 26.2+ rows add ViaVersion/ViaBackwards
+(or ViaFabric, alpha builds) and connect as 26.1; a row with bot `-` stops
+after the queue check. Paper and Folia 26.3 currently kick the bot through
+ViaBackwards (`invalid_player_movement`), so those rows only prove boot and
+queue fill. Spigot rows build with BuildTools on first use (up to 30 minutes).
+Only one sweep can run at a time: every row uses the `rtp-devstack-sweep`
+container and port 25598.
+Results go to `logs/sweep-<stamp>/summary.tsv`, with each row's `server.log`,
+`bot-effects.log`, `bot-death.log` and any `linkage.txt`. A full run takes
+about two hours; `--only` takes a regex over slugs:
+
+```powershell
+& 'C:\Program Files\Git\bin\bash.exe' devstack/run-version-sweep.sh --only '^(paper|folia)-1_21_11'
+```
+
 ## Lobby world (optional)
 
 By default both lobbies generate a vanilla flat-ish Paper world on first boot.

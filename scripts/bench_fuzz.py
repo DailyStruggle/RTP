@@ -489,14 +489,16 @@ class Corpus:
         self.cap = cap
         self.pairs: set[tuple[str, str]] = set()
         self.signatures: set[str] = set()
+        self.probes: set[str] = set()
         self.max_up: dict[str, float] = {}
         self.max_down: dict[str, float] = {}
         self.entries: list[dict] = []
 
     def consider(self, ep, bots: list[dict], pairs: list[list[str]], deltas: dict | None,
-                 signatures=()) -> dict:
+                 signatures=(), probes=()) -> dict:
         new_pairs = [p for p in pairs if tuple(p) not in self.pairs]
         new_sigs = list(dict.fromkeys(s for s in signatures or () if s not in self.signatures))
+        new_probes = [p for p in dict.fromkeys(probes or ()) if p not in self.probes]
         new_counts = {}
         for k, v in (deltas or {}).items():
             if not EXACT_COUNT.match(k) or k.startswith(HARNESS_PLUGIN) or not v:
@@ -504,10 +506,11 @@ class Corpus:
             book = self.max_up if v > 0 else self.max_down
             if abs(v) > book.get(k, 0):
                 new_counts[k] = v
-        kept = bool(new_pairs or new_counts or new_sigs)
+        kept = bool(new_pairs or new_counts or new_sigs or new_probes)
         if kept:
             self.pairs.update(tuple(p) for p in new_pairs)
             self.signatures.update(new_sigs)
+            self.probes.update(new_probes)
             for k, v in new_counts.items():
                 book = self.max_up if v > 0 else self.max_down
                 book[k] = abs(v)
@@ -517,6 +520,8 @@ class Corpus:
         res = {"kept": kept, "new_states": new_pairs, "new_counts": new_counts}
         if new_sigs:
             res["new_findings"] = new_sigs
+        if new_probes:
+            res["new_probes"] = len(new_probes)
         return res
 
 
@@ -801,7 +806,7 @@ CONTROL_HEAP_FILE = "control-heap.json"
 CONTROL_FINDINGS_FILE = "control-findings.json"
 FINDING_REPLAYS_FILE = "finding-replays.jsonl"
 # Episodes that re-run another episode's programs: never a source of new replays.
-RERUN_ORIGINS = ("replay", "shrink", "rung", "finding")
+RERUN_ORIGINS = ("replay", "shrink", "rung", "finding", "leakrerun")
 VERDICT_FILE = "verdict.json"
 HEAP = "heap_used_after_gc_mb"
 CLASS_TERM_CAP = 5.0  # max score contribution of one class per episode, in noise units
@@ -1308,6 +1313,13 @@ def confirm_rule(count_growth: float, predicted: float, heap_net: float, heap_no
             "heap_net_mb": round(heap_net, 3)}
 
 
+def episodes_per_hour(executed: int, explore_s: float) -> float | None:
+    """Executed planned episodes per wall-clock hour of exploration. The clock is the
+    run_seed loop: episodes, surprise and finding replays, leak re-runs and generation
+    refits. Ladder climbs, shrinks and the direct control are not in it. None if untimed."""
+    return round(executed * 3600 / explore_s, 2) if explore_s > 0 else None
+
+
 def target_verdict(searching: bool, confirmed: list[dict], had_candidates: bool, findings=()) -> str:
     """FAIL: a top-rung leak confirmation or a reproduced target finding.
     PASS: the whole budget ran without any signal (nothing found within
@@ -1451,6 +1463,49 @@ def quick_checkpoint(drv, label: str, limit_s: float, poll_s: float = 0.5, mode:
             last = s.split("|", 1)[-1].strip()
             return None if label in last and "failed" not in last else f"checkpoint failed: {last}"
     return "timed out waiting for leakcheck"
+
+
+# --- coverage (ADR-111 section 2.6) ----------------------------------------------
+
+def coverage_probes(data: dict) -> set[str]:
+    """`class#index` keys of the reached JaCoCo probes in one
+    `/rtpstress coverage` dump. Probes are booleans, so a key is reached or not."""
+    out: set[str] = set()
+    for cls, idxs in ((data or {}).get("classes") or {}).items():
+        for i in idxs or []:
+            out.add(f"{cls}#{int(i)}")
+    return out
+
+
+class CoverageReader:
+    """Reads the stdlib JSON written by `/rtpstress coverage <label>` from the
+    runs folder. Keeps the reached probes seen so far, so a probe is new once."""
+
+    def __init__(self, runs_dir: str):
+        self.runs_dir = runs_dir
+        self.seen: set[str] = set()
+
+    def fetch(self, label: str, wait_s: float, poll_s: float = 0.25) -> set[str] | None:
+        """Reached probes of one dump; None if the file is absent after wait_s."""
+        safe = re.sub(r"[^A-Za-z0-9._-]", "_", label)
+        path = os.path.join(self.runs_dir, f"coverage-{safe}.json")
+        end = time.time() + wait_s
+        while True:
+            if os.path.exists(path):
+                try:
+                    with open(path, encoding="utf-8") as f:
+                        return coverage_probes(json.load(f))
+                except (OSError, ValueError):
+                    pass  # still being written: retry until the deadline
+            if time.time() >= end:
+                return None
+            time.sleep(poll_s)
+
+    def new_probes(self, probes: set[str]) -> list[str]:
+        """Probes not seen in any earlier dump, marked seen."""
+        new = sorted(probes - self.seen)
+        self.seen.update(new)
+        return new
 
 
 # --- permissions ----------------------------------------------------------------
@@ -2133,9 +2188,14 @@ class TargetRun:
         self.a, self.drv, self.swarm, self.reader = a, drv, swarm, reader
         self.target, self.stamp, self.tdir = target, stamp, tdir
         self.cmd = command_for(target, parse_cmds(a.cmd))
+        self.probe_reader = CoverageReader(reader.runs_dir) if getattr(a, "coverage", False) else None
+        # The direct control run always measures leaks (its fit is the reference for every target).
+        self.faults = getattr(a, "mode", "leak") == "faults" and target != DIRECT
         self.trace = os.path.join(tdir, "episodes.jsonl")
         self.prev: dict | None = None
         self.prev_histo: dict = {}
+        self.dirty = False  # faults mode: the last episode left players online
+        self.promotions: list[dict] = []  # faults mode: promising episodes awaiting a leak re-run
         self.cfg = {"min_bots": a.min_bots, "max_bots": a.max_bots, "min_s": a.min_episode_s,
                     "max_s": a.max_episode_s, "novelty": a.novelty, "run": f"{stamp}:{target}",
                     "rtp_args": [x for x in (a.rtp_args or "").split(",")] if a.rtp_args else [],
@@ -2163,7 +2223,8 @@ class TargetRun:
         self.control_heap = None if target == DIRECT else load_json(os.path.join(run_dir, CONTROL_HEAP_FILE))
         self.heap_stop = a.heap_stop_mb
         self.learnt: dict[int, dict] = {}  # seed -> final generator parameters
-        self.coverage = {"episodes": 0, "pairs": set(), "restarts": 0, "seeds": [], "heap_stopped": False}
+        self.coverage = {"episodes": 0, "planned": 0, "executed": 0, "explore_s": 0.0, "pairs": set(), "restarts": 0,
+                         "seeds": [], "heap_stopped": False}
         log_path = os.path.join(a.server_dir, "logs", "latest.log") if getattr(a, "server_dir", None) else None
         self.target_names = target_aliases(a, target)
         self.log_oracle = ServerLogOracle(log_path, plugin_packages(getattr(a, "plugin_packages", None)),
@@ -2227,7 +2288,10 @@ class TargetRun:
         time.sleep(self.a.quiet_s)
         left = wait_fuzz_gone(self.drv, self.a.quiet_wait_s)
         lingering = [n for n in left if FUZZ_NAME.match(n)]
-        return lingering, ([] if self.a.allow_online else foreign_online(left))
+        foreign = ([] if self.a.allow_online else foreign_online(left))
+        if self.faults and (lingering or foreign):
+            self.dirty = True
+        return lingering, foreign
 
     def baseline(self, seed: int, tag: str, mode: str = "quick") -> bool:
         """Fresh reference checkpoint, only once no other player is online."""
@@ -2257,9 +2321,13 @@ class TargetRun:
             append_jsonl(os.path.join(self.tdir, CLASSES_FILE), side)
 
     def execute(self, seed: int, ep, plan: dict, corpus: Corpus | None, gen: int = 0, rung: int = 0,
-                reps: int | None = None) -> dict:
+                reps: int | None = None, leak: bool = False, replay: bool = False) -> dict:
         """Run one planned episode and write its trace line; returns the record.
-        reps overrides --reps (finding replays need one run, not a slope)."""
+        reps overrides --reps (finding replays need one run, not a slope).
+        leak=True measures with checkpoints even in faults mode (leak re-runs, rungs,
+        shrink and surprise replays). replay=True marks a finding replay: in faults
+        mode it runs without a checkpoint and confirms by signature only."""
+        faults = self.faults and not leak
         eid = f"{self.target}-s{seed}-e{ep}"[:64]
         bots = plan["bots"]
         rec = {"seed": seed, "ep": ep, "parent": plan.get("parent"), "gen": gen, "rung": rung,
@@ -2268,7 +2336,22 @@ class TargetRun:
                "features": None, "deltas": None, "score": None}
         if plan.get("replay_of") is not None:
             rec["replay_of"] = plan["replay_of"]
-        if self.prev is None and not self.baseline(seed, f"e{ep}b"):
+        if replay and faults:
+            rec["replay"] = True
+        if self.faults and self.dirty:
+            # Faults mode has no baseline to refuse a dirty start: wait for the last episode's players to leave.
+            lingering, foreign = self.settle()
+            if lingering or foreign:
+                rec["excluded"] = "other players online before the episode"
+                self.prev, self.prev_histo = None, {}
+                if lingering:
+                    rec["lingering"] = lingering
+                if foreign:
+                    rec["foreign_online"] = foreign
+                self.write(rec)
+                return rec
+            self.dirty = False
+        if not faults and self.prev is None and not self.baseline(seed, f"e{ep}b"):
             rec["excluded"] = "no baseline checkpoint"
             self.write(rec)
             return rec
@@ -2307,40 +2390,51 @@ class TargetRun:
             rec["foreign_online"] = foreign
         label = self.label(seed, f"e{ep}")
         rec["label"] = label
-        c0 = time.time()
-        err = quick_checkpoint(self.drv, label, self.a.checkpoint_wait_s, self.a.checkpoint_poll_s)
-        d = None if err else self.reader.fetch(label, self.a.files_wait_s, min(0.25, self.a.checkpoint_poll_s))
-        rec["checkpoint_ms"] = int((time.time() - c0) * 1000)
-        if d is None:
-            rec["excluded"] = f"no checkpoint: {err or 'row not in runs files'}"
-            log(f"{self.target}: episode {ep}: {rec['excluded']}; excluded, rebaselining")
-            self.prev = None
-        else:
-            h = self.reader.histo(d)
-            deltas = count_deltas(self.prev, d)
-            if h and self.prev_histo:
-                deltas.update(class_deltas(self.prev_histo, h, self.a.top_classes))
-            else:
-                rec["no_histogram"] = True
-            rec["deltas"] = deltas
-            rec["online_at_checkpoint"] = int(d.get("online", -1))
-            rec["features"] = extract_features(rec)
+        if faults:
+            self.prev, self.prev_histo = None, {}  # no chain: a later checkpointed run must rebaseline
+            # No checkpoint chain: the next episode settles first while these players are still online.
             if foreign or lingering:
-                # The next delta would start from this dirty state: rebaseline.
-                rec["excluded"] = "other players online at the checkpoint"
-                self.prev, self.prev_histo = None, {}
+                rec["excluded"] = "other players online after the episode"
+        else:
+            c0 = time.time()
+            err = quick_checkpoint(self.drv, label, self.a.checkpoint_wait_s, self.a.checkpoint_poll_s)
+            d = None if err else self.reader.fetch(label, self.a.files_wait_s, min(0.25, self.a.checkpoint_poll_s))
+            rec["checkpoint_ms"] = int((time.time() - c0) * 1000)
+            if d is None:
+                rec["excluded"] = f"no checkpoint: {err or 'row not in runs files'}"
+                log(f"{self.target}: episode {ep}: {rec['excluded']}; excluded, rebaselining")
+                self.prev = None
             else:
-                self.prev, self.prev_histo = d, (h or {})
-                reps = self.a.reps if reps is None else reps
-                if reps > 1:
-                    self.repeat(seed, ep, rec, d, h or {}, reps)
+                h = self.reader.histo(d)
+                deltas = count_deltas(self.prev, d)
+                if h and self.prev_histo:
+                    deltas.update(class_deltas(self.prev_histo, h, self.a.top_classes))
+                else:
+                    rec["no_histogram"] = True
+                rec["deltas"] = deltas
+                rec["online_at_checkpoint"] = int(d.get("online", -1))
+                rec["features"] = extract_features(rec)
+                if foreign or lingering:
+                    # The next delta would start from this dirty state: rebaseline.
+                    rec["excluded"] = "other players online at the checkpoint"
+                    self.prev, self.prev_histo = None, {}
+                else:
+                    self.prev, self.prev_histo = d, (h or {})
+                    reps = self.a.reps if reps is None else reps
+                    if reps > 1:
+                        self.repeat(seed, ep, rec, d, h or {}, reps)
         if "excluded" in rec:
             rec["features"] = None
         rec["score"] = score_episode(rec, self.score_counts, self.ref, self.class_z, target_fit=self.fit)
         if corpus is not None and "excluded" not in rec:
+            probes = self.coverage_probes(label) if self.probe_reader is not None else ()
             res = corpus.consider(ep, bots, rec["states"], rec["deltas"],
-                                  [f["signature"] for f in rec.get("findings") or []])
+                                  [f["signature"] for f in rec.get("findings") or []], probes)
             rec.update(res)
+            if faults and rec["origin"] not in RERUN_ORIGINS and (res.get("new_probes") or res.get("new_findings")):
+                self.promotions.append({"ep": ep, "bots": bots, "console": plan.get("console"),
+                                        "probes": res.get("new_probes", 0),
+                                        "signatures": res.get("new_findings", [])})
         self.write(rec)
         ds = rec["deltas"] or {}
         log(f"{self.target}: s{seed} e{ep} {rec['origin']:<8} bots={len(bots)} acts="
@@ -2358,6 +2452,20 @@ class TargetRun:
             + (" kept" if rec.get("kept") else "")
             + (f" score={rec['score']:+.2f}/min" if rec.get("score") is not None else ""))
         return rec
+
+    def coverage_probes(self, label: str) -> set[str]:
+        """Reached probes of this episode's `/rtpstress coverage` dump; a missing
+        dump is logged and yields no probes, so the episode is never excluded."""
+        try:
+            self.drv.try_cmd(f"rtpstress coverage {label}")
+        except Exception as ex:  # noqa: BLE001  (coverage is best-effort evidence)
+            log(f"{self.target}: coverage {label}: {type(ex).__name__}")
+            return set()
+        probes = self.probe_reader.fetch(label, self.a.files_wait_s, min(0.25, self.a.checkpoint_poll_s))
+        if probes is None:
+            log(f"{self.target}: coverage {label}: no dump")
+            return set()
+        return set(self.probe_reader.new_probes(probes))
 
     def observe(self, seed: int, ep, origin: str, events: list[dict], programs: list) -> list[dict]:
         """Every finding oracle's findings of one episode, one per signature
@@ -2379,6 +2487,8 @@ class TargetRun:
     def swarm_failed(self, ep, e: Exception) -> None:
         log(f"{self.target}: episode {ep}: {e}; restarting the swarm")
         self.prev, self.prev_histo = None, {}  # bots may still be online: rebaseline before the next episode
+        if self.faults:
+            self.dirty = True  # faults mode settles before the next episode instead
         try:
             self.swarm.restart()
         except (SwarmError, OSError) as e2:
@@ -2532,7 +2642,7 @@ class TargetRun:
             plan = {"origin": origin, "parent": tag, "params": None, "console": console,
                     "bots": [{"name": bot_name(self.cfg["run"], seed, f"{tag}r{j}", i), "program": b["program"]}
                              for i, b in enumerate(bots)]}
-            r = self.execute(seed, f"{tag}r{j}", plan, None, gen=gen, reps=1)
+            r = self.execute(seed, f"{tag}r{j}", plan, None, gen=gen, reps=1, replay=origin == "finding")
             if "ms" not in r:
                 continue
             done += 1
@@ -2635,16 +2745,71 @@ class TargetRun:
             + (" (no signal yet)" if self.search.searching else "") + f", novelty next {self.search.novelty:.2f}")
         return line
 
+    def drain_promotions(self, seed: int, gen: int) -> tuple[list[dict], list[dict]]:
+        """Leak re-runs of the promising fault episodes queued in this generation:
+        a fresh baseline, the same programs with checkpoints and --reps, then the
+        surprise check. At most --promote-max run; the rest, and any without a
+        clean baseline, are logged to ladder.jsonl as dropped. Re-runs never enter
+        the corpus. Returns (re-runs and their replays, surprise entries); the
+        re-runs climb the ladder like any other measured episode."""
+        if not self.promotions:
+            return [], []
+        queue, self.promotions = self.promotions, []
+        out, surprises = [], []
+        for i, p in enumerate(queue):
+            cand = f"s{seed}e{p['ep']}"
+            why = None
+            if i >= self.a.promote_max:
+                why = "budget"
+            elif not self.baseline(seed, f"p{p['ep']}b"):
+                why = "baseline"
+            if why:
+                if why == "baseline":
+                    self.dirty = True  # the failed baseline saw players online
+                append_jsonl(os.path.join(self.tdir, "ladder.jsonl"),
+                             {"cand": cand, "origin": "leakrerun", "gen": gen, "dropped": why})
+                log(f"{self.target}: {cand} leak re-run dropped ({why})")
+                continue
+            self.dirty = False  # the baseline settled: no other player is online
+            plan = {"origin": "leakrerun", "parent": p["ep"], "params": None, "console": p["console"],
+                    "bots": scale_bots(p["bots"], len(p["bots"]), self.cfg["run"], seed, f"p{p['ep']}")}
+            r = self.execute(seed, f"p{p['ep']}", plan, None, gen=gen, leak=True)
+            batch = [r]
+            if usable(r):
+                replays: list[dict] = []
+                s = self.check_surprise(seed, r, gen, replays)
+                batch += replays
+                if s:
+                    surprises.append(s)
+            out += batch
+            if not usable(r):
+                confirm = {"status": "not measured", "reason": r.get("excluded") or "no leak measurement"}
+            else:
+                confirm = {"status": "pending", "reason": "final confirm only on a ladder climb"}
+            append_jsonl(os.path.join(self.tdir, "ladder.jsonl"),
+                         {"cand": cand, "climb_cand": f"s{seed}ep{p['ep']}", "origin": "leakrerun",
+                          "gen": gen, "probes": p["probes"],
+                          "signatures": p["signatures"], "excluded": r.get("excluded"),
+                          "reps": r.get("reps"), "reps_error": r.get("reps_error"), "score": r.get("score"),
+                          "label": r.get("label"), "surprise": r.get("surprise"), "confirm": confirm})
+            # Any player left online by the re-run, its repetitions or its replays: settle before the next episode.
+            self.dirty = self.dirty or any(x.get("excluded") or x.get("reps_error") or x.get("lingering")
+                                           or x.get("foreign_online") for x in batch)
+        self.prev, self.prev_histo = None, {}
+        return out, surprises
+
     def run_seed(self, seed: int, params: dict | None = None) -> list[dict]:
         """Generations of --generation episodes; each seed starts its own CEM
         from the prior (an independent restart)."""
         params = params or DEFAULT_PARAMS
+        t0 = time.time()  # the exploration clock behind episodes_per_hour
         cem = None if self.a.no_optimise else Cem(params, self.a.elite, self.a.cem_alpha, self.a.stall_gens)
         corpus = Corpus()
         recs: list[dict] = []
         gen_recs: list[dict] = []
         size = max(1, self.a.generation)
-        self.baseline(seed, "base")
+        if not self.faults:
+            self.baseline(seed, "base")
         self.replay_spent = 0
         self.shrink_spent = 0
         spent, ep = 0, 0
@@ -2658,6 +2823,8 @@ class TargetRun:
             recs.append(rec)
             gen_recs.append(rec)
             spent += 1
+            if "ms" in rec:  # bots ran: an early exclusion (dirty start, no baseline) is not an executed episode
+                self.coverage["executed"] += 1
             replays: list[dict] = []
             s = self.check_surprise(seed, rec, gen, replays)
             if s:
@@ -2668,6 +2835,9 @@ class TargetRun:
             ep += 1
             stop = self.over_heap()
             if len(gen_recs) == size or spent >= self.a.episodes or stop:
+                extra, extra_surprises = self.drain_promotions(seed, gen)
+                recs += extra
+                gen_surprises += extra_surprises
                 self.end_generation(seed, gen, cem, gen_recs, recs, corpus, gen_surprises)
                 gen_recs, gen_surprises = [], []
             if stop:
@@ -2676,7 +2846,9 @@ class TargetRun:
                 break
         if cem is not None:
             self.learnt[seed] = cem.params()
+        self.coverage["explore_s"] += time.time() - t0
         self.coverage["episodes"] += len(recs)
+        self.coverage["planned"] += spent
         self.coverage["pairs"] |= corpus.pairs
         self.coverage["seeds"].append(seed)
         kept = len(corpus.entries)
@@ -2695,7 +2867,7 @@ class TargetRun:
             plan = {"origin": origin, "parent": tag, "params": None, "replay_of": replay_of,
                     "bots": [{"name": bot_name(self.cfg["run"], seed, f"{tag}r{j}", i), "program": b["program"]}
                              for i, b in enumerate(bots)], "console": console}
-            r = self.execute(seed, f"{tag}r{j}", plan, None, gen=gen)
+            r = self.execute(seed, f"{tag}r{j}", plan, None, gen=gen, leak=True)
             if out is not None:
                 out.append(r)
             if not usable(r, count):
@@ -2810,7 +2982,7 @@ class TargetRun:
         for j in range(reps):
             plan = {"origin": "rung", "parent": c["cand"], "params": c.get("params"), "console": c.get("console"),
                     "bots": scale_bots(c["bots"], bots_n, self.cfg["run"], seed, f"{tag}r{j}")}
-            r = self.execute(seed, f"{tag}r{j}", plan, None, rung=ri + 1)
+            r = self.execute(seed, f"{tag}r{j}", plan, None, rung=ri + 1, leak=True)
             if usable(r, count):
                 f = r["features"]
                 nets.append(float(r["deltas"].get(count, 0) or 0) - predict(rc, f))
@@ -2904,7 +3076,8 @@ class TargetRun:
         by = (["leak"] if any(c["fail"] for c in confirmed) else []) + sorted(
             {f["oracle"] for f in findings if f.get("reproduced")})
         cov = dict(self.coverage, pairs=len(self.coverage["pairs"]), classes_tested=self.classes_seen,
-                   finding_signatures=len(findings))
+                   finding_signatures=len(findings),
+                   episodes_per_hour=episodes_per_hour(self.coverage["executed"], self.coverage["explore_s"]))
         out = {"target": self.target, "verdict": verdict, "confirmed_by": by, "state": self.search.state,
                "reason": self.search.reason,
                "candidates": [{k: c[k] for k in ("cand", "count", "source", "shrunk")} for c in cands],
@@ -3113,6 +3286,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--checkpoint-wait-s", type=float, default=120)
     p.add_argument("--checkpoint-poll-s", type=float, default=0.5, help="leakcheck status poll interval")
     p.add_argument("--files-wait-s", type=float, default=30, help="wait for rows in the (shared) runs files")
+    p.add_argument("--coverage", action="store_true",
+                   help="JaCoCo probes as a corpus key source (needs the bench server's -javaagent; ADR-111 2.6)")
+    p.add_argument("--mode", choices=("leak", "faults"), default="leak",
+                   help="faults: one checkpoint-free run per episode (finding oracles and coverage only); "
+                        "needs --coverage")
+    p.add_argument("--promote-max", type=int, default=4,
+                   help="faults: leak re-runs per generation for episodes that reached new probes or signatures")
     p.add_argument("--top-classes", type=int, default=0, help="per-class deltas kept per episode (0 = all)")
     p.add_argument("--max-classes", type=int, default=64,
                    help="classes screened into the fit and score per generation (0 = none)")
@@ -3171,11 +3351,16 @@ def run_target(a, drv, swarm, target, seeds, run_dir, stamp, w, replay_rec=None)
     t0 = time.time()
     if replay_rec is not None:
         seed = int(replay_rec.get("seed", 0))
-        tr.baseline(seed, "base")
+        if not tr.faults:
+            tr.baseline(seed, "base")
         for k in range(a.replay_n):
-            tr.execute(seed, f"{replay_rec['ep']}r{k}", replay_plan(replay_rec, k, tr.cfg["run"]), None)
+            tr.execute(seed, f"{replay_rec['ep']}r{k}", replay_plan(replay_rec, k, tr.cfg["run"]), None,
+                       replay=True)
     else:
         tr.heap_stop = heap_stop_mb(a, a.server_dir)
+        if tr.faults and tr.heap_stop:
+            log(f"{target}: --mode faults has no checkpoint, so the heap limit ({tr.heap_stop:.0f} MB) is not "
+                "enforced; watch the server heap or use --mode leak")
         all_recs: list[dict] = []
         by_seed: dict[int, tuple[list, list]] = {}
         for seed in seeds:
@@ -3256,6 +3441,13 @@ def main(argv=None) -> int:
         p.error("need --eta >= 1")
     if a.reps < 1:
         p.error("need --reps >= 1")
+    if a.mode == "faults" and not a.coverage:
+        p.error("--mode faults needs --coverage (promising episodes come from coverage probes)")
+    if a.promote_max < 0:
+        p.error("need --promote-max >= 0")
+    if a.mode == "faults" and a.reps > 1:
+        log(f"--mode faults: --reps {a.reps} applies only to leak re-runs of promising episodes; "
+            "the fault episodes themselves run once")
     if not 0 <= a.console_p <= 1:
         p.error("need 0 <= --console-p <= 1")
     if a.replay and a.ep is None:

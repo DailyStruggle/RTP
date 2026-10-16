@@ -35,13 +35,17 @@ final class FabricMetricsBindingTest {
         assertEquals(MetricsSnapshot.UNSAMPLED, b.mspt(), 1e-9);
     }
 
-    /** First tick seeds the timestamp; no EMA emitted until the second tick. */
+    /** First tick seeds the EMA with nominal tick time so boot spikes don't contaminate the average. */
     @Test
-    void first_tick_only_seeds() {
+    void first_tick_seeds_ema_with_nominal() {
         AtomicLong clock = new AtomicLong(1_000_000_000L);
         FabricMetricsBinding b = new FabricMetricsBinding(clock::get, () -> 0, () -> 0);
         b.tick();
-        assertEquals(MetricsSnapshot.UNSAMPLED, b.tps1m(), 1e-9);
+        // TPS is seeded to nominal (20 TPS) so boot spikes don't drag down the rolling average.
+        assertEquals(20.0, b.tps1m(), 1e-9);
+        assertEquals(20.0, b.tps5m(), 1e-9);
+        assertEquals(20.0, b.tps15m(), 1e-9);
+        // MSPT has no work source, so it remains unsampled.
         assertEquals(MetricsSnapshot.UNSAMPLED, b.mspt(), 1e-9);
     }
 
@@ -168,26 +172,26 @@ final class FabricMetricsBindingTest {
         assertTrue(slow >= 0.0);
     }
 
-    /** TPS is clamped to {@code [0, 20]} even on a near-zero delta. */
+    /** Zero delta is ignored; EMA stays at previous value. */
     @Test
     void zero_delta_is_ignored() {
         AtomicLong clock = new AtomicLong(1_000L);
         FabricMetricsBinding b = new FabricMetricsBinding(clock::get, () -> 0, () -> 0);
+        b.tick(); // seeds EMA to nominal (20 TPS)
+        // Same clock value - delta=0, must be a no-op.
         b.tick();
-        // Same clock value - delta=0, must be a no-op (no EMA emitted).
-        b.tick();
-        assertEquals(MetricsSnapshot.UNSAMPLED, b.tps1m(), 1e-9);
+        assertEquals(20.0, b.tps1m(), 1e-9); // EMA unchanged
     }
 
-    /** Negative deltas (clock regression) are ignored. */
+    /** Negative deltas (clock regression) are ignored; EMA stays at previous value. */
     @Test
     void negative_delta_is_ignored() {
         AtomicLong clock = new AtomicLong(1_000_000_000L);
         FabricMetricsBinding b = new FabricMetricsBinding(clock::get, () -> 0, () -> 0);
-        b.tick(); // seed at 1e9
+        b.tick(); // seeds EMA to nominal (20 TPS)
         clock.set(500_000_000L); // regression
         b.tick();
-        assertEquals(MetricsSnapshot.UNSAMPLED, b.tps1m(), 1e-9);
+        assertEquals(20.0, b.tps1m(), 1e-9); // EMA unchanged
     }
 
     /** PlayerCount / softCap delegate to suppliers and clamp negatives to 0. */

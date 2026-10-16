@@ -91,9 +91,9 @@ rootProject.name = 'RTP'
 // by every plugin/adapter through plain project(':commands-api') /
 // project(':effects-api') edges. They were briefly extracted to sibling repos
 // (CommandsAPI / EffectsAPI) and consumed as published / composite-build
-// coordinates; that was reverted because (a) effects-api applies fabric-loom and
-// a published intermediary jar cannot satisfy RTP's mojmap Fabric modules, and
-// (b) co-evolving the API with its only consumer through a publish round-trip is
+// coordinates; that was reverted because (a) effects-api then applied fabric-loom
+// and a published intermediary jar could not satisfy RTP's mojmap Fabric modules,
+// and (b) co-evolving the API with its only consumer through a publish round-trip is
 // slower than an in-tree edge. See the include lines + projectDir overrides below.
 
 // JDK-25 / unobfuscated-Loom modules can be excluded from the build graph by
@@ -126,9 +126,9 @@ include 'commands-api'
 // rtp-core so rtp-api can host the configurable selection model without a core
 // dependency. Pure Java, no platform/Loom dependency.
 include 'yaml-api'
-// effects-api -- in-module platform split (effects-api-ADR-003). Applies
-// fabric-loom so its fabric/ subpackage resolves net.minecraft.* at compile
-// time; consumed in-tree via project(':effects-api').
+// effects-api -- platform-neutral effects SPI + Bukkit runtime
+// (effects-api-ADR-003). Pure Java, no Loom: Minecraft-typed effect code lives
+// in the Fabric / NeoForge platform carriers. Consumed via project(':effects-api').
 include 'effects-api'
 // effects-api-fabric-unobf -- nested Mojmap-unobf carrier for the deobf MC 26.x
 // runtime (effects-api-ADR-006, rtp-fabric-ADR-009). Requires JDK 25 + Loom

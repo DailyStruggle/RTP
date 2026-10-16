@@ -149,7 +149,8 @@ public final class SparkMetricsBinding implements MetricsBinding {
             }
 
             try {
-                if (io.github.dailystruggle.rtp.common.RTP.metrics instanceof io.github.dailystruggle.rtp.common.metrics.CoreMetrics cm) {
+                io.github.dailystruggle.rtp.common.metrics.CoreMetrics cm = io.github.dailystruggle.rtp.common.RTP.metrics;
+                if (cm != null) {
                     avgLatency = cm.pipelineHistogram().mean();
                     slowCount = cm.slowPipelineCount();
                 }

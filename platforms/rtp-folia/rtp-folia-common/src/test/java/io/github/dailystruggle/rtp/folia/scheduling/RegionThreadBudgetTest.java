@@ -79,4 +79,13 @@ class RegionThreadBudgetTest {
     t.join();
     assertTrue(other[0]);
   }
+
+  @Test
+  @DisplayName("ADR-112: release() drops the calling thread's bucket so the next use starts full")
+  void releaseResetsCallingThread() {
+    budget.charge(BUDGET * 2);
+    assertFalse(budget.hasBudget());
+    budget.release();
+    assertEquals(BUDGET, budget.remaining(), "a released thread re-initialises with one full budget");
+  }
 }

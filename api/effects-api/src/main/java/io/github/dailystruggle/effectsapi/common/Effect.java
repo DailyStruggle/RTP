@@ -93,6 +93,18 @@ public abstract class Effect<T extends Enum<T>> implements Runnable, Cloneable {
     }
 
     /**
+     * Emit a diagnostic warning to the configured default warn sink.
+     *
+     * @param msg warning message
+     */
+    public static void warn(String msg) {
+        Consumer<String> sink = defaultWarn;
+        if (sink != null) {
+            sink.accept(msg);
+        }
+    }
+
+    /**
      * Convenience: parse positional tokens against {@code keyOrder} using
      * the host-configured default warn sink. See
      * {@link #applyByType(Enum[], String[], Consumer)}.
@@ -277,6 +289,12 @@ public abstract class Effect<T extends Enum<T>> implements Runnable, Cloneable {
     public Effect<T> clone() {
         try {
             Effect<T> clone = (Effect<T>) super.clone();
+            if (this.defaults != null) {
+                clone.defaults = this.defaults.clone();
+            }
+            if (this.data != null) {
+                clone.data = this.data.clone();
+            }
             clone.setData(data);
             // Best-effort deep-copy of a cloneable target without binding to a
             // platform-specific type; concrete effects can override clone() if

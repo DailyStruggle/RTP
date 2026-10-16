@@ -70,7 +70,7 @@ Private / Author notes:
 # {{name}}: Random Teleport
 
 [![Build](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml/badge.svg)](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml)
-[![Java](https://img.shields.io/badge/Java-21%2B-blue)](https://adoptium.net/)
+[![Java](https://img.shields.io/badge/Java-17%2B-blue)](https://adoptium.net/)
 [![Platforms](https://img.shields.io/badge/Platforms-Paper%20%7C%20Folia%20%7C%20Fabric%20%7C%20NeoForge%20%7C%20Velocity-orange)](https://dailystruggle.github.io/RTP/admin/QUICK_START/)
 [![Web Editor](https://img.shields.io/badge/Tooling-Visual%20Web%20Editor-2ea44f)](https://dailystruggle.github.io/RTP/editor/)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=DailyStruggle_RTP&metric=coverage)](https://sonarcloud.io/summary/overall?id=DailyStruggle_RTP)
@@ -94,7 +94,7 @@ There is also a paid LeafRTP-Pro listing on BuiltByBit. It is the same code, and
 <!-- /kind -->
 <!-- /only -->
 <!-- only: modrinth -->
-One jar for Paper, Folia and Spigot (1.21+), Fabric (needs Fabric API) and NeoForge (1.21.1+), up to 26.x, and it also loads as a Velocity plugin for cross-server `/rtp`. Java 21+.
+One jar for Paper and Spigot (1.18+), Folia (1.21.11+), Fabric (1.20.1 and 1.21+, needs Fabric API) and NeoForge (1.21.1+), up to 26.3, and it also loads as a Velocity plugin for cross-server `/rtp`. Java 17+, or newer if your Minecraft version needs it.
 <!-- /only -->
 <!-- only: hangar -->
 On Paper all candidate checking runs off the tick thread. On Folia, candidates are screened against the region files first, nothing waits on a synchronous chunk load, and only the final block check of a loaded chunk runs on its region thread. The same jar also loads on Velocity for cross-server `/rtp`.
@@ -132,7 +132,9 @@ These work without extra plugins:
 
 ## Install
 
-**Requirements:** Java 21+. Paper, Folia, Spigot on 1.21+, or Fabric / NeoForge on 1.21.1+, up to 26.x.
+**Requirements:** Paper or Spigot 1.18+, Folia 1.21.11+, Fabric 1.20.1 or 1.21+, or NeoForge 1.21.1+, up to 26.3. Java 17+ (Minecraft itself needs Java 21 from 1.20.5 and Java 25 on 26.x).
+
+Nightly CI boots 1.21.11 and 26.3. I take bug reports from 1.21.11 to the latest release; older versions should run, but fixes there are best effort. Folia is the exception: it is experimental and only its current builds are maintained, so Folia older than 1.21.11 is not supported and can crash without RTP's involvement. Exact per-version status is in the [support matrix](https://github.com/DailyStruggle/RTP/blob/V3/docs/dev/SUPPORT_MATRIX.md).
 
 1. Drop `{{jar}}` into `plugins/` (or `mods/`).
 2. Type `/rtp`. With the bundled GUI addon it opens a picker listing your regions, with links to the map visualizations and the admin panel; without it, `/rtp` teleports straight away.
@@ -396,10 +398,10 @@ Safety-critical packages inside `rtp-core` have higher floors on top of the modu
 | Binary API compatibility | japicmp against the 3.2.1 release on Maven Central for `rtp-api`, `commands-api`, `effects-api`, `maps-api` and `metrics-api`; a binary break not listed in `config/binary-compatibility-accepted-breaks.json` fails the build. `anvil-api` and `tags-api` have no published 3.2.1 artifact, so their check skips. Removals follow a 2-minor deprecation policy | `gradle.yml` (japicmp) |
 | Dependency CVEs | OWASP dependency-check fails at CVSS >= 4 on the scanned files; scanning the resolved Gradle dependency graph and shaded jar isn't in place yet | `dependency-check.yml`, weekly and on dependency changes |
 | Release provenance | SLSA build provenance on every release; GitHub releases also carry a CycloneDX SBOM and SHA-256 / SHA-512 checksums | `release.yml`, `release-bbb.yml` |
-| Runtime acceptance | nightly multi-server devstack: 2 Velocity proxies, 2 lobbies and 4 backends over Redis, on Velocity + Paper + Folia + Fabric (MC 1.21.11, Java 25) and NeoForge (MC 1.21.1, Java 21) | `devstack-acceptance.yml` |
+| Runtime acceptance | nightly multi-server devstack: 2 Velocity proxies, 2 lobbies and 4 backends over Redis, on Velocity + Paper + Folia + Fabric (MC 1.21.11, Java 25) and NeoForge (MC 1.21.1, Java 21). Separately, a single Paper and a single Fabric server on the latest release (26.3) must pass the accessor self-test, fill the location queue and not crash | `devstack-acceptance.yml` |
 | Encoding and docs | tracked text files scanned for UTF-8 mojibake; the docs site builds from the same tree | `gradle.yml`, `docs.yml` |
 
-**Coverage scope.** The `rtp-core` and `rtp-proxy-common` floors sit a point or two under the measured numbers and only go up. The uncovered remainder in `rtp-core` is mostly platform bootstrap and dispatch code, which the nightly devstack exercises. Spigot, NeoForge, BungeeCord and non-LTS Java have no scheduled live CI suite and are best-effort. The weekly Jazzer workflow runs each of the five fuzz targets as its own job for the configured duration (5 minutes by default). Only the two Anvil read targets are seeded from real region files; the LZ4 and NBT targets have no seeds yet. The reworked workflow has not completed a scheduled run yet.
+**Coverage scope.** The `rtp-core` and `rtp-proxy-common` floors sit a point or two under the measured numbers and only go up. The uncovered remainder in `rtp-core` is mostly platform bootstrap and dispatch code, which the nightly devstack exercises. Spigot, NeoForge, BungeeCord and non-LTS Java have no scheduled live CI suite and are best-effort, as are Folia on 26.x and the other platforms below 1.21.11 (Paper 1.18.2 and Fabric 1.20.1 on Java 17 have only been booted by hand). Folia below 1.21.11 is not supported. The weekly Jazzer workflow runs each of the five fuzz targets as its own job for the configured duration (5 minutes by default). Only the two Anvil read targets are seeded from real region files; the LZ4 and NBT targets have no seeds yet. The reworked workflow has not completed a scheduled run yet.
 
 </details>
 
@@ -541,7 +543,7 @@ A: Not to the outside. The hosted editor needs no inbound port: it connects outb
 A: "RTP" is the generic name for random teleport, and the old name was just the function. That worked for years with older search and word of mouth (passing 400k downloads under that name), but current search and marketplace indexes lump it in with every other random-teleport plugin, command and forum thread, and it stopped showing up. "LeafRTP" is a name that points at this plugin. The `/rtp` command, `rtp-api`, config paths and data files stay exactly as they were, and nothing changes for existing installs.
 
 **Q: Does it work on Folia?**
-A: Yes. How it loads chunks there is under [Chunk loading, by platform](#chunk-loading-by-platform). In the Folia benchmarks it had 0 watchdog stalls.
+A: Yes, on Folia 1.21.11 and newer. Folia is experimental and only its current builds are maintained, so older Folia builds aren't supported; they can crash on their own. How it loads chunks there is under [Chunk loading, by platform](#chunk-loading-by-platform). In the Folia benchmarks it had 0 watchdog stalls.
 
 **Q: How do I set up teleportation between worlds?**
 A: Resolution order: the player's current world (or the `world=` parameter) -> that world's target region -> the region's target world. See the admin guide.
@@ -578,7 +580,7 @@ A: The free one, unless you want priority support or early builds. The code is t
 <!-- /only -->
 
 **Q: How do I report a bug?**
-A: Open a GitHub issue with your server version, LeafRTP version, platform, the relevant config files and the error from the log. The [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/) has a full reproduction template.
+A: Open a GitHub issue with your server version, LeafRTP version, platform, the relevant config files and the error from the log. The [admin guide](https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/) has a full reproduction template. I take reports for Minecraft 1.21.11 through the latest release; on older versions it should still run, and I'll look when I can.
 
 </details>
 

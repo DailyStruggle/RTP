@@ -63,7 +63,7 @@ public final class RTPFabricMod implements ModInitializer {
             // that previously appeared at INFO regardless of log-level config.
             // ----------------------------------------------------------------
             try {
-                io.github.dailystruggle.effectsapi.fabric.FabricEffectRuntime
+                io.github.dailystruggle.rtp.fabric.effects.FabricEffectRuntime
                         .setLogSink(RTP::log);
             } catch (NoClassDefFoundError ignored) {
                 // effects-api stripped (rtp-lite assembly) - nothing to wire.
@@ -317,7 +317,7 @@ public final class RTPFabricMod implements ModInitializer {
                     });
             net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
                     .SERVER_STOPPED.register(server ->
-                            io.github.dailystruggle.effectsapi.fabric.FabricEffectRuntime.unbindServer());
+                            io.github.dailystruggle.rtp.fabric.effects.FabricEffectRuntime.unbindServer());
 
             // ----------------------------------------------------------------
             // Stop the periodic databaseAccessor.processQueries drain BEFORE
@@ -788,14 +788,14 @@ public final class RTPFabricMod implements ModInitializer {
         if (mcVersion.startsWith("1.21")) {
             // The DistanceManager / TicketType API broke twice in this line:
             //   1.21.0-1.21.4 → 4-arg `addRegionTicket(TicketType, ChunkPos, int, T)` (R1).
-            //   1.21.5-1.21.10 → record `TicketType(long timeout, boolean persist, TicketUse use)`
+            //   1.21.5-1.21.8 → record `TicketType(long timeout, boolean persist, TicketUse use)`
             //                    + `ServerChunkCache#addTicketWithRadius` (R5; see ADR-004).
-            //   1.21.11+ → record `TicketType(long expiryTicks, int flags)` with the
+            //   1.21.9+ → record `TicketType(long expiryTicks, int flags)` with the
             //              `TicketUse` inner enum removed entirely (R11; see ADR-007 for
             //              the Mojmap-name-decoupling SPI refactor that unblocked this
             //              submodule's inclusion in the default build).
             int patch = patchOf121(mcVersion);
-            if (patch >= 11) {
+            if (patch >= 9) {
                 return "io.github.dailystruggle.rtp.fabric.v1_21_R11.V1_21_R11FabricVersionAdapter";
             }
             if (patch >= 5) {

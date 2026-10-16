@@ -772,7 +772,7 @@ class ActionManagerTest {
   @Test
   @DisplayName("Wait-queue matching: candidate entries matched by command gate and numbered tokens")
   void testWaitQueueMatchingWithCommandGate() {
-    serverAccessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl(null) {
+    serverAccessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl(null) {
       @Override public String name() { return "check_match"; }
       @Override public String permission() { return "test.use"; }
       @Override public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, io.github.dailystruggle.commandsapi.common.CommandsAPICommand nextCommand) {
@@ -840,7 +840,7 @@ class ActionManagerTest {
   @DisplayName("onEnqueue lifecycle hook triggers when action invocation enters wait queue")
   void testOnEnqueueLifecycleHook() {
     java.util.concurrent.atomic.AtomicBoolean enqueueCommandRan = new java.util.concurrent.atomic.AtomicBoolean(false);
-    serverAccessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl(null) {
+    serverAccessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl(null) {
       @Override public String name() { return "notify_enqueue"; }
       @Override public String permission() { return "test.use"; }
       @Override public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, io.github.dailystruggle.commandsapi.common.CommandsAPICommand nextCommand) {
@@ -884,7 +884,7 @@ class ActionManagerTest {
   @DisplayName("Wait Queue & Active Session Cancellation: cancelParticipant removes entry or disarms session and runs onCancel")
   void testCancelParticipantQueueAndSession() {
     java.util.concurrent.atomic.AtomicBoolean cancelHookRan = new java.util.concurrent.atomic.AtomicBoolean(false);
-    serverAccessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl(null) {
+    serverAccessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl(null) {
       @Override public String name() { return "notify_cancel"; }
       @Override public String permission() { return "test.use"; }
       @Override public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, io.github.dailystruggle.commandsapi.common.CommandsAPICommand nextCommand) {
@@ -962,7 +962,7 @@ class ActionManagerTest {
     java.util.concurrent.atomic.AtomicBoolean targetCommandRan = new java.util.concurrent.atomic.AtomicBoolean(false);
     java.util.concurrent.atomic.AtomicBoolean normalCommandRan = new java.util.concurrent.atomic.AtomicBoolean(false);
 
-    serverAccessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl(null) {
+    serverAccessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl(null) {
       @Override public String name() { return "target_cmd"; }
       @Override public String permission() { return "test.use"; }
       @Override public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, io.github.dailystruggle.commandsapi.common.CommandsAPICommand nextCommand) {
@@ -975,7 +975,7 @@ class ActionManagerTest {
       }
     });
 
-    serverAccessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl(null) {
+    serverAccessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl(null) {
       @Override public String name() { return "normal_cmd"; }
       @Override public String permission() { return "test.use"; }
       @Override public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, io.github.dailystruggle.commandsapi.common.CommandsAPICommand nextCommand) {
@@ -1021,7 +1021,7 @@ class ActionManagerTest {
   @Test
   @DisplayName("Two players without explicit target match symmetrically in wait queue")
   void testTwoPlayersWithoutTargetMatchSymmetrically() {
-    serverAccessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl(null) {
+    serverAccessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl(null) {
       @Override public String name() { return "execute"; }
       @Override public String permission() { return "test.use"; }
       @Override public boolean onCommand(UUID callerId, Map<String, List<String>> parameterValues, io.github.dailystruggle.commandsapi.common.CommandsAPICommand nextCommand) {
