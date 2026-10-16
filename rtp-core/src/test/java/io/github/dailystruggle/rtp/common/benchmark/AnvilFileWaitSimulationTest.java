@@ -563,7 +563,7 @@ class AnvilFileWaitSimulationTest {
   }
 
   private static void pipelineCost(String section, String subject, Provenance tier, Pipeline c) {
-    double bins = Math.max(1L, c.bins());
+    double bins = (double) Math.max(1L, c.bins());
     REPORT.add(section, subject, "bins", Long.toString(c.bins()), tier);
     REPORT.add(section, subject, "us pulse wall per bin", c.elapsedNanos() / 1_000.0 / bins, tier);
     REPORT.add(section, subject, "us pulse stalled on file per bin", c.stallNanos() / 1_000.0 / bins, tier);
@@ -576,7 +576,7 @@ class AnvilFileWaitSimulationTest {
 
   private static void concurrentRows(String section, String subject, Concurrent c) {
     costRows(section, subject, "chunk", c.sum());
-    double elapsed = c.elapsedNanos();
+    double elapsed = (double) c.elapsedNanos();
     REPORT.add(section, subject, "elapsed ms", elapsed / 1e6, Provenance.MEASURED);
     REPORT.add(section, subject, "chunks per s", c.sum().chunks() / (elapsed / 1e9), Provenance.DERIVED);
     REPORT.add(section, subject, "occupied threads", c.sum().wallNanos() / elapsed, Provenance.DERIVED);

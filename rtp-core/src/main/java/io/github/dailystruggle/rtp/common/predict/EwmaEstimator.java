@@ -53,11 +53,9 @@ public final class EwmaEstimator {
         this.unbiasEarlySamples = unbiasEarlySamples;
         this.integerMean = new AtomicLong(initialValueNanos);
 
-        if (mode == DecayMode.FRACTIONAL) {
-            if (!Double.isNaN(initialMean)) {
-                this.mean = initialMean;
-                this.variance = 0.0;
-            }
+        if (mode == DecayMode.FRACTIONAL && !Double.isNaN(initialMean)) {
+            this.mean = initialMean;
+            this.variance = 0.0;
         }
     }
 

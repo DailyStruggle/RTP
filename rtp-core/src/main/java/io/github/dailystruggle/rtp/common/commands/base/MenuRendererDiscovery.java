@@ -74,6 +74,7 @@ public final class MenuRendererDiscovery {
                 }
             }
         } catch (RuntimeException ignored) {
+            // config not loaded yet: fall back to the default renderer below
         }
         List<String> ids = new ArrayList<>();
         if (raw instanceof List<?> list) {

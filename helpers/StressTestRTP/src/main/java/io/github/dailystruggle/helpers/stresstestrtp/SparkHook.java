@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 /**
  * Optional integration with the <a href="https://spark.lucko.me/">spark</a>
@@ -33,6 +34,8 @@ import java.util.logging.Logger;
  * once and no-ops, mirroring {@link ConsoleWatcher}'s posture.
  */
 public final class SparkHook {
+
+    private static final Pattern WHITESPACE_RUN = Pattern.compile("\\s+");
 
     private final FileConfiguration config;
     private final Logger log;
@@ -188,7 +191,7 @@ public final class SparkHook {
         List<String> names = new ArrayList<>();
         if (threads != null) {
             for (String part : threads.split(",")) {
-                String n = part.trim().replaceAll("\\s+", " ");
+                String n = WHITESPACE_RUN.matcher(part.trim()).replaceAll(" ");
                 if (!n.isEmpty() && !names.contains(n)) names.add(n);
             }
         }

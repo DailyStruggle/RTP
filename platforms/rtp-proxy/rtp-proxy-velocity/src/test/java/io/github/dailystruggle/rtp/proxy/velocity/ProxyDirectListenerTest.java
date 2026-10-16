@@ -220,11 +220,10 @@ class ProxyDirectListenerTest {
         AtomicInteger pushes = new AtomicInteger();
         ProxyDirectListener listener = countingListener(pushes, System::currentTimeMillis);
         listener.start();
-        try {
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+             DataOutputStream out = new DataOutputStream(baos)) {
             byte unknown = 0x2A;
             WireContext ctx = new WireContext(unknown, System.currentTimeMillis(), "0123456789abcdef");
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            DataOutputStream out = new DataOutputStream(baos);
             out.writeByte(unknown);
             out.writeByte(ProxyDirectWire.FRAME_VERSION);
             out.writeLong(ctx.sentAtMs());
@@ -247,9 +246,8 @@ class ProxyDirectListenerTest {
         AtomicInteger pushes = new AtomicInteger();
         ProxyDirectListener listener = countingListener(pushes, System::currentTimeMillis);
         listener.start();
-        try {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            DataOutputStream out = new DataOutputStream(baos);
+        try (ByteArrayOutputStream baos = new ByteArrayOutputStream();
+             DataOutputStream out = new DataOutputStream(baos)) {
             out.writeByte(ProxyDirectWire.OP_HEARTBEAT);
             out.writeInt(1);
             out.writeUTF(V.sign(1, "hb"));

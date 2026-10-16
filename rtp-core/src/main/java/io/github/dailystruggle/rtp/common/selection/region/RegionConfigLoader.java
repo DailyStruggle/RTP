@@ -25,6 +25,8 @@ import java.util.regex.Pattern;
 public class RegionConfigLoader {
 
     private static final Pattern VERTEX_SEPARATORS = Pattern.compile("[,;\\s]+");
+    private static final Pattern ZERO_DURATION = Pattern.compile("^0[a-zA-Z]*$");
+    private static final Pattern DIGITS_ONLY = Pattern.compile("^\\d+$");
 
     @SuppressWarnings("unchecked") // raw config values are instanceof-checked to Map before the String-keyed cast
     public static RegionSettings load(ConfigParser<RegionKeys> regionParser) {
@@ -211,14 +213,16 @@ public class RegionConfigLoader {
         if (str.equals("-1") || str.equalsIgnoreCase("infinite") || str.equalsIgnoreCase("permanent")) {
             return -1L;
         }
-        if (str.matches("^0[a-zA-Z]*$")) {
+        if (ZERO_DURATION.matcher(str).matches()) {
             return 0L;
         }
-        if (str.matches("^\\d+$")) {
+        if (DIGITS_ONLY.matcher(str).matches()) {
             try {
                 long sec = Long.parseLong(str);
                 return (sec < 0) ? -1L : sec * 1000L;
-            } catch (NumberFormatException ignored) {}
+            } catch (NumberFormatException ignored) {
+                // overflow: fall through to the duration parser
+            }
         }
         long ms = ConfigParser.parseDurationMillis(str, -1L);
         return (ms < 0) ? -1L : ms;

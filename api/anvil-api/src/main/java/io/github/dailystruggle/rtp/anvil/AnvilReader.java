@@ -372,6 +372,7 @@ public final class AnvilReader implements RegionFileReader {
      * if the chunk has no section array (unexpected for a populated chunk).
      */
     public static Nbt.NbtList getSections(LinkedHashMap<String, Object> root) {
+        if (root == null) return null;
         Object v = root.get("sections");
         return (v instanceof Nbt.NbtList) ? (Nbt.NbtList) v : null;
     }

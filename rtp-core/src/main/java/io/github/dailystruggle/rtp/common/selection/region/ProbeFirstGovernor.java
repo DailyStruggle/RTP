@@ -111,24 +111,24 @@ public final class ProbeFirstGovernor {
     static final class Ewma {
         long n;
         double mean = Double.NaN;
-        double var;
+        double variance;
 
         void add(double x) {
             n++;
             if (n == 1) {
                 mean = x;
-                var = 0.0;
+                variance = 0.0;
                 return;
             }
             double a = Math.max(1.0 / n, ALPHA);
             double d = x - mean;
             double inc = a * d;
             mean += inc;
-            var = (1.0 - a) * (var + d * inc);
+            variance = (1.0 - a) * (variance + d * inc);
         }
 
         double neff() {
-            return Math.min(n, WINDOW);
+            return (double) Math.min(n, WINDOW);
         }
     }
 
@@ -175,7 +175,7 @@ public final class ProbeFirstGovernor {
 
         /** Squared standard error of {@link #at}: residual variance, widened by extrapolation distance. */
         double se2At(double x) {
-            double neff = Math.min(n, WINDOW);
+            double neff = (double) Math.min(n, WINDOW);
             if (!identified()) return vyy / neff;
             double b = slope();
             double resid = Math.max(0.0, vyy - 2.0 * b * cxy + b * b * vxx);
@@ -334,9 +334,9 @@ public final class ProbeFirstGovernor {
         String log;
         updateLock.lock();
         try {
-            probe.add(nanos);
+            probe.add((double) nanos);
             probeSamples.set(probe.n);
-            probeFit.add(invG, nanos);
+            probeFit.add(invG, (double) nanos);
             if (decisionState.mode() == Mode.PROBE) defaultInvG.add(invG);
             reject.add(rejected ? 1.0 : 0.0);
             log = evaluate();
@@ -352,7 +352,7 @@ public final class ProbeFirstGovernor {
         String log;
         updateLock.lock();
         try {
-            (afterProbe ? loadAfterProbe : loadDirect).add(nanos);
+            (afterProbe ? loadAfterProbe : loadDirect).add((double) nanos);
             if (!afterProbe) {
                 directSamples.set(loadDirect.n);
             }
@@ -431,14 +431,18 @@ public final class ProbeFirstGovernor {
         costProbe = probeFit.at(x) + (1.0 - p) * tf.mean;
         costDirect = loadDirect.mean;
         double se2 = probeFit.se2At(x)
-                + (1.0 - p) * (1.0 - p) * tf.var / tf.neff()
+                + (1.0 - p) * (1.0 - p) * tf.variance / tf.neff()
                 + tf.mean * tf.mean * p * (1.0 - p) / reject.neff()
-                + loadDirect.var / loadDirect.neff();
+                + loadDirect.variance / loadDirect.neff();
         double gap = costProbe - costDirect;
         if (se2 > 0.0) {
             z = gap / Math.sqrt(se2);
+        } else if (gap > 0.0) {
+            z = Double.POSITIVE_INFINITY;
+        } else if (gap < 0.0) {
+            z = Double.NEGATIVE_INFINITY;
         } else {
-            z = (gap > 0.0) ? Double.POSITIVE_INFINITY : (gap < 0.0) ? Double.NEGATIVE_INFINITY : 0.0;
+            z = 0.0;
         }
         sinceFlip++;
         boolean losing = (mode == Mode.PROBE) ? z > Z_SWITCH : z < -Z_SWITCH;

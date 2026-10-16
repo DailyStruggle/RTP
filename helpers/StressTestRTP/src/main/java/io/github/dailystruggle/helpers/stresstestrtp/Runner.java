@@ -513,7 +513,7 @@ public final class Runner {
         this.rampIdleMs = Math.max(0L, config.getLong("ramp.idle-seconds", 30L)) * 1000L;
         this.rampIdleBaseline = null;
         this.rampGapMs = Math.max(0L, config.getLong("ramp.gap-seconds", 5L)) * 1000L;
-        this.rampPerPlayerGapMs = Math.max(0L, Math.min(5000L, config.getLong("ramp.per-player-gap-ms", 0L)));
+        this.rampPerPlayerGapMs = Math.clamp(config.getLong("ramp.per-player-gap-ms", 0L), 0L, 5000L);
         RampEvaluator.Thresholds th = new RampEvaluator.Thresholds(
                 config.getDouble("ramp.pass.min-achieved-fraction", 0.95),
                 config.getDouble("ramp.pass.max-mspt-p95", 50.0),
@@ -555,7 +555,7 @@ public final class Runner {
             rampInWarmup = false;
             beginRampStage(0, now);
         }
-        plugin.getLogger().info(String.format(Locale.ROOT,
+        plugin.getLogger().info(() -> String.format(Locale.ROOT,
                 "[StressTestRTP] ramp start: target=%s stages=%s stage=%ds idle=%ds warmup=%ds gap=%ds per-player-gap=%dms thresholds=%s csv=%s",
                 target.label, Arrays.toString(rampStages), rampStageMs / 1000L, rampIdleMs / 1000L, rampWarmupMs / 1000L,
                 rampGapMs / 1000L, rampPerPlayerGapMs, th, rampWriter.csvPath().getFileName()));
@@ -601,7 +601,7 @@ public final class Runner {
         rampMaxLiveBetweenStages = Math.max(rampMaxLiveBetweenStages, rampLiveTimersAtStart);
         long tolerance = Math.max(0L, config.getLong("ramp.repeating-task-tolerance", 2L));
         if (rampLiveTimersAtStart > tolerance) {
-            plugin.getLogger().warning(String.format(Locale.ROOT,
+            plugin.getLogger().warning(() -> String.format(Locale.ROOT,
                     "[StressTestRTP] ramp stage %d starts with %d live per-player repeating tasks (expected ~0, tolerance %d): scheduled=%d cancelled=%d cancel_failures=%d",
                     idx, rampLiveTimersAtStart, tolerance, rampTimersAtStart.scheduled(),
                     rampTimersAtStart.cancelled(), rampTimersAtStart.cancelFailures()));
@@ -616,7 +616,7 @@ public final class Runner {
         }
         if (rampIdleBaseline != null) recorder.setNextPhaseIdleBaseline(rampIdleBaseline);
         recorder.beginPhase(rampStageLabel(idx));
-        plugin.getLogger().info(String.format(Locale.ROOT,
+        plugin.getLogger().info(() -> String.format(Locale.ROOT,
                 "[StressTestRTP] ramp stage %d/%d: offered %s TP/s for %ds",
                 idx, rampStages.length - 1, RampEvaluator.fmtRate(rampStages[idx]), rampStageMs / 1000L));
     }
@@ -698,7 +698,7 @@ public final class Runner {
                 if (now - rampStateStartMs < rampIdleMs) return;
                 rampIdleBaseline = gapCalibActive ? harvestIdleCalibration(now) : null;
                 if (rampIdleBaseline != null) {
-                    plugin.getLogger().info(String.format(Locale.ROOT,
+                    plugin.getLogger().info(() -> String.format(Locale.ROOT,
                             "[StressTestRTP] ramp idle baseline: MSPT p50=%.2f ms, main CPU=%.3f cores, proc CPU=%.3f cores (over %.1fs); applied to every stage",
                             rampIdleBaseline.msptP50(), rampIdleBaseline.mainCpuCores(),
                             rampIdleBaseline.processCpuCores(), rampIdleBaseline.durationMs() / 1000.0));
@@ -738,7 +738,7 @@ public final class Runner {
                     if (tps >= 0 && (rampTpsMin < 0 || tps < rampTpsMin)) rampTpsMin = tps;
                     if (rampLowTps.observe(now, tps)) {
                         rampAborted = true;
-                        plugin.getLogger().warning(String.format(Locale.ROOT,
+                        plugin.getLogger().warning(() -> String.format(Locale.ROOT,
                                 "[StressTestRTP] ramp stage %d aborted: TPS < %.1f for %ds",
                                 rampStageIdx, rampEval.thresholds().lowTpsThreshold(),
                                 rampEval.thresholds().lowTpsWindowMs() / 1000L));
@@ -831,7 +831,7 @@ public final class Runner {
         RampEvaluator.Decision decision = RampEvaluator.Decision.STOP;
         RampEvaluator.Evaluation ev;
         if (complete) {
-            decision = rampEval.record(sr, idx >= rampStages.length - 1);
+            decision = rampEval.recordStage(sr, idx >= rampStages.length - 1);
             ev = rampEval.history().get(rampEval.history().size() - 1);
         } else {
             ev = RampEvaluator.evaluate(sr, rampEval.thresholds());
@@ -849,12 +849,17 @@ public final class Runner {
         } catch (java.io.IOException e) {
             plugin.getLogger().log(Level.WARNING, "[StressTestRTP] ramp row write failed", e);
         }
-        plugin.getLogger().info(String.format(Locale.ROOT,
-                "[StressTestRTP] ramp stage %d %s: offered=%s achieved=%.2f TP/s attempts=%d ok=%d timeouts=%d errors=%d busy=%d shed=%d p95=%dms mspt_p95=%.2f tps_min=%.2f%s",
-                idx, !complete ? "PARTIAL" : (ev.passed() ? "PASS" : "FAIL"),
-                RampEvaluator.fmtRate(sr.offeredTps()), sr.achievedTps(), sr.attempts(), ok, to, err,
-                busy, rampShed, x.latencyP95Ms(), msptP95, rampTpsMin,
-                ev.passed() ? "" : " [" + ev.criteriaString() + "]"));
+        if (plugin.getLogger().isLoggable(Level.INFO)) {
+            String verdict;
+            if (!complete) verdict = "PARTIAL";
+            else verdict = ev.passed() ? "PASS" : "FAIL";
+            plugin.getLogger().info(String.format(Locale.ROOT,
+                    "[StressTestRTP] ramp stage %d %s: offered=%s achieved=%.2f TP/s attempts=%d ok=%d timeouts=%d errors=%d busy=%d shed=%d p95=%dms mspt_p95=%.2f tps_min=%.2f%s",
+                    idx, verdict,
+                    RampEvaluator.fmtRate(sr.offeredTps()), sr.achievedTps(), sr.attempts(), ok, to, err,
+                    busy, rampShed, x.latencyP95Ms(), msptP95, rampTpsMin,
+                    ev.passed() ? "" : " [" + ev.criteriaString() + "]"));
+        }
         recorder.endPhase(rampStageLabel(idx));
         rampStageIdx = -1;
         if (!complete) return;
@@ -880,7 +885,7 @@ public final class Runner {
             ev.markOperatorStop();
         }
         String line = ev.summaryLine(rampTarget.label);
-        plugin.getLogger().info("[StressTestRTP] " + line);
+        plugin.getLogger().log(Level.INFO, "[StressTestRTP] {0}", line);
         StringBuilder sb = new StringBuilder();
         sb.append("StressTestRTP ramp summary\n");
         sb.append("target: ").append(rampTarget.label).append(" = `").append(rampTarget.template).append("`\n");
@@ -1317,7 +1322,7 @@ public final class Runner {
                         recorder.setNextPhaseIdleBaseline(baseline);
                         int nextIdx = seqIndex + 1;
                         String nextLabel = (nextIdx >= 0 && nextIdx < seqTargets.size()) ? seqTargets.get(nextIdx).label : "unknown";
-                        plugin.getLogger().info(String.format(java.util.Locale.ROOT,
+                        plugin.getLogger().info(() -> String.format(java.util.Locale.ROOT,
                                 "[StressTestRTP] Idle baseline before phase '%s': MSPT p50=%.2f ms, main CPU=%.3f cores, proc CPU=%.3f cores (calibrated over %.1fs)",
                                 nextLabel, msptP50, mainCores, procCores, durationMs / 1000.0));
                     }
@@ -1664,15 +1669,15 @@ public final class Runner {
     private void capPlayerDistances(Player p, int distance) {
         if (distanceCapped.containsKey(p)) return;
         distanceCapped.put(p, Boolean.TRUE);
-        int d = Math.max(2, Math.min(32, distance));
+        int d = Math.clamp(distance, 2, 32);
         for (String name : new String[]{"setViewDistance", "setSimulationDistance"}) {
             try {
                 p.getClass().getMethod(name, int.class).invoke(p, d);
             } catch (NoSuchMethodException e) {
                 // Spigot: no per-player distance API; server.properties applies.
             } catch (ReflectiveOperationException | RuntimeException e) {
-                plugin.getLogger().log(Level.FINE, "StressTestRTP: " + name + "(" + d
-                        + ") failed for " + p.getName(), e);
+                plugin.getLogger().log(Level.FINE, e, () -> "StressTestRTP: " + name + "(" + d
+                        + ") failed for " + p.getName());
             }
         }
     }

@@ -122,7 +122,7 @@ class LinearDynamicRegistrationTest {
 
         // Build 2-sector Anvil file
         byte[] mca = new byte[8192 + 4096];
-        // Table entry for (1, 2)
+        // Location-table slot of chunk x=1 z=2
         int index = 1 + (2 << 5);
         int locOffset = index * 4;
         mca[locOffset] = 0;

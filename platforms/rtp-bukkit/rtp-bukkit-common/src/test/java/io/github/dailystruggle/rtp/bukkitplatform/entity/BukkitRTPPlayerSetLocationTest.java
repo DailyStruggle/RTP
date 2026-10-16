@@ -40,6 +40,7 @@ import org.mockito.ArgumentCaptor;
 class BukkitRTPPlayerSetLocationTest {
 
   public interface PaperMockPlayer extends Player {
+    @Override
     CompletableFuture<Boolean> teleportAsync(Location location);
   }
 

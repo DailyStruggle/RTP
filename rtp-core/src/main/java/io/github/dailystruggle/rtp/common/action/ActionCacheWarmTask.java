@@ -32,6 +32,8 @@ import java.util.logging.Level;
  */
 public final class ActionCacheWarmTask implements Runnable {
 
+  private static final java.util.regex.Pattern DIGITS = java.util.regex.Pattern.compile("(\\d+)");
+
   private final ActionManager actionManager;
   private final Map<String, AtomicInteger> inFlight = new ConcurrentHashMap<>();
 
@@ -106,7 +108,7 @@ public final class ActionCacheWarmTask implements Runnable {
             Object val = entry.getValue();
             if (val != null) {
               String s = val.toString().trim();
-              java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d+)").matcher(s);
+              java.util.regex.Matcher m = DIGITS.matcher(s);
               if (m.find()) {
                 try {
                   int count = Integer.parseInt(m.group(1));

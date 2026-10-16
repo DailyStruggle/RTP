@@ -122,7 +122,7 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         int sampleStride = getConfig().getInt("sync-load-sample-rate", 1);
         if (sampleStride > 1) {
             chunkCounter.syncAttributor().setSampleStride(sampleStride);
-            getLogger().info("StressTestRTP: sync-load stack-walk sampling enabled (1 in "
+            getLogger().info(() -> "StressTestRTP: sync-load stack-walk sampling enabled (1 in "
                     + sampleStride + " loads).");
         }
         chunkCounter.register();

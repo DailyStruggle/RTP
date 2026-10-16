@@ -158,6 +158,7 @@ public final class V26_4_R1FabricVersionAdapter implements FabricVersionAdapter 
                 Object value = orElse.invoke(either, (Object) null);
                 if (value instanceof ChunkAccess ca2) return ca2;
             } catch (NoSuchMethodException _) {
+                // not Optional-shaped; fall through to Either#left
             }
             java.lang.reflect.Method leftMethod = either.getClass().getMethod("left");
             Object opt = leftMethod.invoke(either);
@@ -397,10 +398,9 @@ public final class V26_4_R1FabricVersionAdapter implements FabricVersionAdapter 
             }
 
             java.util.List<net.minecraft.server.network.Filterable<net.minecraft.network.chat.Component>> filtered =
-                    new java.util.ArrayList<>(pageComponents.size());
-            for (net.minecraft.network.chat.Component c : pageComponents) {
-                filtered.add(net.minecraft.server.network.Filterable.passThrough(c));
-            }
+                    pageComponents.stream()
+                            .map(net.minecraft.server.network.Filterable::passThrough)
+                            .toList();
             net.minecraft.world.item.component.WrittenBookContent content =
                     new net.minecraft.world.item.component.WrittenBookContent(
                             net.minecraft.server.network.Filterable.passThrough(spec.title()),
@@ -518,7 +518,7 @@ public final class V26_4_R1FabricVersionAdapter implements FabricVersionAdapter 
         for (int packed = 0; packed < 256; packed++) {
             net.minecraft.world.level.material.MapColor color =
                     net.minecraft.world.level.material.MapColor.byId(packed >> 2);
-            if (color == null || color.id == 0) continue;
+            if (color.id == 0) continue;
             int rgb = net.minecraft.world.level.material.MapColor.getColorFromPackedId(packed);
             int rr = (rgb >> 16) & 0xFF;
             int gg = (rgb >> 8) & 0xFF;

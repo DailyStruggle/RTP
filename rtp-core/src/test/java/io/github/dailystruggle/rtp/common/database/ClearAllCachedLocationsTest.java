@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.database;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,10 +27,14 @@ class ClearAllCachedLocationsTest {
     Path tempDir;
 
     private H2DatabaseAccessorTest.TestH2Accessor db;
+    private SelectionAPI savedSelectionAPI;
 
     @BeforeEach
     void setUp() throws Exception {
         RTPTestSetup.install(tempDir.toFile());
+        // RTP.selectionAPI is static and survives earlier tests with their regions; isolate it.
+        savedSelectionAPI = RTP.selectionAPI;
+        RTP.selectionAPI = new SelectionAPI();
         String url = "jdbc:h2:mem:rtp_clearall_" + System.nanoTime() + ";DB_CLOSE_DELAY=-1;MODE=MySQL";
         db = new H2DatabaseAccessorTest.TestH2Accessor(url);
     }
@@ -37,6 +42,7 @@ class ClearAllCachedLocationsTest {
     @AfterEach
     void tearDown() throws Exception {
         if (db != null) db.close();
+        RTP.selectionAPI = savedSelectionAPI;
     }
 
     @Test
@@ -67,7 +73,7 @@ class ClearAllCachedLocationsTest {
         db.processQueries(Long.MAX_VALUE);
         assertEquals(1, db.loadCachedLocations("default").size());
 
-        // RTPTestSetup.install leaves permRegionLookup/tempRegions empty - the
+        // A fresh SelectionAPI has empty permRegionLookup/tempRegions - the
         // rebuild must NOT wipe the table in that case, so direct unit-test
         // calls to flushDirtyCache retain their original behaviour.
         assertTrue(RTP.selectionAPI == null

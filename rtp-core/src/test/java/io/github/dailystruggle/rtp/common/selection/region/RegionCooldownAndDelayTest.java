@@ -5,7 +5,6 @@ import io.github.dailystruggle.rtp.common.commands.admin.ClearCooldownCmd;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
-import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,11 +26,9 @@ class RegionCooldownAndDelayTest {
     @TempDir
     File tempDir;
 
-    private MockRTPServerAccessor accessor;
-
     @BeforeEach
     void setUp() {
-        accessor = RTPTestSetup.install(tempDir);
+        RTPTestSetup.install(tempDir);
         if (RTP.getInstance() != null) {
             RTP.getInstance().regionTeleportTimes.clear();
             RTP.getInstance().latestTeleportData.clear();

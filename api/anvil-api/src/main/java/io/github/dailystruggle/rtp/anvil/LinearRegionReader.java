@@ -176,7 +176,6 @@ public final class LinearRegionReader implements RegionFileReader, BuiltInTestab
         }
 
         long newestTimestamp = header.getLong(9);
-        int chunkCount = Short.toUnsignedInt(header.getShort(18));
         int completeRegionLength = header.getInt(20);
 
         // CBIT Tripwire T3: Container Sizing

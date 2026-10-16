@@ -3,7 +3,6 @@ package io.github.dailystruggle.rtp.common.playerData;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -66,19 +65,6 @@ public class PureDataRTPPlayer extends PureDataRTPCommandSender implements RTPPl
   @Override
   public PureDataRTPPlayer clone() {
     return (PureDataRTPPlayer) super.clone();
-  }
-
-  @Override
-  public boolean equals(Object obj) {
-    if (obj == this) return true;
-    if (obj == null || !(obj instanceof RTPPlayer)) return false;
-    RTPPlayer that = (RTPPlayer) obj;
-    return Objects.equals(this.uuid, that.uuid());
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(uuid);
   }
 
   @Override

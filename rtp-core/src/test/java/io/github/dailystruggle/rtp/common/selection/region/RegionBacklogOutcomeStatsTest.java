@@ -72,8 +72,8 @@ class RegionBacklogOutcomeStatsTest {
         long initialSuccesses = RtpOutcomeStats.GLOBAL.successCount();
 
         // First pulse fills the backlog and submits bin batches; later pulses apply them and promote.
-        long deltaFailures = 0L;
-        long deltaSuccesses = 0L;
+        long deltaFailures;
+        long deltaSuccesses;
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         do {
             region.execute(TimeUnit.MILLISECONDS.toNanos(50));

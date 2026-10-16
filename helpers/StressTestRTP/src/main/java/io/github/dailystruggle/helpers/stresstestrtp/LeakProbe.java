@@ -14,6 +14,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.RegisteredListener;
 import org.bukkit.scheduler.BukkitTask;
 
+import javax.management.JMException;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 import java.io.IOException;
@@ -102,7 +103,7 @@ public final class LeakProbe implements Listener {
     private static final Pattern HISTO_LINE = Pattern.compile("^\\s*\\d+:\\s+(\\d+)\\s+(\\d+)\\s+(\\S+)");
     /** NMT summary category line, e.g. {@code -  Java Heap (reserved=16777216KB, committed=16777216KB)}. */
     private static final Pattern NMT_LINE = Pattern.compile(
-            "^-\\s+(.+?)\\s+\\(reserved=(\\d+)KB,\\s*committed=(\\d+)KB");
+            "^-\\s+([^(]+)\\(reserved=(\\d+)KB,\\s*committed=(\\d+)KB");
     private static final Pattern NMT_TOTAL = Pattern.compile(
             "^Total:\\s+reserved=(\\d+)KB,\\s*committed=(\\d+)KB");
     private static final Pattern PROC_STATUS_KB = Pattern.compile("^(\\w+):\\s+(\\d+)\\s+kB");
@@ -110,7 +111,7 @@ public final class LeakProbe implements Listener {
     private static final Pattern LINE_SPLIT = Pattern.compile("\\R");
     private static final Pattern DIGITS = Pattern.compile("\\d+");
     private static final Pattern METRIC_NON_ALPHANUM = Pattern.compile("[^a-z0-9#_-]+");
-    private static final Pattern METRIC_UNDERSCORES = Pattern.compile("(?:^_+)|(?:_+$)");
+    private static final Pattern METRIC_UNDERSCORES = Pattern.compile("^_+|_+$");
     private static final Pattern FILE_SAFE = Pattern.compile("[^A-Za-z0-9._-]");
     private static final DateTimeFormatter STAMP_FORMATTER =
             DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss", Locale.ROOT)
@@ -250,10 +251,9 @@ public final class LeakProbe implements Listener {
      * player's owning thread. Returns the number scheduled.
      */
     public int churn(int n, String namePrefix) {
-        List<Player> pick = new ArrayList<>();
-        for (Player p : Bukkit.getOnlinePlayers()) {
-            if (namePrefix == null || namePrefix.isEmpty() || p.getName().startsWith(namePrefix)) pick.add(p);
-        }
+        List<Player> pick = Bukkit.getOnlinePlayers().stream()
+                .filter(p -> namePrefix == null || namePrefix.isEmpty() || p.getName().startsWith(namePrefix))
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
         Collections.shuffle(pick);
         int limit = n <= 0 ? pick.size() : Math.min(n, pick.size());
         for (int i = 0; i < limit; i++) {
@@ -307,7 +307,7 @@ public final class LeakProbe implements Listener {
                 lastResult = c.describe();
                 reply.accept(c.describe());
             } catch (Throwable t) {
-                plugin.getLogger().log(Level.WARNING, "leakcheck " + safeLabel + " failed", t);
+                plugin.getLogger().log(Level.WARNING, t, () -> "leakcheck " + safeLabel + " failed");
                 lastResult = "leakcheck " + safeLabel + " failed: " + t.getClass().getSimpleName()
                         + ": " + t.getMessage();
                 reply.accept(lastResult);
@@ -358,8 +358,8 @@ public final class LeakProbe implements Listener {
         if (sections.contains(Section.PROC)) procMetrics(m);
         if (sections.contains(Section.NMT)) {
             nativeMemory(m, runsDir.resolve(base + ".nmt.txt"));
-            // Native growth the JVM does not account for (malloc from native libs,
-            // allocator fragmentation): invisible to both the heap and NMT.
+            // Native growth the JVM does not account for, such as malloc from native
+            // libs or allocator fragmentation, is invisible to both the heap and NMT.
             Double rss = m.get("rss_mb");
             Double nmt = m.get("nmt.total.committed_mb");
             if (rss != null && nmt != null) m.put("rss_minus_nmt_mb", rss - nmt);
@@ -688,7 +688,7 @@ public final class LeakProbe implements Listener {
         return s;
     }
 
-    private static String diagnosticCommand(String op, String... args) throws Exception {
+    private static String diagnosticCommand(String op, String... args) throws JMException {
         MBeanServer server = ManagementFactory.getPlatformMBeanServer();
         ObjectName name = new ObjectName("com.sun.management:type=DiagnosticCommand");
         Object out = server.invoke(name, op, new Object[]{args}, new String[]{String[].class.getName()});
@@ -721,7 +721,7 @@ public final class LeakProbe implements Listener {
     }
 
     /** {@code GC.class_histogram} via JMX; performs a full GC (live objects only). */
-    static String classHistogram() throws Exception {
+    static String classHistogram() throws JMException {
         MBeanServer server = ManagementFactory.getPlatformMBeanServer();
         ObjectName name = new ObjectName("com.sun.management:type=DiagnosticCommand");
         Object out = server.invoke(name, "gcClassHistogram",

@@ -65,6 +65,18 @@ class GateExpressionParserTest {
   }
 
   @Test
+  @DisplayName("Bare duration with a Java literal suffix (1d) means days, same as == 1d")
+  void testBareDurationMatchesLikeOperatorForm() {
+    assertTrue(GateExpressionParser.matches("1d", 86400));
+    assertFalse(GateExpressionParser.matches("1d", 1));
+    assertTrue(GateExpressionParser.matches("== 1d", 86400));
+    assertTrue(GateExpressionParser.matches("1d12h", 129600));
+    assertTrue(GateExpressionParser.matches("5", 5));
+    assertTrue(GateExpressionParser.matches("1e3", 1000));
+    assertEquals(GateExpressionParser.matches("== 5f", 5), GateExpressionParser.matches("5f", 5));
+  }
+
+  @Test
   @DisplayName("Blank or malformed expressions fail closed (return false)")
   void testMalformedExpressionsFailClosed() {
     assertFalse(GateExpressionParser.matches(null, 5));

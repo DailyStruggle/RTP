@@ -93,9 +93,10 @@ public final class AnvilBatchPrefilterProvider implements AnvilPrefilterRegistry
       if (RTP.configs == null) return Collections.emptySet();
       Object raw = RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new java.util.ArrayList<>());
       if (raw instanceof Collection<?> c) {
-        Set<String> out = new HashSet<>(c.size());
-        for (Object o : c) if (o != null) out.add(o.toString());
-        return out;
+        return c.stream()
+            .filter(java.util.Objects::nonNull)
+            .map(Object::toString)
+            .collect(java.util.stream.Collectors.toCollection(HashSet::new));
       }
     } catch (Throwable t) {
       // Fall through to empty.

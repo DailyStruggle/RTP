@@ -321,7 +321,7 @@ public final class AnvilPrefilter {
         try {
           s.close();
         } catch (IOException e) {
-          LOG.log(Level.FINE, "[RTP] Anvil probe session close failed: " + s.regionFile(), e);
+          LOG.log(Level.FINE, e, () -> "[RTP] Anvil probe session close failed: " + s.regionFile());
         }
       }
     }

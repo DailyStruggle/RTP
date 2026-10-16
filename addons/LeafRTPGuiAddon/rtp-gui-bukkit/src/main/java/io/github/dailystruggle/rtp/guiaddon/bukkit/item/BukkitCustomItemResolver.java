@@ -37,6 +37,7 @@ public final class BukkitCustomItemResolver {
 
   private static final Set<String> WARNED_PLUGINS = ConcurrentHashMap.newKeySet();
   private static final Map<String, Material> MATERIAL_MAP;
+  private static final Pattern TEXTURE_URL_PATTERN = Pattern.compile("\"url\"\\s*:\\s*\"([^\"]+)\"");
 
   static {
     Map<String, Material> map = new LinkedHashMap<>();
@@ -166,11 +167,9 @@ public final class BukkitCustomItemResolver {
 
   private static boolean isPluginAvailable(String pluginName) {
     try {
-      if (Bukkit.getServer() == null || Bukkit.getPluginManager() == null) {
-        return false;
-      }
       return Bukkit.getPluginManager().isPluginEnabled(pluginName);
     } catch (Throwable ignored) {
+      // unset server (tests, early load) surfaces as NPE: treat as unavailable
       return false;
     }
   }
@@ -296,11 +295,9 @@ public final class BukkitCustomItemResolver {
   static void applyBase64Texture(SkullMeta meta, String base64) {
     try {
       String json = new String(Base64.getDecoder().decode(base64), StandardCharsets.UTF_8);
-      Matcher m = Pattern.compile("\"url\"\\s*:\\s*\"([^\"]+)\"").matcher(json);
-      if (m.find()) {
-        if (applyProfileApi(meta, m.group(1))) {
-          return;
-        }
+      Matcher m = TEXTURE_URL_PATTERN.matcher(json);
+      if (m.find() && applyProfileApi(meta, m.group(1))) {
+        return;
       }
     } catch (Throwable t) {
       RTP.log(Level.FINE, "[RTP-GUI] Base64 JSON decoding / profile lookup failed: " + t.getMessage());

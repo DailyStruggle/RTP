@@ -54,27 +54,26 @@ public final class GateExpressionParser {
         case "<=" -> actualValue <= val;
         case ">" -> actualValue > val;
         case ">=" -> actualValue >= val;
-        case "==", "=" -> Math.abs(actualValue - val) < 1e-6;
-        default -> false;
+        default -> Math.abs(actualValue - val) < 1e-6; // "==" or "=" (OP_PATTERN admits no other operator)
       };
     }
 
-    // Exact numeric match fallback
-    try {
-      double val = Double.parseDouble(trimmed);
-      return Math.abs(actualValue - val) < 1e-6;
-    } catch (NumberFormatException ignored) {
-      DurationParser.ParsedDuration parsed = DurationParser.parse(trimmed, TemporalUnit.SECOND);
-      if (parsed != null) {
-        return Math.abs(actualValue - parsed.toSeconds()) < 1e-6;
-      }
-      return false;
-    }
+    // Exact match fallback; same duration-first order as operator operands, so "1d" == "== 1d".
+    Double val = parseNumber(trimmed);
+    return val != null && Math.abs(actualValue - val) < 1e-6;
   }
 
+  /** {@code text} is a regex group bounded by non-whitespace, so never null or blank. */
   private static double parseValue(String text) {
-    if (text == null || text.isBlank()) return 0.0;
-    String trimmed = text.trim();
+    Double val = parseNumber(text.trim());
+    return val != null ? val : 0.0;
+  }
+
+  /**
+   * Duration first: {@link Double#parseDouble} accepts Java literal suffixes ({@code 1d}, {@code 5f}),
+   * which would otherwise shadow the day unit.
+   */
+  private static Double parseNumber(String trimmed) {
     DurationParser.ParsedDuration parsed = DurationParser.parse(trimmed, TemporalUnit.SECOND);
     if (parsed != null) {
       return parsed.toSeconds();
@@ -82,7 +81,7 @@ public final class GateExpressionParser {
     try {
       return Double.parseDouble(trimmed);
     } catch (NumberFormatException ignored) {
-      return 0.0;
+      return null;
     }
   }
 
@@ -96,20 +95,5 @@ public final class GateExpressionParser {
       return Math.round(parsed.toSeconds());
     }
     return defaultVal;
-  }
-
-  private static double parseMultiplier(String unit) {
-    if (unit == null || unit.isBlank()) return 1.0;
-    TemporalUnit tu = TemporalUnit.fromString(unit);
-    if (tu != null) {
-      return tu.getSecondsPerUnit();
-    }
-    return switch (unit.toLowerCase()) {
-      case "s", "sec", "seconds" -> 1.0;
-      case "m", "min", "minutes" -> 60.0;
-      case "h", "hr", "hours" -> 3600.0;
-      case "d", "days" -> 86400.0;
-      default -> 1.0;
-    };
   }
 }

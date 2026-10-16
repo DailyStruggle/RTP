@@ -140,7 +140,7 @@ public final class Sched {
     private static final Class<?>[] CONSUMER = {Plugin.class, java.util.function.Consumer.class};
 
     private static void logOnce(String key, String msg, Throwable t) {
-        if (LOGGED.add(key)) LOG.log(Level.WARNING, "[StressTestRTP] Sched: " + msg + " (logged once)", t);
+        if (LOGGED.add(key)) LOG.log(Level.WARNING, t, () -> "[StressTestRTP] Sched: " + msg + " (logged once)");
     }
 
     /** First failure of each scheduler call is logged once, then the caller falls back. Never silent. */

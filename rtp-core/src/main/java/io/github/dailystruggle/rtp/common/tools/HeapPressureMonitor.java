@@ -85,13 +85,11 @@ public final class HeapPressureMonitor {
         long effectiveTenuredMax = Math.max(tenuredMax, totalMax);
         double tenuredFrac = (effectiveTenuredMax > 0L) ? ((double) tenuredUsed / (double) effectiveTenuredMax) : 0.0;
 
-        // When tenured/old generation pool is available, base pressure decision on tenured
-        // post-GC usage to prevent false pauses on uncollected ephemeral young-gen garbage
-        if (HeapSampler.getTenuredPool() != null) {
-          cachedUsedPercent = tenuredFrac * 100.0;
-          cachedUnderPressure = tenuredFrac >= threshold;
-        } else if (totalFree >= MIN_ABSOLUTE_HEADROOM_BYTES && totalMax >= 2L * MIN_ABSOLUTE_HEADROOM_BYTES) {
-          // If overall JVM has ample absolute headroom (>= 512 MiB), do not flag as under pressure
+        // Tenured/old pool available: judge on tenured post-GC usage so uncollected young-gen
+        // garbage cannot cause false pauses. Without one, ample absolute headroom (>= 512 MiB)
+        // also judges on the tenured fraction only.
+        if (HeapSampler.getTenuredPool() != null
+            || (totalFree >= MIN_ABSOLUTE_HEADROOM_BYTES && totalMax >= 2L * MIN_ABSOLUTE_HEADROOM_BYTES)) {
           cachedUsedPercent = tenuredFrac * 100.0;
           cachedUnderPressure = tenuredFrac >= threshold;
         } else {

@@ -361,6 +361,7 @@ class BytesocksTransportTest {
                 try {
                     writeFrame(s, 0x88, new byte[]{0x03, (byte) 0xE9});
                 } catch (IOException ignored) {
+                    // peer already gone; the socket is closed below regardless
                 } finally {
                     s.close();
                 }
@@ -372,11 +373,13 @@ class BytesocksTransportTest {
             try {
                 server.close();
             } catch (IOException ignored) {
+                // best-effort test teardown
             }
             for (Socket s : sockets) {
                 try {
                     s.close();
                 } catch (IOException ignored) {
+                    // best-effort test teardown
                 }
             }
         }

@@ -199,8 +199,8 @@ class ActionSessionImplCoverageTest {
   // ---------------------------------------------------------------------------
 
   @Test
-  @DisplayName("checkInBounds classifies world, region, subspace, leash and shape breaches")
-  void breachClassification() {
+  @DisplayName("checkInBounds classifies world, subspace and region breaches")
+  void breachClassificationWorldSubspaceRegion() {
     List<UUID> ps = List.of(UUID.randomUUID());
     Map<UUID, int[]> slots = Map.of();
 
@@ -235,6 +235,13 @@ class ActionSessionImplCoverageTest {
     assertTrue(region.checkInBounds("world", 80, 0));
     assertFalse(region.checkInBounds("world", 0, 0));
     assertFalse(region.checkInBounds("world", 50_000, 50_000));
+  }
+
+  @Test
+  @DisplayName("checkInBounds classifies leash and circle shape breaches")
+  void breachClassificationLeashAndCircle() {
+    List<UUID> ps = List.of(UUID.randomUUID());
+    Map<UUID, int[]> slots = Map.of();
 
     ActionSessionImpl leash = session(def(conf(ConfinementBoundary.LEASH, 100L, 10.0, 0.0, 0.0, 0L, null, 0, 0,
         0.0, 0.0, 1L, 0.0, List.of())), ps, slots, "world");
@@ -257,6 +264,13 @@ class ActionSessionImplCoverageTest {
         simple(ConfinementBoundary.SHAPE, "CIRCLE", 20, 0), ActionDefinition.LifecycleSpec.EMPTY), ps, slots,
         "world");
     assertTrue(circleNoCenter.checkInBounds("world", 0, 0));
+  }
+
+  @Test
+  @DisplayName("checkInBounds classifies square shape breaches")
+  void breachClassificationSquare() {
+    List<UUID> ps = List.of(UUID.randomUUID());
+    Map<UUID, int[]> slots = Map.of();
 
     ActionSessionImpl square =
         session(def(simple(ConfinementBoundary.SHAPE, "SQUARE", 20, 5)), ps, slots, "world");

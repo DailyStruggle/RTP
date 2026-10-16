@@ -348,33 +348,30 @@ class ProxyDirectNetworkBindingTest {
     @Test
     @DisplayName("REQ-RTP-PROXY-007: a correctly signed reply bound to a different request is dropped")
     void replyBoundToOtherRequestDropped() throws Exception {
-        ServerSocket rogue = new ServerSocket();
-        rogue.bind(new InetSocketAddress("127.0.0.1", 0));
-        Thread t = new Thread(() -> {
-            try (Socket s = rogue.accept()) {
-                DataInputStream in = new DataInputStream(s.getInputStream());
-                WireContext ctx = ProxyDirectWire.readRequestHeader(in).context();
-                ProxyDirectWire.readSignedPayload(in, ctx, Direction.REQUEST, V);
-                // Valid secret, but signed for another request's nonce.
-                WireContext other = new WireContext(ctx.opcode(), ctx.sentAtMs(), ctx.nonce() + "x");
-                DataOutputStream out = new DataOutputStream(s.getOutputStream());
-                ProxyDirectWire.writeList(out, other, Direction.RESPONSE,
-                        List.of(BackendHeartbeatCodec.encode(hb("evil", List.of("x")))), V, 1);
-            } catch (Exception ignored) {
-                // test double
-            }
-        }, "rogue-proxy-direct-binding");
-        t.setDaemon(true);
-        t.start();
-        try {
+        try (ServerSocket rogue = new ServerSocket()) {
+            rogue.bind(new InetSocketAddress("127.0.0.1", 0));
+            Thread t = new Thread(() -> {
+                try (Socket s = rogue.accept()) {
+                    DataInputStream in = new DataInputStream(s.getInputStream());
+                    WireContext ctx = ProxyDirectWire.readRequestHeader(in).context();
+                    ProxyDirectWire.readSignedPayload(in, ctx, Direction.REQUEST, V);
+                    // Valid secret, but signed for another request's nonce.
+                    WireContext other = new WireContext(ctx.opcode(), ctx.sentAtMs(), ctx.nonce() + "x");
+                    DataOutputStream out = new DataOutputStream(s.getOutputStream());
+                    ProxyDirectWire.writeList(out, other, Direction.RESPONSE,
+                            List.of(BackendHeartbeatCodec.encode(hb("evil", List.of("x")))), V, 1);
+                } catch (Exception ignored) {
+                    // test double
+                }
+            }, "rogue-proxy-direct-binding");
+            t.setDaemon(true);
+            t.start();
             ProxyDirectNetworkBinding binding = new ProxyDirectNetworkBinding(
                     List.of(InetSocketAddress.createUnresolved("127.0.0.1", rogue.getLocalPort())),
                     V, 1, 5000L, 1000, 2000, () -> 1000L);
             binding.publishBackendHeartbeat(hb("backend-a", List.of("default"))).get();
             assertEquals(0, binding.livePeerCount(), "a reply bound to another request must not be ingested");
             binding.close();
-        } finally {
-            rogue.close();
         }
     }
 

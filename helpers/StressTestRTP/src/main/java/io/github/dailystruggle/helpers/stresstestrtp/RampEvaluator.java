@@ -117,7 +117,7 @@ public final class RampEvaluator {
      * Records a completed stage and returns whether the ramp continues.
      * {@code lastStage} true means no further stage is configured.
      */
-    public Decision record(StageResult s, boolean lastStage) {
+    public Decision recordStage(StageResult s, boolean lastStage) {
         Evaluation e = evaluate(s, t);
         history.add(e);
         if (e.passed()) {

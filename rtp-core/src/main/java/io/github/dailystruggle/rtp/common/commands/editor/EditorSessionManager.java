@@ -1313,7 +1313,11 @@ public final class EditorSessionManager {
         if (verObj instanceof Number n) {
             version = n.intValue();
         } else if (verObj instanceof String s) {
-            try { version = Integer.parseInt(s); } catch (NumberFormatException ignored) {}
+            try {
+                version = Integer.parseInt(s);
+            } catch (NumberFormatException ignored) {
+                // malformed version: keep default 1
+            }
         }
 
         String pluginVersion = rootMap.get("pluginVersion") instanceof String s ? s : null;
@@ -1322,7 +1326,11 @@ public final class EditorSessionManager {
         if (tsObj instanceof Number n) {
             timestamp = n.longValue();
         } else if (tsObj instanceof String s) {
-            try { timestamp = Long.parseLong(s); } catch (NumberFormatException ignored) {}
+            try {
+                timestamp = Long.parseLong(s);
+            } catch (NumberFormatException ignored) {
+                // malformed timestamp: keep default 0
+            }
         }
 
         // Validate each file AST and geometry
@@ -1553,124 +1561,5 @@ public final class EditorSessionManager {
             }
         }
         return -1;
-    }
-
-    private static String extractStringField(String json, String field) {
-        String pattern = "\"" + field + "\"";
-        int idx = json.indexOf(pattern);
-        if (idx == -1) return null;
-        int colon = json.indexOf(':', idx);
-        if (colon == -1) return null;
-        int startQuote = json.indexOf('"', colon);
-        if (startQuote == -1) return null;
-        StringBuilder sb = new StringBuilder();
-        boolean escaped = false;
-        for (int i = startQuote + 1; i < json.length(); i++) {
-            char c = json.charAt(i);
-            if (escaped) {
-                sb.append(unescapeChar(c));
-                escaped = false;
-                continue;
-            }
-            if (c == '\\') {
-                escaped = true;
-                continue;
-            }
-            if (c == '"') {
-                return sb.toString();
-            }
-            sb.append(c);
-        }
-        return null;
-    }
-
-    private static String extractNumericField(String json, String field) {
-        String pattern = "\"" + field + "\"";
-        int idx = json.indexOf(pattern);
-        if (idx == -1) return null;
-        int colon = json.indexOf(':', idx);
-        if (colon == -1) return null;
-        int start = colon + 1;
-        while (start < json.length() && Character.isWhitespace(json.charAt(start))) {
-            start++;
-        }
-        int end = start;
-        while (end < json.length() && (Character.isDigit(json.charAt(end)) || json.charAt(end) == '-')) {
-            end++;
-        }
-        if (end > start) {
-            return json.substring(start, end);
-        }
-        return null;
-    }
-
-    private static Map<String, String> parseJsonStringMap(String jsonObject) {
-        Map<String, String> result = new LinkedHashMap<>();
-        int i = 0;
-        int len = jsonObject.length();
-
-        while (i < len && jsonObject.charAt(i) != '{') i++;
-        i++; // skip '{'
-
-        while (i < len) {
-            while (i < len && (Character.isWhitespace(jsonObject.charAt(i)) || jsonObject.charAt(i) == ',')) i++;
-            if (i >= len || jsonObject.charAt(i) == '}') break;
-
-            if (jsonObject.charAt(i) != '"') break;
-            i++; // skip open quote of key
-
-            StringBuilder key = new StringBuilder();
-            boolean escaped = false;
-            while (i < len) {
-                char c = jsonObject.charAt(i++);
-                if (escaped) {
-                    key.append(unescapeChar(c));
-                    escaped = false;
-                } else if (c == '\\') {
-                    escaped = true;
-                } else if (c == '"') {
-                    break;
-                } else {
-                    key.append(c);
-                }
-            }
-
-            while (i < len && (Character.isWhitespace(jsonObject.charAt(i)) || jsonObject.charAt(i) == ':')) i++;
-
-            if (i < len && jsonObject.charAt(i) == '"') {
-                i++; // skip open quote of value
-                StringBuilder val = new StringBuilder();
-                escaped = false;
-                while (i < len) {
-                    char c = jsonObject.charAt(i++);
-                    if (escaped) {
-                        val.append(unescapeChar(c));
-                        escaped = false;
-                    } else if (c == '\\') {
-                        escaped = true;
-                    } else if (c == '"') {
-                        break;
-                    } else {
-                        val.append(c);
-                    }
-                }
-                result.put(key.toString(), val.toString());
-            } else {
-                // Not a string value or malformed
-                break;
-            }
-        }
-        return result;
-    }
-
-    private static char unescapeChar(char c) {
-        return switch (c) {
-            case 'n' -> '\n';
-            case 'r' -> '\r';
-            case 't' -> '\t';
-            case 'b' -> '\b';
-            case 'f' -> '\f';
-            default -> c;
-        };
     }
 }

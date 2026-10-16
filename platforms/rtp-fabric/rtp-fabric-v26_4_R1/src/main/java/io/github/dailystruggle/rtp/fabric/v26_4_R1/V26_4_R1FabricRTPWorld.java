@@ -264,6 +264,7 @@ public final class V26_4_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
             Object v = orElse.invoke(result, (Object) null);
             if (v instanceof ChunkAccess ca) return ca;
         } catch (Throwable _) {
+            // not an Optional-shaped result; try Either#left
         }
         try {
             java.lang.reflect.Method left = result.getClass().getMethod("left");
@@ -274,6 +275,7 @@ public final class V26_4_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
                 if (v instanceof ChunkAccess ca) return ca;
             }
         } catch (Throwable _) {
+            // not Either-shaped; treat as unloaded
         }
         return null;
     }
@@ -294,7 +296,7 @@ public final class V26_4_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
     public boolean isChunkLoaded(int cx, int cz) {
         try {
             ServerChunkCache cache = world.getChunkSource();
-            return cache != null && cache.hasChunk(cx, cz);
+            return cache.hasChunk(cx, cz);
         } catch (Throwable _) {
             return false;
         }
@@ -623,6 +625,7 @@ public final class V26_4_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
             try {
                 if (java.nio.file.Files.isDirectory(regionDir)) return c;
             } catch (Throwable _) {
+                // unreadable candidate; try the next layout
             }
         }
         return candidates.get(0);
@@ -641,10 +644,10 @@ public final class V26_4_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
                     })
                     .orElseGet(() -> {
                         try {
-                            Identifier id = level.registryAccess()
+                            Identifier biomeId = level.registryAccess()
                                     .lookupOrThrow(net.minecraft.core.registries.Registries.BIOME)
                                     .getKey(holder.value());
-                            return (id == null) ? "" : id.toString();
+                            return (biomeId == null) ? "" : biomeId.toString();
                         } catch (Throwable t) {
                             return "";
                         }

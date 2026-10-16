@@ -35,8 +35,6 @@ public final class ImmediateLoadGovernor {
     public static final int MAX_REGIONAL_PERMITS = 1;
     public static final int MAX_GLOBAL_PERMITS = 2;
 
-    private static final double ALPHA = 2.0 / (64.0 + 1.0); // 64 sample EWMA window
-
     private static final ConcurrentHashMap<String, ImmediateLoadGovernor> REGISTRY = new ConcurrentHashMap<>();
     private static final AtomicInteger GLOBAL_IN_FLIGHT = new AtomicInteger(0);
     private static final ConcurrentLinkedQueue<QueuedRequest> WAITERS = new ConcurrentLinkedQueue<>();

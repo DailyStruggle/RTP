@@ -2594,6 +2594,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
             sendCommands.invoke(s.getCommands(), p);
           }
         } catch (Throwable ignored) {
+          // best-effort tree resync; online clients refresh on relog
         }
       } catch (Throwable t) {
         log(Level.WARNING, "[RTP][Fabric] Dynamic runtime command registration failed: " + t.getMessage());

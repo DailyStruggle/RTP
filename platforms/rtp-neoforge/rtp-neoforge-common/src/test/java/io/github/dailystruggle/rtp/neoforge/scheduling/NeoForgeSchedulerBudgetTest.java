@@ -23,7 +23,7 @@ class NeoForgeSchedulerBudgetTest {
     void asyncPoolIsBounded() throws InterruptedException {
         int expected = Math.max(2, Runtime.getRuntime().availableProcessors() / 2);
         ThreadPoolExecutor pool = NeoForgeScheduler.asyncExecutor();
-        assertEquals(expected, NeoForgeScheduler.ASYNC_MAX_THREADS);
+        assertEquals(NeoForgeScheduler.ASYNC_MAX_THREADS, expected);
         assertEquals(expected, pool.getMaximumPoolSize());
         assertEquals(expected, pool.getCorePoolSize());
         assertTrue(pool.allowsCoreThreadTimeOut(), "idle workers must time out");

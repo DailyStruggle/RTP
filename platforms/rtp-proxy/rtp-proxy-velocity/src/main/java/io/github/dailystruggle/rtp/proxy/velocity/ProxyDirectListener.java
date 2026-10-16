@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -366,7 +367,7 @@ public final class ProxyDirectListener {
 
     /** OP_HEARTBEAT: ingest a heartbeat (region discovery) and reply with the merged snapshot. */
     private void handleHeartbeat(DataInputStream in, DataOutputStream out,
-                                 java.net.SocketAddress remote, WireContext ctx) throws Exception {
+                                 java.net.SocketAddress remote, WireContext ctx) throws IOException {
         String payload = ProxyDirectWire.readSignedPayload(in, ctx, Direction.REQUEST, verifier);
         if (payload == null) {
             logger.warn("RTP proxy-direct: rejecting HMAC-invalid heartbeat from {}.", remote);
@@ -395,7 +396,7 @@ public final class ProxyDirectListener {
 
     /** OP_FLUSH_PENDING: enqueue a batch of enrolments into the proxy's queue. */
     private void handleFlushPending(DataInputStream in, DataOutputStream out,
-                                    java.net.SocketAddress remote, WireContext ctx) throws Exception {
+                                    java.net.SocketAddress remote, WireContext ctx) throws IOException {
         List<String> rows = ProxyDirectWire.readList(in, ctx, Direction.REQUEST, verifier);
         if (!admit(ctx, remote)) return;
         NetworkRequestQueue.EnrolOutcome outcome = NetworkRequestQueue.EnrolOutcome.REJECTED;
@@ -424,7 +425,7 @@ public final class ProxyDirectListener {
 
     /** OP_POLL_STATUS: return per-player queue status rows. */
     private void handlePollStatus(DataInputStream in, DataOutputStream out,
-                                  java.net.SocketAddress remote, WireContext ctx) throws Exception {
+                                  java.net.SocketAddress remote, WireContext ctx) throws IOException {
         List<String> idStrings = ProxyDirectWire.readList(in, ctx, Direction.REQUEST, verifier);
         if (!admit(ctx, remote)) return;
         List<String> reply = new ArrayList<>();
@@ -451,7 +452,7 @@ public final class ProxyDirectListener {
 
     /** OP_CANCEL: cancel a player's pending entry. */
     private void handleCancel(DataInputStream in, DataOutputStream out,
-                              java.net.SocketAddress remote, WireContext ctx) throws Exception {
+                              java.net.SocketAddress remote, WireContext ctx) throws IOException {
         String payload = ProxyDirectWire.readSignedPayload(in, ctx, Direction.REQUEST, verifier);
         if (payload != null && !admit(ctx, remote)) return;
         if (payload != null && requestQueue != null) {
@@ -477,7 +478,7 @@ public final class ProxyDirectListener {
 
     /** OP_FIND_RESERVATION: return the active reservation token for a player (or empty). */
     private void handleFindReservation(DataInputStream in, DataOutputStream out,
-                                       java.net.SocketAddress remote, WireContext ctx) throws Exception {
+                                       java.net.SocketAddress remote, WireContext ctx) throws IOException {
         String payload = ProxyDirectWire.readSignedPayload(in, ctx, Direction.REQUEST, verifier);
         if (payload != null && !admit(ctx, remote)) return;
         String reply = "";
@@ -502,7 +503,7 @@ public final class ProxyDirectListener {
 
     /** OP_REDEEM: transition a CLAIMED reservation to CONSUMED on arrival. */
     private void handleRedeem(DataInputStream in, DataOutputStream out,
-                              java.net.SocketAddress remote, WireContext ctx) throws Exception {
+                              java.net.SocketAddress remote, WireContext ctx) throws IOException {
         String payload = ProxyDirectWire.readSignedPayload(in, ctx, Direction.REQUEST, verifier);
         if (payload != null && !admit(ctx, remote)) return;
         RedeemOutcome outcome = RedeemOutcome.NOT_FOUND;
@@ -528,7 +529,7 @@ public final class ProxyDirectListener {
 
     /** OP_LIST_ACTIVE: list active reservation tokens for a backend (boot reconcile). */
     private void handleListActive(DataInputStream in, DataOutputStream out,
-                                  java.net.SocketAddress remote, WireContext ctx) throws Exception {
+                                  java.net.SocketAddress remote, WireContext ctx) throws IOException {
         String serverId = ProxyDirectWire.readSignedPayload(in, ctx, Direction.REQUEST, verifier);
         if (serverId != null && !admit(ctx, remote)) return;
         List<String> reply = new ArrayList<>();

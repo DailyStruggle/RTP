@@ -156,7 +156,7 @@ final class ColumnProbeCoalescer {
           try {
             session.close();
           } catch (IOException e) {
-            LOG.log(Level.FINE, "[RTP] column probe session close failed: " + regionFile, e);
+            LOG.log(Level.FINE, e, () -> "[RTP] column probe session close failed: " + regionFile);
           }
         }
       }

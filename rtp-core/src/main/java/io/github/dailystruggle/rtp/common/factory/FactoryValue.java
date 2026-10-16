@@ -158,10 +158,9 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
               if (lookup.match() instanceof Enum<?> e && myClass.isInstance(e)) {
                 rebuilt.put(myClass.cast(e), value);
               }
-              if ("name".equalsIgnoreCase(lookup.matchedKey())) {
-                if (this.name == null || !this.name.equalsIgnoreCase(String.valueOf(value))) {
-                  this.name = String.valueOf(value);
-                }
+              if ("name".equalsIgnoreCase(lookup.matchedKey())
+                  && (this.name == null || !this.name.equalsIgnoreCase(String.valueOf(value)))) {
+                this.name = String.valueOf(value);
               }
             } else if (lookup.isPerceptible()) {
               RTP.log(
@@ -178,10 +177,9 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
               if (lookup.match() instanceof Enum<?> e && myClass.isInstance(e)) {
                 rebuilt.put(myClass.cast(e), value);
               }
-              if ("name".equalsIgnoreCase(lookup.matchedKey())) {
-                if (this.name == null || !this.name.equalsIgnoreCase(String.valueOf(value))) {
-                  this.name = String.valueOf(value);
-                }
+              if ("name".equalsIgnoreCase(lookup.matchedKey())
+                  && (this.name == null || !this.name.equalsIgnoreCase(String.valueOf(value)))) {
+                this.name = String.valueOf(value);
               }
             } else {
               RTP.log(

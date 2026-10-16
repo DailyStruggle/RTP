@@ -132,7 +132,7 @@ public class ActionCommand extends BaseRTPCmdImpl {
       @NotNull String[] args,
       int i,
       @Nullable Map<String, io.github.dailystruggle.commandsapi.common.CommandParameter> tempParameters) {
-    if (args != null && i < args.length) {
+    if (i < args.length) {
       String firstArg = args[i];
       if (firstArg != null && !firstArg.contains("=") && !firstArg.endsWith("=")) {
         String upper = firstArg.toUpperCase(java.util.Locale.ROOT);
@@ -141,7 +141,12 @@ public class ActionCommand extends BaseRTPCmdImpl {
           // to the declared 'player' parameter (e.g. /challenge Bob -> player=Bob).
           io.github.dailystruggle.rtp.api.action.ParameterSpec targetParam =
               definition.command().firstParameterOfType(io.github.dailystruggle.rtp.api.action.ParameterType.PLAYER);
-          String paramName = (targetParam != null) ? targetParam.name() : (getParameterLookup().containsKey("player") ? "player" : null);
+          String paramName = null;
+          if (targetParam != null) {
+            paramName = targetParam.name();
+          } else if (getParameterLookup().containsKey("player")) {
+            paramName = "player";
+          }
           if (paramName != null) {
             String[] rewrittenArgs = args.clone();
             rewrittenArgs[i] = paramName + "=" + firstArg;
@@ -159,16 +164,15 @@ public class ActionCommand extends BaseRTPCmdImpl {
       @NotNull Predicate<String> permissionCheckMethod,
       @NotNull String[] args) {
     List<String> results = new ArrayList<>(super.onTabComplete(callerId, permissionCheckMethod, args));
-    if (args != null && args.length == 1 && !args[0].contains("=")) {
+    if (args.length == 1 && !args[0].contains("=")) {
       io.github.dailystruggle.rtp.api.action.ParameterSpec targetParam =
           definition.command().firstParameterOfType(io.github.dailystruggle.rtp.api.action.ParameterType.PLAYER);
-      if (targetParam != null && (!targetParam.hasPermission() || permissionCheckMethod.test(targetParam.permission()))) {
-        if (RTP.serverAccessor != null) {
-          String prefix = args[0].toLowerCase(java.util.Locale.ROOT);
-          for (String name : RTP.serverAccessor.getOnlinePlayerNames()) {
-            if (name.toLowerCase(java.util.Locale.ROOT).startsWith(prefix)) {
-              results.add(name);
-            }
+      if (targetParam != null && (!targetParam.hasPermission() || permissionCheckMethod.test(targetParam.permission()))
+          && RTP.serverAccessor != null) {
+        String prefix = args[0].toLowerCase(java.util.Locale.ROOT);
+        for (String name : RTP.serverAccessor.getOnlinePlayerNames()) {
+          if (name.toLowerCase(java.util.Locale.ROOT).startsWith(prefix)) {
+            results.add(name);
           }
         }
       }

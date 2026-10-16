@@ -70,17 +70,25 @@ class BukkitRTPPlayerRetentionTest {
     return ref.get() == null;
   }
 
-  @Test
-  @DisplayName("Cached BukkitRTPPlayer and its clone do not pin the Player after the server drops it")
-  void cachedWrapperDoesNotPinPlayer() throws Exception {
-    UUID uuid = UUID.randomUUID();
+  private record Bound(BukkitRTPPlayer cached, RTPCommandSender history, WeakReference<Player> probe) {}
+
+  // Strong Player reference lives only in this frame, so it is unreachable once this returns.
+  private static Bound bindThenDrop(UUID uuid) {
     Player player = fakePlayer(uuid, "Leaky");
     BukkitRTPPlayer cached = new BukkitRTPPlayer(player);
     RTPCommandSender history = cached.clone();
     assertSame(player, cached.player(), "bound while the server still holds the player");
+    return new Bound(cached, history, new WeakReference<>(player));
+  }
 
-    WeakReference<Player> probe = new WeakReference<>(player);
-    player = null;
+  @Test
+  @DisplayName("Cached BukkitRTPPlayer and its clone do not pin the Player after the server drops it")
+  void cachedWrapperDoesNotPinPlayer() throws Exception {
+    UUID uuid = UUID.randomUUID();
+    Bound bound = bindThenDrop(uuid);
+    BukkitRTPPlayer cached = bound.cached();
+    RTPCommandSender history = bound.history();
+    WeakReference<Player> probe = bound.probe();
 
     assertTrue(collected(probe), "Player must be collectable while its wrapper is still cached");
     assertNull(cached.player());

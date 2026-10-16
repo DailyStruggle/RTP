@@ -90,8 +90,11 @@ class SelectionHeatmapTest {
         assertEquals(a, a);
         assertEquals(a, base());
         assertEquals(a.hashCode(), base().hashCode());
-        assertNotEquals(a, null);
-        assertNotEquals(a, "r");
+        // a on the left so a.equals(...) is exercised against null and a foreign type
+        Object absent = null;
+        Object foreign = "r";
+        assertNotEquals(a, absent);
+        assertNotEquals(a, foreign);
 
         boolean[] in = {true, false};
         int[] bio = {1, 2};

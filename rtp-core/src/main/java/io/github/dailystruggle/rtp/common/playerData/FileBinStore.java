@@ -93,9 +93,12 @@ public class FileBinStore {
           out.writeLong(data.sender.cooldown());
           out.writeLong(data.sender.delay());
 
-          String regionName = (data.targetRegionName != null)
-              ? data.targetRegionName
-              : (data.targetRegion != null ? data.targetRegion.name : "");
+          String regionName = "";
+          if (data.targetRegionName != null) {
+            regionName = data.targetRegionName;
+          } else if (data.targetRegion != null) {
+            regionName = data.targetRegion.name;
+          }
           out.writeUTF(regionName != null ? regionName : "");
           out.writeDouble(data.cost);
           out.writeLong(data.attempts);
@@ -227,10 +230,8 @@ public class FileBinStore {
         if (!matcher.matches()) continue;
         try {
           long binId = Long.parseLong(matcher.group(1));
-          if (binId < cutoffBin) {
-            if (Files.deleteIfExists(file.toPath())) {
-              deleted++;
-            }
+          if (binId < cutoffBin && Files.deleteIfExists(file.toPath())) {
+            deleted++;
           }
         } catch (Exception e) {
           RTP.log(Level.FINE, "[RTP] Failed to evaluate or purge bin file: " + file.getName(), e);
