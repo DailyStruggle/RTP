@@ -17,10 +17,10 @@ import java.util.function.Consumer;
 
 /**
  * Attributes {@link PlayerTeleportEvent} occurrences back to in-flight
- * {@link MetricsRecorder.Attempt}s.
+ * {@link Attempt}s.
  *
  * <p>Strategy: keep a UUID→Attempt map of "currently expecting a teleport for
- * this player". On dispatch, {@link #expect(MetricsRecorder.Attempt, UUID)}
+ * this player". On dispatch, {@link #expect(Attempt, UUID)}
  * registers the attempt. The first {@link PlayerTeleportEvent} with cause
  * {@code COMMAND}, {@code PLUGIN}, {@code UNKNOWN} (Folia) for that player
  * within the timeout window is treated as completion.
@@ -32,7 +32,7 @@ public final class TeleportProbe implements Listener {
 
     private final Plugin plugin;
     private final MetricsRecorder recorder;
-    private final Map<UUID, MetricsRecorder.Attempt> expecting = new ConcurrentHashMap<>();
+    private final Map<UUID, Attempt> expecting = new ConcurrentHashMap<>();
     /** Notified with the player's UUID when an attempt is attributed (success
      *  or recorded failure) so {@link Runner} can release the in-flight slot
      *  without waiting for the per-attempt timeout. */
@@ -48,7 +48,7 @@ public final class TeleportProbe implements Listener {
     /** Direct-arm attempts already completed by {@link DirectTeleportProbe}
      *  whose CSV row is held until the external channel (the one every arm
      *  shares) sees the same teleport. Keyed by player; one per player. */
-    private final Map<UUID, MetricsRecorder.Attempt> awaitingExternal = new ConcurrentHashMap<>();
+    private final Map<UUID, Attempt> awaitingExternal = new ConcurrentHashMap<>();
     /** Max XZ distance between an external sighting and a held attempt's
      *  destination for the sighting to be that attempt's (blocks). Guards a
      *  late event of attempt N against being stamped on attempt N+1. */
@@ -82,18 +82,18 @@ public final class TeleportProbe implements Listener {
      *  when a target plugin never fires {@code PlayerTeleportEvent} (or fires
      *  it with a cause we don't recognise), because otherwise the prior
      *  expectation would linger until the per-attempt timeout reaper runs. */
-    public MetricsRecorder.Attempt expect(MetricsRecorder.Attempt attempt, UUID playerId) {
+    public Attempt expect(Attempt attempt, UUID playerId) {
         return expecting.put(playerId, attempt);
     }
 
     /** Called by {@link Runner} when an attempt times out, to free the slot. */
-    public MetricsRecorder.Attempt forget(UUID playerId) {
+    public Attempt forget(UUID playerId) {
         return expecting.remove(playerId);
     }
 
     /** Held direct-arm attempt for {@code playerId}, or null. Lets the
      *  pinned watcher keep observing after the plugin's own event fired. */
-    public MetricsRecorder.Attempt awaitingExternal(UUID playerId) {
+    public Attempt awaitingExternal(UUID playerId) {
         return awaitingExternal.get(playerId);
     }
 
@@ -107,7 +107,7 @@ public final class TeleportProbe implements Listener {
      */
     boolean noteExternal(UUID playerId, Location to) {
         long now = System.currentTimeMillis();
-        MetricsRecorder.Attempt held = awaitingExternal.get(playerId);
+        Attempt held = awaitingExternal.get(playerId);
         if (held != null && !recorder.isDeferred(held)) {
             // Its wait elapsed and the row was written without a sighting.
             awaitingExternal.remove(playerId, held);
@@ -118,12 +118,12 @@ public final class TeleportProbe implements Listener {
             if (held.externalSeenEpochMs < 0) held.externalSeenEpochMs = now;
             if (recorder.releaseDeferred(held)) return true;
         }
-        MetricsRecorder.Attempt live = expecting.get(playerId);
+        Attempt live = expecting.get(playerId);
         if (live != null && live.externalSeenEpochMs < 0) live.externalSeenEpochMs = now;
         return false;
     }
 
-    private static boolean matches(MetricsRecorder.Attempt a, double x, double z) {
+    private static boolean matches(Attempt a, double x, double z) {
         double dx = a.toX - x, dz = a.toZ - z;
         return dx * dx + dz * dz <= EXTERNAL_MATCH_BLOCKS * EXTERNAL_MATCH_BLOCKS;
     }
@@ -134,7 +134,7 @@ public final class TeleportProbe implements Listener {
     }
 
     /** Look up an in-flight attempt for {@code playerId} without removing it. */
-    public MetricsRecorder.Attempt peek(UUID playerId) {
+    public Attempt peek(UUID playerId) {
         return expecting.get(playerId);
     }
 
@@ -165,11 +165,11 @@ public final class TeleportProbe implements Listener {
         // rtp arm: the plugin's PostTeleportEvent is the source of truth and
         // the timeout reaper is the only other backstop.
         if (directAuthoritative) return false;
-        MetricsRecorder.Attempt attempt = expecting.remove(playerId);
+        Attempt attempt = expecting.remove(playerId);
         if (attempt == null) return false;
         if (loc != null) attempt.landing = LandingInspector.inspect(loc);
         recorder.onComplete(attempt, true, "", toX, toZ,
-                MetricsRecorder.AttributionSource.POSITION_POLL);
+                AttributionSource.POSITION_POLL);
         onAttributed.accept(playerId);
         return true;
     }
@@ -194,7 +194,7 @@ public final class TeleportProbe implements Listener {
     public boolean attributeDirect(UUID playerId, double toX, double toZ,
                                    boolean success, String failReason,
                                    LandingInspector.Landing landing) {
-        MetricsRecorder.Attempt attempt = expecting.remove(playerId);
+        Attempt attempt = expecting.remove(playerId);
         if (attempt == null) return false;
         attempt.landing = landing;
         boolean hold = success && attempt.externalSeenEpochMs < 0;
@@ -202,7 +202,7 @@ public final class TeleportProbe implements Listener {
         attempt.toX = toX;
         attempt.toZ = toZ;
         recorder.onComplete(attempt, success, failReason, toX, toZ,
-                MetricsRecorder.AttributionSource.PLUGIN_EVENT, hold);
+                AttributionSource.PLUGIN_EVENT, hold);
         // After onComplete, so noteExternal never sees it before it is held.
         if (hold) awaitingExternal.put(playerId, attempt);
         onAttributed.accept(playerId);
@@ -219,7 +219,7 @@ public final class TeleportProbe implements Listener {
         // DirectTeleportProbe; claiming it here would restore the Folia
         // destination-tick floor this event fires on.
         if (directAuthoritative) return;
-        MetricsRecorder.Attempt attempt = expecting.remove(player.getUniqueId());
+        Attempt attempt = expecting.remove(player.getUniqueId());
         if (attempt == null) return; // not ours
 
         // Filter: we only attribute teleports plausibly caused by /rtp.
@@ -248,7 +248,7 @@ public final class TeleportProbe implements Listener {
         Location to = event.getTo();
         if (to == null) {
             recorder.onComplete(attempt, false, "NULL_TO", 0, 0,
-                    MetricsRecorder.AttributionSource.TELEPORT_EVENT);
+                    AttributionSource.TELEPORT_EVENT);
             onAttributed.accept(player.getUniqueId());
             return;
         }
@@ -257,7 +257,7 @@ public final class TeleportProbe implements Listener {
         // which is where the inspector is allowed to read it.
         attempt.landing = LandingInspector.inspect(to);
         recorder.onComplete(attempt, true, "", to.getX(), to.getZ(),
-                MetricsRecorder.AttributionSource.TELEPORT_EVENT);
+                AttributionSource.TELEPORT_EVENT);
         onAttributed.accept(player.getUniqueId());
     }
 }

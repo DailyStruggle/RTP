@@ -11,24 +11,24 @@ import org.jetbrains.annotations.Nullable;
 /**
  * {@code /rtp test network all [count=N] [observeMs=M]} - heartbeat then
  * reservation-token round-trip in a single dispatch. The token-probe peer
- * count is clamped to {@link NetworkSimulationTestJob#MAX_TOKEN_COUNT} and
- * the token TTL uses {@link NetworkSimulationTestJob#DEFAULT_TOKEN_TTL_MS}
+ * count is clamped to {@link NetworkProbeTarget#MAX_TOKEN_COUNT} and
+ * the token TTL uses {@link NetworkProbeTarget#DEFAULT_TOKEN_TTL_MS}
  * to keep the combined run lightweight.
  *
- * <p>Real subcommand of {@link NetworkSimulationTestJob}.
+ * <p>Real subcommand of {@code NetworkSimulationTestJob}.
  */
 public final class NetworkAllProbeCmd extends BaseRTPCmdImpl {
 
-  private final NetworkSimulationTestJob job;
+  private final NetworkProbeTarget job;
 
-  public NetworkAllProbeCmd(@Nullable NetworkSimulationTestJob parent) {
+  public NetworkAllProbeCmd(@Nullable NetworkProbeTarget parent) {
     super(parent);
     this.job = parent;
-    addParameter(NetworkSimulationTestJob.PARAM_COUNT,
+    addParameter(NetworkProbeTarget.PARAM_COUNT,
             new IntegerParameter("rtp.test",
-                    "number of synthetic peers/tokens (1.." + NetworkSimulationTestJob.MAX_PEER_COUNT + ")",
+                    "number of synthetic peers/tokens (1.." + NetworkProbeTarget.MAX_PEER_COUNT + ")",
                     (uuid, s) -> true));
-    addParameter(NetworkSimulationTestJob.PARAM_OBSERVE_MS,
+    addParameter(NetworkProbeTarget.PARAM_OBSERVE_MS,
             new IntegerParameter("rtp.test",
                     "heartbeat observation window in ms (250..30000)",
                     (uuid, s) -> true));
@@ -55,14 +55,14 @@ public final class NetworkAllProbeCmd extends BaseRTPCmdImpl {
           Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
     if (job == null) return true;
-    int count = NetworkHeartbeatProbeCmd.parseInt(parameterValues,
-            NetworkSimulationTestJob.PARAM_COUNT, NetworkSimulationTestJob.DEFAULT_PEER_COUNT);
-    long observeMs = NetworkHeartbeatProbeCmd.parseLong(parameterValues,
-            NetworkSimulationTestJob.PARAM_OBSERVE_MS, NetworkSimulationTestJob.DEFAULT_OBSERVE_MS);
-    count = NetworkSimulationTestJob.clamp(count, 1, NetworkSimulationTestJob.MAX_PEER_COUNT);
-    observeMs = NetworkSimulationTestJob.clamp(observeMs, 250L, 30_000L);
-    job.dispatchProbe(callerId, NetworkSimulationTestJob.ProbeKind.ALL,
-            count, observeMs, NetworkSimulationTestJob.DEFAULT_TOKEN_TTL_MS);
+    int count = NetworkProbeTarget.parseInt(parameterValues,
+            NetworkProbeTarget.PARAM_COUNT, NetworkProbeTarget.DEFAULT_PEER_COUNT);
+    long observeMs = NetworkProbeTarget.parseLong(parameterValues,
+            NetworkProbeTarget.PARAM_OBSERVE_MS, NetworkProbeTarget.DEFAULT_OBSERVE_MS);
+    count = NetworkProbeTarget.clamp(count, 1, NetworkProbeTarget.MAX_PEER_COUNT);
+    observeMs = NetworkProbeTarget.clamp(observeMs, 250L, 30_000L);
+    job.dispatchProbe(callerId, NetworkProbeTarget.ProbeKind.ALL,
+            count, observeMs, NetworkProbeTarget.DEFAULT_TOKEN_TTL_MS);
     return true;
   }
 }

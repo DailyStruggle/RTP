@@ -330,9 +330,11 @@ public class TimeBoundTaskPipeCharacterizationTest {
             BacklogLocationBuffer backlog = region.queueManager.backlogLocations;
             assertNotNull(backlog);
 
-            Field pickField = Region.class.getDeclaredField("backlogPickNanos");
+            Field pickField = Region.class.getDeclaredField("backlogPacer");
             pickField.setAccessible(true);
-            assertEquals(0L, pickField.getLong(region), "Initial backlogPickNanos must be 0");
+            io.github.dailystruggle.rtp.common.predict.BudgetPacer pacer =
+                    (io.github.dailystruggle.rtp.common.predict.BudgetPacer) pickField.get(region);
+            assertEquals(0L, pacer.predictedCostNanos(), "Initial backlog predicted cost must be 0");
 
             Method processBacklogMethod = Region.class.getDeclaredMethod("processBacklog", long.class, long.class);
             processBacklogMethod.setAccessible(true);
@@ -340,8 +342,8 @@ public class TimeBoundTaskPipeCharacterizationTest {
             // Give a generous 500ms budget to allow picks
             processBacklogMethod.invoke(region, TimeUnit.MILLISECONDS.toNanos(500), System.nanoTime());
             assertTrue(backlog.size() > 0, "Positive budget must pick entries into backlog");
-            long updatedPickNanos = pickField.getLong(region);
-            assertTrue(updatedPickNanos > 0L, "backlogPickNanos must be updated and positive: " + updatedPickNanos);
+            long updatedPickNanos = pacer.predictedCostNanos();
+            assertTrue(updatedPickNanos > 0L, "backlog pacer cost must be updated and positive: " + updatedPickNanos);
         }
 
         @Test

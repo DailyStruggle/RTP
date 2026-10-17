@@ -206,18 +206,18 @@ public final class ImmediateLoadGovernor {
     }
 
     public void recordFileRead(double ms) {
-        fileReadCost.record(ms);
+        fileReadCost.recordSample(ms);
     }
 
     public void recordNativeLoad(double asyncMs, double syncMs) {
         if (Double.isNaN(asyncMs) || asyncMs < 0.0) asyncMs = DEFAULT_NATIVE_LOAD_MS;
         if (Double.isNaN(syncMs) || syncMs < 0.0) syncMs = DEFAULT_NATIVE_SYNC_MS;
-        nativeLoadCost.record(asyncMs);
-        nativeSyncCost.record(syncMs);
+        nativeLoadCost.recordSample(asyncMs);
+        nativeSyncCost.recordSample(syncMs);
     }
 
     public void recordOutcome(boolean rejected) {
-        rejectRate.record(rejected);
+        rejectRate.recordOutcome(rejected);
     }
 
     /**
@@ -342,19 +342,17 @@ public final class ImmediateLoadGovernor {
         for (QueuedRequest req : WAITERS) {
             if (req.future.isDone()) {
                 WAITERS.remove(req);
-                continue;
-            }
-            if (now >= req.deadlineMs) {
+            } else if (now >= req.deadlineMs) {
                 WAITERS.remove(req);
                 req.future.completeExceptionally(new TimeoutException("Timed out waiting for generation permit"));
-                continue;
-            }
-            double mspt = req.msptSupplier.getAsDouble();
-            GenerationPermit permit = req.governor.tryAcquirePermit(mspt);
-            if (permit != null) {
-                WAITERS.remove(req);
-                if (!req.future.complete(permit)) {
-                    permit.close();
+            } else {
+                double mspt = req.msptSupplier.getAsDouble();
+                GenerationPermit permit = req.governor.tryAcquirePermit(mspt);
+                if (permit != null) {
+                    WAITERS.remove(req);
+                    if (!req.future.complete(permit)) {
+                        permit.close();
+                    }
                 }
             }
         }

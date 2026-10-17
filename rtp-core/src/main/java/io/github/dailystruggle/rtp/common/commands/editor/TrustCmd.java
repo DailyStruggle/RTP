@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
  */
 public class TrustCmd extends BaseRTPCmdImpl {
 
-    public static final String PERMISSION = EditorCmd.PERMISSION;
+    public static final String PERMISSION = "rtp.editor";
     static final int MAX_FAILURES = 5;
     static final long FAILURE_WINDOW_MILLIS = 60_000L;
     private static final Pattern NONCE = Pattern.compile("[a-z0-9]{8}");

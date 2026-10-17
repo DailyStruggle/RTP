@@ -63,9 +63,9 @@ Each file in the `definitions/regions/` folder defines one teleport region. The 
 | `backlogCacheCap` | Integer | `1000` (lite: `0`) | Maximum **unverified** candidates staged upstream of `cacheCap`. Spiral picks land here without chunk I/O, then a per-region pulse verifies one `.mca` bin at a time and promotes in insertion order. Set to `0` to disable. See [REGIONS.md → Backlog Cache (L3)](REGIONS.md#backlog-cache-l3). |
 | `activeChunkCap` | Integer | `10` | Maximum chunks kept loaded simultaneously for zero-latency teleportation. |
 | `price` | Double | `0.0` | Economy cost override for this region (overrides the global `economy.yml` price). |
-| `cooldown` | Integer / Duration / String | (global fallback) | Per-region cooldown duration between successful teleports. Accepts seconds, duration strings (`5m`), sentinels (`infinite`), or `"@config"`. Defaults to global `teleportCooldown`. |
+| `cooldown` | Integer / Duration / String | (global fallback) | Per-region cooldown duration between successful teleports. Accepts seconds, duration strings (`5m`), or `"@config"`. Negative values / sentinels (`-1`, `infinite`, `permanent`) are not supported per region: they are ignored and the region falls back to the global `teleportCooldown` and shared timer. Defaults to global `teleportCooldown`. |
 | `delay` | Integer / Duration / String | (global fallback) | Per-region warmup delay before teleporting. Accepts seconds, duration strings (`5s`, `40t`), `0` (instant), or `"@config"`. Defaults to global `teleportDelay`. |
-| `spatialResolution` | Integer | `3` | Precision level for storing spatial memory in the database. Higher = more memory, finer detail. |
+| `spatialResolution` | Integer / String | `"auto"` | Precision for spatial memory (bad location tracking). Can be `"auto"` or any positive integer (e.g. `1`, `3`, `4`). Higher values check fewer, more widely spaced spots (faster scans, less memory, but can miss small safe pockets). |
 | `version` | String | `"1.0"` | Internal config version (do not change). |
 
 ---
@@ -185,7 +185,7 @@ override: "default"
 cacheCap: 10
 activeChunkCap: 5
 price: 0.0
-spatialResolution: 3
+spatialResolution: "auto"
 shape:
   name: "CIRCLE"
   mode: "ACCUMULATE"

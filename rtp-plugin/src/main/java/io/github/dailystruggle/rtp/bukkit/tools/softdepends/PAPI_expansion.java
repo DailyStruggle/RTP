@@ -1,13 +1,20 @@
 package io.github.dailystruggle.rtp.bukkit.tools.softdepends;
 
-import io.github.dailystruggle.rtp.bukkit.RTPBukkitPlugin;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.NotNull;
 
 public class PAPI_expansion extends PlaceholderExpansion {
+  /** Registering plugin (full or lite entry point); the expansion's author comes from its descriptor. */
+  private final Plugin owner;
+
+  public PAPI_expansion(Plugin owner) {
+    this.owner = owner;
+  }
+
   @Override
   public boolean persist() {
     return true;
@@ -20,7 +27,7 @@ public class PAPI_expansion extends PlaceholderExpansion {
 
   @Override
   public @NotNull String getAuthor() {
-    return RTPBukkitPlugin.getInstance().getDescription().getAuthors().toString();
+    return owner.getDescription().getAuthors().toString();
   }
 
   @Override

@@ -144,10 +144,9 @@ public final class FabricRTPChunk extends RTPChunk<ChunkAccess> {
     public void keep(boolean keep) {
         if (anvilView != null) return;
         RTPWorld<?> w = getWorld();
-        if (w instanceof FabricRTPWorld fw) {
-            if (keep) fw.keepChunkAt(cx, cz);
-            else fw.forgetChunkAt(cx, cz);
-        }
+        if (w == null) return;
+        if (keep) w.keepChunkAt(cx, cz);
+        else w.forgetChunkAt(cx, cz);
     }
 
     @Override

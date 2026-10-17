@@ -23,7 +23,7 @@ class SetupRecipeTest {
         session.setPerformanceChoice("low");
         session.setToggle("claimIntegrations", true);
 
-        List<Prefab> recipe = SetupRecipe.compileRecipe(session);
+        List<Prefab> recipe = SetupRecipe.compileRecipe(session, SetupHandlerSupport.collectWorldNames());
         assertNotNull(recipe);
         assertFalse(recipe.isEmpty());
 
@@ -51,7 +51,7 @@ class SetupRecipeTest {
         perf.put("syncAllottedTime", 10);
         baseline.put("advanced/performance", perf);
 
-        List<Prefab> recipe = SetupRecipe.compileRecipe(session);
+        List<Prefab> recipe = SetupRecipe.compileRecipe(session, SetupHandlerSupport.collectWorldNames());
         PrefabApplier.Result result = SetupRecipe.applyPipeline(baseline, recipe, List.of("world"));
 
         assertNotNull(result);

@@ -51,7 +51,7 @@ class RecorderProxyTest {
         assertTrue(target.isRecording());
         assertTrue(proxy.isRecording());
 
-        MetricsRecorder.Attempt a = new MetricsRecorder.Attempt(
+        Attempt a = new Attempt(
                 UUID.randomUUID(), "player1", "world", "rtp",
                 System.currentTimeMillis(), 0, 0, 20.0, 10.0, 500);
 

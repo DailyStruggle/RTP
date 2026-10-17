@@ -16,8 +16,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MetricsRecorderWriterTest {
 
-    private static MetricsRecorder.Attempt timedOut(MetricsRecorder rec, String label) {
-        MetricsRecorder.Attempt a = new MetricsRecorder.Attempt(UUID.randomUUID(), "bot", "world", label,
+    private static Attempt timedOut(MetricsRecorder rec, String label) {
+        Attempt a = new Attempt(UUID.randomUUID(), "bot", "world", label,
                 System.currentTimeMillis(), 0, 0, 20.0, 50.0, 512);
         rec.onDispatch(a);
         rec.onTimeout(a);

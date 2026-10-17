@@ -40,7 +40,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
         super(parent);
         this.nonceStore = nonceStore;
         addParameter("id",
-                new PrefabIdParameter(PrefabCommand.PERMISSION,
+                new PrefabIdParameter(PrefabPermission.PERMISSION,
                         "bundled prefab id",
                         (uuid, s) -> true));
         // Token-removal (2026-05-24, mirrors ADR-050): the opaque `token=`
@@ -55,7 +55,7 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
 
     @Override
     public String permission() {
-        return PrefabCommand.PERMISSION;
+        return PrefabPermission.PERMISSION;
     }
 
     @Override

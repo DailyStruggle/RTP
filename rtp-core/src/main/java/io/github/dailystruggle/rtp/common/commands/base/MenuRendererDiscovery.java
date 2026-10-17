@@ -97,35 +97,36 @@ public final class MenuRendererDiscovery {
                 ServiceLoader.load(
                         MenuRendererProvider.class, MenuRendererProvider.class.getClassLoader());
         for (MenuRendererProvider provider : loadProvidersSafely(loader, "menu renderer provider")) {
-            if (!matchesPlatform(provider.platformFamily(), family)) continue;
-            String id;
-            try {
-                id = provider.id();
-            } catch (RuntimeException ex) {
-                RTP.log(Level.WARNING, "menu renderer provider id() threw: " + ex.getMessage(), ex);
-                continue;
+            String id = matchesPlatform(provider.platformFamily(), family) ? providerId(provider) : null;
+            if (id != null) {
+                byId.putIfAbsent(id.trim().toLowerCase(Locale.ROOT), provider);
             }
-            if (id == null) continue;
-            byId.putIfAbsent(id.trim().toLowerCase(Locale.ROOT), provider);
         }
         return byId;
+    }
+
+    private static @Nullable String providerId(MenuRendererProvider provider) {
+        try {
+            return provider.id();
+        } catch (RuntimeException ex) {
+            RTP.log(Level.WARNING, "menu renderer provider id() threw: " + ex.getMessage(), ex);
+            return null;
+        }
     }
 
     public static <T> List<T> loadProvidersSafely(ServiceLoader<T> loader, String what) {
         List<T> providers = new ArrayList<>();
         Iterator<T> it = loader.iterator();
-        while (true) {
-            T provider;
+        boolean more = true;
+        while (more) {
             try {
-                if (!it.hasNext()) break;
-                provider = it.next();
+                more = it.hasNext();
+                if (more) providers.add(it.next());
             } catch (java.util.ServiceConfigurationError | LinkageError err) {
                 RTP.log(
                         Level.FINE,
                         "skipping unloadable " + what + ": " + err);
-                continue;
             }
-            providers.add(provider);
         }
         return providers;
     }

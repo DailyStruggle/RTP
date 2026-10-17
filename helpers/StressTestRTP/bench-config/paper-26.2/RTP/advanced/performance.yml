@@ -1,0 +1,166 @@
+# --- RTP Performance Settings ---
+# Documentation: plugins/RTP/docs/admin/configuration/PERFORMANCE.md
+
+# --- Server health ---
+# Pause background work when server TPS drops below this.
+# @type: number
+# @range: [0.0, 20.0]
+# @default: 19.0
+minTPS: 0.0
+
+# Pause cache filling when memory use passes this %. 0/100 = off.
+# @type: number
+# @range: [0.0, 100.0]
+# @default: 85.0
+maxHeapPercent: 95.0
+
+# How many spots to try per /rtp before giving up.
+# @type: integer
+# @range: [1, null]
+# @default: 32
+maxAttempts: 32
+
+# Ticks between background cache refills.
+# @type: integer
+# @range: [1, null]
+# @unit: ticks
+# @default: 20
+period: 1
+
+# Max ms per tick for main-thread work.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
+syncAllottedTime: 50
+
+# Max ms per tick for background work.
+# @type: integer
+# @range: [1, null]
+# @unit: ms
+# @default: 50
+asyncAllottedTime: 50
+
+# --- View-distance smoothing ---
+# Chunks loaded around a spot while searching. 0 = just the spot.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+viewDistanceSelect: 0
+
+# Chunks loaded around the final spot before teleport. 0 = just the spot.
+# @type: integer
+# @range: [0, null]
+# @unit: chunks
+# @default: 0
+viewDistanceTeleport: 0
+
+# Ticks to ease view distance back to normal after arrival. 0 = off.
+# NOTE: Temporarily forced to 0. The gradual restore causes client-side
+# flashing / re-rendering on arrival. Leave at 0 until further notice.
+# @type: integer
+# @range: [0, null]
+# @unit: ticks
+# @default: 200
+viewDistanceRestoreInterval: 0
+
+# --- Caching / pre-fill ---
+# Refill the cache right after a teleport.
+# @type: boolean
+# @default: false
+postTeleportQueueing: false
+
+# Learn biomes from chunks already loaded (no extra work).
+# @type: boolean
+# @default: true
+checkOnChunkLoads: true
+
+# Refill the backlog when it drops to this fraction. 0.5 = at 50%.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.5
+backlogRefillThreshold: 0.5
+
+# Backlog Candidate Generation Strategy.
+# FLAT_STRIDE = Uses the same 1D Hilbert dyadic-stride Feistel permutation as live/uncached selection.
+# BINNED_AMORTIZED = Uses region-file binned PRP with amortized batch quotas and within-bin dyadic stride.
+# @type: string
+# @options: ["FLAT_STRIDE", "BINNED_AMORTIZED"]
+# @default: "FLAT_STRIDE"
+backlogGenerationStrategy: "FLAT_STRIDE"
+
+# Chance to skip new (ungenerated) land. 0 = don't care, 1 = avoid it.
+# @type: number
+# @range: [0.0, 1.0]
+# @default: 0.0
+pregeneratedPreference: 0.0
+
+# Keep spare spots ready for players joining the server.
+# @type: boolean
+# @default: false
+loginCacheEnabled: false
+
+# Max size of the join-spot cache. 0 = auto (max players).
+# @type: integer
+# @range: [0, null]
+# @default: 0
+loginCacheCap: 0
+
+# --- Biome recall ---
+# Reuse saved biome spots from the cache.
+# @type: boolean
+# @default: true
+biomeRecall: true
+
+# Only use cached biome spots, never search for new ones. Needs biomeRecall.
+# @type: boolean
+# @default: false
+biomeRecallForced: false
+
+# --- Auditing counters ---
+# Warn when a teleport takes longer than this (ms). 0 or less = off.
+# @type: integer
+# @range: [0, null]
+# @unit: ms
+# @default: 5000
+slowPipelineThresholdMs: 5000
+
+# Warn when this many players are waiting. 0 or less = off.
+# @type: integer
+# @range: [0, null]
+# @unit: players
+# @default: 0
+queueGrowthWarnThreshold: 0
+
+# --- Advanced (rarely touched) ---
+# Load chunks on the main thread. NOT RECOMMENDED (causes lag).
+# @type: boolean
+# @default: false
+syncLoading: false
+
+# Re-read permissions every event instead of caching them.
+# @type: boolean
+# @default: false
+onEventParsing: false
+
+# Parse effect permission nodes at startup.
+# @type: boolean
+# @default: true
+effectParsing: true
+
+# Enable background data gathering for visitor analytics.
+# @type: boolean
+# @default: false
+visitorEnabled: false
+
+# Settings for /rtp admin prefab. Keeps backups of changed files.
+prefab:
+  # How many backups to keep per file.
+  # @type: integer
+  # @range: [1, null]
+  # @default: 3
+  bakRetention: 3
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.1

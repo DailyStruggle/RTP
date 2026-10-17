@@ -291,29 +291,23 @@ public final class ProbeFirstGovernor {
             if (left > 0 && currentDecisions > until) {
                 left = 0;
             }
+            boolean probeNow;
             if (left > 0 && bin != NO_BIN && bin == trialBin) {
                 left--;
                 credit -= 1.0;
-                TrialState next = new TrialState(credit, trialBin, left, until);
-                if (trialState.compareAndSet(cur, next)) {
-                    return true;
-                }
-                continue;
-            }
-            if (credit >= 1.0) {
+                probeNow = true;
+            } else if (credit >= 1.0) {
                 credit -= 1.0;
                 trialBin = bin;
                 left = (bin == NO_BIN) ? 0 : TRIAL_RUN - 1;
                 until = currentDecisions + TRIAL_WINDOW;
-                TrialState next = new TrialState(credit, trialBin, left, until);
-                if (trialState.compareAndSet(cur, next)) {
-                    return true;
-                }
-                continue;
+                probeNow = true;
+            } else {
+                probeNow = false;
             }
             TrialState next = new TrialState(credit, trialBin, left, until);
             if (trialState.compareAndSet(cur, next)) {
-                return false;
+                return probeNow;
             }
         }
     }

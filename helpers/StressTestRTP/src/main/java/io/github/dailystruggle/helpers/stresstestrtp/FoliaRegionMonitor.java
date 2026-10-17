@@ -110,7 +110,7 @@ public final class FoliaRegionMonitor {
      * player's region. Also books the region-context acquisition that the hop
      * itself represents.
      */
-    public void noteDispatchHop(MetricsRecorder.Attempt a) {
+    public void noteDispatchHop(Attempt a) {
         if (!folia || a == null) return;
         noteAcquisition(a);
         long landed = a.commandDispatchedEpochMs;
@@ -131,7 +131,7 @@ public final class FoliaRegionMonitor {
      * attempt keeps its {@code -1} sentinel; on Folia it starts at 0 so a
      * genuine zero is distinguishable from "not measured".
      */
-    public void beginAttempt(MetricsRecorder.Attempt a) {
+    public void beginAttempt(Attempt a) {
         if (!folia || a == null) return;
         if (a.regionContextAcquisitions < 0L) a.regionContextAcquisitions = 0L;
     }
@@ -145,7 +145,7 @@ public final class FoliaRegionMonitor {
      * own lifecycle (hop strictly before completion), so there is no
      * read-modify-write race to lose.
      */
-    public void noteAcquisition(MetricsRecorder.Attempt a) {
+    public void noteAcquisition(Attempt a) {
         if (!folia || a == null) return;
         long cur = a.regionContextAcquisitions;
         a.regionContextAcquisitions = (cur < 0L ? 1L : cur + 1L);

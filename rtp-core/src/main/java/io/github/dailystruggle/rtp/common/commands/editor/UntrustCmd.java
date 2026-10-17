@@ -27,7 +27,7 @@ import java.util.logging.Level;
  */
 public class UntrustCmd extends BaseRTPCmdImpl {
 
-    public static final String PERMISSION = EditorCmd.PERMISSION;
+    public static final String PERMISSION = "rtp.editor";
 
     public UntrustCmd(@Nullable CommandsAPICommand parent) {
         super(parent);

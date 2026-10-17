@@ -210,22 +210,11 @@ public class RTP {
       }
       Set<String> raw = new HashSet<>();
       for (Object o : coll) {
-        if (o == null) continue;
-        String token = o.toString().trim();
+        String token = (o == null) ? "" : o.toString().trim();
         if (token.isEmpty()) continue;
-        if (token.charAt(0) == '#') {
-          String tagId = token.substring(1);
-          if (tagId.indexOf(':') < 0) tagId = "minecraft:" + tagId;
-          tagId = tagId.toLowerCase(Locale.ROOT);
-          Set<String> members = tagSnapshot.get(tagId);
-          if (members != null && !members.isEmpty()) {
-            raw.addAll(members);
-            continue;
-          }
-          raw.add(token);
-        } else {
-          raw.add(token);
-        }
+        Set<String> members = resolveAirBlockTag(token, tagSnapshot);
+        if (members != null) raw.addAll(members);
+        else raw.add(token);
       }
       Set<String> reconciled = io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(raw);
       AIR_BLOCKS_CACHE.set(reconciled);
@@ -233,6 +222,16 @@ public class RTP {
     } catch (Throwable ignored) {
       return cached;
     }
+  }
+
+  /** Expands a {@code #tag} token to its non-empty member set; {@code null} keeps the token as written. */
+  private static Set<String> resolveAirBlockTag(String token, Map<String, Set<String>> tagSnapshot) {
+    if (token.charAt(0) != '#') return null;
+    String tagId = token.substring(1);
+    if (tagId.indexOf(':') < 0) tagId = "minecraft:" + tagId;
+    tagId = tagId.toLowerCase(Locale.ROOT);
+    Set<String> members = tagSnapshot.get(tagId);
+    return (members == null || members.isEmpty()) ? null : members;
   }
 
   /**
@@ -1325,7 +1324,7 @@ public class RTP {
   public RTPTaskPipe cancelTasks;
   public final Map<String, ScanTask> scanTasks = new ConcurrentHashMap<>();
   public final ConcurrentHashMap<UUID, Long> invulnerablePlayers = new ConcurrentHashMap<>();
-  public final ConcurrentHashMap<UUID, Map<String, Long>> regionTeleportTimes = new ConcurrentHashMap<>();
+  public final ConcurrentMap<UUID, Map<String, Long>> regionTeleportTimes = new ConcurrentHashMap<>();
   public final ConcurrentLinkedQueue<RTPChunk<?>> chunksToUnload = new ConcurrentLinkedQueue<>();
   public DatabaseAccessor<?> databaseAccessor;
   /**

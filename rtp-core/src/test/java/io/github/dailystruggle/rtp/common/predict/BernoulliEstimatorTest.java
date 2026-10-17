@@ -15,12 +15,12 @@ class BernoulliEstimatorTest {
         assertEquals(0.0, estTrue.rate());
         assertEquals(0L, estTrue.sampleCount());
 
-        estTrue.record(true);
+        estTrue.recordOutcome(true);
         assertEquals(1.0, estTrue.rate(), 1e-9);
         assertEquals(1L, estTrue.sampleCount());
 
         BernoulliEstimator estFalse = BernoulliEstimator.ofWindow(32);
-        estFalse.record(false);
+        estFalse.recordOutcome(false);
         assertEquals(0.0, estFalse.rate(), 1e-9);
         assertEquals(1L, estFalse.sampleCount());
     }
@@ -30,7 +30,7 @@ class BernoulliEstimatorTest {
     void alternatingOutcomes_convergeToHalf() {
         BernoulliEstimator estimator = BernoulliEstimator.ofWindow(64);
         for (int i = 0; i < 200; i++) {
-            estimator.record(i % 2 == 0);
+            estimator.recordOutcome(i % 2 == 0);
         }
 
         assertEquals(0.5, estimator.rate(), 0.05);
@@ -44,7 +44,7 @@ class BernoulliEstimatorTest {
         assertEquals(0.20, estimator.rate(), 1e-9);
         assertEquals(0L, estimator.sampleCount());
 
-        estimator.record(true);
+        estimator.recordOutcome(true);
         assertEquals(1L, estimator.sampleCount());
         // alpha = 2 / 65 ~ 0.030769
         // rate = 0.20 + (2/65) * (1.0 - 0.20) = 0.20 + 0.024615 = 0.224615
@@ -57,13 +57,13 @@ class BernoulliEstimatorTest {
     void rateStaysWithinBounds() {
         BernoulliEstimator estimator = BernoulliEstimator.ofWindow(8, 0.99);
         for (int i = 0; i < 50; i++) {
-            estimator.record(true);
+            estimator.recordOutcome(true);
         }
         assertTrue(estimator.rate() <= 1.0);
         assertTrue(estimator.rate() >= 0.99);
 
         for (int i = 0; i < 100; i++) {
-            estimator.record(false);
+            estimator.recordOutcome(false);
         }
         assertTrue(estimator.rate() >= 0.0);
         assertTrue(estimator.rate() < 0.05);

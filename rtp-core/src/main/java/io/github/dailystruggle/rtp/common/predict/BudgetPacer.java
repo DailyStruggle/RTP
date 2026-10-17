@@ -74,11 +74,7 @@ public final class BudgetPacer {
             return true; // Forward progress guarantee: always run at least once on positive budget
         }
 
-        long predicted = predictedCostNanos();
-        if (elapsedNanos > availableNanos - predicted) {
-            return false;
-        }
-        return true;
+        return elapsedNanos <= availableNanos - predictedCostNanos();
     }
 
     /**

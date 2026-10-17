@@ -148,7 +148,7 @@ class AbstractForeignConfigImporterCoverageTest {
     @Test
     @DisplayName("createRegionYaml defaults and normal-distribution parameters")
     void createRegionYamlVariants() {
-        RtpYamlConfig noShape = importer.createRegionYaml("r", "w", null, 1, 2, 3, 4, 0.0);
+        RtpYamlConfig noShape = importer.createRegionYaml("r", "w", null, 1, 2, 3, 4, 0.0, null);
         assertEquals("CIRCLE", noShape.getString("shape.name"));
         assertFalse(noShape.contains("biomes"));
         RtpYamlConfig normal = importer.createRegionYaml("r", "w", "CIRCLE_NORMAL", 1, 2, 3, 4, 0.0, List.of());

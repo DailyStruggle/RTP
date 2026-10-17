@@ -1222,17 +1222,22 @@ final class PregenTask implements Runnable {
 
         final String resBiome = currBiome;
 
-        loadSafetyNeighbours(cx, cz, finalL, finalX, finalY, finalZ, resBiome, chunk, reservation);
+        loadSafetyNeighbours(
+                new SafetyCandidate(cx, cz, finalL, finalX, finalY, finalZ, resBiome), chunk, reservation);
     }
+
+    /** Candidate under safety check: center chunk, shape index, block position and resolved biome. */
+    private record SafetyCandidate(int cx, int cz, long l, int x, int y, int z, String biome) {}
 
     /**
      * safetyCheck: load the (2r+1)² neighbour grid, then y-scan. ADR-110: while speculative and
      * without native-load rights, neighbours resolve from resident chunks / region files only; a
      * miss escalates to native loads (pinned or unpinned) and re-runs, or defers under heap pressure.
      */
-    private void loadSafetyNeighbours(int cx, int cz, long finalL, int finalX, int finalY, int finalZ,
-                                      String resBiome, RTPChunk<?> chunk,
+    private void loadSafetyNeighbours(SafetyCandidate candidate, RTPChunk<?> chunk,
                                       @org.jetbrains.annotations.Nullable ChunkReservation reservation) {
+        final int cx = candidate.cx();
+        final int cz = candidate.cz();
         final boolean readOnlyNow = readOnly() && !unpinnedLoad.get();
         int safe = state.safetyRadius;
         int L = safe * 2 + 1;
@@ -1259,7 +1264,7 @@ final class PregenTask implements Runnable {
 
         if (neighbourFutures.isEmpty()) {
             // safetyRadius == 0: no neighbours to load, evaluate immediately.
-            evaluateSafety(cx, cz, finalL, finalX, finalY, finalZ, resBiome, localChunks, L, centerChunkX, centerChunkZ, reservation);
+            evaluateSafety(candidate, localChunks, L, centerChunkX, centerChunkZ, reservation);
             return;
         }
 
@@ -1301,8 +1306,7 @@ final class PregenTask implements Runnable {
                     }
                     if (!ok && readOnlyNow) {
                         if (tryNativeLoad()) {
-                            continueInline(() -> loadSafetyNeighbours(
-                                    cx, cz, finalL, finalX, finalY, finalZ, resBiome, chunk, reservation));
+                            continueInline(() -> loadSafetyNeighbours(candidate, chunk, reservation));
                             return;
                         }
                         gate().onDeferredNeighbour();
@@ -1322,8 +1326,7 @@ final class PregenTask implements Runnable {
                         return;
                     }
                     Runnable eval = () -> evaluateSafety(
-                            cx, cz, finalL, finalX, finalY, finalZ, resBiome,
-                            localChunks, L, centerChunkX, centerChunkZ, reservation);
+                            candidate, localChunks, L, centerChunkX, centerChunkZ, reservation);
                     if (reservation != null && isFoliaPlatform()) {
                         // Folia neighbour loads complete off the region thread (ADR-112): live
                         // block reads re-enter the owning region through the budgeted scheduler.
@@ -1364,11 +1367,15 @@ final class PregenTask implements Runnable {
         }
     }
 
-    private void evaluateSafety(int cx, int cz, long finalL, int finalX, int finalY, int finalZ,
-                                String resBiome,
+    private void evaluateSafety(SafetyCandidate candidate,
                                 RTPChunk<?>[] localChunks, int L,
                                 int centerChunkX, int centerChunkZ,
                                 @org.jetbrains.annotations.Nullable ChunkReservation reservation) {
+        final long finalL = candidate.l();
+        final int finalX = candidate.x();
+        final int finalY = candidate.y();
+        final int finalZ = candidate.z();
+        final String resBiome = candidate.biome();
         int safe = state.safetyRadius;
         // ADR-015 Folia-follow-up: no redundant stale-guard here. For the
         // live-backed branch the guard already fired on the region-owning

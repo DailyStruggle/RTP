@@ -765,6 +765,156 @@ public class Region extends FactoryValue<RegionKeys> {
         });
   }
 
+  /**
+   * Loads the chunk of cold candidate {@code coldLoc}, re-verifies its column and runs the
+   * promotion checks; the candidate ends in kept, back in cold, or dropped. Holds one
+   * {@code inFlightCalculations} slot until the outcome is known.
+   */
+  private void promoteCold(RTPLocation coldLoc, int cx, int cz) {
+    inFlightCalculations.incrementAndGet();
+    RTP.log(Level.FINER,
+        "[Region:" + name + "] SpawnWorker for cold (" + coldLoc.coords().x()
+            + "," + coldLoc.coords().y() + "," + coldLoc.coords().z() + ")");
+
+    getWorld().recordChunkLoadOrigin("Region.coldPromote");
+    io.github.dailystruggle.rtp.common.tools.CfDiag.regionDeficitDispatch.increment();
+    RTP.log(Level.FINER,
+        "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
+            + ") getChunkAtAsync DISPATCHED inFlight=" + inFlightCalculations.get());
+    getWorld().getChunkAtAsync(cx, cz).thenAccept(chunkSet -> {
+      RTP.log(Level.FINER,
+          "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
+              + ") thenAccept FIRED chunkSet=" + (chunkSet == null ? "null" : "present")
+              + " complete()=" + (chunkSet == null || chunkSet.complete() == null
+                  ? "null" : "done=" + chunkSet.complete().isDone()));
+      chunkSet.complete().whenComplete((success, throwable) -> {
+        RTP.log(Level.FINER,
+            "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
+                + ") complete.whenComplete success=" + success
+                + (throwable == null ? "" : " throwable=" + throwable.getClass().getSimpleName()
+                    + ":" + throwable.getMessage()));
+        if (success == null || !success) {
+          try {
+            RTP.log(Level.FINER,
+                "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
+                    + ") DROPPED success-false; returned to unkept");
+            queueManager.unkeptLocations.offer(coldLoc);
+          } finally {
+            inFlightCalculations.decrementAndGet();
+          }
+          return;
+        }
+        // Second-pass safety verification on Folia region thread or inline.
+        // Re-runs vertical adjustor against loaded chunk to ensure valid ground placement.
+        @SuppressWarnings("java:S2093") // ChunkReservation ownership is transferred on successful offer; closing in try-with-resources would invalidate cached chunks
+        Runnable verify = () -> {
+          boolean handedOff = false;
+          try {
+            RTP.log(Level.FINER,
+                "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
+                    + ") verify ENTER");
+            RTPCoords resolved = null;
+            io.github.dailystruggle.rtp.api.world.RTPChunk<?> rtpChunk = null;
+            try {
+              long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
+              rtpChunk = getWorld().getCachedChunk(key);
+              VerticalAdjustor<?> v = getVert();
+              RTP.log(Level.FINER,
+                  "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
+                      + ") verify cachedChunk=" + (rtpChunk == null ? "null" : "present")
+                      + " vert=" + (v == null ? "null" : v.getClass().getSimpleName()));
+              if (rtpChunk != null && v != null) {
+                RTPCoords storedCoords = coldLoc.coords();
+                resolved = v.adjustColumn(rtpChunk, storedCoords.x() & 15, storedCoords.z() & 15);
+                if (resolved == null) {
+                  resolved = v.adjust(rtpChunk);
+                }
+              }
+              RTP.log(Level.FINER,
+                  "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
+                      + ") verify adjust resolved=" + (resolved == null ? "null" : "present"));
+            } catch (Throwable verifyEx) {
+              resolved = null;
+              RTP.log(
+                  Level.FINE,
+                  "[Region] unkept→kept safety re-verification failed: "
+                      + verifyEx.getClass().getSimpleName() + ": " + verifyEx.getMessage());
+            }
+
+            if (rtpChunk == null) {
+              // Transient verify failure: chunk not retained through window; re-queue cold.
+              logPromotionDropDiag(coldLoc, null, cx, cz);
+              queueManager.unkeptLocations.offer(coldLoc);
+              return;
+            }
+
+            if (resolved == null) {
+              // [PROMOTE_DIAG] Cold->hot promotion rejected this candidate
+              // because the vertical adjustor found no safe standing column in
+              // the (re)loaded chunk. This is the silent drop that leaves the hot stage
+              // (keptLocations) empty when every promotion fails. Log the
+              // chunk's backing mode + a sample of its block/biome reads so a
+              // broken platform chunk read (everything air / wrong block ids /
+              // ungenerated anvil view) is distinguishable from a genuinely
+              // unsafe column.
+              logPromotionDropDiag(coldLoc, rtpChunk, cx, cz);
+              dropColdLocation(coldLoc, LocationGenerator.FailTypes.vert);
+              return;
+            }
+
+            ChunkReservation reservation = new ChunkReservation(chunkSet, getWorld());
+            final RTPCoords checked = resolved;
+            CompletableFuture<LocationGenerator.FailTypes> checks;
+            try {
+              checks = promotionChecks(checked, rtpChunk);
+            } catch (Throwable t) {
+              checks = CompletableFuture.failedFuture(t);
+            }
+            handedOff = true;
+            checks.whenComplete((cause, ex) -> {
+              try {
+                if (ex == null && cause == null) {
+                  // Moves the slot to pendingKeptPromotions before the in-flight release below.
+                  offerKeptWhenResident(coldLoc, checked, reservation, cx, cz);
+                  return;
+                }
+                reservation.close();
+                RTP.log(Level.FINE, "[Region:" + name + "] promotion chunk=(" + cx + "," + cz
+                    + ") dropped: " + (ex != null ? ex.toString() : cause.name()));
+                dropColdLocation(coldLoc, (ex != null) ? LocationGenerator.FailTypes.misc : cause);
+              } catch (Throwable t) {
+                reservation.close();
+                RTP.log(Level.WARNING, "[Region:" + name + "] promotion check failed: " + t, t);
+              } finally {
+                inFlightCalculations.decrementAndGet();
+              }
+            });
+          } finally {
+            if (!handedOff) inFlightCalculations.decrementAndGet();
+          }
+        };
+        if (isFoliaPlatform()) {
+          RTP.scheduler.runTask(getWorld(), cx, cz, verify);
+        } else if (isOnTickThread()) {
+          // Paper completes chunk futures on the main thread: queue the column re-check and
+          // promotion checks on the budgeted sync pipe instead of running them in the callback.
+          RTP.getInstance().miscSyncTasks.add(verify);
+        } else {
+          verify.run();
+        }
+      });
+    }).exceptionally(throwable -> {
+      RTP.log(Level.FINER,
+          "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
+              + ") getChunkAtAsync EXCEPTIONALLY "
+              + (throwable == null ? "null" : throwable.getClass().getSimpleName()
+                  + ":" + throwable.getMessage()) + "; returned to unkept");
+      inFlightCalculations.decrementAndGet();
+      queueManager.unkeptLocations.offer(coldLoc);
+      return null;
+    });
+  }
+
   public void execute(long availableTime) {
     io.github.dailystruggle.rtp.common.tools.CfDiag.regionExecute.increment();
     // Lobby backends advertise regions=[]/acceptingRequests=false
@@ -835,7 +985,7 @@ public class Region extends FactoryValue<RegionKeys> {
     }
 
     for (int i = 0; i < fillDeficit; i++) {
-      if (i > 0 && System.nanoTime() - start >= availableTime) break;
+      boolean outOfTime = i > 0 && System.nanoTime() - start >= availableTime;
       // Silent poll: this location is about to be re-offered to keptLocations under an
       // identical DB composite key (region:world:x:y:z). Firing the delete callback here
       // and the save callback on the kept offer races inside DatabaseAccessor's
@@ -843,7 +993,7 @@ public class Region extends FactoryValue<RegionKeys> {
       // `/rtp info` showing cacheCap+activeCap-1 instead of the expected total). Keeping
       // the source poll silent preserves the DB row through the promotion; the kept
       // offer's save callback then acts as an idempotent upsert on the same key.
-      RTPLocation coldLoc = queueManager.unkeptLocations.pollSilently();
+      RTPLocation coldLoc = outOfTime ? null : queueManager.unkeptLocations.pollSilently();
       if (coldLoc == null) break;
 
       int cx = coldLoc.coords().x() >> 4;
@@ -852,151 +1002,9 @@ public class Region extends FactoryValue<RegionKeys> {
       // the next candidate (usually another region) takes this slot, so load is divided, not stacked.
       if (RTP.scheduler != null && RTP.scheduler.isRegionSaturated(getWorld(), cx, cz)) {
         queueManager.unkeptLocations.offerSilently(coldLoc); // silent: the poll kept its DB row
-        continue;
+      } else {
+        promoteCold(coldLoc, cx, cz);
       }
-
-      inFlightCalculations.incrementAndGet();
-      RTP.log(Level.FINER,
-          "[Region:" + name + "] SpawnWorker for cold (" + coldLoc.coords().x()
-              + "," + coldLoc.coords().y() + "," + coldLoc.coords().z() + ")");
-
-      getWorld().recordChunkLoadOrigin("Region.coldPromote");
-      io.github.dailystruggle.rtp.common.tools.CfDiag.regionDeficitDispatch.increment();
-      RTP.log(Level.FINER,
-          "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
-              + ") getChunkAtAsync DISPATCHED inFlight=" + inFlightCalculations.get());
-      getWorld().getChunkAtAsync(cx, cz).thenAccept(chunkSet -> {
-        RTP.log(Level.FINER,
-            "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
-                + ") thenAccept FIRED chunkSet=" + (chunkSet == null ? "null" : "present")
-                + " complete()=" + (chunkSet == null || chunkSet.complete() == null
-                    ? "null" : "done=" + chunkSet.complete().isDone()));
-        chunkSet.complete().whenComplete((success, throwable) -> {
-          RTP.log(Level.FINER,
-              "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
-                  + ") complete.whenComplete success=" + success
-                  + (throwable == null ? "" : " throwable=" + throwable.getClass().getSimpleName()
-                      + ":" + throwable.getMessage()));
-          if (success == null || !success) {
-            try {
-              RTP.log(Level.FINER,
-                  "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
-                      + ") DROPPED success-false; returned to unkept");
-              queueManager.unkeptLocations.offer(coldLoc);
-            } finally {
-              inFlightCalculations.decrementAndGet();
-            }
-            return;
-          }
-          // Second-pass safety verification on Folia region thread or inline.
-          // Re-runs vertical adjustor against loaded chunk to ensure valid ground placement.
-          @SuppressWarnings("java:S2093") // ChunkReservation ownership is transferred on successful offer; closing in try-with-resources would invalidate cached chunks
-          Runnable verify = () -> {
-            boolean handedOff = false;
-            try {
-              RTP.log(Level.FINER,
-                  "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
-                      + ") verify ENTER");
-              RTPCoords resolved = null;
-              io.github.dailystruggle.rtp.api.world.RTPChunk<?> rtpChunk = null;
-              try {
-                long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
-                rtpChunk = getWorld().getCachedChunk(key);
-                VerticalAdjustor<?> v = getVert();
-                RTP.log(Level.FINER,
-                    "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
-                        + ") verify cachedChunk=" + (rtpChunk == null ? "null" : "present")
-                        + " vert=" + (v == null ? "null" : v.getClass().getSimpleName()));
-                if (rtpChunk != null && v != null) {
-                  RTPCoords storedCoords = coldLoc.coords();
-                  resolved = v.adjustColumn(rtpChunk, storedCoords.x() & 15, storedCoords.z() & 15);
-                  if (resolved == null) {
-                    resolved = v.adjust(rtpChunk);
-                  }
-                }
-                RTP.log(Level.FINER,
-                    "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
-                        + ") verify adjust resolved=" + (resolved == null ? "null" : "present"));
-              } catch (Throwable verifyEx) {
-                resolved = null;
-                RTP.log(
-                    Level.FINE,
-                    "[Region] unkept→kept safety re-verification failed: "
-                        + verifyEx.getClass().getSimpleName() + ": " + verifyEx.getMessage());
-              }
-
-              if (rtpChunk == null) {
-                // Transient verify failure: chunk not retained through window; re-queue cold.
-                logPromotionDropDiag(coldLoc, null, cx, cz);
-                queueManager.unkeptLocations.offer(coldLoc);
-                return;
-              }
-
-              if (resolved == null) {
-                // [PROMOTE_DIAG] Cold->hot promotion rejected this candidate
-                // because the vertical adjustor found no safe standing column in
-                // the (re)loaded chunk. This is the silent drop that leaves the hot stage
-                // (keptLocations) empty when every promotion fails. Log the
-                // chunk's backing mode + a sample of its block/biome reads so a
-                // broken platform chunk read (everything air / wrong block ids /
-                // ungenerated anvil view) is distinguishable from a genuinely
-                // unsafe column.
-                logPromotionDropDiag(coldLoc, rtpChunk, cx, cz);
-                dropColdLocation(coldLoc, LocationGenerator.FailTypes.vert);
-                return;
-              }
-
-              ChunkReservation reservation = new ChunkReservation(chunkSet, getWorld());
-              final RTPCoords checked = resolved;
-              CompletableFuture<LocationGenerator.FailTypes> checks;
-              try {
-                checks = promotionChecks(checked, rtpChunk);
-              } catch (Throwable t) {
-                checks = CompletableFuture.failedFuture(t);
-              }
-              handedOff = true;
-              checks.whenComplete((cause, ex) -> {
-                try {
-                  if (ex == null && cause == null) {
-                    // Moves the slot to pendingKeptPromotions before the in-flight release below.
-                    offerKeptWhenResident(coldLoc, checked, reservation, cx, cz);
-                    return;
-                  }
-                  reservation.close();
-                  RTP.log(Level.FINE, "[Region:" + name + "] promotion chunk=(" + cx + "," + cz
-                      + ") dropped: " + (ex != null ? ex.toString() : cause.name()));
-                  dropColdLocation(coldLoc, (ex != null) ? LocationGenerator.FailTypes.misc : cause);
-                } catch (Throwable t) {
-                  reservation.close();
-                  RTP.log(Level.WARNING, "[Region:" + name + "] promotion check failed: " + t, t);
-                } finally {
-                  inFlightCalculations.decrementAndGet();
-                }
-              });
-            } finally {
-              if (!handedOff) inFlightCalculations.decrementAndGet();
-            }
-          };
-          if (isFoliaPlatform()) {
-            RTP.scheduler.runTask(getWorld(), cx, cz, verify);
-          } else if (isOnTickThread()) {
-            // Paper completes chunk futures on the main thread: queue the column re-check and
-            // promotion checks on the budgeted sync pipe instead of running them in the callback.
-            RTP.getInstance().miscSyncTasks.add(verify);
-          } else {
-            verify.run();
-          }
-        });
-      }).exceptionally(throwable -> {
-        RTP.log(Level.FINER,
-            "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
-                + ") getChunkAtAsync EXCEPTIONALLY "
-                + (throwable == null ? "null" : throwable.getClass().getSimpleName()
-                    + ":" + throwable.getMessage()) + "; returned to unkept");
-        inFlightCalculations.decrementAndGet();
-        queueManager.unkeptLocations.offer(coldLoc);
-        return null;
-      });
     }
 
     while (!queueManager.playerQueue.isEmpty()) {
@@ -1210,7 +1218,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
       // Schedule at most one observational RegionCacheTask when visitor mode is enabled.
       if (isObservationalModeEnabled()) {
-        cachePipeline.add(RegionCacheTask.observe(this, availableTime - (System.nanoTime() - start)));
+        cachePipeline.add(RegionCacheTask.observe(this));
       }
 
       cachePipeline.execute(Math.max(1L, availableTime - (System.nanoTime() - start)));
@@ -1281,53 +1289,23 @@ public class Region extends FactoryValue<RegionKeys> {
       // the pulse budget. Stop when the predicted next pick would cross the headroom line.
       final long deadline = refillDeadline(availableTime, startNanos, System.nanoTime());
       long pickStart = 0L;
-      while (true) {
+      boolean more = true;
+      while (more) {
         long now = System.nanoTime();
         if (pickStart != 0L) recordPickCost(now - pickStart);
-        if (backlog.size() >= backlog.capacity() || now + backlogPacer.predictedCostNanos() >= deadline) break;
         pickStart = now;
-        int[] sel;
-        try {
-          if (binnedStrategy
-              && currentShape instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.AbstractDualLayerShape ds) {
-            long cand = ds.selectL3Candidate();
-            if (cand < 0) {
-              sel = currentShape.select();
-            } else {
-              io.github.dailystruggle.rtp.api.world.MutableRTPCoords mc =
-                  new io.github.dailystruggle.rtp.api.world.MutableRTPCoords(0, 0);
-              ds.locationToXZ(cand, mc);
-              sel = new int[] {mc.x, mc.z};
-            }
-          } else {
-            // Default FLAT_STRIDE: uses identical selection method as uncached/live selection
-            sel = currentShape.select();
-          }
-        } catch (Throwable t) {
-          break;
+        boolean budgetLeft = backlog.size() < backlog.capacity()
+            && now + backlogPacer.predictedCostNanos() < deadline;
+        int[] sel = budgetLeft ? pickBacklogCell(currentShape, binnedStrategy) : NO_CELL;
+        if (sel.length < 2) {
+          more = false;
+        } else if (pregenPrefRejects(world, sel[0], sel[1])) {
+          more = ++consecutivePregenRejects < maxConsecutivePregenRejects;
+        } else {
+          consecutivePregenRejects = 0;
+          RTPCoords coords = new RTPCoords(worldName, (sel[0] << 4) + 7, verticalY, (sel[1] << 4) + 7);
+          more = stageUnverified(backlog, binIndex, coords);
         }
-        if (sel == null || sel.length < 2) break;
-        if (pregenPrefRejects(world, sel[0], sel[1])) {
-          if (++consecutivePregenRejects >= maxConsecutivePregenRejects) {
-            break;
-          }
-          continue;
-        }
-        consecutivePregenRejects = 0;
-        int blockX = (sel[0] << 4) + 7;
-        int blockZ = (sel[1] << 4) + 7;
-        RTPCoords coords = new RTPCoords(worldName, blockX, verticalY, blockZ);
-        RTPLocation loc = new RTPLocation(coords, 0L);
-        BacklogLocationBuffer.BacklogEntry entry = backlog.offerUnverified(loc);
-        if (entry == null) {
-          // If rejected due to capacity, attempt heuristic cleaning and retry once
-          if (backlog.cleanIfHeuristicMet() > 0) {
-            entry = backlog.offerUnverified(loc);
-          }
-          if (entry == null) break; // capacity rejection
-        }
-        entry.setOwnerOnReject(this::onBacklogReject);
-        binIndex.insert(RegionFileCoord.of(coords), entry);
       }
     }
 
@@ -1351,6 +1329,48 @@ public class Region extends FactoryValue<RegionKeys> {
     // runs the rest of the check on the chunk it loads. UNKNOWN entries stay until the cold fill
     // takes them (RegionCacheTask -> PregenTask).
     drainValidatedToCold(backlog);
+  }
+
+  private static final int[] NO_CELL = new int[0];
+
+  /** Next backlog chunk cell {@code {cx, cz}}; {@link #NO_CELL} when the shape yields none or throws. */
+  private static int[] pickBacklogCell(Shape<?> currentShape, boolean binnedStrategy) {
+    int[] sel;
+    try {
+      if (binnedStrategy
+          && currentShape instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.AbstractDualLayerShape ds) {
+        long cand = ds.selectL3Candidate();
+        if (cand < 0) {
+          sel = currentShape.select();
+        } else {
+          io.github.dailystruggle.rtp.api.world.MutableRTPCoords mc =
+              new io.github.dailystruggle.rtp.api.world.MutableRTPCoords(0, 0);
+          ds.locationToXZ(cand, mc);
+          sel = new int[] {mc.x, mc.z};
+        }
+      } else {
+        // Default FLAT_STRIDE: uses identical selection method as uncached/live selection
+        sel = currentShape.select();
+      }
+    } catch (Throwable t) {
+      return NO_CELL;
+    }
+    return (sel == null || sel.length < 2) ? NO_CELL : sel;
+  }
+
+  /** Offers one unverified pick and indexes it by region file; false on capacity rejection. */
+  private boolean stageUnverified(
+      BacklogLocationBuffer backlog, WorldBacklogBinIndex binIndex, RTPCoords coords) {
+    RTPLocation loc = new RTPLocation(coords, 0L);
+    BacklogLocationBuffer.BacklogEntry entry = backlog.offerUnverified(loc);
+    // If rejected due to capacity, attempt heuristic cleaning and retry once
+    if (entry == null && backlog.cleanIfHeuristicMet() > 0) {
+      entry = backlog.offerUnverified(loc);
+    }
+    if (entry == null) return false;
+    entry.setOwnerOnReject(this::onBacklogReject);
+    binIndex.insert(RegionFileCoord.of(coords), entry);
+    return true;
   }
 
   /** Moves validated backlog entries into cold up to {@code cacheCap}; FIFO head or random per strategy. */

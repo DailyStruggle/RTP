@@ -11,7 +11,6 @@ import io.github.dailystruggle.rtp.api.menu.MenuOpenRequest;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.maps.MapDispatch;
 import org.jetbrains.annotations.Nullable;
 
@@ -33,10 +32,10 @@ import java.util.logging.Level;
  * and maintains S-005 asynchronous safety end-to-end.
  */
 @SuppressWarnings("java:S1845") // PERMISSION constant matches convention alongside permission() method
-public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
+public class MenuRedeemSubcommand extends MenuDispatchTarget {
 
     /** Permission required to redeem a menu token. Reuses {@code rtp.menu}. */
-    public static final String PERMISSION = "rtp.menu";
+    public static final String PERMISSION = MenuPermissionGates.MENU_PERMISSION;
 
     /**
      * Permission required to dispatch the curated config subtree variants.
@@ -44,13 +43,13 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * {@link MenuAction.OpenConfigSelector} /
      * {@link MenuAction.OpenConfigFile} / {@link MenuAction.OpenConfigKey}.
      */
-    public static final String CONFIG_VIEW_PERMISSION = "rtp.config.view";
+    public static final String CONFIG_VIEW_PERMISSION = MenuPermissionGates.CONFIG_VIEW_PERMISSION;
 
     /**
      * Permission required to open the curated admin panel. Missing permission
      * yields an S-004 reject path on an inbound {@link MenuAction.OpenAdminPanel}.
      */
-    public static final String ADMIN_MENU_PERMISSION = "rtp.menu.admin";
+    public static final String ADMIN_MENU_PERMISSION = MenuPermissionGates.ADMIN_MENU_PERMISSION;
 
     /**
      * Parameter names used when the anvil-input "+ add new" prompt on the
@@ -66,15 +65,6 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
     // and msgBadParameter fires).
     public static final String PARAM_MULTIADD_KIND = "multiaddkind";
 
-    /**
-     * Parameter name used when the user (or a renderer's pagination click)
-     * types {@code /rtp menu page:<n>}. Values are 1-indexed on the wire and
-     * translated to a zero-based {@link MenuOpenRequest#pageIndex()} before
-     * reaching the page builder. Default (parameter absent or unparseable) is
-     * page 1 / index 0.
-     */
-    public static final String PARAM_PAGE = "page";
-
     private final TreeCommand rtpRoot;
     private final java.util.function.Function<UUID, Predicate<String>> permissionProbeFactory;
 
@@ -86,6 +76,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * narrow: callers should prefer constructing a {@link MenuPermissionGates}
      * from the returned function rather than calling the probe directly.
      */
+    @Override
     java.util.function.Function<UUID, Predicate<String>> permissionProbeFactory() {
         return permissionProbeFactory;
     }
@@ -830,6 +821,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * Catches and logs builder/renderer exceptions per S-004.
      */
     // package-private (used by `/rtp menu page n=<n>` leaf).
+    @Override
     boolean openPage(UUID senderId,
                              @Nullable CommandsAPICommand nextCommand,
                              int pageIndex,
@@ -851,6 +843,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * Walks {@code path} against live {@link TreeCommand} graph and renders at target node.
      * Unknown/unreachable segments reject with {@code menuInvalid} (S-004).
      */
+    @Override
     boolean dispatchOpen(UUID senderId,
                                  MenuAction.OpenMenu open,
                                  @Nullable Consumer<String> messageMethod) {
@@ -903,6 +896,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * Walks {@code parentPath} against live tree, validates parameter, and renders picker via {@link MenuParamPickerBuilder}.
      * All failure paths log WARN and reject with {@code menuInvalid} (S-004).
      */
+    @Override
     boolean dispatchOpenParamPicker(UUID senderId,
                                             MenuAction.OpenParamPicker picker,
                                             @Nullable Consumer<String> messageMethod) {
@@ -991,6 +985,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * Resolves parameter values and renders {@link SelectionMenuBuilder} page.
      * All failure paths log WARN and reject with {@code menuInvalid} (S-004).
      */
+    @Override
     boolean dispatchSelectionMenu(UUID senderId,
                                   String[] parentPath,
                                   String paramName,
@@ -1009,6 +1004,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * value-staging {@code parentPath} ({@code admin prefab apply}) is not a
      * navigable page: its Back row must return to the admin panel.
      */
+    @Override
     boolean dispatchSelectionMenu(UUID senderId,
                                   String[] parentPath,
                                   String paramName,
@@ -1103,6 +1099,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * Dispatch for {@link MenuAction.PromptAnvilInput} (ADR-045).
      * Delegates to platform {@link AnvilInputOpener}. Fails closed with S-004 reject if opener absent or throws.
      */
+    @Override
     boolean dispatchPromptAnvilInput(UUID senderId,
                                              MenuAction.PromptAnvilInput prompt,
                                              @Nullable Consumer<String> messageMethod) {
@@ -1198,6 +1195,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * log WARN and reject with {@code menuInvalid} (S-004).
      */
     // package-private.
+    @Override
     boolean dispatchOpenConfigSelector(UUID senderId,
                                                @Nullable Consumer<String> messageMethod) {
         return dispatchOpenConfigSelector(senderId,
@@ -1210,6 +1208,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * {@code buildSelector(viewer, subDir)} so the same recursive walk renders
      * the root and every nested config directory.
      */
+    @Override
     boolean dispatchOpenConfigSelector(UUID senderId,
                                                MenuAction.OpenConfigSelector open,
                                                @Nullable Consumer<String> messageMethod) {
@@ -1264,6 +1263,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * return from the builder (unknown file name) is an S-004 reject path.
      */
     // package-private.
+    @Override
     boolean dispatchOpenConfigFile(UUID senderId,
                                            MenuAction.OpenConfigFile open,
                                            @Nullable Consumer<String> messageMethod) {
@@ -1488,6 +1488,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
     }
 
     // package-private.
+    @Override
     boolean dispatchOpenConfigKey(UUID senderId,
                                           MenuAction.OpenConfigKey open,
                                           @Nullable Consumer<String> messageMethod) {
@@ -1850,6 +1851,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * Dispatch for {@link MenuAction.OpenConfigSearchPrompt}.
      * Translates into a {@link MenuAction.PromptAnvilInput} routed through {@link #anvilInputOpener}.
      */
+    @Override
     boolean dispatchOpenConfigSearchPrompt(UUID senderId,
                                                    @Nullable Consumer<String> messageMethod) {
         if (!hasConfigViewPermission(senderId)) {
@@ -1881,6 +1883,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * reject path. Shape mirrors {@link #dispatchOpenConfigKey}.
      */
     // package-private.
+    @Override
     boolean dispatchOpenConfigSearchResults(UUID senderId,
                                                     MenuAction.OpenConfigSearchResults search,
                                                     @Nullable Consumer<String> messageMethod) {
@@ -1954,6 +1957,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      */
     // package-private for the concrete `/rtp menu admin` leaf.
     // Permission gate stays inside.
+    @Override
     boolean dispatchOpenAdminPanel(UUID senderId,
                                            @Nullable Consumer<String> messageMethod) {
         if (renderer == null || curatedPageBuilder == null) {
@@ -2002,6 +2006,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      */
     // package-private for the concrete `/rtp menu visualizations` and
     // `/rtp visualization` leaves. Permission gate (rtp.menu.admin) stays inside.
+    @Override
     boolean dispatchOpenVisualizations(UUID senderId,
                                                @Nullable Consumer<String> messageMethod) {
         if (renderer == null || curatedPageBuilder == null) {
@@ -2046,6 +2051,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * Kind-scoped variant of {@link #dispatchOpenVisualizations}: opens the per-kind region picker.
      * Gated on {@link #ADMIN_MENU_PERMISSION}; all failure paths log WARN and reject with {@code menuInvalid} (S-004).
      */
+    @Override
     boolean dispatchOpenVisualizationRegions(UUID senderId,
                                              ChartSpec.Kind kind,
                                              @Nullable Consumer<String> messageMethod) {
@@ -2100,6 +2106,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * failure paths log WARN and reject with {@code menuInvalid} (S-004).
      */
     // package-private for the concrete `/rtp menu front` leaf.
+    @Override
     boolean dispatchOpenFrontPage(UUID senderId,
                                           @Nullable Consumer<String> messageMethod) {
         if (renderer == null || curatedPageBuilder == null) {
@@ -2149,6 +2156,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * reject with {@code menuInvalid} (S-004).
      */
     // package-private.
+    @Override
     boolean dispatchOpenInfo(UUID senderId,
                                      MenuAction.OpenInfo action,
                                      @Nullable Consumer<String> messageMethod) {
@@ -2196,6 +2204,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * the standard chat output. Failures log WARN + reject (S-004).
      */
     // package-private.
+    @Override
     boolean dispatchSwitchInfoToText(UUID senderId,
                                              MenuAction.SwitchInfoToText action,
                                              @Nullable Consumer<String> messageMethod) {
@@ -2286,6 +2295,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * Invokes {@link #pageBuilder} or routes config paths to curated dispatchers.
      * All failure paths log WARN + reject with {@code menuInvalid} (S-004).
      */
+    @Override
     boolean renderForPath(UUID senderId,
                           TreeCommand target,
                           java.util.List<String> assembledPath,
@@ -2361,6 +2371,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * Routes slash-bearing "<kind>/<entryName>" to {@link #dispatchOpenMultiConfigEntry},
      * else {@link #dispatchOpenConfigFile}.
      */
+    @Override
     boolean reopenAfterCartOp(UUID senderId,
                                       String fileName,
                                       @Nullable Consumer<String> messageMethod) {
@@ -2406,6 +2417,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * Dispatch for {@link MenuAction.StageConfigValue}: routes entry into player's cart and re-renders.
      * Gates on {@link #CONFIG_VIEW_PERMISSION}; all failure paths log WARN and reject with {@code menuInvalid} (S-004).
      */
+    @Override
     boolean dispatchStageConfigValue(UUID senderId,
                                              MenuAction.StageConfigValue stage,
                                              @Nullable Consumer<String> messageMethod) {
@@ -2444,6 +2456,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * to a different file, or does not contain {@code paramName}.
      */
     // package-private.
+    @Override
     boolean dispatchUnstageConfigValue(UUID senderId,
                                                MenuAction.UnstageConfigValue unstage,
                                                @Nullable Consumer<String> messageMethod) {
@@ -2474,6 +2487,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * Dispatch for {@link MenuAction.ApplyStagedConfig}: pops cart and executes batched config command.
      * Gates on {@link #CONFIG_VIEW_PERMISSION}; empty cart triggers S-004 reject.
      */
+    @Override
     boolean dispatchApplyStagedConfig(UUID senderId,
                                               MenuAction.ApplyStagedConfig apply,
                                               @Nullable Consumer<String> messageMethod) {
@@ -2535,6 +2549,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * {@link #CONFIG_VIEW_PERMISSION}.
      */
     // package-private.
+    @Override
     boolean dispatchDiscardStagedConfig(UUID senderId,
                                                 MenuAction.DiscardStagedConfig discard,
                                                 @Nullable Consumer<String> messageMethod) {
@@ -2604,6 +2619,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * WARN + reject with {@code menuInvalid} (S-004).
      */
     // package-private.
+    @Override
     boolean dispatchOpenMultiConfigSelector(UUID senderId,
                                                     MenuAction.OpenMultiConfigSelector open,
                                                     @Nullable Consumer<String> messageMethod) {
@@ -2697,6 +2713,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * An unknown kind or unknown entry name is an S-004 reject path.
      */
     // package-private.
+    @Override
     boolean dispatchOpenMultiConfigEntry(UUID senderId,
                                                  MenuAction.OpenMultiConfigEntry open,
                                                  @Nullable Consumer<String> messageMethod) {
@@ -2767,6 +2784,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * Gates on {@link #CONFIG_VIEW_PERMISSION} plus {@code rtp.config} (the node the CLI
      * {@code SubConfigCmd} mutation requires); mutates parser and re-renders selector page.
      */
+    @Override
     boolean dispatchMultiConfigMutate(UUID senderId,
                                               MenuAction.MultiConfigMutate mutate,
                                               @Nullable Consumer<String> messageMethod) {
@@ -3093,26 +3111,6 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
         }
     }
 
-    /**
-     * Extracts the zero-based page index from the parsed {@code page} parameter.
-     * Wire format is 1-indexed ({@code page:1} = first page); we subtract one
-     * before returning. Missing, empty, non-numeric, or {@code < 1} values
-     * collapse to {@code 0} (first page) so a malformed click degrades
-     * gracefully - the parameter-level predicate already rejects clearly
-     * invalid inputs at the commands-api parser, this is a defensive backstop.
-     */
-    static int extractPageIndex(Map<String, List<String>> parameterValues) {
-        if (parameterValues == null) return 0;
-        List<String> vs = parameterValues.get(PARAM_PAGE);
-        if (vs == null || vs.isEmpty() || vs.get(0) == null) return 0;
-        try {
-            int oneBased = Integer.parseInt(vs.get(0));
-            return oneBased < 1 ? 0 : oneBased - 1;
-        } catch (NumberFormatException ignored) {
-            return 0;
-        }
-    }
-
 
     /**
      * Package-private wrapper around the private
@@ -3122,6 +3120,7 @@ public class MenuRedeemSubcommand extends BaseRTPCmdImpl {
      * record whose canonical constructor would throw
      * {@code IllegalArgumentException} on empty strings.
      */
+    @Override
     void rejectMenuInvalid(@Nullable UUID senderId,
                            String logMessage,
                            @Nullable Consumer<String> messageMethod) {

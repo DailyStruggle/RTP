@@ -598,7 +598,8 @@ When paired with `expand: true` in dual-layer shapes, it enables zero-memory dya
 - In `regions/<name>.yml`, sets an independent per-region cooldown timer for that region.
 - In `config.yml` (`teleportCooldown`), sets the global server-wide cooldown baseline.
 - Accepts raw seconds (e.g. `300`) or duration units (e.g. `5m`, `300s`, `1h`, `40t`).
-- Accepts sentinels (`-1`, `infinite`, `permanent`) or `@config` to inherit from global defaults.
+- Accepts `@config` to inherit from global defaults.
+- Negative values / sentinels (`-1`, `infinite`, `permanent`) are not supported per region: they are ignored and the region falls back to the global `teleportCooldown` and shared timer.
 - Bypassed by `rtp.nocooldown` or overridden by `rtp.cooldown.<seconds>`."""
         },
         "delay": {

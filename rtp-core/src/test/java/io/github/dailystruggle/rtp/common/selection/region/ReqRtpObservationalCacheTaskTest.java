@@ -111,7 +111,7 @@ public class ReqRtpObservationalCacheTaskTest {
         int beforeInFlight = region.inFlightCalculations.get();
         long beforeSize = region.queueManager.unkeptLocations.size();
 
-        RegionCacheTask observational = RegionCacheTask.observe(region, 50_000_000L);
+        RegionCacheTask observational = RegionCacheTask.observe(region);
         observational.run();
 
         assertEquals(beforeInFlight, region.inFlightCalculations.get(),
@@ -128,7 +128,7 @@ public class ReqRtpObservationalCacheTaskTest {
     @Test
     @Timeout(value = 1, unit = TimeUnit.SECONDS)
     void observe_factory_returnsNonNullTask() {
-        RegionCacheTask task = RegionCacheTask.observe(region, 1_000_000L);
+        RegionCacheTask task = RegionCacheTask.observe(region);
         assertNotNull(task, "observe() factory must not return null");
         // Distinct identity from the default constructor's output.
         RegionCacheTask defaultTask = new RegionCacheTask(region, 1_000_000L);

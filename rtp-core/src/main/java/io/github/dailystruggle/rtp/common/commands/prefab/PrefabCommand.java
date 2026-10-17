@@ -22,7 +22,7 @@ import org.jetbrains.annotations.Nullable;
 public class PrefabCommand extends BaseRTPCmdImpl {
 
     /** Permission key for the {@code prefab} subtree (every verb shares it). */
-    public static final String PERMISSION = "rtp.admin.prefab";
+    public static final String PERMISSION = PrefabPermission.PERMISSION;
 
     private final PrefabNonceStore nonceStore;
 

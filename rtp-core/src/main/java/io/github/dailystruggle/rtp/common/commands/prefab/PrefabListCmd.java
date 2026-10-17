@@ -25,7 +25,7 @@ public class PrefabListCmd extends BaseRTPCmdImpl {
 
     @Override
     public String permission() {
-        return PrefabCommand.PERMISSION;
+        return PrefabPermission.PERMISSION;
     }
 
     @Override

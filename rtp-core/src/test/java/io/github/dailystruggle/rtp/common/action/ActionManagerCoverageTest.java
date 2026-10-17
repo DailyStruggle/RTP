@@ -57,7 +57,7 @@ class ActionManagerCoverageTest {
 
   @Test
   @DisplayName("PrevalidatedActionPlacement.release tolerates null locations and throwing reservations")
-  void testPlacementReleaseToleratesFailures() throws Exception {
+  void testPlacementReleaseToleratesFailures() {
     ChunkReservation throwing = Mockito.mock(ChunkReservation.class);
     Mockito.doThrow(new RuntimeException("boom")).when(throwing).close();
     Map<UUID, RTPLocation> map = new HashMap<>();
@@ -383,7 +383,7 @@ class ActionManagerCoverageTest {
 
   @Test
   @DisplayName("Cached placement teleports online participants and releases excess slot reservations")
-  void testCachedPlacementTeleportsAndReleasesExcess() throws Exception {
+  void testCachedPlacementTeleportsAndReleasesExcess() {
     UUID p1 = UUID.randomUUID();
     MockRTPPlayer player = new MockRTPPlayer(p1, "CacheP", new RTPLocation(serverAccessor.getRTPWorld("world"), 0, 64, 0));
     serverAccessor.addPlayer(player);
@@ -406,7 +406,7 @@ class ActionManagerCoverageTest {
 
   @Test
   @DisplayName("Undersized cached placement is discarded and released before live placement")
-  void testUndersizedCachedPlacementReleased() throws Exception {
+  void testUndersizedCachedPlacementReleased() {
     actionManager.registerAction(cachedDef("cache_small"));
     UUID a = UUID.randomUUID();
     UUID b = UUID.randomUUID();
@@ -514,7 +514,7 @@ class ActionManagerCoverageTest {
 
   @Test
   @DisplayName("Cached placement fails when a participant is offline and releases the slot")
-  void testCachedPlacementOfflineParticipant() throws Exception {
+  void testCachedPlacementOfflineParticipant() {
     UUID p1 = UUID.randomUUID();
     MockRTPPlayer player = new MockRTPPlayer(p1, "OffC", new RTPLocation(serverAccessor.getRTPWorld("world"), 0, 64, 0));
     player.setOnline(false);
@@ -531,7 +531,7 @@ class ActionManagerCoverageTest {
 
   @Test
   @DisplayName("Cached placement for an unknown participant releases reservation and starts the session")
-  void testCachedPlacementUnknownPlayer() throws Exception {
+  void testCachedPlacementUnknownPlayer() {
     UUID ghost = UUID.randomUUID();
     actionManager.registerAction(cachedDef("cache_ghost"));
     ChunkReservation r = Mockito.mock(ChunkReservation.class);

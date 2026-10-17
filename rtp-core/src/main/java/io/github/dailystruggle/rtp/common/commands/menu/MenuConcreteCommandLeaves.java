@@ -22,7 +22,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Concrete {@code /rtp menu ...} and {@code /rtp visualization} subcommand leaves (ADR-050).
- * Replaces token indirection with typed commands that route into {@link MenuRedeemSubcommand}.
+ * Replaces token indirection with typed commands that route into {@code MenuRedeemSubcommand}.
  */
 final class MenuConcreteCommandLeaves {
 
@@ -158,12 +158,12 @@ final class MenuConcreteCommandLeaves {
      */
     static final class OpenMenuConcreteCmd extends io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl {
 
-        private final MenuRedeemSubcommand owner;
+        private final MenuDispatchTarget owner;
 
-        OpenMenuConcreteCmd(MenuRedeemSubcommand owner) {
+        OpenMenuConcreteCmd(MenuDispatchTarget owner) {
             super(owner);
             this.owner = owner;
-            addParameter(PARAM_PATH, new CommandParameter(MenuRedeemSubcommand.PERMISSION,
+            addParameter(PARAM_PATH, new CommandParameter(MenuPermissionGates.MENU_PERMISSION,
                     "dotted /rtp subtree path (empty = root menu page)",
                     (uuid, value) -> true) {
                 @Override
@@ -180,7 +180,7 @@ final class MenuConcreteCommandLeaves {
 
         @Override
         public String permission() {
-            return MenuRedeemSubcommand.PERMISSION;
+            return MenuPermissionGates.MENU_PERMISSION;
         }
 
         @Override
@@ -212,12 +212,12 @@ final class MenuConcreteCommandLeaves {
 
     /**
      * {@code /rtp menu admin} - open the curated admin panel. Routes through
-     * {@link MenuRedeemSubcommand#dispatchOpenAdminPanel}; permission gate
+     * {@code MenuRedeemSubcommand#dispatchOpenAdminPanel}; permission gate
      * ({@code rtp.menu.admin}) stays inside the helper.
      */
     static final class OpenAdminPanelConcreteCmd extends MenuActionLeafCmd {
-        OpenAdminPanelConcreteCmd(MenuRedeemSubcommand owner) {
-            super(owner, "admin", MenuRedeemSubcommand.ADMIN_MENU_PERMISSION, "open the curated admin panel",
+        OpenAdminPanelConcreteCmd(MenuDispatchTarget owner) {
+            super(owner, "admin", MenuPermissionGates.ADMIN_MENU_PERMISSION, "open the curated admin panel",
                     (java.util.function.BiFunction<UUID, Consumer<String>, Boolean>) (uuid, msg) -> owner.dispatchOpenAdminPanel(uuid, msg));
         }
     }
@@ -227,8 +227,8 @@ final class MenuConcreteCommandLeaves {
      * gate; the front page is the default landing for any menu viewer.
      */
     static final class OpenFrontPageConcreteCmd extends MenuActionLeafCmd {
-        OpenFrontPageConcreteCmd(MenuRedeemSubcommand owner) {
-            super(owner, "front", MenuRedeemSubcommand.PERMISSION, "open the curated front page",
+        OpenFrontPageConcreteCmd(MenuDispatchTarget owner) {
+            super(owner, "front", MenuPermissionGates.MENU_PERMISSION, "open the curated front page",
                     (java.util.function.BiFunction<UUID, Consumer<String>, Boolean>) (uuid, msg) -> owner.dispatchOpenFrontPage(uuid, msg));
         }
     }
@@ -236,11 +236,11 @@ final class MenuConcreteCommandLeaves {
     /**
      * {@code /rtp menu visualizations} - open the visualizations selector.
      * Gates on {@code rtp.menu.admin} (inside
-     * {@link MenuRedeemSubcommand#dispatchOpenVisualizations}).
+     * {@code MenuRedeemSubcommand#dispatchOpenVisualizations}).
      */
     static final class OpenVisualizationsConcreteCmd extends MenuActionLeafCmd {
-        OpenVisualizationsConcreteCmd(MenuRedeemSubcommand owner) {
-            super(owner, "visualizations", MenuRedeemSubcommand.ADMIN_MENU_PERMISSION, "open the visualizations selector",
+        OpenVisualizationsConcreteCmd(MenuDispatchTarget owner) {
+            super(owner, "visualizations", MenuPermissionGates.ADMIN_MENU_PERMISSION, "open the visualizations selector",
                     (java.util.function.BiFunction<UUID, Consumer<String>, Boolean>) (uuid, msg) -> owner.dispatchOpenVisualizations(uuid, msg));
         }
     }
@@ -251,9 +251,9 @@ final class MenuConcreteCommandLeaves {
      */
     static final class VisualizationRootCmd extends io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl {
 
-        private final MenuRedeemSubcommand owner;
+        private final MenuDispatchTarget owner;
 
-        VisualizationRootCmd(CommandsAPICommand rtpRoot, MenuRedeemSubcommand owner) {
+        VisualizationRootCmd(CommandsAPICommand rtpRoot, MenuDispatchTarget owner) {
             super(rtpRoot);
             this.owner = owner;
             // Typed per-kind sub-commands hang off the visualization root.
@@ -309,7 +309,7 @@ final class MenuConcreteCommandLeaves {
 
         @Override
         public String permission() {
-            return MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
+            return MenuPermissionGates.ADMIN_MENU_PERMISSION;
         }
 
         @Override
@@ -357,7 +357,7 @@ final class MenuConcreteCommandLeaves {
             this.dispatch = java.util.Objects.requireNonNull(dispatch, "dispatch");
             this.selectorOpener = java.util.Objects.requireNonNull(selectorOpener, "selectorOpener");
             this.name = java.util.Objects.requireNonNull(name, "name");
-            addParameter(PARAM_REGION, new CommandParameter(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
+            addParameter(PARAM_REGION, new CommandParameter(MenuPermissionGates.ADMIN_MENU_PERMISSION,
                     "region name (omit to open the visualizations selector)",
                     (uuid, value) -> value != null && !value.isEmpty()) {
                 @Override
@@ -374,7 +374,7 @@ final class MenuConcreteCommandLeaves {
 
         @Override
         public String permission() {
-            return MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
+            return MenuPermissionGates.ADMIN_MENU_PERMISSION;
         }
 
         @Override
@@ -529,7 +529,7 @@ final class MenuConcreteCommandLeaves {
 
         @Override
         public String permission() {
-            return MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
+            return MenuPermissionGates.ADMIN_MENU_PERMISSION;
         }
 
         @Override
@@ -781,7 +781,7 @@ final class MenuConcreteCommandLeaves {
         }
 
         private static void addSizingParameters(io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl cmd) {
-            cmd.addParameter(PARAM_SIZE, new CommandParameter(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
+            cmd.addParameter(PARAM_SIZE, new CommandParameter(MenuPermissionGates.ADMIN_MENU_PERMISSION,
                     "image size in pixels or resolution (e.g. 512, 1024, 4k, 8k, k, kpx, m, mpx, 1920x1080; metric units supported)",
                     (uuid, value) -> value != null && !value.isEmpty()) {
                 @Override
@@ -789,7 +789,7 @@ final class MenuConcreteCommandLeaves {
                     return new HashSet<>(Arrays.asList("512", "1024", "2048", "4k", "8k", "k", "kpx"));
                 }
             });
-            cmd.addParameter(PARAM_WIDTH, new CommandParameter(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
+            cmd.addParameter(PARAM_WIDTH, new CommandParameter(MenuPermissionGates.ADMIN_MENU_PERMISSION,
                     "image width in pixels (e.g. 512, 1024, 4k, 8k, k, kpx; metric units supported)",
                     (uuid, value) -> value != null && !value.isEmpty()) {
                 @Override
@@ -797,7 +797,7 @@ final class MenuConcreteCommandLeaves {
                     return new HashSet<>(Arrays.asList("512", "1024", "2048", "4096", "8000", "8192", "k", "kpx"));
                 }
             });
-            cmd.addParameter(PARAM_HEIGHT, new CommandParameter(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
+            cmd.addParameter(PARAM_HEIGHT, new CommandParameter(MenuPermissionGates.ADMIN_MENU_PERMISSION,
                     "image height in pixels (e.g. 512, 1024, 4k, 8k, k, kpx; metric units supported)",
                     (uuid, value) -> value != null && !value.isEmpty()) {
                 @Override
@@ -805,7 +805,7 @@ final class MenuConcreteCommandLeaves {
                     return new HashSet<>(Arrays.asList("512", "1024", "2048", "4096", "8000", "8192", "k", "kpx"));
                 }
             });
-            cmd.addParameter(PARAM_ZOOM, new CommandParameter(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
+            cmd.addParameter(PARAM_ZOOM, new CommandParameter(MenuPermissionGates.ADMIN_MENU_PERMISSION,
                     "zoom factor (e.g. 1.0, 2.0, 0.5)",
                     (uuid, value) -> value != null && !value.isEmpty()) {
                 @Override
@@ -822,7 +822,7 @@ final class MenuConcreteCommandLeaves {
 
         @Override
         public String permission() {
-            return MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
+            return MenuPermissionGates.ADMIN_MENU_PERMISSION;
         }
 
         @Override
@@ -854,7 +854,7 @@ final class MenuConcreteCommandLeaves {
 
             ExportComprehensiveCmd() {
                 super(null);
-                addParameter(PARAM_REGION, new CommandParameter(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
+                addParameter(PARAM_REGION, new CommandParameter(MenuPermissionGates.ADMIN_MENU_PERMISSION,
                         "region name",
                         (uuid, value) -> value != null && !value.isEmpty()) {
                     @Override
@@ -876,7 +876,7 @@ final class MenuConcreteCommandLeaves {
 
             @Override
             public String permission() {
-                return MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
+                return MenuPermissionGates.ADMIN_MENU_PERMISSION;
             }
 
             @Override
@@ -952,7 +952,7 @@ final class MenuConcreteCommandLeaves {
 
             ExportAllCmd() {
                 super(null);
-                addParameter(PARAM_REGION, new CommandParameter(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
+                addParameter(PARAM_REGION, new CommandParameter(MenuPermissionGates.ADMIN_MENU_PERMISSION,
                         "region name",
                         (uuid, value) -> value != null && !value.isEmpty()) {
                     @Override
@@ -974,7 +974,7 @@ final class MenuConcreteCommandLeaves {
 
             @Override
             public String permission() {
-                return MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
+                return MenuPermissionGates.ADMIN_MENU_PERMISSION;
             }
 
             @Override
@@ -1111,7 +1111,7 @@ final class MenuConcreteCommandLeaves {
                 super(null);
                 this.typeName = typeName;
                 this.kind = kind;
-                addParameter(PARAM_REGION, new CommandParameter(MenuRedeemSubcommand.ADMIN_MENU_PERMISSION,
+                addParameter(PARAM_REGION, new CommandParameter(MenuPermissionGates.ADMIN_MENU_PERMISSION,
                         "region name",
                         (uuid, value) -> value != null && !value.isEmpty()) {
                     @Override
@@ -1133,7 +1133,7 @@ final class MenuConcreteCommandLeaves {
 
             @Override
             public String permission() {
-                return MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
+                return MenuPermissionGates.ADMIN_MENU_PERMISSION;
             }
 
             @Override

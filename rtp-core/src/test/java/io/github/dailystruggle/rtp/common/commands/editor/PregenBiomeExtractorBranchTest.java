@@ -30,7 +30,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
@@ -199,12 +198,12 @@ class PregenBiomeExtractorBranchTest {
 
         RTPServerAccessor accessor = mock(RTPServerAccessor.class);
         when(accessor.getRTPWorld(anyString())).thenReturn(null);
-        when(accessor.getRTPWorld(eq("pbx_no_native"))).thenAnswer(inv -> world("pbx_no_native", null));
-        when(accessor.getRTPWorld(eq("pbx_no_method"))).thenAnswer(inv -> world("pbx_no_method", "plain string"));
-        when(accessor.getRTPWorld(eq("pbx_not_file"))).thenAnswer(inv -> world("pbx_not_file", new NotFileWorld()));
-        when(accessor.getRTPWorld(eq("pbx_bare"))).thenAnswer(inv -> world("pbx_bare", new FolderWorld(bareWorld.toFile())));
-        when(accessor.getRTPWorld(eq("pbx_ok"))).thenAnswer(inv -> world("pbx_ok", new FolderWorld(okWorld.toFile())));
-        when(accessor.getRTPWorld(eq("pbx_throws"))).thenThrow(new IllegalStateException("accessor down"));
+        when(accessor.getRTPWorld("pbx_no_native")).thenAnswer(inv -> world("pbx_no_native", null));
+        when(accessor.getRTPWorld("pbx_no_method")).thenAnswer(inv -> world("pbx_no_method", "plain string"));
+        when(accessor.getRTPWorld("pbx_not_file")).thenAnswer(inv -> world("pbx_not_file", new NotFileWorld()));
+        when(accessor.getRTPWorld("pbx_bare")).thenAnswer(inv -> world("pbx_bare", new FolderWorld(bareWorld.toFile())));
+        when(accessor.getRTPWorld("pbx_ok")).thenAnswer(inv -> world("pbx_ok", new FolderWorld(okWorld.toFile())));
+        when(accessor.getRTPWorld("pbx_throws")).thenThrow(new IllegalStateException("accessor down"));
         RTP.serverAccessor = accessor;
 
         assertNull(PregenBiomeExtractor.resolveRegionFolder(null));
@@ -316,7 +315,7 @@ class PregenBiomeExtractorBranchTest {
         Files.write(regionDir.resolve("r.-1.0.mca"), new byte[8192]);
 
         RTPServerAccessor accessor = mock(RTPServerAccessor.class);
-        when(accessor.getRTPWorld(eq("pbx_disk"))).thenAnswer(inv -> world("pbx_disk", new FolderWorld(worldDir.toFile())));
+        when(accessor.getRTPWorld("pbx_disk")).thenAnswer(inv -> world("pbx_disk", new FolderWorld(worldDir.toFile())));
         RTP.serverAccessor = accessor;
 
         Region r = region(world("pbx_disk", null), null);

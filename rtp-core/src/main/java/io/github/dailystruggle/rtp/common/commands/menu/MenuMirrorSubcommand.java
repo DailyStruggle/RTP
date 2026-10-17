@@ -12,17 +12,17 @@ import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Shadow {@link TreeCommand} mirroring a node from the live {@code /rtp} tree under {@link MenuRedeemSubcommand}.
+ * Shadow {@link TreeCommand} mirroring a node from the live {@code /rtp} tree under {@code MenuRedeemSubcommand}.
  * Navigating via mirror opens the menu at the target node instead of executing the underlying command.
  */
 public final class MenuMirrorSubcommand extends BaseRTPCmdImpl implements TreeCommand {
 
-    private final MenuRedeemSubcommand redeem;
+    private final MenuDispatchTarget redeem;
     private final TreeCommand target;
     /** Path from {@code /rtp} root down to (and including) {@link #target}. */
     private final List<String> path;
 
-    MenuMirrorSubcommand(MenuRedeemSubcommand redeem,
+    MenuMirrorSubcommand(MenuDispatchTarget redeem,
                          CommandsAPICommand parent,
                          TreeCommand target,
                          List<String> path) {
@@ -60,7 +60,7 @@ public final class MenuMirrorSubcommand extends BaseRTPCmdImpl implements TreeCo
     }
 
     /**
-     * Package-visible accessor used by {@link MenuRedeemSubcommand} to walk
+     * Package-visible accessor used by {@code MenuRedeemSubcommand} to walk
      * the mirror tree to a specific sub-node for runtime add/remove of
      * multi-config children. Equivalent to a {@code getTarget()} but kept
      * narrowly scoped to package-private to discourage external coupling.
@@ -71,11 +71,11 @@ public final class MenuMirrorSubcommand extends BaseRTPCmdImpl implements TreeCo
 
     /**
      * Package-visible accessor for the redeem instance, used by
-     * {@link MenuRedeemSubcommand}'s runtime mirror-mutation helpers
+     * {@code MenuRedeemSubcommand}'s runtime mirror-mutation helpers
      * when constructing fresh child mirrors so they share the same
      * {@code redeem} root.
      */
-    MenuRedeemSubcommand redeem() {
+    MenuDispatchTarget redeem() {
         return redeem;
     }
 
@@ -98,11 +98,11 @@ public final class MenuMirrorSubcommand extends BaseRTPCmdImpl implements TreeCo
         // Navigating to a menu page is always allowed for menu users; the
         // underlying subcommand's permission is enforced separately when the
         // player clicks the Execute row.
-        return MenuRedeemSubcommand.PERMISSION;
+        return MenuPermissionGates.MENU_PERMISSION;
     }
 
     /**
-     * Leaf-side dispatch from args-form walker: delegates to {@link MenuRedeemSubcommand#renderForPath}.
+     * Leaf-side dispatch from args-form walker: delegates to {@code MenuRedeemSubcommand#renderForPath}.
      */
     @Override
     public boolean onCommand(UUID senderId,
@@ -112,7 +112,7 @@ public final class MenuMirrorSubcommand extends BaseRTPCmdImpl implements TreeCo
             // Intermediate node - let the parser descend into the child mirror.
             return true;
         }
-        int pageIndex = MenuRedeemSubcommand.extractPageIndex(parameterValues);
+        int pageIndex = MenuDispatchTarget.extractPageIndex(parameterValues);
         // No messageMethod available on the canonical 3-arg contract; the
         // commands-api default-method (CommandsAPICommand line 75) delegates
         // the 4-arg form here and discards the consumer, so renderForPath

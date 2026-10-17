@@ -413,8 +413,7 @@ public final class FuzzySearchEngine {
 
         for (Map.Entry<String, T> entry : candidateMap.entrySet()) {
             String key = entry.getKey();
-            if (key == null) continue;
-            String normKey = normalize(key);
+            String normKey = key == null ? "" : normalize(key);
             if (normKey.isEmpty()) continue;
 
             int dist = levenshtein(normInput, normKey, allowedDist);

@@ -28,8 +28,8 @@ class MeasurementChannelTest {
                 });
     }
 
-    private static MetricsRecorder.Attempt attempt(String label) {
-        return new MetricsRecorder.Attempt(UUID.randomUUID(), "bot", "world", label,
+    private static Attempt attempt(String label) {
+        return new Attempt(UUID.randomUUID(), "bot", "world", label,
                 System.currentTimeMillis(), 0, 0, 20.0, 50.0, 512);
     }
 
@@ -114,7 +114,7 @@ class MeasurementChannelTest {
         TeleportProbe probe = new TeleportProbe(null, rec);
         UUID player = UUID.randomUUID();
 
-        MetricsRecorder.Attempt a = attempt("rtp");
+        Attempt a = attempt("rtp");
         rec.onDispatch(a);
         probe.expect(a, player);
         assertTrue(probe.attributeDirect(player, 1000, -2000, true, "", null));
@@ -143,7 +143,7 @@ class MeasurementChannelTest {
         TeleportProbe probe = new TeleportProbe(null, rec);
 
         UUID p1 = UUID.randomUUID();
-        MetricsRecorder.Attempt failed = attempt("rtp");
+        Attempt failed = attempt("rtp");
         rec.onDispatch(failed);
         probe.expect(failed, p1);
         probe.attributeDirect(p1, 10, 10, false, "NOT_AT_DESTINATION", null);
@@ -152,7 +152,7 @@ class MeasurementChannelTest {
         assertTrue(rows(rec, csv).get(0).contains("NOT_AT_DESTINATION"));
 
         UUID p2 = UUID.randomUUID();
-        MetricsRecorder.Attempt competitor = attempt("betterrtp");
+        Attempt competitor = attempt("betterrtp");
         rec.onDispatch(competitor);
         probe.expect(competitor, p2);
         probe.noteExternal(p2, new Location(null, 5, 64, 5));
@@ -166,9 +166,9 @@ class MeasurementChannelTest {
         Path csv = Files.createTempFile("stresstest-channel-", ".csv");
         csv.toFile().deleteOnExit();
         MetricsRecorder rec = new MetricsRecorder(csv);
-        MetricsRecorder.Attempt a = attempt("rtp");
+        Attempt a = attempt("rtp");
         rec.onDispatch(a);
-        rec.onComplete(a, true, "", 1, 1, MetricsRecorder.AttributionSource.PLUGIN_EVENT, true);
+        rec.onComplete(a, true, "", 1, 1, AttributionSource.PLUGIN_EVENT, true);
         rec.flushDeferred(false);
         assertTrue(rec.isDeferred(a)); // still inside the wait
         rec.flushDeferred(true);

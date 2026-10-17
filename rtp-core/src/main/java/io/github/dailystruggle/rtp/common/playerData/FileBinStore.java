@@ -147,67 +147,72 @@ public class FileBinStore {
 
     synchronized (lock) {
       for (long binId = currentBin; binId >= minBin; binId--) {
-        File binFile = new File(baseDir, "bin_" + binId + ".dat");
-        if (!binFile.exists() || binFile.length() < 4) continue;
-
-        try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(binFile)))) {
-          int magic = in.readInt();
-          if (magic != MAGIC) continue;
-
-          TeleportData found = null;
-          while (in.available() > 0) {
-            long most = in.readLong();
-            long least = in.readLong();
-            UUID recordUuid = new UUID(most, least);
-            String name = in.readUTF();
-            long time = in.readLong();
-            long cooldown = in.readLong();
-            long delay = in.readLong();
-            String regionName = in.readUTF();
-            double cost = in.readDouble();
-            long attempts = in.readLong();
-            boolean completed = in.readBoolean();
-
-            RTPCoords orig = null;
-            if (in.readBoolean()) {
-              String w = in.readUTF();
-              int x = in.readInt();
-              int y = in.readInt();
-              int z = in.readInt();
-              orig = new RTPCoords(w, x, y, z);
-            }
-
-            RTPCoords sel = null;
-            if (in.readBoolean()) {
-              String w = in.readUTF();
-              int x = in.readInt();
-              int y = in.readInt();
-              int z = in.readInt();
-              sel = new RTPCoords(w, x, y, z);
-            }
-
-            if (recordUuid.equals(uuid)) {
-              TeleportData data = new TeleportData();
-              data.sender = new PureDataRTPCommandSender(uuid, name, cooldown, delay, Collections.emptySet());
-              data.time = time;
-              data.targetRegionName = regionName.isEmpty() ? null : regionName;
-              data.cost = cost;
-              data.attempts = attempts;
-              data.completed = completed;
-              data.originalCoords = orig;
-              data.selectedCoords = sel;
-              found = data;
-            }
-          }
-          if (found != null) {
-            return found;
-          }
-        } catch (EOFException ignored) {
-          // Normal end of file
-        } catch (IOException e) {
-          RTP.log(Level.WARNING, "[RTP] Failed to read bin file: " + binFile.getName(), e);
+        TeleportData found = loadFromBin(new File(baseDir, "bin_" + binId + ".dat"), uuid);
+        if (found != null) {
+          return found;
         }
       }
+    }
+    return null;
+  }
+
+  /** Last record for {@code uuid} in one bin file; {@code null} if absent, unreadable or foreign. */
+  private static @Nullable TeleportData loadFromBin(File binFile, UUID uuid) {
+    if (!binFile.exists() || binFile.length() < 4) return null;
+    try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(binFile)))) {
+      int magic = in.readInt();
+      if (magic != MAGIC) return null;
+
+      TeleportData found = null;
+      while (in.available() > 0) {
+        long most = in.readLong();
+        long least = in.readLong();
+        UUID recordUuid = new UUID(most, least);
+        String name = in.readUTF();
+        long time = in.readLong();
+        long cooldown = in.readLong();
+        long delay = in.readLong();
+        String regionName = in.readUTF();
+        double cost = in.readDouble();
+        long attempts = in.readLong();
+        boolean completed = in.readBoolean();
+
+        RTPCoords orig = null;
+        if (in.readBoolean()) {
+          String w = in.readUTF();
+          int x = in.readInt();
+          int y = in.readInt();
+          int z = in.readInt();
+          orig = new RTPCoords(w, x, y, z);
+        }
+
+        RTPCoords sel = null;
+        if (in.readBoolean()) {
+          String w = in.readUTF();
+          int x = in.readInt();
+          int y = in.readInt();
+          int z = in.readInt();
+          sel = new RTPCoords(w, x, y, z);
+        }
+
+        if (recordUuid.equals(uuid)) {
+          TeleportData data = new TeleportData();
+          data.sender = new PureDataRTPCommandSender(uuid, name, cooldown, delay, Collections.emptySet());
+          data.time = time;
+          data.targetRegionName = regionName.isEmpty() ? null : regionName;
+          data.cost = cost;
+          data.attempts = attempts;
+          data.completed = completed;
+          data.originalCoords = orig;
+          data.selectedCoords = sel;
+          found = data;
+        }
+      }
+      return found;
+    } catch (EOFException ignored) {
+      // Normal end of file
+    } catch (IOException e) {
+      RTP.log(Level.WARNING, "[RTP] Failed to read bin file: " + binFile.getName(), e);
     }
     return null;
   }

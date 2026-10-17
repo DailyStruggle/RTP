@@ -35,7 +35,7 @@ import java.util.Map;
  * throws {@code IllegalStateException}) self-heals once spark is ready; any such
  * failure is swallowed and reported as {@link MetricsSnapshot#UNSAMPLED}.
  */
-final class ReflectiveSparkStats implements SparkMetricsBinding.SparkStats {
+final class ReflectiveSparkStats implements SparkStatSource {
 
     private final boolean available;
 
@@ -159,7 +159,7 @@ final class ReflectiveSparkStats implements SparkMetricsBinding.SparkStats {
                 return "RTPSparkMetadataProviderProxy";
             }
             if (Map.class.isAssignableFrom(returnType)) {
-                return SparkMetricsBinding.collectTelemetry();
+                return SparkTelemetry.collect();
             }
             if (returnType.isPrimitive()) {
                 if (returnType == boolean.class) return false;

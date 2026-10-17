@@ -31,7 +31,7 @@ import org.bukkit.block.data.BlockData;
  * a single branch on the populated source field.
  *
  * <p>Anvil-backed instances are constructed by
- * {@link FoliaRTPWorld#getCachedChunk(long)} when the pre-filter previously
+ * {@code FoliaRTPWorld#getCachedChunk(long)} when the pre-filter previously
  * produced a decoded view for this chunk key. They carry the decoded snapshot
  * plus the world identity + chunk coordinates needed to answer RTPChunk queries
  * without ever hopping to the Region Thread. The authoritative live
@@ -177,7 +177,7 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
           RTP.serverAccessor == null ? null : RTP.serverAccessor.getScheduler();
       RTPWorld<?> rtpWorld =
           RTP.serverAccessor == null ? null : RTP.serverAccessor.getRTPWorld(world.getUID());
-      if (scheduler != null && rtpWorld instanceof FoliaRTPWorld) {
+      if (scheduler != null && rtpWorld != null) {
         scheduler.runTask(rtpWorld, cx, cz, reconcile);
       } else {
         org.bukkit.Bukkit.getRegionScheduler().run(plugin, world, cx, cz, st -> reconcile.run());

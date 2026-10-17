@@ -14,9 +14,10 @@ import java.util.logging.Level;
  */
 final class MenuPermissionGates {
 
-    // Mirrors of MenuRedeemSubcommand permission constants.
-    static final String CONFIG_VIEW_PERMISSION = MenuRedeemSubcommand.CONFIG_VIEW_PERMISSION;
-    static final String ADMIN_MENU_PERMISSION = MenuRedeemSubcommand.ADMIN_MENU_PERMISSION;
+    // Owned here so leaves need no reference to MenuRedeemSubcommand (which re-exports them).
+    static final String MENU_PERMISSION = "rtp.menu";
+    static final String CONFIG_VIEW_PERMISSION = "rtp.config.view";
+    static final String ADMIN_MENU_PERMISSION = "rtp.menu.admin";
     static final String INFO_PERMISSION = "rtp.info";
     /** Same node {@code SubConfigCmd} requires for CLI config mutation. */
     static final String CONFIG_EDIT_PERMISSION = "rtp.config";

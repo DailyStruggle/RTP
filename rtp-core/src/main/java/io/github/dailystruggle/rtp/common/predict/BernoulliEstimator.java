@@ -54,7 +54,7 @@ public final class BernoulliEstimator {
      *
      * @param outcome {@code true} for success/target event, {@code false} for rejection/non-event
      */
-    public synchronized void record(boolean outcome) {
+    public synchronized void recordOutcome(boolean outcome) {
         count++;
         double target = outcome ? 1.0 : 0.0;
         if (count == 1 && Double.isNaN(rate)) {

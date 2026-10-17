@@ -23,15 +23,15 @@ class ChunkLoadLandingAreaTest {
         return c;
     }
 
-    private static MetricsRecorder.Attempt dispatch(ChunkLoadCounter c, String player) {
-        MetricsRecorder.Attempt a = new MetricsRecorder.Attempt(UUID.randomUUID(), player, WORLD, "rtp",
+    private static Attempt dispatch(ChunkLoadCounter c, String player) {
+        Attempt a = new Attempt(UUID.randomUUID(), player, WORLD, "rtp",
                 System.currentTimeMillis(), 0.0, 0.0, 20.0, 10.0, 0L);
         c.beginAttempt(a);
         return a;
     }
 
     /** Completes {@code a} at block (x, z); chunk = floor(x / 16). */
-    private static void land(ChunkLoadCounter c, MetricsRecorder.Attempt a, double x, double z) {
+    private static void land(ChunkLoadCounter c, Attempt a, double x, double z) {
         a.success = true;
         a.toX = x;
         a.toZ = z;
@@ -42,9 +42,9 @@ class ChunkLoadLandingAreaTest {
     @DisplayName("Loads around a finished landing are charged to it, not to another account's in-flight attempt")
     void landingAreaBeatsLatestDispatch() {
         ChunkLoadCounter c = counter();
-        MetricsRecorder.Attempt a = dispatch(c, "leaf26");
+        Attempt a = dispatch(c, "leaf26");
         land(c, a, 1600, 1600); // chunk (100, 100)
-        MetricsRecorder.Attempt b = dispatch(c, "leaf_26");
+        Attempt b = dispatch(c, "leaf_26");
 
         c.route(WORLD, 105, 95, true, null);   // inside the 11-chunk ring
         c.route(WORLD, 111, 100, true, null);  // edge: Chebyshev 11
@@ -66,7 +66,7 @@ class ChunkLoadLandingAreaTest {
         c.route(WORLD, 100, 100, false, null);
         assertEquals(1, c.phaseLanding());
 
-        MetricsRecorder.Attempt next = dispatch(c, "leaf26"); // same account: window closes
+        Attempt next = dispatch(c, "leaf26"); // same account: window closes
         c.route(WORLD, 100, 100, false, null);  // off-tick, no ticket -> background
         c.route(WORLD, 100, 100, true, null);   // on-tick -> latest in-flight attempt
         assertEquals(1, c.phaseLanding());
@@ -85,7 +85,7 @@ class ChunkLoadLandingAreaTest {
         c.route(WORLD, 105, 100, false, null);
         assertEquals(1, c.phaseLanding());
 
-        MetricsRecorder.Attempt failed = dispatch(c, "leaf_27");
+        Attempt failed = dispatch(c, "leaf_27");
         failed.success = false;
         c.endAttempt(failed);
         c.route(WORLD, -500, -500, false, null);
@@ -104,7 +104,7 @@ class ChunkLoadLandingAreaTest {
     @DisplayName("attributed + landing_area + background reconciles with the phase total")
     void totalsReconcile() {
         ChunkLoadCounter c = counter();
-        MetricsRecorder.Attempt a = dispatch(c, "leaf26");
+        Attempt a = dispatch(c, "leaf26");
         c.route(WORLD, 0, 0, true, null);
         land(c, a, 160, 160);
         c.route(WORLD, 10, 10, true, null);

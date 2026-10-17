@@ -31,7 +31,7 @@ You can create and update regions through:
 | `backlogCacheCap` | Integer | `1000` (lite: `0`) | Maximum number of **unverified** candidate locations to stage upstream of `cacheCap`. See *Backlog Cache (L3)* below. Set to `0` to disable. |
 | `activeChunkCap` | Integer | `10` | Maximum number of chunks to keep loaded for zero-latency teleports. |
 | `price` | Double | `0.0` | Economy cost to use this specific region (overrides global `price`). |
-| `cooldown` | Integer / Duration / String | (global fallback) | Cooldown duration between successful teleports using this region. Accepts raw seconds (`300`), duration strings (e.g. `5m`, `1h`, `40t`), sentinels (`-1`, `infinite`), or `"@config"` to inherit `defaults.cooldown` (or global `teleportCooldown`). Tracks cooldowns independently per region. See [Teleport Cooldown and Warmup Delay](#teleport-cooldown-and-warmup-delay-cooldown--delay). |
+| `cooldown` | Integer / Duration / String | (global fallback) | Cooldown duration between successful teleports using this region. Accepts raw seconds (`300`), duration strings (e.g. `5m`, `1h`, `40t`), or `"@config"` to inherit `defaults.cooldown` (or global `teleportCooldown`). Negative values / sentinels (`-1`, `infinite`, `permanent`) are not supported per region: they are ignored and the region falls back to the global `teleportCooldown` and shared timer. Tracks cooldowns independently per region. See [Teleport Cooldown and Warmup Delay](#teleport-cooldown-and-warmup-delay-cooldown--delay). |
 | `delay` | Integer / Duration / String | (global fallback) | Warmup wait time before teleportation occurs. Accepts raw seconds (`5`), duration strings (e.g. `5s`, `40t`, `1500ms`), `0` for instant teleport, or `"@config"` to inherit `defaults.delay` (or global `teleportDelay`). See [Teleport Cooldown and Warmup Delay](#teleport-cooldown-and-warmup-delay-cooldown--delay). |
 | `spatialResolution` | Integer / String | `"auto"` | Precision for spatial memory (bad location tracking). Can be `"auto"` or any positive integer (e.g. `1`, `3`, `4`). Higher values check fewer, more widely spaced spots (e.g. `4` = one spot per 4x4 chunks): faster scans and less memory, but small safe pockets can be missed. |
 | `displayName` | String | (region name) | Optional cosmetic display name shown in menus and messages; does not change the region's identity or the permission node. |
@@ -53,8 +53,8 @@ Regions can configure custom pacing controls (`cooldown` and `delay`) that overr
 - **`cooldown`**: Wait time required after a successful teleport before the player can teleport using this region again.
   - Accepts raw seconds (e.g. `300`).
   - Accepts duration units: `s`/`sec`/`seconds`, `m`/`min`/`minutes`, `h`/`hr`/`hours`, `d`/`day`/`days`, `ms`/`millis`, `t`/`ticks` (e.g. `5m`, `300s`, `1h`, `45s500ms`).
-  - Accepts sentinels: `-1`, `infinite`, `permanent` (locks the player out after one teleport until an admin clears the timer).
   - Accepts `"@config"` to inherit from `defaults.cooldown` (or fallback `teleportCooldown`) in `config.yml`.
+  - Negative values / sentinels (`-1`, `infinite`, `permanent`) are not supported per region: they are ignored and the region falls back to the global `teleportCooldown` and shared timer.
   - When omitted or `null`, falls back to the player's global cooldown timer.
 - **`delay`**: Warmup delay between command execution and actual teleportation (during which movement beyond `cancelDistance` or taking damage cancels the teleport).
   - Accepts raw seconds (e.g. `5`).

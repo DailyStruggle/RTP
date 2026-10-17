@@ -62,10 +62,9 @@ public final class V26_4_R1FabricRTPChunk extends RTPChunk<ChunkAccess> {
     public void keep(boolean keep) {
         // Route via the world wrapper's ref-counted ticket map.
         RTPWorld<?> w = getWorld();
-        if (w instanceof V26_4_R1FabricRTPWorld fw) {
-            if (keep) fw.keepChunkAt(cx, cz);
-            else fw.forgetChunkAt(cx, cz);
-        }
+        if (w == null) return;
+        if (keep) w.keepChunkAt(cx, cz);
+        else w.forgetChunkAt(cx, cz);
     }
 
     @Override

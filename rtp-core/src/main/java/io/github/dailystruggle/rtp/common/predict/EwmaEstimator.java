@@ -120,7 +120,7 @@ public final class EwmaEstimator {
      *
      * @param value execution measurement (e.g. duration or latency)
      */
-    public void record(double value) {
+    public void recordSample(double value) {
         if (Double.isNaN(value) || Double.isInfinite(value) || value < 0.0) {
             return; // Guard against NaN, infinity, and negative values (REQ-PRED-NF-003)
         }
@@ -157,7 +157,7 @@ public final class EwmaEstimator {
         if (nanos < 0L) nanos = 0L; // Guard against negative clock deltas
 
         if (mode == DecayMode.FRACTIONAL) {
-            record(nanos);
+            recordSample(nanos);
             return;
         }
 

@@ -36,7 +36,7 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
         // live PrefabRegistry). Mirrors how InfoCmd registers `world=` /
         // `region=` parameters - no per-id sub-command, no args-form override.
         addParameter("id",
-                new PrefabIdParameter(PrefabCommand.PERMISSION,
+                new PrefabIdParameter(PrefabPermission.PERMISSION,
                         "bundled prefab id",
                         (uuid, s) -> true));
     }
@@ -48,7 +48,7 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
 
     @Override
     public String permission() {
-        return PrefabCommand.PERMISSION;
+        return PrefabPermission.PERMISSION;
     }
 
     @Override

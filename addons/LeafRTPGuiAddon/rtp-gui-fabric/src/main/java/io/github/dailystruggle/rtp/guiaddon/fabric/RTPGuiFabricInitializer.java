@@ -28,18 +28,11 @@ import net.minecraft.server.MinecraftServer;
  */
 public final class RTPGuiFabricInitializer implements ModInitializer {
 
-  private static volatile MinecraftServer server;
-
-  /** @return the live server, or {@code null} before start / after stop. */
-  static MinecraftServer server() {
-    return server;
-  }
-
   @Override
   public void onInitialize() {
     ServerLifecycleEvents.SERVER_STARTED.register(
         startedServer -> {
-          server = startedServer;
+          FabricMenuRenderer.bindServer(startedServer);
           // Core is up by SERVER_STARTED; register the renderer and the common addon
           // (config + bare-/rtp binding). Each platform registers its own renderer
           // programmatically (no MenuRenderer SPI): every platform's chest renderer
@@ -58,7 +51,7 @@ public final class RTPGuiFabricInitializer implements ModInitializer {
     ServerLifecycleEvents.SERVER_STOPPING.register(
         stoppingServer -> {
           GuiRenderers.unregister(FabricMenuRenderer.STYLE);
-          server = null;
+          FabricMenuRenderer.bindServer(null);
         });
   }
 }

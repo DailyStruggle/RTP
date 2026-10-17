@@ -90,6 +90,7 @@ nav:
       - Actions & arenas: admin/ACTIONS.md
       - FAQ: admin/FAQ.md
       - Common recipes: admin/RECIPES.md
+      - Features: site/features.md
       - Migration guide: admin/MIGRATION.md
   - Operations:
       - Runbook: admin/RUNBOOK.md
@@ -122,6 +123,8 @@ nav:
       - Cross-server verification: admin/proxies/CROSS_SERVER_VERIFICATION.md
   - Developers:
       - Why LeafRTP exists: site/why.md
+      - How it works: site/how-it-works.md
+      - Testing and quality gates: site/quality-gates.md
       - Shape algorithm testing & charts: site/shape-algorithms.md
       - Addon developers: FOR_ADDON_DEVELOPERS.md
       - Addon quickstart: ADDON_QUICKSTART.md

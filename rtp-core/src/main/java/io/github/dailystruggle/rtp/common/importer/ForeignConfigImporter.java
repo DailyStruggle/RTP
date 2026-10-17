@@ -127,51 +127,17 @@ public interface ForeignConfigImporter {
         List<String> pass1 = new ArrayList<>();
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i];
-
             String trimmed = line.trim();
-            if (trimmed.equals("{}") || trimmed.equals("[]") || trimmed.startsWith("{}#") || trimmed.startsWith("{} #")
-                    || trimmed.startsWith("[]#") || trimmed.startsWith("[] #")) {
+            Matcher mFlow = flowSeq.matcher(line);
+            if (isEmptyBracketLine(trimmed)) {
                 pass1.add("");
                 sourceLines.add(i + 1);
-                continue;
+            } else if (mFlow.matches() && !isInsideQuotes(line, mFlow.start(3))) {
+                addFlowSequence(mFlow, i + 1, pass1, sourceLines);
+            } else {
+                pass1.add(normalizeKeyLine(line, emptyBrackets, immediateComment));
+                sourceLines.add(i + 1);
             }
-
-            Matcher mFlow = flowSeq.matcher(line);
-            if (mFlow.matches() && !isInsideQuotes(line, mFlow.start(3))) {
-                String indent = mFlow.group(1);
-                String key = mFlow.group(2);
-                String inside = mFlow.group(3).trim();
-                String comment = mFlow.group(4);
-
-                if (inside.isEmpty()) {
-                    pass1.add(indent + key + (comment != null ? " " + comment.trim() : ""));
-                    sourceLines.add(i + 1);
-                } else {
-                    pass1.add(indent + key + (comment != null && !comment.isBlank() ? " " + comment.trim() : ""));
-                    sourceLines.add(i + 1);
-                    String[] items = inside.split(",");
-                    for (String it : items) {
-                        pass1.add(indent + "  - " + it.trim());
-                        sourceLines.add(i + 1);
-                    }
-                }
-                continue;
-            }
-
-            Matcher mEmpty = emptyBrackets.matcher(line);
-            if (mEmpty.matches() && !isInsideQuotes(line, mEmpty.start(2))) {
-                String keyPart = mEmpty.group(1);
-                String trailing = mEmpty.group(3);
-                line = keyPart + (trailing.isEmpty() ? "" : " " + trailing.trim());
-            }
-
-            Matcher mComm = immediateComment.matcher(line);
-            if (mComm.matches() && !line.stripLeading().startsWith("-") && !isInsideQuotes(line, mComm.group(1).length())) {
-                line = mComm.group(1);
-            }
-
-            pass1.add(line);
-            sourceLines.add(i + 1);
         }
 
         foldPlainContinuations(pass1);
@@ -209,12 +175,49 @@ public interface ForeignConfigImporter {
             }
             int outIndent = indent + shift;
             String keyPart = item ? content.substring(1).stripLeading() : content;
-            openKeyColumn = keyPart.stripTrailing().endsWith(":") && !keyPart.startsWith("\"") && !keyPart.startsWith("'")
-                    ? outIndent + (item ? content.length() - keyPart.length() : 0)
-                    : -1;
+            int itemOffset = item ? content.length() - keyPart.length() : 0;
+            boolean keyLine = keyPart.stripTrailing().endsWith(":") && !keyPart.startsWith("\"") && !keyPart.startsWith("'");
+            openKeyColumn = keyLine ? outIndent + itemOffset : -1;
             resultLines.add(shift > 0 ? " ".repeat(shift) + line : line);
         }
         return String.join("\n", resultLines);
+    }
+
+    private static boolean isEmptyBracketLine(String trimmed) {
+        return trimmed.equals("{}") || trimmed.equals("[]") || trimmed.startsWith("{}#") || trimmed.startsWith("{} #")
+                || trimmed.startsWith("[]#") || trimmed.startsWith("[] #");
+    }
+
+    private static void addFlowSequence(Matcher mFlow, int sourceLine, List<String> pass1, List<Integer> sourceLines) {
+        String indent = mFlow.group(1);
+        String key = mFlow.group(2);
+        String inside = mFlow.group(3).trim();
+        String comment = mFlow.group(4);
+        if (inside.isEmpty()) {
+            pass1.add(indent + key + (comment != null ? " " + comment.trim() : ""));
+            sourceLines.add(sourceLine);
+            return;
+        }
+        pass1.add(indent + key + (comment != null && !comment.isBlank() ? " " + comment.trim() : ""));
+        sourceLines.add(sourceLine);
+        for (String item : inside.split(",")) {
+            pass1.add(indent + "  - " + item.trim());
+            sourceLines.add(sourceLine);
+        }
+    }
+
+    private static String normalizeKeyLine(String line, Pattern emptyBrackets, Pattern immediateComment) {
+        String result = line;
+        Matcher mEmpty = emptyBrackets.matcher(result);
+        if (mEmpty.matches() && !isInsideQuotes(result, mEmpty.start(2))) {
+            String trailing = mEmpty.group(3);
+            result = mEmpty.group(1) + (trailing.isEmpty() ? "" : " " + trailing.trim());
+        }
+        Matcher mComm = immediateComment.matcher(result);
+        if (mComm.matches() && !result.stripLeading().startsWith("-") && !isInsideQuotes(result, mComm.group(1).length())) {
+            result = mComm.group(1);
+        }
+        return result;
     }
 
     /**
@@ -224,30 +227,36 @@ public interface ForeignConfigImporter {
      * items are left alone and reach the parser as written.
      */
     private static void foldPlainContinuations(List<String> lines) {
-        for (int i = 0; i < lines.size(); i++) {
-            String line = lines.get(i);
-            int indent = leadingSpaces(line);
-            String content = line.substring(indent);
-            if (content.isEmpty() || content.startsWith("#") || !startsPlainScalar(content)) continue;
-            StringBuilder folded = null;
-            int j = i + 1;
-            for (; j < lines.size(); j++) {
-                String next = lines.get(j);
-                int nextIndent = leadingSpaces(next);
-                String nextContent = next.substring(nextIndent).stripTrailing();
-                if (nextContent.isEmpty() || nextContent.startsWith("#") || nextIndent <= indent
-                        || isSequenceItem(nextContent) || looksLikeKey(nextContent)) {
-                    break;
-                }
-                if (folded == null) folded = new StringBuilder(line.stripTrailing());
-                folded.append(' ').append(nextContent);
-                lines.set(j, "");
-            }
-            if (folded != null) {
-                lines.set(i, folded.toString());
-                i = j - 1;
-            }
+        int i = 0;
+        while (i < lines.size()) {
+            i = foldPlainScalarAt(lines, i) + 1;
         }
+    }
+
+    /** Folds the continuation lines of the scalar at {@code i}; returns the last index consumed. */
+    private static int foldPlainScalarAt(List<String> lines, int i) {
+        String line = lines.get(i);
+        int indent = leadingSpaces(line);
+        String content = line.substring(indent);
+        if (content.isEmpty() || content.startsWith("#") || !startsPlainScalar(content)) return i;
+        StringBuilder folded = null;
+        int j = i + 1;
+        while (j < lines.size()) {
+            String next = lines.get(j);
+            int nextIndent = leadingSpaces(next);
+            String nextContent = next.substring(nextIndent).stripTrailing();
+            if (nextContent.isEmpty() || nextContent.startsWith("#") || nextIndent <= indent
+                    || isSequenceItem(nextContent) || looksLikeKey(nextContent)) {
+                break;
+            }
+            if (folded == null) folded = new StringBuilder(line.stripTrailing());
+            folded.append(' ').append(nextContent);
+            lines.set(j, "");
+            j++;
+        }
+        if (folded == null) return i;
+        lines.set(i, folded.toString());
+        return j - 1;
     }
 
     /** True when the line's value (after {@code key: } or {@code - }) is a non-empty plain scalar. */
@@ -288,21 +297,26 @@ public interface ForeignConfigImporter {
     }
 
     private static boolean isInsideQuotes(String s, int target) {
-        boolean inD = false, inS = false;
-        for (int i = 0; i < target && i < s.length(); i++) {
+        boolean inD = false;
+        boolean inS = false;
+        int end = Math.min(target, s.length());
+        int i = 0;
+        while (i < end) {
             char c = s.charAt(i);
+            int step = 1;
             if (inD) {
-                if (c == '\\') { i++; continue; }
-                if (c == '"') inD = false;
+                if (c == '\\') step = 2;
+                else if (c == '"') inD = false;
             } else if (inS) {
                 if (c == '\'') {
-                    if (i + 1 < s.length() && s.charAt(i + 1) == '\'') { i++; continue; }
-                    inS = false;
+                    if (i + 1 < s.length() && s.charAt(i + 1) == '\'') step = 2;
+                    else inS = false;
                 }
             } else {
                 if (c == '"') inD = true;
                 else if (c == '\'') inS = true;
             }
+            i += step;
         }
         return inD || inS;
     }

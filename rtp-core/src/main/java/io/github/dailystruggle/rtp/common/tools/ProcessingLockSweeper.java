@@ -43,15 +43,7 @@ public final class ProcessingLockSweeper {
     suspects.retainAll(locks);
     int released = 0;
     for (UUID id : locks) {
-      if (liveData.contains(id) || isHeld(id, livePipelines)) {
-        suspects.remove(id);
-        continue;
-      }
-      if (suspects.add(id)) {
-        continue; // first unowned sighting: grace for in-between handoffs
-      }
-      suspects.remove(id);
-      if (locks.remove(id)) {
+      if (unownedTwice(id, livePipelines, liveData) && locks.remove(id)) {
         released++;
         RTP.log(Level.WARNING, "[RTP] released stale teleport lock for player " + id
             + " (no queue, pipeline, death hold or network enrolment owned it across two"
@@ -59,6 +51,19 @@ public final class ProcessingLockSweeper {
       }
     }
     return released;
+  }
+
+  /** Updates the suspect set for one lock; true when it is unowned on a second consecutive sweep. */
+  private static boolean unownedTwice(UUID id, Set<UUID> livePipelines, Set<UUID> liveData) {
+    if (liveData.contains(id) || isHeld(id, livePipelines)) {
+      suspects.remove(id);
+      return false;
+    }
+    if (suspects.add(id)) {
+      return false; // first unowned sighting: grace for in-between handoffs
+    }
+    suspects.remove(id);
+    return true;
   }
 
   /**

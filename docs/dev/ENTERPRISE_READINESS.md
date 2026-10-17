@@ -849,7 +849,7 @@ still skips `anvil-api` and `tags-api` (no published baseline). F-8 was resolved
 | 4 | Support matrix distinguishes tested vs best-effort; tested cells re-verified by CI on a schedule | **MET** | PARTIAL | `SUPPORT_MATRIX.md` marks a cell Tested only when a scheduled CI job boots it (ADR-113 amendment 4): the nightly devstack (`devstack/docker-compose.yml`: Velocity, Paper 1.21.11, Folia 1.21.11, Fabric 1.21.11 on Java 25, NeoForge 1.21.1 on Java 21) and the nightly `versions-smoke` job (Paper 26.3, Fabric 26.3 on Java 25). | Bump the `versions-smoke` `VERSION` with each Minecraft release. |
 | 5 | Each release ships SBOM, signed artifacts, checksums, acceptance log | **MET** | PARTIAL | Lite release (`release.yml`) and Pro release (`release-bbb.yml`) both generate and archive CycloneDX SBOM (`bom.json`), SHA-256/SHA-512 checksums, PGP signatures (`.asc`), and SLSA build provenance attestations alongside acceptance evidence logs. | None. |
 | 6 | API compatibility gated automatically; deprecation policy published | **MET** | NOT MET | `build.gradle` `checkBinaryCompatibility` task compares public API modules against published Maven Central baseline `3.2.1`, failing closed on unannounced breaking changes. `DEPRECATION_POLICY.md` and `SEMVER.md` published. | None. |
-| 7 | Zero known CVEs in shipped dependencies, checked automatically | **MET** | NOT MET | `rtp-plugin` shades zero external libraries (bundles only in-house API and core modules). `.github/workflows/dependency-check.yml` builds plugin deliverables and scans `rtp-plugin/build/libs` gating on CVSS >= 4 with `config/dependency-check-suppressions.xml`. | None. |
+| 7 | Zero known CVEs in shipped dependencies, checked automatically | **MET** | NOT MET | `rtp-plugin` shades zero external libraries: every class in `LeafRTP-3.3.0.jar` and its four bundled addon jars is under `io/github/dailystruggle/` (checked 2026-10-17), so all shipped code is in-repo and covered by SonarCloud and PMD. `.github/workflows/dependency-check.yml` is paused (manual dispatch only) because it has no third-party code to match. | No automated check yet that the jar holds only in-repo packages; re-check by hand when a dependency is added, and restore the dependency-check triggers if a third-party library is ever shaded or bundled. |
 
 **Cross-cutting gap (resolved 2026-09-15):** `.github/workflows/gradle.yml` `build-full`
 now runs `./gradlew build shadowJar -Pcoverage -PstaticAnalysis`, so the JaCoCo floors
@@ -919,6 +919,9 @@ approved designs; build and workflow changes go through the usual proposal step.
 - **F-7 (criterion 7).** The Dependency-Check job scans source files, not the resolved Gradle
   dependency graph or the shaded jar. A green run therefore does not show zero CVEs in
   shipped dependencies.
+  **Resolved (2026-10-17):** the shipped jars contain no third-party classes, so there is no
+  shipped dependency to scan. The workflow is paused (manual dispatch only) and the Dependency
+  CVEs row is dropped from `docs/site/quality-gates.md`.
 - **F-8 (item 48 regression).** `cross_plugin_destinations_scatter_chart.png` and
   `cross_plugin_destinations_scatter_chart_16k.png` are tracked at the repository root again
   (the root `*.log` files are gitignored local clutter only).

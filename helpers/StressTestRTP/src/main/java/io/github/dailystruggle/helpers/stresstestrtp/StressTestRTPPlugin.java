@@ -30,7 +30,7 @@ import java.util.logging.Level;
  * convention set by {@code PeriodicWorldSaver}: a single {@link JavaPlugin}
  * subclass that wires components, no business logic in the plugin itself.
  */
-public final class StressTestRTPPlugin extends JavaPlugin {
+public final class StressTestRTPPlugin extends JavaPlugin implements StressHost {
 
     private TpsMsptHeapSampler sampler;
     private TeleportProbe probe;
@@ -459,9 +459,9 @@ public final class StressTestRTPPlugin extends JavaPlugin {
 
     public Runner runner() { return runner; }
     public LeakProbe leakProbe() { return leakProbe; }
-    CoverageProbe coverageProbe() { return coverageProbe; }
+    public CoverageProbe coverageProbe() { return coverageProbe; }
 
-    HarnessTeleporter harnessTeleporter() { return harnessTeleporter; }
+    public HarnessTeleporter harnessTeleporter() { return harnessTeleporter; }
     public TpsMsptHeapSampler sampler() { return sampler; }
     public TicketFootprintProbe ticketFootprintProbe() { return ticketFootprintProbe; }
     public MetricsRecorder recorder() { return recorder; }

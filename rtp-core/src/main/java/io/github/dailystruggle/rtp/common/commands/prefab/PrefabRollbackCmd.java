@@ -28,7 +28,7 @@ public class PrefabRollbackCmd extends BaseRTPCmdImpl {
     public PrefabRollbackCmd(@Nullable CommandsAPICommand parent) {
         super(parent);
         addParameter("id",
-                new PrefabIdParameter(PrefabCommand.PERMISSION,
+                new PrefabIdParameter(PrefabPermission.PERMISSION,
                         "bundled prefab id",
                         (uuid, s) -> true));
     }
@@ -40,7 +40,7 @@ public class PrefabRollbackCmd extends BaseRTPCmdImpl {
 
     @Override
     public String permission() {
-        return PrefabCommand.PERMISSION;
+        return PrefabPermission.PERMISSION;
     }
 
     @Override

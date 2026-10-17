@@ -138,10 +138,9 @@ public final class NeoForgeRTPChunk extends RTPChunk<ChunkAccess> {
     public void keep(boolean keep) {
         if (anvilView != null) return;
         RTPWorld<?> w = getWorld();
-        if (w instanceof NeoForgeRTPWorld nw) {
-            if (keep) nw.keepChunkAt(cx, cz);
-            else nw.forgetChunkAt(cx, cz);
-        }
+        if (w == null) return;
+        if (keep) w.keepChunkAt(cx, cz);
+        else w.forgetChunkAt(cx, cz);
     }
 
     @Override

@@ -37,6 +37,14 @@ public final class NeoForgeMenuRenderer implements MenuRenderer {
   private static final Pattern COLOR_CODE = Pattern.compile("(?i)[&\u00a7](#[0-9a-f]{6}|x([&\u00a7][0-9a-f]){6}|[0-9a-fk-or])");
   private static final Pattern LEFTOVER_TAGS = Pattern.compile("<[^>]+>");
 
+  /** Server captured by the standalone mod entry point; {@code null} before start / after stop. */
+  private static volatile MinecraftServer boundServer;
+
+  /** Called by {@code RTPGuiNeoForgeMod} on server start ({@code server}) and stop ({@code null}). */
+  static void bindServer(MinecraftServer server) {
+    boundServer = server;
+  }
+
   @Override
   public String key() {
     return STYLE;
@@ -69,7 +77,7 @@ public final class NeoForgeMenuRenderer implements MenuRenderer {
    * ServiceLoader / bundled-in-jar load path where the mod entry point never runs.
    */
   private static MinecraftServer currentServer() {
-    MinecraftServer s = RTPGuiNeoForgeMod.server();
+    MinecraftServer s = boundServer;
     if (s != null) {
       return s;
     }
