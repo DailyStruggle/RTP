@@ -2,7 +2,7 @@
 
 Gitar must evaluate pull requests with an uncompromising stance on correctness and stability. The operational and human costs of defects in multi-threaded Minecraft server environments (Folia, Paper, Fabric, NeoForge) are severely asymmetrical: a single escaped bug can freeze tick loops, exhaust server heaps, corrupt world regions, or mislead server operators across thousands of production servers.
 
-Under no circumstances should review friction be minimized or velocity prioritized when evaluating changes against the following non-negotiable criteria. Any violation must trigger a hard block on the pull request.
+Review friction is not minimized and velocity is not prioritized when evaluating changes against the following criteria. A finding blocks only when it matches a criterion below and carries evidence (`path:line`, command output, or code path) and a clearing condition, per `.gitar/instructions/verdict.md` and `docs/dev/PR_AUDIT_PROTOCOL.md`. A suspected violation with no evidence is an `unconfirmed` advisory, not a block.
 
 ---
 
@@ -59,7 +59,12 @@ Under no circumstances should review friction be minimized or velocity prioritiz
 
 ---
 
-## 5. Evidentiary Burden on Critical Paths
+## 5. Evidentiary Burden on Critical Paths and New Features
+
+- **Feature Evidence (gate 10, B7):**
+  - New features or mechanism replacements (e.g., dual-layer shapes replacing the Archimedean spiral) with no artifact for the stated claim: differential benchmark with spread, before/after screenshots, or real command output. See the table in `docs/dev/VERIFICATION_GATES.md`.
+- **Fixes Without Reproduction (gate 1):**
+  - Bug fixes with no test that fails on the old code.
 
 - **Unattested Concurrency or Memory Claims:**
   - Pull requests altering critical execution pipelines (`rtp-core/.../tasks/teleport/`, `MemoryTracker`, `rtp-folia/`, or `anvil-api`) that assert thread safety or leak-freedom without presenting empirical test/fuzzing attestation (`scripts/bench_fuzz.py`, ADR-111).

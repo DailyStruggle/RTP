@@ -64,7 +64,11 @@ class CpuSamplerTest {
         Thread t = new Thread(() -> {
             spin(150 * MS);
             spun.countDown();
-            try { release.await(); } catch (InterruptedException ignored) { }
+            try {
+                release.await();
+            } catch (InterruptedException ignored) {
+                // Thread will terminate normally on test completion
+            }
         }, "Craft Scheduler Thread - 7 - TestPlugin");
         t.start();
         try {
@@ -95,7 +99,9 @@ class CpuSamplerTest {
                 spin(100 * MS);
                 done.countDown();
                 release.await();
-            } catch (InterruptedException ignored) { }
+            } catch (InterruptedException ignored) {
+                // Thread will terminate normally on test completion
+            }
         }, "Netty Server IO #77");
         t.start();
         try {

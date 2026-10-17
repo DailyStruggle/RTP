@@ -555,27 +555,9 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     return dimensionRegionSubpath(world);
   }
 
-  /**
-   * Map a Bukkit {@link World#getEnvironment()} to the on-disk region subdirectory used
-   * by vanilla. Inlined here (rather than in the platform-neutral {@code AnvilPrefilter})
-   * because it is the single place where {@code rtp-anvil} would otherwise need to know
-   * about Bukkit's {@link org.bukkit.World.Environment} enum.
-   */
+  /** On-disk region subdirectory; covers the legacy and the 26.1+ unified layouts. */
   private static String dimensionRegionSubpath(World world) {
-    if (world == null) return "";
-    try {
-      switch (world.getEnvironment()) {
-        case NETHER:
-          return "DIM-1";
-        case THE_END:
-          return "DIM1";
-        case NORMAL:
-        default:
-          return "";
-      }
-    } catch (Throwable ignored) {
-      return "";
-    }
+    return BukkitRegionPaths.dimensionRegionSubpath(world);
   }
 
   /**

@@ -1,6 +1,6 @@
 # ADR-045 — `/rtp docs` Menu Consumer (Markdown → `MenuModel`, converted at config load)
 
-**Status:** Proposed
+**Status:** Withdrawn (retired in favor of ADR-104 web editor integration)
 **Date:** 2026-05-15
 **Target release:** `3.0.0-beta.3`
 

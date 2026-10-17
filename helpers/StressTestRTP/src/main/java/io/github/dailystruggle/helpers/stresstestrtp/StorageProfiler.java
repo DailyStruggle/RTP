@@ -278,9 +278,7 @@ public final class StorageProfiler {
      */
     private List<Path> untouchedRegionFiles() {
         List<Path> found = new ArrayList<>();
-        for (String sub : new String[] {"region", "DIM-1/region", "DIM1/region"}) {
-            Path dir = worldDir.resolve(sub);
-            if (!Files.isDirectory(dir)) continue;
+        for (Path dir : regionDirs(worldDir)) {
             try (DirectoryStream<Path> ds = Files.newDirectoryStream(dir)) {
                 for (Path p : ds) {
                     String fn = p.getFileName().toString().toLowerCase(Locale.ROOT);
@@ -294,6 +292,38 @@ public final class StorageProfiler {
         }
         found.sort((a, b) -> Long.compare(originDistanceSq(b), originDistanceSq(a)));
         return found;
+    }
+
+    /**
+     * Existing region directories under {@code worldDir}: the legacy
+     * {@code region/}, {@code DIM-1/region/}, {@code DIM1/region/} and every
+     * {@code dimensions/<ns>/<key>/region/} of the Paper/Folia 26.1+ layout.
+     * Duplicates the platform resolver because the harness depends only on the
+     * Bukkit API.
+     */
+    static List<Path> regionDirs(Path worldDir) {
+        List<Path> out = new ArrayList<>();
+        for (String sub : new String[] {"region", "DIM-1/region", "DIM1/region"}) {
+            Path dir = worldDir.resolve(sub);
+            if (Files.isDirectory(dir)) out.add(dir);
+        }
+        Path dims = worldDir.resolve("dimensions");
+        if (!Files.isDirectory(dims)) return out;
+        try (DirectoryStream<Path> namespaces = Files.newDirectoryStream(dims, Files::isDirectory)) {
+            for (Path ns : namespaces) {
+                try (DirectoryStream<Path> keys = Files.newDirectoryStream(ns, Files::isDirectory)) {
+                    for (Path key : keys) {
+                        Path dir = key.resolve("region");
+                        if (Files.isDirectory(dir)) out.add(dir);
+                    }
+                } catch (IOException | RuntimeException e) {
+                    // Unreadable namespace: skip it, the others may still work.
+                }
+            }
+        } catch (IOException | RuntimeException e) {
+            // Unreadable dimensions directory: keep the legacy hits.
+        }
+        return out;
     }
 
     /** Squared region-grid distance from origin, parsed from {@code r.X.Z.mca}.

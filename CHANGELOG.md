@@ -96,15 +96,11 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 - **Runs on Spigot and Paper 1.18 - 1.20.6, and on Java 17 ([ADR-113](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-113-java-17-baseline-and-26x-support-boundary.md)).** The full jar now loads on Spigot and Paper 1.18 through 1.20.6, and Fabric 1.20.1 servers can run it on Java 17. These older versions are best-effort and are not covered by automated tests. NeoForge still needs 1.21.1 or newer, and Fabric 1.20.2 - 1.20.6 is not supported. Folia is supported from 1.21.11: it is experimental and only its current builds are maintained, so older Folia builds are not supported and can crash on their own. Bug reports are accepted for Minecraft 1.21.11 through the latest release; the per-version status is in the [support matrix](https://github.com/DailyStruggle/RTP/blob/V3/docs/dev/SUPPORT_MATRIX.md).
 
-- **In-game documentation (`/rtp docs`).** Browse RTP's manuals in game or in the console, matched to the version you run, or export them all to one offline HTML file. Also available from the admin panel. Permission: `rtp.admin.docs`.
-
 - **Tag exclusions in `safety.yml` (ADR-017).** Remove entries from a block tag instead of listing every variant by hand, e.g. `#minecraft:slabs - OAK_SLAB`.
 
 - **Actions.** Script multi-step teleports in YAML: what happens before, during and after the teleport, what to do on failure or timeout, and conditions that must pass first (permission, balance, cooldown, world, biome, time, server load and more). Destinations can be anchored to a player, a claim, a faction or a world center, and teams can be placed together. Walk-in triggers start an action when a player enters a zone. Commands: `/rtp action` (`rtp.action`; `/rtp trigger` and `/rtp run` are other names for it), `/rtp action cancel` (`rtp.action.cancel`) and `/rtp back` (`rtp.back`). The bundled action addon ships ready-made modes such as arena, KOTH, scatter and teams.
 
 - **Web config editor (`/rtp editor`).** Edit RTP's configs in a browser and apply the changes back to the server. Permission: `rtp.editor`. The region map shows the land of every loaded world, including the nether and the end, and a region's world can be picked from the worlds the server detected. Passwords, tokens and other secrets are redacted before anything leaves the server and are never overwritten by the editor. Only config files inside the plugin folder can be written, and a browser must be trusted before it can apply changes (revoke with `/rtp editor untrust`; optional expiry with `editor.trust.maxAgeDays` in `advanced/network.yml`).
-
-- **Addon tabs in the web editor (ADR-107).** Addons can add their own tabs, live status and config files to the editor using built-in widgets, so no addon code runs in the browser. Addon config changes are validated and backed up before they are written. A misbehaving addon is rate-limited and switched off for the session without affecting the rest of the editor, and mixed editor and plugin versions keep working together.
 
 - **Import from other RTP plugins (`/rtp config import`, ADR-066).** Reads another random-teleport plugin's config folder, such as BetterRTP, JustRTP or EzRTP, by recognizing common config layouts, and moves over worlds, radius, shape, cooldowns, prices, database, effects and JustRTP zones. Permission: `rtp.config`. The old plugin doesn't need to be installed. Existing files are only replaced with `overwrite=true`, and are backed up first. `/rtp config import permissions` prints LuckPerms commands that map BetterRTP, JustRTP and EzRTP permission nodes to RTP's.
 
@@ -132,7 +128,7 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 - **API on Maven Central.** `rtp-api`, `rtp-core` and the API libraries they depend on, such as `commands-api` and `effects-api`, are published to Maven Central. Platform jars are not.
 
-- **For addon developers.** New `rtp-api` surfaces for actions, claim boundaries (`ClaimBoundaryProvider`), web editor extensions, and extra region-file formats (`RegionFormatRegistry`, ADR-077; RTP itself reads only Anvil `.mca` and loads other formats such as `.linear` asynchronously).
+- **For addon developers.** New `rtp-api` surfaces for actions, claim boundaries (`ClaimBoundaryProvider`), web editor extensions (`EditorExtensionRegistry`, ADR-107; tabs are built from the editor's own widgets, so no addon code runs in the browser, and no bundled addon uses them yet), and extra region-file formats (`RegionFormatRegistry`, ADR-077; RTP itself reads only Anvil `.mca` and loads other formats such as `.linear` asynchronously).
 
 ### Changed
 
@@ -240,6 +236,14 @@ One changelog covers both the free and Pro jars, which ship the same code.
 - **Fabric and NeoForge could start an unlimited number of background threads,** and a slow repeating task could run several copies at once.
 
 - **On Folia, delayed tasks ran immediately, cancelled tasks still ran, and one failing task skipped the rest of that tick's queue.** Chunk tickets were also changed on the wrong thread. With spark installed, RTP also lost its own TPS readings.
+
+- **`/rtp scan` progress lines showed a speed and ETA that jumped wildly between updates** (for example 150 cps, then 3,000 cps). They now show the average since the previous progress line.
+
+- **`/rtp scan` stalled for seconds at a time on large pregenerated worlds.** RTP re-checked the region file format by listing the whole region folder every 10 seconds; it now detects the format once.
+
+- **`/rtp scan` on circle regions checked chunks outside the circle, and generated them on fresh worlds.** These are the corners of the square area the scan walks. It now skips them without recording them, so they no longer count toward land % or toward the learned bad area that `expand` uses.
+
+- **On Paper and Folia 26.1 or newer, `/rtp scan` and the background search did not recognize pregenerated land** and loaded every chunk through the server, which put heavy load on the scheduler. RTP looked for region files in the old folder layout; it now also reads the new `world/dimensions/<namespace>/<name>/region/` layout.
 
 ### Security
 

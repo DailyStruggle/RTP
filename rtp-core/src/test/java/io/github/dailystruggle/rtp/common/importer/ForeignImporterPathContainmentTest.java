@@ -98,9 +98,9 @@ class ForeignImporterPathContainmentTest {
       all.filter(Files::isRegularFile)
           .forEach(p -> assertTrue(p.toAbsolutePath().normalize().startsWith(destAbs), "escaped: " + p));
     }
-    assertTrue(Files.exists(dest.resolve("regions").resolve("good_region.yml")));
-    assertTrue(Files.exists(dest.resolve("worlds").resolve("world.yml")));
-    assertTrue(Files.exists(dest.resolve("worlds").resolve("world_nether.yml")));
+    assertTrue(Files.exists(dest.resolve("definitions").resolve("regions").resolve("good_region.yml")));
+    assertTrue(Files.exists(dest.resolve("definitions").resolve("worlds").resolve("world.yml")));
+    assertTrue(Files.exists(dest.resolve("definitions").resolve("worlds").resolve("world_nether.yml")));
     assertEquals(3, errors.size(), errors.toString());
   }
 

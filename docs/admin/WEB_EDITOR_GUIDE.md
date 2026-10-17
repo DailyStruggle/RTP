@@ -111,16 +111,24 @@ Click the link to open the workspace in your browser on Screen 2.
   - **Type Exact Values:** Every value a handle changes can also be typed in the shape settings form, which uses the same staging path.
   - **Visualization Layers:** Toggle overlays for chunk-resolution pregenerated land (biome data streamed progressively to maintain > 5 FPS), rejected candidate blocks (`bad-locations`), and 1D Archimedean spiral walk traces.
 
+  ![Visual Region Editor with Polygon Boundaries, Math Invariants & Live Diff](../assets/img/web_editor_cartography.png)
+
 - **Panel 2: 📊 Diagnostics & Telemetry**
   - Monitor real-time L1 hot chunk queue depth (active tickets), L2 cold queue depth, and L3 backlog binned cache.
   - Check `MemoryTracker` watchdog status and active worker thread counts.
+
+  ![Diagnostics & Telemetry with Tick Rates, Reservoir Depths & Memory](../assets/img/web_editor_diagnostics.png)
 
 - **Panel 3: ⚙ Config & Prefabs**
   - Edit `config.yml`, `messages.yml`, or `regions/*.yml` directly.
   - The **Contextual Doc Tracker** drawer tracks your cursor in real time, displaying parameter definitions, default values, units, and links to relevant documentation and ADRs.
 
+  ![Configuration Editor & Contextual Doc Tracker](../assets/img/web_editor_docs.png)
+
 - **Panel 4: 📖 Shipped Docs**
   - Read bundled operator runbooks and guides directly inside the web workspace.
+
+  ![Shipped Documentation Browser](../assets/img/web_editor_shipped_docs.png)
 
 ### Step 3: Inspect the Staging Diff
 Before committing changes, review the **📋 Staging Diff Inspector** sidebar on the right of the workspace.

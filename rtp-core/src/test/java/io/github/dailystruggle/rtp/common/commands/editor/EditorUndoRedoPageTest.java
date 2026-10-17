@@ -71,7 +71,7 @@ class EditorUndoRedoPageTest {
             "  getElementById: (id) => {",
             "    if (id === 'btn-undo') return undoBtnStub;",
             "    if (id === 'btn-redo') return redoBtnStub;",
-            "    if (id === 'hud-shape' || id === 'hud-region' || id === 'hud-coords') return { textContent: '' };",
+            "    if (id === 'hud-shape' || id === 'hud-region' || id === 'hud-coords' || id === 'hud-biome') return { textContent: '' };",
             "    if (id === 'reg-shape') return { value: '' };",
             "    if (id === 'poly-points-count') return { textContent: '' };",
             "    if (id === 'polygon-vertices-list') return { innerHTML: '' };",

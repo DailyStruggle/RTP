@@ -307,7 +307,12 @@ public class UniversalConfigImporter extends AbstractForeignConfigImporter {
         int defaultMinRadius = 100;
         int defaultCenterX = 0;
         int defaultCenterZ = 0;
+        int defaultMinY = 64;
+        int defaultMaxY = 320;
+        double defaultPrice = 0.0;
         String defaultShape = "CIRCLE";
+        List<String> defaultBiomes = null;
+        boolean defaultBiomesIsBlacklist = false;
 
         // Check if primaryConfig defines default radii or centers (like BetterRTP's Default or AsyRTP's teleport)
         RtpYamlSection defaultSec = getSectionCaseInsensitive(primaryConfig, "Default", "teleport");
@@ -316,20 +321,68 @@ public class UniversalConfigImporter extends AbstractForeignConfigImporter {
             defaultMinRadius = getIntCaseInsensitive(defaultSec, defaultMinRadius, "MinRadius", "min-radius", "min");
             defaultCenterX = getIntCaseInsensitive(defaultSec, defaultCenterX, "CenterX", "center-x", "center.x", "x");
             defaultCenterZ = getIntCaseInsensitive(defaultSec, defaultCenterZ, "CenterZ", "center-z", "center.z", "z");
+            defaultMinY = getIntCaseInsensitive(defaultSec, defaultMinY, "MinY", "min-y", "min_y", "bottom");
+            defaultMaxY = getIntCaseInsensitive(defaultSec, defaultMaxY, "MaxY", "max-y", "max_y", "top");
+            defaultPrice = getDoubleCaseInsensitive(defaultSec, defaultPrice, "Price", "price", "cost");
             defaultShape = mapShape(getStringCaseInsensitive(defaultSec, defaultShape, "shape", "distribution", "pattern"));
+
+            List<String> bl = getStringListCaseInsensitive(defaultSec, "blacklisted-biomes", "blacklisted_biomes", "disabled-biomes");
+            if (!bl.isEmpty()) {
+                defaultBiomes = bl;
+                defaultBiomesIsBlacklist = true;
+            } else {
+                List<String> al = getStringListCaseInsensitive(defaultSec, "biomes", "allowed-biomes", "allowed_biomes");
+                if (!al.isEmpty()) {
+                    defaultBiomes = al;
+                    defaultBiomesIsBlacklist = false;
+                }
+            }
         }
 
         // Also check root for centers/radii/shapes
         defaultCenterX = getIntCaseInsensitive(primaryConfig, defaultCenterX, "CenterX", "center-x", "center.x", "x");
         defaultCenterZ = getIntCaseInsensitive(primaryConfig, defaultCenterZ, "CenterZ", "center-z", "center.z", "z");
+        defaultMinY = getIntCaseInsensitive(primaryConfig, defaultMinY, "MinY", "min-y", "min_y", "bottom");
+        defaultMaxY = getIntCaseInsensitive(primaryConfig, defaultMaxY, "MaxY", "max-y", "max_y", "top");
         defaultShape = mapShape(getStringCaseInsensitive(primaryConfig, defaultShape, "shape", "distribution", "pattern"));
+
+        double globalPrice = defaultPrice;
+        int globalCacheCap = rootCacheCap;
+        for (RtpYamlConfig cfg : rootConfigs.values()) {
+            double p = getDoubleCaseInsensitive(cfg, -1.0, "cost", "price", "vault-cost");
+            if (p > globalPrice) globalPrice = p;
+            RtpYamlSection econSec = getSectionCaseInsensitive(cfg, "economy");
+            if (econSec != null) {
+                double ep = getDoubleCaseInsensitive(econSec, -1.0, "cost", "price", "vault-cost");
+                if (ep > globalPrice) globalPrice = ep;
+            }
+
+            int cc = getIntCaseInsensitive(cfg, -1, "cache_size", "cache-size", "cacheCap", "cache-cap");
+            if (cc > globalCacheCap) globalCacheCap = cc;
+            RtpYamlSection locCacheSec = getSectionCaseInsensitive(cfg, "location_cache", "location-cache", "locationCache");
+            if (locCacheSec != null) {
+                int lcc = getIntCaseInsensitive(locCacheSec, -1, "cache_size", "cache-size", "cacheCap", "cache-cap");
+                if (lcc > globalCacheCap) globalCacheCap = lcc;
+            }
+        }
+
+        DiscoveredWorldRegion baseDefaults = new DiscoveredWorldRegion(
+                "world", "world", defaultShape, defaultMinRadius, defaultMaxRadius,
+                defaultCenterX, defaultCenterZ, defaultMinY, defaultMaxY, globalPrice,
+                globalCacheCap, defaultBiomes, defaultBiomesIsBlacklist, null
+        );
+
+        if (defaultSec != null && !worldSections.containsKey("world") && !disabledWorlds.contains("world")) {
+            DiscoveredWorldRegion defWorld = extractWorldRegion("world", defaultSec, baseDefaults);
+            discoveredList.add(defWorld);
+        }
 
         for (Map.Entry<String, RtpYamlSection> entry : worldSections.entrySet()) {
             String targetName = entry.getKey();
             RtpYamlSection sec = entry.getValue();
 
             // Skip non-world utility sections if detected as child
-            if ((targetName.equalsIgnoreCase("default") || targetName.equalsIgnoreCase("teleport")) && worldSections.size() > 1) {
+            if ((targetName.equalsIgnoreCase("default") || targetName.equalsIgnoreCase("teleport")) && (worldSections.size() > 1 || defaultSec != null)) {
                 continue;
             }
 
@@ -340,38 +393,10 @@ public class UniversalConfigImporter extends AbstractForeignConfigImporter {
             }
 
             DiscoveredWorldRegion defaults = new DiscoveredWorldRegion(
-                    targetName, targetName, defaultShape, defaultMinRadius, defaultMaxRadius, defaultCenterX, defaultCenterZ, 64, 320, 0.0, null
+                    targetName, targetName, defaultShape, defaultMinRadius, defaultMaxRadius,
+                    defaultCenterX, defaultCenterZ, defaultMinY, defaultMaxY, globalPrice,
+                    globalCacheCap, defaultBiomes, defaultBiomesIsBlacklist, null
             );
-
-            // If price wasn't defined in the section, check if any root config defined cost/price globally
-            double globalPrice = 0.0;
-            int globalCacheCap = rootCacheCap;
-            for (RtpYamlConfig cfg : rootConfigs.values()) {
-                double p = getDoubleCaseInsensitive(cfg, -1.0, "cost", "price", "vault-cost");
-                if (p > globalPrice) globalPrice = p;
-                RtpYamlSection econSec = getSectionCaseInsensitive(cfg, "economy");
-                if (econSec != null) {
-                    double ep = getDoubleCaseInsensitive(econSec, -1.0, "cost", "price", "vault-cost");
-                    if (ep > globalPrice) globalPrice = ep;
-                }
-
-                int cc = getIntCaseInsensitive(cfg, -1, "cache_size", "cache-size", "cacheCap", "cache-cap");
-                if (cc > globalCacheCap) globalCacheCap = cc;
-                RtpYamlSection locCacheSec = getSectionCaseInsensitive(cfg, "location_cache", "location-cache", "locationCache");
-                if (locCacheSec != null) {
-                    int lcc = getIntCaseInsensitive(locCacheSec, -1, "cache_size", "cache-size", "cacheCap", "cache-cap");
-                    if (lcc > globalCacheCap) globalCacheCap = lcc;
-                }
-            }
-            if (globalPrice > 0.0 || globalCacheCap > 0) {
-                defaults = new DiscoveredWorldRegion(
-                        defaults.name(), defaults.world(), defaults.shape(),
-                        defaults.minRadius(), defaults.maxRadius(),
-                        defaults.centerX(), defaults.centerZ(),
-                        defaults.minY(), defaults.maxY(),
-                        globalPrice, globalCacheCap, defaults.biomes(), null
-                );
-            }
 
             DiscoveredWorldRegion extracted = extractWorldRegion(targetName, sec, defaults);
 
@@ -391,6 +416,7 @@ public class UniversalConfigImporter extends AbstractForeignConfigImporter {
                         extracted.price(),
                         extracted.cacheCap(),
                         extracted.biomes(),
+                        extracted.biomesIsBlacklist(),
                         additionalWorlds
                 );
             }
@@ -399,9 +425,7 @@ public class UniversalConfigImporter extends AbstractForeignConfigImporter {
         }
 
         if (discoveredList.isEmpty()) {
-            discoveredList.add(new DiscoveredWorldRegion(
-                    "world", "world", "CIRCLE", defaultMinRadius, defaultMaxRadius, 0, 0, 64, 320, 0.0, null
-            ));
+            discoveredList.add(baseDefaults);
         }
 
         emitRegionsAndWorlds(discoveredList, destinationDir, overwrite, createdFiles, mappedEntities, errors);
@@ -467,15 +491,25 @@ public class UniversalConfigImporter extends AbstractForeignConfigImporter {
             }
             RtpYamlSection rootCdSec = getSectionCaseInsensitive(cfg, "cooldown");
             if (rootCdSec != null) {
-                long nestedCd = getLongCaseInsensitive(rootCdSec, -1L, "duration", "time", "seconds", "cooldown", "fallback-seconds");
-                if (nestedCd > cd) cd = nestedCd;
+                boolean cdEnabled = getBooleanCaseInsensitive(rootCdSec, true, "enabled");
+                if (!cdEnabled) {
+                    cd = 0;
+                } else {
+                    long nestedCd = getLongCaseInsensitive(rootCdSec, -1L, "duration", "time", "seconds", "cooldown", "fallback-seconds");
+                    if (nestedCd > cd) cd = nestedCd;
+                }
                 long nestedLock = getLongCaseInsensitive(rootCdSec, -1L, "lockafter", "lock-after", "lock");
                 if (nestedLock > lock) lock = nestedLock;
             }
             RtpYamlSection rootDelSec = getSectionCaseInsensitive(cfg, "delay", "warmup");
             if (rootDelSec != null) {
-                long nestedDel = getLongCaseInsensitive(rootDelSec, -1L, "duration", "time", "seconds", "delay");
-                if (nestedDel > del) del = nestedDel;
+                boolean delEnabled = getBooleanCaseInsensitive(rootDelSec, true, "enabled");
+                if (!delEnabled) {
+                    del = 0;
+                } else {
+                    long nestedDel = getLongCaseInsensitive(rootDelSec, -1L, "duration", "time", "seconds", "delay");
+                    if (nestedDel > del) del = nestedDel;
+                }
                 if (getBooleanCaseInsensitive(rootDelSec, false, "cancelonmove", "cancel-on-move")) {
                     cancelOnMove = true;
                 }
@@ -483,8 +517,13 @@ public class UniversalConfigImporter extends AbstractForeignConfigImporter {
             if (settingsSec != null) {
                 RtpYamlSection cdSec = getSectionCaseInsensitive(settingsSec, "cooldown");
                 if (cdSec != null) {
-                    long nestedCd = getLongCaseInsensitive(cdSec, -1L, "duration", "time", "seconds", "cooldown", "fallback-seconds");
-                    if (nestedCd > cd) cd = nestedCd;
+                    boolean cdEnabled = getBooleanCaseInsensitive(cdSec, true, "enabled");
+                    if (!cdEnabled) {
+                        cd = 0;
+                    } else {
+                        long nestedCd = getLongCaseInsensitive(cdSec, -1L, "duration", "time", "seconds", "cooldown", "fallback-seconds");
+                        if (nestedCd > cd) cd = nestedCd;
+                    }
                     long nestedLock = getLongCaseInsensitive(cdSec, -1L, "lockafter", "lock-after", "lock");
                     if (nestedLock > lock) lock = nestedLock;
                 } else {
@@ -494,8 +533,13 @@ public class UniversalConfigImporter extends AbstractForeignConfigImporter {
 
                 RtpYamlSection delSec = getSectionCaseInsensitive(settingsSec, "delay", "warmup");
                 if (delSec != null) {
-                    long nestedDel = getLongCaseInsensitive(delSec, -1L, "duration", "time", "seconds", "delay");
-                    if (nestedDel > del) del = nestedDel;
+                    boolean delEnabled = getBooleanCaseInsensitive(delSec, true, "enabled");
+                    if (!delEnabled) {
+                        del = 0;
+                    } else {
+                        long nestedDel = getLongCaseInsensitive(delSec, -1L, "duration", "time", "seconds", "delay");
+                        if (nestedDel > del) del = nestedDel;
+                    }
                     if (getBooleanCaseInsensitive(delSec, false, "cancelonmove", "cancel-on-move")) {
                         cancelOnMove = true;
                     }
@@ -527,9 +571,19 @@ public class UniversalConfigImporter extends AbstractForeignConfigImporter {
                 }
             }
 
-            if (cd > cooldown) cooldown = cd;
-            if (del > delay) delay = del;
-            if (lock > lockAfter) lockAfter = lock;
+            if (cd >= 0) {
+                if (cooldown < 0 || cd > cooldown || cd == 0) {
+                    cooldown = cd;
+                }
+            }
+            if (del >= 0) {
+                if (delay < 0 || del > delay || del == 0) {
+                    delay = del;
+                }
+            }
+            if (lock >= 0 && (lockAfter < 0 || lock > lockAfter || lock == 0)) {
+                lockAfter = lock;
+            }
 
             if (getBooleanCaseInsensitive(cfg, false, "cancel-on-move", "cancelOnMove", "cancel-on-motion")) {
                 cancelOnMove = true;
@@ -589,6 +643,29 @@ public class UniversalConfigImporter extends AbstractForeignConfigImporter {
 
         // 6. Mirror spatial zones (rtp_zones.yml) if present
         mirrorZonesConfig(sourcePluginDir, destinationDir, overwrite, mappedEntities, createdFiles, warnings, errors);
+
+        // 7. Warn about unmapped source keys (e.g. BetterRTP MaxAttempts, BlacklistedBlocks, Overrides, WorldType, PermissionGroup)
+        List<String> unmappedCandidates = List.of(
+                "MaxAttempts", "BlacklistedBlocks", "Overrides", "WorldType", "PermissionGroup"
+        );
+        for (Map.Entry<String, RtpYamlConfig> entry : rootConfigs.entrySet()) {
+            String fileName = entry.getKey();
+            RtpYamlConfig cfg = entry.getValue();
+            List<String> foundUnmapped = new ArrayList<>();
+            for (String key : unmappedCandidates) {
+                if (containsCaseInsensitive(cfg, key)) {
+                    foundUnmapped.add(key);
+                } else {
+                    RtpYamlSection settingsSec = getSectionCaseInsensitive(cfg, "settings");
+                    if (settingsSec != null && containsCaseInsensitive(settingsSec, key)) {
+                        foundUnmapped.add(key);
+                    }
+                }
+            }
+            if (!foundUnmapped.isEmpty()) {
+                warnings.add("Source keys in " + fileName + " were not mapped: " + String.join(", ", foundUnmapped));
+            }
+        }
 
         boolean success = errors.isEmpty() && !createdFiles.isEmpty();
         String resultSource = sourcePluginDir.getFileName() != null ? sourcePluginDir.getFileName().toString() : sourceName();

@@ -711,33 +711,20 @@ public final class ActionConfigLoader {
     }
 
     List<ActionDefinition.CommandAction> outsideActions = Collections.emptyList();
+    Object oaObj = null;
     if (map.containsKey("outsideActions")) {
-      Object oaObj = map.get("outsideActions");
-      if (oaObj instanceof List<?> list) {
-        outsideActions = parseActions(list);
-      } else if (oaObj instanceof Map<?, ?> m) {
-        outsideActions = parseActionFromMap((Map<String, Object>) m);
-      } else if (oaObj instanceof String s) {
-        outsideActions = List.of(ActionDefinition.CommandAction.action(s));
-      }
+      oaObj = map.get("outsideActions");
     } else if (map.containsKey("outsideAction")) {
-      Object oaObj = map.get("outsideAction");
-      if (oaObj instanceof List<?> list) {
-        outsideActions = parseActions(list);
-      } else if (oaObj instanceof Map<?, ?> m) {
-        outsideActions = parseActionFromMap((Map<String, Object>) m);
-      } else if (oaObj instanceof String s) {
-        outsideActions = List.of(ActionDefinition.CommandAction.action(s));
-      }
+      oaObj = map.get("outsideAction");
     } else if (map.containsKey("onOutsideLimit")) {
-      Object oaObj = map.get("onOutsideLimit");
-      if (oaObj instanceof List<?> list) {
-        outsideActions = parseActions(list);
-      } else if (oaObj instanceof Map<?, ?> m) {
-        outsideActions = parseActionFromMap((Map<String, Object>) m);
-      } else if (oaObj instanceof String s) {
-        outsideActions = List.of(ActionDefinition.CommandAction.action(s));
-      }
+      oaObj = map.get("onOutsideLimit");
+    }
+    if (oaObj instanceof List<?> list) {
+      outsideActions = parseActions(list);
+    } else if (oaObj instanceof Map<?, ?> m) {
+      outsideActions = parseActionFromMap((Map<String, Object>) m);
+    } else if (oaObj instanceof String s) {
+      outsideActions = List.of(ActionDefinition.CommandAction.action(s));
     }
 
     return new ActionDefinition.ConfinementSpec(

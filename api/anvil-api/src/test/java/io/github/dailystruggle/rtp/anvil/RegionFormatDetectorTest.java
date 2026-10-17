@@ -76,6 +76,23 @@ class RegionFormatDetectorTest {
     }
 
     @Test
+    @DisplayName("Detected format is kept until invalidateCache, even as files are added")
+    void detectedFormatIsSticky(@TempDir Path tempDir) throws IOException {
+        Files.createFile(tempDir.resolve("r.0.0.mca"));
+        RegionFormatDetector detector = RegionFormatDetector.INSTANCE;
+        detector.invalidateCache();
+        assertEquals(RegionFormatDetector.PrimaryFormat.MCA, detector.detectProfile(tempDir).primaryFormat());
+
+        Files.createFile(tempDir.resolve("r.5.5.linear"));
+        RegionFormatDetector.WorldFormatProfile cached = detector.detectProfile(tempDir);
+        assertEquals(RegionFormatDetector.PrimaryFormat.MCA, cached.primaryFormat());
+        assertFalse(cached.hasMixedFormats());
+
+        detector.invalidateCache();
+        assertTrue(detector.detectProfile(tempDir).hasMixedFormats());
+    }
+
+    @Test
     @DisplayName("PBIT execution reports healthy status")
     void pbitExecution() {
         RegionFormatDetector detector = RegionFormatDetector.INSTANCE;

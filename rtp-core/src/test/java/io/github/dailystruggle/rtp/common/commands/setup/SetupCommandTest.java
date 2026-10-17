@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.setup;
 
+import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -52,6 +53,35 @@ class SetupCommandTest {
 
         var toggleCmd = (io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand) children.get("TOGGLE");
         assertEquals(java.util.Set.of("claimIntegrations", "cinematicEffects", "economyIntegration"), toggleCmd.getParameterLookup().get("key").values());
+    }
+
+    @Test
+    @DisplayName("SetupCmd discovers menu renderer and routes in-game players to book menu")
+    void testSetupCmdDiscoversMenuRendererForPlayers() {
+        SetupSessionRegistry registry = new SetupSessionRegistry();
+        SetupBookMenuBuilder builder = new SetupBookMenuBuilder();
+
+        // 1. Default constructor discovers platform renderer (e.g. StubRenderer on test classpath)
+        SetupCmd defaultCmd = new SetupCmd(null);
+        assertNotNull(defaultCmd.menuRenderer(), "menuRenderer must be discovered");
+
+        // 2. In-game player caller triggers book menu renderer
+        java.util.concurrent.atomic.AtomicBoolean playerRendered = new java.util.concurrent.atomic.AtomicBoolean(false);
+        MenuRenderer mockRenderer = (uuid, model) -> playerRendered.set(true);
+
+        SetupCmd customCmd = new SetupCmd(null, registry, builder, mockRenderer);
+        assertEquals(mockRenderer, customCmd.menuRenderer());
+
+        UUID playerId = UUID.randomUUID();
+        boolean playerResult = customCmd.onCommand(playerId, Map.of(), null);
+        assertTrue(playerResult);
+        assertTrue(playerRendered.get(), "Book menu renderer should be invoked for player caller");
+
+        // 3. Console caller falls back to console status without invoking book menu renderer
+        playerRendered.set(false);
+        boolean consoleResult = customCmd.onCommand(SetupSession.CONSOLE_CALLER_ID, Map.of(), null);
+        assertTrue(consoleResult);
+        assertFalse(playerRendered.get(), "Console caller must not invoke book menu renderer");
     }
 
     @Test

@@ -74,6 +74,20 @@ public final class LandingHeatmap {
         return out;
     }
 
+    /** Chunks of {@code region} with landings, as {@code [cx, cz, count]} rows; weakly consistent. */
+    public static List<int[]> snapshot(String region) {
+        RegionCounts rc = REGIONS.get(region);
+        if (rc == null) return List.of();
+        List<int[]> out = new ArrayList<>(rc.chunks.size());
+        for (Map.Entry<Long, AtomicInteger> e : rc.chunks.entrySet()) {
+            int n = e.getValue().get();
+            if (n <= 0) continue;
+            long k = e.getKey();
+            out.add(new int[]{(int) (k >> 32), (int) k, n});
+        }
+        return out;
+    }
+
     /** Total landings recorded for {@code region}. */
     public static long total(String region) {
         RegionCounts rc = REGIONS.get(region);

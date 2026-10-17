@@ -1,26 +1,20 @@
 package io.github.dailystruggle.metrics.api;
 
 /**
- * Immutable per-region health sample for Folia (and any future multi-region runtime).
+ * Snapshot of one Folia region's health metrics.
  *
- * <p>Carried as an element of {@link MetricsSnapshot#foliaRegions} alongside the
- * aggregated scalar fields. The scalar fields remain authoritative for cross-platform
- * consumers (bStats, /rtp info default view, network telemetry). This carrier exposes
- * the underlying per-region detail for verbose surfaces and operator diagnostics.
+ * <p>Constructed by Folia-specific adapters (such as {@code rtp-folia})
+ * and surfaced across the platform-neutral {@link MetricsBinding} SPI.
+ * On non-Folia platforms, {@link MetricsBinding#foliaRegions()} is empty
+ * and this record is never instantiated.
  *
- * <p>The {@link #regionId} is an opaque, stable-per-server-lifetime identifier
- * (e.g. {@code region-0}, {@code region-1}). Under network mode redaction this id does not
- * leak human-readable region names across the wire.
- *
- * <p>Non-Folia bindings populate {@link MetricsSnapshot#foliaRegions} with an empty list
- * (the default on {@link MetricsBinding#foliaRegions()}); single-region runtimes already
- * publish their TPS / MSPT via the scalar fields.
- *
- * <p>No platform types appear here.
+ * <p>All fields are immutable values captured at sample time. {@link #regionId}
+ * is an opaque, stable string identifying the region thread / chunk group
+ * (e.g. {@code "world:overworld@chunk:12,-4"}).
  */
 public class FoliaRegionSample {
 
-    /** Stable opaque identifier (e.g. {@code "region-0"}). Never null. */
+    /** Opaque, stable identifier for the sampled region. Never {@code null}. */
     public final String regionId;
 
     /** Per-region 1m TPS EMA, or {@link MetricsSnapshot#UNSAMPLED}. */
@@ -35,12 +29,25 @@ public class FoliaRegionSample {
     /** Queue depth attributable to this region, or {@code 0} if unknown. */
     public final int queueDepth;
 
+    /** Valid tick delta samples recorded for this region, or {@code 0} if unknown. */
+    public final long sampleCount;
+
+    /** Age of this region sampler in milliseconds, or {@code 0} if unknown. */
+    public final long ageMillis;
+
     public FoliaRegionSample(String regionId, double tps1m, double mspt, int playerCount, int queueDepth) {
+        this(regionId, tps1m, mspt, playerCount, queueDepth, 0L, 0L);
+    }
+
+    public FoliaRegionSample(String regionId, double tps1m, double mspt, int playerCount, int queueDepth,
+                             long sampleCount, long ageMillis) {
         this.regionId = (regionId == null) ? "region-?" : regionId;
         this.tps1m = tps1m;
         this.mspt = mspt;
         this.playerCount = playerCount;
         this.queueDepth = queueDepth;
+        this.sampleCount = sampleCount;
+        this.ageMillis = ageMillis;
     }
 
     /** {@code mspt / 50.0} when {@link #mspt} is sampled, else {@link Double#NaN}. */
@@ -56,6 +63,8 @@ public class FoliaRegionSample {
                 + ", mspt=" + mspt
                 + ", playerCount=" + playerCount
                 + ", queueDepth=" + queueDepth
+                + ", sampleCount=" + sampleCount
+                + ", ageMillis=" + ageMillis
                 + '}';
     }
 }

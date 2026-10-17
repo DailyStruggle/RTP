@@ -43,7 +43,9 @@ public class FoliaRTPCommandSender implements RTPCommandSender {
   @Override
   @RegionThread
   public void sendMessage(String message) {
-    sender.sendMessage(message);
+    if (sender != null) {
+      SendMessage.sendMessage(sender, message);
+    }
   }
 
   @Override

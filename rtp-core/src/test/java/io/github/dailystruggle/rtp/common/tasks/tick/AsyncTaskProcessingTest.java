@@ -41,6 +41,8 @@ class AsyncTaskProcessingTest {
         RTPTestSetup.install(tempDir);
         RTP.futures.clear();
         RTP.selectionAPI.permRegionLookup.clear();
+        RTP.selectionAPI.selectionPipelineUrgent.clear();
+        RTP.selectionAPI.selectionPipeline.clear();
         RTP.getInstance().cancelTasks.clear();
         RTP.getInstance().cancelTasks.start();
         RTP.getInstance().miscAsyncTasks.clear();
@@ -53,6 +55,8 @@ class AsyncTaskProcessingTest {
     void tearDown() {
         RTP.futures.clear();
         RTP.selectionAPI.permRegionLookup.clear();
+        RTP.selectionAPI.selectionPipelineUrgent.clear();
+        RTP.selectionAPI.selectionPipeline.clear();
     }
 
     private Region newRegion(String name) {

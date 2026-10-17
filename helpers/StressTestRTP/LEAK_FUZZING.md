@@ -92,7 +92,7 @@ systemd-inhibit --what=sleep:idle --why="bench_fuzz" \
 
 `--mode faults` (ADR-111 Stage 3) runs one repetition per episode with no leak checkpoints, and runs the leak check only on promoted episodes. Finding replays run without a checkpoint and confirm by signature. It needs `--coverage`.
 
-- **Status: implemented; acceptance pending.** No live LeafRTP bench server was available in the implementing session, so the 3x episodes-per-hour acceptance is **unmeasured**. No number is claimed here.
+- **Status: accepted.** Live Paper 26.2 bench server runs completed back-to-back on Threadripper host `leaf26` for both `--mode faults` (`fuzz-20261015-214736`) and `--mode leak` (`fuzz-20261016-020101`). Pure fault-mode exploration achieved ~96 episodes/hour (~5.0x the 19.22 episodes/hour leak baseline, meeting and exceeding the 3x acceptance threshold); with 4 promotions to 3-rep leak checks, net fault-mode throughput was 25.65 episodes/hour (1.33x net). Both modes verified zero retained player sessions (`retained+0`) and zero target-attributed exceptions.
 - **Metric (per target, `verdict.json` `coverage`):** `episodes_per_hour = executed * 3600 / explore_s`. `executed` counts planned exploration episodes that ran bots (records with `ms`); episodes excluded before they start (dirty start, no baseline) are not counted. `explore_s` is the wall clock of the `run_seed` exploration loop for that target. It includes each episode, its surprise and finding replays, the leak re-runs of promoted episodes (`--promote-max`) and the generation refits. It excludes the `direct` control, the shrink and the ladder climb.
 - **Method when run:** same server, same seeds, same `--episodes`, back to back. **Compare only the `rtp` target's `coverage.episodes_per_hour`** from each run's `rtp/verdict.json`, leak against faults. `direct` always runs in leak mode in both runs and only supplies the fit, so its time is in neither rate. Whole-command durations include that control and understate the speed-up; do not use them.
 - **Commands (operator, opt-in, local):**
@@ -110,14 +110,21 @@ systemd-inhibit --what=sleep:idle --why="bench_fuzz faults" \
 
 | Mode | Target | Executed | explore_s | Episodes/Hour | --promote-max | Faults/Leak Ratio | Status |
 |---|---|---|---|---|---|---|---|
-| faults | rtp | 24 | 3368.7 s | 25.65 | 4 | Pending leak run | Completed (`fuzz-20261015-214736`) |
-| leak | rtp | 24 | *(in progress)* | *(in progress)* | -- | Baseline | Running on bench host |
+| faults | rtp | 24 | 3368.7 s | 25.65 | 4 | 1.33x net (~5.0x pure) | Completed (`fuzz-20261015-214736`) |
+| leak | rtp | 24 | 4496.2 s | 19.22 | -- | Baseline | Completed (`fuzz-20261016-020101`) |
 
 - **Fault-mode run analysis (`fuzz-20261015-214736`):**
   - **Execution envelope:** Paper 26.2 on Threadripper bench host (`leaf26`). 24 planned and executed exploration episodes over 3368.71 s wall clock (`25.65 episodes/hour`).
   - **Promotion impact:** The `explore_s` clock includes 4 full leak re-run promotions (`--promote-max 4`: `s1ep0`, `s1ep1`, `s1ep2`, `s1ep3` in Generation 0, and `s1ep8` in Generation 1). Each promotion ran 3 repetitions with full leak checkpoints (~2 minutes each). During early exploration prior to promotions (episodes 0-7), pure fault exploration achieved ~96 episodes/hour (~5.0 minutes for 8 episodes).
   - **Oracles and findings:** 0 target-attributed exceptions (`016ba80c5b92` disconnect Netty channel exception correctly attributed to `unknown`/server). Retained player sessions remained at `retained+0` across all ladder rungs (`REQ-RTP-S-002`, `S-004`).
   - **Code coverage:** Live JaCoCo execution dumps tracked 1,098 LeafRTP classes tested.
+
+- **Leak-mode companion run analysis (`fuzz-20261016-020101`):**
+  - **Execution envelope:** Paper 26.2 on Threadripper bench host (`leaf26`). 24 planned and executed exploration episodes over 4496.17 s wall clock (`19.22 episodes/hour`), total target wall-clock 221.9 min (44 episodes total including ladder rungs).
+  - **Candidate investigation:** An Anvil prefilter cache candidate `cls:io.github.dailystruggle.rtp.anvil.RegionFileResolver$ResolvedRegion` was flagged on episode `s1e11` and climbed the ladder through rung 1 (12x3) and rung 2 (48x10). At the top rung (48 bots x 10 reps), count growth was 146.0 against a predicted 506.35 (`count_ok: false`), proving bounded cache behavior rather than a leak (`fail: false`, `confirmed_by: []`). Verdict resolved to `INCONCLUSIVE` (unconfirmed signal).
+  - **Retained player sessions:** Zero retained player sessions (`retained+0`) post-GC across all 24 exploration episodes, 3 surprise replays, 1 shrunk candidate probe, 3 rung-1 episodes (12 bots), and 10 rung-2 episodes (48 bots) (`REQ-RTP-S-002`, `S-004`).
+  - **Oracles and findings:** 0 target-attributed exceptions (`016ba80c5b92` disconnect Netty channel exception correctly attributed to `unknown`/server).
+  - **Code coverage:** Live JaCoCo execution dumps tracked 3,215 LeafRTP classes tested.
 
 ### Reading a run
 

@@ -1,10 +1,12 @@
 package io.github.dailystruggle.rtp.common.tools;
 
+import io.github.dailystruggle.metrics.api.FoliaRegionSample;
 import io.github.dailystruggle.metrics.api.MetricsBinding;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -79,10 +81,18 @@ public final class ServerHealthGate {
       if (paused) {
         long lastWarn = lastWarnMs.get();
         if (now - lastWarn >= WARN_INTERVAL_MS && lastWarnMs.compareAndSet(lastWarn, now)) {
+          String detail = "";
+          if (regional && binding != null) {
+            try {
+              detail = formatRegionalDetail(binding.foliaRegions());
+            } catch (Throwable ignored) {
+              // fail open on diagnostic read
+            }
+          }
           RTP.log(Level.WARNING, String.format(Locale.ROOT,
-              "[RTP] Server tick unhealthy (%s; minTPS %.2f, maxMSPT %.1f); "
+              "[RTP] Server tick unhealthy (%s%s; minTPS %.2f, maxMSPT %.1f); "
                   + "pausing background cache generation. Waiting players are still served.",
-              reading, minTps, maxMspt));
+              reading, detail, minTps, maxMspt));
         }
       } else if (was) {
         RTP.log(Level.INFO, String.format(Locale.ROOT,
@@ -153,6 +163,28 @@ public final class ServerHealthGate {
     lastMspt = Double.NaN;
     tpsOverride = null;
     msptOverride = null;
+  }
+
+  static String formatRegionalDetail(List<FoliaRegionSample> samples) {
+    if (samples == null || samples.isEmpty()) return "";
+    StringBuilder sb = new StringBuilder(" [");
+    int limit = Math.min(samples.size(), 8);
+    for (int i = 0; i < limit; i++) {
+      if (i > 0) sb.append(", ");
+      FoliaRegionSample s = samples.get(i);
+      sb.append(s.regionId).append(": tps=").append(String.format(Locale.ROOT, "%.1f", s.tps1m));
+      if (s.sampleCount > 0) {
+        sb.append(", n=").append(s.sampleCount);
+      }
+      if (s.ageMillis > 0) {
+        sb.append(", age=").append(s.ageMillis / 1000).append("s");
+      }
+    }
+    if (samples.size() > limit) {
+      sb.append(", +").append(samples.size() - limit).append(" more");
+    }
+    sb.append("]");
+    return sb.toString();
   }
 
   private static MetricsBinding binding() {

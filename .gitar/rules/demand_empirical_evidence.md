@@ -12,7 +12,9 @@ Check if the pull request modifies files in any of the following critical subsys
 ---
 
 ## 2. Evidence Verification Gate
-If any critical subsystem file is modified:
+If a critical subsystem file has a behavioral change (comment-, formatting-, and import-only edits do not trigger this gate), and the stated claim is thread safety, leak freedom, or performance:
+- Require only the evidence that matches the touched subsystem: leak fuzzing for `MemoryTracker`/teleport tasks, devstack for `rtp-folia`/scheduler changes, off-tick and bounded-memory tests for `anvil-api` (see `.gitar/review/evidence.md`).
+- Verify tests against the changed lines (would a wrong version fail?), not aggregate coverage.
 - Inspect the pull request description, commit messages, and attached CI artifacts for empirical validation proof:
   1. **Leak Fuzzing Attestation (ADR-111):**
      - Summary of a minimum 24-episode fuzzing run using `scripts/bench_fuzz.py`.
@@ -27,7 +29,7 @@ If any critical subsystem file is modified:
 ## 3. Automated Enforcement Action
 If empirical proof is missing or incomplete:
 - Apply label: `evidence-required`
-- Block pull request approval.
+- Report it as blocker B-EVIDENCE with the missing artifact as the clearing condition (no percentage verdicts).
 - Post the following required evidence checklist as a review comment:
 
 ```markdown
@@ -37,7 +39,7 @@ This pull request touches subsystems governing concurrent execution, regional th
 
 Please run the verification tooling and update the pull request description with the results:
 
-- [ ] **24-Episode Leak Fuzzing:** Execute `python scripts/bench_fuzz.py --episodes 24 --scenario disconnect_mid_teleport` (see `helpers/StressTestRTP/LEAK_FUZZING.md`).
+- [ ] **24-Episode Leak Fuzzing:** Execute `python scripts/bench_fuzz.py --mode leak --episodes 24 --reps 3` (see `helpers/StressTestRTP/LEAK_FUZZING.md`).
 - [ ] **Zero Retained Sessions:** Verify `retained+0` player sessions post-GC across all disconnect episodes.
 - [ ] **Clean Log Oracle:** Verify zero `ServerLogOracle` exceptions or unhandled pipeline errors.
 - [ ] **Devstack Regional Verification:** Execute `.\devstack\run-acceptance.ps1 -Scenario rtptest` and verify all platform backends report passing accessors.

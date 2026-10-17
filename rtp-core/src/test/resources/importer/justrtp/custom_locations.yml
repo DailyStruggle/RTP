@@ -1,0 +1,88 @@
+# ----------------------------------------------------------------
+# JustRTP Custom Locations Configuration
+# ----------------------------------------------------------------
+# Define custom named locations for players to teleport to
+# Usage: /rtp location <location_name>
+# Example: /rtp location europe, /rtp location asia
+# ----------------------------------------------------------------
+# CONFIG VERSION - DO NOT CHANGE THIS
+config-version: 1
+# ----------------------------------------------------------------
+
+# Enable or disable the custom locations feature
+enabled: true
+
+# Custom location definitions
+# Each location must have:
+#   world: The world name
+#   center-x: X coordinate of the center point
+#   center-z: Z coordinate of the center point
+#   min-radius: Minimum distance from center (in blocks)
+#   max-radius: Maximum distance from center (in blocks)
+#   permission: Optional permission node (leave empty for no permission required)
+locations:
+  # Example: Europe region
+  europe:
+    enabled: true
+    world: "world"
+    center-x: 10000
+    center-z: 5000
+    min-radius: 0
+    max-radius: 2500
+    # Players need justrtp.location.europe to use this (leave empty for no permission)
+    permission: ""
+    # Optional: Custom display name for messages
+    display-name: "Europe"
+
+  # Example: Asia region
+  asia:
+    enabled: true
+    world: "world"
+    center-x: -8000
+    center-z: 12000
+    min-radius: 0
+    max-radius: 3000
+    permission: ""
+    display-name: "Asia"
+
+  # Example: America region
+  america:
+    enabled: true
+    world: "world"
+    center-x: 15000
+    center-z: -7000
+    min-radius: 0
+    max-radius: 2800
+    permission: ""
+    display-name: "America"
+
+  # Example: VIP Area (requires permission)
+  vip_area:
+    enabled: true
+    world: "world"
+    center-x: 0
+    center-z: 0
+    min-radius: 100
+    max-radius: 1000
+    permission: "justrtp.location.vip"
+    display-name: "VIP Area"
+
+  # Example: Nether location
+  nether_hub:
+    enabled: true
+    world: "world_nether"
+    center-x: 0
+    center-z: 0
+    min-radius: 50
+    max-radius: 500
+    permission: ""
+    display-name: "Nether Hub"
+
+# Settings for custom locations
+settings:
+  # Respect the main RTP settings (biome blacklist, region protection, etc.)
+  respect-main-settings: true
+  # Use location cache for faster teleports
+  use-cache: true
+  # Number of attempts to find a safe location
+  max-attempts: 25

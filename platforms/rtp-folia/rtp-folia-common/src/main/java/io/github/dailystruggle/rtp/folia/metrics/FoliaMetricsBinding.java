@@ -338,6 +338,9 @@ public final class FoliaMetricsBinding implements MetricsBinding {
         probes.remove(probe.key, probe);
         Object h = probe.handle;
         if (h != null) cancelQuietly(h);
+        samplers.remove(probe.key);
+        regionIds.remove(probe.key);
+        regionQueueDepths.remove(probe.key);
     }
 
     private void cancelQuietly(Object handle) {
@@ -363,12 +366,15 @@ public final class FoliaMetricsBinding implements MetricsBinding {
         return aggregate(SamplerView.MSPT, readAggregation(MetricsKeys.foliaAggregationMspt, AGG_MAX));
     }
 
-    /** Lowest 1m TPS over every sampled region and the global heartbeat. */
+    /** Lowest 1m TPS over every active sampled region and the global heartbeat. */
     @Override
     public double worstTps1m() {
         evictIdle();
         double worst = Double.POSITIVE_INFINITY;
+        long now = nanoClock.getAsLong();
         for (FoliaRegionTpsSampler s : samplers.values()) {
+            long last = s.lastTickWallNanos();
+            if (last != Long.MIN_VALUE && (now - last) > ACTIVE_REGION_WINDOW_NANOS) continue;
             double v = s.tps1m();
             if (isSampled(v) && v < worst) worst = v;
         }
@@ -380,14 +386,17 @@ public final class FoliaMetricsBinding implements MetricsBinding {
     }
 
     /**
-     * Highest tick interval over every sampled region and the global heartbeat, reported only
+     * Highest tick interval over every active sampled region and the global heartbeat, reported only
      * when it proves an overrun (above {@link #OVERRUN_INTERVAL_MS}); otherwise UNSAMPLED.
      */
     @Override
     public double worstMspt() {
         evictIdle();
         double worst = Double.NEGATIVE_INFINITY;
+        long now = nanoClock.getAsLong();
         for (FoliaRegionTpsSampler s : samplers.values()) {
+            long last = s.lastTickWallNanos();
+            if (last != Long.MIN_VALUE && (now - last) > ACTIVE_REGION_WINDOW_NANOS) continue;
             double v = s.mspt();
             if (isSampled(v) && v > worst) worst = v;
         }
@@ -446,6 +455,7 @@ public final class FoliaMetricsBinding implements MetricsBinding {
         evictIdle();
         if (samplers.isEmpty()) return Collections.emptyList();
         List<FoliaRegionSample> out = new ArrayList<>(samplers.size());
+        long now = nanoClock.getAsLong();
         for (Map.Entry<RegionKey, FoliaRegionTpsSampler> e : samplers.entrySet()) {
             String id = regionIds.getOrDefault(e.getKey(), "region-?");
             FoliaRegionTpsSampler s = e.getValue();
@@ -454,12 +464,28 @@ public final class FoliaMetricsBinding implements MetricsBinding {
             // attributed in M2 (no cheap region->player map on Folia); the
             // scalar playerCount() above carries the server-wide value.
             int qd = regionQueueDepths.getOrDefault(e.getKey(), 0);
-            out.add(new FoliaRegionSample(id, s.tps1m(), s.mspt(), 0, qd));
+            out.add(new FoliaRegionSample(id, s.tps1m(), s.mspt(), 0, qd, s.sampleCount(), s.ageMillis(now)));
         }
         return Collections.unmodifiableList(out);
     }
 
     // --------- aggregation ---------
+
+    /**
+     * Active tick window in nanoseconds; regions that have not ticked within
+     * this duration are considered idle or unloaded and excluded from the
+     * server-wide aggregate TPS.
+     */
+    static final long ACTIVE_REGION_WINDOW_NANOS = 2L * 1_000_000_000L;
+
+    /**
+     * Minimum tick samples required before a region's EMA is considered mature for
+     * aggregate TPS, preventing transient startup jitter from distorting the mean.
+     */
+    static final long MIN_SAMPLES = 20L;
+
+    /** Window in ticks for weighting mature regions in the sample-count weighted mean. */
+    private static final long MAX_WEIGHT_TICKS = (long) (60.0 * 20.0); // 1200 ticks
 
     private enum SamplerView { TPS_1M, TPS_5M, TPS_15M, MSPT }
 
@@ -469,29 +495,55 @@ public final class FoliaMetricsBinding implements MetricsBinding {
 
     private double aggregate(SamplerView view, String mode) {
         evictIdle();
+        boolean isMax = AGG_MAX.equalsIgnoreCase(mode);
+        long now = nanoClock.getAsLong();
+
+        boolean hasMature = (globalSampled && globalSampler.sampleCount() >= MIN_SAMPLES);
+        if (!hasMature) {
+            for (FoliaRegionTpsSampler s : samplers.values()) {
+                long last = s.lastTickWallNanos();
+                if (last != Long.MIN_VALUE && (now - last) > ACTIVE_REGION_WINDOW_NANOS) continue;
+                if (s.sampleCount() >= MIN_SAMPLES && isSampled(read(s, view))) {
+                    hasMature = true;
+                    break;
+                }
+            }
+        }
+
         double sum = 0.0;
         double max = Double.NEGATIVE_INFINITY;
+        double totalWeight = 0.0;
         int n = 0;
+
         for (FoliaRegionTpsSampler s : samplers.values()) {
+            if (hasMature && s.sampleCount() < MIN_SAMPLES) continue;
+            long last = s.lastTickWallNanos();
+            if (last != Long.MIN_VALUE && (now - last) > ACTIVE_REGION_WINDOW_NANOS) continue;
             double v = read(s, view);
-            if (Double.isNaN(v) || v == MetricsSnapshot.UNSAMPLED) continue;
-            sum += v;
+            if (!isSampled(v)) continue;
+            double weight = Math.max(1L, Math.min(s.sampleCount(), MAX_WEIGHT_TICKS));
+            sum += v * weight;
+            totalWeight += weight;
             if (v > max) max = v;
             n++;
         }
-        // Fold in the steady global heartbeat sampler so the scalar TPS / MSPT
-        // stays sampled even when no per-region sampler has data (zero RTP
-        // traffic). The global sampler is not surfaced in foliaRegions().
+
         if (globalSampled) {
             double v = read(globalSampler, view);
-            if (!Double.isNaN(v) && v != MetricsSnapshot.UNSAMPLED) {
-                sum += v;
-                if (v > max) max = v;
-                n++;
+            if (isSampled(v)) {
+                if (!hasMature || globalSampler.sampleCount() >= MIN_SAMPLES) {
+                    double weight = Math.max(1L, Math.min(globalSampler.sampleCount(), MAX_WEIGHT_TICKS));
+                    sum += v * weight;
+                    totalWeight += weight;
+                    if (v > max) max = v;
+                    n++;
+                }
             }
         }
+
         if (n == 0) return MetricsSnapshot.UNSAMPLED;
-        return AGG_MAX.equalsIgnoreCase(mode) ? max : (sum / n);
+        if (isMax) return max;
+        return totalWeight > 0.0 ? (sum / totalWeight) : (sum / n);
     }
 
     private static double read(FoliaRegionTpsSampler s, SamplerView view) {
@@ -506,6 +558,13 @@ public final class FoliaMetricsBinding implements MetricsBinding {
 
     private void evictIdle() {
         long now = nanoClock.getAsLong();
+        for (RegionProbe probe : new java.util.ArrayList<>(probes.values())) {
+            long lastTick = probe.lastTickNanos;
+            long silent = now - (lastTick == Long.MIN_VALUE ? probe.startedNanos : lastTick);
+            if (silent > PROBE_IDLE_NANOS || (now - probe.lastObservedNanos > PROBE_IDLE_NANOS)) {
+                stopProbe(probe);
+            }
+        }
         for (Map.Entry<RegionKey, FoliaRegionTpsSampler> e : samplers.entrySet()) {
             long last = e.getValue().lastTickWallNanos();
             if (last == Long.MIN_VALUE) continue;

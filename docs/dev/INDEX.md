@@ -33,6 +33,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Commenting an option in a shipped YAML config | [`CONFIG_COMMENT_STYLE.md`](CONFIG_COMMENT_STYLE.md) |
 | A decision (why something is the way it is) | [`../adr/README.md`](../adr/README.md) |
 | How a developer ought to work in this repo, and why (full lifecycle: intake, planning, read-document-modify, design records, verification, divergence handling, communication, self-maintenance, optional AI tooling) | [`../adr/ADR-000-development-workflow.md`](../adr/ADR-000-development-workflow.md) |
+| Pull Request (PR) lifecycle, pre-PR verification gates & CI pipeline reference | [`PULL_REQUEST_PROCESS.md`](PULL_REQUEST_PROCESS.md) |
 | Multi-server / proxy (Velocity, BungeeCord) plan | [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md) (D-005 gated; admin stub: [`../admin/proxies/INDEX.md`](../admin/proxies/INDEX.md)) |
 | Why network mode (multi-server, multi-proxy) is in scope | [`../adr/ADR-036-network-mode-multi-server-multi-proxy.md`](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) (umbrella; subproject refinements under [`../../platforms/rtp-proxy/docs/adr/`](../../platforms/rtp-proxy/docs/adr/)) |
 | Runtime metrics SPI (TPS / MSPT / heap / pipeline samples) | [`METRICS_PLAN.md`](METRICS_PLAN.md) |
@@ -46,6 +47,9 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Block tags / state predicates in safety lists | [`../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md`](../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md) |
 | Testing guide (what to test when: unit, mutation, devstack) | [`TESTING_GUIDE.md`](TESTING_GUIDE.md) |
 | Coverage targets | [`COVERAGE_PLAN.md`](COVERAGE_PLAN.md) |
+| Verification gates and research references | [`VERIFICATION_GATES.md`](VERIFICATION_GATES.md) |
+| PR audit protocol (blocker classes, large-PR triage, report template) | [`PR_AUDIT_PROTOCOL.md`](PR_AUDIT_PROTOCOL.md) |
+| Contributor review experience (stable blocker ledger, comment form, newcomers) | [`CONTRIBUTOR_REVIEW_EXPERIENCE.md`](CONTRIBUTOR_REVIEW_EXPERIENCE.md) |
 | Enterprise readiness (gates, evidence, compatibility matrix) | [`ENTERPRISE_READINESS.md`](ENTERPRISE_READINESS.md) |
 | Platform support matrix (Spigot/Paper/Folia/Fabric/NeoForge/Velocity) | [`SUPPORT_MATRIX.md`](SUPPORT_MATRIX.md) |
 | Semantic Versioning (SemVer) contract (public vs internal API) | [`SEMVER.md`](SEMVER.md) |
@@ -90,6 +94,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | [`LICENSING.md`](LICENSING.md) | All-MIT licensing (ADR-108), per-module licence matrix, Pro (support tier) vs Lite editions. |
 | [`DEPRECATION_POLICY.md`](DEPRECATION_POLICY.md) | Deprecation lifecycle, notice window, and compiler annotation policy. |
 | [`PUBLISHING.md`](PUBLISHING.md) | Addon artifact publishing guide (JitPack, GitHub Packages, Maven Central). |
+| [`PULL_REQUEST_PROCESS.md`](PULL_REQUEST_PROCESS.md) | Pull request workflow: branching, local pre-PR verification gates, CI pipeline anatomy, and merge criteria. |
 | [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md) | Proxy / multi-server (Velocity, BungeeCord) roadmap; D-005 gated. |
 | [`METRICS_PLAN.md`](METRICS_PLAN.md) | Runtime metrics SPI (TPS/MSPT/heap/queue/pipeline); implementation eligible. |
 | [`ROADMAP.md`](ROADMAP.md) | Forward-looking work. |
@@ -108,4 +113,5 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 |-----|---------|
 | [`../../.junie/AGENTS.md`](../../.junie/AGENTS.md) | Top-level operational guide. Start here. |
 | [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) | Human contributor workflow. |
+| [`PULL_REQUEST_PROCESS.md`](PULL_REQUEST_PROCESS.md) | Pull request lifecycle, verification gates, and merge criteria. |
 | [`../../CHANGELOG.md`](../../CHANGELOG.md) | Release notes. |

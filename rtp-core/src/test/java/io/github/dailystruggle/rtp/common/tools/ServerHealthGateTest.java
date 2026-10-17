@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.tools;
 
+import io.github.dailystruggle.metrics.api.FoliaRegionSample;
 import io.github.dailystruggle.metrics.api.MetricsBinding;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import io.github.dailystruggle.rtp.common.RTP;
@@ -8,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -146,5 +148,18 @@ class ServerHealthGateTest {
         });
         assertFalse(ServerHealthGate.regionUnhealthy(WORLD, 0, 0));
         assertEquals(ServerHealthGate.shouldPause(), ServerHealthGate.regionUnhealthy(WORLD, 0, 0));
+    }
+
+    @Test
+    @DisplayName("formatRegionalDetail formats samples with sample count and age")
+    void formatRegionalDetailFormatsSamples() {
+        assertEquals("", ServerHealthGate.formatRegionalDetail(null));
+        assertEquals("", ServerHealthGate.formatRegionalDetail(List.of()));
+
+        FoliaRegionSample s1 = new FoliaRegionSample("region-0", 18.5, 25.0, 0, 0, 10L, 5000L);
+        FoliaRegionSample s2 = new FoliaRegionSample("region-1", 20.0, 10.0, 0, 0, 1200L, 60000L);
+        String formatted = ServerHealthGate.formatRegionalDetail(List.of(s1, s2));
+        assertTrue(formatted.contains("region-0: tps=18.5, n=10, age=5s"));
+        assertTrue(formatted.contains("region-1: tps=20.0, n=1200, age=60s"));
     }
 }

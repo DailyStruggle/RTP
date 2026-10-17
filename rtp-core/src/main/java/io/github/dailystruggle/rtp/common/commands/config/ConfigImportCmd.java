@@ -18,7 +18,7 @@ import java.util.logging.Level;
 import java.util.regex.Pattern;
 
 /**
- * Subcommand {@code /rtp config import [source] [--overwrite]}.
+ * Subcommand {@code /rtp config import [source] [overwrite=true]}.
  * Implements the foreign config importer seam (ADR-066).
  */
 public class ConfigImportCmd extends BaseRTPCmdImpl {
@@ -139,20 +139,12 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
                     overwrite = true;
                 }
             }
-            // Also check for raw flag style --overwrite
-            if (parameterValues.containsKey("--overwrite") || parameterValues.containsKey("-o")) {
-                overwrite = true;
-            }
 
             if (parameterValues.containsKey(PARAM_PERMISSIONS)) {
                 List<String> permValues = parameterValues.get(PARAM_PERMISSIONS);
                 if (permValues != null && !permValues.isEmpty()) {
                     migratePermissions = Boolean.parseBoolean(permValues.get(0));
                 }
-            } else if (parameterValues.containsKey("--no-permissions")) {
-                migratePermissions = false;
-            } else if (parameterValues.containsKey("--permissions") || parameterValues.containsKey("-p")) {
-                migratePermissions = true;
             }
         }
 
@@ -289,7 +281,7 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
                     sendMessage(callerId, "&c[ERROR] " + err);
                 }
                 if (!finalOverwrite) {
-                    sendMessage(callerId, "&7Tip: pass &foverwrite=true&7 or &f--overwrite&7 to replace existing files.");
+                    sendMessage(callerId, "&7Tip: pass &foverwrite=true&7 to replace existing files.");
                 }
                 return;
             }

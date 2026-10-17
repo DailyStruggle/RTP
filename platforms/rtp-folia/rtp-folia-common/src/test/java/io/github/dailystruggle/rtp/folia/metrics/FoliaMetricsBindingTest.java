@@ -535,4 +535,146 @@ final class FoliaMetricsBindingTest {
         assertEquals(2, b.probeCount());
         assertEquals(2, timers.ticks.size());
     }
+
+    @Test
+    @DisplayName("Transient region with < 20 samples does not distort mature mean TPS")
+    void transient_region_excluded_when_mature_sampler_present() {
+        SteppingClock clk = new SteppingClock(0L, 50_000_000L); // ~20 TPS
+        FoliaMetricsBinding b = new FoliaMetricsBinding(clk::peek, () -> 0, () -> 0);
+
+        // Mature the global heartbeat with 25 ticks (24 valid delta samples >= MIN_SAMPLES)
+        for (int i = 0; i < 25; i++) {
+            clk.advance();
+            b.tickGlobalSamplerForTest();
+        }
+        double baselineTps = b.tps1m();
+        assertTrue(baselineTps > 19.5 && baselineTps <= 20.0, "mature baseline should be ~20 TPS, got " + baselineTps);
+
+        // A newly probed region experiences startup jitter: delta = 70ms (14.3 TPS), only 1 sample
+        RegionKey transientRegion = region(10, 10);
+        clk.advance();
+        b.recordRegionTick(transientRegion); // seed
+        clk.now.addAndGet(70_000_000L);
+        b.recordRegionTick(transientRegion); // 1 sample (< 20)
+
+        // Immature region must be excluded from aggregate mean TPS
+        double tpsWithTransient = b.tps1m();
+        assertEquals(baselineTps, tpsWithTransient, 1e-6, "transient region must not distort mature mean TPS");
+
+        // Now advance and tick the region 25 times at 70ms (now mature >= MIN_SAMPLES)
+        for (int i = 0; i < 25; i++) {
+            clk.now.addAndGet(70_000_000L);
+            b.recordRegionTick(transientRegion);
+        }
+
+        // Now that the region is mature, it is factored into the mean weighted by tick count
+        double tpsWithMatureLag = b.tps1m();
+        assertTrue(tpsWithMatureLag < baselineTps, "mature degraded region should pull down the mean");
+    }
+
+    @Test
+    @DisplayName("foliaRegions exposes sampleCount and ageMillis")
+    void foliaRegions_exposes_sampleCount_and_age() {
+        AtomicLong now = new AtomicLong(1_000_000_000L);
+        FoliaMetricsBinding b = new FoliaMetricsBinding(now::get, () -> 0, () -> 0);
+        RegionKey k = region(1, 1);
+
+        b.recordRegionTick(k); // seed at t=1000ms
+        for (int i = 0; i < 5; i++) {
+            now.addAndGet(50_000_000L);
+            b.recordRegionTick(k);
+        }
+
+        List<FoliaRegionSample> list = b.foliaRegions();
+        assertEquals(1, list.size());
+        FoliaRegionSample sample = list.get(0);
+        assertEquals(5L, sample.sampleCount);
+        assertEquals(250L, sample.ageMillis);
+    }
+
+    @Test
+    @DisplayName("ADR-087: inactive regions (> 2s without a tick) are excluded from aggregate mean TPS")
+    void aggregate_excludes_inactive_regions_past_2s_window() {
+        AtomicLong now = new AtomicLong(1_000_000_000L);
+        FoliaMetricsBinding b = new FoliaMetricsBinding(now::get, () -> 0, () -> 0);
+
+        // Mature global heartbeat at 20 TPS
+        for (int i = 0; i < 25; i++) {
+            now.addAndGet(50_000_000L);
+            b.tickGlobalSamplerForTest();
+        }
+        double baselineTps = b.tps1m();
+        assertTrue(baselineTps > 19.5);
+
+        // A region had load: 25 ticks at 100ms (10 TPS)
+        RegionKey region = region(5, 5);
+        b.recordRegionTick(region);
+        for (int i = 0; i < 25; i++) {
+            now.addAndGet(100_000_000L);
+            b.recordRegionTick(region);
+        }
+
+        // While active, it pulls down the mean
+        double activeMeanTps = b.tps1m();
+        assertTrue(activeMeanTps < baselineTps, "active degraded region pulls down mean");
+
+        // The region unloads and stops ticking; 3 seconds pass (> 2s active window)
+        now.addAndGet(3L * 1_000_000_000L);
+        b.tickGlobalSamplerForTest(); // global keeps ticking
+
+        // Inactive region is now excluded from the aggregate mean
+        double recoveredMeanTps = b.tps1m();
+        assertEquals(baselineTps, recoveredMeanTps, 1e-6,
+                "inactive region must be excluded from aggregate mean TPS");
+    }
+
+    @Test
+    @DisplayName("ADR-087: evictIdle cancels and removes probes on unloaded chunks")
+    void evictIdle_cancels_and_removes_unloaded_probe() {
+        AtomicLong now = new AtomicLong(1_000_000_000L);
+        FakeTimers timers = new FakeTimers();
+        FoliaMetricsBinding b = new FoliaMetricsBinding(now::get, () -> 0, () -> 0, timers);
+        io.github.dailystruggle.rtp.api.world.RTPWorld<?> w = world(UUID.randomUUID());
+
+        b.observeRegion(w, 0, 0);
+        assertEquals(1, b.probeCount());
+        timers.ticks.get(0).run();
+
+        // Region unloads: probe never ticks again; time advances past PROBE_IDLE_NANOS
+        now.addAndGet(FoliaMetricsBinding.PROBE_IDLE_NANOS + 1L);
+
+        // Inspection/aggregation triggers evictIdle()
+        b.tps1m();
+
+        assertEquals(0, b.probeCount(), "unloaded probe must be removed");
+        assertEquals(1, timers.cancelled.size(), "unloaded probe handle must be cancelled");
+        assertEquals(0, b.registrySize(), "unloaded sampler must be cleaned up");
+    }
+
+    @Test
+    @DisplayName("ADR-087: replaced silent probe does not fold reload gap into TPS")
+    void silent_probe_replacement_does_not_blend_gap_into_tps() {
+        AtomicLong now = new AtomicLong(1_000_000_000L);
+        FakeTimers timers = new FakeTimers();
+        FoliaMetricsBinding b = new FoliaMetricsBinding(now::get, () -> 0, () -> 0, timers);
+        io.github.dailystruggle.rtp.api.world.RTPWorld<?> w = world(UUID.randomUUID());
+
+        b.observeRegion(w, 0, 0);
+        timers.ticks.get(0).run();
+        now.addAndGet(50_000_000L);
+        timers.ticks.get(0).run();
+
+        // 30 seconds pass (region unloaded between spiral passes)
+        now.addAndGet(30L * 1_000_000_000L);
+        b.observeRegion(w, 0, 0); // replaces silent probe with fresh probe
+
+        assertEquals(2, timers.ticks.size());
+        Runnable probe2 = timers.ticks.get(1);
+        probe2.run(); // first tick of replacement probe (seeds)
+        now.addAndGet(50_000_000L);
+        probe2.run(); // second tick
+
+        double worstTps = b.worstTps1m();
+        assertTrue(worstTps > 19.9, "reload gap must not depress TPS, got " + worstTps);
+    }
 }

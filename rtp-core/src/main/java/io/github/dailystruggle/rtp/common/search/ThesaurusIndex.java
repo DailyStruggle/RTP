@@ -154,18 +154,16 @@ public final class ThesaurusIndex {
 
             // Direct concept to key match (e.g. candidate="dinero", target="price")
             Set<String> keys = conceptToKeys.get(normCandidate);
-            if (keys != null && keys.contains(normTarget)) {
-                if (!("shape".equals(normCandidate) && "radius".equals(normTarget))) {
-                    return true;
-                }
+            if (keys != null && keys.contains(normTarget)
+                    && !("shape".equals(normCandidate) && "radius".equals(normTarget))) {
+                return true;
             }
 
             // Reverse key to concept match (e.g. candidate="price", target="cost")
             Set<String> concepts = keyToConcepts.get(normCandidate);
-            if (concepts != null && concepts.contains(normTarget)) {
-                if (!("shape".equals(normCandidate) && "radius".equals(normTarget))) {
-                    return true;
-                }
+            if (concepts != null && concepts.contains(normTarget)
+                    && !("shape".equals(normCandidate) && "radius".equals(normTarget))) {
+                return true;
             }
         }
         return false;

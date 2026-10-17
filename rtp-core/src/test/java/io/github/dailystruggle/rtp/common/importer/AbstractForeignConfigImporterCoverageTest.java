@@ -467,8 +467,8 @@ class AbstractForeignConfigImporterCoverageTest {
     @Test
     @DisplayName("emitRegionsAndWorlds naming, vertical bounds, cache cap, and additional worlds")
     void emitRegionsHappyPath(@TempDir Path tmp) throws IOException {
-        Files.createDirectories(tmp.resolve("worlds"));
-        Files.writeString(tmp.resolve("worlds/kept.yml"), "keep: true\n");
+        Files.createDirectories(tmp.resolve("definitions/worlds"));
+        Files.writeString(tmp.resolve("definitions/worlds/kept.yml"), "keep: true\n");
         List<DiscoveredWorldRegion> regions = List.of(
                 new DiscoveredWorldRegion("my-world", "my_world", "CIRCLE", 1, 2, 0, 0, 0, 100, 0.0, 8,
                         null, java.util.Arrays.asList(null, " ", "my_world", "wild*", "q?", "bad/name", "kept", "extra")),
@@ -481,21 +481,21 @@ class AbstractForeignConfigImporterCoverageTest {
         List<String> errors = new ArrayList<>();
         importer.emitRegionsAndWorlds(regions, tmp, false, written, mapped, errors);
 
-        RtpYamlConfig region = RtpYamlConfig.load(tmp.resolve("regions/my_world_region.yml").toFile());
+        RtpYamlConfig region = RtpYamlConfig.load(tmp.resolve("definitions/regions/my_world_region.yml").toFile());
         assertEquals(0, region.getInt("vert.minY"));
         assertEquals(100, region.getInt("vert.maxY"));
         assertEquals(8, region.getInt("cacheCap"));
-        assertEquals(400, RtpYamlConfig.load(tmp.resolve("regions/pre_region.yml").toFile()).getInt("vert.maxY"));
-        assertTrue(Files.exists(tmp.resolve("regions/justrtp_loc_a.yml")));
-        assertTrue(Files.exists(tmp.resolve("regions/x_loc_b.yml")));
-        assertTrue(Files.exists(tmp.resolve("worlds/extra.yml")));
-        assertEquals("keep: true\n", Files.readString(tmp.resolve("worlds/kept.yml")));
+        assertEquals(400, RtpYamlConfig.load(tmp.resolve("definitions/regions/pre_region.yml").toFile()).getInt("vert.maxY"));
+        assertTrue(Files.exists(tmp.resolve("definitions/regions/justrtp_loc_a.yml")));
+        assertTrue(Files.exists(tmp.resolve("definitions/regions/x_loc_b.yml")));
+        assertTrue(Files.exists(tmp.resolve("definitions/worlds/extra.yml")));
+        assertEquals("keep: true\n", Files.readString(tmp.resolve("definitions/worlds/kept.yml")));
         assertTrue(errors.stream().anyMatch(e -> e.contains("unsafe file name: bad/name")), errors.toString());
         assertTrue(errors.stream().anyMatch(e -> e.contains("region=unsafe_region")), errors.toString());
 
         // Re-run without overwrite: existing region file and existing world file are reported.
         errors.clear();
-        Files.delete(tmp.resolve("regions/justrtp_loc_a.yml"));
+        Files.delete(tmp.resolve("definitions/regions/justrtp_loc_a.yml"));
         importer.emitRegionsAndWorlds(regions.subList(0, 3), tmp, false, written, mapped, errors);
         assertTrue(errors.stream().anyMatch(e -> e.startsWith("Region file already exists")), errors.toString());
         assertTrue(errors.stream().anyMatch(e -> e.startsWith("World file already exists")), errors.toString());
@@ -511,9 +511,9 @@ class AbstractForeignConfigImporterCoverageTest {
         assertTrue(errors.get(0).startsWith("Failed to create destination directories"));
 
         Path dest = tmp.resolve("dest");
-        occupyWithDirectory(dest.resolve("regions/r_region.yml"));
-        occupyWithDirectory(dest.resolve("worlds/w.yml"));
-        occupyWithDirectory(dest.resolve("worlds/extra.yml"));
+        occupyWithDirectory(dest.resolve("definitions/regions/r_region.yml"));
+        occupyWithDirectory(dest.resolve("definitions/worlds/w.yml"));
+        occupyWithDirectory(dest.resolve("definitions/worlds/extra.yml"));
         errors.clear();
         DiscoveredWorldRegion r = new DiscoveredWorldRegion("r", "w", "CIRCLE", 1, 2, 0, 0, 64, 320, 0.0, -1,
                 null, List.of("extra"));

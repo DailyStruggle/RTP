@@ -460,7 +460,6 @@ Switching between the free download and this one is a jar swap. Config, data fil
 | `/rtp gui` | Open the menu a GUI addon bound to `/rtp`; without one, a plain teleport | `rtp.gui` |
 | `/rtp admin` | Operator book menu | `rtp.menu.admin` |
 | `/rtp editor [local\|trust\|untrust\|apply]` | Web editor link, offline copy, browser trust and revocation (`untrust key=<prefix\|all>`), token apply | `rtp.editor` |
-| `/rtp docs [topic\|list\|export]` | Read the bundled docs in game; `export` writes an offline HTML bundle | `rtp.admin.docs` |
 | `/rtp clear <cache\|cooldown\|queue\|limit\|invuln>` | Clear location caches, cooldowns, queues, use limits or invulnerability | `rtp.admin` |
 | `/rtp info` | Operator diagnostics | `rtp.info` |
 | `/rtp reload [file]` | Reload all configuration, or one file | `rtp.reload` |
@@ -485,7 +484,6 @@ Switching between the free download and this one is a jar swap. Config, data fil
 | `rtp.back` | `op` | `/rtp back` (not declared in `plugin.yml`; op by server default) |
 | `rtp.editor` | `op` | `/rtp editor` and its subcommands (not declared in `plugin.yml`; op by server default) |
 | `rtp.gui` | `op` | `/rtp gui` (not declared in `plugin.yml`; op by server default) |
-| `rtp.admin.docs` | `op` | `/rtp docs` (not declared in `plugin.yml`; op by server default) |
 | `rtp.servers.*` | `true` | Cross-server destinations in network mode (was `op` before 3.3.0) |
 | `rtp.admin` | `op` | `/rtp clear`, plus `rtp.reload`, `rtp.config`, `rtp.scan`, `rtp.info` and `rtp.menu.admin` |
 | `rtp.admin.setup` | `op` | `/rtp admin setup` wizard |

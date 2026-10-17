@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.mock.MockRTPScheduler;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -18,7 +19,10 @@ import java.io.File;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -146,6 +150,83 @@ class ScanTaskTest {
         task.setCancelled(true);
         assertTrue(task.isCancelled());
         assertNull(RTP.getInstance().scanTasks.get(region.name));
+    }
+
+    @Test
+    void setCancelled_runsTeardownOffCallingThread() throws Exception {
+        MockRTPScheduler scheduler = ((MockRTPScheduler) RTP.scheduler).enableServerThreads();
+        try {
+            RecordingSquare recorder = new RecordingSquare();
+            Region threadedRegion = new Region("scan_region_async", new RegionSettings(
+                    "scan_region_async", world, recorder, region.getVert(),
+                    false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false));
+            ScanTask task = new ScanTask(threadedRegion, 10L);
+            recorder.clearRecords();
+
+            Thread caller = Thread.currentThread();
+            task.setCancelled(true);
+            assertTrue(task.isCancelled(), "Cancel flag must be set synchronously on the caller");
+
+            awaitRecord(recorder);
+            task.teardownFuture().get(5, TimeUnit.SECONDS);
+            assertNotSame(caller, recorder.rebuildThreads.get(0),
+                    "flushAndRebuild must not run on the calling thread");
+            assertEquals(MockRTPScheduler.Lane.ASYNC, recorder.rebuildLanes.get(0),
+                    "flushAndRebuild must run on the RTP.scheduler async lane");
+        } finally {
+            scheduler.shutdown();
+        }
+    }
+
+    @Test
+    void pause_runsTeardownOffCallingThread() throws Exception {
+        MockRTPScheduler scheduler = ((MockRTPScheduler) RTP.scheduler).enableServerThreads();
+        try {
+            RecordingSquare recorder = new RecordingSquare();
+            Region threadedRegion = new Region("scan_region_async", new RegionSettings(
+                    "scan_region_async", world, recorder, region.getVert(),
+                    false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false));
+            ScanTask task = new ScanTask(threadedRegion, 10L);
+            recorder.clearRecords();
+
+            Thread caller = Thread.currentThread();
+            task.pause();
+            assertTrue(task.pause.get(), "Pause flag must be set synchronously on the caller");
+
+            awaitRecord(recorder);
+            task.teardownFuture().get(5, TimeUnit.SECONDS);
+            assertNotSame(caller, recorder.rebuildThreads.get(0),
+                    "flushAndRebuild must not run on the calling thread");
+            assertEquals(MockRTPScheduler.Lane.ASYNC, recorder.rebuildLanes.get(0),
+                    "flushAndRebuild must run on the RTP.scheduler async lane");
+        } finally {
+            scheduler.shutdown();
+        }
+    }
+
+    private static void awaitRecord(RecordingSquare recorder) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (recorder.rebuildThreads.isEmpty() && System.nanoTime() < deadline) {
+            Thread.sleep(5L);
+        }
+        assertFalse(recorder.rebuildThreads.isEmpty(), "flushAndRebuild never ran");
+    }
+
+    private static final class RecordingSquare extends Square {
+        final List<Thread> rebuildThreads = new CopyOnWriteArrayList<>();
+        final List<MockRTPScheduler.Lane> rebuildLanes = new CopyOnWriteArrayList<>();
+
+        @Override
+        public void flushAndRebuild(long spatialResolution) {
+            rebuildThreads.add(Thread.currentThread());
+            rebuildLanes.add(((MockRTPScheduler) RTP.scheduler).currentLane());
+            super.flushAndRebuild(spatialResolution);
+        }
+
+        void clearRecords() {
+            rebuildThreads.clear();
+            rebuildLanes.clear();
+        }
     }
 
     @Test

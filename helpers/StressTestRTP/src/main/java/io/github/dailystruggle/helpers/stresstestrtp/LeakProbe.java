@@ -103,7 +103,7 @@ public final class LeakProbe implements Listener {
     private static final Pattern HISTO_LINE = Pattern.compile("^\\s*\\d+:\\s+(\\d+)\\s+(\\d+)\\s+(\\S+)");
     /** NMT summary category line, e.g. {@code -  Java Heap (reserved=16777216KB, committed=16777216KB)}. */
     private static final Pattern NMT_LINE = Pattern.compile(
-            "^-\\s+([^(]+)\\(reserved=(\\d+)KB,\\s*committed=(\\d+)KB");
+            "^-\\s++(\\S[^(]*?)\\s*+\\(reserved=(\\d++)KB,\\s*+committed=(\\d++)KB");
     private static final Pattern NMT_TOTAL = Pattern.compile(
             "^Total:\\s+reserved=(\\d+)KB,\\s*committed=(\\d+)KB");
     private static final Pattern PROC_STATUS_KB = Pattern.compile("^(\\w+):\\s+(\\d+)\\s+kB");
@@ -111,7 +111,7 @@ public final class LeakProbe implements Listener {
     private static final Pattern LINE_SPLIT = Pattern.compile("\\R");
     private static final Pattern DIGITS = Pattern.compile("\\d+");
     private static final Pattern METRIC_NON_ALPHANUM = Pattern.compile("[^a-z0-9#_-]+");
-    private static final Pattern METRIC_UNDERSCORES = Pattern.compile("^_+|_+$");
+    private static final Pattern METRIC_UNDERSCORES = Pattern.compile("(?:^_+)|(?:_+$)");
     private static final Pattern FILE_SAFE = Pattern.compile("[^A-Za-z0-9._-]");
     private static final DateTimeFormatter STAMP_FORMATTER =
             DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss", Locale.ROOT)
@@ -606,7 +606,7 @@ public final class LeakProbe implements Listener {
                 });
                 return out;
             }
-        } catch (Exception e) {
+        } catch (Exception ignored) {
             return Set.of();
         }
     }

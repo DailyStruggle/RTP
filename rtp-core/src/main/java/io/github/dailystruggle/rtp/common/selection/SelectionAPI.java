@@ -223,7 +223,8 @@ public class SelectionAPI {
   public void compute(long availableNanos) {
     if (selectionPipelineUrgent.isEmpty() && selectionPipeline.isEmpty()) return;
     long deadline = System.nanoTime() + Math.max(0L, availableNanos);
-    int req = RTP.minRTPExecutions;
+    int urgentReq = RTP.minRTPExecutions;
+    int standardReq = RTP.minRTPExecutions;
 
     // Diagram 02: drain the urgent (private/biome) queue first, then the
     // standard pipeline. FINER traces every individual task; FINE summarises
@@ -231,24 +232,24 @@ public class SelectionAPI {
     int urgentRan = 0;
     int standardRan = 0;
 
-    while (req > 0 || System.nanoTime() < deadline) {
+    while (urgentReq > 0 || System.nanoTime() < deadline) {
       Runnable task = selectionPipelineUrgent.poll();
       if (task == null) break;
       RTP.log(java.util.logging.Level.FINER,
           "[SelectionAPI] running urgent pipeline task " + task.getClass().getSimpleName());
       runSelectionTask(task);
       urgentRan++;
-      req--;
+      urgentReq--;
     }
 
-    while (req > 0 || System.nanoTime() < deadline) {
+    while (standardReq > 0 || System.nanoTime() < deadline) {
       Runnable task = selectionPipeline.poll();
       if (task == null) break;
       RTP.log(java.util.logging.Level.FINER,
           "[SelectionAPI] running standard pipeline task " + task.getClass().getSimpleName());
       runSelectionTask(task);
       standardRan++;
-      req--;
+      standardReq--;
     }
 
     if (urgentRan > 0 || standardRan > 0) {

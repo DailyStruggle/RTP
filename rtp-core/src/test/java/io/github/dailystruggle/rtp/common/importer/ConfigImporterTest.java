@@ -97,7 +97,7 @@ public class ConfigImporterTest {
         assertTrue(result.getSourceName().equalsIgnoreCase("EzRTP") || result.getSourceName().equalsIgnoreCase("universal") || result.getSourceName().equalsIgnoreCase("ezrtp"));
 
         // Verify generated region file
-        Path regionFile = rtpDir.resolve("regions").resolve("world_region.yml");
+        Path regionFile = rtpDir.resolve("definitions").resolve("regions").resolve("world_region.yml");
         assertTrue(Files.exists(regionFile), "Region file must exist: " + regionFile);
 
         RtpYamlConfig regionConfig = RtpYamlConfig.load(regionFile.toFile());
@@ -110,7 +110,7 @@ public class ConfigImporterTest {
         assertEquals(25.5, regionConfig.getDouble("price"));
 
         // Verify generated world file
-        Path worldFile = rtpDir.resolve("worlds").resolve("world.yml");
+        Path worldFile = rtpDir.resolve("definitions").resolve("worlds").resolve("world.yml");
         assertTrue(Files.exists(worldFile), "World file must exist: " + worldFile);
         RtpYamlConfig worldConfig = RtpYamlConfig.load(worldFile.toFile());
         assertEquals("world_region", worldConfig.getString("region"));
@@ -171,7 +171,7 @@ public class ConfigImporterTest {
         assertTrue(result.getSourceName().equalsIgnoreCase("justRTP") || result.getSourceName().equalsIgnoreCase("universal") || result.getSourceName().equalsIgnoreCase("justrtp"));
 
         // Check world region (ROUND -> CIRCLE)
-        Path worldRegionFile = rtpDir.resolve("regions").resolve("world_region.yml");
+        Path worldRegionFile = rtpDir.resolve("definitions").resolve("regions").resolve("world_region.yml");
         assertTrue(Files.exists(worldRegionFile));
         RtpYamlConfig worldCfg = RtpYamlConfig.load(worldRegionFile.toFile());
         assertEquals("CIRCLE", worldCfg.getString("shape.name"));
@@ -189,7 +189,7 @@ public class ConfigImporterTest {
         assertTrue(worldShape instanceof Circle);
 
         // Check world_nether region (SQUARE -> SQUARE)
-        Path netherRegionFile = rtpDir.resolve("regions").resolve("world_nether_region.yml");
+        Path netherRegionFile = rtpDir.resolve("definitions").resolve("regions").resolve("world_nether_region.yml");
         assertTrue(Files.exists(netherRegionFile));
         RtpYamlConfig netherCfg = RtpYamlConfig.load(netherRegionFile.toFile());
         assertEquals("SQUARE", netherCfg.getString("shape.name"));
@@ -304,7 +304,7 @@ public class ConfigImporterTest {
         assertTrue(globalConfig.getBoolean("setRespawnOnTeleport"));
 
         // Verify world_nether region
-        Path netherRegFile = rtpDir.resolve("regions").resolve("world_nether_region.yml");
+        Path netherRegFile = rtpDir.resolve("definitions").resolve("regions").resolve("world_nether_region.yml");
         assertTrue(Files.exists(netherRegFile));
         RtpYamlConfig netherCfg = RtpYamlConfig.load(netherRegFile.toFile());
         assertEquals("SQUARE", netherCfg.getString("shape.name"));
@@ -342,8 +342,7 @@ public class ConfigImporterTest {
         boolean res = importCmd.onCommand(caller, params, null);
         assertTrue(res, "Command should succeed on single detected source");
 
-        assertTrue(Files.exists(rtpDir.resolve("regions").resolve("world_region.yml"))
-                || Files.exists(rtpDir.resolve("definitions").resolve("regions").resolve("world_region.yml")));
+        assertTrue(Files.exists(rtpDir.resolve("definitions/regions/world_region.yml")));
 
         // Test bad custom path
         Map<String, List<String>> badPathParams = new HashMap<>();
@@ -402,8 +401,8 @@ public class ConfigImporterTest {
         ImportResult result = importer.importConfiguration(betterDir, rtpDir, true);
         assertTrue(result.isSuccess(), "Import should succeed: " + result.getErrors());
 
-        Path cw1File = rtpDir.resolve("regions").resolve("custom_world_1_region.yml");
-        Path ocwFile = rtpDir.resolve("regions").resolve("other_custom_world_region.yml");
+        Path cw1File = rtpDir.resolve("definitions").resolve("regions").resolve("custom_world_1_region.yml");
+        Path ocwFile = rtpDir.resolve("definitions").resolve("regions").resolve("other_custom_world_region.yml");
         assertTrue(Files.exists(cw1File));
         assertTrue(Files.exists(ocwFile));
 
@@ -480,8 +479,8 @@ public class ConfigImporterTest {
         ImportResult result = importer.importConfiguration(justDir, rtpDir, true);
         assertTrue(result.isSuccess(), "Import should succeed: " + result.getErrors());
 
-        Path europeFile = rtpDir.resolve("regions").resolve("justrtp_loc_europe.yml");
-        Path netherHubFile = rtpDir.resolve("regions").resolve("justrtp_loc_nether_hub.yml");
+        Path europeFile = rtpDir.resolve("definitions").resolve("regions").resolve("justrtp_loc_europe.yml");
+        Path netherHubFile = rtpDir.resolve("definitions").resolve("regions").resolve("justrtp_loc_nether_hub.yml");
         assertTrue(Files.exists(europeFile));
         assertTrue(Files.exists(netherHubFile));
 
@@ -519,10 +518,7 @@ public class ConfigImporterTest {
         boolean res = importCmd.onCommand(caller, params, null);
         assertTrue(res, "Command should succeed with custom path");
 
-        Path regFile = rtpDir.resolve("regions").resolve("world_region.yml");
-        if (!Files.exists(regFile)) {
-            regFile = rtpDir.resolve("definitions").resolve("regions").resolve("world_region.yml");
-        }
+        Path regFile = rtpDir.resolve("definitions/regions/world_region.yml");
         assertTrue(Files.exists(regFile));
         RtpYamlConfig reg = RtpYamlConfig.load(regFile.toFile());
         assertEquals(3000, reg.getInt("shape.radius"));
@@ -547,7 +543,7 @@ public class ConfigImporterTest {
             if (ezImporter.canImport(ezDir)) {
                 ImportResult ezResult = ezImporter.importConfiguration(ezDir, outDir.resolve("ez"), true);
                 assertTrue(ezResult.isSuccess(), "EzRTP import failed: " + ezResult.getErrors());
-                assertTrue(Files.exists(outDir.resolve("ez").resolve("regions").resolve("world_region.yml")));
+                assertTrue(Files.exists(outDir.resolve("ez").resolve("definitions").resolve("regions").resolve("world_region.yml")));
             }
         }
 
@@ -558,7 +554,7 @@ public class ConfigImporterTest {
             if (jImporter.canImport(justDir)) {
                 ImportResult jResult = jImporter.importConfiguration(justDir, outDir.resolve("just"), true);
                 assertTrue(jResult.isSuccess(), "JustRTP import failed: " + jResult.getErrors());
-                assertTrue(Files.exists(outDir.resolve("just").resolve("regions").resolve("justrtp_loc_europe.yml")));
+                assertTrue(Files.exists(outDir.resolve("just").resolve("definitions").resolve("regions").resolve("justrtp_loc_europe.yml")));
             }
         }
     }
@@ -907,7 +903,7 @@ public class ConfigImporterTest {
         assertTrue(result.isSuccess(), "Import should succeed: " + result.getErrors());
 
         // Verify default region file (should be CIRCLE_NORMAL because gaussian enabled)
-        Path defaultRegionFile = rtpDir.resolve("regions").resolve("default_settings_region.yml");
+        Path defaultRegionFile = rtpDir.resolve("definitions").resolve("regions").resolve("default_settings_region.yml");
         assertTrue(Files.exists(defaultRegionFile), "Default region file must exist: " + defaultRegionFile);
         RtpYamlConfig defRegionCfg = RtpYamlConfig.load(defaultRegionFile.toFile());
         assertEquals("world", defRegionCfg.getString("world"));
@@ -921,7 +917,7 @@ public class ConfigImporterTest {
         assertEquals(220, defRegionCfg.getInt("vert.maxY"));
 
         // Verify nether region file (SQUARE)
-        Path netherRegionFile = rtpDir.resolve("regions").resolve("nether_settings_region.yml");
+        Path netherRegionFile = rtpDir.resolve("definitions").resolve("regions").resolve("nether_settings_region.yml");
         assertTrue(Files.exists(netherRegionFile), "Nether region file must exist: " + netherRegionFile);
         RtpYamlConfig netherRegionCfg = RtpYamlConfig.load(netherRegionFile.toFile());
         assertEquals("world_nether", netherRegionCfg.getString("world"));
@@ -932,9 +928,9 @@ public class ConfigImporterTest {
         assertEquals(120, netherRegionCfg.getInt("vert.maxY"));
 
         // Verify world files
-        Path worldFile = rtpDir.resolve("worlds").resolve("world.yml");
+        Path worldFile = rtpDir.resolve("definitions").resolve("worlds").resolve("world.yml");
         assertTrue(Files.exists(worldFile), "World file must exist");
-        Path netherWorldFile = rtpDir.resolve("worlds").resolve("world_nether.yml");
+        Path netherWorldFile = rtpDir.resolve("definitions").resolve("worlds").resolve("world_nether.yml");
         assertTrue(Files.exists(netherWorldFile), "Nether world file must exist");
 
         // Verify global config.yml updates
@@ -990,7 +986,7 @@ public class ConfigImporterTest {
         ImportResult result = importer.importConfiguration(asyncDir, outDir, false);
         assertTrue(result.isSuccess(), "Import should succeed: " + result.getErrors());
 
-        Path regFile = outDir.resolve("regions").resolve("survival_region.yml");
+        Path regFile = outDir.resolve("definitions").resolve("regions").resolve("survival_region.yml");
         assertTrue(Files.exists(regFile));
         RtpYamlConfig regCfg = RtpYamlConfig.load(regFile.toFile());
         assertEquals(7500, regCfg.getInt("shape.radius"));
@@ -1035,7 +1031,7 @@ public class ConfigImporterTest {
         ImportResult result = importer.importConfiguration(advDir, outDir, false);
         assertTrue(result.isSuccess(), "Import should succeed: " + result.getErrors());
 
-        Path regFile = outDir.resolve("regions").resolve("mining_region.yml");
+        Path regFile = outDir.resolve("definitions").resolve("regions").resolve("mining_region.yml");
         assertTrue(Files.exists(regFile));
         RtpYamlConfig regCfg = RtpYamlConfig.load(regFile.toFile());
         assertEquals(4000, regCfg.getInt("shape.radius"));
@@ -1069,7 +1065,7 @@ public class ConfigImporterTest {
         Path out1 = tempDir.resolve("uni_out_better");
         ImportResult res1 = universal.importConfiguration(betterDir, out1, false);
         assertTrue(res1.isSuccess(), "BetterRTP universal import failed: " + res1.getErrors());
-        Path reg1 = out1.resolve("regions").resolve("world_region.yml");
+        Path reg1 = out1.resolve("definitions").resolve("regions").resolve("world_region.yml");
         assertTrue(Files.exists(reg1));
         RtpYamlConfig cfg1 = RtpYamlConfig.load(reg1.toFile());
         assertEquals(8000, cfg1.getInt("shape.radius"));
@@ -1096,7 +1092,7 @@ public class ConfigImporterTest {
         Path out2 = tempDir.resolve("uni_out_ez");
         ImportResult res2 = universal.importConfiguration(ezDir, out2, false);
         assertTrue(res2.isSuccess(), "EzRTP universal import failed: " + res2.getErrors());
-        Path reg2 = out2.resolve("regions").resolve("world_region.yml");
+        Path reg2 = out2.resolve("definitions").resolve("regions").resolve("world_region.yml");
         assertTrue(Files.exists(reg2));
         RtpYamlConfig cfg2 = RtpYamlConfig.load(reg2.toFile());
         assertEquals(3600, cfg2.getInt("shape.radius"));
@@ -1119,7 +1115,7 @@ public class ConfigImporterTest {
         Path out3 = tempDir.resolve("uni_out_just");
         ImportResult res3 = universal.importConfiguration(justDir, out3, false);
         assertTrue(res3.isSuccess(), "JustRTP universal import failed: " + res3.getErrors());
-        Path reg3 = out3.resolve("regions").resolve("world_region.yml");
+        Path reg3 = out3.resolve("definitions").resolve("regions").resolve("world_region.yml");
         assertTrue(Files.exists(reg3));
         RtpYamlConfig cfg3 = RtpYamlConfig.load(reg3.toFile());
         assertEquals(4200, cfg3.getInt("shape.radius"));
@@ -1144,7 +1140,7 @@ public class ConfigImporterTest {
         Path out4 = tempDir.resolve("uni_out_jakes");
         ImportResult res4 = universal.importConfiguration(jakesDir, out4, false);
         assertTrue(res4.isSuccess(), "JakesRTP universal import failed: " + res4.getErrors());
-        Path reg4 = out4.resolve("regions").resolve("survival_region.yml");
+        Path reg4 = out4.resolve("definitions").resolve("regions").resolve("survival_region.yml");
         assertTrue(Files.exists(reg4));
         RtpYamlConfig cfg4 = RtpYamlConfig.load(reg4.toFile());
         assertEquals(5500, cfg4.getInt("shape.radius"));
@@ -1164,7 +1160,7 @@ public class ConfigImporterTest {
         Path out5 = tempDir.resolve("uni_out_async");
         ImportResult res5 = universal.importConfiguration(asyncDir, out5, false);
         assertTrue(res5.isSuccess(), "AsyncRTP universal import failed: " + res5.getErrors());
-        Path reg5 = out5.resolve("regions").resolve("nether_region.yml");
+        Path reg5 = out5.resolve("definitions").resolve("regions").resolve("nether_region.yml");
         assertTrue(Files.exists(reg5));
         RtpYamlConfig cfg5 = RtpYamlConfig.load(reg5.toFile());
         assertEquals(3000, cfg5.getInt("shape.radius"));
@@ -1184,7 +1180,7 @@ public class ConfigImporterTest {
         Path out6 = tempDir.resolve("uni_out_adv");
         ImportResult res6 = universal.importConfiguration(advDir, out6, false);
         assertTrue(res6.isSuccess(), "AdvancedRTP universal import failed: " + res6.getErrors());
-        Path reg6 = out6.resolve("regions").resolve("end_world_region.yml");
+        Path reg6 = out6.resolve("definitions").resolve("regions").resolve("end_world_region.yml");
         assertTrue(Files.exists(reg6));
         RtpYamlConfig cfg6 = RtpYamlConfig.load(reg6.toFile());
         assertEquals(6500, cfg6.getInt("shape.radius"));
@@ -1251,9 +1247,9 @@ public class ConfigImporterTest {
         assertTrue(result.isSuccess(), "Import must succeed: " + result.getErrors());
 
         // Verify custom worlds were mapped
-        Path cw1File = outDir.resolve("regions").resolve("custom_world_1_region.yml");
-        Path ocwFile = outDir.resolve("regions").resolve("other_custom_world_region.yml");
-        Path prisonFile = outDir.resolve("regions").resolve("prison_region.yml");
+        Path cw1File = outDir.resolve("definitions").resolve("regions").resolve("custom_world_1_region.yml");
+        Path ocwFile = outDir.resolve("definitions").resolve("regions").resolve("other_custom_world_region.yml");
+        Path prisonFile = outDir.resolve("definitions").resolve("regions").resolve("prison_region.yml");
 
         assertTrue(Files.exists(cw1File), "custom_world_1_region.yml must be created");
         assertTrue(Files.exists(ocwFile), "other_custom_world_region.yml must be created");
@@ -1299,7 +1295,7 @@ public class ConfigImporterTest {
         assertEquals("AdvancedRTP", result.getSourceName());
 
         // Verify default world region was created with AdvancedRTP params
-        Path regFile = outDir.resolve("regions").resolve("world_region.yml");
+        Path regFile = outDir.resolve("definitions").resolve("regions").resolve("world_region.yml");
         assertTrue(Files.exists(regFile), "world_region.yml must exist");
         RtpYamlConfig regCfg = RtpYamlConfig.load(regFile.toFile());
         assertEquals("world", regCfg.getString("world"));
@@ -1309,9 +1305,9 @@ public class ConfigImporterTest {
         assertEquals(94, regCfg.getInt("vert.maxY"));
 
         // Verify blacklisted worlds were skipped
-        assertFalse(Files.exists(outDir.resolve("regions").resolve("events_region.yml")));
-        assertFalse(Files.exists(outDir.resolve("regions").resolve("admin_world_region.yml")));
-        assertFalse(Files.exists(outDir.resolve("regions").resolve("dungeon_region.yml")));
+        assertFalse(Files.exists(outDir.resolve("definitions").resolve("regions").resolve("events_region.yml")));
+        assertFalse(Files.exists(outDir.resolve("definitions").resolve("regions").resolve("admin_world_region.yml")));
+        assertFalse(Files.exists(outDir.resolve("definitions").resolve("regions").resolve("dungeon_region.yml")));
 
         // Verify global config extracted cooldown and delay
         Path destConfig = outDir.resolve("config.yml");
@@ -1337,9 +1333,9 @@ public class ConfigImporterTest {
         assertEquals("AsyRTP", result.getSourceName());
 
         // Verify gui.worlds sections were extracted
-        Path worldReg = outDir.resolve("regions").resolve("world_region.yml");
-        Path netherReg = outDir.resolve("regions").resolve("nether_region.yml");
-        Path endReg = outDir.resolve("regions").resolve("end_region.yml");
+        Path worldReg = outDir.resolve("definitions").resolve("regions").resolve("world_region.yml");
+        Path netherReg = outDir.resolve("definitions").resolve("regions").resolve("nether_region.yml");
+        Path endReg = outDir.resolve("definitions").resolve("regions").resolve("end_region.yml");
 
         assertTrue(Files.exists(worldReg), "world_region.yml must exist");
         assertTrue(Files.exists(netherReg), "nether_region.yml must exist");
@@ -1439,8 +1435,8 @@ public class ConfigImporterTest {
         Path customOut = tempDir.resolve("custom_out");
         ImportResult customRes = importer.importConfiguration(customRtpDir, customOut, false);
         assertTrue(customRes.isSuccess(), "Import should succeed: " + customRes.getErrors());
-        assertTrue(Files.exists(customOut.resolve("regions").resolve("world_region.yml")));
-        assertFalse(Files.exists(customOut.resolve("regions").resolve("dungeon_region.yml")));
+        assertTrue(Files.exists(customOut.resolve("definitions").resolve("regions").resolve("world_region.yml")));
+        assertFalse(Files.exists(customOut.resolve("definitions").resolve("regions").resolve("dungeon_region.yml")));
         RtpYamlConfig customCfg = RtpYamlConfig.load(customOut.resolve("config.yml").toFile());
         assertEquals(30L, customCfg.getLong("teleportCooldown"));
         assertEquals(4L, customCfg.getLong("teleportDelay"));

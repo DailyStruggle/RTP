@@ -7,8 +7,12 @@ import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
 
 import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Matcher;
@@ -43,6 +47,22 @@ public final class MarkdownToMenuModel {
      * @return structured {@link MenuModel}
      */
     public static MenuModel lower(String title, String markdownSource, DocsLoweringOptions options) {
+        return lower(title, markdownSource, options, null);
+    }
+
+    /**
+     * Lowers a Markdown source string into a {@link MenuModel}, resolving relative {@code .md}
+     * links against the directory of {@code docRelpath}.
+     *
+     * @param title          document title
+     * @param markdownSource raw Markdown text
+     * @param options        lowering options (wrapping, caps)
+     * @param docRelpath     registry key of this document (e.g. {@code admin/QUICK_START.md}),
+     *                       or {@code null} to resolve links against the docs root
+     * @return structured {@link MenuModel}
+     */
+    public static MenuModel lower(String title, String markdownSource, DocsLoweringOptions options,
+                                  String docRelpath) {
         Objects.requireNonNull(title, "title");
         Objects.requireNonNull(options, "options");
         if (markdownSource == null || markdownSource.isBlank()) {
@@ -113,7 +133,7 @@ public final class MarkdownToMenuModel {
             // Bullet list item
             if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
                 String itemText = trimmed.substring(2).trim();
-                List<MenuFragment> frags = parseInlineFragments("&0\u2022 ", itemText);
+                List<MenuFragment> frags = parseInlineFragments("&0\u2022 ", itemText, docRelpath);
                 currentLines.add(new MenuLine(frags));
                 continue;
             }
@@ -123,7 +143,7 @@ public final class MarkdownToMenuModel {
                 int dotIdx = trimmed.indexOf('.');
                 String num = trimmed.substring(0, dotIdx + 1);
                 String rest = trimmed.substring(dotIdx + 1).trim();
-                List<MenuFragment> frags = parseInlineFragments("&0" + num + " ", rest);
+                List<MenuFragment> frags = parseInlineFragments("&0" + num + " ", rest, docRelpath);
                 currentLines.add(new MenuLine(frags));
                 continue;
             }
@@ -139,12 +159,12 @@ public final class MarkdownToMenuModel {
             // Regular paragraph line (soft-wrapped if necessary)
             // If the line contains links, do not soft-wrap across link syntax boundaries
             if (trimmed.contains("[") && trimmed.contains("](")) {
-                List<MenuFragment> frags = parseInlineFragments("", trimmed);
+                List<MenuFragment> frags = parseInlineFragments("", trimmed, docRelpath);
                 currentLines.add(new MenuLine(frags));
             } else {
                 List<String> wrapped = softWrap(trimmed, options.maxLineWidth());
                 for (String w : wrapped) {
-                    List<MenuFragment> frags = parseInlineFragments("", w);
+                    List<MenuFragment> frags = parseInlineFragments("", w, docRelpath);
                     currentLines.add(new MenuLine(frags));
                 }
             }
@@ -164,7 +184,7 @@ public final class MarkdownToMenuModel {
     /**
      * Parses inline links, bold, and codes into {@link MenuFragment} items.
      */
-    private static List<MenuFragment> parseInlineFragments(String prefix, String text) {
+    private static List<MenuFragment> parseInlineFragments(String prefix, String text, String docRelpath) {
         List<MenuFragment> frags = new ArrayList<>();
         if (prefix != null && !prefix.isEmpty()) {
             frags.add(new MenuFragment(prefix, null, null));
@@ -189,8 +209,8 @@ public final class MarkdownToMenuModel {
                     action = null;
                 }
             } else if (url.endsWith(".md") || url.contains(".md#")) {
-                String cleanPath = URL_ANCHOR.matcher(url).replaceAll("");
-                action = new MenuAction.RunRtpCommand(new String[]{"docs", cleanPath});
+                String target = resolveDocLink(docRelpath, url);
+                action = target == null ? null : docsCommand(target);
             } else {
                 action = null;
             }
@@ -204,6 +224,53 @@ public final class MarkdownToMenuModel {
         }
 
         return frags.isEmpty() ? List.of(new MenuFragment(text, null, null)) : frags;
+    }
+
+    private static final String PARAM_TOPIC = "topic";
+
+    /**
+     * Click action opening {@code relpath}. The topic is passed as {@code topic=<relpath>}: the
+     * commands-api tree reads a bare token as a sub-command name ("invalid command").
+     */
+    static MenuAction.RunRtpCommand docsCommand(String relpath) {
+        return new MenuAction.RunRtpCommand(new String[]{"docs", PARAM_TOPIC + "=" + relpath});
+    }
+
+    /**
+     * Resolves a Markdown link target to a registry key: drops the {@code #anchor}, percent-decodes,
+     * and applies {@code .}/{@code ..} against the linking document's directory (a leading
+     * {@code /} means the docs root).
+     *
+     * @return normalized relpath, or {@code null} if the target is empty or climbs above the docs root
+     */
+    static String resolveDocLink(String docRelpath, String url) {
+        String path = URL_ANCHOR.matcher(url).replaceAll("");
+        try {
+            path = URLDecoder.decode(path.replace("+", "%2B"), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException ignored) {
+            // malformed %-escape: keep the literal target
+        }
+        path = path.replace('\\', '/');
+        Deque<String> segments = new ArrayDeque<>();
+        if (!path.startsWith("/") && docRelpath != null) {
+            String base = docRelpath.replace('\\', '/');
+            int slash = base.lastIndexOf('/');
+            if (slash > 0) {
+                for (String seg : base.substring(0, slash).split("/")) {
+                    if (!seg.isEmpty()) segments.addLast(seg);
+                }
+            }
+        }
+        for (String seg : path.split("/")) {
+            if (seg.isEmpty() || ".".equals(seg)) continue;
+            if ("..".equals(seg)) {
+                if (segments.isEmpty()) return null;
+                segments.removeLast();
+            } else {
+                segments.addLast(seg);
+            }
+        }
+        return segments.isEmpty() ? null : String.join("/", segments);
     }
 
     private static List<MenuFragment> formatBasicText(String text) {
