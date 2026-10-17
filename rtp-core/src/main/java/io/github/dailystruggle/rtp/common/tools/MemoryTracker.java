@@ -29,6 +29,10 @@ public class MemoryTracker {
   static {
     // Inject the core untrack logic into the API
     RTPRunnable.untrackHook = MemoryTracker::untrack;
+    io.github.dailystruggle.rtp.common.metrics.CoreMetrics.setMemoryTrackerSuppliers(
+        MemoryTracker::trackedCount,
+        MemoryTracker::trackedCountByLabel
+    );
   }
 
   private MemoryTracker() {

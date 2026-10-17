@@ -10,8 +10,8 @@ import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.CircleOptimizedDualLayer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
+import io.github.dailystruggle.rtp.common.tools.ChartOutputHelper;
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,7 +38,7 @@ public class CompositeRegionModelBuilderTest {
 
   @Test
   @DisplayName("ADR-089: CompositeRegionModelBuilder builds and exports composite map from MemoryShape")
-  public void testCompositeRegionModelBuilding() throws IOException {
+  public void testCompositeRegionModelBuilding() throws Exception {
     CircleOptimizedDualLayer shape = new CircleOptimizedDualLayer("COMPOSITE_TEST_SHAPE", 32);
     shape.set(GenericMemoryShapeParams.radius, 128L);
     shape.set(GenericMemoryShapeParams.centerRadius, 16L);
@@ -80,17 +80,10 @@ public class CompositeRegionModelBuilderTest {
     CompositeRegionRenderer.INSTANCE.render(canvas, model);
     canvas.commit();
 
-    File outDir = new File("build/reports/visualizations");
-    outDir.mkdirs();
-    File outFile = new File(outDir, "composite_builder_test_output.png");
-    canvas.writeToFile(outFile, "png");
-
-    // Also copy to project root and testServer debug directory for easy viewing
-    canvas.writeToFile(new File("example_composite_overlay_512.png"), "png");
-    File testServerDebug = new File("C:\\GameServers\\Minecraft\\testServer\\RTP-Folia\\26.1\\plugins\\RTP\\database\\regionData\\debug");
-    if (testServerDebug.exists()) {
-      canvas.writeToFile(new File(testServerDebug, "example_composite_overlay_512.png"), "png");
-    }
+    // Report-only: not referenced by docs; skip-if-unchanged keeps reruns diff-free.
+    ChartOutputHelper.writeReportOnly(canvas.getImage(), "visualizations", "composite_builder_test_output.png");
+    ChartOutputHelper.writeReportOnly(canvas.getImage(), "visualizations", "example_composite_overlay_512.png");
+    File outFile = ChartOutputHelper.getReportFile("visualizations", "composite_builder_test_output.png");
 
     assertTrue(outFile.exists() && outFile.length() > 500, "Rendered output file must exist on disk");
     System.out.println("[DEBUG_LOG] Successfully rendered composite region model to " + outFile.getAbsolutePath());
@@ -98,7 +91,7 @@ public class CompositeRegionModelBuilderTest {
 
   @Test
   @DisplayName("ADR-089: Generate high-resolution rich terrain composite map with real-world scale and queue bars")
-  public void testGenerateRichWorldCompositeMap() throws IOException {
+  public void testGenerateRichWorldCompositeMap() throws Exception {
     int w = 256;
     int h = 256;
     int[] biomes = new int[w * h];
@@ -206,20 +199,13 @@ public class CompositeRegionModelBuilderTest {
     // Render 1: Vanilla Map scale (128x128)
     ImageMapCanvas mapCanvas = new ImageMapCanvas(128, 128);
     CompositeRegionRenderer.INSTANCE.render(mapCanvas, model);
-    mapCanvas.writeToFile(new File("example_composite_map_128.png"), "png");
+    ChartOutputHelper.writeReportOnly(mapCanvas.getImage(), "visualizations", "example_composite_map_128.png");
 
     // Render 2: High-Resolution 1024x1024 Export
     ImageMapCanvas exportCanvas = new ImageMapCanvas(1024, 1024);
     CompositeRegionRenderer.INSTANCE.render(exportCanvas, model);
-    File exportFile = new File("example_composite_overlay_1024.png");
-    exportCanvas.writeToFile(exportFile, "png");
-
-    // Also copy to test server debug and docs/assets/img
-    File testServerDebug = new File("C:\\GameServers\\Minecraft\\testServer\\RTP-Folia\\26.1\\plugins\\RTP\\database\\regionData\\debug");
-    if (testServerDebug.exists()) {
-      exportCanvas.writeToFile(new File(testServerDebug, "example_composite_overlay_1024.png"), "png");
-    }
-    exportCanvas.writeToFile(new File("docs/assets/img/example_composite_overlay_1024.png"), "png");
+    ChartOutputHelper.writeReportOnly(exportCanvas.getImage(), "visualizations", "example_composite_overlay_1024.png");
+    File exportFile = ChartOutputHelper.getReportFile("visualizations", "example_composite_overlay_1024.png");
 
     assertTrue(exportFile.exists() && exportFile.length() > 1000);
     System.out.println("[DEBUG_LOG] Successfully rendered high-res ADR-089 example image to " + exportFile.getAbsolutePath());

@@ -145,7 +145,7 @@ When `barrierOnUnavailable: true` (default), destinations on cooldown, in PvP co
   and the common addon on `ServerStartedEvent`.
 - `NeoForgeMenuRenderer` / `DestinationPickerMenu` - the NeoForge counterparts of the Fabric pair.
 
-## Planned: "Virtual Rift" warmup effect (ROADMAP Tier 2)
+## Planned: "Virtual Rift" warmup effect
 
 A separate companion addon, `addons/rtp-effects-rift`, is planned as a **demo of the
 RTP/EffectsAPI extension surface**: a registrable warmup effect that, during the teleport

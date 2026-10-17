@@ -209,7 +209,7 @@ final class PregenTask implements Runnable {
         }
         String token = name.substring(0, cut);
         if (token.equals("success")) {
-            io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL.recordSuccess();
+            RtpOutcomeStats.GLOBAL.recordSuccess();
             return;
         }
         // Run-control breadcrumbs, not verdicts: the candidate was neither accepted nor rejected.
@@ -220,7 +220,7 @@ final class PregenTask implements Runnable {
         } catch (IllegalArgumentException ex) {
             cause = LocationGenerator.FailTypes.misc;
         }
-        io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL.recordFailure(cause);
+        RtpOutcomeStats.GLOBAL.recordFailure(cause);
     }
 
     /**

@@ -1,6 +1,4 @@
-package io.github.dailystruggle.rtp.common.selection.region.selectors.memory;
-
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
+package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;

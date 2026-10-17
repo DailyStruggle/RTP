@@ -562,20 +562,20 @@ public class PlaceholderProvider {
         placeholders.put(
                 "genSuccessRate",
                 uuid -> {
-                    double r = io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL.successRate();
+                    double r = io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL.successRate();
                     return Double.isNaN(r) ? "n/a" : String.format("%.1f%%", r * 100.0);
                 });
         placeholders.put(
                 "genFailureRate",
                 uuid -> {
-                    double r = io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL.successRate();
+                    double r = io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL.successRate();
                     return Double.isNaN(r) ? "n/a" : String.format("%.1f%%", (1.0 - r) * 100.0);
                 });
         placeholders.put(
                 "genOutcomeTotal",
                 uuid -> {
-                    io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats stats =
-                            io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL;
+                    io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats stats =
+                            io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL;
                     return String.valueOf(stats.successCount() + stats.totalFailures());
                 });
         placeholders.put(
@@ -583,7 +583,7 @@ public class PlaceholderProvider {
                 uuid -> {
                     Map<io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes, Long>
                             breakdown =
-                            io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL.failureBreakdown();
+                            io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL.failureBreakdown();
                     // Comma-separated "cause=N" list, omitting zero buckets, busiest first.
                     String out = breakdown.entrySet().stream()
                             .filter(e -> e.getValue() > 0L)
@@ -597,7 +597,7 @@ public class PlaceholderProvider {
                 uuid -> {
                     Map<io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes, Long>
                             breakdown =
-                            io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL.failureBreakdown();
+                            io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL.failureBreakdown();
                     return breakdown.entrySet().stream()
                             .filter(e -> e.getValue() > 0L)
                             .max(java.util.Map.Entry.comparingByValue())
@@ -609,7 +609,7 @@ public class PlaceholderProvider {
                 uuid -> {
                     Map<io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes, Long>
                             breakdown =
-                            io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL.failureBreakdown();
+                            io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL.failureBreakdown();
                     long total = 0L;
                     long top = 0L;
                     for (long v : breakdown.values()) {

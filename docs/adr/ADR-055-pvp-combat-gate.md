@@ -7,7 +7,7 @@
 
 `/rtp` can be abused to escape mid-fight: a losing player teleports away the instant combat turns against them. Competing plugins address this; EzRTP 3.3.0 shipped "PvP-Tag Integration" as a soft-depend on external combat-tag plugins (PvPManager, SimpleCombatLog) with two knobs (`cancel-countdown-on-pvp-tag`, `cancel-queued-on-pvp-tag`) and locale messages. It performs no native damage tracking, so it does nothing without a third-party combat-tag plugin installed.
 
-RTP's [ROADMAP](../dev/ROADMAP.md) Tier 2 already scoped an "Optional PvP / combat-tag check": off by default, native damage tracking plus an external soft-depend path, gated at the `/rtp` pre-dispatch surface with an S-004 audit on refusal. This ADR records the design before implementation (Rule D-005), delivered incrementally - this increment is the platform-agnostic foundation (rtp-api SPI + rtp-core native fallback + gate evaluator + config); platform damage listeners, command/execution wiring, and the PvPManager/SimpleCombatLog adapters follow.
+RTP's roadmap (now tracked in the Linear `LeafRTP` team; see [`ROADMAP.md`](../dev/ROADMAP.md)) already scoped an "Optional PvP / combat-tag check": off by default, native damage tracking plus an external soft-depend path, gated at the `/rtp` pre-dispatch surface with an S-004 audit on refusal. This ADR records the design before implementation (Rule D-005), delivered incrementally - this increment is the platform-agnostic foundation (rtp-api SPI + rtp-core native fallback + gate evaluator + config); platform damage listeners, command/execution wiring, and the PvPManager/SimpleCombatLog adapters follow.
 
 ## Decision
 
@@ -45,7 +45,7 @@ The gate is no longer inert. Wiring landed across all in-scope platforms:
 
 ## References
 
-- [ROADMAP Tier 2 - Optional PvP / combat-tag check](../dev/ROADMAP.md)
+- Roadmap entry "Optional PvP / combat-tag check": delivered; history in [`CHANGELOG.md`](../../CHANGELOG.md). Open work is tracked in the Linear `LeafRTP` team ([`ROADMAP.md`](../dev/ROADMAP.md) pointer).
 - [ADR-026 - external hook API surface](ADR-026-external-hook-api-surface.md), [EXTERNAL_HOOKS.md](../dev/EXTERNAL_HOOKS.md)
 - `AnvilPrefilterRegistry` (the replaceable-provider precedent), REQ-RTP-S-004, REQ-RTP-F-013
 - Code: `rtp-api/.../hooks/PvPCombatStateRegistry.java`, `PvPCombatAction.java`; `rtp-core/.../common/pvp/{NativePvPCombatTracker,PvPGate}.java`

@@ -151,43 +151,58 @@ public final class ActionManager implements ActionService {
   }
 
   /**
+   * Listener interface for external command registrars (e.g. {@code ActionSubCmd}).
+   */
+  @FunctionalInterface
+  public interface ActionCommandRegistrar {
+    void onActionRegistered(ActionDefinition definition);
+    default void onSync() {}
+  }
+
+  private static volatile ActionCommandRegistrar commandRegistrar;
+  private static volatile java.util.function.Consumer<io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec> triggerRegistrar;
+
+  private static void ensureCommandRegistrar() {
+    if (commandRegistrar == null) {
+      try {
+        Class.forName("io.github.dailystruggle.rtp.common.commands.action.ActionSubCmd");
+      } catch (Throwable ignored) {}
+    }
+  }
+
+  /**
+   * Installs the external action command registrar.
+   */
+  public static void setCommandRegistrar(ActionCommandRegistrar registrar) {
+    commandRegistrar = registrar;
+  }
+
+  /**
+   * Installs the trigger registrar callback.
+   */
+  public static void setTriggerRegistrar(java.util.function.Consumer<io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec> registrar) {
+    triggerRegistrar = registrar;
+  }
+
+  /**
    * Registers or updates an action definition in the registry, and registers its command if configured.
    */
   public void registerAction(ActionDefinition definition) {
     if (definition != null) {
       definitions.put(definition.id().toLowerCase(), definition);
-      registerActionCommand(definition);
-      syncActionSubCmd();
-    }
-  }
-
-  private void registerActionCommand(ActionDefinition definition) {
-    if (definition.command().isConfigured() && RTP.serverAccessor != null) {
-      try {
-        io.github.dailystruggle.rtp.common.commands.action.ActionCommand actionCmd =
-            new io.github.dailystruggle.rtp.common.commands.action.ActionCommand(definition);
-        List<String> names = new ArrayList<>();
-        names.add(definition.command().name());
-        names.addAll(definition.command().aliases());
-        RTP.serverAccessor.registerCommands(actionCmd, names.toArray(new String[0]));
-      } catch (Exception e) {
-        RTP.log(Level.WARNING, "[RTP Action] Failed registering command for action " + definition.id() + ": " + e.getMessage());
+      if (triggerRegistrar != null && definition.triggers() != null) {
+        for (io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec trigger : definition.triggers()) {
+          try {
+            triggerRegistrar.accept(trigger);
+            RTP.log(Level.FINE, "[RTP Action] Registered physical trigger: " + trigger.id() + " -> " + definition.id());
+          } catch (Exception e) {
+            RTP.log(Level.WARNING, "[RTP Action] Failed registering trigger " + trigger.id() + ": " + e.getMessage());
+          }
+        }
       }
-    }
-  }
-
-  private void syncActionSubCmd() {
-    if (RTP.baseCommand != null) {
-      io.github.dailystruggle.commandsapi.common.CommandsAPICommand actionSub =
-          RTP.baseCommand.getCommandLookup().get("ACTION");
-      if (actionSub == null) {
-        actionSub = new io.github.dailystruggle.rtp.common.commands.action.ActionSubCmd(RTP.baseCommand);
-        RTP.baseCommand.addSubCommand(actionSub);
-        RTP.baseCommand.getCommandLookup().put("RUN", actionSub);
-        RTP.baseCommand.getCommandLookup().put("TRIGGER", actionSub);
-      }
-      if (actionSub instanceof io.github.dailystruggle.rtp.common.commands.action.ActionSubCmd subCmd) {
-        subCmd.syncActions();
+      ensureCommandRegistrar();
+      if (commandRegistrar != null) {
+        commandRegistrar.onActionRegistered(definition);
       }
     }
   }
@@ -197,10 +212,13 @@ public final class ActionManager implements ActionService {
    * Called during startup once commands are bound and after configuration reloads.
    */
   public void registerAllCommands() {
-    for (ActionDefinition definition : definitions.values()) {
-      registerActionCommand(definition);
+    ensureCommandRegistrar();
+    if (commandRegistrar != null) {
+      for (ActionDefinition definition : definitions.values()) {
+        commandRegistrar.onActionRegistered(definition);
+      }
+      commandRegistrar.onSync();
     }
-    syncActionSubCmd();
   }
 
   /**

@@ -23,6 +23,10 @@ public final class TickBudget {
   private static volatile long asyncNanos = -1L;
   private static volatile long periodTicks = -1L;
 
+  static {
+    io.github.dailystruggle.rtp.common.selection.SelectionAPI.setDefaultBudgetSupplier(TickBudget::asyncNanos);
+  }
+
   private TickBudget() {}
 
   /** Re-reads the budgets; called on PerformanceKeys registration and config reload. */

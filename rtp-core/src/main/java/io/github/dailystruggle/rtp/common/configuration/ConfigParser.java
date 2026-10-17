@@ -197,6 +197,11 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     check(version, pluginDirectory, null);
   }
 
+  @Override
+  public void onConstruct() {
+    check(this.version, this.pluginDirectory, this.langFile);
+  }
+
   /**
    * Sanitize a configuration name for use as a filesystem path component. Replaces characters
    * that are illegal on Windows ({@code : \ / * ? " < > |}) with {@code _}. Necessary for

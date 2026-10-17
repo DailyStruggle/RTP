@@ -256,7 +256,7 @@ region/world/effect selectors slot in as their own directory nodes.
 
 ## References
 
-- ROADMAP Tier 2: "Config-file organization + discoverability (operator feedback)".
+- Former roadmap item "Config-file organization + discoverability (operator feedback)": delivered; history in [`CHANGELOG.md`](../../CHANGELOG.md).
 - [ADR-020](ADR-020-language-bootstrap-and-locale-aware-configparser.md) Language bootstrap and locale-aware ConfigParser.
 - [ADR-042](ADR-042-yaml-comment-preservation-block-only.md) YAML comment preservation.
 - [ADR-064](ADR-064-config-comment-format-summary-line-as-menu-hover.md) Config-comment format: summary line as menu hover text; `docs/dev/CONFIG_COMMENT_STYLE.md`.

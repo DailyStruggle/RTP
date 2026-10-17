@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.common.metrics;
+package io.github.dailystruggle.rtp.common.selection.region;
 
 /**
  * Immutable per-(region, path) view of the probe-first cost governor (ADR-109).

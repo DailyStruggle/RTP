@@ -82,4 +82,4 @@ This ADR records the **design only** (Rule D-005). No production code is changed
 - [ADR-024](ADR-024-rtp-lite-assembly-variant.md) — RTP Lite Assembly Variant (edition gating).
 - `docs/dev/REQUIREMENTS.md section 3` — REQ-RTP-S-001 (unsafe-block prohibition), REQ-RTP-S-004 (never-silent failure), REQ-RTP-S-005 (no main-thread chunk I/O).
 - `rtp-bukkit-common/.../world/BukkitRTPChunk.java#isSafe(int,int,int,CompiledUnsafeSet)` and the Folia/Fabric peers — proposed injection site.
-- `docs/dev/ROADMAP.md` Tier 2 "Safety-list grammar expansion".
+- Linear `RTP-51` ("Safety grammar: relative ground-distance predicate", team `LeafRTP`); pointer in `docs/dev/ROADMAP.md`.

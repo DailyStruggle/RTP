@@ -1,6 +1,9 @@
 package io.github.dailystruggle.rtp.common.metrics;
 
 import io.github.dailystruggle.metrics.api.RegionQueueRow;
+import io.github.dailystruggle.rtp.common.selection.region.ImmediateGovernorRow;
+import io.github.dailystruggle.rtp.common.selection.region.LiveLoadGateRow;
+import io.github.dailystruggle.rtp.common.selection.region.ProbeGovernorRow;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;

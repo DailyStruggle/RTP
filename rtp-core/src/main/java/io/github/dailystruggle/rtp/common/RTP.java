@@ -1355,7 +1355,7 @@ public class RTP {
     long sharedTime = 0L;
     try {
       if (inst != null && inst.databaseAccessor instanceof AbstractSQLDatabaseAccessor sql) {
-        io.github.dailystruggle.rtp.common.network.NetworkStateBinding binding = sql.getNetworkStateBinding();
+        io.github.dailystruggle.rtp.common.database.options.NetworkStateBinding binding = sql.getNetworkStateBinding();
         if (binding != null) {
           sharedTime = binding.getLastTeleportTime(uuid);
         }
@@ -1381,7 +1381,7 @@ public class RTP {
     if (inst == null) return;
     try {
       if (inst.databaseAccessor instanceof AbstractSQLDatabaseAccessor sql) {
-        io.github.dailystruggle.rtp.common.network.NetworkStateBinding binding = sql.getNetworkStateBinding();
+        io.github.dailystruggle.rtp.common.database.options.NetworkStateBinding binding = sql.getNetworkStateBinding();
         if (binding != null) {
           binding.setLastTeleportTime(uuid, epochMillis);
         }

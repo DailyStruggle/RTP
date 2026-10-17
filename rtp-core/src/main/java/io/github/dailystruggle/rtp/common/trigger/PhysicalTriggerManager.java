@@ -36,6 +36,7 @@ public class PhysicalTriggerManager implements AutoCloseable {
   private Object accumulatorTaskHandle;
 
   public void start() {
+    io.github.dailystruggle.rtp.common.action.ActionManager.setTriggerRegistrar(this::registerTrigger);
     if (moveRegistration == null && RTPAPI.playerMoveEvents != null) {
       moveRegistration = RTPAPI.playerMoveEvents.watchAll(this::onPlayerMove);
     }

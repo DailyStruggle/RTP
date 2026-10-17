@@ -1,6 +1,6 @@
-package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.residency;
+package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.residency.SweepCursor;
 
 /**
  * {@link SweepCursor} backed directly by a {@link SquareOptimizedDualLayer}, the

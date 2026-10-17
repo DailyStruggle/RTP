@@ -33,3 +33,7 @@ gradlew text eol=lf
 *.zip    binary
 *.mca    binary
 *.dat    binary
+
+# Generated / fixture data: collapsed in GitHub PR diffs and excluded from language stats.
+docs/editor/editor-data.json                linguist-generated=true
+scripts/tests/fixtures/bench_matrix/**      linguist-generated=true

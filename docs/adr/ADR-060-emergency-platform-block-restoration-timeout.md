@@ -110,4 +110,4 @@ The original-block capture happens at platform-build time, but the world may cha
 - Scheduling contract: [`.junie/AGENTS.md`](../../.junie/AGENTS.md) *Scheduler Usage*; `RTPScheduler` (`runTask(RTPLocation, ...)`); active-GC prior art: `MemoryTracker`.
 - S-003 / S-004 / S-005: [`REQUIREMENTS.md section 3`](../dev/REQUIREMENTS.md); claim integration: [ADR-019](ADR-019-claim-plugin-integrations-folded-into-plugin.md).
 - Decoupled-from-paste rationale: [ADR-058](ADR-058-region-specific-schematic-paste.md) (the `SchematicPaster` path this feature deliberately does **not** use).
-- Roadmap context: [`docs/dev/ROADMAP.md`](../dev/ROADMAP.md).
+- Roadmap context: open work is tracked in the Linear `LeafRTP` team ([`docs/dev/ROADMAP.md`](../dev/ROADMAP.md) pointer).

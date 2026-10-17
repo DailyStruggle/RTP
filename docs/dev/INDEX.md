@@ -97,7 +97,7 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | [`PULL_REQUEST_PROCESS.md`](PULL_REQUEST_PROCESS.md) | Pull request workflow: branching, local pre-PR verification gates, CI pipeline anatomy, and merge criteria. |
 | [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md) | Proxy / multi-server (Velocity, BungeeCord) roadmap; D-005 gated. |
 | [`METRICS_PLAN.md`](METRICS_PLAN.md) | Runtime metrics SPI (TPS/MSPT/heap/queue/pipeline); implementation eligible. |
-| [`ROADMAP.md`](ROADMAP.md) | Forward-looking work. |
+| [`ROADMAP.md`](ROADMAP.md) | Pointer to the Linear `LeafRTP` team, where forward-looking work is tracked. |
 | [`STAKEHOLDERS.md`](STAKEHOLDERS.md) | Roles and review expectations. |
 | [`PLAYER_TAXONOMY_VALUATION.md`](PLAYER_TAXONOMY_VALUATION.md) | Player taxonomy, utility functions, site valuation weights, and behavioral benchmark models. |
 | [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md) | Dated engineering notes. |
