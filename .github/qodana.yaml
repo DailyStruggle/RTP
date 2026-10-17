@@ -1,0 +1,23 @@
+version: "1.0"
+
+linter: qodana-jvm-community
+
+profile:
+  name: qodana.recommended
+  inspections:
+    # Reflection across platform bridges and NMS accessors is audited under ADR-026.
+    - inspection: JavaReflectionMemberAccess
+      ignore:
+        - "platforms"
+    # Bukkit MapPalette/MapView calls in maps-api.
+    - inspection: Deprecation
+      ignore:
+        - "api/maps-api/src"
+    # Optional parameters in the proxy SPI. rtp-core hits remain visible.
+    - inspection: OptionalUsedAsFieldOrParameterType
+      ignore:
+        - "platforms/rtp-proxy"
+    # StressTestRTP harness classes.
+    - inspection: ClassEscapesItsScope
+      ignore:
+        - "helpers/StressTestRTP"

@@ -78,16 +78,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Suggested next step:** Keep the repeat limit documented; both obvious fixes are ruled out. Physical-order lanes need per-lane occupancy state instead of run tables (the encoding that failed earlier performance tests, and it breaks C8), and marking landings without `expand` exhausts the region. Any future fix must consume no good area and keep the run encoding. Route BINNED_AMORTIZED through the main counter and phase windows. Flip the `dups > 0` pin in `ConsecutiveLandingSpacingSimTest.terrainRejectionKeepsBackToBackSpacing` only with such a fix.
 - **Linear:** RTP-2
 
-### 2026-10-17 - Linux ladder runs re-serve the exact same landing block
-
-- **Severity:** Medium
-- **Status:** Open
-- **Discovered during:** moving the front-page paced figures to the Threadripper ladder runs
-- **Location:** queue / reservation path that hands out `to_x,to_z` (unknown); data in `/networkshare/26.2/plugins/StressTestRTP/runs/<stamp>.csv` on the bench host
-- **Symptom / hypothesis:** In the 14 Paper ladder runs `20261009-095754`..`20261010-070617` (tuned bench config), LeafRTP landed two players on the identical block 5-149 times per run (e.g. 149 of 15,896 in `20261009-225939`), mostly in the 10-160 TP/s stages; 3 in 4,186 at 5 TP/s, 20-48 s apart, served as FAST or COLD. Other plugins had 0 in the same 5 TP/s windows. Exact-block repeats at ~1% exceed the ~0.1% chunk-repeat rate modelled for RTP-2, so a verified spot may be handed out twice or returned to the queue after use.
-- **Impact:** Players can land on the same spot as someone a few seconds earlier; contradicts the "0 duplicate landings" storefront claim if those runs are used.
-- **Suggested next step:** Group repeats by `served_mode` and stage in one run's CSV; check whether a location is re-queued after teleport (cache recycle, cancelled-teleport return path) and whether the tuned config (`period: 1`, no unverified backlog) is required to reproduce.
-
 ### 2026-10-06 — Weekly Jazzer job fuzzes one Anvil target for 2 s and passes
 
 - **Severity:** Medium

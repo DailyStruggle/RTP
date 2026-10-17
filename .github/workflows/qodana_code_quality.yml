@@ -46,7 +46,9 @@ jobs:
         env:
           QODANA_TOKEN: ${{ secrets.QODANA_TOKEN }}
         with:
-          args: --linter qodana-jvm-community --profile-name qodana.recommended
+          args: |
+            --config .github/qodana.yaml
+            --baseline .qodana/baseline.sarif.json
           # When pr-mode is set to true, Qodana analyzes only the files that have been changed
           pr-mode: false
           use-caches: true

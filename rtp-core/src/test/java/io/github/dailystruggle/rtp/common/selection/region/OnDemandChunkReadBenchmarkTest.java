@@ -168,6 +168,8 @@ public class OnDemandChunkReadBenchmarkTest {
         // Concurrency gauges
         public final AtomicInteger activeConcurrentNativeLoads = new AtomicInteger();
         public final AtomicInteger peakConcurrentNativeLoads = new AtomicInteger();
+        public final AtomicInteger activeConcurrentGenerations = new AtomicInteger();
+        public final AtomicInteger peakConcurrentGenerations = new AtomicInteger();
 
         // Cumulative simulated CPU time
         public final AtomicLong totalSimulatedCpuTimeNanos = new AtomicLong();
@@ -222,6 +224,10 @@ public class OnDemandChunkReadBenchmarkTest {
             peakConcurrentNativeLoads.updateAndGet(p -> Math.max(p, cur));
 
             boolean generated = isChunkGeneratedOnDisk(cx, cz);
+            if (!generated) {
+                int gen = activeConcurrentGenerations.incrementAndGet();
+                peakConcurrentGenerations.updateAndGet(p -> Math.max(p, gen));
+            }
             long cost = generated ? COST_NANOS_LIVE_LOAD_GENERATED : COST_NANOS_LIVE_LOAD_UNGENERATED;
             totalSimulatedCpuTimeNanos.addAndGet(cost);
 
@@ -230,6 +236,7 @@ public class OnDemandChunkReadBenchmarkTest {
                 discardedGenerations.incrementAndGet();
             }
 
+            if (!generated) activeConcurrentGenerations.decrementAndGet();
             activeConcurrentNativeLoads.decrementAndGet();
             return CompletableFuture.completedFuture(new BenchmarkedChunk(cx, cz, this, false, safe));
         }
@@ -692,6 +699,7 @@ public class OnDemandChunkReadBenchmarkTest {
     @DisplayName("Baseline Benchmark: 10-Player Concurrent Burst (Current State Multi-Trial)")
     void baselineConcurrentBurst10() throws Exception {
         List<Double> trialPeakConcurrencies = new ArrayList<>();
+        List<Double> trialPeakGenerations = new ArrayList<>();
         List<Double> trialBurstCpus = new ArrayList<>();
         List<Double> trialBurstDurations = new ArrayList<>();
         List<Double> trialP50Latencies = new ArrayList<>();
@@ -739,6 +747,7 @@ public class OnDemandChunkReadBenchmarkTest {
             double totalBurstCpuMs = totalBurstCpuNanos / 1_000_000.0;
             double burstDurationMs = burstElapsedNanos / 1_000_000.0;
             int peakConcurrency = burstWorld.peakConcurrentNativeLoads.get();
+            trialPeakGenerations.add((double) burstWorld.peakConcurrentGenerations.get());
 
             Collections.sort(burstLatenciesMs);
             int burstCount = burstLatenciesMs.size();
@@ -787,7 +796,8 @@ public class OnDemandChunkReadBenchmarkTest {
         System.out.printf("  P50 Burst Lat:    %s%n", statsP50Latency.format());
         System.out.printf("  P95 Burst Lat:    %s%n%n", statsP95Latency.format());
 
-        assertTrue(statsConcurrency.max() <= ImmediateLoadGovernor.MAX_REGIONAL_PERMITS,
-                "ADR-114 Criterion D: Concurrency capped at governor permit ceiling");
+        // ADR-114 Decision 4: the permit bounds native generation; on-disk loads are not gated.
+        assertTrue(StatsSummary.of(trialPeakGenerations).max() <= ImmediateLoadGovernor.MAX_REGIONAL_PERMITS,
+                "ADR-114 Decision 4: concurrent native generations capped at governor permit ceiling");
     }
 }
