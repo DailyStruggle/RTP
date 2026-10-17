@@ -193,12 +193,13 @@ Pull requests trigger automated GitHub Actions workflows configured in `.github/
 flowchart LR
     subgraph CI["GitHub Actions (gradle.yml)"]
         direction TB
-        A["build-reduced-jdk21\n(JDK 21 Sandbox & Offline Check)"]
+        A["build-reduced-jdk21\n(JDK 21 Sandbox & Exclusion Assemble)"]
         B["build-full\n(JDK 21 + 25, Toolchains, All Carriers)"]
         B --> C["Spotless & Binary Compatibility"]
         B --> D["Full Build & ShadowJar"]
         B --> E["Static Analysis (PMD) & JaCoCo Coverage"]
         B --> F["Changed-Line Coverage Gate (>= 80%)"]
+        B --> G["SonarCloud Analysis (when token present)"]
     end
 ```
 
@@ -208,13 +209,13 @@ flowchart LR
    - Runs on Ubuntu with Temurin JDK 21.
    - Validates the reduced build variant using exclusion flags:
      `-PexcludeJdk25 -PexcludeNeoforge`
-   - Verifies traceability (`check_traceability.sh`), UTF-8 mojibake (`check-mojibake.py`), front-page copy, Spotless, binary compatibility, and module tests.
-   - Guards against silent degradation of offline sandbox and JitPack environments.
+   - Executes `./gradlew assemble` to guard against silent degradation of offline sandbox and JitPack environments without duplicating full test suites.
 2. **`build-full`:**
-   - Provisions both JDK 21 and JDK 25 toolchains.
+   - Provisions both JDK 21 and JDK 25 toolchains with `gradle/actions/setup-gradle`.
    - Compiles the full unified JAR, including modern Fabric and NeoForge deobfuscation carriers.
    - Executes Spotless verification, japicmp public API compatibility checks, and full multi-module tests.
    - Enables coverage and static analysis via `-Pcoverage -PstaticAnalysis`.
+   - Executes SonarCloud analysis (when `SONAR_TOKEN` is present), reusing build bytecode, PMD reports, and JaCoCo XML.
    - Executes `scripts/diff-coverage.py` against the base ref (`origin/V3`), enforcing the 80% coverage threshold on modified code.
    - Publishes test reports and uploads coverage and binary artifacts.
 
