@@ -587,6 +587,33 @@ When paired with `expand: true` in dual-layer shapes, it enables zero-memory dya
 - Set to `0.0` for free teleports.
 - If teleportation fails or is cancelled, fees are refunded automatically according to `economy.yml`.
 - Accepts `@economy` to inherit global economy defaults."""
+        },
+        "cooldown": {
+            "title": "cooldown",
+            "meta": "Type: Integer / Duration | Default: @config (global fallback) | Docs: REGIONS.md / CORE_CONFIG.md",
+            "defaultVal": "@config",
+            "defaultSnippet": "cooldown: 300s",
+            "markdown": """Wait time required after a successful teleport before the player can teleport again using this region.
+
+- In `regions/<name>.yml`, sets an independent per-region cooldown timer for that region.
+- In `config.yml` (`teleportCooldown`), sets the global server-wide cooldown baseline.
+- Accepts raw seconds (e.g. `300`) or duration units (e.g. `5m`, `300s`, `1h`, `40t`).
+- Accepts sentinels (`-1`, `infinite`, `permanent`) or `@config` to inherit from global defaults.
+- Bypassed by `rtp.nocooldown` or overridden by `rtp.cooldown.<seconds>`."""
+        },
+        "delay": {
+            "title": "delay",
+            "meta": "Type: Integer / Duration | Default: @config (global fallback) | Docs: REGIONS.md / CORE_CONFIG.md",
+            "defaultVal": "@config",
+            "defaultSnippet": "delay: 5s",
+            "markdown": """Warmup wait time between command execution and actual teleportation.
+
+- In `regions/<name>.yml`, sets a per-region warmup delay before teleporting to this region.
+- In `config.yml` (`teleportDelay`), sets the global server-wide delay baseline.
+- Accepts raw seconds (e.g. `5`) or duration units (e.g. `5s`, `40t`, `1500ms`).
+- `0` teleports immediately (skips the cancel-on-move window).
+- Accepts `@config` to inherit from global defaults.
+- Bypassed by `rtp.nodelay` or overridden by `rtp.delay.<seconds>`."""
         }
     }
 

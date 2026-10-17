@@ -571,15 +571,11 @@ public class UniversalConfigImporter extends AbstractForeignConfigImporter {
                 }
             }
 
-            if (cd >= 0) {
-                if (cooldown < 0 || cd > cooldown || cd == 0) {
-                    cooldown = cd;
-                }
+            if (cd >= 0 && (cooldown < 0 || cd > cooldown || cd == 0)) {
+                cooldown = cd;
             }
-            if (del >= 0) {
-                if (delay < 0 || del > delay || del == 0) {
-                    delay = del;
-                }
+            if (del >= 0 && (delay < 0 || del > delay || del == 0)) {
+                delay = del;
             }
             if (lock >= 0 && (lockAfter < 0 || lock > lockAfter || lock == 0)) {
                 lockAfter = lock;

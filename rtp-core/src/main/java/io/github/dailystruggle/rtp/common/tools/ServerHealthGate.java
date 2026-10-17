@@ -82,7 +82,7 @@ public final class ServerHealthGate {
         long lastWarn = lastWarnMs.get();
         if (now - lastWarn >= WARN_INTERVAL_MS && lastWarnMs.compareAndSet(lastWarn, now)) {
           String detail = "";
-          if (regional && binding != null) {
+          if (regional) {
             try {
               detail = formatRegionalDetail(binding.foliaRegions());
             } catch (Throwable ignored) {

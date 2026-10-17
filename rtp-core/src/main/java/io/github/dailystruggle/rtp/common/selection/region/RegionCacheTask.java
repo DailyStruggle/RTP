@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
+import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
@@ -147,10 +148,10 @@ public class RegionCacheTask extends RTPRunnable {
             // ADR-110: fill is speculative - verify from resident chunks / region files first; native
             // loads pin into the kept queue when it has room, else stay unpinned (no ring) for the
             // cold queue. Third-party generators keep their own contract.
-            Object generator = RTP.serverAccessor.getLocationGenerator();
+            ILocationGenerator generator = RTP.serverAccessor.getLocationGenerator();
             CompletableFuture<GenerationResult> locationFuture = (generator instanceof LocationGenerator)
                     ? LocationGenerator.getLocationFuture(region, null, LoadPurpose.SPECULATIVE, backlog)
-                    : RTP.serverAccessor.getLocationGenerator().getLocation(region, (java.util.Set<String>) null);
+                    : generator.getLocation(region, (java.util.Set<String>) null);
 
             locationFuture = locationFuture.exceptionally(e -> {
                 if (playerId != null) {

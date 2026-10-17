@@ -101,7 +101,7 @@ For fast updates from the console or chat without opening the menu, use the `/rt
 | `/rtp config logging <key>=<value>` | Log categories and verbosity levels | `advanced/logging.yml` |
 | `/rtp config messages <key>=<value>` | Message strings and system notices | `advanced/messages/*.yml` |
 | `/rtp config world <name> <key>=<value>` | World definitions and region overrides | `definitions/worlds/<world>.yml` |
-| `/rtp config region <name> <key>=<value>` | Region bounds, shape, radius, and center | `definitions/regions/<region>.yml` |
+| `/rtp config region <name> <key>=<value>` | Region bounds, shape, radius, center, cooldown, and delay | `definitions/regions/<region>.yml` |
 
 ### Examples
 - Change language:

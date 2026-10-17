@@ -521,7 +521,7 @@ public final class FoliaMetricsBinding implements MetricsBinding {
             if (last != Long.MIN_VALUE && (now - last) > ACTIVE_REGION_WINDOW_NANOS) continue;
             double v = read(s, view);
             if (!isSampled(v)) continue;
-            double weight = Math.max(1L, Math.min(s.sampleCount(), MAX_WEIGHT_TICKS));
+            double weight = (double) Math.max(1L, Math.min(s.sampleCount(), MAX_WEIGHT_TICKS));
             sum += v * weight;
             totalWeight += weight;
             if (v > max) max = v;
@@ -530,14 +530,12 @@ public final class FoliaMetricsBinding implements MetricsBinding {
 
         if (globalSampled) {
             double v = read(globalSampler, view);
-            if (isSampled(v)) {
-                if (!hasMature || globalSampler.sampleCount() >= MIN_SAMPLES) {
-                    double weight = Math.max(1L, Math.min(globalSampler.sampleCount(), MAX_WEIGHT_TICKS));
-                    sum += v * weight;
-                    totalWeight += weight;
-                    if (v > max) max = v;
-                    n++;
-                }
+            if (isSampled(v) && (!hasMature || globalSampler.sampleCount() >= MIN_SAMPLES)) {
+                double weight = (double) Math.max(1L, Math.min(globalSampler.sampleCount(), MAX_WEIGHT_TICKS));
+                sum += v * weight;
+                totalWeight += weight;
+                if (v > max) max = v;
+                n++;
             }
         }
 

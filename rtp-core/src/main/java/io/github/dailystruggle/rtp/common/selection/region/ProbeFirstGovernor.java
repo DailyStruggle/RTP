@@ -127,7 +127,7 @@ public final class ProbeFirstGovernor {
         }
 
         double neff() {
-            return (double) Math.min(n, WINDOW);
+            return Math.min(n, WINDOW);
         }
     }
 
@@ -174,7 +174,7 @@ public final class ProbeFirstGovernor {
 
         /** Squared standard error of {@link #at}: residual variance, widened by extrapolation distance. */
         double se2At(double x) {
-            double neff = (double) Math.min(n, WINDOW);
+            double neff = Math.min(n, WINDOW);
             if (!identified()) return vyy / neff;
             double b = slope();
             double resid = Math.max(0.0, vyy - 2.0 * b * cxy + b * b * vxx);
@@ -333,9 +333,9 @@ public final class ProbeFirstGovernor {
         String log;
         updateLock.lock();
         try {
-            probe.add((double) nanos);
+            probe.add(nanos);
             probeSamples.set(probe.n);
-            probeFit.add(invG, (double) nanos);
+            probeFit.add(invG, nanos);
             if (decisionState.mode() == Mode.PROBE) defaultInvG.add(invG);
             reject.add(rejected ? 1.0 : 0.0);
             log = evaluate();
@@ -351,7 +351,7 @@ public final class ProbeFirstGovernor {
         String log;
         updateLock.lock();
         try {
-            (afterProbe ? loadAfterProbe : loadDirect).add((double) nanos);
+            (afterProbe ? loadAfterProbe : loadDirect).add(nanos);
             if (!afterProbe) {
                 directSamples.set(loadDirect.n);
             }
