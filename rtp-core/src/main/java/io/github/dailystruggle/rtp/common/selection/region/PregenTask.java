@@ -951,13 +951,15 @@ final class PregenTask implements Runnable {
             return;
         }
 
-        // Chunk is generated on disk: evaluate thread-weighted deduplication threshold
+        // Chunk is generated on disk: evaluate thread-weighted deduplication threshold.
+        // ADR-114 generation permits cap worldgen only; on-disk loads skip them so the
+        // BYPASS route is not serialised behind a 1-per-region permit.
         double mspt = ServerHealthGate.lastMspt();
         boolean shouldPrefilter = hasAnvil && (immGov != null) && immGov.shouldPrefilter(isPredicateConstrained, mspt);
 
         if (!shouldPrefilter) {
             // Deduplication bypass: direct native load (eliminates duplicate decode on safe chunks)
-            admitNativeLoadWithPermit(cx, cz, finalL, staleRetries, immGov, gov, afterProbe);
+            loadChunk(cx, cz, finalL, staleRetries, gov, afterProbe);
             return;
         }
 
@@ -971,14 +973,15 @@ final class PregenTask implements Runnable {
             if (ex == null && chunk != null && chunk.isSelfContained()) {
                 if (gov != null) gov.recordLoad(afterProbe, readDuration);
                 // Safe Anvil candidate verified: proceed to Tier 3 native load for player placement
-                admitNativeLoadWithPermit(cx, cz, finalL, staleRetries, immGov, gov, afterProbe);
+                continueInline(() -> loadChunk(cx, cz, finalL, staleRetries, gov, afterProbe));
                 return;
             }
             // Fallback to native load if file read returns null/fails
-            admitNativeLoadWithPermit(cx, cz, finalL, staleRetries, immGov, gov, afterProbe);
+            continueInline(() -> loadChunk(cx, cz, finalL, staleRetries, gov, afterProbe));
         });
     }
 
+    /** Native load of an ungenerated chunk, gated by an ADR-114 generation permit. */
     private void admitNativeLoadWithPermit(int cx, int cz, long finalL, int staleRetries,
                                           @org.jetbrains.annotations.Nullable ImmediateLoadGovernor immGov,
                                           @org.jetbrains.annotations.Nullable ProbeFirstGovernor gov,
