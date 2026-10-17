@@ -157,7 +157,7 @@ public final class EwmaEstimator {
         if (nanos < 0L) nanos = 0L; // Guard against negative clock deltas
 
         if (mode == DecayMode.FRACTIONAL) {
-            record((double) nanos);
+            record(nanos);
             return;
         }
 
@@ -189,7 +189,7 @@ public final class EwmaEstimator {
      */
     public double mean() {
         if (mode == DecayMode.INTEGER_SEVEN_EIGHTHS) {
-            return (double) integerMean.get();
+            return integerMean.get();
         }
         synchronized (this) {
             return mean;

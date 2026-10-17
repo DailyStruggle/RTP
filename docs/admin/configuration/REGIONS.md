@@ -31,14 +31,57 @@ You can create and update regions through:
 | `backlogCacheCap` | Integer | `1000` (lite: `0`) | Maximum number of **unverified** candidate locations to stage upstream of `cacheCap`. See *Backlog Cache (L3)* below. Set to `0` to disable. |
 | `activeChunkCap` | Integer | `10` | Maximum number of chunks to keep loaded for zero-latency teleports. |
 | `price` | Double | `0.0` | Economy cost to use this specific region (overrides global `price`). |
+| `cooldown` | Integer / Duration / String | (global fallback) | Cooldown duration between successful teleports using this region. Accepts raw seconds (`300`), duration strings (e.g. `5m`, `1h`, `40t`), sentinels (`-1`, `infinite`), or `"@config"` to inherit `defaults.cooldown` (or global `teleportCooldown`). Tracks cooldowns independently per region. See [Teleport Cooldown and Warmup Delay](#teleport-cooldown-and-warmup-delay-cooldown--delay). |
+| `delay` | Integer / Duration / String | (global fallback) | Warmup wait time before teleportation occurs. Accepts raw seconds (`5`), duration strings (e.g. `5s`, `40t`, `1500ms`), `0` for instant teleport, or `"@config"` to inherit `defaults.delay` (or global `teleportDelay`). See [Teleport Cooldown and Warmup Delay](#teleport-cooldown-and-warmup-delay-cooldown--delay). |
 | `spatialResolution` | Integer / String | `"auto"` | Precision for spatial memory (bad location tracking). Can be `"auto"` or any positive integer (e.g. `1`, `3`, `4`). Higher values check fewer, more widely spaced spots (e.g. `4` = one spot per 4x4 chunks): faster scans and less memory, but small safe pockets can be missed. |
 | `displayName` | String | (region name) | Optional cosmetic display name shown in menus and messages; does not change the region's identity or the permission node. |
 | `biomeWhitelist` / `biomes` | Boolean / List | (inherited from `safety.yml`) | Optional per-region override of the global biome filter. `biomeWhitelist: true` makes `biomes` an allow-list; `false` makes it a block-list. See [SAFETY.md](SAFETY.md). |
 | `version` | String | `"1.1"` | Internal config version. **Do not modify.** |
 
-> **Inheritance (`@config`).** Most of the keys above accept the token `@config` instead of a literal value, in which case they inherit the matching global default from the `defaults:` block of `config.yml`. The type-bearing `shape`/`vert` keys inherit as a whole named block; type-free scalars (`requirePermission`, `cacheCap`, `backlogCacheCap`, `activeChunkCap`, `spatialResolution`) inherit individually; `price` may reference `@economy`. See [CORE_CONFIG.md → Defaults (inheritance)](CORE_CONFIG.md#defaults-inheritance).
+> **Inheritance (`@config`).** Most of the keys above accept the token `@config` instead of a literal value, in which case they inherit the matching global default from the `defaults:` block of `config.yml`. The type-bearing `shape`/`vert` keys inherit as a whole named block; type-free scalars (`requirePermission`, `cacheCap`, `backlogCacheCap`, `activeChunkCap`, `spatialResolution`, `cooldown`, `delay`) inherit individually; `price` may reference `@economy`. See [CORE_CONFIG.md → Defaults (inheritance)](CORE_CONFIG.md#defaults-inheritance).
 
 > **"Zone"/"arena" synonym.** Other plugins call a bounded random-teleport area a "zone" or "arena"; in RTP that concept *is* a region - there is no separate object to configure. A region controls *where a player lands*, not *whether they can walk back out*. To keep a teleported player confined to the area, either pair the region with a WorldGuard region whose `exit` flag is `deny` (Bukkit family only), or use the cross-platform tether addon (LeafRTPTetherAddon), which enforces confinement on RTP's own geometry with no WorldGuard dependency.
+
+---
+
+## Teleport Cooldown and Warmup Delay (`cooldown` & `delay`)
+
+Regions can configure custom pacing controls (`cooldown` and `delay`) that override the global server-wide baselines in `config.yml`. This allows operators to differentiate high-risk or resource-heavy zones (such as a 10-minute cooldown and a 10-second warmup delay in a Nether or Mining world) from instant, low-friction hubs or spawn regions (`delay: 0`, `cooldown: 0` or short timers).
+
+### Pacing Parameters
+
+- **`cooldown`**: Wait time required after a successful teleport before the player can teleport using this region again.
+  - Accepts raw seconds (e.g. `300`).
+  - Accepts duration units: `s`/`sec`/`seconds`, `m`/`min`/`minutes`, `h`/`hr`/`hours`, `d`/`day`/`days`, `ms`/`millis`, `t`/`ticks` (e.g. `5m`, `300s`, `1h`, `45s500ms`).
+  - Accepts sentinels: `-1`, `infinite`, `permanent` (locks the player out after one teleport until an admin clears the timer).
+  - Accepts `"@config"` to inherit from `defaults.cooldown` (or fallback `teleportCooldown`) in `config.yml`.
+  - When omitted or `null`, falls back to the player's global cooldown timer.
+- **`delay`**: Warmup delay between command execution and actual teleportation (during which movement beyond `cancelDistance` or taking damage cancels the teleport).
+  - Accepts raw seconds (e.g. `5`).
+  - Accepts duration units: e.g. `5s`, `40t` (2 seconds), `1500ms`.
+  - `0` teleports immediately (skips the cancel-on-move window).
+  - Accepts `"@config"` to inherit from `defaults.delay` (or fallback `teleportDelay`) in `config.yml`.
+  - When omitted or `null`, falls back to the player's global warmup delay.
+
+### Precedence Hierarchy
+
+The engine evaluates effective cooldown and delay through a strict precedence hierarchy:
+
+1. **Permission bypass**: Players with `rtp.nocooldown` or `rtp.nodelay` (or server operators) bypass the cooldown or delay completely (effective time = 0).
+2. **Permission override**: Explicit numeric permissions (`rtp.cooldown.<seconds>` or `rtp.delay.<seconds>`), when assigned via LuckPerms or another permissions manager, take priority over both global and regional configurations.
+3. **Regional configuration**: The region's explicit `cooldown` or `delay` setting configured in `definitions/regions/<name>.yml`.
+4. **Global configuration fallback**: The default `teleportCooldown` or `teleportDelay` defined in `config.yml`.
+
+### Independent Per-Region Cooldown Tracking
+
+- Global cooldowns track a single last-teleport timestamp per player.
+- In contrast, when a region specifies its own `cooldown`, RTP records the cooldown timestamp **independently** for that region. Teleporting to region `mining` puts only region `mining` on cooldown; the player remains free to teleport to other regions (such as `survival` or `nether`) provided those regions are not on cooldown.
+- Default regions without an explicit `cooldown` continue to share the global cooldown timestamp.
+
+### Administrative Management
+
+- **Resetting Cooldowns**: Operators can clear both global and all per-region cooldown timers for a player using `/rtp admin clearcooldown <player>`.
+- **In-Game Configuration**: Operators can inspect or modify these settings live using `/rtp config region <name> cooldown=<duration>` or `/rtp config region <name> delay=<duration>` (e.g. `/rtp config region nether cooldown=10m delay=5s`).
 
 ---
 

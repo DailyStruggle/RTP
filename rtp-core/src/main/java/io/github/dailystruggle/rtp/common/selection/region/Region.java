@@ -108,8 +108,6 @@ public class Region extends FactoryValue<RegionKeys> {
   /** Pacer for backlog pick operations. */
   private final BudgetPacer backlogPacer = BudgetPacer.ofTaskPipe(0L);
 
-  /** EWMA of one refill pick (ns); predicts whether the next pick still fits the budget. */
-  private long backlogPickNanos = 0L;
 
   /** Batched backlog bin verification; per instance (reset by {@link #clone()}). */
   private BacklogBinVerifier binVerifier = new BacklogBinVerifier();
@@ -1380,10 +1378,9 @@ public class Region extends FactoryValue<RegionKeys> {
     return now + (long) (remaining * (1.0d - BACKLOG_HEADROOM));
   }
 
-  /** Folds one pick's cost into {@link #backlogPickNanos} (7/8 decay, as in TimeBoundTaskPipe). */
+  /** Folds one pick's cost into the backlog pacer (7/8 decay, as in TimeBoundTaskPipe). */
   private void recordPickCost(long cost) {
     backlogPacer.recordDuration(cost);
-    backlogPickNanos = backlogPacer.predictedCostNanos();
   }
 
   /**

@@ -334,12 +334,16 @@
   "maxY"
  ],
  "delay": [
+  "delay",
+  "teleportDelay",
   "teleport-delay",
   "cooldown",
   "cancel",
   "timer"
  ],
  "cooldown": [
+  "cooldown",
+  "teleportCooldown",
   "teleport-delay",
   "timer",
   "cancel"

@@ -93,11 +93,11 @@ final class PregenTask implements Runnable {
         if (r == null || r.queueManager == null) return false;
         int cap;
         try {
-            cap = (int) Math.min(Integer.MAX_VALUE, r.getSettings().activeChunkCap());
+            cap = Math.min(Integer.MAX_VALUE, r.getSettings().activeChunkCap());
         } catch (Throwable t) {
             return false;
         }
-        if (!gate().tryAcquirePin(() -> r.queueManager.keptLocations.size(), cap)) return false;
+        if (!gate().tryAcquirePin(r.queueManager.keptLocations::size, cap)) return false;
         if (!pinHeld.compareAndSet(false, true)) gate().releasePin();
         gate().onPinnedLoad();
         return true;
