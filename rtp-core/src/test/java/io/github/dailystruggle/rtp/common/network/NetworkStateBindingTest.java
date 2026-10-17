@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.network;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import io.github.dailystruggle.rtp.common.database.options.NetworkStateBinding;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;

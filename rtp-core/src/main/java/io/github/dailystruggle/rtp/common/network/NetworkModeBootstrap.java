@@ -1306,14 +1306,14 @@ public final class NetworkModeBootstrap {
 
     /**
      * Trivial adapter: lets the existing
-     * {@link io.github.dailystruggle.rtp.common.network.NetworkStateBinding}
+     * {@link io.github.dailystruggle.rtp.common.database.options.NetworkStateBinding}
      * slot on {@code AbstractSQLDatabaseAccessor} hold a reference to the
      * live transport. The interface's {@code transport()} default returns
      * {@code null}; this override exposes the delegate to consumers such
      * as {@code NetworkSimulationTestJob} ({@code rtp test network}).
      */
     private static final class BindingAdapter
-            implements io.github.dailystruggle.rtp.common.network.NetworkStateBinding {
+            implements io.github.dailystruggle.rtp.common.database.options.NetworkStateBinding {
         private final NetworkTransport delegate;
         BindingAdapter(NetworkTransport delegate) { this.delegate = delegate; }
         @Override
