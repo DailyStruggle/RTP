@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.database.options.AbstractSQLDatabaseAccessor;
-import io.github.dailystruggle.rtp.common.network.NetworkStateBinding;
+import io.github.dailystruggle.rtp.common.database.options.NetworkStateBinding;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReleaseReason;

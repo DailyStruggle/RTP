@@ -4,7 +4,6 @@ import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
-import io.github.dailystruggle.rtp.common.network.NetworkStateBinding;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

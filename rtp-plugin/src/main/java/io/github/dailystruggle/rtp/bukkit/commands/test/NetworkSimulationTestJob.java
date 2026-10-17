@@ -7,7 +7,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import io.github.dailystruggle.rtp.common.database.options.AbstractSQLDatabaseAccessor;
-import io.github.dailystruggle.rtp.common.network.NetworkStateBinding;
+import io.github.dailystruggle.rtp.common.database.options.NetworkStateBinding;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;

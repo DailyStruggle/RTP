@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.network;
 
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.database.options.AbstractSQLDatabaseAccessor;
+import io.github.dailystruggle.rtp.common.database.options.NetworkStateBinding;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
