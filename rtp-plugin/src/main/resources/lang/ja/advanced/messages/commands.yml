@@ -492,6 +492,11 @@ editorUntrustNone: "&7[P0] [key] に一致する信頼済みエディターブ�
 editorUntrustFailed: "&c[P0] 信頼済みエディター一覧を更新できませんでした: [reason]"
 editorApplyDigestMissing: "&c[P0] エディターのペイロードに sha256 チェックサムがないため、適用されませんでした。最新のエディターページから再度コミットしてください。"
 editorApplyFileUnreadable: "&e[P0] オフライン適用ファイルを読み込めませんでした ([reason])。バイトストアを試します。"
+editorApplyUsage: "&c[P0] 使い方: /rtp editor apply token=<token>"
+editorApplyFetching: "&7[P0] 設定ペイロードを取得しています..."
+editorApplyValidating: "&7[P0] ペイロードの整合性と構文を検証しています..."
+editorApplySuccess: "&a[P0] 設定を適用し、ホットリロードしました! (変更されたファイルの .bak コピーを作成しました)"
+editorApplyFailed: "&c[P0] ペイロードを適用できませんでした: [reason]"
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

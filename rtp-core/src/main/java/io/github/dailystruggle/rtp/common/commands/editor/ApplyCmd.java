@@ -6,7 +6,11 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -88,17 +92,15 @@ public class ApplyCmd extends BaseRTPCmdImpl {
             }
         }
 
-        if (token == null || token.isBlank()) {
-            sendMessage(callerId, "RTP: Usage - /rtp editor apply token=<token>");
+        if (token == null || token.isBlank() || !EditorSecurity.isToken(token.trim())) {
+            sendMessage(callerId, EditorChannelWiring.message("editorApplyUsage",
+                    "[P0] Usage: /rtp editor apply token=<token>"));
             return true;
         }
 
         token = token.trim();
-        if (!EditorSecurity.isToken(token)) {
-            sendMessage(callerId, "RTP: Usage - /rtp editor apply token=<token>");
-            return true;
-        }
-        sendMessage(callerId, "RTP: Fetching configuration payload...");
+        sendMessage(callerId, EditorChannelWiring.message("editorApplyFetching",
+                "[P0] Fetching configuration payload..."));
 
         applyToken(callerId, token);
         return true;
@@ -123,45 +125,25 @@ public class ApplyCmd extends BaseRTPCmdImpl {
         String localPayload = EditorSessionManager.getInstance().getSession(finalToken);
         final boolean fromSession = localPayload != null;
 
-        // 2. Check local offline file drop (<pluginDir>/editor/<token>.json or <pluginDir>/editor/apply.json)
-        if (localPayload == null && RTP.serverAccessor != null) {
-            try {
-                java.io.File pluginDir = RTP.serverAccessor.getPluginDirectory();
-                if (pluginDir != null) {
-                    java.nio.file.Path editorDir = pluginDir.toPath().resolve("editor");
-                    java.nio.file.Path tokenFile = editorDir.resolve(finalToken.endsWith(".json") ? finalToken : finalToken + ".json");
-                    if (!java.nio.file.Files.exists(tokenFile) && "apply".equalsIgnoreCase(finalToken)) {
-                        tokenFile = editorDir.resolve("apply.json");
-                    }
-                    if (java.nio.file.Files.isRegularFile(tokenFile)) {
-                        long size = java.nio.file.Files.size(tokenFile);
-                        if (size > EditorSessionManager.MAX_PAYLOAD_BYTES) {
-                            throw new IllegalArgumentException("offline apply file too large (" + size + " bytes; max " + EditorSessionManager.MAX_PAYLOAD_BYTES + ")");
-                        }
-                        localPayload = java.nio.file.Files.readString(tokenFile, java.nio.charset.StandardCharsets.UTF_8);
-                    }
-                }
-            } catch (IOException | RuntimeException e) {
-                // S-004: an unreadable drop file falls through to the byte store, but is reported
-                RTP.log(Level.WARNING, "[editor] offline apply file for session " + shown + " unreadable: " + e.getMessage(), e);
-                sendMessage(callerId, EditorChannelWiring.message("editorApplyFileUnreadable",
-                        "[P0] The offline apply file could not be read ([reason]); trying the byte store.")
-                        .replace("[reason]", String.valueOf(e.getMessage())));
-            }
-        }
+        // 2. Offline file drop, then the byte store; S-005: the drop's disk I/O runs on RTP.scheduler's async pool
+        CompletableFuture<Fetched> payloadFuture = fromSession
+                ? CompletableFuture.completedFuture(new Fetched(localPayload, false))
+                : EditorSecurity.supplyAsync(() -> readOfflineDrop(callerId, finalToken, shown))
+                        .thenCompose(drop -> drop != null
+                                ? CompletableFuture.completedFuture(new Fetched(drop, false))
+                                : EditorSecurity.supplyAsync(transports::get)
+                                        .thenCompose(t -> t.fetchPayload(finalToken))
+                                        .thenApply(json -> new Fetched(json, true)));
 
-        final boolean remote = localPayload == null;
-        CompletableFuture<String> payloadFuture = !remote
-                ? CompletableFuture.completedFuture(localPayload)
-                : EditorSecurity.supplyAsync(transports::get).thenCompose(t -> t.fetchPayload(finalToken));
-
-        return payloadFuture.thenCompose(payloadJson -> {
-            sendMessage(callerId, "RTP: Validating payload integrity and syntax...");
+        return payloadFuture.thenCompose(fetched -> {
+            sendMessage(callerId, EditorChannelWiring.message("editorApplyValidating",
+                    "[P0] Validating payload integrity and syntax..."));
             // Byte-store payloads are untrusted transport: their digest is mandatory
-            return EditorSessionManager.getInstance().applyPayload(payloadJson, remote);
+            return EditorSessionManager.getInstance().applyPayload(fetched.json(), fetched.remote());
         }).thenRun(() -> {
             if (fromSession) EditorSessionManager.getInstance().removeSession(finalToken);
-            sendMessage(callerId, "RTP: Successfully applied configurations and hot-reloaded! (.bak copies created for dirty files)");
+            sendMessage(callerId, EditorChannelWiring.message("editorApplySuccess",
+                    "[P0] Successfully applied configurations and hot-reloaded! (.bak copies created for dirty files)"));
         }).exceptionally(throwable -> {
             // S-004: Zero silent swallows on invalid token or apply failure; the token is not echoed
             Throwable cause = EditorChannelWiring.cause(throwable);
@@ -172,12 +154,49 @@ public class ApplyCmd extends BaseRTPCmdImpl {
                 return null;
             }
             RTP.log(Level.WARNING, "[editor] apply of session " + shown + " failed: " + cause.getMessage(), cause);
-            sendMessage(callerId, "RTP: Failed to apply payload: " + cause.getMessage());
+            sendMessage(callerId, EditorChannelWiring.message("editorApplyFailed",
+                    "[P0] Failed to apply payload: [reason]")
+                    .replace("[reason]", String.valueOf(cause.getMessage())));
             return null;
         });
     }
 
-    private void sendMessage(@Nullable UUID callerId, String msg) {
+    /** Payload JSON and whether it came from the byte store (digest mandatory). */
+    private record Fetched(String json, boolean remote) {
+    }
+
+    /**
+     * Contents of {@code <pluginDir>/editor/<token>.json} (or {@code editor/apply.json} for token {@code apply}),
+     * or {@code null} when absent or unreadable. Blocking disk I/O: call off the main thread only (S-005).
+     */
+    @Nullable
+    private static String readOfflineDrop(@Nullable UUID callerId, String token, String shown) {
+        if (RTP.serverAccessor == null) return null;
+        try {
+            File pluginDir = RTP.serverAccessor.getPluginDirectory();
+            if (pluginDir == null) return null;
+            Path editorDir = pluginDir.toPath().resolve("editor");
+            Path tokenFile = editorDir.resolve(token.endsWith(".json") ? token : token + ".json");
+            if (!Files.exists(tokenFile) && "apply".equalsIgnoreCase(token)) {
+                tokenFile = editorDir.resolve("apply.json");
+            }
+            if (!Files.isRegularFile(tokenFile)) return null;
+            long size = Files.size(tokenFile);
+            if (size > EditorSessionManager.MAX_PAYLOAD_BYTES) {
+                throw new IllegalArgumentException("offline apply file too large (" + size + " bytes; max " + EditorSessionManager.MAX_PAYLOAD_BYTES + ")");
+            }
+            return Files.readString(tokenFile, StandardCharsets.UTF_8);
+        } catch (IOException | RuntimeException e) {
+            // S-004: an unreadable drop file falls through to the byte store, but is reported
+            RTP.log(Level.WARNING, "[editor] offline apply file for session " + shown + " unreadable: " + e.getMessage(), e);
+            sendMessage(callerId, EditorChannelWiring.message("editorApplyFileUnreadable",
+                    "[P0] The offline apply file could not be read ([reason]); trying the byte store.")
+                    .replace("[reason]", String.valueOf(e.getMessage())));
+            return null;
+        }
+    }
+
+    private static void sendMessage(@Nullable UUID callerId, String msg) {
         if (callerId == null || RTP.serverAccessor == null) return;
         try {
             RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);

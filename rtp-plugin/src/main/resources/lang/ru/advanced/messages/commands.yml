@@ -506,5 +506,10 @@ editorUntrustNone: "&7[P0] Ни один доверенный браузер р�
 editorUntrustFailed: "&c[P0] Не удалось обновить список доверенных редакторов: [reason]"
 editorApplyDigestMissing: "&c[P0] В данных редактора нет контрольной суммы sha256, поэтому они не применены. Подтвердите изменения снова с актуальной страницы редактора."
 editorApplyFileUnreadable: "&e[P0] Не удалось прочитать файл офлайн-применения ([reason]); пробуем хранилище байтов."
+editorApplyUsage: "&c[P0] Использование: /rtp editor apply token=<token>"
+editorApplyFetching: "&7[P0] Получение данных конфигурации..."
+editorApplyValidating: "&7[P0] Проверка целостности и синтаксиса данных..."
+editorApplySuccess: "&a[P0] Конфигурация применена и перезагружена на лету! (созданы копии .bak изменённых файлов)"
+editorApplyFailed: "&c[P0] Не удалось применить данные: [reason]"
 
 version: 1.0

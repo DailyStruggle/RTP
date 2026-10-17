@@ -424,5 +424,15 @@ public enum CommandMessages {
   /** {@code /rtp editor apply}: the byte-store payload has no sha256 checksum. No placeholders. */
   editorApplyDigestMissing,
   /** {@code /rtp editor apply}: the offline apply file could not be read. {@code [reason]}. */
-  editorApplyFileUnreadable
+  editorApplyFileUnreadable,
+  /** {@code /rtp editor apply} without a valid token. No placeholders. */
+  editorApplyUsage,
+  /** {@code /rtp editor apply}: the payload fetch started. No placeholders. */
+  editorApplyFetching,
+  /** {@code /rtp editor apply}: the payload arrived and is being validated. No placeholders. */
+  editorApplyValidating,
+  /** {@code /rtp editor apply}: the payload was applied and the configs reloaded. No placeholders. */
+  editorApplySuccess,
+  /** {@code /rtp editor apply}: fetching, validating or applying the payload failed. {@code [reason]}. */
+  editorApplyFailed
 }

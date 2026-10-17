@@ -506,6 +506,11 @@ editorUntrustNone: "&7[P0] Nenhum navegador confiável do editor corresponde a [
 editorUntrustFailed: "&c[P0] Não foi possível atualizar a lista de editores confiáveis: [reason]"
 editorApplyDigestMissing: "&c[P0] O payload do editor não tem checksum sha256, por isso não foi aplicado. Confirme novamente a partir de uma página do editor atualizada."
 editorApplyFileUnreadable: "&e[P0] Não foi possível ler o arquivo de aplicação offline ([reason]); tentando o armazenamento de bytes."
+editorApplyUsage: "&c[P0] Uso: /rtp editor apply token=<token>"
+editorApplyFetching: "&7[P0] Obtendo o payload de configuração..."
+editorApplyValidating: "&7[P0] Validando a integridade e a sintaxe do payload..."
+editorApplySuccess: "&a[P0] Configuração aplicada e recarregada a quente! (cópias .bak criadas para os arquivos modificados)"
+editorApplyFailed: "&c[P0] Não foi possível aplicar o payload: [reason]"
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

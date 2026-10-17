@@ -507,6 +507,11 @@ editorUntrustNone: "&7[P0] Aucun navigateur approuvé de l'éditeur ne correspon
 editorUntrustFailed: "&c[P0] Impossible de mettre à jour la liste des éditeurs approuvés : [reason]"
 editorApplyDigestMissing: "&c[P0] La charge de l'éditeur n'a pas de somme de contrôle sha256, elle n'a donc pas été appliquée. Valide à nouveau depuis une page de l'éditeur à jour."
 editorApplyFileUnreadable: "&e[P0] Le fichier d'application hors ligne est illisible ([reason]) ; tentative via le stockage d'octets."
+editorApplyUsage: "&c[P0] Utilisation : /rtp editor apply token=<token>"
+editorApplyFetching: "&7[P0] Récupération de la charge de configuration..."
+editorApplyValidating: "&7[P0] Vérification de l'intégrité et de la syntaxe de la charge..."
+editorApplySuccess: "&a[P0] Configuration appliquée et rechargée à chaud ! (copies .bak créées pour les fichiers modifiés)"
+editorApplyFailed: "&c[P0] Impossible d'appliquer la charge : [reason]"
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

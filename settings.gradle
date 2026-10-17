@@ -85,6 +85,12 @@ pluginManagement {
     }
 }
 
+// Toolchain auto-provisioning: Gradle downloads a missing JDK 21 (the subprojects
+// javaToolchain) so hosts without one, such as the Qodana container, can still import.
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+}
+
 rootProject.name = 'RTP'
 
 // commands-api and effects-api are in-tree Gradle modules (under api/), consumed

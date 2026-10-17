@@ -504,5 +504,10 @@ editorUntrustNone: "&7[P0] Ningún navegador de confianza del editor coincide co
 editorUntrustFailed: "&c[P0] No se pudo actualizar la lista de editores de confianza: [reason]"
 editorApplyDigestMissing: "&c[P0] La carga del editor no tiene suma de comprobación sha256, así que no se aplicó. Vuelve a confirmar desde una página del editor actualizada."
 editorApplyFileUnreadable: "&e[P0] No se pudo leer el archivo de aplicación sin conexión ([reason]); se intentará con el almacén de bytes."
+editorApplyUsage: "&c[P0] Uso: /rtp editor apply token=<token>"
+editorApplyFetching: "&7[P0] Obteniendo la carga de configuración..."
+editorApplyValidating: "&7[P0] Validando la integridad y la sintaxis de la carga..."
+editorApplySuccess: "&a[P0] ¡Configuración aplicada y recargada en caliente! (se crearon copias .bak de los archivos modificados)"
+editorApplyFailed: "&c[P0] No se pudo aplicar la carga: [reason]"
 
 version: 1.0

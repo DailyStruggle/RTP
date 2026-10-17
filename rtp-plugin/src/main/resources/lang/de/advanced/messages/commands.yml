@@ -507,6 +507,11 @@ editorUntrustNone: "&7[P0] Kein vertrauter Editor-Browser passt zu [key]."
 editorUntrustFailed: "&c[P0] Die Liste vertrauter Editoren konnte nicht aktualisiert werden: [reason]"
 editorApplyDigestMissing: "&c[P0] Die Editor-Nutzlast hat keine sha256-Prüfsumme und wurde nicht angewendet. Übernimm die Änderungen erneut von einer aktuellen Editor-Seite."
 editorApplyFileUnreadable: "&e[P0] Die Offline-Apply-Datei konnte nicht gelesen werden ([reason]); versuche den Byte-Store."
+editorApplyUsage: "&c[P0] Verwendung: /rtp editor apply token=<token>"
+editorApplyFetching: "&7[P0] Konfigurations-Nutzlast wird abgerufen..."
+editorApplyValidating: "&7[P0] Integrität und Syntax der Nutzlast werden geprüft..."
+editorApplySuccess: "&a[P0] Konfiguration angewendet und im laufenden Betrieb neu geladen! (.bak-Kopien für geänderte Dateien erstellt)"
+editorApplyFailed: "&c[P0] Die Nutzlast konnte nicht angewendet werden: [reason]"
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

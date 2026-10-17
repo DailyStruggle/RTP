@@ -1,6 +1,8 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.mock.MockRTPScheduler;
+import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,9 +20,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -585,6 +591,44 @@ class EditorTransportAndApplyTest {
         applyCmd.applyToken(UUID.randomUUID(), "apply").join();
 
         assertTrue(Files.readString(configFile).contains("radius: 9999"));
+    }
+
+    @Test
+    @DisplayName("S-005: offline drop lookup and read run on the async pool, not the calling main thread")
+    void offlineDropReadRunsOffMainThread() throws Exception {
+        Path pluginPath = RTP.serverAccessor.getPluginDirectory().toPath();
+        Path editorDir = pluginPath.resolve("editor");
+        Files.createDirectories(editorDir);
+        Path configFile = pluginPath.resolve("config.yml");
+        Files.writeString(configFile, "radius: 500\n");
+        String dropPayload = EditorSessionManager.getInstance().createPayloadJson(Map.of("config.yml", "radius: 7777\n"));
+        Files.writeString(editorDir.resolve("apply.json"), dropPayload);
+
+        MockRTPScheduler scheduler = ((MockRTPServerAccessor) RTP.serverAccessor).getMockScheduler().enableServerThreads();
+        // The drop lookup is the pipeline's first plugin-directory access; record the lane of every access
+        List<Optional<MockRTPScheduler.Lane>> lanes = new CopyOnWriteArrayList<>();
+        RTP.serverAccessor = new MockRTPServerAccessor(pluginPath.toFile()) {
+            @Override
+            public File getPluginDirectory() {
+                lanes.add(Optional.ofNullable(scheduler.currentLane()));
+                return super.getPluginDirectory();
+            }
+        };
+        try {
+            HttpClient errorClient = new MockErrorHttpClient(500, "Should not hit bytebin for local file drop");
+            ApplyCmd applyCmd = new ApplyCmd(null, new EditorHttpTransport(errorClient, "https://mock.bytebin", "https://editor.rtp"));
+
+            CompletableFuture<CompletableFuture<Void>> started = new CompletableFuture<>();
+            scheduler.runTask(() -> started.complete(applyCmd.applyToken(UUID.randomUUID(), "apply")));
+            started.get(5, TimeUnit.SECONDS).get(15, TimeUnit.SECONDS);
+
+            assertFalse(lanes.isEmpty(), "the drop lookup resolves the plugin directory");
+            assertEquals(Optional.of(MockRTPScheduler.Lane.ASYNC), lanes.get(0),
+                    "offline drop file I/O must not run on the main thread");
+            assertTrue(Files.readString(configFile).contains("radius: 7777"));
+        } finally {
+            scheduler.shutdown();
+        }
     }
 
     @Test
