@@ -45,6 +45,22 @@ Message values accept, in any combination:
 
 ---
 
+## Web Editor Apply Messages (`commands.yml`)
+
+Feedback sent to the operator running `/rtp editor apply token=<token>`.
+
+| Key | Sent when | Placeholders |
+|---|---|---|
+| `editorApplyUsage` | The command has no token, or the token is malformed. | - |
+| `editorApplyFetching` | The token was accepted and the payload lookup started. | - |
+| `editorApplyValidating` | The payload arrived and its checksum and syntax are being checked. | - |
+| `editorApplySuccess` | The payload was written (with `.bak` copies of changed files) and the configs hot-reloaded. | - |
+| `editorApplyFailed` | Fetching, validating or applying the payload failed. | `[reason]` |
+| `editorApplyDigestMissing` | A byte-store payload has no `sha256` checksum, so it was refused. | - |
+| `editorApplyFileUnreadable` | The offline drop file (`editor/<token>.json`) could not be read; the byte store is tried next. | `[reason]` |
+
+---
+
 ## Useful UI Glyphs & Icons
 
 RTP menus, prompts, and message configurations utilize decorative glyphs and icons to deliver an intuitive, polished in-game interface. Because messages may be displayed both in-game and on the server terminal, consider the target medium when selecting glyphs:

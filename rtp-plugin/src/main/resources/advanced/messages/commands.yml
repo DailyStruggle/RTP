@@ -555,5 +555,18 @@ editorApplyDigestMissing: "&c[P0] The editor payload has no sha256 checksum, so 
 # Sent when the offline apply file (editor/<token>.json) cannot be read. Placeholder: [reason].
 editorApplyFileUnreadable: "&e[P0] The offline apply file could not be read ([reason]); trying the byte store."
 
+# Sent when /rtp editor apply has no valid token. No placeholders.
+editorApplyUsage: "&c[P0] Usage: /rtp editor apply token=<token>"
+
+# Progress of /rtp editor apply. No placeholders.
+editorApplyFetching: "&7[P0] Fetching configuration payload..."
+editorApplyValidating: "&7[P0] Validating payload integrity and syntax..."
+
+# Sent when /rtp editor apply wrote the payload and hot-reloaded. No placeholders.
+editorApplySuccess: "&a[P0] Successfully applied configurations and hot-reloaded! (.bak copies created for dirty files)"
+
+# Sent when /rtp editor apply failed. Placeholder: [reason].
+editorApplyFailed: "&c[P0] Failed to apply payload: [reason]"
+
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

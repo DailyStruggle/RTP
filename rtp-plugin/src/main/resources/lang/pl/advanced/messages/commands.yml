@@ -511,6 +511,11 @@ editorUntrustNone: "&7[P0] Żadna zaufana przeglądarka edytora nie pasuje do [k
 editorUntrustFailed: "&c[P0] Nie udało się zaktualizować listy zaufanych edytorów: [reason]"
 editorApplyDigestMissing: "&c[P0] Ładunek edytora nie ma sumy kontrolnej sha256, więc nie został zastosowany. Zatwierdź ponownie z aktualnej strony edytora."
 editorApplyFileUnreadable: "&e[P0] Nie udało się odczytać pliku zastosowania offline ([reason]); próba z magazynem bajtów."
+editorApplyUsage: "&c[P0] Użycie: /rtp editor apply token=<token>"
+editorApplyFetching: "&7[P0] Pobieranie ładunku konfiguracji..."
+editorApplyValidating: "&7[P0] Sprawdzanie integralności i składni ładunku..."
+editorApplySuccess: "&a[P0] Konfiguracja zastosowana i przeładowana na gorąco! (utworzono kopie .bak zmienionych plików)"
+editorApplyFailed: "&c[P0] Nie udało się zastosować ładunku: [reason]"
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

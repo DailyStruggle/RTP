@@ -505,5 +505,10 @@ editorUntrustNone: "&7[P0] Geen vertrouwde editorbrowser komt overeen met [key].
 editorUntrustFailed: "&c[P0] De lijst met vertrouwde editors kon niet worden bijgewerkt: [reason]"
 editorApplyDigestMissing: "&c[P0] De editorpayload heeft geen sha256-controlesom en is niet toegepast. Bevestig opnieuw vanaf een bijgewerkte editorpagina."
 editorApplyFileUnreadable: "&e[P0] Het offline toepassingsbestand kon niet worden gelezen ([reason]); de bytestore wordt geprobeerd."
+editorApplyUsage: "&c[P0] Gebruik: /rtp editor apply token=<token>"
+editorApplyFetching: "&7[P0] Configuratiepayload wordt opgehaald..."
+editorApplyValidating: "&7[P0] Integriteit en syntaxis van de payload worden gecontroleerd..."
+editorApplySuccess: "&a[P0] Configuratie toegepast en live herladen! (.bak-kopieën gemaakt van gewijzigde bestanden)"
+editorApplyFailed: "&c[P0] De payload kon niet worden toegepast: [reason]"
 
 version: 1.0

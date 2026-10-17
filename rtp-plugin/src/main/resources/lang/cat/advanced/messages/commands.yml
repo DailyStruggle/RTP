@@ -508,5 +508,10 @@ editorUntrustNone: "&7[P0] Cap navegador de confiança de l'editor coincideix am
 editorUntrustFailed: "&c[P0] No s'ha pogut actualitzar la llista d'editors de confiança: [reason]"
 editorApplyDigestMissing: "&c[P0] La càrrega de l'editor no té suma de verificació sha256 i no s'ha aplicat. Torna a confirmar des d'una pàgina de l'editor actualitzada."
 editorApplyFileUnreadable: "&e[P0] No s'ha pogut llegir el fitxer d'aplicació fora de línia ([reason]); s'intenta amb el magatzem de bytes."
+editorApplyUsage: "&c[P0] Ús: /rtp editor apply token=<token>"
+editorApplyFetching: "&7[P0] S'està obtenint la càrrega de configuració..."
+editorApplyValidating: "&7[P0] S'està validant la integritat i la sintaxi de la càrrega..."
+editorApplySuccess: "&a[P0] Configuració aplicada i recarregada en calent! (s'han creat còpies .bak dels fitxers modificats)"
+editorApplyFailed: "&c[P0] No s'ha pogut aplicar la càrrega: [reason]"
 
 version: 1.0

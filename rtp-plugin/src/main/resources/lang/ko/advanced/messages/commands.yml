@@ -492,5 +492,10 @@ editorUntrustNone: "&7[P0] [key]와 일치하는 신뢰된 에디터 브라우�
 editorUntrustFailed: "&c[P0] 신뢰된 에디터 목록을 업데이트할 수 없습니다: [reason]"
 editorApplyDigestMissing: "&c[P0] 에디터 페이로드에 sha256 체크섬이 없어 적용되지 않았습니다. 최신 에디터 페이지에서 다시 커밋하세요."
 editorApplyFileUnreadable: "&e[P0] 오프라인 적용 파일을 읽을 수 없습니다([reason]). 바이트 저장소를 시도합니다."
+editorApplyUsage: "&c[P0] 사용법: /rtp editor apply token=<token>"
+editorApplyFetching: "&7[P0] 설정 페이로드를 가져오는 중..."
+editorApplyValidating: "&7[P0] 페이로드 무결성과 구문을 검증하는 중..."
+editorApplySuccess: "&a[P0] 설정을 적용하고 핫 리로드했습니다! (변경된 파일의 .bak 사본을 만들었습니다)"
+editorApplyFailed: "&c[P0] 페이로드를 적용하지 못했습니다: [reason]"
 
 version: 1.0
