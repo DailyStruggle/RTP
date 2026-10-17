@@ -6,7 +6,7 @@ import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
@@ -260,7 +260,7 @@ final class MenuWiringSupportInstallerTest {
                         "messages.yml", "testKey", false, "testVal", java.util.List.of(new int[]{0, 4}));
 
         // invoke resolveHitHover
-        Object hover = mHover.invoke(null, profile, hit);
+        mHover.invoke(null, profile, hit);
 
         // invoke resolveYamlRoot
         Method mYaml = MenuWiringSupportInstaller.class.getDeclaredMethod("resolveYamlRoot", String.class);

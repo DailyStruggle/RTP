@@ -276,6 +276,19 @@ Implications:
 
 See `helpers/PeriodicWorldSaver/README.md` for the runtime model. Folia is excluded because the main-thread sweep would hit `ThreadAccessException`; a `RegionScheduler` variant remains future work.
 
+### Region-file decode that drops data must answer UNKNOWN, not "all air" (2026-10-13)
+
+On a Paper 26.3 world (DataVersion 5023, `region-file-compression=lz4`), `/rtp scan` ran at about 9,000 chunks/s with 0.1% land and generated nothing (FINE counters: every probe was `scanShortCircuit`). Two causes, both in `AnvilReader`:
+
+- **The block palette format changed in 26.3.** A state with no properties is a bare string (`"minecraft:stone"`). A state with properties is `{id, properties}`, not `{Name, Properties}`. When a list mixes both, Minecraft wraps each string as `{"": "minecraft:stone"}`. The decoder only knew `{Name}`, so it dropped every section without an error. The column probe then read an empty chunk as all air, and the vertical adjustor returned `SCAN_MISS`, a final reject. `AnvilPrefilter` already treated an empty decode as `UNKNOWN:no-sections`, but the column probe had no matching check. Biome palettes, which were always bare strings, still decoded, so the probe looked healthy.
+- **Proto-chunks.** Paper saves chunks that stopped part-way through generation (`Status` such as `structure_starts`, `biomes`, `terrain`) beside the generated area. They fill the region header, so they count as generated, and they read as air. Only a native load finishes them. On this world 86% of saved chunks were proto-chunks.
+
+The bug stayed hidden until LZ4 support (2026-10-05): before that, every LZ4 chunk threw in the decoder, fell through to a full load, and was correct but slow.
+
+Lessons: a decoder that drops data shall make the read UNKNOWN, never return a partial view that callers trust. Check `Status` before trusting a chunk's blocks. Add a real fixture for every new DataVersion: the 26.1 fixture (4788) still used `{Name}`. Before guessing at a cause, count `Status` values and dump one chunk's NBT from the real `.mca` files.
+
+Guards: `anvil/real/26_3_R1/r.0.0.mca` (LZ4; one full chunk and two proto-chunks at their original slots). `AnvilFixtureParityTest#realFixtureDecodesTerrain` requires non-air blocks from every real fixture, and `realProtoChunksAreUnknown` requires UNKNOWN for proto-chunks. `ScanTaskAdvancedCoverageTest#nullProbeOnGeneratedChunk_loadsChunkWithoutMarkingBad` requires a null probe to load the chunk. Reverting the palette fix fails five fixture tests.
+
 ---
 
 ## Stress Testing
@@ -294,6 +307,17 @@ Implications for anyone running stress tests:
 
 Recorded as a potential third-party interaction worth a deeper investigation when stress-testing priorities allow; an `EXTERNAL_HOOKS.md` row is **not** warranted yet because RTP adds no reflection or soft-depend for EssentialsX — the interference is purely runtime event ordering when `/tpr` is dispatched on Spigot.
 
+### Leak fuzzing: what a verdict does and does not mean (2026-10-11)
+
+Full methodology and findings: [`helpers/StressTestRTP/LEAK_FUZZING.md`](../../helpers/StressTestRTP/LEAK_FUZZING.md).
+
+- **A cached record that holds a live `Player` is a leak for as long as the cache lives.** LeafRTP's last-teleport cache (cooldowns, `/rtp back`) held the sender; the cleanup-time `toPureData()` copy re-attached on the next permission or message call, `clone()` copied the live player, and Folia never detached. Detaching at one exit path is not enough: hold the player only through a `WeakReference` so no path can pin it (3.3.0 fix).
+- **Score against a control from the same run.** `direct` (no plugin) is what separates vanilla structure-template and chunk growth from the plugin's. A target run without it counts everything the server does against the plugin.
+- **Use growth per repetition, not a long idle wait.** A cache that fills once and a leak both show `+N` after one episode; only the slope over repeated runs separates them. A 240 s wait cost about 5 minutes per episode and per shrink probe.
+- **INCONCLUSIVE and PASS are budget statements.** BetterRTP's confirmed leak came out INCONCLUSIVE when a tool bug rejected every rung above 8 bots, and PASS in an 8-episode screening run because the race reproduces only some of the time.
+- **Check the units behind a score.** Counts the control cannot have (a plugin's own live instances) default to a noise of 1 object, so 1 KB of objects produced "3 of 3" candidates and scores of +700/min while live bytes matched the control.
+- **The histogram says what is retained, not who holds it.** Take the heap dump before any restart; reading the plugin's bytecode along the shrunk reproducer is a fast cross-check of the GC root path.
+
 ---
 
 ## Build & Environment
@@ -301,6 +325,10 @@ Recorded as a potential third-party interaction worth a deeper investigation whe
 ### Gradle daemon / Java version mismatch
 
 The Gradle daemon caches the JVM it was started with. If the active JDK changes between sessions (e.g., Java 17 → Java 25), Gradle logs a daemon-context mismatch and starts a new daemon. This is normal; do **not** kill or restart the daemon manually.
+
+### `gradlew.bat` lock wrapper: never splice `%*` into PowerShell source (2026-10-05)
+
+The Windows lock wrapper once pasted `%*` into an inline `powershell -Command "..."` script. A quoted argument such as `--tests "*Foo*"` closed that string early, so PowerShell failed to parse and printed only `#< CLIXML`, with exit 1 and no Gradle output (it looked like an idle hang). The lock logic now lives in `gradle/rtp-gradle-lock.ps1`: `gradlew.bat` passes its arguments only as data (`RTP_GRADLE_RAW_ARGS`, set unquoted outside any parenthesized block), and the script re-runs `gradlew.bat` with `cmd /d /s /c --% ""%RTP_GRADLE_SELF%" %RTP_GRADLE_RAW_ARGS%"`, which keeps the original command line byte for byte. Call the native command at script level, not from a function: a function captures Gradle's output as its return value instead of letting it stream.
 
 ## 2026-05-02 - StressTestRTP spark profiles empty when --only-ticks-over is set
 
@@ -786,6 +814,10 @@ Empirical results showed:
 - **Hard complexity limit:** Spatial index representations in the memory shape pipeline have reached an empirical boundary where additional geometric pre-processing steps cost substantially more compute than any marginal compaction can save.
 
 ---
+
+## 2026-10-12 - Folia benchmark: `chunk-system.io-threads: -1` is one IO thread
+
+Paper/Folia `paper-global.yml` `chunk-system.io-threads: -1` runs a single chunk IO thread (any value below zero). At 200+ TP/s every arrival queues ~25 chunk reads, and a villager in the fresh destination region blocks its region thread in `AcquirePoi` -> `PoiManager.getOrLoad` -> `ChunkHolderManager.loadPoiChunk` (`LockSupport.park`) until that one IO thread reaches it; the Folia watchdog logged 6-16 s stalls and 44 s slow teleports. Parked time reads as idle in spark, so region threads looked 83% idle. Set `io-threads` explicitly (16 on a 32-core host) for high-rate Folia benchmarks. `worker-threads: -1` already scales (half the physical cores).
 
 ## Git & Workspace Safety
 

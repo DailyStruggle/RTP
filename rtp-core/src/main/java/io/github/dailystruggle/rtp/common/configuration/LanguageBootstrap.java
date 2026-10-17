@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.logging.Level;
+import java.util.regex.Pattern;
 
 /**
  * Bootstrap loader for active locale (ADR-020).
@@ -24,6 +25,8 @@ public final class LanguageBootstrap {
 
   /** Default locale when no value is configured. */
   public static final String DEFAULT_LOCALE = "en";
+
+  private static final Pattern SAFE_LOCALE = Pattern.compile("[A-Za-z0-9_-]+");
 
   private LanguageBootstrap() {}
 
@@ -74,7 +77,7 @@ public final class LanguageBootstrap {
     if (locale == null) return DEFAULT_LOCALE;
     String normalized = locale.trim();
     if (normalized.isEmpty()) return DEFAULT_LOCALE;
-    if (!normalized.matches("[A-Za-z0-9_-]+")) {
+    if (!SAFE_LOCALE.matcher(normalized).matches()) {
       RTP.log(Level.WARNING,
           "[RTP] Invalid language '" + locale + "' in " + FILE_NAME
               + "; falling back to '" + DEFAULT_LOCALE + "'.");

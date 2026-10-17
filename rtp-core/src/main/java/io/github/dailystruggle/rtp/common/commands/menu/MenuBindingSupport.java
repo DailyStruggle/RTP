@@ -9,7 +9,6 @@ import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 
 import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -33,38 +32,7 @@ public final class MenuBindingSupport {
    * @return resolved {@link MenuRenderer}, or {@code null}
    */
   public static @Nullable MenuRenderer discoverRenderer() {
-    List<String> ids = configuredRendererIds();
-
-    Map<String, MenuRendererProvider> byId = discoverRendererProviders();
-
-    for (String id : ids) {
-      MenuRendererProvider provider = byId.get(id);
-      if (provider == null) {
-        RTP.log(
-            Level.WARNING,
-            "menu.renderer '" + id + "' has no provider on this platform");
-        continue;
-      }
-      try {
-        MenuRenderer r = provider.create();
-        if (r != null) return r;
-      } catch (RuntimeException | LinkageError ex) {
-        // A universal / lite jar may carry a platform provider whose renderer
-        // class hard-references a runtime type absent on this server (e.g. the
-        // Paper Adventure-Book renderer referencing net.kyori...Component on
-        // plain Spigot). That surfaces as a LinkageError (NoClassDefFoundError),
-        // not a RuntimeException; catch both so discovery degrades to the
-        // configurable menuInvalid fallback rather than aborting plugin enable.
-        RTP.log(
-            Level.WARNING,
-            "failed to instantiate menu.renderer '" + id + "': " + ex,
-            ex);
-      }
-    }
-    RTP.log(
-        Level.WARNING,
-        "menu.renderer list exhausted (" + ids + "); /rtp menu open-page disabled");
-    return null;
+    return io.github.dailystruggle.rtp.common.commands.base.MenuRendererDiscovery.discoverRenderer();
   }
 
   /**
@@ -135,39 +103,6 @@ public final class MenuBindingSupport {
       ids.add("book");
     }
     return ids;
-  }
-
-  /**
-   * Discover every {@link MenuRendererProvider} on the runtime classpath, keyed
-   * by {@link MenuRendererProvider#id()} (first registration wins on a duplicate
-   * id; later ones skipped).
-   */
-  private static Map<String, MenuRendererProvider> discoverRendererProviders() {
-    Map<String, MenuRendererProvider> byId = new LinkedHashMap<>();
-    PlatformFamily family = currentPlatformFamily();
-    ServiceLoader<MenuRendererProvider> loader =
-        ServiceLoader.load(
-            MenuRendererProvider.class, MenuRendererProvider.class.getClassLoader());
-    for (MenuRendererProvider provider : loadProvidersSafely(loader, "menu renderer provider")) {
-      // Skip a provider bound to a different platform. A universal jar shades
-      // the Paper, Fabric, and NeoForge adapters together, so all three
-      // `book` providers are on the runtime classpath; without this gate the
-      // first-enumerated provider would win and the wrong platform's renderer
-      // could be selected (e.g. the Fabric book renderer on Paper, which then
-      // degrades to the chat fallback because it cannot open a book for a
-      // non-Fabric player).
-      if (!matchesPlatform(provider.platformFamily(), family)) continue;
-      String id;
-      try {
-        id = provider.id();
-      } catch (RuntimeException ex) {
-        RTP.log(Level.WARNING, "menu renderer provider id() threw: " + ex.getMessage(), ex);
-        continue;
-      }
-      if (id == null) continue;
-      byId.putIfAbsent(id.trim().toLowerCase(Locale.ROOT), provider);
-    }
-    return byId;
   }
 
   /**

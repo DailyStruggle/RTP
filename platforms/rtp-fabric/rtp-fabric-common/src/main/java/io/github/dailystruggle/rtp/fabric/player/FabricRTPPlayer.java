@@ -36,12 +36,15 @@ public final class FabricRTPPlayer
 
     private final UUID uuid;
     private final String name;
-    private volatile @Nullable ServerPlayer handle;
+    // Weak: a cached copy of this wrapper (teleport history, cooldown records) must never pin a
+    // quit player's ServerPlayer graph. The server's player list keeps it alive while online.
+    private volatile java.lang.ref.WeakReference<ServerPlayer> handleRef =
+            new java.lang.ref.WeakReference<>(null);
 
     public FabricRTPPlayer(ServerPlayer player) {
         this.uuid = player.getUUID();
         this.name = resolveName(player);
-        this.handle = player;
+        this.handleRef = new java.lang.ref.WeakReference<>(player);
     }
 
     /**
@@ -63,7 +66,7 @@ public final class FabricRTPPlayer
 
     /** Called by the event bridge when a player rejoins; refreshes the handle. */
     public void rebind(ServerPlayer player) {
-        this.handle = player;
+        this.handleRef = new java.lang.ref.WeakReference<>(player);
     }
 
     /**
@@ -73,12 +76,12 @@ public final class FabricRTPPlayer
      *         platform-typed target object via {@code Effect#setTarget(Object)}.
      */
     public @Nullable ServerPlayer handle() {
-        return handle;
+        return handleRef.get();
     }
 
     /** Called by the event bridge on disconnect; subsequent calls treat the player as offline. */
     public void unbind() {
-        this.handle = null;
+        this.handleRef = new java.lang.ref.WeakReference<>(null);
     }
 
     /**
@@ -92,7 +95,7 @@ public final class FabricRTPPlayer
      */
     @Override
     public boolean openBookMenu(FabricBookSpec spec) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || !isOnline() || spec == null) return false;
         FabricVersionAdapter adapter = FabricVersionAdapterRegistry.peek();
         if (adapter == null) return false;
@@ -125,7 +128,7 @@ public final class FabricRTPPlayer
         FabricVersionAdapter adapter = FabricVersionAdapterRegistry.peek();
         if (adapter == null || !adapter.supportsMapCharts()) return false;
         RTP.scheduler.runTask(() -> {
-            ServerPlayer p = handle;
+            ServerPlayer p = handleRef.get();
             if (p == null) return; // viewer went offline before the hop
             adapter.renderMapChart(p, chartKey, argb, locked, deliverItem);
         });
@@ -170,7 +173,7 @@ public final class FabricRTPPlayer
         // perms-api's own fallback ultimately calls the same op-level check, but
         // we wrap with a LinkageError guard and route the no-perms-api branch
         // through PlayerList.isOp(GameProfile), which is stable across versions.
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null) return false;
         if (permission == null || permission.isEmpty()) return true;
         // PRIMARY: consult fabric-permissions-api (LuckPerms-Fabric, Cyan,
@@ -284,7 +287,7 @@ public final class FabricRTPPlayer
         // (rtp.effect.*, rtp.onevent.*) registry-probe fallback. Op status is
         // detected by probing a known default:op node through hasPermission so the
         // ops.json scan / perms-api verdict is honoured without duplicating logic.
-        if (handle == null) return Collections.emptySet();
+        if (handleRef.get() == null) return Collections.emptySet();
         boolean isOp = hasPermission("rtp.reload");
         return FabricEffectivePermissionsResolver.resolve(uuid, isOp, this::hasPermission);
     }
@@ -311,7 +314,7 @@ public final class FabricRTPPlayer
      * lower-level API across versions.
      */
     public void sendComponent(Component component) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || component == null) return;
         try {
             if (p.connection != null) {
@@ -361,7 +364,7 @@ public final class FabricRTPPlayer
      * patch releases (NoSuchMethodError on 1.21.11).
      */
     public void sendTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null) return;
         if ((title == null || title.isEmpty()) && (subtitle == null || subtitle.isEmpty())) return;
         try {
@@ -394,7 +397,7 @@ public final class FabricRTPPlayer
      * same intermediary-stability rationale as {@link #sendTitle}.
      */
     public void sendActionbar(String message) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null) return;
         if (message == null || message.isEmpty()) return;
         try {
@@ -420,7 +423,7 @@ public final class FabricRTPPlayer
 
     @Override
     public void performCommand(@Nullable RTPPlayer player, String command) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || command == null) return;
         // Use Entity#getServer() rather than ServerPlayer#server - see setLocation
         // for the IllegalAccessError rationale (intermediary field_13995 is
@@ -543,7 +546,7 @@ public final class FabricRTPPlayer
     public RTPCommandSender clone() {
         // Same identity, same handle snapshot. Cloneable contract is loose for
         // command senders - the clone shares the handle until a rebind/unbind.
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null) {
             // No handle to clone from; return a detached placeholder that will
             // no-op on subsequent calls. Acceptable per the offline contract.
@@ -554,7 +557,7 @@ public final class FabricRTPPlayer
 
     @Override
     public CompletableFuture<Boolean> setLocation(RTPLocation to) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || to == null) {
             return CompletableFuture.completedFuture(false);
         }
@@ -582,7 +585,7 @@ public final class FabricRTPPlayer
         final double ty = to.getBlockY();
         final double tz = to.getBlockZ() + 0.5;
         return srv.submit(() -> {
-            ServerPlayer cur = handle;
+            ServerPlayer cur = handleRef.get();
             if (cur == null || cur.isRemoved()) return false;
             return performTeleport(cur, target, tx, ty, tz, cur.getYRot(), cur.getXRot());
         });
@@ -681,7 +684,7 @@ public final class FabricRTPPlayer
         // run there). The native setRespawnPosition signature drifts across MC
         // versions (the 5-arg ResourceKey/BlockPos form on 1.20.x-1.21.x, the
         // RespawnConfig form on 26.x), so resolve it reflectively like performTeleport.
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || to == null) return;
         RTPWorld<?> rtpWorld = to.world();
         if (!(rtpWorld instanceof FabricRTPWorld fw)) return;
@@ -693,7 +696,7 @@ public final class FabricRTPPlayer
         final int bz = to.getBlockZ();
         final ServerLevel targetFinal = target;
         srv.execute(() -> {
-            ServerPlayer cur = handle;
+            ServerPlayer cur = handleRef.get();
             if (cur == null || cur.isRemoved()) return;
             anchorRespawn(cur, targetFinal, bx, by, bz);
         });
@@ -756,7 +759,7 @@ public final class FabricRTPPlayer
 
     @Override
     public RTPLocation getLocation() {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null) return null;
         ServerLevel level = p.serverLevel();
         RTPWorld<?> rtpWorld = RTP.serverAccessor == null
@@ -768,7 +771,7 @@ public final class FabricRTPPlayer
 
     @Override
     public boolean isOnline() {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         return p != null && !p.isRemoved();
     }
 
@@ -792,7 +795,7 @@ public final class FabricRTPPlayer
     @Override
     public String getClientBlock(RTPLocation location) {
         if (location == null) return null;
-        if (handle == null) return null;
+        if (handleRef.get() == null) return null;
         if (!(location.world() instanceof FabricRTPWorld fw)) return null;
         ServerLevel level = fw.level();
         if (level == null) return null;
@@ -815,7 +818,7 @@ public final class FabricRTPPlayer
     @Override
     public void sendClientBlockChange(RTPLocation location, String blockData) {
         if (location == null || blockData == null) return;
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || p.connection == null) return;
         if (!(location.world() instanceof FabricRTPWorld fw)) return;
         ServerLevel level = fw.level();

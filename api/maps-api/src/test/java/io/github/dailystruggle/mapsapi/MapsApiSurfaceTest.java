@@ -20,6 +20,7 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -50,7 +51,9 @@ class MapsApiSurfaceTest {
                 RegionBiomesRgb.class.getName(),
                 MermaidChart.class.getName(),
                 io.github.dailystruggle.mapsapi.model.DualSparkline.class.getName(),
-                io.github.dailystruggle.mapsapi.model.CompositeRegionModel.class.getName());
+                io.github.dailystruggle.mapsapi.model.CompositeRegionModel.class.getName(),
+                io.github.dailystruggle.mapsapi.model.RegionWalkPath.class.getName(),
+                io.github.dailystruggle.mapsapi.model.SelectionHeatmap.class.getName());
         assertEquals(expected, permitted,
                 "ChartModel permits clause shall list exactly the documented record shapes");
     }
@@ -395,6 +398,209 @@ class MapsApiSurfaceTest {
         assertEquals(ds1.hashCode(), same.hashCode());
         org.junit.jupiter.api.Assertions.assertNotNull(ds1.toString());
         assertEquals(2, ds1.sampleCount());
+    }
+
+    @Test
+    @DisplayName("RegionWalkPath validations, defensive copy, and renderer sanity")
+    void regionWalkPathValidations() {
+        assertThrows(NullPointerException.class, () -> new io.github.dailystruggle.mapsapi.model.RegionWalkPath(null, 2, 2, new boolean[4], List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new io.github.dailystruggle.mapsapi.model.RegionWalkPath("r", 0, 2, new boolean[0], List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new io.github.dailystruggle.mapsapi.model.RegionWalkPath("r", 2, 0, new boolean[0], List.of()));
+        assertThrows(NullPointerException.class, () -> new io.github.dailystruggle.mapsapi.model.RegionWalkPath("r", 2, 2, null, List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new io.github.dailystruggle.mapsapi.model.RegionWalkPath("r", 2, 2, new boolean[3], List.of()));
+        assertThrows(NullPointerException.class, () -> new io.github.dailystruggle.mapsapi.model.RegionWalkPath("r", 2, 2, new boolean[4], null));
+
+        boolean[] domain = new boolean[]{true, true, false, false};
+        List<io.github.dailystruggle.mapsapi.model.RegionWalkPath.WalkStep> steps = List.of(
+            new io.github.dailystruggle.mapsapi.model.RegionWalkPath.WalkStep(0, 0, io.github.dailystruggle.mapsapi.model.RegionWalkPath.StepStatus.VALID, 0.0f),
+            new io.github.dailystruggle.mapsapi.model.RegionWalkPath.WalkStep(1, 0, io.github.dailystruggle.mapsapi.model.RegionWalkPath.StepStatus.HAZARD, 0.5f),
+            new io.github.dailystruggle.mapsapi.model.RegionWalkPath.WalkStep(0, 1, io.github.dailystruggle.mapsapi.model.RegionWalkPath.StepStatus.OUT_OF_BOUNDS, 1.0f)
+        );
+
+        io.github.dailystruggle.mapsapi.model.RegionWalkPath wp =
+            new io.github.dailystruggle.mapsapi.model.RegionWalkPath("region-wp", 2, 2, domain, steps);
+
+        // Mutating external domain doesn't change wp
+        domain[0] = false;
+        assertTrue(wp.insideDomain()[0]);
+        assertNotSame(wp.insideDomain(), wp.insideDomain());
+        assertEquals(3, wp.steps().size());
+        assertEquals(2, wp.boundW());
+        assertEquals(2, wp.boundH());
+
+        io.github.dailystruggle.mapsapi.image.ImageMapCanvas canvas =
+            new io.github.dailystruggle.mapsapi.image.ImageMapCanvas(16, 16);
+        io.github.dailystruggle.mapsapi.render.RegionWalkPathRenderer.INSTANCE.render(canvas, wp);
+        assertEquals(16, canvas.width());
+        assertEquals(16, canvas.height());
+
+        // Test with full bounds and backdrop
+        int[] biomes = new int[]{0x2ECC71, 0x2ECC71, 0x3498DB, 0x3498DB};
+        boolean[] hazards = new boolean[]{false, true, false, false};
+        io.github.dailystruggle.mapsapi.model.RegionWalkPath fullWp =
+            new io.github.dailystruggle.mapsapi.model.RegionWalkPath("region-wp2", 2, 2, -10, -10, 10, 10, domain, biomes, hazards, steps);
+        assertEquals(20, fullWp.boundW());
+        assertEquals(20, fullWp.boundH());
+        io.github.dailystruggle.mapsapi.render.RegionWalkPathRenderer.INSTANCE.render(canvas, fullWp);
+
+        // Branch tests for RegionWalkPathRenderer
+        assertThrows(IllegalArgumentException.class, () ->
+            io.github.dailystruggle.mapsapi.render.RegionWalkPathRenderer.INSTANCE.render(null, fullWp));
+        assertThrows(IllegalArgumentException.class, () ->
+            io.github.dailystruggle.mapsapi.render.RegionWalkPathRenderer.INSTANCE.render(canvas, null));
+
+        // Empty steps
+        io.github.dailystruggle.mapsapi.model.RegionWalkPath emptyStepsWp =
+            new io.github.dailystruggle.mapsapi.model.RegionWalkPath("empty", 2, 2, domain, List.of());
+        io.github.dailystruggle.mapsapi.render.RegionWalkPathRenderer.INSTANCE.render(canvas, emptyStepsWp);
+
+        // Backdrop without hazard mask (null hazardMask)
+        io.github.dailystruggle.mapsapi.model.RegionWalkPath noHazardMaskWp =
+            new io.github.dailystruggle.mapsapi.model.RegionWalkPath("no-hazard", 2, 2, -10, -10, 10, 10, domain, biomes, null, steps);
+        io.github.dailystruggle.mapsapi.render.RegionWalkPathRenderer.INSTANCE.render(canvas, noHazardMaskWp);
+
+        // No backdrop, domain with internal boundary edges
+        boolean[] domainWithEdges = new boolean[]{
+            false, false, false, false,
+            false, true,  true,  false,
+            false, true,  false, false,
+            false, false, false, false
+        };
+        io.github.dailystruggle.mapsapi.model.RegionWalkPath edgeWp =
+            new io.github.dailystruggle.mapsapi.model.RegionWalkPath("edges", 4, 4, domainWithEdges, steps);
+        io.github.dailystruggle.mapsapi.render.RegionWalkPathRenderer.INSTANCE.render(canvas, edgeWp);
+
+        // Large step count (>2000 steps)
+        List<io.github.dailystruggle.mapsapi.model.RegionWalkPath.WalkStep> largeSteps = new java.util.ArrayList<>();
+        for (int i = 0; i < 2005; i++) {
+            largeSteps.add(new io.github.dailystruggle.mapsapi.model.RegionWalkPath.WalkStep(
+                i % 10, i % 10,
+                (i % 3 == 0) ? io.github.dailystruggle.mapsapi.model.RegionWalkPath.StepStatus.VALID :
+                (i % 3 == 1) ? io.github.dailystruggle.mapsapi.model.RegionWalkPath.StepStatus.HAZARD :
+                               io.github.dailystruggle.mapsapi.model.RegionWalkPath.StepStatus.OUT_OF_BOUNDS,
+                (float) i / 2005f
+            ));
+        }
+        io.github.dailystruggle.mapsapi.model.RegionWalkPath largeWp =
+            new io.github.dailystruggle.mapsapi.model.RegionWalkPath("large", 2, 2, -10, -10, 10, 10, domain, biomes, hazards, largeSteps);
+        io.github.dailystruggle.mapsapi.render.RegionWalkPathRenderer.INSTANCE.render(canvas, largeWp);
+
+        // Test equals, hashCode, toString
+        io.github.dailystruggle.mapsapi.model.RegionWalkPath wpCopy =
+            new io.github.dailystruggle.mapsapi.model.RegionWalkPath("region-wp", 2, 2, wp.insideDomain(), steps);
+        assertEquals(wp, wpCopy);
+        assertEquals(wp.hashCode(), wpCopy.hashCode());
+        assertNotNull(wp.toString());
+        assertTrue(wp.toString().contains("region-wp"));
+        assertTrue(wp.equals(wp));
+        assertFalse(wp.equals(null));
+        assertFalse(wp.equals("other"));
+        org.junit.jupiter.api.Assertions.assertNotEquals(wp, fullWp);
+    }
+
+    @Test
+    @DisplayName("SelectionHeatmap validations, defensive copy, and renderer sanity")
+    void selectionHeatmapValidations() {
+        assertThrows(NullPointerException.class, () -> new io.github.dailystruggle.mapsapi.model.SelectionHeatmap(
+            null, 2, 2, -10, -10, 10, 10, new boolean[4], new int[4], new double[4], 1.0, List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new io.github.dailystruggle.mapsapi.model.SelectionHeatmap(
+            "r", 0, 2, -10, -10, 10, 10, new boolean[4], new int[4], new double[4], 1.0, List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new io.github.dailystruggle.mapsapi.model.SelectionHeatmap(
+            "r", 2, 0, -10, -10, 10, 10, new boolean[4], new int[4], new double[4], 1.0, List.of()));
+        assertThrows(NullPointerException.class, () -> new io.github.dailystruggle.mapsapi.model.SelectionHeatmap(
+            "r", 2, 2, -10, -10, 10, 10, null, new int[4], new double[4], 1.0, List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new io.github.dailystruggle.mapsapi.model.SelectionHeatmap(
+            "r", 2, 2, -10, -10, 10, 10, new boolean[3], new int[4], new double[4], 1.0, List.of()));
+        assertThrows(NullPointerException.class, () -> new io.github.dailystruggle.mapsapi.model.SelectionHeatmap(
+            "r", 2, 2, -10, -10, 10, 10, new boolean[4], new int[4], null, 1.0, List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new io.github.dailystruggle.mapsapi.model.SelectionHeatmap(
+            "r", 2, 2, -10, -10, 10, 10, new boolean[4], new int[4], new double[3], 1.0, List.of()));
+        assertThrows(NullPointerException.class, () -> new io.github.dailystruggle.mapsapi.model.SelectionHeatmap(
+            "r", 2, 2, -10, -10, 10, 10, new boolean[4], new int[4], new double[4], 1.0, null));
+        assertThrows(NullPointerException.class, () -> new io.github.dailystruggle.mapsapi.model.SelectionHeatmap.SelectionPoint(
+            0, 0, 1, null));
+
+        boolean[] domain = new boolean[]{true, true, true, false};
+        int[] biomes = new int[]{0x2ECC71, 0x2ECC71, 0x3498DB, 0x000000};
+        double[] density = new double[]{1.0, 5.0, 2.0, 0.0};
+        List<io.github.dailystruggle.mapsapi.model.SelectionHeatmap.SelectionPoint> pts = List.of(
+            new io.github.dailystruggle.mapsapi.model.SelectionHeatmap.SelectionPoint(
+                0, 0, 1, io.github.dailystruggle.mapsapi.model.SelectionHeatmap.SelectionType.QUEUE_L1),
+            new io.github.dailystruggle.mapsapi.model.SelectionHeatmap.SelectionPoint(
+                1, 0, 1, io.github.dailystruggle.mapsapi.model.SelectionHeatmap.SelectionType.QUEUE_L2),
+            new io.github.dailystruggle.mapsapi.model.SelectionHeatmap.SelectionPoint(
+                0, 1, 1, io.github.dailystruggle.mapsapi.model.SelectionHeatmap.SelectionType.ARRIVAL),
+            new io.github.dailystruggle.mapsapi.model.SelectionHeatmap.SelectionPoint(
+                5, 5, 2, io.github.dailystruggle.mapsapi.model.SelectionHeatmap.SelectionType.HAZARD_DISCARD),
+            new io.github.dailystruggle.mapsapi.model.SelectionHeatmap.SelectionPoint(
+                -20, -20, 1, io.github.dailystruggle.mapsapi.model.SelectionHeatmap.SelectionType.CANDIDATE) // Out of bounds
+        );
+
+        io.github.dailystruggle.mapsapi.model.SelectionHeatmap sh =
+            new io.github.dailystruggle.mapsapi.model.SelectionHeatmap("reg", 2, 2, -10, -10, 10, 10, domain, biomes, density, 5.0, pts);
+
+        // Mutating source arrays must not affect sh
+        domain[0] = false;
+        density[0] = 99.0;
+        assertTrue(sh.insideDomain()[0]);
+        assertEquals(1.0, sh.densityGrid()[0]);
+        assertNotSame(sh.insideDomain(), sh.insideDomain());
+        assertNotSame(sh.densityGrid(), sh.densityGrid());
+        assertNotNull(sh.biomeRgb());
+        assertEquals(5, sh.points().size());
+        assertEquals(20, sh.boundW());
+        assertEquals(20, sh.boundH());
+
+        // Test SelectionHeatmapRenderer input validation
+        assertThrows(IllegalArgumentException.class, () ->
+            io.github.dailystruggle.mapsapi.render.SelectionHeatmapRenderer.INSTANCE.render(null, sh));
+        assertThrows(IllegalArgumentException.class, () ->
+            io.github.dailystruggle.mapsapi.render.SelectionHeatmapRenderer.INSTANCE.render(new io.github.dailystruggle.mapsapi.image.ImageMapCanvas(10, 10), null));
+
+        // Test sampleHeatRamp across all thresholds
+        assertEquals(0xFF0D47A1, io.github.dailystruggle.mapsapi.render.SelectionHeatmapRenderer.sampleHeatRamp(-0.1));
+        assertTrue(io.github.dailystruggle.mapsapi.render.SelectionHeatmapRenderer.sampleHeatRamp(0.1) != 0);
+        assertTrue(io.github.dailystruggle.mapsapi.render.SelectionHeatmapRenderer.sampleHeatRamp(0.3) != 0);
+        assertTrue(io.github.dailystruggle.mapsapi.render.SelectionHeatmapRenderer.sampleHeatRamp(0.5) != 0);
+        assertTrue(io.github.dailystruggle.mapsapi.render.SelectionHeatmapRenderer.sampleHeatRamp(0.7) != 0);
+        assertTrue(io.github.dailystruggle.mapsapi.render.SelectionHeatmapRenderer.sampleHeatRamp(0.85) != 0);
+        assertTrue(io.github.dailystruggle.mapsapi.render.SelectionHeatmapRenderer.sampleHeatRamp(0.98) != 0);
+        assertEquals(0xFFFFFFFF, io.github.dailystruggle.mapsapi.render.SelectionHeatmapRenderer.sampleHeatRamp(1.1));
+
+        // Render to canvas
+        io.github.dailystruggle.mapsapi.image.ImageMapCanvas canvas =
+            new io.github.dailystruggle.mapsapi.image.ImageMapCanvas(32, 32);
+        io.github.dailystruggle.mapsapi.render.SelectionHeatmapRenderer.INSTANCE.render(canvas, sh);
+        assertEquals(32, canvas.width());
+        assertEquals(32, canvas.height());
+
+        // Render to canvas with a 5x5 grid so interior pixels and heat blending are exercised
+        boolean[] domain5x5 = new boolean[25];
+        Arrays.fill(domain5x5, true);
+        int[] biomes5x5 = new int[25];
+        Arrays.fill(biomes5x5, 0x2ECC71);
+        double[] density5x5 = new double[25];
+        density5x5[12] = 5.0; // center hot point
+        io.github.dailystruggle.mapsapi.model.SelectionHeatmap sh5x5 =
+            new io.github.dailystruggle.mapsapi.model.SelectionHeatmap("reg5", 5, 5, -10, -10, 10, 10, domain5x5, biomes5x5, density5x5, 5.0, pts);
+        io.github.dailystruggle.mapsapi.render.SelectionHeatmapRenderer.INSTANCE.render(canvas, sh5x5);
+
+        // Model with null biomes and zero density
+        io.github.dailystruggle.mapsapi.model.SelectionHeatmap emptySh =
+            new io.github.dailystruggle.mapsapi.model.SelectionHeatmap("reg2", 2, 2, -10, -10, 10, 10, new boolean[]{true, false, false, true}, null, new double[4], 0.0, List.of());
+        io.github.dailystruggle.mapsapi.render.SelectionHeatmapRenderer.INSTANCE.render(canvas, emptySh);
+
+        // Test equals, hashCode, toString
+        io.github.dailystruggle.mapsapi.model.SelectionHeatmap shCopy =
+            new io.github.dailystruggle.mapsapi.model.SelectionHeatmap("reg", 2, 2, -10, -10, 10, 10, sh.insideDomain(), biomes, sh.densityGrid(), 5.0, pts);
+        assertEquals(sh, shCopy);
+        assertEquals(sh.hashCode(), shCopy.hashCode());
+        assertNotNull(sh.toString());
+        assertTrue(sh.toString().contains("SelectionHeatmap"));
+        assertTrue(sh.equals(sh));
+        assertFalse(sh.equals(null));
+        assertFalse(sh.equals("other"));
+        org.junit.jupiter.api.Assertions.assertNotEquals(sh, emptySh);
     }
 
     @Test

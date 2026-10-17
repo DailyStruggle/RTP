@@ -40,9 +40,10 @@ class RtpYamlUnsupportedFeatureTest {
         assertEquals("rtpYaml.unsupported.flowMap", e.messageKey());
     }
 
-    @Test @DisplayName("rejects flow sequences with rtpYaml.unsupported.flowSeq")
+    // Flow sequences as values ("vertices: [[1, 2]]", "- [x, z]") are accepted (ADR-034); a root one is not
+    @Test @DisplayName("rejects a root-level flow sequence with rtpYaml.unsupported.flowSeq")
     void rejectsFlowSeq() {
-        RtpYamlParseException e = assertRejected("a: [1, 2]\n");
+        RtpYamlParseException e = assertRejected("[1, 2]\n");
         assertEquals("rtpYaml.unsupported.flowSeq", e.messageKey());
     }
 

@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.benchmark;
 
+import io.github.dailystruggle.rtp.common.tools.ChartOutputHelper;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
@@ -8,7 +9,6 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.Random;
-import javax.imageio.ImageIO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -141,30 +141,10 @@ public class RadialDistanceDistributionVisualizerTest {
 
     g.dispose();
 
-    // Save outputs
-    File docsOut = new File("docs/assets/img/radial_distance_distribution_chart.png");
-    if (!docsOut.exists()) {
-      File alt = new File("../docs/assets/img/radial_distance_distribution_chart.png");
-      if (alt.getParentFile().exists()) {
-        docsOut = alt;
-      }
-    }
-    docsOut.getParentFile().mkdirs();
-    ImageIO.write(img, "png", docsOut);
-    System.out.printf("[DEBUG_LOG] Saved Radial Distance Distribution Chart to: %s (%d KB)%n",
-        docsOut.getAbsolutePath(), docsOut.length() / 1024);
-
-    // Also write directly to canonical docs path from project root
-    File absDocs = new File(System.getProperty("user.dir"), "docs/assets/img/radial_distance_distribution_chart.png");
-    if (!absDocs.getParentFile().exists()) {
-      absDocs = new File(new File(System.getProperty("user.dir")).getParentFile(), "docs/assets/img/radial_distance_distribution_chart.png");
-    }
-    absDocs.getParentFile().mkdirs();
-    ImageIO.write(img, "png", absDocs);
-
-    File reportOut = new File("build/reports/player_distribution/radial_distance_distribution_chart.png");
-    reportOut.getParentFile().mkdirs();
-    ImageIO.write(img, "png", reportOut);
+    // Save to canonical docs and report destinations
+    ChartOutputHelper.writeChart(img, "player_distribution", "radial_distance_distribution_chart.png");
+    System.out.printf("[DEBUG_LOG] Saved Radial Distance Distribution Chart to canonical destination: %s%n",
+        ChartOutputHelper.getDocsAssetFile("radial_distance_distribution_chart.png").getAbsolutePath());
   }
 
   private void renderCurvePanel(

@@ -12,6 +12,8 @@ import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWire;
+import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWire.Direction;
+import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWire.WireContext;
 import io.github.dailystruggle.rtp.proxy.common.transport.memory.InMemoryNetworkStateBinding;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -30,25 +32,30 @@ class NetworkBindingsAndWirePlainTest {
   @Test
   @DisplayName("ProxyDirectWire opcodes, payloads, and tokens round-trip without servers")
   void testProxyDirectWireRoundTrip() throws IOException {
+    byte[] key = new byte[32];
+    for (int i = 0; i < 32; i++) key[i] = (byte) (i + 7);
+    HmacVerifier v = HmacVerifier.forTesting(key, 1, 1);
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(baos);
 
-    ProxyDirectWire.writeOpcode(out, ProxyDirectWire.OP_HEARTBEAT);
-    ProxyDirectWire.writeSignedPayload(out, "test-heartbeat", null, 1);
-    ProxyDirectWire.writeList(out, List.of("row1", "row2", "row3"), null, 1);
+    WireContext ctx = ProxyDirectWire.writeRequestHeader(out, ProxyDirectWire.OP_HEARTBEAT);
+    ProxyDirectWire.writeSignedPayload(out, ctx, Direction.REQUEST, "test-heartbeat", v, 1);
+    ProxyDirectWire.writeList(out, ctx, Direction.RESPONSE, List.of("row1", "row2", "row3"), v, 1);
 
     String tokenId = UUID.randomUUID().toString();
     UUID playerId = UUID.randomUUID();
     ReservationToken token = new ReservationToken(tokenId, "survival", playerId, System.currentTimeMillis() + 60000L, ReservationToken.State.CLAIMED, "world");
     String encodedToken = ProxyDirectWire.encodeToken(token);
-    ProxyDirectWire.writeSignedPayload(out, encodedToken, null, 1);
+    ProxyDirectWire.writeSignedPayload(out, ctx, Direction.RESPONSE, encodedToken, v, 1);
 
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(baos.toByteArray()));
-    assertEquals(ProxyDirectWire.OP_HEARTBEAT, ProxyDirectWire.readOpcode(in));
-    assertEquals("test-heartbeat", ProxyDirectWire.readSignedPayload(in, null));
-    assertEquals(List.of("row1", "row2", "row3"), ProxyDirectWire.readList(in, null));
+    ProxyDirectWire.RequestHeader header = ProxyDirectWire.readRequestHeader(in);
+    assertEquals(ProxyDirectWire.OP_HEARTBEAT, header.opcode());
+    assertEquals(ctx, header.context());
+    assertEquals("test-heartbeat", ProxyDirectWire.readSignedPayload(in, ctx, Direction.REQUEST, v));
+    assertEquals(List.of("row1", "row2", "row3"), ProxyDirectWire.readList(in, ctx, Direction.RESPONSE, v));
 
-    String readTokenStr = ProxyDirectWire.readSignedPayload(in, null);
+    String readTokenStr = ProxyDirectWire.readSignedPayload(in, ctx, Direction.RESPONSE, v);
     ReservationToken readToken = ProxyDirectWire.decodeToken(readTokenStr);
     assertNotNull(readToken);
     assertEquals(tokenId, readToken.tokenId());
@@ -62,7 +69,7 @@ class NetworkBindingsAndWirePlainTest {
   }
 
   @Test
-  @DisplayName("ProxyDirectWire signed payload round-trip with and without HmacVerifier")
+  @DisplayName("REQ-RTP-PROXY-007: ProxyDirectWire signs with a verifier and fails closed without one")
   void testSignedPayloads() throws IOException {
     byte[] key = new byte[32];
     for (int i = 0; i < 32; i++) key[i] = (byte) i;
@@ -70,14 +77,18 @@ class NetworkBindingsAndWirePlainTest {
     ByteArrayOutputStream baos = new ByteArrayOutputStream();
     DataOutputStream out = new DataOutputStream(baos);
 
-    ProxyDirectWire.writeSignedPayload(out, "sensitive-data", verifier, 1);
-    ProxyDirectWire.writeSignedPayload(out, "plain-data", null, 1);
-    ProxyDirectWire.writeList(out, List.of("item1", "item2"), verifier, 1);
+    WireContext ctx = new WireContext(ProxyDirectWire.OP_CANCEL, 1_000L, "nonce");
+    ProxyDirectWire.writeSignedPayload(out, ctx, Direction.REQUEST, "sensitive-data", verifier, 1);
+    assertThrows(IllegalStateException.class,
+        () -> ProxyDirectWire.writeSignedPayload(out, ctx, Direction.REQUEST, "plain-data", null, 1));
+    ProxyDirectWire.writeSignedPayload(out, ctx, Direction.REQUEST, "signed-but-unverified", verifier, 1);
+    ProxyDirectWire.writeList(out, ctx, Direction.RESPONSE, List.of("item1", "item2"), verifier, 1);
 
     DataInputStream in = new DataInputStream(new ByteArrayInputStream(baos.toByteArray()));
-    assertEquals("sensitive-data", ProxyDirectWire.readSignedPayload(in, verifier));
-    assertEquals("plain-data", ProxyDirectWire.readSignedPayload(in, null));
-    assertEquals(List.of("item1", "item2"), ProxyDirectWire.readList(in, verifier));
+    assertEquals("sensitive-data", ProxyDirectWire.readSignedPayload(in, ctx, Direction.REQUEST, verifier));
+    assertNull(ProxyDirectWire.readSignedPayload(in, ctx, Direction.REQUEST, null),
+        "null verifier must reject every payload");
+    assertEquals(List.of("item1", "item2"), ProxyDirectWire.readList(in, ctx, Direction.RESPONSE, verifier));
   }
 
   @Test

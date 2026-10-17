@@ -191,6 +191,7 @@ class BukkitMapBindingTest {
         assertNotNull(view);
         org.bukkit.map.MapRenderer liveRenderer = view.getRenderers().get(0);
 
+        @SuppressWarnings("removal")
         org.bukkit.map.MapCanvas dummyCanvas = new org.bukkit.map.MapCanvas() {
             private final byte[] buf = new byte[128 * 128];
             @Override public org.bukkit.map.MapView getMapView() { return view; }
@@ -233,11 +234,7 @@ class BukkitMapBindingTest {
         org.bukkit.map.MapView biomeView = binding.viewOf(biomeHandle);
         biomeView.getRenderers().get(0).render(biomeView, dummyCanvas, mockPlayer);
 
-        // Directly exercise BukkitMapCanvas coordinate clipping & methods
-        org.bukkit.map.MapRenderer customRenderer = new org.bukkit.map.MapRenderer() {
-            @Override
-            public void render(org.bukkit.map.MapView map, org.bukkit.map.MapCanvas canvas, org.bukkit.entity.Player player) {}
-        };
+        // Directly exercise BukkitMapCanvas coordinate clipping & methods.
         // Use a test renderer to invoke BukkitMapCanvas directly via renderEphemeral
         binding.renderEphemeral(biomeHandle, (canvas, m) -> {
             // Out of bounds clipping

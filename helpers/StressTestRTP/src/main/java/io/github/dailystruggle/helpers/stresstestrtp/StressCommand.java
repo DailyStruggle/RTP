@@ -22,12 +22,12 @@ import java.util.logging.Level;
 public final class StressCommand implements CommandExecutor, TabCompleter {
 
     private static final List<String> SUBS = Arrays.asList(
-            "start", "stop", "status", "burst", "sequence", "reset-cold", "export",
-            "probe-footprint");
+            "start", "stop", "status", "burst", "sequence", "ramp", "reset-cold", "export",
+            "probe-footprint", "leakcheck", "churn", "tp", "coverage");
 
-    private final StressTestRTPPlugin plugin;
+    private final StressHost plugin;
 
-    public StressCommand(StressTestRTPPlugin plugin) { this.plugin = plugin; }
+    StressCommand(StressHost plugin) { this.plugin = plugin; }
 
     @Override
     @SuppressWarnings("java:S3516") // Bukkit command execution returns true to indicate command was handled
@@ -45,9 +45,14 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
                 case "status":  return doStatus(sender);
                 case "burst":   return doBurst(sender, args);
                 case "sequence": return doSequence(sender, args);
+                case "ramp":    return doRamp(sender, args);
                 case "reset-cold": return doResetCold(sender);
                 case "export":  return doExport(sender);
                 case "probe-footprint": return doProbeFootprint(sender);
+                case "leakcheck": return doLeakCheck(sender, args);
+                case "churn": return doChurn(sender, args);
+                case "tp": return doTp(sender, args);
+                case "coverage": return doCoverage(sender, args);
                 default:
                     sender.sendMessage("StressTestRTP: unknown subcommand. Try: " + SUBS);
                     return true;
@@ -155,6 +160,83 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
         return true;
     }
 
+    /** {@code /rtpstress ramp <target> [stageSeconds] [rates]}: fixed-rate stages
+     *  against one {@code target-commands} entry, chosen by label. The label
+     *  may be omitted only when exactly one target is configured. {@code rates}
+     *  (comma-separated TP/s, e.g. {@code 100}) overrides {@code ramp.stages}. */
+    private boolean doRamp(CommandSender sender, String[] args) throws IOException {
+        if (plugin.runner().isRunning()) {
+            sender.sendMessage("StressTestRTP: a run is already in progress. /rtpstress stop first.");
+            return true;
+        }
+        FileConfiguration cfg = plugin.getConfig();
+        var targets = Targets.load(cfg, plugin.getLogger());
+        Targets.Entry target = resolveTarget(targets, args.length >= 2 ? args[1] : null);
+        if (target == null) {
+            sender.sendMessage("StressTestRTP: usage /rtpstress ramp <target> [stageSeconds] [rate,rate,...]; targets: "
+                    + targetLabels(targets));
+            return true;
+        }
+        int stageSeconds = args.length >= 3
+                ? safeInt(args[2], (int) cfg.getLong("ramp.stage-seconds", 60))
+                : (int) cfg.getLong("ramp.stage-seconds", 60);
+        double[] override = null;
+        if (args.length >= 4) {
+            override = parseRates(args[3]);
+            if (override.length == 0) {
+                sender.sendMessage("StressTestRTP: rates must be positive numbers, comma-separated (e.g. 100 or 20,50,100).");
+                return true;
+            }
+        }
+        plugin.beginRun();
+        if (!plugin.runner().startRamp(sender, target, stageSeconds, override)) {
+            sender.sendMessage("StressTestRTP: failed to start ramp (already running?).");
+            return true;
+        }
+        List<Double> stages = cfg.getDoubleList("ramp.stages");
+        String stagesText;
+        if (override != null) stagesText = Arrays.toString(override);
+        else stagesText = stages.isEmpty() ? Arrays.toString(Runner.DEFAULT_RAMP_STAGES) : stages.toString();
+        sender.sendMessage(String.format(java.util.Locale.ROOT,
+                "StressTestRTP: ramp started \u2014 target=%s, stages=%s TP/s x %ds, warmup=%ds, csv=%s",
+                target.label, stagesText,
+                stageSeconds, cfg.getLong("ramp.warmup-seconds", 30),
+                stripExt(plugin.recorder().csvPath().getFileName().toString()) + "-ramp.csv"));
+        sender.sendMessage("  /rtpstress stop ends it; completed stages are already on disk.");
+        return true;
+    }
+
+    /** Comma-separated positive TP/s list; empty when blank or any entry is invalid. */
+    static double[] parseRates(String raw) {
+        if (raw == null || raw.isBlank()) return new double[0];
+        String[] parts = raw.split(",");
+        double[] out = new double[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            try {
+                out[i] = Double.parseDouble(parts[i].trim());
+            } catch (NumberFormatException e) {
+                return new double[0];
+            }
+            if (!(out[i] > 0) || Double.isInfinite(out[i])) return new double[0];
+        }
+        return out;
+    }
+
+    /** Case-insensitive label match; null label resolves only a single-target config. */
+    static Targets.Entry resolveTarget(List<Targets.Entry> targets, String label) {
+        if (label == null || label.isBlank()) {
+            return targets.size() == 1 ? targets.get(0) : null;
+        }
+        for (Targets.Entry e : targets) {
+            if (e.label.equalsIgnoreCase(label)) return e;
+        }
+        return null;
+    }
+
+    private static List<String> targetLabels(List<Targets.Entry> targets) {
+        return targets.stream().map(e -> e.label).toList();
+    }
+
     /** Re-runs the one-ticket footprint probe on demand, for when the
      *  start-up attempt raced server start (a cold Folia start typically
      *  leaves it NOT MEASURED). Refused mid-run: the probe's window would
@@ -174,6 +256,115 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("StressTestRTP: ticket-footprint probe scheduled; result lands in "
                 + "plugins/StressTestRTP/ticket-footprint.txt and the console within ~"
                 + (TicketFootprintProbe.MAX_LOAD_WAIT_TICKS / 20L) + " s.");
+        return true;
+    }
+
+    /** {@code /rtpstress leakcheck [label] [force] [dump] [quick]} or {@code /rtpstress leakcheck status}.
+     *  Refused mid-run without {@code force}: the full GC it performs would
+     *  land inside the measured window as a multi-second stop-the-world pause.
+     *  {@code dump} also writes a live-objects heap dump beside the histogram;
+     *  {@code quick} skips NMT and the thread census/dump (exact counts only). */
+    @SuppressWarnings("java:S3516")
+    private boolean doLeakCheck(CommandSender sender, String[] args) {
+        LeakProbe leak = plugin.leakProbe();
+        if (leak == null) {
+            sender.sendMessage("StressTestRTP: leak probe unavailable.");
+            return true;
+        }
+        String label = args.length >= 2 ? args[1] : "checkpoint";
+        if ("status".equalsIgnoreCase(label)) {
+            sender.sendMessage("StressTestRTP: " + leak.status());
+            return true;
+        }
+        boolean force = false;
+        boolean dump = false;
+        boolean quick = false;
+        for (int i = 2; i < args.length; i++) {
+            if ("force".equalsIgnoreCase(args[i])) force = true;
+            else if ("dump".equalsIgnoreCase(args[i])) dump = true;
+            else if ("quick".equalsIgnoreCase(args[i])) quick = true;
+        }
+        if (plugin.runner().isRunning() && !force) {
+            sender.sendMessage("StressTestRTP: refusing leakcheck during a run (full GC would pause the "
+                    + "measured window); /rtpstress stop first or append 'force'.");
+            return true;
+        }
+        plugin.runner().releaseRosterRefs();
+        if (!leak.checkpoint(label, new LeakProbe.Options(dump, quick),
+                msg -> Sched.runGlobal(plugin, () -> sender.sendMessage("StressTestRTP: " + msg)))) {
+            sender.sendMessage("StressTestRTP: a leakcheck is already running; poll /rtpstress leakcheck status.");
+            return true;
+        }
+        sender.sendMessage("StressTestRTP: leakcheck '" + label + "' started (full GC + class histogram"
+                + (quick ? ", quick" : "") + (dump ? " + heap dump" : "")
+                + "); poll /rtpstress leakcheck status, rows land in "
+                + "runs/leak.csv and runs/leak-metrics.csv.");
+        return true;
+    }
+
+    /** {@code /rtpstress coverage [label]}: reads and resets the JaCoCo agent's
+     *  execution data in this JVM and writes the reached probes as JSON into the
+     *  runs folder (ADR-111 section 2.6). Probes are booleans, no hit counts. */
+    @SuppressWarnings("java:S3516")
+    private boolean doCoverage(CommandSender sender, String[] args) throws IOException {
+        CoverageProbe probe = plugin.coverageProbe();
+        if (!CoverageProbe.agentAttached()) {
+            sender.sendMessage("StressTestRTP: coverage unavailable; start the server with the JaCoCo "
+                    + "-javaagent (see devstack/docker-compose.coverage.yml).");
+            return true;
+        }
+        String label = args.length >= 2 ? args[1] : "checkpoint";
+        CoverageProbe.Result r = probe.dumpAndReset(label);
+        sender.sendMessage("StressTestRTP: coverage '" + label + "': " + r.reachedProbes()
+                + " probes reached -> " + r.file().getFileName());
+        return true;
+    }
+
+    /** {@code /rtpstress tp <player>}: plugin-free random teleport, the
+     *  {@code direct} leak control's target command. A failure is logged as a
+     *  WARNING and reaches the run as a timeout (no teleport event fires). */
+    @SuppressWarnings("java:S3516")
+    private boolean doTp(CommandSender sender, String[] args) {
+        HarnessTeleporter t = plugin.harnessTeleporter();
+        if (t == null || !t.available()) {
+            sender.sendMessage("StressTestRTP: direct teleport unavailable (needs Paper async chunk API).");
+            return true;
+        }
+        if (args.length < 2) {
+            sender.sendMessage("StressTestRTP: usage /rtpstress tp <player>");
+            return true;
+        }
+        org.bukkit.entity.Player p = Bukkit.getPlayerExact(args[1]);
+        if (p == null) {
+            sender.sendMessage("StressTestRTP: tp: no online player '" + args[1] + "'.");
+            return true;
+        }
+        t.teleport(p, reason -> plugin.getLogger().warning("[StressTestRTP] direct tp " + p.getName()
+                + " failed: " + reason));
+        return true;
+    }
+
+    /** {@code /rtpstress churn [n|all] [namePrefix]}: kicks players so the
+     *  bot swarm reconnects them as new sessions. Refused mid-run: departures
+     *  inside a measured stage would read as plugin timeouts. */
+    @SuppressWarnings("java:S3516")
+    private boolean doChurn(CommandSender sender, String[] args) {
+        LeakProbe leak = plugin.leakProbe();
+        if (leak == null) {
+            sender.sendMessage("StressTestRTP: leak probe unavailable.");
+            return true;
+        }
+        if (plugin.runner().isRunning()) {
+            sender.sendMessage("StressTestRTP: refusing churn during a run; /rtpstress stop first.");
+            return true;
+        }
+        int n = args.length >= 2 && !"all".equalsIgnoreCase(args[1]) ? safeInt(args[1], 0) : 0;
+        String prefix = args.length >= 3 ? args[2]
+                : plugin.getConfig().getString("leak.churn-name-prefix", "");
+        int kicked = leak.churn(n, prefix);
+        sender.sendMessage("StressTestRTP: churn kicked " + kicked + " player(s)"
+                + (prefix == null || prefix.isEmpty() ? "" : " matching '" + prefix + "*'")
+                + "; reason '" + LeakProbe.CHURN_KICK_REASON + "'.");
         return true;
     }
 
@@ -206,6 +397,8 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
                 rec.totalAttempts(), rec.successCount(), rec.inFlightCount(),
                 p50, p95, p99, rec.coldStartLatencyMs(),
                 agg.minTps(), agg.p95Mspt(), agg.peakHeapMb()));
+        String ramp = plugin.runner().rampStatus();
+        if (!ramp.isEmpty()) sender.sendMessage("  " + ramp);
         return true;
     }
 
@@ -293,7 +486,15 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command,
                                       String alias, String[] args) {
-        if (args.length <= 1) return SUBS;
+        if (args.length <= 1) {
+            String p = args.length == 1 ? args[0].toLowerCase(java.util.Locale.ROOT) : "";
+            return SUBS.stream().filter(s -> s.startsWith(p)).toList();
+        }
+        if (args.length == 2 && "ramp".equalsIgnoreCase(args[0])) {
+            String p = args[1].toLowerCase(java.util.Locale.ROOT);
+            return targetLabels(Targets.load(plugin.getConfig(), plugin.getLogger())).stream()
+                    .filter(l -> l.toLowerCase(java.util.Locale.ROOT).startsWith(p)).toList();
+        }
         return List.of();
     }
 }

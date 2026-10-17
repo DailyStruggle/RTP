@@ -20,12 +20,15 @@ jobs:
           - name: worldborder
             target: "io.github.dailystruggle.rtp.common.selection.worldborder.*"
             threshold: 60
-          - name: region-cache
-            target: "io.github.dailystruggle.rtp.common.selection.region.cache.*"
+          - name: region
+            target: "io.github.dailystruggle.rtp.common.selection.region.*"
             threshold: 60
           - name: teleport
             target: "io.github.dailystruggle.rtp.common.tasks.teleport.*"
-            threshold: 40
+            threshold: 60
+          - name: tools
+            target: "io.github.dailystruggle.rtp.common.tools.*"
+            threshold: 60
 
     steps:
       - name: Check out repository
@@ -49,7 +52,7 @@ jobs:
 
       - name: Archive PIT Report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         with:
           name: pitest-report-${{ matrix.package.name }}
           path: rtp-core/build/reports/pitest/

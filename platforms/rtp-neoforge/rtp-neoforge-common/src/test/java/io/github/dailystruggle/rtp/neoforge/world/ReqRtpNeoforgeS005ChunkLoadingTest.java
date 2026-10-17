@@ -43,10 +43,7 @@ class ReqRtpNeoforgeS005ChunkLoadingTest {
 
     /** A self-contained, empty-sections view: no chunk data on disk. */
     private static AnvilChunkView emptyView() {
-        // Two-arg constructor defaults biomeSections to an empty list and
-        // motionBlockingNoLeaves to null, which makes getSurfaceHeight return
-        // the floor (0).
-        return new AnvilChunkView(0, Collections.emptyList(), null);
+        return new AnvilChunkView(0, Collections.emptyList());
     }
 
     @Test
@@ -69,7 +66,7 @@ class ReqRtpNeoforgeS005ChunkLoadingTest {
     }
 
     @Test
-    @DisplayName("isAir / getSkyLight / getSurfaceHeight route through the view (no live access)")
+    @DisplayName("isAir / getSkyLight route through the view (no live access)")
     void blockQueriesRouteThroughView() {
         NeoForgeRTPChunk c = new NeoForgeRTPChunk(emptyView(), 0, 0, WORLD_ID, null);
         // Empty sections => every (x,y,z) is "above the highest emitted section"
@@ -79,8 +76,6 @@ class ReqRtpNeoforgeS005ChunkLoadingTest {
         assertTrue(c.isAir(15, 0, 15));
         // Anvil-backed sky light is the vanilla "fully lit" default.
         assertEquals(15, c.getSkyLight(0, 64, 0));
-        // Empty heightmap => floor (= minHeight = 0).
-        assertEquals(0, c.getSurfaceHeight(0, 0));
     }
 
     @Test

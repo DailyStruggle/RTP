@@ -1,0 +1,5 @@
+name: Nexo
+version: 1.0.0-MOCK
+main: io.github.dailystruggle.helpers.mockitems.MockNexoPlugin
+api-version: "1.20"
+description: Mock Nexo stub plugin for testing LeafRTP integrations.

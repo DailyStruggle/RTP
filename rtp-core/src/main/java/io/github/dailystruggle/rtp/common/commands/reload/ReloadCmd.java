@@ -4,7 +4,7 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
@@ -93,6 +93,10 @@ public class ReloadCmd extends BaseRTPCmdImpl {
       // Drop the decoded-schematic cache so a swapped/edited <region>.schem file on disk is
       // re-read on the next teleport instead of serving the stale in-memory copy (ADR-058).
       io.github.dailystruggle.rtp.api.schematic.AbstractFileSchematicPaster.clearCache();
+
+      // Re-index <dataFolder>/docs so edited shipped docs reach /rtp docs and the editor.
+      io.github.dailystruggle.rtp.common.commands.docs.DocsRegistry.rebuildFromDataFolder(
+          RTP.serverAccessor.getPluginDirectory());
 
       String msgReloaded = msg(SystemMessages.reloaded, "");
       if (!msgReloaded.isEmpty()) {

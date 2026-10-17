@@ -89,10 +89,13 @@ public class BukkitRTPWorld extends RTPWorld<World> {
         m = null;
       }
     } catch (Throwable ignored) {
-      // No such method on the running server - fall back to synchronous loading.
+      // No such method on the running server - live loads are rejected (S-005).
     }
     CHUNK_AT_ASYNC_FUTURE = m;
   }
+
+  /** Once-per-world latch for the async-API-absent warning; avoids per-candidate spam. */
+  private final AtomicBoolean asyncApiAbsentWarned = new AtomicBoolean(false);
 
   public BukkitRTPWorld(World world) {
     super(world);
@@ -189,6 +192,19 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
   @Override
   public CompletableFuture<Long> getChunkAt(int cx, int cz) {
+    return resolveChunkKey(cx, cz, true);
+  }
+
+  /**
+   * ADR-110: resident chunk or region-file view only; {@code null} where only a native load
+   * (or generation) could answer.
+   */
+  @Override
+  public CompletableFuture<Long> getChunkIfReadable(int cx, int cz) {
+    return resolveChunkKey(cx, cz, false);
+  }
+
+  private CompletableFuture<Long> resolveChunkKey(int cx, int cz, boolean allowLive) {
     final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
 
     // ADR-016 - Anvil read-only data source (no longer a gate).
@@ -240,11 +256,20 @@ public class BukkitRTPWorld extends RTPWorld<World> {
               return CompletableFuture.completedFuture(key);
             }
             // No view available (UNKNOWN) → live load is authoritative.
-            return loadChunkFuture(cx, cz, key);
+            return allowLive ? loadChunkFuture(cx, cz, key) : CompletableFuture.completedFuture(null);
           });
     }
 
+    if (!allowLive && !isResident(cx, cz)) return CompletableFuture.completedFuture(null);
     return loadChunkFuture(cx, cz, key);
+  }
+
+  private boolean isResident(int cx, int cz) {
+    try {
+      return world != null && world.isChunkLoaded(cx, cz);
+    } catch (Throwable ignored) {
+      return false;
+    }
   }
 
   /**
@@ -287,26 +312,12 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     final String dim = dimensionRegionSubpath(world);
     final int finalMinY = minY;
     final int finalMaxY = maxY;
-    // Dispatch onto AnvilIoPool rather than inline: inline dispatch serialized
-    // ~7ms of probe I/O onto the driver's single thread, holding peak in-flight
-    // at 11-12 vs cap 50. AnvilIoPool (dedicated blocking-I/O executor, sized
-    // for disk parallelism) lets the driver saturate its semaphore and run
-    // probes in parallel; the scheduler handoff overhead is far cheaper than
-    // serializing 7ms onto the driver. S-005 preserved: AnvilIoPool threads are
-    // daemons with no region-thread affinity.
-    return CompletableFuture.supplyAsync(() -> {
+    // Coalesced on AnvilIoPool: pending probes for one r.X.Z.mca share one open (S-005: no
+    // I/O on the caller; pool threads are daemons with no region-thread affinity).
+    return io.github.dailystruggle.rtp.anvil.AnvilPrefilter.probeColumnAsync(
+        worldFolder, dim, cx, cz, finalMinY, finalMaxY).handle((probe, err) -> {
       try {
-        java.nio.file.Path regionFile =
-            io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(worldFolder, dim, cx, cz);
-        // Share raw region bytes across sibling-chunk probes in the same
-        // r.X.Z.mca via a 4-entry LRU, with mtime invalidation.
-        byte[] regionBytes = io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
-        if (regionBytes == null) return null;
-        int rx = Math.floorMod(cx, 32);
-        int rz = Math.floorMod(cz, 32);
-        io.github.dailystruggle.rtp.anvil.ColumnProbe probe =
-            io.github.dailystruggle.rtp.anvil.AnvilReader.readColumnProbe(
-                regionBytes, rx, rz, finalMinY, finalMaxY);
+        if (err != null) throw err;
         if (probe == null) return null;
         return io.github.dailystruggle.rtp.api.world.ChunkColumnProbe.of(
             new io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter(probe, cx, cz,
@@ -320,17 +331,15 @@ public class BukkitRTPWorld extends RTPWorld<World> {
                 + t.getClass().getSimpleName() + ": " + t.getMessage());
         return null;
       }
-    }, io.github.dailystruggle.rtp.anvil.AnvilIoPool.get());
+    });
   }
 
   /**
    * {@inheritDoc}
    *
-   * <p>Reads {@code r.<rcx>.<rcz>.mca} once via {@link
-   * io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache}, decodes each of the
-   * up-to-1024 chunks via {@link io.github.dailystruggle.rtp.anvil.AnvilReader#readChunkView},
-   * and samples the biome at chunk-local {@code (8, y, 8)} via
-   * {@link io.github.dailystruggle.rtp.anvil.AnvilChunkView#getBiomeAt}.
+   * <p>Reads {@code r.<rcx>.<rcz>.mca} once under a pooled-buffer lease via {@link
+   * io.github.dailystruggle.rtp.anvil.AnvilRegionSampler#readAllBiomes} and samples each
+   * chunk's biome at chunk-local {@code (8, y, 8)}.
    *
    * <p>Biome names are canonicalised to the same uppercase, {@code minecraft:}
    * -stripped form used by {@code MemoryShape.addBiomeLocation} so that
@@ -352,37 +361,72 @@ public class BukkitRTPWorld extends RTPWorld<World> {
           io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(
               worldFolder, dim, rcx << 5, rcz << 5);
       if (regionFile == null) return java.util.Collections.emptyMap();
-      byte[] regionBytes =
-          io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
-      if (regionBytes == null) return java.util.Collections.emptyMap();
-      java.util.HashMap<Long, String> out = new java.util.HashMap<>(1024);
-      for (int rx = 0; rx < 32; rx++) {
-        for (int rz = 0; rz < 32; rz++) {
-          try {
-            io.github.dailystruggle.rtp.anvil.AnvilChunkView view =
-                io.github.dailystruggle.rtp.anvil.AnvilReader.readChunkView(
-                    regionBytes, rx, rz);
-            if (view == null) continue;
-            String raw = view.getBiomeAt(8, y, 8);
-            if (raw == null) continue;
-            String canonical = canonicaliseBiome(raw);
-            if (canonical == null || canonical.isEmpty()) continue;
-            int cx = (rcx << 5) | rx;
-            int cz = (rcz << 5) | rz;
-            long key = ((long) cx << 32) | (cz & 0xFFFF_FFFFL);
-            out.put(key, canonical);
-          } catch (Throwable ignored) {
-            // chunk not present in region file or unreadable; skip silently.
-          }
-        }
-      }
-      return out;
+      return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.readAllBiomes(
+          regionFile, rcx, rcz, y, BukkitRTPWorld::canonicaliseBiome);
     } catch (Throwable t) {
       RTP.log(java.util.logging.Level.FINE,
           "[RTP] readBiomesInRegionFile failed for world=" + name
               + " region=(" + rcx + "," + rcz + "): "
               + t.getClass().getSimpleName() + ": " + t.getMessage());
       return java.util.Collections.emptyMap();
+    }
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Reads only the region header plus each requested chunk's sectors via {@link
+   * io.github.dailystruggle.rtp.anvil.AnvilRegionSampler} (ADR-104 section 4.6). S-005: blocking,
+   * off-tick only.
+   */
+  @Override
+  public java.util.Map<Long, String> sampleBiomesInRegionFile(
+      int rcx, int rcz, int y, int[] localIndices) {
+    if (world == null) return java.util.Collections.emptyMap();
+    try {
+      java.nio.file.Path regionFile =
+          io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(
+              world.getWorldFolder().toPath(), dimensionRegionSubpath(world), rcx << 5, rcz << 5);
+      if (regionFile == null) return java.util.Collections.emptyMap();
+      return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.sampleBiomesOrThrow(
+          regionFile, rcx, rcz, y, localIndices, BukkitRTPWorld::canonicaliseBiome);
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.FINE,
+          "[RTP] sampleBiomesInRegionFile failed for world=" + name
+              + " region=(" + rcx + "," + rcz + "): "
+              + t.getClass().getSimpleName() + ": " + t.getMessage());
+      return java.util.Collections.emptyMap();
+    }
+  }
+
+  /** {@inheritDoc} S-005: blocking stat, off-tick only. */
+  @Override
+  public long regionFileModifiedMillis(int rcx, int rcz) {
+    if (world == null) return -1L;
+    try {
+      return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.lastModifiedMillis(
+          io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(
+              world.getWorldFolder().toPath(), dimensionRegionSubpath(world), rcx << 5, rcz << 5));
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.FINE,
+          "[RTP] regionFileModifiedMillis failed for world=" + name
+              + " region=(" + rcx + "," + rcz + "): " + t.getMessage());
+      return -1L;
+    }
+  }
+
+  /** {@inheritDoc} Lists this dimension's region directory; S-005: off-tick only. */
+  @Override
+  public java.util.List<int[]> listRegionFiles() {
+    if (world == null) return null;
+    try {
+      return io.github.dailystruggle.rtp.anvil.RegionFileResolver.listAnvilRegionCoords(
+          io.github.dailystruggle.rtp.anvil.RegionFileResolver.regionDirectoryFor(
+              world.getWorldFolder().toPath(), dimensionRegionSubpath(world)));
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[RTP] listRegionFiles failed for world=" + name + ": " + t.getMessage(), t);
+      return null;
     }
   }
 
@@ -496,27 +540,24 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     }
   }
 
-  /**
-   * Map a Bukkit {@link World#getEnvironment()} to the on-disk region subdirectory used
-   * by vanilla. Inlined here (rather than in the platform-neutral {@code AnvilPrefilter})
-   * because it is the single place where {@code rtp-anvil} would otherwise need to know
-   * about Bukkit's {@link org.bukkit.World.Environment} enum.
-   */
-  private static String dimensionRegionSubpath(World world) {
-    if (world == null) return "";
+  @Override
+  public java.nio.file.Path anvilWorldFolder() {
     try {
-      switch (world.getEnvironment()) {
-        case NETHER:
-          return "DIM-1";
-        case THE_END:
-          return "DIM1";
-        case NORMAL:
-        default:
-          return "";
-      }
+      World w = world;
+      return (w == null) ? null : w.getWorldFolder().toPath();
     } catch (Throwable ignored) {
-      return "";
+      return null;
     }
+  }
+
+  @Override
+  public String anvilDimensionSubpath() {
+    return dimensionRegionSubpath(world);
+  }
+
+  /** On-disk region subdirectory; covers the legacy and the 26.1+ unified layouts. */
+  private static String dimensionRegionSubpath(World world) {
+    return BukkitRegionPaths.dimensionRegionSubpath(world);
   }
 
   /**
@@ -541,15 +582,13 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   }
 
   /**
-   * Perform the actual chunk load (reflective async → sync-on-primary-thread fallback).
+   * Perform the actual chunk load through the reflective async API only.
    *
-   * <p>When the reflective async path is unavailable, returns {@code null} (async I/O
-   * failed), or resolves to a {@code null} {@link Chunk} (some Paper/Folia builds
-   * return null when a chunk cannot be provided off-tick without generation), this
-   * method falls back to {@link World#getChunkAt(int, int)} on the primary thread
-   * - the only Bukkit API guaranteed to generate a missing chunk. Each failure edge
-   * is logged at {@code WARNING} so operators can isolate problems in the pregen
-   * summary's {@code nullChunk} bucket (REQ-RTP-S-004).
+   * <p>When the async API is unavailable, throws, returns {@code null}, or resolves to a
+   * {@code null} {@link Chunk}, the candidate is rejected: the future completes with
+   * {@code null} (pregen {@code nullChunk}/{@code asyncLoadNull}). No synchronous
+   * {@link World#getChunkAt(int, int)} fallback exists (S-005). Each edge is logged at
+   * {@code WARNING}; the API-absent edge once per world (REQ-RTP-S-004).
    */
   private CompletableFuture<Long> loadChunkFuture(int cx, int cz, long key) {
     // Count only actual live chunk-load attempts dispatched to the chunk system.
@@ -576,6 +615,15 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     // fork implements true async generation (Paper/Folia). On vanilla Spigot the
     // scheduling still resolves on the main thread internally, but the caller is
     // not blocked - a strict improvement over the previous runTask+getChunkAt path.
+    return profileChunkLoad(requestChunkAsync(cx, cz, key), chunkLoadStartNanos, chunkGenerated);
+  }
+
+  /**
+   * Async-only chunk request without load counters/profiling. Caches the chunk and completes
+   * with {@code key} on success; every failure edge logs and completes with {@code null}.
+   * Never completes exceptionally; never calls {@link World#getChunkAt(int, int)} (S-005).
+   */
+  private CompletableFuture<Long> requestChunkAsync(int cx, int cz, long key) {
     if (CHUNK_AT_ASYNC_FUTURE != null) {
       try {
         @SuppressWarnings("unchecked")
@@ -588,36 +636,39 @@ public class BukkitRTPWorld extends RTPWorld<World> {
               RTP.log(java.util.logging.Level.WARNING,
                   "[RTP] Async chunk load threw for world=" + name + " chunk=(" + cx + "," + cz
                       + "): " + ex.getClass().getSimpleName() + ": " + ex.getMessage()
-                      + " — falling back to Bukkit synchronous getChunkAt");
-              completeViaSyncGenerate(cx, cz, key, out);
+                      + " - candidate rejected (no synchronous fallback, S-005)");
+              out.complete(null);
               return;
             }
             if (chunk == null) {
               RTP.log(java.util.logging.Level.WARNING,
                   "[RTP] Async chunk load returned null for world=" + name + " chunk=(" + cx
-                      + "," + cz + ") — falling back to Bukkit synchronous getChunkAt to"
-                      + " trigger generation");
-              completeViaSyncGenerate(cx, cz, key, out);
+                      + "," + cz + ") - candidate rejected (no synchronous fallback, S-005)");
+              out.complete(null);
               return;
             }
             cacheChunk(cx, cz, chunk);
             out.complete(key);
           });
-          return profileChunkLoad(out, chunkLoadStartNanos, chunkGenerated);
+          return out;
         }
+        RTP.log(java.util.logging.Level.WARNING,
+            "[RTP] Reflective async chunk API returned null for world=" + name + " chunk=("
+                + cx + "," + cz + ") - candidate rejected (no synchronous fallback, S-005)");
       } catch (Throwable t) {
-        // Some test doubles (e.g. MockBukkit builds) or very old forks may not
-        // honor the async API - fall through to the synchronous generation path.
+        // Test doubles (e.g. MockBukkit) or old forks may not honor the async API.
         RTP.log(java.util.logging.Level.WARNING,
             "[RTP] Reflective async chunk API failed for world=" + name + " chunk=(" + cx
                 + "," + cz + "): " + t.getClass().getSimpleName() + ": " + t.getMessage()
-                + " — falling back to Bukkit synchronous getChunkAt");
+                + " - candidate rejected (no synchronous fallback, S-005)");
       }
+    } else if (asyncApiAbsentWarned.compareAndSet(false, true)) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[RTP] World#getChunkAtAsync(int,int) CompletableFuture API is unavailable on this"
+              + " server; unloaded chunks in world=" + name + " are rejected instead of loaded"
+              + " synchronously (S-005). Pre-generate the world or use Paper/Folia.");
     }
-
-    CompletableFuture<Long> future = new CompletableFuture<>();
-    completeViaSyncGenerate(cx, cz, key, future);
-    return profileChunkLoad(future, chunkLoadStartNanos, chunkGenerated);
+    return CompletableFuture.completedFuture(null);
   }
 
   /**
@@ -635,59 +686,6 @@ public class BukkitRTPWorld extends RTPWorld<World> {
             .record(generated, System.nanoTime() - startNanos);
       }
     });
-  }
-
-  /**
-   * Synchronous generation fallback. Runs {@link World#getChunkAt(int, int)} on the
-   * primary thread (generating the chunk if needed) and completes {@code out} with
-   * {@code key} on success or {@code null} on failure. Each failure edge is logged
-   * at {@code WARNING} so operators can isolate which candidates are being dropped
-   * and why.
-   */
-  private void completeViaSyncGenerate(int cx, int cz, long key, CompletableFuture<Long> out) {
-    Runnable loadChunkTask = () -> {
-      try {
-        org.bukkit.Chunk chunk = world.getChunkAt(cx, cz);
-        if (chunk == null) {
-          RTP.log(java.util.logging.Level.WARNING,
-              "[RTP] Synchronous world.getChunkAt returned null for world=" + name
-                  + " chunk=(" + cx + "," + cz + ")");
-          out.complete(null);
-          return;
-        }
-        cacheChunk(cx, cz, chunk);
-        out.complete(key);
-      } catch (Throwable t) {
-        RTP.log(java.util.logging.Level.WARNING,
-            "[RTP] Synchronous chunk load threw for world=" + name + " chunk=(" + cx + ","
-                + cz + "): " + t.getClass().getSimpleName() + ": " + t.getMessage());
-        out.complete(null);
-      }
-    };
-
-    if (org.bukkit.Bukkit.isPrimaryThread()) {
-      loadChunkTask.run();
-      return;
-    }
-    // Folia note: Bukkit.getScheduler().runTask(...) throws UnsupportedOperationException
-    // on Folia, so route the synchronous load through RTP.scheduler (region-aware on
-    // Folia, main-thread on Bukkit/Paper).
-    io.github.dailystruggle.rtp.api.scheduling.RTPScheduler scheduler =
-        RTP.serverAccessor == null ? null : RTP.serverAccessor.getScheduler();
-    if (scheduler != null) {
-      scheduler.runTask(this, cx, cz, loadChunkTask);
-      return;
-    }
-    org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
-    if (plugin != null) {
-      org.bukkit.Bukkit.getScheduler().runTask(plugin, loadChunkTask);
-    } else {
-      RTP.log(java.util.logging.Level.WARNING,
-          "[RTP] Cannot schedule synchronous chunk load — RTP plugin is not registered"
-              + " with Bukkit plugin manager (world=" + name + " chunk=(" + cx + "," + cz
-              + ")) — dropping candidate");
-      out.complete(null);
-    }
   }
 
   @Override
@@ -714,21 +712,74 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     }
   }
 
+  /**
+   * In-flight ticket adds deferred behind an async load, keyed by packed chunk key. A release
+   * removes the entry, so the deferred add sees its token gone and skips (S-002). Holds only
+   * pending adds; entries are removed when the add applies or is cancelled.
+   */
+  private final java.util.concurrent.ConcurrentHashMap<Long, Object> deferredTicketAdds =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
   @Override
   protected java.util.concurrent.CompletableFuture<Void> setForceLoadedImpl(int cx, int cz, boolean forceLoad) {
     org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
     if (plugin == null || !plugin.isEnabled()) {
       return java.util.concurrent.CompletableFuture.completedFuture(null);
     }
-    if (org.bukkit.Bukkit.isPrimaryThread()) {
-      if (forceLoad) {
-        if (!world.getPluginChunkTickets(cx, cz).contains(plugin)) {
-          world.addPluginChunkTicket(cx, cz, plugin);
+    final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
+    if (!forceLoad) {
+      deferredTicketAdds.remove(key);
+    }
+    if (forceLoad && CHUNK_AT_ASYNC_FUTURE != null && !isChunkLoaded(cx, cz)) {
+      // S-005: addPluginChunkTicket loads an absent chunk synchronously on the tick thread.
+      // Load it through the async chunk API first, then apply the ticket to the now-resident
+      // chunk. The returned future still completes only once the ticket is applied (ADR-015).
+      try {
+        @SuppressWarnings("unchecked")
+        CompletableFuture<org.bukkit.Chunk> load =
+            (CompletableFuture<org.bukkit.Chunk>) CHUNK_AT_ASYNC_FUTURE.invoke(world, cx, cz);
+        if (load != null) {
+          final Object token = new Object();
+          deferredTicketAdds.put(key, token);
+          return load.handle((chunk, ex) -> null)
+              .thenCompose(ignored -> applyTicketOnOwner(plugin, cx, cz, true, token));
         }
-      } else {
-        world.removePluginChunkTicket(cx, cz, plugin);
+      } catch (Throwable t) {
+        RTP.log(java.util.logging.Level.FINE,
+            "[RTP] async pre-load before chunk ticket failed for world=" + name + " chunk=("
+                + cx + "," + cz + "): " + t.getClass().getSimpleName() + ": " + t.getMessage());
       }
-      return java.util.concurrent.CompletableFuture.completedFuture(null);
+    }
+    return applyTicketOnOwner(plugin, cx, cz, forceLoad, null);
+  }
+
+  /**
+   * Apply or drop the plugin chunk ticket on the thread that owns {@code (cx, cz)}.
+   *
+   * @param deferredToken non-null when the add was postponed behind an async load; the add is
+   *     then skipped unless the token is still registered, so a release that ran first cannot
+   *     leave an orphaned ticket (S-002)
+   * @return future completed after the native ticket call has executed
+   */
+  private java.util.concurrent.CompletableFuture<Void> applyTicketOnOwner(
+      org.bukkit.plugin.Plugin plugin, int cx, int cz, boolean forceLoad, Object deferredToken) {
+    final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
+    if (org.bukkit.Bukkit.isPrimaryThread()) {
+      try {
+        if (forceLoad) {
+          if (deferredToken != null && !deferredTicketAdds.remove(key, deferredToken)) {
+            return java.util.concurrent.CompletableFuture.completedFuture(null);
+          }
+          if (!world.getPluginChunkTickets(cx, cz).contains(plugin)) {
+            world.addPluginChunkTicket(cx, cz, plugin);
+          }
+        } else {
+          world.removePluginChunkTicket(cx, cz, plugin);
+        }
+        return java.util.concurrent.CompletableFuture.completedFuture(null);
+      } catch (Throwable t) {
+        return java.util.concurrent.CompletableFuture.failedFuture(t);
+      }
     }
     // ADR-015 Paper chunk-system-v2 follow-up (ticket-application race):
     // the raw addPluginChunkTicket call is main-thread-only on Bukkit/Paper and
@@ -746,6 +797,10 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     Runnable applyTicket = () -> {
       try {
         if (forceLoad) {
+          if (deferredToken != null && !deferredTicketAdds.remove(key, deferredToken)) {
+            future.complete(null);
+            return;
+          }
           if (!world.getPluginChunkTickets(cx, cz).contains(plugin)) {
             world.addPluginChunkTicket(cx, cz, plugin);
           }
@@ -778,9 +833,22 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       }
 
       int count = 0;
+      try {
+        java.util.Map<org.bukkit.plugin.Plugin, java.util.Collection<org.bukkit.Chunk>> tickets = world.getPluginChunkTickets();
+        if (tickets != null && tickets.containsKey(plugin)) {
+          java.util.Collection<org.bukkit.Chunk> chunks = tickets.get(plugin);
+          if (chunks != null) {
+            count = chunks.size();
+          }
+        }
+      } catch (Throwable ignored) {
+      }
       for (org.bukkit.Chunk chunk : world.getForceLoadedChunks()) {
-        if (chunk.getPluginChunkTickets().contains(plugin)) {
-          count++;
+        try {
+          if (chunk.getPluginChunkTickets().contains(plugin)) {
+            count++;
+          }
+        } catch (Throwable ignored) {
         }
       }
       future.complete(count);
@@ -834,9 +902,27 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
   @Override
   public void keepChunkAt(int cx, int cz) {
-    RTP.scheduler.runTask(this, cx, cz, () -> {
-      chunkCache.put(((long) cx & 0xffffffffL | ((long) cz << 32)), new WeakReference<>(world.getChunkAt(cx, cz)));
-      setForceLoaded(cx, cz, true);
+    // S-005: async load only; requestChunkAsync caches into the concurrent chunkCache on success.
+    // Ticket only once resident; failures keep nothing and are logged (S-004). API-absent edge
+    // is already logged once per world by requestChunkAsync.
+    final long key = ((long) cx & 0xffffffffL | ((long) cz << 32));
+    requestChunkAsync(cx, cz, key).whenComplete((k, ex) -> {
+      if (ex != null || k == null) {
+        if (CHUNK_AT_ASYNC_FUTURE != null) {
+          RTP.log(java.util.logging.Level.WARNING,
+              "[RTP] keepChunkAt async load failed for world=" + name + " chunk=(" + cx + "," + cz
+                  + ")" + (ex == null ? "" : ": " + ex.getClass().getSimpleName() + ": " + ex.getMessage())
+                  + " - chunk not kept");
+        }
+        return;
+      }
+      setForceLoaded(cx, cz, true).whenComplete((v, tex) -> {
+        if (tex != null) {
+          RTP.log(java.util.logging.Level.WARNING,
+              "[RTP] keepChunkAt ticket apply failed for world=" + name + " chunk=(" + cx + "," + cz
+                  + "): " + tex.getClass().getSimpleName() + ": " + tex.getMessage());
+        }
+      });
     });
   }
 
@@ -1032,12 +1118,12 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       // ADR-060: optional block-restoration timeout. -1 (default) keeps the platform permanent
       // and skips diff capture entirely (zero added cost).
       int restoreSeconds = safety.getNumber(SafetyKeys.platformRestoreSeconds, -1).intValue();
-      Material material;
-      try {
-        material = Material.valueOf(safety.getConfigValue(SafetyKeys.platformMaterial, "GLASS").toString().toUpperCase());
-      } catch (IllegalArgumentException e) {
-        material = Material.GLASS;
-      }
+      Object rawMat = safety.getConfigValue(SafetyKeys.platformMaterial, "GLASS");
+      Material material = BukkitMaterialResolver.resolve(
+          rawMat != null ? rawMat.toString() : "GLASS",
+          Material.GLASS,
+          "Platform material"
+      );
 
       int lx = location.getBlockX();
       int ly = location.getBlockY();

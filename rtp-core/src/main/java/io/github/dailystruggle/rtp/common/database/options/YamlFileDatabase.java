@@ -74,10 +74,9 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
   @Override
   @NotNull
   public Map<String, RtpYamlConfig> connect() {
-    if (!directory.exists()) {
-      if (!directory.mkdirs())
-        throw new IllegalStateException(
-            "unable to create directory " + directory.getAbsolutePath());
+    if (!directory.exists() && !directory.mkdirs()) {
+      throw new IllegalStateException(
+          "unable to create directory " + directory.getAbsolutePath());
     }
 
     File[] files = directory.listFiles();
@@ -85,9 +84,8 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
     if (files == null) return res;
     for (File file : files) {
       if (!file.isFile()) continue;
-      // Skip the locale bootstrap file - it is plugin configuration, not a database table.
-      if (io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap.FILE_NAME
-          .equalsIgnoreCase(file.getName())) continue;
+      // Skip the locale bootstrap file (LanguageBootstrap.FILE_NAME) - plugin configuration, not a database table.
+      if ("language.yml".equalsIgnoreCase(file.getName())) continue;
 
       long lastModified = file.lastModified();
       long dt = lastModified - cachedLookupLastModified.get().getOrDefault(file.getName(), -1L);
@@ -461,13 +459,23 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
               teleportData.time =
                   System.currentTimeMillis() - Math.abs(referenceTime - teleportData.time);
             Object originalWorldName = dataMap.get("originalWorldName");
-            if (originalWorldName != null)
+            if (originalWorldName != null) {
+              teleportData.originWorldName = originalWorldName.toString();
               teleportData.originalCoords =
                   new RTPCoords(
                       originalWorldName.toString(),
                       ((Number) dataMap.get("originalX")).intValue(),
                       ((Number) dataMap.get("originalY")).intValue(),
                       ((Number) dataMap.get("originalZ")).intValue());
+            }
+            Object originServerId = dataMap.get("originServerId");
+            if (originServerId != null) {
+              teleportData.originServerId = originServerId.toString();
+            }
+            Object originWorldName = dataMap.get("originWorldName");
+            if (originWorldName != null) {
+              teleportData.originWorldName = originWorldName.toString();
+            }
             Object selectedWorldName = dataMap.get("selectedWorldName");
             if (selectedWorldName != null)
               teleportData.selectedCoords =

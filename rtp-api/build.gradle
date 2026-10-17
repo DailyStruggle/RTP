@@ -43,7 +43,7 @@ tasks.withType(JavaCompile).configureEach { task ->
             // Change to '-Awarns=false' (or remove) to make violations hard errors.
             '-Awarns',
             // Suppress noise from unannotated third-party APIs (Bukkit, Paper, Folia).
-            '-AstubWarnIfNotFound=false',
+            '-AstubNoWarnIfNotFound',
         ]
         // The Checker Framework annotation processor accesses internal javac APIs that are
         // encapsulated by the Java module system in JDK 9+. These --add-opens flags are the

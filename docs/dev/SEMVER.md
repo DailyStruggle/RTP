@@ -43,7 +43,7 @@ The public API is designed for third-party addon developers, external integratio
    - **`effects-api` (`io.github.dailystruggle.effectsapi.common.*`):** Platform-neutral visual/auditory effect models.
    - **`maps-api` (`io.github.dailystruggle.mapsapi.common.*`):** Minimap/chart rendering models and specs.
    - **`metrics-api` (`io.github.dailystruggle.metricsapi.common.*`):** Telemetry SPI interfaces.
-   - **`anvil-api` (`io.github.dailystruggle.anvilapi.*`):** Platform-neutral Anvil/Linear chunk and region file decoders.
+   - **`anvil-api` (`io.github.dailystruggle.anvilapi.*`):** Platform-neutral Anvil chunk and region file decoders, and the `RegionFileReader` SPI for addon-supplied region formats.
    - **`tags-api` (`io.github.dailystruggle.tagsapi.*`):** Block and biome tag query interfaces.
    - **`yaml-api` (`io.github.dailystruggle.rtp.common.configuration.yaml.*`):** Hand-rolled zero-dependency YAML parser AST types (`RtpYaml*`).
 

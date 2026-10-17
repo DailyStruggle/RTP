@@ -18,18 +18,33 @@ public record ColumnProbe(int minY,
                           int maxY,
                           int heightmapTopY,
                           List<PaletteSection> sections,
-                          List<BiomePaletteSection> biomeSections) {
+                          List<BiomePaletteSection> biomeSections,
+                          long drainNanos,
+                          int groupSize) {
 
     /** Chunk-local X used for all center-column queries. */
     public static final int CENTER_LOCAL_X = 8;
     /** Chunk-local Z used for all center-column queries. */
     public static final int CENTER_LOCAL_Z = 8;
 
+    public ColumnProbe(int minY,
+                       int maxY,
+                       int heightmapTopY,
+                       List<PaletteSection> sections,
+                       List<BiomePaletteSection> biomeSections) {
+        this(minY, maxY, heightmapTopY, sections, biomeSections, 0L, 0);
+    }
+
     public ColumnProbe {
         Objects.requireNonNull(sections, "sections");
         Objects.requireNonNull(biomeSections, "biomeSections");
         sections = Collections.unmodifiableList(sections);
         biomeSections = Collections.unmodifiableList(biomeSections);
+    }
+
+    /** Returns a copy with the measured per-chunk drain duration and the coalesced group size. */
+    public ColumnProbe withDrain(long drainNanos, int groupSize) {
+        return new ColumnProbe(minY, maxY, heightmapTopY, sections, biomeSections, drainNanos, groupSize);
     }
 
     /**

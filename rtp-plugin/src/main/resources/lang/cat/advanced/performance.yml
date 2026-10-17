@@ -1,8 +1,17 @@
-# Minimum purrs/sec (TPS) to keep sniffing in the background
+# Pause background cache filling when TPS drops below this.
+# On Folia, the slowest region counts. Waiting players are still served. 0 = off.
 # @type: number
 # @range: [0.0, 20.0]
 # @default: 19.0
 minimum_purrs_per_second: 19.0
+
+# Pause background warm-spot filling when a tick takes longer than this (ms).
+# Catches lag TPS hides (TPS stays 20 up to 50 ms). 0 = off.
+# @type: number
+# @range: [0.0, null]
+# @unit: ms
+# @default: 45.0
+maxMSPT: 45.0
 
 # Max JVM heap nibbling (% of max) before background warm-spot stuffing naps.
 # Already-stashed warm-spots are still served. 0 or 100 turns the gate off.
@@ -19,26 +28,26 @@ maxHeapPurrcent: 85.0
 # @default: 32
 max_pounces: 32
 
-# Tail flicks (ticks) between background sniff cycles
+# Ticks between refills of the same region. Regions take turns.
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
 # @default: 20
 tail_swish_period: 20
 
-# Max whisker-twitches per tick for sync errands
+# Max ms per tick for main-thread errands. Capped at 25.
 # @type: integer
-# @range: [1, null]
+# @range: [1, 25]
 # @unit: ms
-# @default: 50
-sync_nap_time: 50
+# @default: 5
+sync_nap_time: 5
 
-# Max whisker-twitches per tick for async errands
+# Max ms per pulse for background errands. Capped at 25.
 # @type: integer
-# @range: [1, null]
+# @range: [1, 25]
 # @unit: ms
-# @default: 50
-async_nap_time: 50
+# @default: 25
+async_nap_time: 25
 
 # Kibble (chunk) radius to load while stalking
 # @type: integer
@@ -140,6 +149,13 @@ queue_growth_warn_threshold: 0
 # @type: boolean
 # @default: false
 synced_kibble: false
+
+# How the cat lands on Paper. AUTO = same-tick pounce when the spot's chunk is
+# already loaded, else teleportAsync. ASYNC = always teleportAsync (one tick slower).
+# @type: string
+# @options: ["AUTO", "ASYNC"]
+# @default: "AUTO"
+pounce_path: "AUTO"
 
 # Re-sniff permissions on every event
 # @type: boolean

@@ -2,30 +2,20 @@ package io.github.dailystruggle.rtp.neoforge.world;
 
 import io.github.dailystruggle.rtp.anvil.AnvilChunkView;
 import io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer;
-import io.github.dailystruggle.rtp.api.safety.CompiledUnsafeSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
-import net.minecraft.world.level.levelgen.Heightmap;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * NeoForge {@link RTPChunk} (the NeoForge analogue of {@code FabricRTPChunk}).
@@ -135,12 +125,6 @@ public final class NeoForgeRTPChunk extends RTPChunk<ChunkAccess> {
     }
 
     @Override
-    public boolean isGenerated() {
-        if (anvilView != null) return true;
-        return chunk != null;
-    }
-
-    @Override
     public boolean isLoaded() {
         if (anvilView != null) return false;
         try {
@@ -152,30 +136,24 @@ public final class NeoForgeRTPChunk extends RTPChunk<ChunkAccess> {
 
     @Override
     public void keep(boolean keep) {
-        if (anvilView != null) {
-            return;
-        }
+        if (anvilView != null) return;
         RTPWorld<?> w = getWorld();
-        if (w instanceof NeoForgeRTPWorld nw) {
-            if (keep) {
-                nw.keepChunkAt(cx, cz);
-            } else {
-                nw.forgetChunkAt(cx, cz);
-            }
-        }
+        if (w == null) return;
+        if (keep) w.keepChunkAt(cx, cz);
+        else w.forgetChunkAt(cx, cz);
     }
 
     @Override
     public void unload() {
-        if (anvilView != null) return;
         keep(false);
     }
 
-    // ---------------------------------------------------------------------------
-    // Block-data queries
-    // ---------------------------------------------------------------------------
-
-    private String materialNameAt(int x, int y, int z) {
+    @Override
+    public String materialNameAt(int x, int y, int z) {
+        if (anvilView != null) {
+            String id = anvilView.blockIdAt(x & 0xF, y, z & 0xF);
+            return (id != null) ? id.toUpperCase(Locale.ROOT) : "AIR";
+        }
         if (chunk == null) return "";
         try {
             BlockState state = chunk.getBlockState(new BlockPos(
@@ -189,78 +167,6 @@ public final class NeoForgeRTPChunk extends RTPChunk<ChunkAccess> {
         }
     }
 
-    private static final AtomicReference<Set<String>> AIR_BLOCKS_CACHE =
-            new AtomicReference<>(Collections.emptySet());
-
-    @SuppressWarnings("unchecked")
-    private static Set<String> reconciledAirBlocks() {
-        Set<String> cached = AIR_BLOCKS_CACHE.get();
-        try {
-            if (RTP.configs == null) return cached;
-            Object value = RTP.configs.getConfigValue(BlocksKeys.airBlocks, new ArrayList<>());
-            if (!(value instanceof Collection<?> coll)) return cached;
-            Map<String, Set<String>> tagSnapshot = Collections.emptyMap();
-            if (RTP.serverAccessor != null) {
-                try {
-                    Map<String, Set<String>> s = RTP.serverAccessor.blockTagSnapshot();
-                    if (s != null) tagSnapshot = s;
-                } catch (Throwable ignoredTag) {
-                    // best-effort
-                }
-            }
-            Set<String> raw = new HashSet<>();
-            for (Object o : coll) {
-                if (o == null) continue;
-                String token = o.toString().trim();
-                if (token.isEmpty()) continue;
-                if (token.charAt(0) == '#') {
-                    String tagId = token.substring(1);
-                    if (tagId.indexOf(':') < 0) tagId = "minecraft:" + tagId;
-                    tagId = tagId.toLowerCase(Locale.ROOT);
-                    Set<String> members = tagSnapshot.get(tagId);
-                    if (members != null && !members.isEmpty()) {
-                        raw.addAll(members);
-                        continue;
-                    }
-                    raw.add(token);
-                } else {
-                    raw.add(token);
-                }
-            }
-            Set<String> reconciled = (RTP.serverAccessor != null)
-                ? RTP.serverAccessor.reconcilePaletteIdentifiers(raw)
-                : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalizeAll(raw);
-            AIR_BLOCKS_CACHE.set(reconciled);
-            return reconciled;
-        } catch (Throwable ignored) {
-            return cached;
-        }
-    }
-
-    @Override
-    public boolean isAir(int x, int y, int z) {
-        Set<String> airSet = reconciledAirBlocks();
-        if (anvilView != null) {
-            return anvilView.isAir(x & 0xF, y, z & 0xF, airSet);
-        }
-        if (chunk == null) return true;
-        try {
-            BlockState state = chunk.getBlockState(new BlockPos(
-                    (cx << 4) + (x & 0xF), y, (cz << 4) + (z & 0xF)));
-            if (state.isAir()) return true;
-            if (airSet.isEmpty()) return false;
-            Block block = state.getBlock();
-            String id = io.github.dailystruggle.rtp.neoforge.tools.NeoForgeResourceIds
-                    .registryKeyString(BuiltInRegistries.BLOCK, block);
-            if (id == null) return false;
-            return (RTP.serverAccessor != null)
-                ? RTP.serverAccessor.matchesPaletteIdentifier(id, airSet)
-                : airSet.contains(io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(id));
-        } catch (Throwable t) {
-            return false;
-        }
-    }
-
     @Override
     public String getBiome(int x, int y, int z) {
         if (anvilView != null) {
@@ -271,60 +177,6 @@ public final class NeoForgeRTPChunk extends RTPChunk<ChunkAccess> {
             }
         }
         return super.getBiome(x, y, z);
-    }
-
-    @Override
-    public int getSkyLight(int x, int y, int z) {
-        if (anvilView != null) {
-            return 15;
-        }
-        if (level == null) return 0;
-        try {
-            return level.getBrightness(LightLayer.SKY, new BlockPos(
-                    (cx << 4) + (x & 0xF), y, (cz << 4) + (z & 0xF)));
-        } catch (Throwable t) {
-            return 0;
-        }
-    }
-
-    @Override
-    public int getSurfaceHeight(int x, int z) {
-        x = Math.max(0, Math.min(15, x));
-        z = Math.max(0, Math.min(15, z));
-        if (anvilView != null) {
-            return anvilView.getSurfaceHeight(x, z);
-        }
-        if (chunk == null) return 0;
-        try {
-            return chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
-        } catch (Throwable t) {
-            return 0;
-        }
-    }
-
-    @Override
-    public boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks) {
-        if (anvilView != null) {
-            Set<String> set = (reconciledUnsafe != null)
-                    ? reconciledUnsafe
-                    : ((RTP.serverAccessor != null)
-                        ? RTP.serverAccessor.reconcilePaletteIdentifiers(unsafeBlocks)
-                        : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalizeAll(unsafeBlocks));
-            return anvilView.isSafe(x & 0xF, y, z & 0xF, set);
-        }
-        if (unsafeBlocks == null || unsafeBlocks.isEmpty()) return true;
-        String name = materialNameAt(x, y, z);
-        if (name.isEmpty()) return true;
-        if (unsafeBlocks.contains(name)) return false;
-        int colon = name.indexOf(':');
-        if (colon > 0 && unsafeBlocks.contains(name.substring(colon + 1))) return false;
-        return true;
-    }
-
-    @Override
-    public boolean isSafe(int x, int y, int z, CompiledUnsafeSet unsafeBlocks) {
-        if (unsafeBlocks == null || unsafeBlocks.isEmpty()) return true;
-        return isSafe(x, y, z, unsafeBlocks.plainMaterials());
     }
 
     /**

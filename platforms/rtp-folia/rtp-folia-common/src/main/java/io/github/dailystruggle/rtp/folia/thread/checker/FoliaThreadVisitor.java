@@ -96,17 +96,15 @@ public class FoliaThreadVisitor extends BaseTypeVisitor<FoliaThreadAnnotatedType
             return super.visitMethodInvocation(callTree, p);
         }
 
-        // Caller is @RegionThread. Callee requires a different (incompatible) context.
-        if (calleeIsAsync || calleeIsGlobal) {
-            // Violation unless the call-site is inside a scheduler-bridge lambda.
-            if (!isInsideSchedulerBridgeLambda(getCurrentPath())) {
-                checker.reportError(
-                        callTree,
-                        "thread.affinity.violation",
-                        caller.getSimpleName(),
-                        callee.getSimpleName(),
-                        calleeIsAsync ? "@AsyncThread" : "@GlobalRegionThread");
-            }
+        // Caller is @RegionThread. Callee requires a different (incompatible) context:
+        // violation unless the call-site is inside a scheduler-bridge lambda.
+        if ((calleeIsAsync || calleeIsGlobal) && !isInsideSchedulerBridgeLambda(getCurrentPath())) {
+            checker.reportError(
+                    callTree,
+                    "thread.affinity.violation",
+                    caller.getSimpleName(),
+                    callee.getSimpleName(),
+                    calleeIsAsync ? "@AsyncThread" : "@GlobalRegionThread");
         }
 
         return super.visitMethodInvocation(callTree, p);

@@ -23,6 +23,8 @@ public final class RTPTestSetup {
      * @return the installed accessor so tests can call {@link MockRTPServerAccessor#addPlayer} etc.
      */
     public static MockRTPServerAccessor install(File pluginDir) {
+        // Pending arrival holds belong to the previous test's scheduler and would never fire.
+        io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask.flushArrivalReservations();
         MockRTPServerAccessor accessor = new MockRTPServerAccessor(pluginDir);
 
         // Clear any accessor registered by a previous test so that the write-once
@@ -48,6 +50,7 @@ public final class RTPTestSetup {
         // left by shutdown-path tests.
         io.github.dailystruggle.rtp.common.RTP rtpInstance = RTP.getInstance();
         if (rtpInstance != null) {
+            rtpInstance.databaseAccessor = null;
             rtpInstance.cancelTasks = (io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe();
             rtpInstance.miscSyncTasks = (io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe();
             rtpInstance.miscAsyncTasks = (io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe) accessor.createTaskPipe();
@@ -83,14 +86,35 @@ public final class RTPTestSetup {
                 RTP.configs.fileDatabase.processQueries(Long.MAX_VALUE);
                 RTP.configs.fileDatabase.disconnect(java.util.Collections.emptyMap());
             }
-            if (RTP.configs.multiConfigParserMap != null) {
-                for (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> mcp : RTP.configs.multiConfigParserMap.values()) {
-                    if (mcp != null && mcp.fileDatabase != null) {
-                        mcp.fileDatabase.processQueries(Long.MAX_VALUE);
-                        mcp.fileDatabase.disconnect(java.util.Collections.emptyMap());
+            if (RTP.configs.configParserMap != null) {
+                for (io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> cp : RTP.configs.configParserMap.values()) {
+                    if (cp != null && cp.fileDatabase != null && cp.fileDatabase != RTP.configs.fileDatabase) {
+                        cp.fileDatabase.processQueries(Long.MAX_VALUE);
+                        cp.fileDatabase.disconnect(java.util.Collections.emptyMap());
                     }
                 }
             }
+            if (RTP.configs.multiConfigParserMap != null) {
+                for (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> mcp : RTP.configs.multiConfigParserMap.values()) {
+                    if (mcp != null) {
+                        if (mcp.fileDatabase != null) {
+                            mcp.fileDatabase.processQueries(Long.MAX_VALUE);
+                            mcp.fileDatabase.disconnect(java.util.Collections.emptyMap());
+                        }
+                        if (mcp.configParserFactory != null && mcp.configParserFactory.map != null) {
+                            for (io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> cp : mcp.configParserFactory.map.values()) {
+                                if (cp != null && cp.fileDatabase != null && cp.fileDatabase != mcp.fileDatabase) {
+                                    cp.fileDatabase.processQueries(Long.MAX_VALUE);
+                                    cp.fileDatabase.disconnect(java.util.Collections.emptyMap());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (RTP.getInstance() != null) {
+            RTP.getInstance().databaseAccessor = null;
         }
         RTP.configs = null;
         RTP.serverAccessor = null;

@@ -111,7 +111,7 @@ public class ReqRtpObservationalCacheTaskTest {
         int beforeInFlight = region.inFlightCalculations.get();
         long beforeSize = region.queueManager.unkeptLocations.size();
 
-        RegionCacheTask observational = RegionCacheTask.observe(region, 50_000_000L);
+        RegionCacheTask observational = RegionCacheTask.observe(region);
         observational.run();
 
         assertEquals(beforeInFlight, region.inFlightCalculations.get(),
@@ -128,7 +128,7 @@ public class ReqRtpObservationalCacheTaskTest {
     @Test
     @Timeout(value = 1, unit = TimeUnit.SECONDS)
     void observe_factory_returnsNonNullTask() {
-        RegionCacheTask task = RegionCacheTask.observe(region, 1_000_000L);
+        RegionCacheTask task = RegionCacheTask.observe(region);
         assertNotNull(task, "observe() factory must not return null");
         // Distinct identity from the default constructor's output.
         RegionCacheTask defaultTask = new RegionCacheTask(region, 1_000_000L);
@@ -143,19 +143,18 @@ public class ReqRtpObservationalCacheTaskTest {
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void execute_withObservationalEnabled_reachesFullCacheCapPlusActiveCap() {
         long totalCap = region.getSettings().cacheCap() + region.getSettings().activeChunkCap();
-        long previous = -1L;
         long current = region.getPublicQueueLength();
         // Bounded retry: each pulse should add at least one location until
         // saturation. 64 pulses comfortably covers the 8-slot total even
         // with cache-pipeline yielding.
         for (int i = 0; i < 64 && current < totalCap; i++) {
-            region.execute(Long.MAX_VALUE);
-            previous = current;
+            pulse();
+            long previous = current;
             current = region.getPublicQueueLength();
             if (current == previous && current >= totalCap - 1) {
                 // Saturation candidate: one more pulse to confirm we're not
                 // mid-promotion (kept polled, awaiting async chunk-load).
-                region.execute(Long.MAX_VALUE);
+                pulse();
                 current = region.getPublicQueueLength();
                 break;
             }
@@ -164,5 +163,11 @@ public class ReqRtpObservationalCacheTaskTest {
                 "with observational mode enabled, [cached] must reach "
                         + "cacheCap + activeChunkCap (regression guard for the "
                         + "off-by-one cache-deficit bug - \"cached: 59\" symptom).");
+    }
+
+    /** One async region pulse plus the sync pulse that runs tick-thread promotion verify. */
+    private void pulse() {
+        region.execute(Long.MAX_VALUE);
+        RTP.getInstance().miscSyncTasks.execute(Long.MAX_VALUE);
     }
 }

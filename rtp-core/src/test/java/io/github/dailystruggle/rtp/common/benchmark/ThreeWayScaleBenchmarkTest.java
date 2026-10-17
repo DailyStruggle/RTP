@@ -78,7 +78,6 @@ public class ThreeWayScaleBenchmarkTest {
     // 512 chunks = 8.19km (medium server border)
     // 1024 chunks = 16.38km (large server border)
     int[] radiiChunks = {50, 256, 512};
-    long binSize = 512L;
 
     for (int radius : radiiChunks) {
       String scaleName = (radius * 16 / 1000) + "km (r=" + radius + "ch)";

@@ -4,10 +4,10 @@ plugins {
 group = 'io.github.dailystruggle'
 // LeafRTPClaimAddon carries its OWN version line, independent of the RTP core
 // version: it ships and updates on its own cadence (mirroring LeafRTPGuiAddon).
-version = '1.0.0'
+version = '1.1.0'
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 // Installable artifact carries the brand name, so the build produces
@@ -38,7 +38,7 @@ dependencies {
     // Claim-plugin APIs (compile-only; the installed plugin supplies the classes at runtime,
     // and each checker is additionally gated on the plugin being enabled).
     compileOnly 'com.sk89q.worldguard:worldguard-bukkit:7.0.12'
-    compileOnly 'com.sk89q.worldedit:worldedit-bukkit:7.2.15'
+    compileOnly 'com.sk89q.worldedit:worldedit-bukkit:7.3.0'
     compileOnly 'com.github.TechFortress:GriefPrevention:16.18.1'
     compileOnly 'com.github.LlmDl:Towny:0.102.0.13'
     compileOnly 'com.griefdefender:api:2.1.0-SNAPSHOT'
@@ -51,6 +51,18 @@ dependencies {
         exclude group: 'de.keyle', module: 'mypet'
         exclude group: 'net.ess3', module: 'EssentialsX'
     }
+
+    testImplementation project(':rtp-api')
+    testImplementation project(':rtp-core')
+    testImplementation testFixtures(project(':rtp-core'))
+    testImplementation 'org.spigotmc:spigot-api:1.20.1-R0.1-SNAPSHOT'
+    testImplementation 'com.github.TechFortress:GriefPrevention:16.18.1'
+    testImplementation 'com.github.LlmDl:Towny:0.102.0.13'
+    testImplementation 'com.sk89q.worldguard:worldguard-bukkit:7.0.12'
+    testImplementation 'com.sk89q.worldedit:worldedit-bukkit:7.3.0'
+    testImplementation 'net.kyori:adventure-api:4.17.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 test {

@@ -5,8 +5,8 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
-import io.github.dailystruggle.rtp.common.commands.reload.ReloadCmd;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmd;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap;
 import org.jetbrains.annotations.Nullable;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
@@ -103,9 +103,7 @@ public class LanguageCmd extends BaseRTPCmdImpl {
       updatedMsg = updatedMsg.replace("[filename]", LanguageBootstrap.FILE_NAME);
       RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updatedMsg);
 
-      CommandsAPICommand reload =
-          RTP.baseCommand.getCommandLookup().getOrDefault("reload", new ReloadCmd(RTP.baseCommand));
-      reload.onCommand(callerId, new HashMap<>(), null);
+      BaseRTPCmd.dispatchReload(callerId);
     });
 
     return true;

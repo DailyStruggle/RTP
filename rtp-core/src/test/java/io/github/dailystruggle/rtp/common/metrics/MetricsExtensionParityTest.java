@@ -11,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Parity test for the {@link MetricsExtension} slot mechanism on {@link MetricsSnapshot}.
@@ -63,6 +64,27 @@ class MetricsExtensionParityTest {
         assertEquals(base.heapMaxBytes, derived.heapMaxBytes);
         assertEquals(base.playerCount, derived.playerCount);
         assertEquals(base.takenAtEpochMs, derived.takenAtEpochMs);
+    }
+
+    @Test
+    void builderCarriesEveryFieldAndCopiesTables() {
+        java.util.Map<String, io.github.dailystruggle.metrics.api.RegionQueueRow> queues = new java.util.HashMap<>();
+        queues.put("r", null);
+        RTPMetricsExtension ext = RTPMetricsExtension.builder()
+                .queueDepth(1).pendingTeleports(2).memoryTrackerEntries(3).chunkLoadBacklog(4)
+                .avgPipelineMs(5.5).databaseLatencyMs(6)
+                .slowPipeline(7L, 8L).queueGrowthWarn(9L, 10)
+                .regionQueueStatus(queues).probeGovernors(null)
+                .build();
+        queues.clear();
+
+        assertEquals("RTPMetricsExtension{queueDepth=1, pendingTeleports=2, memoryTrackerEntries=3,"
+                + " chunkLoadBacklog=4, avgPipelineMs=5.5, databaseLatencyMs=6, slowPipelineCount=7,"
+                + " slowPipelineThresholdMs=8, queueGrowthWarnCount=9, queueGrowthWarnThreshold=10,"
+                + " regionQueueStatus={r=null}, probeGovernors={}, liveLoadGates={}, immediateGovernors={}}",
+                ext.toString());
+        assertThrows(UnsupportedOperationException.class, () -> ext.regionQueueStatus.put("x", null));
+        assertTrue(ext.probeGovernors.isEmpty());
     }
 
     @Test

@@ -1,15 +1,13 @@
 package io.github.dailystruggle.rtp.common.commands.prefab;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -30,7 +28,7 @@ public class PrefabRollbackCmd extends BaseRTPCmdImpl {
     public PrefabRollbackCmd(@Nullable CommandsAPICommand parent) {
         super(parent);
         addParameter("id",
-                new PrefabIdParameter(PrefabCommand.PERMISSION,
+                new PrefabIdParameter(PrefabPermission.PERMISSION,
                         "bundled prefab id",
                         (uuid, s) -> true));
     }
@@ -42,7 +40,7 @@ public class PrefabRollbackCmd extends BaseRTPCmdImpl {
 
     @Override
     public String permission() {
-        return PrefabCommand.PERMISSION;
+        return PrefabPermission.PERMISSION;
     }
 
     @Override
@@ -72,19 +70,15 @@ public class PrefabRollbackCmd extends BaseRTPCmdImpl {
             return false;
         }
         Prefab prefab = opt.get();
-        File pluginDir = (RTP.serverAccessor == null) ? null : RTP.serverAccessor.getPluginDirectory();
-        if (pluginDir == null) {
-            RTP.log(Level.WARNING,
-                    "[prefab] rollback rejected NO_PLUGIN_DIR: caller=" + callerId
-                            + " prefab=" + prefabId);
-            send(callerId, "&cRollback failed: plugin directory unavailable.");
+        Optional<File> pluginDirOpt = PrefabDiskIO.resolvePluginDirectory(callerId, "rollback", prefabId,
+                "&cRollback failed: plugin directory unavailable.");
+        if (pluginDirOpt.isEmpty()) {
             return false;
         }
+        File pluginDir = pluginDirOpt.get();
 
         // Enumerate the file ids the prefab touches: perf overlay + region overlays.
-        Set<String> fileIds = new LinkedHashSet<>();
-        if (!prefab.performanceOverlay().isEmpty()) fileIds.add("performance");
-        for (String regionId : prefab.regionOverlays().keySet()) fileIds.add("regions/" + regionId);
+        Set<String> fileIds = PrefabDiskIO.enumeratePrefabFileIds(prefab);
 
         List<String> restored = new ArrayList<>();
         List<String> empty = new ArrayList<>();
@@ -154,11 +148,6 @@ public class PrefabRollbackCmd extends BaseRTPCmdImpl {
     }
 
     private static void send(UUID callerId, String msg) {
-        if (callerId == null || RTP.serverAccessor == null) return;
-        try {
-            RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);
-        } catch (RuntimeException ignored) {
-            // Test scaffolds without a real sender are not fatal.
-        }
+        PrefabDiskIO.send(callerId, msg);
     }
 }

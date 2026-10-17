@@ -36,7 +36,7 @@ public class BiomeParameter extends CommandParameter {
   @Override
   public Set<String> relevantValues(UUID senderId) {
     Set<String> observed =
-        io.github.dailystruggle.rtp.common.commands.menu.BiomeMenuSource.observedBiomes(senderId);
+        io.github.dailystruggle.rtp.common.selection.region.BiomeMenuSource.observedBiomes(senderId);
     if (observed != null && !observed.isEmpty()) return observed;
     return super.relevantValues(senderId);
   }

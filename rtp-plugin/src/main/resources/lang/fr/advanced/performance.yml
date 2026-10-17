@@ -1,8 +1,17 @@
-# Min TPS to continue background queueing
+# Met en pause le remplissage du cache en arrière-plan si les TPS passent sous cette valeur.
+# Sur Folia, la région la plus lente compte. Les joueurs en attente restent servis. 0 = désactivé.
 # @type: number
 # @range: [0.0, 20.0]
 # @default: 19.0
 tpsMin: 19.0
+
+# Met en pause le remplissage du cache en arrière-plan si un tick dépasse cette durée (ms).
+# Détecte le lag masqué par les TPS (ils restent à 20 jusqu'à 50 ms). 0 = désactivé.
+# @type: number
+# @range: [0.0, null]
+# @unit: ms
+# @default: 45.0
+maxMSPT: 45.0
 
 # Utilisation max du heap JVM (% du max) avant la pause du remplissage du cache
 # en arrière-plan. Les emplacements déjà en cache restent servis. 0 ou 100 désactive.
@@ -19,26 +28,26 @@ maxHeapPourcentage: 85.0
 # @default: 32
 tentativesMax: 32
 
-# Ticks between background cache cycles
+# Ticks entre deux remplissages de la même région. Les régions alternent.
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
 # @default: 20
 periode: 20
 
-# Max ms per tick for sync tasks
+# Maximum de ms par tick pour le travail du thread principal. Limité à 25.
 # @type: integer
-# @range: [1, null]
+# @range: [1, 25]
 # @unit: ms
-# @default: 50
-tempsAlloueSync: 50
+# @default: 5
+tempsAlloueSync: 5
 
-# Max ms per tick for async tasks
+# Maximum de ms par impulsion pour le travail en arrière-plan. Limité à 25.
 # @type: integer
-# @range: [1, null]
+# @range: [1, 25]
 # @unit: ms
-# @default: 50
-tempsAlloueAsync: 50
+# @default: 25
+tempsAlloueAsync: 25
 
 # Chunk radius to load during selection
 # @type: integer
@@ -140,6 +149,13 @@ seuilAlerteCroissanceFile: 0
 # @type: boolean
 # @default: false
 chargementSync: false
+
+# Chemin de téléportation sur Paper. AUTO = téléportation dans le même tick si le chunk
+# cible est déjà chargé, sinon teleportAsync. ASYNC = toujours teleportAsync (un tick plus lent).
+# @type: string
+# @options: ["AUTO", "ASYNC"]
+# @default: "AUTO"
+cheminTeleportation: "AUTO"
 
 # Parse permissions on every event
 # @type: boolean

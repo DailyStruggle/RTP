@@ -3,7 +3,6 @@ import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
 import io.github.dailystruggle.effectsapi.common.EffectFactory;
-import io.github.dailystruggle.effectsapi.fabric.FabricEffectRuntime;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
@@ -31,30 +30,19 @@ import io.github.dailystruggle.rtp.common.configuration.Messages;
  * {@code io.github.dailystruggle.rtp.fabric.effects.FabricEffectsHandler}
  * (effects-api-ADR-003 / ADR-005).
  *
- * <p>Unlike Fabric, NeoForge cannot reuse the {@code effectsapi.fabric.*}
- * concrete effect prototypes: that subpackage is Loom-built and its bytecode
- * is remapped to Fabric intermediary, so its static initializers reference
- * obfuscated {@code net.minecraft.class_NNNN} types (e.g. {@code class_7923} =
- * {@code BuiltInRegistries}) that do not exist on the Mojmap NeoForge runtime
- * ({@code NoClassDefFoundError}). NeoForge therefore ships its own Mojmap
- * effect prototypes in
+ * <p>NeoForge shares no code with the Fabric effects carrier (which is
+ * Loom-remapped to Fabric intermediary and does not link on the Mojmap
+ * NeoForge runtime). It ships its own Mojmap effect prototypes in
  * {@code io.github.dailystruggle.rtp.neoforge.effects.local.*}
- * ({@link NeoForgeEffectsInitializer}), which additionally never type
+ * ({@link NeoForgeEffectsInitializer}), which never type
  * {@code ResourceLocation} (renamed to {@code Identifier} in 1.21.11) and
- * dispatch every drift-prone surface reflectively.</p>
- *
- * <p>Only the platform-neutral {@code effectsapi.common.*}
- * ({@code Effect}/{@code EffectFactory}) and the safe parts of
- * {@link FabricEffectRuntime} (the {@code MinecraftServer}-bound
- * {@code schedule(Runnable, long)} chokepoint + log sink; {@code MinecraftServer}
- * is not obfuscated) are reused here. The obfuscated-typed dispatcher SPI of
- * {@link FabricEffectRuntime} is intentionally NOT used; each NeoForge effect
- * resolves its own dispatch reflectively.</p>
+ * dispatch every drift-prone surface reflectively. Only the platform-neutral
+ * {@code effectsapi.common.*} SPI is reused.</p>
  *
  * <p>Responsibilities:</p>
  * <ol>
- *   <li>Bind the {@link MinecraftServer} into {@link FabricEffectRuntime} and
- *       route its diagnostics through {@link RTP#log}.</li>
+ *   <li>Bind the {@link MinecraftServer} into {@link NeoForgeHandles}, the
+ *       effect scheduler chokepoint.</li>
  *   <li>Invoke {@link NeoForgeEffectsInitializer#registerAll()} (idempotent) to
  *       bind the NeoForge value coercer + SOUND/PARTICLE/TITLE/POTION
  *       prototypes.</li>
@@ -62,7 +50,7 @@ import io.github.dailystruggle.rtp.common.configuration.Messages;
  *       {@link TeleportPipelineTask} / {@link Region} / {@link RTPTeleportCancel}.</li>
  * </ol>
  *
- * <p>S-005: effect dispatch funnels through {@link FabricEffectRuntime#schedule}
+ * <p>S-005: effect dispatch funnels through {@link NeoForgeHandles#execute}
  * ({@code MinecraftServer#execute}); effect resolution is pure in-memory parser
  * lookup, no chunk I/O.</p>
  */
@@ -73,13 +61,11 @@ public final class NeoForgeEffectsHandler {
     /**
      * Wire the NeoForge effects layer to the RTP pipeline. Call from
      * {@code ServerStartedEvent} (so {@code BuiltInRegistries} is fully
-     * populated and {@link FabricEffectRuntime#schedule} has a server to
+     * populated and {@link NeoForgeHandles#execute} has a server to
      * dispatch onto). Idempotent: re-binds the server and registers the
      * lifecycle-hook lambdas exactly once.
      */
     public static void setupEffects(MinecraftServer server) {
-        FabricEffectRuntime.setLogSink((lvl, msg, t) -> RTP.log(lvl, msg, t));
-        FabricEffectRuntime.bindServer(server);
         NeoForgeHandles.setServer(server);
         NeoForgeEffectsInitializer.registerAll();
 
@@ -87,23 +73,22 @@ public final class NeoForgeEffectsHandler {
 
         Configs configs = RTP.configs;
         FactoryValue<PerformanceKeys> parser = configs.getParser(PerformanceKeys.class);
-        FabricEffectRuntime runtime = new FabricEffectRuntime();
 
         TeleportPipelineTask.setupPreActions.add(task -> {
             if (!effectParsingEnabled(parser) || task.player() == null) return;
-            dispatch("rtp.effect.presetup", task.player(), runtime);
+            dispatch("rtp.effect.presetup", task.player());
         });
         TeleportPipelineTask.setupPostActions.add((task, ok) -> {
             if (!ok || !effectParsingEnabled(parser) || task.player() == null) return;
-            dispatch("rtp.effect.postsetup", task.player(), runtime);
+            dispatch("rtp.effect.postsetup", task.player());
         });
         TeleportPipelineTask.loadPreActions.add(task -> {
             if (!effectParsingEnabled(parser) || task.player() == null) return;
-            dispatch("rtp.effect.preload", task.player(), runtime);
+            dispatch("rtp.effect.preload", task.player());
         });
         TeleportPipelineTask.loadPostActions.add(task -> {
             if (!effectParsingEnabled(parser) || task.player() == null) return;
-            dispatch("rtp.effect.postload", task.player(), runtime);
+            dispatch("rtp.effect.postload", task.player());
         });
         TeleportPipelineTask.teleportPreActions.add(task -> {
             if (!effectParsingEnabled(parser) || task.player() == null) return;
@@ -115,25 +100,25 @@ public final class NeoForgeEffectsHandler {
             if (task.coords() != null) {
                 destPos = new net.minecraft.world.phys.Vec3(task.coords().x(), task.coords().y(), task.coords().z());
             }
-            dispatch("rtp.effect.preteleport", task.player(), runtime, originPos, destPos, task.coords() != null ? task.coords().worldName() : null, task);
+            dispatch("rtp.effect.preteleport", task.player(), originPos, destPos, task.coords() != null ? task.coords().worldName() : null, task);
         });
         TeleportPipelineTask.teleportPostActions.add(task -> {
             if (!effectParsingEnabled(parser) || task.player() == null) return;
-            dispatch("rtp.effect.postteleport", task.player(), runtime);
+            dispatch("rtp.effect.postteleport", task.player());
         });
         RTPTeleportCancel.postActions.add(cancel -> {
             if (!effectParsingEnabled(parser)) return;
             UUID uuid = cancel.getPlayerId();
             if (uuid == null) return;
-            dispatchByUuid("rtp.effect.cancel", uuid, runtime);
+            dispatchByUuid("rtp.effect.cancel", uuid);
         });
         Region.onPlayerQueuePush.add((region, uuid) -> {
             if (!effectParsingEnabled(parser) || uuid == null) return;
-            dispatchByUuid("rtp.effect.queuepush", uuid, runtime);
+            dispatchByUuid("rtp.effect.queuepush", uuid);
         });
         Region.onPlayerQueuePop.add((region, uuid) -> {
             if (!effectParsingEnabled(parser) || uuid == null) return;
-            dispatchByUuid("rtp.effect.queuepop", uuid, runtime);
+            dispatchByUuid("rtp.effect.queuepop", uuid);
         });
 
         // ----------------------------------------------------------------
@@ -162,8 +147,7 @@ public final class NeoForgeEffectsHandler {
         RTPPlayer rp = RTP.serverAccessor.getPlayer(player.getUUID());
         if (rp == null) return;
 
-        FabricEffectRuntime runtime = new FabricEffectRuntime();
-        dispatch("rtp.effect.death", rp, runtime);
+        dispatch("rtp.effect.death", rp);
     }
 
     private static void sendConfiguredTitle(TeleportPipelineTask task) {
@@ -221,12 +205,12 @@ public final class NeoForgeEffectsHandler {
     }
 
     /** UUID-resolving variant for cancel / queue-push / queue-pop hooks. */
-    private static void dispatchByUuid(String prefix, UUID uuid, FabricEffectRuntime runtime) {
+    private static void dispatchByUuid(String prefix, UUID uuid) {
         try {
             if (RTP.serverAccessor == null) return;
             RTPPlayer rp = RTP.serverAccessor.getPlayer(uuid);
             if (rp == null) return;
-            dispatch(prefix, rp, runtime);
+            dispatch(prefix, rp);
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
                     "[RTP][NeoForge] effect dispatch (uuid) failed for " + prefix + ": "
@@ -234,18 +218,11 @@ public final class NeoForgeEffectsHandler {
         }
     }
 
-    private static void dispatch(String prefix, RTPPlayer player, FabricEffectRuntime runtime) {
-        dispatch(prefix, player, runtime, null, null, null, null);
+    private static void dispatch(String prefix, RTPPlayer player) {
+        dispatch(prefix, player, null, null, null, null);
     }
 
-    private static void dispatch(String prefix, RTPPlayer player, FabricEffectRuntime runtime,
-                                 net.minecraft.world.phys.Vec3 explicitLocation,
-                                 net.minecraft.world.phys.Vec3 destinationLocation,
-                                 String destWorldName) {
-        dispatch(prefix, player, runtime, explicitLocation, destinationLocation, destWorldName, null);
-    }
-
-    private static void dispatch(String prefix, RTPPlayer player, FabricEffectRuntime runtime,
+    private static void dispatch(String prefix, RTPPlayer player,
                                  net.minecraft.world.phys.Vec3 explicitLocation,
                                  net.minecraft.world.phys.Vec3 destinationLocation,
                                  String destWorldName,
@@ -267,11 +244,10 @@ public final class NeoForgeEffectsHandler {
             if (explicitLocation != null) {
                 Object destHandle = null;
                 if (destinationLocation != null && destWorldName != null) {
-                    destHandle = io.github.dailystruggle.effectsapi.fabric.FabricHandles.wrap(
-                            destinationLocation, destWorldName);
+                    destHandle = NeoForgeHandles.wrap(destinationLocation, destWorldName);
                 }
                 target = new io.github.dailystruggle.effectsapi.common.spi.EffectTarget(
-                        io.github.dailystruggle.effectsapi.fabric.FabricHandles.wrap(handle),
+                        NeoForgeHandles.wrap(handle),
                         io.github.dailystruggle.effectsapi.common.spi.HandleRegistry.wrapLocation(explicitLocation),
                         destHandle != null ? io.github.dailystruggle.effectsapi.common.spi.HandleRegistry.wrapLocation(destHandle) : null);
             } else {
@@ -287,7 +263,7 @@ public final class NeoForgeEffectsHandler {
                         pipelineTask.deathEffectTriggered = true;
                     }
                 }
-                runtime.schedule(effect, 0);
+                NeoForgeHandles.execute(effect);
             }
         } catch (Throwable t) {
             RTP.log(Level.WARNING,

@@ -296,8 +296,7 @@ class RealH2DatabaseAccessorTest {
     @Test
     void networkStateBinding_defaultsNull_andRoundTrips() {
         assertNull(db.getNetworkStateBinding());
-        io.github.dailystruggle.rtp.common.network.NetworkStateBinding binding =
-                mock(io.github.dailystruggle.rtp.common.network.NetworkStateBinding.class);
+        NetworkStateBinding binding = mock(NetworkStateBinding.class);
         db.setNetworkStateBinding(binding);
         assertSame(binding, db.getNetworkStateBinding());
         db.setNetworkStateBinding(null);

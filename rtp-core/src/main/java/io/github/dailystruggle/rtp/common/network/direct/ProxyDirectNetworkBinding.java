@@ -10,10 +10,14 @@ import io.github.dailystruggle.rtp.proxy.common.spi.ReleaseReason;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.spi.Subscription;
 import io.github.dailystruggle.rtp.proxy.common.transport.codec.BackendHeartbeatCodec;
+import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectTlsConfig;
 import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWire;
+import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWire.Direction;
+import io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectWire.WireContext;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.time.Duration;
@@ -37,6 +41,16 @@ import java.util.logging.Logger;
  * Backend-side {@link NetworkTransport} for the {@code proxy-direct} tier (ADR-036).
  * Opens outbound TCP connections to configured proxies during heartbeat ticks to exchange state.
  * Folia-safe RPC client without raw background threads.
+ *
+ * <p>An {@link HmacVerifier} is mandatory (no unsigned mode; null fails the
+ * ctor). Optional TLS via {@link ProxyDirectTlsConfig}: plain TCP connect, then
+ * a TLS layer with SNI + hostname verification against the configured proxy
+ * host.</p>
+ *
+ * <p>Each RPC writes a fresh {@link ProxyDirectWire} request header (wall-clock
+ * {@code sentAtMs}, random nonce; the injected {@code clock} only drives
+ * snapshot staleness) and accepts a reply only if signed against that same
+ * request context (REQ-RTP-PROXY-007).</p>
  */
 public final class ProxyDirectNetworkBinding implements NetworkTransport {
 
@@ -44,6 +58,7 @@ public final class ProxyDirectNetworkBinding implements NetworkTransport {
 
     private final List<InetSocketAddress> proxies;
     private final HmacVerifier verifier;
+    private final ProxyDirectTlsConfig tls;
     private final int schemaVersion;
     private final long staleTimeoutMillis;
     private final int connectTimeoutMs;
@@ -64,11 +79,32 @@ public final class ProxyDirectNetworkBinding implements NetworkTransport {
                                      int connectTimeoutMs,
                                      int readTimeoutMs,
                                      LongSupplier clock) {
+        this(proxies, verifier, schemaVersion, staleTimeoutMillis, connectTimeoutMs, readTimeoutMs,
+                clock, null);
+    }
+
+    /**
+     * @param tls client TLS settings; {@code null} or not {@link ProxyDirectTlsConfig#enabled()} = plain TCP
+     * @throws IllegalArgumentException when {@code verifier} is null or {@code proxies} is empty
+     */
+    public ProxyDirectNetworkBinding(List<InetSocketAddress> proxies,
+                                     HmacVerifier verifier,
+                                     int schemaVersion,
+                                     long staleTimeoutMillis,
+                                     int connectTimeoutMs,
+                                     int readTimeoutMs,
+                                     LongSupplier clock,
+                                     ProxyDirectTlsConfig tls) {
         this.proxies = List.copyOf(java.util.Objects.requireNonNull(proxies, "proxies"));
         if (this.proxies.isEmpty()) {
             throw new IllegalArgumentException("proxy-direct requires at least one proxy address");
         }
+        if (verifier == null) {
+            throw new IllegalArgumentException("proxy-direct requires an HMAC verifier "
+                    + "(network.secretEnv, >= 32 bytes); refusing unsigned transport");
+        }
         this.verifier = verifier;
+        this.tls = tls == null ? ProxyDirectTlsConfig.unset() : tls;
         this.schemaVersion = schemaVersion;
         this.staleTimeoutMillis = staleTimeoutMillis > 0 ? staleTimeoutMillis : 5000L;
         this.connectTimeoutMs = connectTimeoutMs > 0 ? connectTimeoutMs : 1000;
@@ -111,30 +147,42 @@ public final class ProxyDirectNetworkBinding implements NetworkTransport {
 
     /** One request/response round-trip with a single proxy. */
     private List<String> exchange(InetSocketAddress addr, String payload) throws Exception {
-        try (Socket socket = new Socket()) {
-            // Resolve at connect time: the configured addresses are stored
-            // unresolved (the proxy host may not have been resolvable at boot),
-            // and Socket.connect rejects an unresolved InetSocketAddress.
-            InetSocketAddress target = addr.isUnresolved()
-                    ? new InetSocketAddress(addr.getHostString(), addr.getPort())
-                    : addr;
-            socket.connect(target, connectTimeoutMs);
-            socket.setSoTimeout(readTimeoutMs);
+        try (Socket socket = openSocket(addr)) {
             DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-            ProxyDirectWire.writeOpcode(out, ProxyDirectWire.OP_HEARTBEAT);
-            ProxyDirectWire.writeSignedPayload(out, payload, verifier, schemaVersion);
+            WireContext ctx = ProxyDirectWire.writeRequestHeader(out, ProxyDirectWire.OP_HEARTBEAT);
+            ProxyDirectWire.writeSignedPayload(out, ctx, Direction.REQUEST, payload, verifier, schemaVersion);
             out.flush();
             DataInputStream in = new DataInputStream(socket.getInputStream());
-            return ProxyDirectWire.readList(in, verifier);
+            return ProxyDirectWire.readList(in, ctx, Direction.RESPONSE, verifier);
         }
     }
 
     // ---- generic RPC helpers (one short-lived socket per call) ------------
 
     private InetSocketAddress resolve(InetSocketAddress addr) {
+        // Configured addresses are stored unresolved (proxy host may not resolve
+        // at boot); Socket.connect rejects an unresolved address.
         return addr.isUnresolved()
                 ? new InetSocketAddress(addr.getHostString(), addr.getPort())
                 : addr;
+    }
+
+    /**
+     * Connected (and, with TLS, handshaken) socket to {@code addr}. TLS is
+     * layered over the plain socket so SNI / hostname verification use the
+     * configured host string, not the resolved IP.
+     */
+    private Socket openSocket(InetSocketAddress addr) throws Exception {
+        Socket plain = new Socket();
+        try {
+            plain.connect(resolve(addr), connectTimeoutMs);
+            plain.setSoTimeout(readTimeoutMs);
+            if (!tls.enabled()) return plain;
+            return tls.wrapClient(plain, addr.getHostString(), addr.getPort());
+        } catch (Exception e) {
+            try { plain.close(); } catch (IOException ignored) { }
+            throw e;
+        }
     }
 
     /**
@@ -145,15 +193,13 @@ public final class ProxyDirectNetworkBinding implements NetworkTransport {
     String rpcCall(byte op, String request) {
         if (!open.get()) return null;
         for (InetSocketAddress addr : proxies) {
-            try (Socket socket = new Socket()) {
-                socket.connect(resolve(addr), connectTimeoutMs);
-                socket.setSoTimeout(readTimeoutMs);
+            try (Socket socket = openSocket(addr)) {
                 DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-                ProxyDirectWire.writeOpcode(out, op);
-                ProxyDirectWire.writeSignedPayload(out, request, verifier, schemaVersion);
+                WireContext ctx = ProxyDirectWire.writeRequestHeader(out, op);
+                ProxyDirectWire.writeSignedPayload(out, ctx, Direction.REQUEST, request, verifier, schemaVersion);
                 out.flush();
                 DataInputStream in = new DataInputStream(socket.getInputStream());
-                String resp = ProxyDirectWire.readSignedPayload(in, verifier);
+                String resp = ProxyDirectWire.readSignedPayload(in, ctx, Direction.RESPONSE, verifier);
                 if (resp != null) return resp;
             } catch (Throwable t) {
                 LOG.log(Level.FINE, "[RTP] proxy-direct rpc op=" + op + " to " + addr
@@ -172,14 +218,12 @@ public final class ProxyDirectNetworkBinding implements NetworkTransport {
     String rpcCallListReq(byte op, List<String> requests) {
         if (!open.get()) return null;
         for (InetSocketAddress addr : proxies) {
-            try (Socket socket = new Socket()) {
-                socket.connect(resolve(addr), connectTimeoutMs);
-                socket.setSoTimeout(readTimeoutMs);
+            try (Socket socket = openSocket(addr)) {
                 DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-                ProxyDirectWire.writeOpcode(out, op);
-                ProxyDirectWire.writeList(out, requests, verifier, schemaVersion);
+                WireContext ctx = ProxyDirectWire.writeRequestHeader(out, op);
+                ProxyDirectWire.writeList(out, ctx, Direction.REQUEST, requests, verifier, schemaVersion);
                 DataInputStream in = new DataInputStream(socket.getInputStream());
-                String resp = ProxyDirectWire.readSignedPayload(in, verifier);
+                String resp = ProxyDirectWire.readSignedPayload(in, ctx, Direction.RESPONSE, verifier);
                 if (resp != null) return resp;
             } catch (Throwable t) {
                 LOG.log(Level.FINE, "[RTP] proxy-direct rpc(list) op=" + op + " to " + addr
@@ -196,14 +240,12 @@ public final class ProxyDirectNetworkBinding implements NetworkTransport {
     List<String> rpcCallListBoth(byte op, List<String> requests) {
         if (!open.get()) return List.of();
         for (InetSocketAddress addr : proxies) {
-            try (Socket socket = new Socket()) {
-                socket.connect(resolve(addr), connectTimeoutMs);
-                socket.setSoTimeout(readTimeoutMs);
+            try (Socket socket = openSocket(addr)) {
                 DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-                ProxyDirectWire.writeOpcode(out, op);
-                ProxyDirectWire.writeList(out, requests, verifier, schemaVersion);
+                WireContext ctx = ProxyDirectWire.writeRequestHeader(out, op);
+                ProxyDirectWire.writeList(out, ctx, Direction.REQUEST, requests, verifier, schemaVersion);
                 DataInputStream in = new DataInputStream(socket.getInputStream());
-                return ProxyDirectWire.readList(in, verifier);
+                return ProxyDirectWire.readList(in, ctx, Direction.RESPONSE, verifier);
             } catch (Throwable t) {
                 LOG.log(Level.FINE, "[RTP] proxy-direct rpc(list2) op=" + op + " to " + addr
                         + " failed: " + t.getMessage());
@@ -219,15 +261,13 @@ public final class ProxyDirectNetworkBinding implements NetworkTransport {
     List<String> rpcCallListResp(byte op, String request) {
         if (!open.get()) return List.of();
         for (InetSocketAddress addr : proxies) {
-            try (Socket socket = new Socket()) {
-                socket.connect(resolve(addr), connectTimeoutMs);
-                socket.setSoTimeout(readTimeoutMs);
+            try (Socket socket = openSocket(addr)) {
                 DataOutputStream out = new DataOutputStream(socket.getOutputStream());
-                ProxyDirectWire.writeOpcode(out, op);
-                ProxyDirectWire.writeSignedPayload(out, request, verifier, schemaVersion);
+                WireContext ctx = ProxyDirectWire.writeRequestHeader(out, op);
+                ProxyDirectWire.writeSignedPayload(out, ctx, Direction.REQUEST, request, verifier, schemaVersion);
                 out.flush();
                 DataInputStream in = new DataInputStream(socket.getInputStream());
-                return ProxyDirectWire.readList(in, verifier);
+                return ProxyDirectWire.readList(in, ctx, Direction.RESPONSE, verifier);
             } catch (Throwable t) {
                 LOG.log(Level.FINE, "[RTP] proxy-direct rpc(resp-list) op=" + op + " to " + addr
                         + " failed: " + t.getMessage());

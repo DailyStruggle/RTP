@@ -132,6 +132,13 @@ final class QueueTask {
         int cx = left.x() >> 4;
         int cz = left.z() >> 4;
 
+        // ADR-110 evidence: is the queued chunk still resident at use (pinned vs unpinned)?
+        try {
+            LiveLoadGate.of(region.name).onUse(pair.reservation() != null, world.isChunkLoaded(cx, cz));
+        } catch (Throwable ignored) {
+            // diagnostics only
+        }
+
         ChunkReservation preReservation = pair.reservation();
         if (preReservation != null) {
             // Pre-acquired reservation from the queue: chunk is already loaded + pinned.
@@ -158,11 +165,14 @@ final class QueueTask {
         }
 
         // Probe-first gate: try to reject candidate from lean column probe
-        // before paying for full chunk decode.
-        if (tryProbeFirstQueue(pair, left, world, cx, cz)) {
+        // before paying for full chunk decode. ADR-109: measured cost decides
+        // whether the probe runs at all.
+        ProbeFirstGovernor gov = ProbeFirstGovernor.of(region.name, ProbeFirstGovernor.Path.CONSUME);
+        boolean probeFirst = gov.shouldProbe(ProbeFirstGovernor.binKey(cx, cz));
+        if (probeFirst && tryProbeFirstQueue(pair, left, world, cx, cz, gov)) {
             return;
         }
-        runFullLoadAndResolve(pair, left, world, cx, cz);
+        runFullLoadAndResolve(pair, left, world, cx, cz, gov, probeFirst);
     }
 
     /**
@@ -171,10 +181,16 @@ final class QueueTask {
      * <p>Returns {@code true} iff the probe committed a verdict that the caller
      * must honour without running the full load path.
      *
+     * <p>A {@code null} adjustor result means miss/unknown (see
+     * {@code VerticalAdjustor#adjustFromProbe}): the full load decides, as in
+     * {@code PregenTask}. This gate therefore never rejects on its own; the
+     * governor measures that and skips the probe when it only adds cost.</p>
+     *
      * <p>S-005: all probe work stays on the async pool.</p>
      */
     private boolean tryProbeFirstQueue(
-            RTPLocation pair, RTPCoords left, RTPWorld<?> world, int cx, int cz) {
+            RTPLocation pair, RTPCoords left, RTPWorld<?> world, int cx, int cz,
+            ProbeFirstGovernor gov) {
         io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor<?> vert;
         try {
             vert = region.getVert();
@@ -187,6 +203,7 @@ final class QueueTask {
         if (minY >= maxY) return false;
 
         CompletableFuture<io.github.dailystruggle.rtp.api.world.ChunkColumnProbe> fut;
+        final long probeStart = System.nanoTime();
         try {
             // Widen window by one block below minY so adjustFromProbe's
             // standing-surface y-1 read doesn't trivially reject.
@@ -202,68 +219,45 @@ final class QueueTask {
         // Synchronous fast path: default no-op adapter returns completedFuture(null);
         // real adapters with a warm cache frequently complete inline as well.
         if (fut.isDone() && !fut.isCompletedExceptionally()) {
-            io.github.dailystruggle.rtp.api.world.ChunkColumnProbe probe;
-            try {
-                probe = fut.getNow(null);
-            } catch (Throwable ignored) {
-                return false;
-            }
-            if (probe == null) return false;
-            RTPCoords picked;
-            try {
-                picked = vert.adjustFromProbe(probe, world.name());
-            } catch (Throwable t) {
-                // Adjustor misbehaved - treat as UNKNOWN, fall through.
-                return false;
-            }
-            if (picked == null) {
-                // Stage-1 reject: no valid Y in the probe window. Skip load + DB write.
-                reenterAsync(this::pollNext);
-                return true;
-            }
-            return false; // probe-accept - caller runs full load.
+            // Accept or unknown alike: caller runs the full load.
+            io.github.dailystruggle.rtp.api.world.ChunkColumnProbe probe = fut.getNow(null);
+            long probeNanos = System.nanoTime() - probeStart;
+            long drain = (probe != null) ? probe.drainNanos() : 0L;
+            long effectiveNanos = (drain > 0L) ? Math.min(drain, probeNanos) : probeNanos;
+            gov.recordProbe(effectiveNanos, (probe != null) ? probe.groupSize() : 0, false);
+            return false;
         }
 
         // Async completion: we've committed to this candidate; continuation happens
         // from the whenComplete callback.
         fut.whenComplete((probe, ex) -> {
+            long probeNanos = System.nanoTime() - probeStart;
+            long drain = (probe != null) ? probe.drainNanos() : 0L;
+            long effectiveNanos = (drain > 0L) ? Math.min(drain, probeNanos) : probeNanos;
+            gov.recordProbe(effectiveNanos, (probe != null) ? probe.groupSize() : 0, false);
             if (ex != null) {
                 RTP.log(Level.FINE,
                         "[RTP] QueueTask probeChunkColumn failed for world=" + world.name()
                                 + " chunk=(" + cx + "," + cz + "): "
                                 + ex.getClass().getSimpleName() + ": " + ex.getMessage());
-                reenterAsync(() -> runFullLoadAndResolve(pair, left, world, cx, cz));
-                return;
             }
-            if (probe == null) {
-                reenterAsync(() -> runFullLoadAndResolve(pair, left, world, cx, cz));
-                return;
-            }
-            RTPCoords picked;
-            try {
-                picked = vert.adjustFromProbe(probe, world.name());
-            } catch (Throwable t) {
-                reenterAsync(() -> runFullLoadAndResolve(pair, left, world, cx, cz));
-                return;
-            }
-            if (picked == null) {
-                reenterAsync(this::pollNext);
-                return;
-            }
-            reenterAsync(() -> runFullLoadAndResolve(pair, left, world, cx, cz));
+            reenterAsync(() -> runFullLoadAndResolve(pair, left, world, cx, cz, gov, true));
         });
         return true;
     }
 
     private void runFullLoadAndResolve(
-            RTPLocation pair, RTPCoords left, RTPWorld<?> world, int cx, int cz) {
+            RTPLocation pair, RTPCoords left, RTPWorld<?> world, int cx, int cz,
+            ProbeFirstGovernor gov, boolean afterProbe) {
         // ADR-016 section 13.1 probe-first via getOrLoadChunk traffic-cop.
         // Anvil-backed candidates run inline with no reservation; live-backed
         // candidates allocate a reservation and dispatch to the region thread.
         // Per-attempt chunk-load: per-chunk deadline lives in the world adapter,
         // not here. See note in the pre-reserved branch above.
+        final long loadStart = System.nanoTime();
         world.getOrLoadChunk(cx, cz, "QueueTask.runFullLoadAndResolve")
                 .whenComplete((chunk, ex) -> {
+                    if (ex == null) gov.recordLoad(afterProbe, System.nanoTime() - loadStart);
                     if (ex != null || chunk == null) {
                         if (ex != null) {
                             RTP.log(Level.WARNING,

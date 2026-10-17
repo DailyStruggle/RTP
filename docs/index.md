@@ -3,7 +3,7 @@
 [![Build](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml/badge.svg)](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml)
 [![Coverage](assets/badges/coverage.svg)](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml)
 [![Release](https://img.shields.io/github/v/release/DailyStruggle/RTP)](https://github.com/DailyStruggle/RTP/releases)
-[![Java](https://img.shields.io/badge/Java-21-blue)](https://adoptium.net/)
+[![Java](https://img.shields.io/badge/Java-17%2B-blue)](https://adoptium.net/)
 
 A random-teleportation plugin built to fill operator needs still unmet by the more
 popular RTP plugins:
@@ -24,9 +24,13 @@ algorithm.
 
 ## Supported platforms
 
-**Backend servers** (where the plugin/mod jar runs and teleports happen): Paper, Folia,
-Spigot, Fabric, and NeoForge (Minecraft 1.20.x / 1.21.x / 26.x). Java 21+ is required.
-Legacy Forge is not native - run the Spigot/Paper jar under Arclight / Mohist.
+**Backend servers** (where the plugin/mod jar runs and teleports happen): Paper and
+Spigot 1.18+, Folia 1.21.11+, Fabric 1.20.1 and 1.21+, and NeoForge 1.21.1+, up to Minecraft
+26.3. Java 17+ is required (Minecraft itself needs Java 21 from 1.20.5 and Java 25 on
+26.x). Bug reports are accepted for 1.21.11 through the latest release; older versions are
+best effort, except Folia, which is experimental and not supported below 1.21.11
+([support matrix](dev/SUPPORT_MATRIX.md)). Legacy Forge is not native - run the
+Spigot/Paper jar under Arclight / Mohist.
 
 **Proxy** (a different role, not another backend): the same jar also runs on a **Velocity**
 proxy, where it acts as the router/transport for cross-server "network mode" rather than

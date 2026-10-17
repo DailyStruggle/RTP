@@ -1,0 +1,59 @@
+# --- actions/quickchallenge.yml ---
+# Symmetrical duel challenge with immediate completion (one-shot placement, no lingering session).
+# Teleports two reciprocal challengers into a shared arena and immediately disarms.
+
+alias: "quickchallenge"
+permission: "rtp.action.quickchallenge"
+description: "One-shot duel challenge without lingering session confinement."
+
+command:
+  name: "quickchallenge"
+  permission: "rtp.command.quickchallenge"
+  description: "Challenge a player to an instant duel without ongoing session tracking"
+  # Root command aliases (opt-in; empty by default to keep root command namespace clean)
+  aliases: []
+  # aliases:
+  #   - "qduel"
+  parameters:
+    - name: "player"
+      type: "player"
+      required: false
+      permission: "rtp.command.quickchallenge.target"
+      default: "any"
+
+placement:
+  region: "default"
+  anchor: "regionQueue"
+  shape:
+    name: "SQUARE"
+    radius: 4c
+  minSeparation: 24
+  elevationTolerance: 64
+
+confinement:
+  duration: "0s"
+
+gate:
+  - players: ">= 2"
+  - command:
+      - "execute if entity @a[name=[sender_name_1],tag=rtp_qchal_[target_name_1]]"
+      - "execute if entity @a[name=[sender_name_2],tag=rtp_qchal_[target_name_2]]"
+
+lifecycle:
+  onEnqueue:
+    - CONSOLE: "tag [sender_name] add rtp_qchal_[target_name]"
+    - MESSAGE: "<gray>Quick challenge sent to <yellow>[target_name]</yellow>! Waiting for response...</gray>"
+    - MESSAGE_TARGET: "<gold>[sender_name] has challenged you to an instant duel! </gold><green><bold><click:run_command:'/rtp action quickchallenge player=[sender_name]'><hover:show_text:'<gray>Click to accept instant duel with [sender_name]</gray>'>[CLICK TO ACCEPT]</hover></click></bold></green>"
+
+  onStart:
+    - CONSOLE: "tag [sender_name_1] remove rtp_qchal_[sender_name_2]"
+    - CONSOLE: "tag [sender_name_2] remove rtp_qchal_[sender_name_1]"
+    - FOR_EACH:
+        - MESSAGE: "<green><bold>Instant duel started! Fight!</bold></green>"
+
+  onCancel:
+    - CONSOLE: "tag [sender_name] remove rtp_qchal_[target_name]"
+    - MESSAGE: "<gray>Quick challenge to <yellow>[target_name]</yellow> was cancelled.</gray>"
+    - MESSAGE_TARGET: "<gray>Quick challenge from <yellow>[sender_name]</yellow> was cancelled.</gray>"
+
+version: "1.0"

@@ -1,9 +1,17 @@
-# TPS minimo del server richiesto per continuare l'accodamento in background.
-# Il lavoro in background si mette in pausa quando i TPS scendono sotto questa soglia.
+# Sospende il riempimento della cache in background se i TPS scendono sotto questo valore.
+# Su Folia conta la regione più lenta. I giocatori in attesa continuano a essere serviti. 0 = disattivato.
 # @type: number
 # @range: [0.0, 20.0]
 # @default: 19.0
 tpsMinimo: 19.0
+
+# Sospende il riempimento della cache in background se un tick supera questo valore (ms).
+# Rileva il lag nascosto dai TPS (restano a 20 fino a 50 ms). 0 = disattivato.
+# @type: number
+# @range: [0.0, null]
+# @unit: ms
+# @default: 45.0
+maxMSPT: 45.0
 
 # Uso massimo dell'heap JVM (% del massimo) prima di mettere in pausa il riempimento
 # della cache in background. Le posizioni già in cache restano servite. 0 o 100 disabilita.
@@ -20,26 +28,26 @@ maxHeapPercentuale: 85.0
 # @default: 32
 tentativiMassimi: 32
 
-# Tick tra cicli di cache in background (pre-riempimento regione, ricarica coda).
+# Tick tra i riempimenti della stessa regione. Le regioni si alternano.
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
 # @default: 20
 periodo: 20
 
-# Massimo di millisecondi per tick spesi in task sincroni.
+# Massimo di ms per tick per il lavoro sul thread principale. Limitato a 25.
 # @type: integer
-# @range: [1, null]
+# @range: [1, 25]
 # @unit: ms
-# @default: 50
-tempoAssegnatoSinc: 50
+# @default: 5
+tempoAssegnatoSinc: 5
 
-# Massimo di millisecondi per tick spesi in task asincroni.
+# Massimo di ms per impulso per il lavoro in background. Limitato a 25.
 # @type: integer
-# @range: [1, null]
+# @range: [1, 25]
 # @unit: ms
-# @default: 50
-tempoAssegnatoAsinc: 50
+# @default: 25
+tempoAssegnatoAsinc: 25
 
 # Raggio in chunk caricato attorno a una posizione candidata durante la selezione.
 # 0 carica solo il chunk candidato.
@@ -145,6 +153,13 @@ sogliaAvvisoCrescitaCoda: 0
 # @type: boolean
 # @default: false
 caricamentoSinc: false
+
+# Percorso di teletrasporto su Paper. AUTO = teletrasporto nello stesso tick se il chunk
+# di destinazione è già caricato, altrimenti teleportAsync. ASYNC = sempre teleportAsync (un tick più lento).
+# @type: string
+# @options: ["AUTO", "ASYNC"]
+# @default: "AUTO"
+percorsoTeletrasporto: "AUTO"
 
 # Ri-analizza i nodi di permesso ad ogni evento invece di metterli in cache.
 # @type: boolean

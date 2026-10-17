@@ -14,7 +14,8 @@ For the conceptual model and verification walkthroughs see [`INDEX.md`](INDEX.md
 |---|---|---|---|
 | `enabled` | Boolean | `false` | Opt this backend into the cross-server network. |
 | `serverId` | String | `""` | Stable backend identity. **Required** when `enabled: true`; no default. Two backends sharing a `serverId` overwrite each other's heartbeat row. |
-| `secretEnv` | String | `"RTP_NET_SECRET"` | Environment variable holding the shared HMAC secret. Required when `enabled: true` **and** `transport.type: redis`. The SQL binding treats it as optional (DB auth + TLS is the security boundary). |
+| `secretEnv` | String | `"RTP_NET_SECRET"` | Environment variable holding the shared HMAC secret: Base64, at least 32 bytes after decoding, identical on every backend and proxy. `redis`, `sql` and `proxy-direct` refuse to start without it. `auto` and `plugin-message` also stay off without it unless `allowUnsigned: true`. |
+| `allowUnsigned` | Boolean | `false` | Run `auto` / `plugin-message` without a secret. Heartbeats are then unsigned, so a modded client can fake server or region availability. Set the same option on the proxy companion too. |
 
 ## `transport` (Backing store for cross-process state)
 
@@ -46,9 +47,28 @@ Used when `type: redis`.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `host` | String | `"localhost"` | Hostname/IP of the Redis instance shared by every backend and proxy. |
+| `host` | String | `"localhost"` | Hostname/IP of the Redis instance shared by every backend and proxy. A `rediss://[user@]host[:port]` URL turns on TLS and sets the ACL user. On backends this URL is the only way to set TLS or a username. |
 | `port` | Integer | `6379` | Redis port. |
-| `password` | String | `""` | Optional. Empty for unauthenticated Redis; set when Redis ACL / `requirepass` is configured. |
+| `passwordEnv` | String | `"RTP_REDIS_PASSWORD"` | Environment variable read for the Redis password, checked before `password`. |
+| `password` | String | `""` | Fallback when the `passwordEnv` variable is unset. Empty for unauthenticated Redis. A value here logs a one-time warning; prefer `passwordEnv`. |
+
+The proxy companion's `network-proxy.yml` also accepts `tls: true` and `username` in its `transport.redis` block. TLS uses the JVM's default trust store.
+
+### `proxy-direct` keys (backend)
+
+Used when `type: proxy-direct`. The keys sit directly under `transport`, and the proxy companion's `transport.direct` block must use matching TLS settings.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `proxies` | List | *(required)* | `host:port` of each proxy companion listener. |
+| `port` | Integer | `25599` | Port used for entries without one. |
+| `connectTimeoutMs` / `readTimeoutMs` | Integer | `1000` / `2000` | Socket timeouts. |
+| `tls` | Boolean | unset | `true` for TLS. The proxy refuses a non-loopback plain listener unless its side sets `tls: false` explicitly. |
+| `truststore` / `truststoreType` / `truststorePasswordEnv` | String | JVM trust / `PKCS12` / `RTP_DIRECT_TRUSTSTORE_PASSWORD` | Trust for the proxy's certificate. |
+| `keystore` / `keystoreType` / `keystorePasswordEnv` | String | none / `PKCS12` / `RTP_DIRECT_KEYSTORE_PASSWORD` | Client certificate, needed when the proxy requires one (mTLS). |
+| `verifyHostname` | Boolean | `true` | Check the proxy certificate's host name. |
+
+On the proxy, `transport.direct` binds `127.0.0.1` by default, accepts an `allowedClients` IP/CIDR list, and uses `requireClientAuth` (default `true` when a truststore is set) for mTLS.
 
 ## `heartbeat` (State publication cadence)
 

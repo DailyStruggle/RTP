@@ -10,6 +10,9 @@ import java.util.Map;
 import java.util.logging.Level;
 
 public class BukkitDatabaseHandler {
+    private BukkitDatabaseHandler() {
+    }
+
     public static void setupDatabase(RTP rtp) throws FileSystemException {
         File databaseDirectory = RTP.configs.pluginDirectory;
         databaseDirectory = new File(databaseDirectory.getAbsolutePath() + File.separator + "database");

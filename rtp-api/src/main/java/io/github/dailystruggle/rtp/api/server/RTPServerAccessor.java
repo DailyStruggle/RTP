@@ -85,6 +85,15 @@ public interface RTPServerAccessor {
   String getPlatform();
 
   /**
+   * Returns the server name or network identity if configured, or {@code null}.
+   *
+   * @return server name or {@code null}
+   */
+  default String getServerName() {
+    return null;
+  }
+
+  /**
    * Returns the coarse {@link PlatformFamily} this server belongs to.
    *
    * <p>Prefer over string-matching {@link #getPlatform()} for runtime gating.
@@ -368,6 +377,17 @@ public interface RTPServerAccessor {
   default void sendMessageWithRunCommand(
       RTPCommandSender target, String message, String hover, String runCommand) {
     sendMessageWithRunCommand(target, message, hover, runCommand, null);
+  }
+
+  /**
+   * Retrieves the current scoreboard score for the specified player and objective name.
+   *
+   * @param playerId  the player's unique identifier; must not be {@code null}
+   * @param objective the objective name; must not be {@code null}
+   * @return the player's score, or {@code null} if the objective or score does not exist
+   */
+  default Integer getScoreboardScore(UUID playerId, String objective) {
+    return null;
   }
 
   /**
@@ -733,6 +753,15 @@ public interface RTPServerAccessor {
     return "";
   }
 
+  /**
+   * Returns a snapshot collection of currently online RTPPlayer entities.
+   *
+   * @return collection of online players
+   */
+  default java.util.Collection<RTPPlayer> getOnlinePlayers() {
+    return java.util.Collections.emptyList();
+  }
+
   // ---------------------------------------------------------------------------
   // Command registration & execution SPI
   // ---------------------------------------------------------------------------
@@ -756,6 +785,166 @@ public interface RTPServerAccessor {
   default boolean executeCommand(UUID senderId, String commandLine) {
     return false;
   }
+
+  /**
+   * Executes a console command and captures emitted messages/feedback lines into a consumer.
+   *
+   * @param commandLine  the command string to execute
+   * @param lineConsumer consumer receiving each line of output
+   * @return true if the command was successfully dispatched, false otherwise
+   */
+  default boolean executeCommandWithCapture(String commandLine, java.util.function.Consumer<String> lineConsumer) {
+    return false;
+  }
+
+  /**
+   * Executes a console command and captures emitted messages/feedback lines into a CompletableFuture.
+   *
+   * @param commandLine the command string to execute
+   * @return CompletableFuture completing with captured output lines
+   */
+  default java.util.concurrent.CompletableFuture<List<String>> executeCommandWithCapture(String commandLine) {
+    java.util.concurrent.CompletableFuture<List<String>> future = new java.util.concurrent.CompletableFuture<>();
+    List<String> lines = new java.util.concurrent.CopyOnWriteArrayList<>();
+    boolean dispatched = executeCommandWithCapture(commandLine, lines::add);
+    if (!dispatched) {
+      future.complete(java.util.Collections.emptyList());
+    } else {
+      future.complete(lines);
+    }
+    return future;
+  }
+
+  /**
+   * Returns the set of Minecraft scoreboard tags currently applied to the given player.
+   *
+   * <p>Used by declarative action gates to reliably evaluate entity/tag predicates
+   * (e.g. reciprocity checks like {@code execute if entity @a[name=X,tag=Y]}) without
+   * relying on command-dispatch return values, which do not reflect predicate results
+   * on most platforms. Platform adapters back this with the live entity tag set
+   * (e.g. Bukkit {@code Entity#getScoreboardTags()}).
+   *
+   * @param playerId player UUID
+   * @return an unmodifiable set of scoreboard tags; empty if unknown or player offline
+   */
+  default Set<String> getScoreboardTags(UUID playerId) {
+    return java.util.Collections.emptySet();
+  }
+
+  /**
+   * Adds a scoreboard tag to the player.
+   *
+   * @param playerId player UUID
+   * @param tag      the tag to add
+   * @return true if added, false if already present or player offline
+   */
+  default boolean addScoreboardTag(UUID playerId, String tag) {
+    return false;
+  }
+
+  /**
+   * Removes a scoreboard tag from the player.
+   *
+   * @param playerId player UUID
+   * @param tag      the tag to remove
+   * @return true if removed, false if not present or player offline
+   */
+  default boolean removeScoreboardTag(UUID playerId, String tag) {
+    return false;
+  }
+
+  /**
+   * Ensures a scoreboard objective exists.
+   *
+   * @param objective the objective name
+   * @param criteria  the objective criteria (defaults to "dummy" if null)
+   */
+  default void ensureScoreboardObjective(String objective, @Nullable String criteria) {}
+
+  /**
+   * Sets a scoreboard score for the player on a given objective.
+   *
+   * @param playerId  player UUID
+   * @param objective the objective name
+   * @param score     the score value
+   */
+  default void setScoreboardScore(UUID playerId, String objective, int score) {}
+
+  /**
+   * Resets scores for the player on a given objective, or across all objectives if null.
+   *
+   * @param playerId  player UUID
+   * @param objective objective name, or null to reset all
+   */
+  default void resetScoreboardScore(UUID playerId, @Nullable String objective) {}
+
+  // ---------------------------------------------------------------------------
+  // Per-player WorldBorder packet SPI (ADR-093 confinement visuals)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Sends a clientbound per-player world border packet setting its center and size.
+   *
+   * @param playerId player UUID to receive the world border
+   * @param centerX  center X coordinate
+   * @param centerZ  center Z coordinate
+   * @param size     border diameter (width) in blocks
+   */
+  default void sendWorldBorder(UUID playerId, double centerX, double centerZ, double size) {
+    sendWorldBorder(playerId, centerX, centerZ, size, size, 0L);
+  }
+
+  /**
+   * Sends a clientbound per-player world border packet setting its center and optionally lerping size over time.
+   *
+   * @param playerId       player UUID to receive the world border
+   * @param centerX        center X coordinate
+   * @param centerZ        center Z coordinate
+   * @param oldSize        starting border diameter (width) in blocks
+   * @param newSize        target border diameter (width) in blocks
+   * @param shrinkSeconds  duration in seconds to transition from oldSize to newSize (0 for instant)
+   */
+  default void sendWorldBorder(
+      UUID playerId, double centerX, double centerZ, double oldSize, double newSize, long shrinkSeconds) {
+    sendWorldBorder(playerId, centerX, centerZ, oldSize, newSize, shrinkSeconds, 0.0, 0.0);
+  }
+
+  /**
+   * Sends a clientbound per-player world border packet setting its center, size transition, damage amount, and buffer.
+   *
+   * @param playerId       player UUID to receive the world border
+   * @param centerX        center X coordinate
+   * @param centerZ        center Z coordinate
+   * @param oldSize        starting border diameter (width) in blocks
+   * @param newSize        target border diameter (width) in blocks
+   * @param shrinkSeconds  duration in seconds to transition from oldSize to newSize (0 for instant)
+   * @param damageAmount   damage per block outside buffer
+   * @param damageBuffer   buffer distance in blocks before damage begins
+   */
+  default void sendWorldBorder(
+      UUID playerId,
+      double centerX,
+      double centerZ,
+      double oldSize,
+      double newSize,
+      long shrinkSeconds,
+      double damageAmount,
+      double damageBuffer) {}
+
+  /**
+   * Applies damage to the specified player. Safe across server threads and platform runtimes.
+   *
+   * @param playerId player UUID
+   * @param amount   amount of damage to apply
+   */
+  default void damagePlayer(UUID playerId, double amount) {}
+
+  /**
+   * Resets the player's clientbound world border to match the world's actual border.
+   *
+   * @param playerId player UUID whose world border is to be restored
+   */
+  default void resetWorldBorder(UUID playerId) {}
 
   // ---------------------------------------------------------------------------
   // Palette identifier normalization & reconciliation SPI
@@ -806,4 +995,16 @@ public interface RTPServerAccessor {
     String n = reconcilePaletteIdentifier(rawPaletteId);
     return n != null && !n.isEmpty() && reconciledUnsafe.contains(n);
   }
+
+  // ---------------------------------------------------------------------------
+  // Cartography MapBinding SPI (ADR-047 / REQ-RTP-MAP-006)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Installs or registers the platform-appropriate map binding for cartography chart delivery.
+   *
+   * <p>Default implementation is a no-op; platform adapters should override to instantiate and
+   * register their platform-specific map binding with the central dispatch.
+   */
+  default void setupMapBinding() {}
 }

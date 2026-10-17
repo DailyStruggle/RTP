@@ -76,6 +76,7 @@ RTP-style plugin under test. Restart the server. Then in-game:
 ```
 /rtpstress start 60 4         # 60 s run, concurrency 4 (round-robin across targets)
 /rtpstress sequence 60 30 4   # run each target 60 s, 30 s gap, concurrency 4
+/rtpstress ramp betterrtp     # fixed-rate stages 5..320 TP/s; finds the stress point
 /rtpstress status             # rolling p50/p95/p99/min-TPS/p95-MSPT/heap
 /rtpstress burst 10           # one-shot 10× burst (TPS-burst column)
 /rtpstress export             # write <timestamp>-summary.txt
@@ -117,6 +118,12 @@ label is observed.
 > rejected as `invalid command`. Always use `rtp:rtp player:{player}` for
 > the in-tree plugin; only competitors typically take a positional name.
 
+> **Per-target sender:** an entry may set `sender: console` or
+> `sender: player` to override the global `dispatch-as-player` for that
+> target only. BetterRTP uses its console form
+> (`betterrtp:betterrtp player {player}`, `sender: console`) because the
+> player-dispatched form produced zero teleports on Paper 26.2.
+
 > **Back-compat:** the legacy scalar `target-command: "..."` key is
 > still honoured when `target-commands` is absent (single entry, label
 > `default`).
@@ -138,8 +145,348 @@ guarantee comparable cold-start numbers between competitors.
 - `names:` — combined with a YAML list `roster-names: [a, b, c]`.
 
 The harness only drives players that are **currently online**. To
-benchmark with many players, log many alts in (or wait for the
-follow-up out-of-process bot driver — see *Future work*).
+benchmark with many players, run the offline-mode bot roster
+(`devstack/clients/bench-swarm.js`, see *Ramp mode*).
+
+---
+
+## Player-churn retention check (leak proof)
+
+A heap-used curve cannot separate a leak from GC sawtooth. The leak check
+counts what survives a full GC instead, the same way for every plugin:
+
+```
+/rtpstress leakcheck <label>        # full GC + class histogram -> runs/leak.csv + runs/leak-*.histo.txt
+/rtpstress leakcheck status         # busy flag, completed count, last result (for RCON polling)
+/rtpstress churn all [namePrefix]   # kick players; bench-swarm reconnects them as new sessions
+```
+
+- `retained_player_objects` = live `CraftPlayer` / `ServerPlayer`
+  instances after the histogram's full GC, minus players online. Any
+  value above 0 that grows with `quits_total` is a session something
+  still references.
+- Same-name churn (default swarm) gives each rejoin a new `Player`
+  object with the same offline UUID, which exposes `Player`-keyed
+  retention. `bench-swarm.js --churn-rename` rejoins churn-kicked bots as
+  `<name>g<n>` (new UUID), which also exposes UUID- and name-keyed
+  retention. Set `leak.auto-op-prefix: "bench_"` so renamed bots are
+  opped on join and deopped on quit.
+- Both commands refuse to run during a measured run (`leakcheck ... force`
+  overrides): the full GC is a stop-the-world pause, and kicks inside a
+  stage would read as plugin timeouts.
+- The harness drops its own roster `Player` references when a run stops
+  and before every checkpoint, so the harness itself cannot be charged as
+  retention.
+
+### What a checkpoint records
+
+Besides the `leak.csv` row and the `.histo.txt` histogram, every
+checkpoint appends long-format rows (`epoch_ms,label,metric,value`) to
+`runs/leak-metrics.csv`, so any metric can be fitted without knowing the
+plugin:
+
+- every memory pool and buffer pool after the full GC, loaded/unloaded classes;
+- RSS, peak RSS, swap, OS threads (`/proc/self/status`), open descriptors
+  (`/proc/self/fd`); Linux only, absent elsewhere;
+- native memory by category (`nmt.*`) when the JVM runs with
+  `-XX:NativeMemoryTracking=summary`; otherwise `nmt_enabled=0` (NOT
+  MEASURED). The raw summary is kept as `.nmt.txt`;
+- thread counts and `threadgroup.<name with digits folded>.<STATE>`
+  counts; the full thread dump is kept as `.threads.txt`;
+- per plugin: pending `BukkitScheduler` tasks (not on Folia:
+  `plugin_tasks_measured=0`), registered listeners, and live instances /
+  MB of classes shipped in the plugin's own jar (`owned_classes`; bundled
+  libraries count, a class shipped by several jars counts for none; main
+  package as fallback when the jar is unreadable, `owned_classes=-1`);
+- `rss_minus_nmt_mb`: process memory the JVM does not account for
+  (native-library malloc, allocator fragmentation);
+- workload counters: teleports, chunk loads, generated chunks, joins,
+  quits, uptime (the x-axes for slopes).
+
+`/rtpstress leakcheck <label> dump` also writes a live-objects
+`.hprof` (a second multi-second pause, about the size of the live heap).
+
+`/rtpstress leakcheck <label> quick` keeps the full GC, the histogram
+file and the `leak.csv` row, but writes a reduced metrics row: heap after
+GC, `histogram_ms`, workload counters, `/proc` RSS/threads/open
+descriptors, JVM thread counts and the per-plugin census
+(`checkpoint_quick=1`). It skips NMT, memory/buffer pools, the thread
+census and both side files (`.nmt.txt`, `.threads.txt`), so its cost is
+about one full GC; meant for short per-episode deltas.
+
+### Controls
+
+- `none`: no RTP plugin jar, bots idle.
+- `direct`: no RTP plugin jar, the harness teleports bots at the soak
+  rate with `/rtpstress tp <player>` (uniform point within
+  `leak.direct-radius`, async chunk load, highest block; Paper/Folia
+  only). Uncomment the `direct` entry in `target-commands` to use it. It
+  subtracts world, generation and landing growth that any RTP plugin
+  causes, so it is the preferred control.
+
+### Driver
+
+`scripts/bench_leakcheck.py` automates the protocol over RCON: one
+restart per target with only that plugin's jar enabled (controls: none
+enabled, verified via `plugins`).
+
+- `--mode soak` (default): c00 checkpoint, then flat ramp segments at
+  `--rate` TP/s for `--segment-s` (keep it at or below
+  `spark.timeout-seconds`) for `--soak-hours`, a churn every
+  `--churn-every` segments and a checkpoint every `--checkpoint-every`,
+  then a final checkpoint. `--dump` takes a heap dump at the first and
+  last checkpoint.
+- `--mode cycles`: the earlier N x (ramp, churn, rejoin, checkpoint).
+
+The analysis fits a slope per metric against elapsed hours, subtracts
+the control's slope for the same metric, and flags metrics whose excess
+is beyond 3 standard errors, rising, and at least 2 % of the start value.
+It also lists classes by live-byte growth between the first and last
+histogram, net of the control's growth per hour (G1 filler objects
+excluded). `--analyze-only <stamp>` re-reads the server's `runs/`;
+`--from-checkpoint 1` drops a c00 that was not a cold baseline.
+
+`scripts/heap_owner.py` runs Eclipse MAT headless (installed separately)
+on the two dumps: leak suspects by snapshot comparison against c00, and
+leak suspects on the final dump. It names as owner the first class in
+each suspect that a plugin's jar ships (same rule as `owned_classes`,
+`plugin.yml` `main` package as fallback), or `server/JDK` when none does.
+
+### Behaviour fuzzing
+
+Goals, methodology, how to read a run, and the leaks found so far:
+[`LEAK_FUZZING.md`](LEAK_FUZZING.md).
+
+`scripts/bench_fuzz.py` looks for the player behaviour that leaks,
+without knowing the plugin. It starts `devstack/clients/bench-swarm.js
+--fuzz-control <port>` itself and runs short seeded *episodes*: 2-8 bots
+each run a program of `rtp`, `wait`, `move`, `quit`, `rejoin` (same or new
+name), `die` and `rtp2`, then a `leakcheck <label> quick` gives the exact
+post-GC count deltas and every class's instance delta. The only
+per-target input is the command (`direct` maps `/rtp` to `/rtpstress tp
+{self}`); bots get permissions from LuckPerms group `default` (`*` or
+`--grant`), reverted on exit. `direct` runs first and is the control every
+other target subtracts.
+
+- **Repetitions (`--reps`, default 3):** each episode's programs run
+  `reps` times with fresh bot names and a checkpoint after each;
+  `slope.<metric>` (live bytes, heap after GC, RSS, metaspace, loaded
+  classes, buffers, threads, fds, per-plugin tasks and listeners) is the
+  growth per repetition, so a cache that fills once scores about 0.
+- **Console actions (`--console "rtp=rtp reload,..."`, opt-in):**
+  allow-listed RCON commands fired at random times during about 30 % of
+  episodes (`--console-p`, `--console-max`), carried through replay,
+  shrink and the ladder.
+- **Prediction:** a ridge fit per count against behaviour features
+  (action counts, quits by time since the last `/rtp`, moves during a
+  pending teleport). A feature is flagged when its interval excludes 0
+  and the control's does not. Classes enter through a cumulative screen
+  net of the control, with a Bonferroni-corrected z.
+- **Learning:** a cross-entropy method moves the generator towards the
+  highest net leak per minute. While nothing is confirmed the search
+  stays `searching`: more novelty per stalled generation (up to
+  `--novelty-max`), restarts from fresh random points.
+- **Surprises:** an episode that grows a count far beyond the control is
+  replayed at once (`--surprise-n`, `--surprise-k`); a reproduction makes
+  a candidate and switches to `exploiting`. Candidates are shrunk to the
+  fewest actions that still leak.
+- **Findings:** every episode also runs the finding oracles (server log:
+  uncaught exceptions with a stack trace, `Could not pass event`, tick
+  stalls; permission denials). A finding has a stable signature (class,
+  owning plugin, root exception type, first frame in that plugin, digits
+  dropped). A new signature attributed to the target (`--names` /
+  `--jars`, plus `--plugin-packages`) and absent from the control is
+  replayed the first time it appears (`--finding-n`, `--finding-k`) and
+  shrunk (`--finding-shrink`).
+- **Ladder and verdict:** candidates climb `--rungs` (default
+  `4x1,12x3,48x10` bots x reps) by successive halving. At the top rung a
+  target **fails** when the count grows by at least half the prediction
+  and heap after GC beyond the control's; heap dumps are taken and
+  `heap_owner.py` runs with `--mat`. A reproduced target finding also
+  **fails**, with no ladder (`confirmed_by` names the oracle). **PASS**
+  means nothing found within budget, with the coverage reached;
+  **INCONCLUSIVE** is a signal that did not confirm (a candidate lost at
+  scale is micro-only; a target finding that did not reproduce is a
+  one-off).
+
+```
+python3 scripts/bench_fuzz.py --server-dir /mnt/threadripper-dir/26.2 --host <bench> \
+  --targets direct,betterrtp,rtp --seeds 1 --episodes 80 [--mat ~/mat/ParseHeapDump.sh]
+```
+
+Output goes to `scripts/tmp/runs/fuzz-<stamp>/`: `report.txt`, and per
+target `episodes.jsonl` (one line per episode, replayable with `--replay
+FILE --ep K`), `classes.jsonl`, `optimiser.jsonl`, `fit.json`,
+`surprises.jsonl`, `shrunk.jsonl`, `ladder.jsonl`, `findings.jsonl`,
+`finding-replays.jsonl` and `verdict.json`; the control's signatures are
+in `control-findings.json`.
+Stop any passive swarm first: the script refuses to run with non-fuzz
+players online unless `--allow-online` is set.
+
+---
+
+## Ramp mode (stress point)
+
+`start` / `sequence` are closed-loop: one attempt in flight per player
+and at most `default-concurrency` in flight overall. By Little's law the
+offered rate is then at most `in-flight / latency`, so 4 accounts against
+a ~300 ms plugin can never offer more than ~13 TP/s, and a fast plugin's
+throughput reads as the harness's ceiling, not its own. Ramp mode offers
+load **open-loop at a fixed rate** and finds the rate at which each
+plugin stops keeping up.
+
+```
+/rtpstress ramp <target> [stageSeconds]   # target = a target-commands label
+/rtpstress ramp <target> 120 100          # flat 100 TP/s for 120 s (rates override ramp.stages)
+/rtpstress status                         # current stage + stress point so far
+/rtpstress stop                           # ends the ramp; completed stages are on disk
+```
+
+- Idle window (`ramp.idle-seconds`, default 30) with bots online and no
+  dispatch. Its second half is the idle baseline (CPU cores, MSPT p50)
+  applied to every stage, so the `net_*` cost-per-teleport columns in
+  `<stamp>-phases.csv` are filled. It runs before any teleport so a
+  plugin's post-teleport background work (queue fill, generation) is
+  billed to that plugin, not subtracted as ambient.
+- Optional warm-up (`ramp.warmup-seconds`, default 30) at the first
+  stage's rate; no CSV rows are written for it.
+- Each stage (`ramp.stages`, default `5,10,20,40,80,160,320` TP/s, each
+  `ramp.stage-seconds`, default 60) issues dispatch slots at exactly the
+  offered rate. Every slot goes to an idle roster player (no attempt in
+  flight, past `ramp.per-player-gap-ms`, default 0). If none is idle the
+  slot is counted as **`harness_shed`**, harness-side saturation, and is
+  not retried.
+- Concurrency is bounded only by the roster size: still one in-flight
+  attempt per player, and `default-concurrency` is ignored.
+- After the dispatch window the stage drains (at most
+  `attempt-timeout-ms` + 1 s), so late completions count toward the stage
+  that dispatched them. Then one row is appended to `<stamp>-ramp.csv`
+  and flushed before the next stage starts, so a server crash keeps
+  every completed stage. `ramp.gap-seconds` (default 5) idles between stages.
+- Each stage is also a normal measurement phase (label
+  `<target>@ramp<i>-<rate>tps`), so `<stamp>-phases.csv` keeps its CPU,
+  chunk and GC columns per stage. One spark profile spans the ramp.
+
+### Stress point
+
+A stage **passes** iff all of these hold (thresholds under `ramp.pass`):
+
+| Criterion | Default | CSV `fail_criteria` token |
+|---|---|---|
+| `achieved_tps >= 0.95 x offered_tps` (achieved = successful teleports / stage seconds) | `min-achieved-fraction: 0.95` | `ACHIEVED_BELOW_OFFERED` (+ `HARNESS_SATURATED` when shed slots alone exceed the 5 % shortfall) |
+| MSPT p95 over the stage <= 50 ms | `max-mspt-p95: 50.0` | `MSPT_P95` |
+| `(timeouts + errors) <= 1 %` of attempts | `max-fail-fraction: 0.01` | `FAILURE_RATE` |
+
+The **stress point** is the highest passing stage. The ramp stops after
+`ramp.stop.consecutive-failures` (default 2) failing stages in a row; a
+pass after a single failure resets the count. It also stops if wall-clock
+TPS stays below `ramp.stop.low-tps-threshold` (default 5) for
+`ramp.stop.low-tps-seconds` (default 10) continuously. That stage is
+aborted, recorded with `aborted=true`, and fails `LOW_TPS_ABORT`. The
+end of the ramp logs one summary line and writes `<stamp>-ramp-summary.txt`:
+stress point stage and offered rate, plus the first failing stage and
+the criterion it failed on.
+
+A stress point whose next stage failed with `HARNESS_SATURATED` is a
+**lower bound**: the roster, not the plugin, ran out. Add bots and re-run.
+
+**Busy vs failure.** Plugin-side "busy / cooldown / already teleporting"
+rejections are shed load (`busy_rejections`): they lower `achieved_tps`
+but are not failures. They are recognised only when the rejection reaches
+the **console** (`ConsoleWatcher` -> `CONSOLE_FAIL:` reason) and matches
+`ramp.busy-patterns`. A rejection sent only to the player via chat never
+reaches the server log. It surfaces as a timeout, and therefore as a
+failure. `bench-swarm.js` counts such chat replies out-of-band
+(`busy_chat=` in its stats line) so the two can be reconciled.
+
+MSPT is the sampler's value (Paper `getAverageTickTime`, a ~100-tick
+average; wall tick time on Spigot/Folia). TPS for the abort rule and
+`tps_min` is measured by a 20-tick wall-clock timer with a staleness
+bound, not Paper's 1-minute `getTPS()[0]`, which lags a 10 s rule.
+
+### `<stamp>-ramp.csv` columns
+
+```
+target,stage_index,offered_tps,stage_seconds,attempts,successes,timeouts,errors,
+busy_rejections,harness_shed,achieved_tps,achieved_fraction,fail_fraction,
+latency_p50_ms,latency_p95_ms,latency_p99_ms,mspt_p50,mspt_p95,mspt_samples,
+tps_min,heap_peak_mb,roster_size,peak_in_flight,aborted,complete,verdict,fail_criteria,
+start_epoch_ms,end_epoch_ms,
+repeating_scheduled,repeating_cancelled,repeating_live_start,repeating_live_end,
+repeating_cancel_failures
+```
+
+`repeating_*` count the harness's own per-player repeating tasks (the Folia
+pinned-position watch): scheduled and cancelled during the stage, the live
+count when the stage began (after the settle gap; ~0 expected, a warning is
+logged above `ramp.repeating-task-tolerance`, default 2) and when it ended,
+and `cancel()` failures. A non-zero `repeating_cancel_failures` means a
+scheduler task could not be cancelled; the task then stops itself through its
+stop flag and a hard tick bound (`folia.pinned-position-watch-max-ticks`,
+default attempt timeout + 2 s). The summary file adds
+`repeating_live_between_stages_max`, `repeating_live_at_end` and
+`repeating_cancel_failures`.
+
+`verdict` is `PASS`, `FAIL`, or `PARTIAL`. `PARTIAL` (`complete=false`)
+marks a stage cut short by `/rtpstress stop`; it is kept for the record
+but never counts toward the stress point. `-1` means NOT MEASURED.
+
+### Bot roster: `bench-swarm.js`
+
+Full clients cost too much RAM, so the roster is many lightweight
+offline-mode Mineflayer bots, split across a few Node worker processes
+(`--workers`, default one per 16 bots, at most CPUs - 1):
+
+```powershell
+cd devstack/clients
+npm install
+node bench-swarm.js --host <bench-host> --port 25565 --count 64
+```
+
+- Server prerequisites: `online-mode=false` (the Linux bench server
+  already runs offline) and `roster: "all"`. The bots are named
+  `bench_000`..`bench_063` (`--prefix`, `--start-index`).
+- **Connection throttle:** every bot connects from one IP, and Paper
+  rejects reconnects faster than `bukkit.yml`
+  `settings.connection-throttle` (default 4000 ms). Either set it to
+  `-1` for the bench, or keep `--join-delay-ms` above it (default 4500;
+  64 bots are then online after ~5 min). All connects and reconnects go
+  through one queue spaced by this delay.
+- Bots stay idle: no chat, no movement. They auto-respawn on death and
+  reconnect after a kick or disconnect with exponential backoff
+  (`--reconnect-base-ms` 5000 doubling to `--reconnect-max-ms` 60000).
+  Ctrl+C disconnects them cleanly.
+- Defaults keep memory low: `--view-distance 2` (the server still sends
+  real chunks, but only min(client, server) of them; raise it to model
+  real clients' send cost), physics off (no gravity simulation;
+  teleport-confirm and position packets are still sent; use `--physics`
+  if `allow-flight=false` causes mid-air fly kicks), and a lean
+  Mineflayer plugin set (`--full-plugins` restores all).
+- **Chunk decode off:** each teleport makes the server send a fresh
+  chunk square, and decoding those on one Node thread saturated the
+  event loop at ramp rates. Keepalives then queued behind chunk data and
+  both sides dropped the bots ("client timed out after 60000 ms",
+  server "keepalive timeout"). The bots now receive chunks and still
+  acknowledge every chunk batch, so server send cost stays real, but do
+  not decode them (`--keep-world` restores decoding).
+- **Server-side load distance:** Paper loads chunks around a player by
+  the *server's* view/simulation distance, whatever the client asks.
+  During a ramp the harness caps each roster player to
+  `ramp.player-view-distance` (default 2, Paper only, 0 disables), the
+  same for every target. Without it, 64 bots at view-distance 10 meant
+  ~529 fresh chunks per landing: TPS fell below 1 and every attempt
+  timed out before any plugin was measured.
+- A stats line every 30 s (one per worker) reports online count,
+  connects, kicks (top reasons), errors, deaths, busy chat replies and
+  process RSS.
+- With `dispatch-as-player: true` the bots need each target's `/rtp`
+  permission, and per-player plugin cooldowns must be zero (or bypassed)
+  for the bench. Otherwise every repeat dispatch is a cooldown rejection,
+  not load.
+
+Ramp procedure: start the swarm, wait until `online=64/64`, run
+`/rtpstress ramp <target>` from the console, then repeat for each target
+with a server restart between targets so each plugin starts cold.
 
 ---
 
@@ -156,6 +503,68 @@ Supported. The harness is structured to never violate Folia threading:
 Folia detection is automatic via reflective probing of
 `io.papermc.paper.threadedregions.RegionizedServer`. The same JAR drops
 onto Spigot, Paper, and Folia unchanged.
+
+### Folia matrix (one plugin at a time)
+
+`scripts/bench_matrix.py` runs every Folia-capable target in turn, restarting the server
+with only that target's jar enabled (`direct` = no RTP jar), and writes one table per run.
+n=1 per target per pass on one rig: compare rows only within a run. Defaults (`folia`
+profile): a paced ramp `5@820` (about 4,096 teleports), then a ladder `10,20,40@60`;
+`jakesrtp` gets one load attempt and is recorded `unsupported-not-loaded` if Folia refuses it.
+
+```
+# 1. server up under a relaunch loop (Folia has no /restart; the matrix sends `stop` and the loop
+#    starts the JVM again): copy scripts/folia-start-loop.sh to the server dir as start-loop.sh and run
+#    `tmux new -s folia 'cd <server-dir> && ./start-loop.sh'` (detach Ctrl-b d; Ctrl-C ends it, or
+#    `touch .no-relaunch` then `stop`). Then the swarm with byte counters
+#    (the Folia dir uses game port 25677 / RCON 25685 so it can run beside the Paper dir)
+node devstack/clients/bench-swarm.js --host <server> --port 25677 --count 48 \
+     --stats-file /tmp/swarm-stats.jsonl --swap-stuck --churn-rename
+# 2. plan and time estimate, no RCON traffic
+python scripts/bench_matrix.py --server-dir <server-dir> --host <server> \
+     --swarm-stats /tmp/swarm-stats.jsonl --dry-run
+# 3. smoke run, then the full list (resume a stopped run with --resume <out-dir>)
+python scripts/bench_matrix.py ... --targets direct,rtp --round 5@60
+python scripts/bench_matrix.py ...
+```
+
+Output in `scripts/tmp/matrix-<stamp>/`: `matrix.md` and `matrix.csv` (long form),
+`manifest.csv` (outcome, wall window, run stamp, config hashes, swaps, live log findings),
+`bandwidth.csv`, copies of each run's ramp files and the session log. Rebuild the tables
+with `python scripts/bench_matrix_report.py <out-dir>`.
+
+- **Bandwidth** is wire bytes received by the bots (`socket.bytesRead` summed over bots,
+  compressed), sampled on the driver's clock. Net = stage bytes minus the idle rate (second
+  half of the ramp's idle window) times stage seconds, divided by successful teleports.
+  Stage windows map the server clock to the driver clock with one offset per run
+  (first stage starts `idle-seconds + warmup-seconds` after the ramp command). A stalled
+  stats file prints `NOT MEASURED`, never zero.
+- **Stuck bots.** `--swap-stuck` replaces a bot the server stopped teleporting while it
+  keeps teleporting the others (a plugin that locks a player out after an error, as EzRTP
+  did on Folia in `20261008-052141`): it quits and rejoins under a new name, which is a new
+  offline UUID. The swap count is recorded per run, and each swap adds one join chunk burst
+  to that stage's bandwidth. The harness refuses `/rtpstress churn` mid-run, so the swarm
+  does it.
+- **Log findings.** A live watcher records the first plugin problem and the watchdog and
+  async-chunk counts per run; the report scans the session log for `Tick region ... has not
+  responded`, `Cannot retrieve chunk asynchronously`, off-thread access errors and
+  exceptions attributed by package. A failure is reported as "failed on this rig, this
+  config" with its first log line.
+- **Latency maximum** is the slowest successful teleport dispatched inside the stage window,
+  read from the harness's per-teleport `<stamp>.csv` (`latency_ms`, which the run copies
+  next to the ramp files). Timed-out attempts are kept out of it and reported separately
+  as `latency_max_failed_attempt_ms` in `matrix.csv`.
+- **MSPT on Folia.** The harness's MSPT is a 50 ms timer on the global region, so its p95 reads
+  about 50.0 whatever the load. Set `ramp.pass.max-mspt-p95: 1000` in the Folia config so the
+  ladder is not stopped by it. The table labels the column "global timer"; read the regional
+  TPS columns for tick health.
+- **Profiling** (`--spark`) needs `spark.enabled: true` and a Folia thread selector in
+  `plugins/StressTestRTP/config.yml`. Folia ticks on `Folia Region Scheduler Thread #N`
+  and has no `Server thread`, so use `threads: "*Region Scheduler Thread*,RTP-Anvil-IO-*"`
+  and a `timeout-seconds` longer than the longest stage (900 for the 820 s ramp). After
+  a short run, `python scripts/folia_spark_check.py --server-dir <server-dir> --since-min 15`
+  decodes the new profiles and fails when they hold no region-thread samples. Set
+  `threads: "*"` once to see every thread name if it does.
 
 ---
 
@@ -382,6 +791,73 @@ instead - the plugin's own completion instant. `plugin_latency_ms`
 external channels and write `-1` there. Compare `latency_ms` across
 arms only within one `attribution_source`.
 
+**`external_latency_ms`** (per attempt) is dispatch to the first
+`PlayerTeleportEvent` or position-watch sighting, recorded on every arm
+including LeafRTP's. This is the cross-plugin latency column. A LeafRTP row
+is held up to 1 s for the sighting and writes `-1` if none arrives.
+
+**`fail_reason=NOT_AT_DESTINATION`**. LeafRTP fires `PostTeleportEvent`
+whether or not the platform teleport succeeded, so on Post the probe checks
+that the player is within 3 blocks (XZ) of the destination, in the same world.
+
+**`landing_class`** (with `to_world`, `to_y`, `landing_floor/feet/head`) is
+the landing block column read with fixed criteria: `SAFE`, `LAVA`, `WATER`,
+`SUFFOCATING`, `NO_FLOOR`, `HAZARD`, `VOID`, or `UNCHECKED_*` when it could
+not be read without loading a chunk or crossing a region.
+
+**`main_thread_cpu_scope`** (phases) is `main-thread` on Spigot/Paper and
+`folia-region-threads:N` on Folia, where `main_thread_cpu_ms` sums every
+region scheduler thread. Folia rows without this column measured one thread.
+
+**`cpu_*_ms`** (phases) split `process_cpu_ms` by thread name, summed from
+per-thread CPU deltas sampled every `cpu-breakdown-sample-ms` (default
+1000) and at phase boundaries:
+
+| Column | Threads |
+|---|---|
+| `cpu_server_thread_ms` | the tick thread (`Server thread`) |
+| `cpu_region_threads_ms` | Folia region scheduler threads |
+| `cpu_scheduler_ms` | Bukkit async workers (`Craft Scheduler Thread`) |
+| `cpu_scheduler_by_plugin` | the same, as `plugin=ms;...` from the name Paper gives a worker while it runs a task; `(idle)` is time between tasks |
+| `cpu_async_scheduler_ms` | Paper/Folia `AsyncScheduler` workers |
+| `cpu_chunk_system_ms` | chunk load, generation and region I/O workers |
+| `cpu_network_ms` | Netty |
+| `cpu_other_java_ms` | every other Java thread; top 8 names in `cpu_other_top` |
+| `cpu_non_java_ms` | process CPU minus all of the above: GC, JIT and VM threads, plus the last interval of any thread that exited between samples |
+| `cpu_gc_ms` | the JVM's GC-thread CPU counter, a subset of `cpu_non_java_ms`; JDK 26+ only, `-1` otherwise |
+
+A worker is charged to the plugin named at sample time, so a worker that
+switched plugins within one interval bills the whole interval to the later
+one. The harness's own async work appears as `StressTestRTP`. Check
+`cpu_other_top` after a run on a new platform: a large entry there is a
+thread family the name patterns in `CpuSampler.classify` do not cover yet.
+
+`chunk-load-cost-us` is read per platform family (`-paper`, `-folia`, or
+the base key on Spigot) with no fallback, so `chunk_load_cost_ms` /
+`cpu_ms_with_chunks` stay empty on Paper and Folia unless their own key is
+set. On those platforms chunk-worker CPU is already in `process_cpu_ms`
+and is measured directly as `cpu_chunk_system_ms`.
+
+**`chunks_sync_requested` / `chunks_sync_by_plugin`** (phases) name the
+plugin that synchronously requested each load, from the `ChunkLoadEvent`
+call stack. They are `-1` unless `chunks_sync_selftest` is `PASS` (one sync
+and one async load of a generated chunk at startup, `sync-load-selftest`).
+`chunks_on_tick` classifies by firing thread, which Paper and Folia make
+near 100% for every plugin; publish chunk counts from
+`chunks_inclusive_per_attempt`.
+
+**`chunks_landing_area`**. Paper loads a player's view area after the
+teleport event, so those loads used to land on whichever attempt was in
+flight, or in background when none was, which made `chunks_per_attempt`
+depend on how long a plugin's teleports take. A load within
+`viewDistance + 1` chunks (Chebyshev) of an account's last successful
+destination is now charged to that teleport until the same account's next
+dispatch. The window is never time-based, so one account's consecutive
+teleports cannot overlap. These loads are excluded from
+`chunks_loaded_attributed` and `chunks_loaded_background`, so attributed +
+landing area + background = `chunks_loaded`. `chunks_per_teleport` is
+(attributed + landing area) / attempts.
+
 **`region_tps_*`**. Folia has no server-wide TPS; `Server#getTPS()`
 throws, so the `tps` column there is a wall-clock timer on the *global*
 region, which is never where a teleport lands. It can read 20.0 while
@@ -518,7 +994,7 @@ source of irreproducible numbers:
 
 When the [spark](https://spark.lucko.me/) profiler plugin is installed,
 StressTestRTP automatically brackets each measurement phase with
-`spark profiler start --timeout N --only-ticks-over T` /
+`spark profiler start --timeout N [--only-ticks-over T] [--thread S]` /
 `spark profiler stop --comment <target_label>`. One profile is produced
 per `sequence` target (and one per `start` / `burst` run), and the spark
 upload's comment matches the CSV's `target_label` column so the two
@@ -526,12 +1002,28 @@ artifacts correlate 1:1.
 
 This gives you white-box "where did the time go" data (sync chunk loads,
 GC pauses, region scans) alongside the harness's black-box per-attempt
-timings. When spark isn't installed the hook silently no-ops — no hard
-dependency.
+timings. Both a spark plugin jar and the spark that Paper 1.21+ bundles
+are detected; the bundled one registers no Bukkit plugin, so the hook
+also checks for the `/spark` command. When neither is present the hook
+logs one line and no-ops — no hard dependency.
 
 Configure under `spark:` in `config.yml` (defaults: enabled, 90 s
 timeout, only-ticks-over 50 ms). Set `spark.enabled: false` if you'd
 rather drive `/spark profiler` manually.
+
+- `spark.threads` (default `Server thread,RTP-Anvil-IO-*`) is a comma list;
+  each entry becomes its own `--thread <name>` (names with spaces are not
+  quoted; spark re-joins them). An entry containing `*` is a wildcard and
+  adds `--regex` (exact entries are escaped), so pool threads spawned after
+  the profile starts are still sampled. `*` alone samples every thread;
+  `""` omits the flag (server thread only).
+- With `save-to-file`, spark writes `plugins/spark/profile-<stamp>.sparkprofile`
+  (the log line names the folder that was found). The auto-summary polls
+  that folder every ~1 s, starting after `auto-summary-delay-ticks`, until
+  `spark.auto-summary-timeout-seconds` (default 30) have passed since the
+  stop. It accepts only a profile that is new since the stop and whose size
+  is unchanged across two polls. Spark's save can take several seconds on
+  Windows.
 
 ---
 

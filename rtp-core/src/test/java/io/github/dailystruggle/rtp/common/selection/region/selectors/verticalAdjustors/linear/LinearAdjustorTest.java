@@ -310,7 +310,7 @@ public class LinearAdjustorTest {
      * When {@code requireSkyLight=true} the adjustor performs the same per-Y scan as the
      * non-requireSkyLight path; it merely gates the candidate Y on
      * {@link io.github.dailystruggle.rtp.api.world.RTPChunk#getSkyLight} {@code > 7}.
-     * No {@code getSurfaceHeight} fast-path is used.
+     * No surface-height fast-path is used.
      */
     @Test
     void requireSkyLight_findsLandingViaPerYScan() {
@@ -813,5 +813,24 @@ public class LinearAdjustorTest {
         }
         LinearAdjustor adjNull = buildAdjustor(0, 60, 80);
         assertNull(adjNull.adjustColumn(null, 0, 0));
+    }
+
+    @Test
+    void boundary_minYZero_doesNotProbeBelowWorldMin() {
+        // Test in a world with minHeight=0, adjustor with minY=0 (or negative).
+        // Candidate feet at y=0 would require checking y-1 = -1 (below minHeight=0).
+        // The adjustor must not check or return y=0; lowest valid feet Y is 1 (floor at 0).
+        LinearAdjustor adj = buildAdjustor(0, 0, 80);
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        chunk.setSolidSafe(0); // floor at 0 -> feet at 1
+        RTPCoords res = adj.adjust(chunk);
+        assertNotNull(res, "Landing on floor at 0 (feet at 1) should be found");
+        assertEquals(1, res.y(), "Feet Y must be at 1");
+
+        // If floor is at -1 (which is below minHeight=0), it must not be selected or queried
+        ConfigurableMockChunk chunkBelow = new ConfigurableMockChunk(0, 0, world);
+        chunkBelow.setSolidSafe(-1);
+        RTPCoords resBelow = adj.adjust(chunkBelow);
+        assertNull(resBelow, "Feet at 0 with floor below worldMin should not be found");
     }
 }

@@ -28,7 +28,7 @@ public enum Verdict {
   /**
    * The pre-filter did not produce a definitive answer - region file missing, custom
    * generator in use, chunk currently loaded, unsupported {@code DataVersion}, unsupported
-   * compression mode (e.g. LZ4 in phase 1), or any I/O error. The candidate proceeds
+   * compression mode (unknown mode or external-file flag), or any I/O error. The candidate proceeds
    * through the existing live-load path unchanged.
    */
   UNKNOWN

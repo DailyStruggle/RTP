@@ -97,4 +97,74 @@ class RtpYamlWriterTest {
         String src = "items:\n  - name: a\n    qty: 2\n  - name: b\n";
         assertEquals(src, reemit(src));
     }
+
+    @Test
+    @DisplayName("ADR-034: Chunky-style - [x, z] vertex items round-trip byte-for-byte")
+    void flowPairItemsRoundTrip() {
+        String src = "shape:\n"
+                + "  name: POLYGON\n"
+                + "  vertices:\n"
+                + "    - [-125c, 187c]\n"
+                + "    - [2000b, 3000b]\n"
+                + "    - [10, -4]\n";
+        String once = reemit(src);
+        assertEquals(src, once);
+        assertEquals(once, reemit(once));
+    }
+
+    @Test
+    @DisplayName("ADR-034: inline nested flow sequence re-emits inline, whitespace normalised")
+    void inlineFlowRoundTrip() {
+        assertEquals("vertices: [[1, 2], [3, 4]]\n", reemit("vertices: [[1, 2], [3, 4]]\n"));
+        assertEquals("a: [1, 2, 3]\nempty: []\nq: [\"x y\", 'it''s']\n",
+                reemit("a: [ 1 ,2,3 ]\nempty: [ ]\nq: [\"x y\", 'it''s']\n"));
+        // Inline flow under a sequence-of-mappings entry.
+        String nested = "items:\n  - name: a\n    pos: [1, 2]\n";
+        assertEquals(nested, reemit(nested));
+    }
+
+    @Test
+    @DisplayName("ADR-034: vertex pairs rebuilt from Java lists on save stay compact [x, z] items")
+    void javaListRebuildEmitsFlowPairs() {
+        RtpYamlConfig cfg = RtpYamlConfig.parse("shape:\n  name: POLYGON\n  vertices:\n    - [-125c, 187c]\n    - [10, -4]\n");
+        // Updater/migration path: read as Java lists, write the same lists back.
+        java.util.List<?> vertices = cfg.getList("shape.vertices");
+        cfg.set("shape.vertices", vertices);
+        String out = cfg.saveToString();
+        assertEquals("shape:\n  name: POLYGON\n  vertices:\n    - [\"-125c\", \"187c\"]\n    - [10, -4]\n", out);
+        // And the rewritten file loads back to the same values.
+        assertEquals(vertices, RtpYamlConfig.parse(out).getList("shape.vertices"));
+    }
+
+    @Test
+    @DisplayName("Unflagged top-level scalar lists stay block style; unsafe flow entries fall back to block")
+    void flowFallbacks() {
+        // A Java list set directly under a key keeps the historical block layout.
+        RtpYamlConfig cfg = RtpYamlConfig.parse("k: 1\n");
+        cfg.set("list", java.util.List.of(1, 2));
+        assertEquals("k: 1\nlist:\n  - 1\n  - 2\n", cfg.saveToString());
+
+        // A flow-flagged sequence whose plain entry contains a flow indicator.
+        RtpYamlMapping root = new RtpYamlMapping();
+        RtpYamlSequence seq = new RtpYamlSequence();
+        seq.setFlowStyle(true);
+        seq.add(new RtpYamlScalar("a, b", RtpYamlScalar.Style.PLAIN));
+        seq.add(new RtpYamlScalar("c", RtpYamlScalar.Style.PLAIN));
+        root.put("s", seq);
+        String out = RtpYamlWriter.emit(root);
+        assertEquals("s:\n  - a, b\n  - c\n", out);
+        assertEquals(out, reemit(out));
+
+        // A commented item cannot live inside brackets.
+        RtpYamlMapping root2 = new RtpYamlMapping();
+        RtpYamlSequence outer = new RtpYamlSequence();
+        RtpYamlSequence pair = new RtpYamlSequence();
+        pair.add(new RtpYamlScalar("1", RtpYamlScalar.Style.PLAIN));
+        RtpYamlScalar commented = new RtpYamlScalar("2", RtpYamlScalar.Style.PLAIN);
+        commented.addBlockComment("note");
+        pair.add(commented);
+        outer.add(pair);
+        root2.put("v", outer);
+        assertEquals("v:\n  -\n    - 1\n    # note\n    - 2\n", RtpYamlWriter.emit(root2));
+    }
 }

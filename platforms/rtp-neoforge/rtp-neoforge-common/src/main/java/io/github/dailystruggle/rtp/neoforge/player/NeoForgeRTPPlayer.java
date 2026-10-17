@@ -42,18 +42,25 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
 
     private final UUID uuid;
     private final String name;
-    private volatile @Nullable ServerPlayer handle;
+    // Weak: a cached copy of this wrapper (teleport history, cooldown records) must never pin a
+    // quit player's ServerPlayer graph. The server's player list keeps it alive while online.
+    private volatile java.lang.ref.WeakReference<ServerPlayer> handleRef =
+            new java.lang.ref.WeakReference<>(null);
 
     public NeoForgeRTPPlayer(ServerPlayer player) {
         this.uuid = player.getUUID();
         this.name = resolveName(player);
-        this.handle = player;
+        this.handleRef = new java.lang.ref.WeakReference<>(player);
     }
 
-    private static String resolveName(ServerPlayer player) {
+    /**
+     * Profile name that survives the authlib record change (~1.21.9: {@code GameProfile#getName()}
+     * became {@code name()}). Code compiled against 1.21.1 must not call {@code getName()} unguarded.
+     */
+    public static String resolveName(ServerPlayer player) {
         try {
             return player.getGameProfile().getName();
-        } catch (NoSuchMethodError ignored) {
+        } catch (LinkageError ignored) {
             // authlib record-shape: no getName(); fall through to Entity name.
         }
         return player.getName().getString();
@@ -61,17 +68,17 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
 
     /** Called by the event bridge when a player rejoins; refreshes the handle. */
     public void rebind(ServerPlayer player) {
-        this.handle = player;
+        this.handleRef = new java.lang.ref.WeakReference<>(player);
     }
 
     /** @return the underlying Mojmap {@link ServerPlayer} handle, or {@code null} if disconnected. */
     public @Nullable ServerPlayer handle() {
-        return handle;
+        return handleRef.get();
     }
 
     /** Called by the event bridge on disconnect; subsequent calls treat the player as offline. */
     public void unbind() {
-        this.handle = null;
+        this.handleRef = new java.lang.ref.WeakReference<>(null);
     }
 
     /**
@@ -85,7 +92,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
      */
     @Override
     public boolean openBookMenu(NeoForgeBookSpec spec) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || !isOnline() || spec == null) return false;
         NeoForgeVersionAdapter adapter = NeoForgeVersionAdapterRegistry.peek();
         if (adapter == null) return false;
@@ -108,7 +115,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
         NeoForgeVersionAdapter adapter = NeoForgeVersionAdapterRegistry.peek();
         if (adapter == null || !adapter.supportsMapCharts()) return false;
         RTP.scheduler.runTask(() -> {
-            ServerPlayer p = handle;
+            ServerPlayer p = handleRef.get();
             if (p == null) return; // viewer went offline before the hop
             adapter.renderMapChart(p, chartKey, argb, locked, deliverItem);
         });
@@ -137,7 +144,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
 
     @Override
     public boolean hasPermission(String permission) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null) return false;
         if (permission == null || permission.isEmpty()) return true;
         // N2.5: PRIMARY - consult LuckPerms (if present) FIRST so explicit
@@ -184,7 +191,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
         // status is detected by probing a known default:op node through
         // hasPermission so the LuckPerms verdict / ops.json scan is honoured
         // without duplicating logic.
-        if (handle == null) return Collections.emptySet();
+        if (handleRef.get() == null) return Collections.emptySet();
         boolean isOp = hasPermission("rtp.reload");
         return NeoForgeEffectivePermissionsResolver.resolve(uuid, isOp, this::hasPermission);
     }
@@ -200,7 +207,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
      * packet path so hover/click annotations survive end-to-end.
      */
     public void sendComponent(Component component) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || component == null) return;
         try {
             if (p.connection != null) {
@@ -214,7 +221,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
 
     /** Send a title / subtitle pair with explicit fade/stay timings (ticks). */
     public void sendTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null) return;
         if ((title == null || title.isEmpty()) && (subtitle == null || subtitle.isEmpty())) return;
         try {
@@ -237,7 +244,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
 
     /** Send an actionbar message (text hovering above the hotbar). */
     public void sendActionbar(String message) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null) return;
         if (message == null || message.isEmpty()) return;
         try {
@@ -262,7 +269,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
 
     @Override
     public void performCommand(@Nullable RTPPlayer player, String command) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || command == null) return;
         ServerLevel lvl = resolveServerLevel(p);
         net.minecraft.server.MinecraftServer srv = lvl == null ? null : lvl.getServer();
@@ -338,7 +345,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
 
     @Override
     public RTPCommandSender clone() {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null) {
             return new DetachedClone(uuid, name);
         }
@@ -347,7 +354,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
 
     @Override
     public CompletableFuture<Boolean> setLocation(RTPLocation to) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || to == null) {
             return CompletableFuture.completedFuture(false);
         }
@@ -361,7 +368,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
         final double ty = to.getBlockY();
         final double tz = to.getBlockZ() + 0.5;
         return srv.submit(() -> {
-            ServerPlayer cur = handle;
+            ServerPlayer cur = handleRef.get();
             if (cur == null || cur.isRemoved()) return false;
             return performTeleport(cur, target, tx, ty, tz, cur.getYRot(), cur.getXRot());
         });
@@ -372,7 +379,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
         // BetterRTP SetAsRespawn parity. Anchors the respawn point on the server
         // thread via reflective setRespawnPosition (signature drift across the
         // 1.21.x carrier line). S-004: failures are logged, never swallowed.
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || to == null) return;
         RTPWorld<?> rtpWorld = to.world();
         if (!(rtpWorld instanceof NeoForgeRTPWorld nw)) return;
@@ -384,7 +391,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
         final int bz = to.getBlockZ();
         final ServerLevel targetFinal = target;
         srv.submit(() -> {
-            ServerPlayer cur = handle;
+            ServerPlayer cur = handleRef.get();
             if (cur == null || cur.isRemoved()) return Boolean.FALSE;
             anchorRespawn(cur, targetFinal, bx, by, bz);
             return Boolean.TRUE;
@@ -502,7 +509,6 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
      */
     private static volatile java.lang.reflect.Method LEVEL_ACCESSOR;
     private static volatile java.lang.reflect.Field LEVEL_FIELD;
-    private static volatile boolean LEVEL_RESOLVED;
 
     @Nullable
     public static ServerLevel resolveServerLevel(ServerPlayer p) {
@@ -550,7 +556,6 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
                 Object r = m.invoke(p);
                 if (r instanceof ServerLevel sl) {
                     LEVEL_ACCESSOR = m;
-                    LEVEL_RESOLVED = true;
                     return sl;
                 }
             } catch (Throwable ignored) { /* try next */ }
@@ -565,7 +570,6 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
                     Object r = m.invoke(p);
                     if (r instanceof ServerLevel sl) {
                         LEVEL_ACCESSOR = m;
-                        LEVEL_RESOLVED = true;
                         return sl;
                     }
                 } catch (Throwable ignored) { /* try next */ }
@@ -580,7 +584,6 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
                     Object r = f.get(p);
                     if (r instanceof ServerLevel sl) {
                         LEVEL_FIELD = f;
-                        LEVEL_RESOLVED = true;
                         return sl;
                     }
                 } catch (Throwable ignored) { /* try next */ }
@@ -603,7 +606,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
 
     @Override
     public RTPLocation getLocation() {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null) return null;
         ServerLevel level = resolveServerLevel(p);
         if (level == null) return null;
@@ -618,7 +621,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
 
     @Override
     public boolean isOnline() {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         return p != null && !p.isRemoved();
     }
 
@@ -640,7 +643,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
     @Override
     public String getClientBlock(RTPLocation location) {
         if (location == null) return null;
-        if (handle == null) return null;
+        if (handleRef.get() == null) return null;
         if (!(location.world() instanceof NeoForgeRTPWorld nw)) return null;
         ServerLevel level = nw.level();
         if (level == null) return null;
@@ -663,7 +666,7 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
     @Override
     public void sendClientBlockChange(RTPLocation location, String blockData) {
         if (location == null || blockData == null) return;
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || p.connection == null) return;
         if (!(location.world() instanceof NeoForgeRTPWorld nw)) return;
         ServerLevel level = nw.level();

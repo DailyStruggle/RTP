@@ -242,24 +242,24 @@ class AnvilBiomeDecoderTest {
                 () -> assertThrows(IndexOutOfBoundsException.class, () -> bs.biomeIdAt(16, 0, 0)),
                 () -> assertThrows(IndexOutOfBoundsException.class, () -> bs.biomeIdAt(0, 0, 16)));
 
-        // In-bounds query against a malformed data array falls back to palette[0]
+        // In-bounds query against a malformed data array returns null (UNKNOWN)
         BiomePaletteSection malformed = new BiomePaletteSection(
                 0, List.of("minecraft:plains", "minecraft:desert"), new long[0]);
-        assertEquals("minecraft:plains", malformed.biomeIdAt(0, 0, 0));
+        assertNull(malformed.biomeIdAt(0, 0, 0));
 
-        // Short data array
+        // Short data array returns null (UNKNOWN)
         BiomePaletteSection shortData = new BiomePaletteSection(
-                0, List.of("minecraft:plains", "minecraft:desert"), new long[1]); // needs more longs
-        assertEquals("minecraft:plains", shortData.biomeIdAt(15, 15, 15));
+                0, List.of("minecraft:plains", "minecraft:desert", "minecraft:forest"), new long[1]); // 3-entry palette needs 2 longs
+        assertNull(shortData.biomeIdAt(15, 15, 15));
 
-        // Out of range paletteIdx in data
+        // Out of range paletteIdx in data returns null (UNKNOWN)
         // For palette size 2, bits = 1. Mask is 1, so paletteIdx is always 0 or 1.
         // For palette size 3, bits = 2. Mask is 3. An index of 3 > palette size 3.
         long[] badWord = new long[64];
         badWord[0] = 0x3L; // index 3 >= palette size 3
         BiomePaletteSection outOfRange = new BiomePaletteSection(
                 0, List.of("minecraft:plains", "minecraft:desert", "minecraft:badlands"), badWord);
-        assertEquals("minecraft:plains", outOfRange.biomeIdAt(0, 0, 0));
+        assertNull(outOfRange.biomeIdAt(0, 0, 0));
 
         // Validations
         assertThrows(IllegalArgumentException.class, () -> BiomePaletteSection.biomeBitsPerEntry(0));

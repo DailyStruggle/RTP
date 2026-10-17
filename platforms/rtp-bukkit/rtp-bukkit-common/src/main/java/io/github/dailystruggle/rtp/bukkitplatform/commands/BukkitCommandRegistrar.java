@@ -4,6 +4,7 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
+import org.bukkit.command.CommandMap;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.command.PluginCommand;
@@ -12,6 +13,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -34,12 +38,106 @@ public final class BukkitCommandRegistrar extends BukkitCommand {
   }
 
   public void register(String... names) {
+    if (names == null || names.length == 0) return;
+    boolean registeredAnyDynamic = false;
+    CommandMap commandMap = null;
+
     for (String name : names) {
-      PluginCommand command = Bukkit.getPluginCommand(name);
+      if (name == null || name.isBlank()) continue;
+      PluginCommand command = resolvePluginCommand(name);
       if (command != null) {
         command.setExecutor(this);
         command.setTabCompleter(this);
+      } else {
+        if (commandMap == null) {
+          commandMap = getCommandMap();
+        }
+        if (commandMap != null) {
+          Command existing = commandMap.getCommand(name);
+          String prefix = (plugin != null) ? plugin.getName().toLowerCase(java.util.Locale.ROOT) : "rtp";
+          if (existing == null || commandMap.getCommand(prefix + ":" + name) == null) {
+            String desc = (root != null) ? root.description() : "";
+            DynamicBukkitCommand dynamicCmd = new DynamicBukkitCommand(
+                name,
+                desc,
+                "/" + name,
+                Collections.emptyList(),
+                this,
+                this
+            );
+            commandMap.register(prefix, dynamicCmd);
+            registeredAnyDynamic = true;
+          }
+        }
       }
+    }
+
+    if (registeredAnyDynamic) {
+      syncCommands();
+    }
+  }
+
+  private @Nullable PluginCommand resolvePluginCommand(String name) {
+    if (plugin instanceof org.bukkit.plugin.java.JavaPlugin jp) {
+      try {
+        PluginCommand cmd = jp.getCommand(name);
+        if (cmd != null && cmd.getPlugin() == plugin) {
+          return cmd;
+        }
+      } catch (Throwable ignored) {
+        // best-effort: fall through to server-wide lookup
+      }
+    }
+
+    try {
+      PluginCommand cmd = Bukkit.getPluginCommand(name);
+      if (cmd != null && (plugin == null || cmd.getPlugin() == plugin)) {
+        return cmd;
+      }
+    } catch (Throwable ignored) {
+      // best-effort: fall through to namespaced lookup
+    }
+
+    if (plugin != null) {
+      try {
+        String prefix = plugin.getName().toLowerCase(java.util.Locale.ROOT);
+        PluginCommand cmd = Bukkit.getPluginCommand(prefix + ":" + name.toLowerCase(java.util.Locale.ROOT));
+        if (cmd != null && cmd.getPlugin() == plugin) {
+          return cmd;
+        }
+      } catch (Throwable ignored) {
+        // best-effort: caller falls back to dynamic registration
+      }
+    }
+
+    return null;
+  }
+
+  private static @Nullable CommandMap getCommandMap() {
+    try {
+      Method m = Bukkit.getServer().getClass().getMethod("getCommandMap");
+      Object map = m.invoke(Bukkit.getServer());
+      if (map instanceof CommandMap cm) return cm;
+    } catch (Throwable ignored) {
+      // getCommandMap absent on this server; try plugin-manager field
+    }
+    try {
+      Field f = Bukkit.getServer().getPluginManager().getClass().getDeclaredField("commandMap");
+      f.setAccessible(true);
+      Object map = f.get(Bukkit.getServer().getPluginManager());
+      if (map instanceof CommandMap cm) return cm;
+    } catch (Throwable ignored) {
+      // reflection blocked or field missing; no dynamic registration
+    }
+    return null;
+  }
+
+  private static void syncCommands() {
+    try {
+      Method sync = Bukkit.getServer().getClass().getMethod("syncCommands");
+      sync.invoke(Bukkit.getServer());
+    } catch (Throwable ignored) {
+      // syncCommands is Paper/CraftBukkit-only; clients refresh on relog
     }
   }
 
@@ -51,7 +149,7 @@ public final class BukkitCommandRegistrar extends BukkitCommand {
     }
     try {
       CommandSender console = Bukkit.getConsoleSender();
-      if (console != null && sender.getName().equals(console.getName())) {
+      if (sender.getName().equals(console.getName())) {
         return CommandsAPI.serverId;
       }
     } catch (Exception ignored) {

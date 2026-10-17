@@ -5,8 +5,8 @@ import io.github.dailystruggle.rtp.bukkitplatform.commands.parameters.OnlinePlay
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
-import io.github.dailystruggle.rtp.common.commands.RTPCmd;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.RTPCmd;
 import io.github.dailystruggle.rtp.common.commands.parameters.IntegerParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
 import java.util.ArrayList;
@@ -280,7 +280,7 @@ public class TestStressCmd extends BaseRTPCmdImpl {
   static int parseFirst(List<String> values, int fallback) {
     if (values == null || values.isEmpty()) return fallback;
     try {
-      return Integer.parseInt(values.getFirst());
+      return Integer.parseInt(values.get(0));
     } catch (NumberFormatException e) {
       return fallback;
     }

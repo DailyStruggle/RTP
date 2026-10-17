@@ -3,6 +3,7 @@
 # performance.yml (right). Generated from the per-locale TSV; edit the TSV's
 # base_key/key columns and regenerate, do not hand-edit this file.
 minTPS: "minimaleTPS"
+maxMSPT: "maxMSPT"
 maxHeapPercent: "maxHeapProzent"
 maxAttempts: "maxVersuche"
 period: "intervall"
@@ -23,6 +24,7 @@ biomeRecallForced: "biomWiederverwendungErzwungen"
 slowPipelineThresholdMs: "langsamePipelineSchwelleMs"
 queueGrowthWarnThreshold: "warteschlangenWachstumWarnSchwelle"
 syncLoading: "syncLaden"
+teleportPath: "teleportPfad"
 onEventParsing: "ereignisAuswertung"
 effectParsing: "effektAuswertung"
 visitorEnabled: "besucherAktiviert"

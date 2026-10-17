@@ -1,6 +1,6 @@
 # ADR-021 — Legacy Minecraft and Java Support Are Out of Scope
 
-**Status:** Accepted
+**Status:** Accepted (amended by [ADR-113](ADR-113-java-17-baseline-and-26x-support-boundary.md))
 **Date:** 2026-04-22
 
 ## Context

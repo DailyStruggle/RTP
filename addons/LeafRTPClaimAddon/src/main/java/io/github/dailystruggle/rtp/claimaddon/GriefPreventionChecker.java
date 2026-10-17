@@ -1,8 +1,6 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import java.util.Collection;
-import java.util.logging.Level;
 import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import org.bukkit.Bukkit;
@@ -10,6 +8,7 @@ import org.bukkit.plugin.Plugin;
 
 /** Checker for GriefPrevention claims */
 public class GriefPreventionChecker {
+  private GriefPreventionChecker() {}
   private static boolean exists = true;
 
   private static GriefPrevention getGriefPrevention() {
@@ -21,10 +20,10 @@ public class GriefPreventionChecker {
   }
 
   public static Boolean isInClaim(io.github.dailystruggle.rtp.api.world.RTPCoords location) {
-    if (!exists) return false;
-    org.bukkit.World world = org.bukkit.Bukkit.getWorld(location.worldName());
-    if (world == null) return false;
-    return isInClaim(new org.bukkit.Location(world, location.x(), location.y(), location.z()));
+    if (!exists || location == null) return false;
+    org.bukkit.Location loc = ClaimLocationResolver.toLocation(location);
+    if (loc == null) return false;
+    return isInClaim(loc);
   }
 
   public static Boolean isInClaim(org.bukkit.Location location) {
@@ -36,12 +35,7 @@ public class GriefPreventionChecker {
       Collection<Claim> claims = GriefPrevention.instance.dataStore.getClaims(chunkX, chunkZ);
       return !claims.isEmpty();
     } catch (Throwable t) {
-      exists = false;
-      RTP.log(
-          Level.SEVERE,
-          "[RTP] Critical architectural incompatibility detected. Disabling GriefPrevention integration for this session to prevent server instability.",
-          t);
+      return ClaimCheckFailure.handle("GriefPrevention", t, () -> exists = false);
     }
-    return false;
   }
 }

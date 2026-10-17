@@ -19,9 +19,13 @@ All keys are booleans defaulting to `false`. Set a key to `true` to avoid telepo
 | `rerollResidence` | Residence | `false` | Reroll if the location lands inside a Residence claim. |
 | `rerollCrashClaim` | CrashClaim | `false` | Reroll if the location lands inside a CrashClaim claim. |
 | `rerollHuskClaims` | HuskClaims | `false` | Reroll if the location lands inside a HuskClaims claim. |
+| `rerollHuskTowns` | HuskTowns | `false` | Reroll if the location lands inside a HuskTowns town claim. |
+| `rerollPlotSquared` | PlotSquared | `false` | Reroll if the location lands inside a PlotSquared plot or unclaimable road/restricted zone. |
 | `rerollKingdomsX` | KingdomsX | `false` | Reroll if the location lands inside KingdomsX claimed land. |
 | `rerollTownyAdvanced` | Towny Advanced | `false` | Reroll if the location lands inside a Towny Advanced claim. |
 | `rerollWorldGuard` | WorldGuard | `false` | Reroll if the location lands inside a WorldGuard region. |
+| `rerollUltimateClaims` | UltimateClaims | `false` | Reroll if the location lands inside an UltimateClaims claim. |
+| `rerollMinePlots` | MinePlots | `false` | Reroll if the location lands inside a MinePlots plot or claim. |
 
 ## Versioning
 

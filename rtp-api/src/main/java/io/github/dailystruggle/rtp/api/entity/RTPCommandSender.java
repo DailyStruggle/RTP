@@ -26,6 +26,17 @@ public interface RTPCommandSender extends Cloneable {
   boolean hasPermission(String permission);
 
   /**
+   * Returns whether this sender holds the RTP super-permission ({@code rtp.*}) and therefore bypasses
+   * per-node and per-parameter permission checks. Centralizes the wildcard-admin test so callers do not
+   * hardcode the literal node.
+   *
+   * @return {@code true} if the sender has {@code rtp.*}
+   */
+  default boolean isRtpAdmin() {
+    return hasPermission("rtp.*");
+  }
+
+  /**
    * Sends a message to this command sender.
    *
    * @param message the message to send; must not be {@code null}
@@ -67,6 +78,33 @@ public interface RTPCommandSender extends Cloneable {
    * @param command the command string to execute; must not be {@code null}
    */
   void performCommand(@Nullable RTPPlayer player, String command);
+
+  /**
+   * Returns whether this sender holds only self-contained pure data and has no live platform handle.
+   *
+   * @return {@code true} if detached from live platform objects, {@code false} otherwise
+   */
+  default boolean isSelfContained() {
+    return false;
+  }
+
+  /**
+   * Converts this sender into a pure-data snapshot detached from live platform handles.
+   *
+   * @return a pure-data snapshot of this sender
+   */
+  default RTPCommandSender toPureData() {
+    return this;
+  }
+
+  /**
+   * Resolves the underlying live platform sender if online or available, or {@code null}.
+   *
+   * @return the platform sender object, or {@code null} if offline or unavailable
+   */
+  default @Nullable Object getLiveSender() {
+    return null;
+  }
 
   /**
    * Creates a clone of this command sender.

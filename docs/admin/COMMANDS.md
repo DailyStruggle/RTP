@@ -319,6 +319,55 @@ Operator-facing self-test commands that exercise the teleport pipeline, queue, s
 
 ---
 
+## `/rtp action` — Declarative Scripted Actions
+
+Executes a declarative scripted action defined in `definitions/actions/<id>.yml`. Actions support multi-entity group placements, custom anchor types (`nearplayer`, `nearclaim`, `location`, `scatter`), arena confinement boundaries, scoreboards, and lifecycle automation.
+
+**Syntax**
+```
+/rtp action <actionId> [player=<target>] [parameters...]
+/rtp action cancel [session_id]
+```
+
+**Required permissions:** `rtp.action` plus the action's specific permission (e.g. `rtp.action.nearplayer`).
+
+| Form | Description |
+|---|---|
+| `/rtp action <actionId>` | Execute the named action for the calling player. |
+| `/rtp action <actionId> player=<target>` | Target or pair with another player (when supported by the action). |
+| `/rtp action cancel` | Cancel the caller's active confined action session, running its `onCancel` script. |
+
+Actions with a configured `command:` block are also automatically registered as top-level standalone commands (e.g. `/challenge`, `/duel`, `/nearplayer`). See the dedicated [Action Engine guide](ACTIONS.md) for full configuration details.
+
+---
+
+## `/rtp editor` — Web Workspace & Configuration Editor
+
+Generates an outbound ephemeral web editor session or offline standalone bundle to inspect diagnostics, adjust region boundary geometry, and configure plugin YAML with live documentation hints on a secondary display without port forwarding.
+
+**Syntax**
+```
+/rtp editor
+/rtp editor local
+/rtp editor apply token=<token>
+/rtp editor trust <code>
+/rtp editor untrust key=<prefix|all>
+```
+
+**Required permission:** `rtp.editor`
+
+| Form | Description |
+|---|---|
+| `/rtp editor` | Gathers active configuration models, schemas, and region geometries, uploads an ephemeral session to the byte store, and emits a clickable browser link. |
+| `/rtp editor local` | Generates a self-contained offline HTML editor bundle at `plugins/RTP/editor/index.html`. |
+| `/rtp editor apply token=<token>` | Fetches and applies staged configuration changes from the byte store session. |
+| `/rtp editor trust <code>` | Grants trust to a new browser session using the 6-character code shown in the web editor. |
+| `/rtp editor untrust key=<prefix\|all>` | Revokes trust for a browser fingerprint prefix, or `all` to revoke all trusted browsers. |
+
+See the [Web Workspace & Visual Editor Guide](WEB_EDITOR_GUIDE.md) for full operational and workflow documentation.
+
+---
+
 ## `/rtp help` — Help
 
 Displays a clickable, permission-filtered list of all available `/rtp` sub-commands. Only sub-commands for which the sender holds the required permission **and** which have a matching `MessagesKeys` entry are shown.
@@ -417,12 +466,15 @@ When PlaceholderAPI is installed, the following `%rtp_<key>%` placeholders are a
 | `rtp.config.set` | op | Use `/rtp config <file> …` to write any config file (umbrella). |
 | `rtp.config.set.<section>` | op | Write only the named section (e.g. `rtp.config.set.regions`, `rtp.config.set.performance`). `set` implies `view` for the same section. |
 | `rtp.update` | op | Write individual config keys or list items (legacy node; subsumed by `rtp.config.set`). |
+| `rtp.editor` | op | Use `/rtp editor` and its subcommands (local, apply, trust, untrust). |
 | `rtp.info` | op | Use `/rtp info` |
 | `rtp.admin` | op | See DRM info in `/rtp info`; elevated admin access |
 | `rtp.support` | op | See DRM info in `/rtp info` |
 | `rtp.scan` | op | Use all `/rtp scan` sub-commands |
 | `rtp.test` | op | Use all `/rtp test` runtime-test sub-commands |
 | `rtp.params` | op | Override `shape`, `vert`, and `worldBorderOverride` parameters |
+| `rtp.action` | op | Base permission to execute `/rtp action` commands |
+| `rtp.action.<id>` | op | Permission to execute a specific action (e.g. `rtp.action.nearplayer`, `rtp.action.challenge`) |
 | `rtp.unqueued` | op | Teleport without consuming a pre-generated cached location |
 | `rtp.personalqueue` | op | Use a personal (per-player) location queue |
 | `rtp.world` | op | Use the `world` parameter |

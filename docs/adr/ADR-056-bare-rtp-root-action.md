@@ -39,5 +39,5 @@ Introduce an optional, single-binding root-action hook on the same replaceable-p
 
 - [ADR-026 - external hook API surface](ADR-026-external-hook-api-surface.md), [EXTERNAL_HOOKS.md](../dev/EXTERNAL_HOOKS.md)
 - `PvPCombatStateRegistry` / `AnvilPrefilterRegistry` (the single-binding precedent), REQ-RTP-S-004, REQ-API-F-006
-- Code: `rtp-api/.../hooks/RootActionRegistry.java`; `rtp-core/.../common/hooks/DefaultRTPHooks.java`; `rtp-core/.../common/commands/RTPCmd.java`
+- Code: `rtp-api/.../hooks/RootActionRegistry.java`; `rtp-core/.../common/hooks/DefaultRTPHooks.java`; `rtp-core/.../common/commands/base/RTPCmd.java`
 - Test: `rtp-core/.../common/commands/ReqApiF006RootActionTest.java`

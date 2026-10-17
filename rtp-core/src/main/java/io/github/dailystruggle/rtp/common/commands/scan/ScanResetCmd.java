@@ -15,6 +15,7 @@ import io.github.dailystruggle.rtp.common.tasks.ScanTask;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 public class ScanResetCmd extends ScanSubCmd {
@@ -39,51 +40,71 @@ public class ScanResetCmd extends ScanSubCmd {
 
     List<Region> regions = getRegions(callerId, parameterValues.get("region"));
     for (Region region : regions) {
+      if (ScanTask.isTeardownPending(region.name)) {
+        if (RTP.configs == null) continue;
+        String msg = String.valueOf(RTP.configs.getConfigValue(CommandMessages.scanRunning, ""));
+        if (msg == null || msg.isEmpty()) continue;
+        msg = msg.replace("[scan_regions]", region.name);
+        msg = msg.replace("[scan_region]", region.name);
+        msg = msg.replace("[region]", region.name);
+        RTP.serverAccessor.announce(msg, "rtp.scan", "SCAN");
+        continue;
+      }
 
       // cancel any running scan task for this region first
       ScanTask scanTask = RTP.getInstance().scanTasks.get(region.name);
       if (scanTask != null) {
-        scanTask.setCancelled(true);
-        scanTask.pause();
-        ScanTask.delete(region.name);
         RTP.getInstance().scanTasks.remove(region.name);
-      }
-
-      Shape<?> shapeObj = region.getShape();
-      if (!(shapeObj instanceof MemoryShape)) {
-        if (RTP.configs == null) continue;
-        String msg = String.valueOf(RTP.configs.getConfigValue(PlayerMessages.badArg, ""));
-        if (msg == null || msg.isEmpty()) continue;
-        msg = msg.replace("[arg]", "region=" + region.name);
-        RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);
+        scanTask.setCancelled(true, err -> {
+          if (err != null) {
+            RTP.log(Level.WARNING, "[ScanResetCmd] cancel teardown failed region=" + region.name, err);
+          }
+          resetRegion(callerId, region);
+        });
         continue;
       }
 
-      MemoryShape<?> shape = (MemoryShape<?>) shapeObj;
-      shape.clear();
-      shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
-      ScanTask.delete(region.name);
-
-      // restore spatialResolution from config so the region is ready for a fresh scan or normal use
-      MultiConfigParser<RegionKeys> multiConfigParser =
-          (MultiConfigParser<RegionKeys>) RTP.configs.getParser(RegionKeys.class);
-      if (multiConfigParser != null) {
-        ConfigParser<RegionKeys> regionConfig = multiConfigParser.getParser(region.name);
-        if (regionConfig != null) {
-          shape.setSpatialResolution(
-              regionConfig.getNumber(RegionKeys.spatialResolution, 1L).longValue());
-        }
-      }
-
-      if (RTP.configs == null) continue;
-      String msg = String.valueOf(RTP.configs.getConfigValue(CommandMessages.scanReset, ""));
-      if (msg == null || msg.isEmpty()) continue;
-      msg = msg.replace("[scan_regions]", region.name);
-      msg = msg.replace("[scan_region]", region.name);
-      msg = msg.replace("[region]", region.name);
-      RTP.serverAccessor.announce(msg, "rtp.scan", "SCAN");
+      resetRegion(callerId, region);
     }
     return true;
+  }
+
+  private void resetRegion(UUID callerId, Region region) {
+    Shape<?> shapeObj = region.getShape();
+    if (!(shapeObj instanceof MemoryShape)) {
+      if (RTP.configs == null) return;
+      String msg = String.valueOf(RTP.configs.getConfigValue(PlayerMessages.badArg, ""));
+      if (msg == null || msg.isEmpty()) return;
+      msg = msg.replace("[arg]", "region=" + region.name);
+      RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);
+      return;
+    }
+
+    MemoryShape<?> shape = (MemoryShape<?>) shapeObj;
+    shape.clear();
+    shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
+    ScanTask.delete(region.name);
+
+    // restore spatialResolution from config so the region is ready for a fresh scan or normal use
+    long spatialRes = region.getSettings().spatialResolution();
+    MultiConfigParser<RegionKeys> multiConfigParser =
+        (MultiConfigParser<RegionKeys>) RTP.configs.getParser(RegionKeys.class);
+    if (multiConfigParser != null) {
+      ConfigParser<RegionKeys> regionConfig = multiConfigParser.getParser(region.name);
+      if (regionConfig != null) {
+        spatialRes = io.github.dailystruggle.rtp.common.selection.region.RegionConfigLoader.resolveSpatialResolution(
+            regionConfig.getData(RegionKeys.spatialResolution), shape);
+      }
+    }
+    shape.setSpatialResolution(spatialRes);
+
+    if (RTP.configs == null) return;
+    String msg = String.valueOf(RTP.configs.getConfigValue(CommandMessages.scanReset, ""));
+    if (msg == null || msg.isEmpty()) return;
+    msg = msg.replace("[scan_regions]", region.name);
+    msg = msg.replace("[scan_region]", region.name);
+    msg = msg.replace("[region]", region.name);
+    RTP.serverAccessor.announce(msg, "rtp.scan", "SCAN");
   }
 
 }

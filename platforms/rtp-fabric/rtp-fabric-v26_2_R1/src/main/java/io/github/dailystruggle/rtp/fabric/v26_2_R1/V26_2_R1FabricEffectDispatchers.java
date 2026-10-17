@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.fabric.v26_2_R1;
 
-import io.github.dailystruggle.effectsapi.fabric.FabricEffectRuntime;
+import io.github.dailystruggle.rtp.fabric.effects.FabricEffectRuntime;
 import io.github.dailystruggle.effectsapi.fabric_unobf.FabricEffectRuntimeUnobf;
 import io.github.dailystruggle.rtp.common.RTP;
 import net.minecraft.core.Holder;

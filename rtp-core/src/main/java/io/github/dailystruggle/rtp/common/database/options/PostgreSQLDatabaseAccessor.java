@@ -1,27 +1,19 @@
 package io.github.dailystruggle.rtp.common.database.options;
 
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.database.pool.MiniConnectionPool;
 import java.sql.*;
 import java.util.*;
 import java.util.logging.Level;
 
 public class PostgreSQLDatabaseAccessor extends AbstractSQLDatabaseAccessor {
-  private final HikariDataSource dataSource;
+  private final MiniConnectionPool pool;
   private final String name;
 
   public PostgreSQLDatabaseAccessor(String host, int port, String database, String username, String password) {
     this.name = "jdbc:postgresql://" + host + ":" + port + "/" + database;
-    HikariConfig config = new HikariConfig();
-    config.setJdbcUrl(name);
-    config.setUsername(username);
-    config.setPassword(password);
-    config.addDataSourceProperty("cachePrepStmts", "true");
-    config.addDataSourceProperty("prepStmtCacheSize", "250");
-    config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
-
-    this.dataSource = new HikariDataSource(config);
+    String url = name + "?cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048";
+    this.pool = new MiniConnectionPool(url, username, password);
 
     try (Connection connection = getConnection();
          Statement statement = connection.createStatement()) {
@@ -62,6 +54,8 @@ public class PostgreSQLDatabaseAccessor extends AbstractSQLDatabaseAccessor {
         statement.execute(schema);
     } catch (SQLException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
+      close();
+      throw new IllegalStateException("Failed to connect to PostgreSQL database: " + e.getMessage(), e);
     }
   }
 
@@ -72,13 +66,13 @@ public class PostgreSQLDatabaseAccessor extends AbstractSQLDatabaseAccessor {
 
   @Override
   public Connection getConnection() throws SQLException {
-    return dataSource.getConnection();
+    return pool.getConnection();
   }
 
   @Override
   public void close() {
-    if (dataSource != null) {
-      dataSource.close();
+    if (pool != null) {
+      pool.close();
     }
   }
 

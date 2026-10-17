@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.predict.BudgetPacer;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import java.io.File;
 import java.util.*;
@@ -35,6 +36,12 @@ public abstract class DatabaseAccessor<D> {
 
   /** Average time taken for a write operation */
   protected long avgTimeWrite = 0;
+
+  /** Pacer for write and delete operations */
+  protected final BudgetPacer writePacer = BudgetPacer.ofTaskPipe(0L);
+
+  /** Pacer for read operations */
+  protected final BudgetPacer readPacer = BudgetPacer.ofTaskPipe(0L);
 
   /** Queue for read operations */
   protected ConcurrentLinkedQueue<
@@ -269,6 +276,10 @@ public abstract class DatabaseAccessor<D> {
       res.put("originalY", originalCoords.y());
       res.put("originalZ", originalCoords.z());
       res.put("originalWorldName", originalCoords.worldName());
+      res.put("originWorldName", (teleportData.originWorldName != null) ? teleportData.originWorldName : originalCoords.worldName());
+      if (teleportData.originServerId != null) {
+        res.put("originServerId", teleportData.originServerId);
+      }
       RTPWorld<?> originalWorld = RTP.serverAccessor.getRTPWorld(originalCoords.worldName());
       if (originalWorld != null) res.put("originalWorldId", originalWorld.id().toString());
 
@@ -759,9 +770,26 @@ public abstract class DatabaseAccessor<D> {
     if (readQueue.isEmpty() && writeQueue.isEmpty() && deleteQueue.isEmpty()) return;
     D database = connect();
     if (database == null) return;
+    // Every exit (stop flag, budget, exception) must release the handle, or pooled
+    // MySQL/PostgreSQL connections are stranded until the pool times out.
+    try {
+      drainQueries(database, availableTime);
+    } finally {
+      disconnect(database);
+    }
+  }
+
+  private void drainQueries(D database, long availableTime) {
     if (stop.get()) return;
     long dt;
     long start = System.nanoTime();
+
+    if (avgTimeWrite != 0L && writePacer.predictedCostNanos() == 0L) {
+      writePacer.recordDuration(avgTimeWrite);
+    }
+    if (avgTimeRead != 0L && readPacer.predictedCostNanos() == 0L) {
+      readPacer.recordDuration(avgTimeRead);
+    }
 
     while (!writeQueue.isEmpty()) {
       if (stop.get()) return;
@@ -776,12 +804,12 @@ public abstract class DatabaseAccessor<D> {
 
       if (localStop < localStart) localStart = -(Long.MAX_VALUE - localStart);
       long diff = localStop - localStart;
-      if (avgTimeWrite == 0) avgTimeWrite = diff;
-      else avgTimeWrite = ((avgTimeWrite * 7) / 8) + (diff / 8);
+      writePacer.recordDuration(diff);
+      avgTimeWrite = writePacer.predictedCostNanos();
 
       if (localStop < start) start = -(Long.MAX_VALUE - start); // overflow correction
       dt = localStop - start;
-      if (dt + avgTimeWrite > availableTime) break;
+      if (!writePacer.canExecute(dt, availableTime, true)) break;
     }
 
     while (!deleteQueue.isEmpty()) {
@@ -796,12 +824,12 @@ public abstract class DatabaseAccessor<D> {
       if (localStop < localStart) localStart = -(Long.MAX_VALUE - localStart);
       long diff = localStop - localStart;
       // We'll use write timing for delete as well
-      if (avgTimeWrite == 0) avgTimeWrite = diff;
-      else avgTimeWrite = ((avgTimeWrite * 7) / 8) + (diff / 8);
+      writePacer.recordDuration(diff);
+      avgTimeWrite = writePacer.predictedCostNanos();
 
       if (localStop < start) start = -(Long.MAX_VALUE - start); // overflow correction
       dt = localStop - start;
-      if (dt + avgTimeWrite > availableTime) break;
+      if (!writePacer.canExecute(dt, availableTime, true)) break;
     }
 
     while (!readQueue.isEmpty()) {
@@ -825,15 +853,13 @@ public abstract class DatabaseAccessor<D> {
 
       if (localStop < localStart) localStart = -(Long.MAX_VALUE - localStart);
       long diff = localStop - localStart;
-      if (avgTimeRead == 0) avgTimeRead = diff;
-      else avgTimeRead = ((avgTimeRead * 7) / 8) + (diff / 8);
+      readPacer.recordDuration(diff);
+      avgTimeRead = readPacer.predictedCostNanos();
 
       if (localStop < start) start = -(Long.MAX_VALUE - start); // overflow correction
       dt = localStop - start;
-      if (dt + avgTimeRead > availableTime) break;
+      if (!readPacer.canExecute(dt, availableTime, true)) break;
     }
-
-    disconnect(database);
   }
 
   /** Start the database accessor */

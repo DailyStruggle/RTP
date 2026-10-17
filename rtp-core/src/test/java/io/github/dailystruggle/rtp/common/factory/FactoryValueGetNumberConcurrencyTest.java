@@ -1,6 +1,8 @@
 package io.github.dailystruggle.rtp.common.factory;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 import java.util.EnumMap;
 import java.util.concurrent.CountDownLatch;
@@ -27,7 +29,8 @@ class FactoryValueGetNumberConcurrencyTest {
     OTHER_NUMERIC,
     OTHER_STRINGY,
     BOOL_TRUE,      // pre-seeded as Boolean true → coerces to 1
-    BOOL_FALSE      // pre-seeded as Boolean false → coerces to 0
+    BOOL_FALSE,     // pre-seeded as Boolean false → coerces to 0
+    AUTO_STR        // pre-seeded as "auto"
   }
 
   /** Concrete subclass exposing only the inherited surface we test. */
@@ -40,7 +43,16 @@ class FactoryValueGetNumberConcurrencyTest {
       data.put(K.OTHER_STRINGY, "1.5");
       data.put(K.BOOL_TRUE, Boolean.TRUE);
       data.put(K.BOOL_FALSE, Boolean.FALSE);
+      data.put(K.AUTO_STR, "auto");
     }
+  }
+
+  @Test
+  void getNumber_onAutoString_resolvesCorrectlyWithoutThrowing() {
+    Probe probe = new Probe();
+    // generic key with 'auto' falls back to def without throwing or logging SEVERE
+    assertEquals(5L, probe.getNumber(K.AUTO_STR, 5L).longValue(),
+        "generic key with 'auto' must resolve to default without throwing");
   }
 
   /**
@@ -129,6 +141,56 @@ class FactoryValueGetNumberConcurrencyTest {
     assertNull(firstFailure.get(),
         "concurrent getNumber/toString/setData must not throw, but observed: "
             + firstFailure.get());
+  }
+
+  /**
+   * Stress-test stall regression: ~1,400 selection workers queued on the FactoryValue monitor
+   * because every knob read took it. Reads must complete while a writer holds the lock.
+   */
+  @Test
+  @Timeout(value = 10, unit = TimeUnit.SECONDS)
+  @DisplayName("REQ-RTP-S-004: getNumber/getData do not block while a writer holds the data lock")
+  void reads_areLockFree_whileWriterHoldsLock() throws Exception {
+    Probe probe = new Probe();
+    java.lang.reflect.Field f = FactoryValue.class.getDeclaredField("dataLock");
+    f.setAccessible(true);
+    Object lock = f.get(probe);
+
+    CountDownLatch held = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    Thread writer = new Thread(() -> {
+      synchronized (lock) {
+        held.countDown();
+        try {
+          release.await();
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+      }
+    }, "factoryvalue-lock-holder");
+    writer.start();
+    assertTrue(held.await(5, TimeUnit.SECONDS), "writer failed to take the lock");
+
+    ExecutorService reader = Executors.newSingleThreadExecutor();
+    try {
+      Number n = reader.submit(() -> probe.getNumber(K.NUMERIC, 0L)).get(2, TimeUnit.SECONDS);
+      assertEquals(42L, n.longValue());
+      assertEquals(42L, reader.submit(() -> probe.getData().get(K.NUMERIC)).get(2, TimeUnit.SECONDS));
+    } finally {
+      release.countDown();
+      writer.join(5_000);
+      reader.shutdownNow();
+    }
+  }
+
+  /** Copy-on-write: a snapshot taken before {@code set} is never mutated by it. */
+  @Test
+  void set_publishesNewMap_withoutMutatingPriorSnapshot() {
+    Probe probe = new Probe();
+    java.util.EnumMap<K, Object> before = probe.data;
+    probe.set(K.NUMERIC, 99L);
+    assertEquals(42L, before.get(K.NUMERIC), "published maps must be immutable");
+    assertEquals(99L, probe.getNumber(K.NUMERIC, 0L).longValue());
   }
 
   /**

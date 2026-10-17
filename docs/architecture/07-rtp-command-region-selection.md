@@ -50,7 +50,7 @@ flowchart TD
     UnqPerm -- No  --> CachePop
     CachePop == Yes ==> StartLOAD([Start LOAD stage<br/>see diagram 01]):::success
     CachePop -- No --> UnqPerm2{has rtp.unqueued?}
-    UnqPerm2 -- Yes --> AdHoc[Spawn async search now<br/>SETUP stage]:::async
+    UnqPerm2 -- Yes --> AdHoc["Spawn on-demand search now<br/>LoadPurpose.IMMEDIATE (ADR-114)"]:::async
     UnqPerm2 -- No  --> EnqueuePublic[Park in public queue<br/>wait for selectionAPI pulse<br/>see diagram 02]:::async
 
 %% 4. Per-region behavior is DATA, not code (see prose below)
@@ -72,9 +72,15 @@ How to read this chart:
 - **Permission nodes involved** (non-exhaustive):
   - `rtp.worlds.<worldName>` — gates access to a world; failure falls through the world `override`.
   - `rtp.regions.<regionName>` — gates access to a region; failure falls through the region `override`.
-  - `rtp.unqueued` — bypasses the public queue and forces an ad-hoc async search. Dangerous on large servers; see [ADR-001](../adr/ADR-001-archimedean-spiral-1d-mapping.md) on why the search is still bounded.
+  - `rtp.unqueued` — bypasses the public queue and forces an ad-hoc on-demand search (`LoadPurpose.IMMEDIATE`). Under ADR-114, immediate searches are governed by `ImmediateLoadGovernor` in-flight native generation semaphores (max 1 per region, max 2 global) and thread-weighted deduplication, protecting the communal tick loop from unqueued bursts while strictly preserving the mathematical 2D spatial distribution (ADR-001, ADR-009).
   - `rtp.effect.<stage>.*` — decorates pipeline stages with sounds/particles/etc. (see [`docs/admin/EVENTS_AND_EFFECTS.md`](../admin/configuration/EVENTS_AND_EFFECTS.md)).
   - `rtp.onevent.<event>` — opts the player into auto-teleport on lifecycle events (join / respawn / …). Requires `onEventParsing: true`.
 - **`RegionSettings`** (`shape`, `vert`, `cacheCap`, `activeChunkCap`, `price`, `spatialResolution`, `worldBorderOverride`) is the *only* source of truth for per-region behavior. To change a region's shape or cache size, edit `region.yml`; never fork code per region.
 - **Busy / invalid messages are configurable** (S-007, REQ-RTP-F-013). All user-visible strings come from `messages.yml`; never hardcode them in a command or adapter.
 - **`tempRegion(...)`** (SelectionAPI) lets an addon or command spawn a one-shot region by overriding specific keys against a named base region (default: `default`). It is the supported extensibility point for custom per-call behavior — prefer it over constructing `Region` directly.
+
+Related documentation:
+- Teleport execution pipeline: [`docs/architecture/01-teleport-execution-pipeline.md`](01-teleport-execution-pipeline.md).
+- Location selection per attempt: [`docs/architecture/08-location-selection-per-attempt.md`](08-location-selection-per-attempt.md).
+- Cost-governed chunk resolution and native admission: [`docs/architecture/15-cost-governed-chunk-reads-and-native-admission.md`](15-cost-governed-chunk-reads-and-native-admission.md).
+- Governing ADRs: [ADR-001](../adr/ADR-001-archimedean-spiral-1d-mapping.md), [ADR-009](../adr/ADR-009-configurable-spatial-distributions.md), [ADR-110](../adr/ADR-110-purpose-gated-live-loads.md), [ADR-114](../adr/ADR-114-cost-governed-on-demand-chunk-reads.md).

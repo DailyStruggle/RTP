@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection;
 
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -45,11 +44,28 @@ public class SelectionAPI {
   /** A lookup map for all permanently configured regions, keyed by name. */
   public final ConcurrentHashMap<String, Region> permRegionLookup = new ConcurrentHashMap<>();
 
-  /** A factory for creating {@link Region} instances. */
-  private final Factory<Region> regionFactory = new Factory<>();
 
   /** A factory for creating {@link Shape} instances. */
   public Factory<Shape<?>> shapeFactory;
+
+  public SelectionAPI() {
+    if (RTP.factoryMap != null) {
+      @SuppressWarnings("unchecked")
+      Factory<Shape<?>> sf = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+      if (sf != null) {
+        this.shapeFactory = sf;
+      }
+    }
+  }
+
+  public Factory<Shape<?>> getShapeFactory() {
+    if (shapeFactory == null && RTP.factoryMap != null) {
+      @SuppressWarnings("unchecked")
+      Factory<Shape<?>> sf = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+      shapeFactory = sf;
+    }
+    return shapeFactory;
+  }
 
   /**
    * Retrieves a region by its name.
@@ -187,15 +203,39 @@ public class SelectionAPI {
     }
   }
 
+  private static volatile java.util.function.LongSupplier defaultBudgetSupplier = () -> 10_000_000L;
+
+  /**
+   * Configures the supplier used by no-arg {@link #compute()} to determine available nanoseconds.
+   *
+   * @param supplier budget supplier in nanoseconds
+   */
+  public static void setDefaultBudgetSupplier(java.util.function.LongSupplier supplier) {
+    if (supplier != null) {
+      defaultBudgetSupplier = supplier;
+    }
+  }
+
   /**
    * Processes tasks from the selection pipelines, prioritizing urgent tasks.
    * This method is called on each server tick to drive the asynchronous location
    * generation process.
    */
   public void compute() {
-    RTPServerAccessor serverAccessor = RTP.serverAccessor;
+    compute(defaultBudgetSupplier.getAsLong());
+  }
 
-    int req = RTP.minRTPExecutions;
+  /**
+   * Drains the urgent queue, then the standard queue, until {@code availableNanos} is spent.
+   * {@link RTP#minRTPExecutions} tasks always run so selection progresses under load.
+   *
+   * @param availableNanos budget for this drain in nanoseconds
+   */
+  public void compute(long availableNanos) {
+    if (selectionPipelineUrgent.isEmpty() && selectionPipeline.isEmpty()) return;
+    long deadline = System.nanoTime() + Math.max(0L, availableNanos);
+    int urgentReq = RTP.minRTPExecutions;
+    int standardReq = RTP.minRTPExecutions;
 
     // Diagram 02: drain the urgent (private/biome) queue first, then the
     // standard pipeline. FINER traces every individual task; FINE summarises
@@ -203,24 +243,24 @@ public class SelectionAPI {
     int urgentRan = 0;
     int standardRan = 0;
 
-    while (serverAccessor.overTime() < 0 || req > 0) {
+    while (urgentReq > 0 || System.nanoTime() < deadline) {
       Runnable task = selectionPipelineUrgent.poll();
       if (task == null) break;
       RTP.log(java.util.logging.Level.FINER,
           "[SelectionAPI] running urgent pipeline task " + task.getClass().getSimpleName());
-      task.run();
+      runSelectionTask(task);
       urgentRan++;
-      req--;
+      urgentReq--;
     }
 
-    while (serverAccessor.overTime() < 0 || req > 0) {
+    while (standardReq > 0 || System.nanoTime() < deadline) {
       Runnable task = selectionPipeline.poll();
       if (task == null) break;
       RTP.log(java.util.logging.Level.FINER,
           "[SelectionAPI] running standard pipeline task " + task.getClass().getSimpleName());
-      task.run();
+      runSelectionTask(task);
       standardRan++;
-      req--;
+      standardReq--;
     }
 
     if (urgentRan > 0 || standardRan > 0) {
@@ -229,6 +269,15 @@ public class SelectionAPI {
               + " standard=" + standardRan
               + " urgentRemaining=" + selectionPipelineUrgent.size()
               + " standardRemaining=" + selectionPipeline.size());
+    }
+  }
+
+  private static void runSelectionTask(Runnable task) {
+    try {
+      task.run();
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.WARNING,
+          "[SelectionAPI] selection task " + task.getClass().getSimpleName() + " failed", t);
     }
   }
 
@@ -376,13 +425,18 @@ public class SelectionAPI {
    */
   @SuppressWarnings("unchecked") // multiConfigParserMap keyed by WorldKeys/RegionKeys class guarantees the parser's E
   public Region getRegion(RTPPlayer player) {
+    if (player == null) return getRegionOrDefault("default");
     Set<String> worldsAttempted = new HashSet<>();
-    String worldName = player.getLocation().world().name();
+    io.github.dailystruggle.rtp.api.world.RTPLocation loc = player.getLocation();
+    if (loc == null || loc.world() == null) return getRegionOrDefault("default");
+    String worldName = loc.world().name();
     RTP.log(Level.FINE, "[SELECT_TRACE] SelectionAPI.getRegion ENTER playerId=" + player.uuid()
         + " startingWorld=" + worldName);
     MultiConfigParser<WorldKeys> worldParsers =
         (MultiConfigParser<WorldKeys>) RTP.configs.multiConfigParserMap.get(WorldKeys.class);
+    if (worldParsers == null) return getRegionOrDefault("default");
     ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
+    if (worldParser == null) return getRegionOrDefault("default");
     boolean requirePermission =
         Boolean.parseBoolean(
             worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
@@ -398,6 +452,7 @@ public class SelectionAPI {
           + " from=" + previousWorld + " to=" + worldName
           + " attemptedSoFar=" + worldsAttempted);
       worldParser = worldParsers.getParser(worldName);
+      if (worldParser == null) return getRegionOrDefault("default");
       requirePermission =
           Boolean.parseBoolean(
               worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
@@ -408,7 +463,9 @@ public class SelectionAPI {
         + " resolvedWorld=" + worldName + " initialRegion=" + regionName);
     MultiConfigParser<RegionKeys> regionParsers =
         (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
+    if (regionParsers == null) return getRegionOrDefault("default");
     ConfigParser<RegionKeys> regionParser = regionParsers.getParser(regionName);
+    if (regionParser == null) return getRegionOrDefault("default");
     requirePermission =
         Boolean.parseBoolean(
             regionParser.getConfigValue(RegionKeys.requirePermission, false).toString());
@@ -426,6 +483,7 @@ public class SelectionAPI {
           + " from=" + previousRegion + " to=" + regionName
           + " attemptedSoFar=" + regionsAttempted);
       regionParser = regionParsers.getParser(regionName);
+      if (regionParser == null) return getRegionOrDefault("default");
       requirePermission =
           Boolean.parseBoolean(
               regionParser.getConfigValue(RegionKeys.requirePermission, false).toString());
@@ -443,10 +501,13 @@ public class SelectionAPI {
    */
   @SuppressWarnings("unchecked") // multiConfigParserMap keyed by WorldKeys.class guarantees the parser's E
   public Region getRegion(RTPWorld world) {
+    if (world == null) return getRegionOrDefault("default");
     String worldName = world.name();
     MultiConfigParser<WorldKeys> worldParsers =
         (MultiConfigParser<WorldKeys>) RTP.configs.multiConfigParserMap.get(WorldKeys.class);
+    if (worldParsers == null) return getRegionOrDefault("default");
     ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
+    if (worldParser == null) return getRegionOrDefault("default");
     String regionName = String.valueOf(worldParser.getConfigValue(WorldKeys.region, "default"));
     return permRegionLookup.get(regionName);
   }

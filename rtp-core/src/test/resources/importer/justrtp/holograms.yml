@@ -1,0 +1,63 @@
+# ----------------------------------------------------------------
+# JustRTP Hologram Configuration
+# ----------------------------------------------------------------
+# CONFIG VERSION - DO NOT CHANGE THIS
+config-version: 9
+# ----------------------------------------------------------------
+#
+# Customize the holograms that appear above RTP zones here.
+# These settings can be overridden for individual zones in rtp_zones.yml.
+#
+# ----------------------------------------------------------------
+
+# Preferred Hologram Engine
+# Options: auto, fancyholograms, axohologram, packetevents, entity
+#
+# - auto: Automatically detects and uses the best available engine
+#         Priority: FancyHolograms > AxoHologram > PacketEvents > Display Entities
+#
+# - fancyholograms: Force use of FancyHolograms (requires FancyHolograms plugin)
+#                   Best visuals, Paper/Folia 1.21+ only
+#
+# - axohologram: Force use of AxoHologram (requires AxoHologram plugin)
+#                Display-entity based, MiniMessage + PlaceholderAPI support
+#
+# - packetevents: Force use of PacketEvents (requires PacketEvents plugin)
+#                 High performance, packet-based holograms
+#
+# - entity: Force use of vanilla Display Entities
+#           No dependencies, works on any Paper/Folia server
+#
+preferred-engine: auto
+
+hologram-settings:
+  # The vertical distance (in blocks) between each line of the hologram.
+  line-spacing: 0.35
+  # The default vertical offset (in blocks) from the zone's center point.
+  # This can be overridden per-zone with /rtpzone sethologram <id> [offset]
+  y-offset: 2.5
+  # The scale of the hologram text. 1.0 is default size.
+  scale: 1.0
+
+  # The lines of text to display in the hologram.
+  # Use an empty string "" for a blank line.
+  # <time> or <countdown> = countdown number (10, 9, 8... 3, 2, 1) or when in progress
+  # <zone> or <zone_id> = the zone ID/name
+  #
+  # MiniMessage Examples:
+  # - Gradients: <gradient:#FF0000:#00FF00>Text</gradient>
+  # - Rainbow: <rainbow>Rainbow Text</rainbow>
+  # - Bold/Italic: <bold>Bold</bold> <italic>Italic</italic>
+  # - Colors: <red>Red</red> <#FF5733>Custom Hex</#FF5733>
+  lines:
+    - "<gradient:#20B2AA:#7FFFD4><bold>⚡ RTP Zone</bold></gradient>"
+    - ""
+    - "<gradient:#FFD700:#FFA500><bold>⏱ <time></bold></gradient>"
+    - ""
+
+  # Particle effect that swirls around the hologram location.
+  particles:
+    enabled: true
+    particle: "ENCHANT"
+    count: 2
+    radius: 0.8

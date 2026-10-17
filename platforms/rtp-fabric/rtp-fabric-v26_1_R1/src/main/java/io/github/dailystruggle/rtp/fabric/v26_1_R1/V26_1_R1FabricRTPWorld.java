@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.world.BiomeOverride;
 import io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -22,7 +23,12 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.storage.LevelResource;
 
+import java.lang.ref.Reference;
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -49,8 +55,43 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
     private final String name;
     private final UUID id;
 
-    /** Cache of recently-loaded chunks keyed by {@code (cz << 32) | cx}. */
-    private final ConcurrentHashMap<Long, V26_1_R1FabricRTPChunk> chunkCache = new ConcurrentHashMap<>();
+    /**
+     * Weak live-chunk cache keyed by {@code (cz << 32) | cx}; vanilla's chunk holder keeps the
+     * referent alive while loaded, so this tier never retains a chunk the server has unloaded.
+     * Cleared referents are expunged via {@link #clearedChunks}. Parity with {@code FabricRTPWorldUnobf}.
+     */
+    private final ConcurrentHashMap<Long, KeyedChunkRef> chunkCache = new ConcurrentHashMap<>();
+    private final ReferenceQueue<ChunkAccess> clearedChunks = new ReferenceQueue<>();
+
+    private static final int RECENT_LOADED_CAP = 1024;
+
+    /**
+     * Bounded strong pin of recent live loads: keeps a fresh chunk resolvable through
+     * {@link #getCachedChunk(long)} after the temp load-ticket lapses (promotion verify window).
+     * Access-order LRU; the eldest pin drops past {@link #RECENT_LOADED_CAP}.
+     */
+    private final Map<Long, V26_1_R1FabricRTPChunk> recentlyLoadedChunks = Collections.synchronizedMap(
+            new LinkedHashMap<Long, V26_1_R1FabricRTPChunk>(64, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<Long, V26_1_R1FabricRTPChunk> eldest) {
+                    return size() > RECENT_LOADED_CAP;
+                }
+            });
+
+    private static final class KeyedChunkRef extends WeakReference<ChunkAccess> {
+        final long key;
+
+        KeyedChunkRef(long key, ChunkAccess chunk, ReferenceQueue<ChunkAccess> queue) {
+            super(chunk, queue);
+            this.key = key;
+        }
+    }
+
+    private void expungeClearedChunks() {
+        for (Reference<? extends ChunkAccess> r; (r = clearedChunks.poll()) != null; ) {
+            chunkCache.remove(((KeyedChunkRef) r).key, r);
+        }
+    }
 
     public V26_1_R1FabricRTPWorld(ServerLevel level) {
         super(level);
@@ -157,9 +198,11 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
         if (server == null) return CompletableFuture.completedFuture(null);
         long k = key(cx, cz);
         // Cache hit short-circuits - keeps getOrLoadChunk's cached path cheap.
-        if (chunkCache.containsKey(k)) {
+        if (getCachedChunk(k) != null) {
             return CompletableFuture.completedFuture(k);
         }
+        // Live-load entry: counted once here (getChunkAtAsync and getOrLoadChunk route through it).
+        totalChunkLoads.incrementAndGet();
         final ChunkPos ticketPos = new ChunkPos(cx, cz);
         // (1) Apply the transient generation load-ticket ON the tick thread, then
         //     (2) invoke requestChunkFuture (the public getChunkFuture) OFF the
@@ -177,7 +220,9 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
                 }, RTP_CONTINUATION_EXECUTOR)
                 .thenApply(ca -> {
                     if (ca == null) return null;
-                    chunkCache.put(k, new V26_1_R1FabricRTPChunk(ca, level, id));
+                    expungeClearedChunks();
+                    chunkCache.put(k, new KeyedChunkRef(k, ca, clearedChunks));
+                    recentlyLoadedChunks.put(k, new V26_1_R1FabricRTPChunk(ca, level, id));
                     return k;
                 })
                 .exceptionally(t -> {
@@ -363,7 +408,7 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
     public boolean isChunkLoaded(int cx, int cz) {
         try {
             ServerChunkCache cache = world.getChunkSource();
-            return cache != null && cache.hasChunk(cx, cz);
+            return cache.hasChunk(cx, cz);
         } catch (Throwable ignored) {
             return false;
         }
@@ -423,7 +468,16 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public RTPChunk<?> getCachedChunk(long key) {
-        return chunkCache.get(key);
+        V26_1_R1FabricRTPChunk pinned = recentlyLoadedChunks.get(key);
+        if (pinned != null) return pinned;
+        KeyedChunkRef ref = chunkCache.get(key);
+        if (ref == null) return null;
+        ChunkAccess chunk = ref.get();
+        if (chunk == null) {
+            chunkCache.remove(key, ref);
+            return null;
+        }
+        return new V26_1_R1FabricRTPChunk(chunk, world, id);
     }
 
     @Override
@@ -436,12 +490,24 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
         setForceLoaded(cx, cz, false);
         // Drop our cached wrapper so a subsequent load re-enters the server submit
         // path and observes any state changes that happened while unkept.
-        chunkCache.remove(key(cx, cz));
+        long k = key(cx, cz);
+        chunkCache.remove(k);
+        recentlyLoadedChunks.remove(k);
     }
 
     @Override
     public void forgetChunks() {
+        // S-002: drain every held keep-ticket before dropping the cache. setForceLoaded(false)
+        // decrements synchronously and hops the native release to the server thread.
+        chunkTickets.forEach((k, count) -> {
+            int cx = (int) (k & 0xffffffffL);
+            int cz = (int) (k >> 32);
+            while (count.get() > 0) {
+                setForceLoaded(cx, cz, false);
+            }
+        });
         chunkCache.clear();
+        recentlyLoadedChunks.clear();
     }
 
     // ---------------------------------------------------------------------------
@@ -480,19 +546,11 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
         final int finalMinY = minY;
         final int finalMaxY = maxY;
 
-        return CompletableFuture.supplyAsync(() -> {
+        // Coalesced on AnvilIoPool: pending probes for one r.X.Z.mca share one open (S-005).
+        return io.github.dailystruggle.rtp.anvil.AnvilPrefilter.probeColumnAsync(
+                worldFolder, dim, cx, cz, finalMinY, finalMaxY).handle((probe, err) -> {
             try {
-                java.nio.file.Path regionFile =
-                        io.github.dailystruggle.rtp.anvil.AnvilPrefilter
-                                .regionFileFor(worldFolder, dim, cx, cz);
-                byte[] regionBytes =
-                        io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
-                if (regionBytes == null) return null;
-                int rx = Math.floorMod(cx, 32);
-                int rz = Math.floorMod(cz, 32);
-                io.github.dailystruggle.rtp.anvil.ColumnProbe probe =
-                        io.github.dailystruggle.rtp.anvil.AnvilReader.readColumnProbe(
-                                regionBytes, rx, rz, finalMinY, finalMaxY);
+                if (err != null) throw err;
                 if (probe == null) return null;
                 return ChunkColumnProbe.of(new AnvilColumnProbeAdapter(probe, cx, cz,
                         s -> (RTP.serverAccessor != null)
@@ -505,7 +563,7 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
                                 + t.getClass().getSimpleName() + ": " + t.getMessage());
                 return null;
             }
-        }, io.github.dailystruggle.rtp.anvil.AnvilIoPool.get());
+        });
     }
 
     /**
@@ -535,37 +593,102 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
                     io.github.dailystruggle.rtp.anvil.AnvilPrefilter
                             .regionFileFor(worldFolder, dim, rcx << 5, rcz << 5);
             if (regionFile == null) return java.util.Collections.emptyMap();
-            byte[] regionBytes =
-                    io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
-            if (regionBytes == null) return java.util.Collections.emptyMap();
-            java.util.HashMap<Long, String> out = new java.util.HashMap<>(1024);
-            for (int rx = 0; rx < 32; rx++) {
-                for (int rz = 0; rz < 32; rz++) {
-                    try {
-                        io.github.dailystruggle.rtp.anvil.AnvilChunkView view =
-                                io.github.dailystruggle.rtp.anvil.AnvilReader.readChunkView(
-                                        regionBytes, rx, rz);
-                        if (view == null) continue;
-                        String raw = view.getBiomeAt(8, y, 8);
-                        if (raw == null) continue;
-                        String canonical = canonicaliseBiome(raw);
-                        if (canonical == null || canonical.isEmpty()) continue;
-                        int cx = (rcx << 5) | rx;
-                        int cz = (rcz << 5) | rz;
-                        long key = ((long) cx << 32) | (cz & 0xFFFF_FFFFL);
-                        out.put(key, canonical);
-                    } catch (Throwable ignored) {
-                        // chunk not present / unreadable; skip silently.
-                    }
-                }
-            }
-            return out;
+            // One whole-file read under a pooled-buffer lease.
+            return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.readAllBiomes(
+                    regionFile, rcx, rcz, y, V26_1_R1FabricRTPWorld::canonicaliseBiome);
         } catch (Throwable t) {
             RTP.log(Level.FINE,
                     "[RTP][v26_1_R1] readBiomesInRegionFile failed for world=" + name
                             + " region=(" + rcx + "," + rcz + "): "
                             + t.getClass().getSimpleName() + ": " + t.getMessage());
             return java.util.Collections.emptyMap();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Reads only the region header plus each requested chunk's sectors via {@link
+     * io.github.dailystruggle.rtp.anvil.AnvilRegionSampler} (ADR-104 section 4.6). S-005:
+     * blocking, off-tick only.
+     */
+    @Override
+    public java.util.Map<Long, String> sampleBiomesInRegionFile(
+            int rcx, int rcz, int y, int[] localIndices) {
+        ServerLevel level = world;
+        if (level == null || level.getServer() == null) return java.util.Collections.emptyMap();
+        try {
+            java.nio.file.Path worldFolder = level.getServer().getWorldPath(LevelResource.ROOT);
+            java.nio.file.Path regionFile =
+                    io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(
+                            worldFolder, dimensionRegionSubpath(worldFolder, level), rcx << 5, rcz << 5);
+            if (regionFile == null) return java.util.Collections.emptyMap();
+            return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.sampleBiomesOrThrow(
+                    regionFile, rcx, rcz, y, localIndices, V26_1_R1FabricRTPWorld::canonicaliseBiome);
+        } catch (Throwable t) {
+            RTP.log(Level.FINE,
+                    "[RTP][v26_1_R1] sampleBiomesInRegionFile failed for world=" + name
+                            + " region=(" + rcx + "," + rcz + "): "
+                            + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return java.util.Collections.emptyMap();
+        }
+    }
+
+    @Override
+    public java.nio.file.Path anvilWorldFolder() {
+        ServerLevel level = world;
+        if (level == null || level.getServer() == null) return null;
+        try {
+            return level.getServer().getWorldPath(LevelResource.ROOT);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    @Override
+    public String anvilDimensionSubpath() {
+        ServerLevel level = world;
+        java.nio.file.Path worldFolder = anvilWorldFolder();
+        if (level == null || worldFolder == null) return "";
+        try {
+            return dimensionRegionSubpath(worldFolder, level);
+        } catch (Throwable t) {
+            return "";
+        }
+    }
+
+    /** {@inheritDoc} S-005: blocking stat, off-tick only. */
+    @Override
+    public long regionFileModifiedMillis(int rcx, int rcz) {
+        ServerLevel level = world;
+        if (level == null || level.getServer() == null) return -1L;
+        try {
+            java.nio.file.Path worldFolder = level.getServer().getWorldPath(LevelResource.ROOT);
+            return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.lastModifiedMillis(
+                    io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(
+                            worldFolder, dimensionRegionSubpath(worldFolder, level), rcx << 5, rcz << 5));
+        } catch (Throwable t) {
+            RTP.log(Level.FINE,
+                    "[RTP][v26_1_R1] regionFileModifiedMillis failed for world=" + name
+                            + " region=(" + rcx + "," + rcz + "): " + t.getMessage());
+            return -1L;
+        }
+    }
+
+    /** {@inheritDoc} Lists this dimension's region directory; S-005: off-tick only. */
+    @Override
+    public java.util.List<int[]> listRegionFiles() {
+        ServerLevel level = world;
+        if (level == null || level.getServer() == null) return null;
+        try {
+            java.nio.file.Path worldFolder = level.getServer().getWorldPath(LevelResource.ROOT);
+            return io.github.dailystruggle.rtp.anvil.RegionFileResolver.listAnvilRegionCoords(
+                    io.github.dailystruggle.rtp.anvil.RegionFileResolver.regionDirectoryFor(
+                            worldFolder, dimensionRegionSubpath(worldFolder, level)));
+        } catch (Throwable t) {
+            RTP.log(Level.WARNING,
+                    "[RTP][v26_1_R1] listRegionFiles failed for world=" + name + ": " + t.getMessage(), t);
+            return null;
         }
     }
 
@@ -712,6 +835,11 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public String getBiome(int x, int y, int z) {
+        var override = BiomeOverride.get();
+        if (override != null) {
+            String fromAddon = override.apply(new RTPLocation(this, x, y, z));
+            if (fromAddon != null) return fromAddon;
+        }
         ServerLevel level = world;
         if (level == null) return "";
         try {
@@ -730,10 +858,10 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
                     .orElseGet(() -> {
                         // Fallback: registry reverse lookup via BuiltInRegistries.
                         try {
-                            Identifier id = level.registryAccess()
+                            Identifier biomeId = level.registryAccess()
                                     .lookupOrThrow(net.minecraft.core.registries.Registries.BIOME)
                                     .getKey(holder.value());
-                            return (id == null) ? "" : id.toString();
+                            return (biomeId == null) ? "" : biomeId.toString();
                         } catch (Throwable t) {
                             return "";
                         }
@@ -830,8 +958,8 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
     @Override
     public int getMaxHeight() {
         try {
-            // LevelHeightAccessor#getMaxY() on MC 26.1.2 - inclusive max build Y.
-            return world.getMaxY();
+            // getMaxY() is the inclusive top block; RTPWorld#getMaxHeight is exclusive.
+            return world.getMaxY() + 1;
         } catch (Throwable t) {
             return 320;
         }
@@ -848,6 +976,7 @@ public final class V26_1_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public int getCacheSize() {
+        expungeClearedChunks();
         return chunkCache.size();
     }
 

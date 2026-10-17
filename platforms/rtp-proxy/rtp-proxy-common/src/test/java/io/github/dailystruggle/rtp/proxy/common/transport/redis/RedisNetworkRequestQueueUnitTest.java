@@ -8,9 +8,10 @@ import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue.QueueSta
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -33,14 +34,14 @@ import static org.mockito.Mockito.when;
 
 class RedisNetworkRequestQueueUnitTest {
 
-    private JedisPool pool;
-    private Jedis jedis;
+    private RespPool pool;
+    private RespConnection jedis;
     private RedisNetworkRequestQueue queue;
 
     @BeforeEach
-    void setUp() {
-        pool = mock(JedisPool.class);
-        jedis = mock(Jedis.class);
+    void setUp() throws Exception {
+        pool = mock(RespPool.class);
+        jedis = mock(RespConnection.class);
         when(pool.getResource()).thenReturn(jedis);
         when(jedis.scriptLoad(anyString())).thenAnswer(inv -> {
             String script = inv.getArgument(0);
@@ -133,6 +134,60 @@ class RedisNetworkRequestQueueUnitTest {
     }
 
     @Test
+    void dequeueReady_withProxyId_returnsEnvelope() throws Exception {
+        UUID cid = UUID.randomUUID();
+        UUID pid = UUID.randomUUID();
+        List<Object> scriptRes = Arrays.asList(
+                "playerId", pid.toString(),
+                "correlationId", cid.toString(),
+                "regionKey", "",
+                "serverHint", "",
+                "createdAtMs", "12345678",
+                "dequeuedAtMs", "12345678"
+        );
+        when(jedis.evalsha(anyString(), any(List.class), any(List.class))).thenReturn(scriptRes);
+
+        Optional<QueueEnvelope> dequeued = queue.dequeueReady(java.time.Duration.ofMillis(100), "proxy-1").get();
+        assertTrue(dequeued.isPresent());
+        assertEquals(cid, dequeued.get().correlationId());
+        assertEquals(pid, dequeued.get().playerId());
+        assertTrue(dequeued.get().regionKey().isEmpty());
+        assertTrue(dequeued.get().serverHint().isEmpty());
+
+        // empty proxyId fails
+        assertThrows(ExecutionException.class, () -> queue.dequeueReady(Duration.ofMillis(10), "").get());
+    }
+
+    @Test
+    void dequeueReady_timeout_returnsEmpty() throws Exception {
+        when(jedis.evalsha(anyString(), any(List.class), any(List.class))).thenReturn(Collections.emptyList());
+
+        Optional<QueueEnvelope> dequeued = queue.dequeueReady(java.time.Duration.ZERO).get();
+        assertTrue(dequeued.isEmpty());
+
+        Optional<QueueEnvelope> dequeuedOwned = queue.dequeueReady(java.time.Duration.ZERO, "proxy-1").get();
+        assertTrue(dequeuedOwned.isEmpty());
+    }
+
+    @Test
+    void requeue_reportsScriptVerdict_withCidAndPlayer() throws Exception {
+        UUID cid = UUID.randomUUID();
+        UUID pid = UUID.randomUUID();
+        QueueEnvelope env = new QueueEnvelope(pid, cid, Optional.empty(), Optional.empty(), 1L, 2L);
+        assertTrue(queue.supportsRequeue());
+
+        when(jedis.evalsha(anyString(), any(List.class), any(List.class))).thenReturn(1L);
+        assertTrue(queue.requeue(env).get());
+        verify(jedis).evalsha(anyString(), eq(List.of("rtp:net:wq:ready")),
+                org.mockito.ArgumentMatchers.argThat((List<String> a) ->
+                        a.get(0).equals(cid.toString()) && a.get(1).equals(pid.toString())));
+
+        // 0 = entry cancelled / replaced since the pop: nothing handed back.
+        when(jedis.evalsha(anyString(), any(List.class), any(List.class))).thenReturn(0L);
+        assertFalse(queue.requeue(env).get());
+    }
+
+    @Test
     void transition_dispatchesScript() throws Exception {
         UUID pid = UUID.randomUUID();
         queue.transition(pid, QueueState.ROUTING, Optional.empty()).get();
@@ -150,6 +205,7 @@ class RedisNetworkRequestQueueUnitTest {
     @Test
     void closedQueue_rejectsOperations() {
         queue.close();
+        queue.close(); // idempotent close
         UUID cid = UUID.randomUUID();
         UUID pid = UUID.randomUUID();
         EnrolmentEnvelope env = new EnrolmentEnvelope(pid, cid, Optional.empty(), Optional.empty(), System.currentTimeMillis());
@@ -160,5 +216,41 @@ class RedisNetworkRequestQueueUnitTest {
         assertThrows(ExecutionException.class, () -> queue.dequeueReady(java.time.Duration.ZERO).get());
         assertThrows(ExecutionException.class, () -> queue.transition(pid, QueueState.FAILED, Optional.of("err")).get());
         assertThrows(ExecutionException.class, () -> queue.cancel(pid, io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue.CancelReason.EXPLICIT_REQUEST).get());
+    }
+
+    @Test
+    void enrol_and_flushPending_outcomes() throws Exception {
+        UUID cid = UUID.randomUUID();
+        UUID pid = UUID.randomUUID();
+        EnrolmentEnvelope env = new EnrolmentEnvelope(pid, cid, Optional.empty(), Optional.empty(), System.currentTimeMillis());
+
+        when(jedis.evalsha(anyString(), any(List.class), any(List.class))).thenReturn(1L);
+        assertEquals(EnrolOutcome.ACCEPTED, queue.enrol(env).get());
+
+        // flushPending multiple
+        assertEquals(EnrolOutcome.ACCEPTED, queue.flushPending(List.of(env)).get());
+
+        // Exception during flushPending
+        when(jedis.evalsha(anyString(), any(List.class), any(List.class))).thenThrow(new RuntimeException("redis-err"));
+        assertThrows(ExecutionException.class, () -> queue.enrol(env).get());
+    }
+
+    @Test
+    void pollStatus_coercionAndOddListReturns() throws Exception {
+        UUID pid = UUID.randomUUID();
+        // Object not list or malformed
+        when(jedis.evalsha(anyString(), any(List.class), any(List.class))).thenReturn(List.of("not-a-list"));
+        List<QueueStatus> res = queue.pollStatus(List.of(pid)).get();
+        assertTrue(res.isEmpty());
+
+        // Valid row with byte[]
+        byte[] pidBytes = pid.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] stateKey = "state".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] stateVal = "ROUTING".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        List<Object> row = List.of(pidBytes, stateKey, stateVal);
+        when(jedis.evalsha(anyString(), any(List.class), any(List.class))).thenReturn(List.of(row));
+        res = queue.pollStatus(List.of(pid)).get();
+        assertEquals(1, res.size());
+        assertEquals(QueueState.ROUTING, res.get(0).state());
     }
 }

@@ -580,20 +580,90 @@ public class JumpAdjustorTest {
 
     @Test
     void boundary_binaryNarrowing_earlyExit_when_i_exceeds_maxYMinusItLen() {
-        // In loop:
-        // for (int it_len = step; it_len > 2; it_len = it_len / 2) {
-        //   for (int i = minY; i < maxY; i += it_len) {
-        //     ...
-        //     if (i > maxY - it_len) return false;
-        //     oldY = i;
-        //   }
-        // }
-        // If a column has no valid air gap satisfying the condition during the step loop,
-        // it hits `if (i > maxY - it_len) return false;` and fails immediately.
+        // A coarse-scan miss rejects the column; with every column solid, the chunk is rejected.
         ConfigurableMockChunk solidChunk = new ConfigurableMockChunk(0, 0, world);
         // Make the whole chunk completely solid (no air anywhere)
         for (int y = 0; y < 200; y++) solidChunk.setSolid(y);
         JumpAdjustor adj = buildAdjustor(0, 160, 16);
         assertNull(adj.adjust(solidChunk), "Completely solid chunk should return null when step narrowing exceeds range");
+    }
+
+    /**
+     * A coarse-scan miss in the first test column (7,7) must not abort the remaining columns;
+     * column (2,2) has ground at Y=32..64 and shall yield Y=65.
+     */
+    @Test
+    void coarseMissInFirstColumn_fallsThroughToNextColumn() {
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world) {
+            @Override
+            public boolean isAir(int x, int y, int z) {
+                if (x == 7 && z == 7) return y > 200 || y < 0;
+                return y > 64 || y < 32;
+            }
+
+            @Override
+            public boolean isSafe(int x, int y, int z, java.util.Set<String> unsafeBlocks) {
+                return true;
+            }
+        };
+
+        JumpAdjustor adj = buildAdjustor(32, 127, 8);
+        RTPCoords result = adj.adjust(chunk);
+
+        assertNotNull(result, "Gapless first column must not reject the whole chunk");
+        assertEquals(65, result.y());
+        assertEquals(2, result.x());
+        assertEquals(2, result.z());
+    }
+
+    @Test
+    void testMiscJumpAdjustorMethods() {
+        JumpAdjustor adj = buildAdjustor(60, 80, 1);
+        assertEquals(60, adj.minY());
+        assertEquals(80, adj.maxY());
+        assertFalse(adj.requiresSkyLight());
+        assertTrue(adj.keys().contains("minY"));
+        assertNotNull(adj.getParameters());
+
+        adj.set(JumpAdjustorKeys.requireSkyLight, "true");
+        assertTrue(adj.requiresSkyLight());
+
+        // null chunk guards
+        assertThrows(NullPointerException.class, () -> adj.adjust(null));
+        assertThrows(NullPointerException.class, () -> adj.adjustColumn(null, 0, 0));
+
+        // invalid ranges minY > maxY
+        adj.set(JumpAdjustorKeys.minY, 200L);
+        adj.set(JumpAdjustorKeys.maxY, 100L);
+        ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
+        assertNull(adj.adjust(chunk));
+        assertNull(adj.adjustColumn(chunk, 0, 0));
+
+        // verifiers testPlacement
+        JumpAdjustor adjWithVerifier = new JumpAdjustor(java.util.List.of(coords -> coords.y() > 70));
+        assertTrue(adjWithVerifier.testPlacement(new RTPCoords(null, 0, 75, 0)));
+        assertFalse(adjWithVerifier.testPlacement(new RTPCoords(null, 0, 65, 0)));
+    }
+
+    @Test
+    void testProbeWindowRejectionAndSkyLightProbe() {
+        JumpAdjustor adj = buildAdjustor(60, 100, 1);
+        adj.set(JumpAdjustorKeys.requireSkyLight, true);
+
+        // Probe window too small (< maxY or > minY - 1)
+        io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.FakeChunkColumnProbe probeSmall =
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.FakeChunkColumnProbe(0, 0, 65, 90);
+        assertEquals(io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor.AdjustResult.WINDOW_REJECT,
+                adj.adjustFromProbeWithReason(probeSmall, "test_world"));
+
+        // Probe with valid window and skylight requirement
+        io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.FakeChunkColumnProbe probe =
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.FakeChunkColumnProbe(0, 0, 50, 120);
+        probe.setSolidRange(50, 70);
+        probe.setAirRange(71, 120);
+        io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor.AdjustResult res =
+                adj.adjustFromProbeWithReason(probe, "test_world");
+        assertNotNull(res.picked());
+        assertEquals(71, res.picked().y());
     }
 }

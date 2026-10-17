@@ -93,7 +93,9 @@ public class CommandEffect extends Effect<CommandEffect.CommandKeys> {
     @Override
     public void setData(EnumMap<CommandKeys, Object> data) {
         if (data == null) return;
-        this.data.putAll(data);
+        EnumMap<CommandKeys, Object> copy = (this.defaults != null) ? this.defaults.clone() : new EnumMap<>(CommandKeys.class);
+        copy.putAll(data);
+        this.data = copy;
     }
 
     @Override

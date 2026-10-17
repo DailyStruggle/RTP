@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.tasks.teleport;
 
+import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.platform.PlatformCreator;
 import io.github.dailystruggle.rtp.api.schematic.*;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
@@ -350,10 +351,10 @@ public class TeleportPipelineTaskMutationTest {
     void schematicFootprintClear_zeroDimension_returns_true() {
         LoadedSchematic zeroSchem = new TestSchematic(0, 5, 5, 0, 0);
         RTPLocation loc = new RTPLocation(world, 100, 64, 100);
-        assertTrue(TeleportPipelineTask.schematicFootprintClear(zeroSchem, loc, PasteOptions.defaults(), world.name()));
+        assertTrue(TeleportPipelineTask.schematicFootprintClearAsync(zeroSchem, loc, PasteOptions.defaults(), world.name()).join());
 
         LoadedSchematic zeroLength = new TestSchematic(5, 5, 0, 0, 0);
-        assertTrue(TeleportPipelineTask.schematicFootprintClear(zeroLength, loc, PasteOptions.defaults(), world.name()));
+        assertTrue(TeleportPipelineTask.schematicFootprintClearAsync(zeroLength, loc, PasteOptions.defaults(), world.name()).join());
     }
 
     @Test
@@ -367,10 +368,10 @@ public class TeleportPipelineTaskMutationTest {
 
         // Block exactly cell 99, 99
         GlobalRegionVerifiers.addGlobalRegionVerifier(c -> !(c.x() == 99 && c.z() == 99));
-        assertFalse(TeleportPipelineTask.schematicFootprintClear(schem, loc, originOptions, world.name()));
+        assertFalse(TeleportPipelineTask.schematicFootprintClearAsync(schem, loc, originOptions, world.name()).join());
 
         GlobalRegionVerifiers.clearGlobalRegionVerifiers();
-        assertTrue(TeleportPipelineTask.schematicFootprintClear(schem, loc, originOptions, world.name()));
+        assertTrue(TeleportPipelineTask.schematicFootprintClearAsync(schem, loc, originOptions, world.name()).join());
     }
 
     @Test
@@ -383,7 +384,7 @@ public class TeleportPipelineTaskMutationTest {
             throw new RuntimeException("Claim plugin error");
         });
 
-        assertFalse(TeleportPipelineTask.schematicFootprintClear(schem, loc, PasteOptions.defaults(), world.name()),
+        assertFalse(TeleportPipelineTask.schematicFootprintClearAsync(schem, loc, PasteOptions.defaults(), world.name()).join(),
                 "When claim check throws, must fail closed and return false (S-003)");
     }
 
@@ -503,6 +504,105 @@ public class TeleportPipelineTaskMutationTest {
         accessor.getMockScheduler().tick(1);
 
         assertTrue(pasteAttempted.get(), "Schematic paste should be dispatched to destination region task");
+    }
+
+    /** Player recording setLocation calls into a shared event log. */
+    private MockRTPPlayer eventPlayer(String name, List<String> events) {
+        MockRTPPlayer p = new MockRTPPlayer(UUID.randomUUID(), name, new RTPLocation(world, 0, 64, 0)) {
+            @Override
+            public CompletableFuture<Boolean> setLocation(RTPLocation to) {
+                events.add("teleport");
+                return super.setLocation(to);
+            }
+        };
+        accessor.addPlayer(p);
+        return p;
+    }
+
+    private TeleportPipelineTask schematicTeleportTask(RTPPlayer player, Region reg, SchematicPaster paster,
+                                                      LoadedSchematic schem) throws Exception {
+        RTPCoords coords = new RTPCoords(world.name(), 50, 70, 50);
+        List<CompletableFuture<Long>> chunks = new ArrayList<>();
+        chunks.add(CompletableFuture.completedFuture(0L));
+        ChunkSet chunkSet = new ChunkSet(world, 3, 3, chunks, CompletableFuture.completedFuture(true));
+        ChunkReservation res = new ChunkReservation(chunkSet, world);
+        TeleportPipelineTask task = new TeleportPipelineTask(new GenerationContext(player, player, null), reg, coords, res);
+        task.setPhase(TeleportPipelineTask.Phase.TELEPORT);
+        Field fSchemLoad = TeleportPipelineTask.class.getDeclaredField("schematicLoad");
+        fSchemLoad.setAccessible(true);
+        fSchemLoad.set(task, CompletableFuture.completedFuture(schem));
+        Field fPaster = TeleportPipelineTask.class.getDeclaredField("schematicPaster");
+        fPaster.setAccessible(true);
+        fPaster.set(task, paster);
+        RTP.getInstance().databaseAccessor = Mockito.mock(DatabaseAccessor.class);
+        TeleportData data = new TeleportData();
+        data.time = System.currentTimeMillis();
+        data.sender = player;
+        data.targetRegion = reg;
+        data.selectedCoords = coords;
+        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        Field fData = TeleportPipelineTask.class.getDeclaredField("teleportData");
+        fData.setAccessible(true);
+        fData.set(task, data);
+        return task;
+    }
+
+    private static SchematicPaster recordingPaster(LoadedSchematic schem, Runnable onPaste) {
+        return new SchematicPaster() {
+            @Override
+            public boolean supports(SchematicSource source) { return true; }
+            @Override
+            public CompletableFuture<LoadedSchematic> load(SchematicSource source) {
+                return CompletableFuture.completedFuture(schem);
+            }
+            @Override
+            public PasteResult paste(LoadedSchematic schematic, RTPLocation target, PasteOptions options) {
+                onPaste.run();
+                return PasteResult.PASTED;
+            }
+        };
+    }
+
+    @Test
+    @DisplayName("S-001: arrival setLocation is chained after the destination-region schematic paste")
+    void runTeleport_setLocation_runs_after_schematic_paste() throws Exception {
+        List<String> events = new java.util.concurrent.CopyOnWriteArrayList<>();
+        MockRTPPlayer player = eventPlayer("SchemOrderP", events);
+        LoadedSchematic schem = new TestSchematic(3, 3, 3, 0, 0);
+        TeleportPipelineTask task = schematicTeleportTask(player, createTestRegion("schem_order_reg"),
+                recordingPaster(schem, () -> events.add("paste")), schem);
+
+        task.run();
+        for (int i = 0; i < 3; i++) accessor.getMockScheduler().tick(1);
+
+        assertEquals(List.of("paste", "teleport"), events,
+                "the player must only be moved once the schematic footing has been pasted");
+    }
+
+    @Test
+    @DisplayName("S-001 / S-004: a failing arrival-footing task aborts the teleport with a message and releases the player")
+    void runTeleport_failing_footing_task_fails_closed() throws Exception {
+        List<String> events = new java.util.concurrent.CopyOnWriteArrayList<>();
+        MockRTPPlayer player = eventPlayer("SchemFailP", events);
+        LoadedSchematic schem = new TestSchematic(3, 3, 3, 0, 0);
+        TeleportPipelineTask task = schematicTeleportTask(player, createTestRegion("schem_fail_reg"),
+                recordingPaster(schem, () -> { throw new LinkageError("paste exploded"); }), schem);
+        RTP.getInstance().processingPlayers.add(player.uuid());
+        String savedUnsafe = TeleportPipelineTask.ConfigCache.unsafe;
+        TeleportPipelineTask.ConfigCache.unsafe = "UNSAFE_FOOTING";
+        try {
+            task.run();
+            for (int i = 0; i < 3; i++) accessor.getMockScheduler().tick(1);
+
+            assertFalse(events.contains("teleport"), "no teleport without footing (S-001)");
+            assertEquals(TeleportPipelineTask.Phase.CLEANUP, task.getPhase());
+            assertFalse(RTP.getInstance().processingPlayers.contains(player.uuid()),
+                    "the busy lock must be released so the next /rtp is accepted");
+            assertTrue(player.sentMessages.stream().anyMatch(m -> m.contains("UNSAFE_FOOTING")),
+                    "the abort must be reported to the player (S-004)");
+        } finally {
+            TeleportPipelineTask.ConfigCache.unsafe = savedUnsafe;
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -1666,10 +1766,13 @@ public class TeleportPipelineTaskMutationTest {
         fChunkSet.set(task, chunkSet);
 
         int scheduledBefore = accessor.getMockScheduler().getScheduledTasks().size();
+        int holdsBefore = TeleportPipelineTask.pendingArrivalReleaseCount();
         task.run();
 
-        // Should NOT have scheduled a delayed task because it ran inline
-        int scheduledAfter = accessor.getMockScheduler().getScheduledTasks().size();
+        // Should NOT have scheduled a delayed task because it ran inline. The deferred
+        // arrival-ticket release (REQ-RTP-S-005) is not a player task and is excluded.
+        int arrivalHolds = TeleportPipelineTask.pendingArrivalReleaseCount() - holdsBefore;
+        int scheduledAfter = accessor.getMockScheduler().getScheduledTasks().size() - arrivalHolds;
         assertEquals(scheduledBefore, scheduledAfter, "Inline execution on primary thread must not schedule player task");
     }
 
@@ -2167,26 +2270,26 @@ public class TeleportPipelineTaskMutationTest {
         RTPLocation loc = new RTPLocation(world, 0, 64, 0);
         PasteOptions options = new PasteOptions(PasteAnchor.CENTER, false, false);
 
-        assertTrue(TeleportPipelineTask.schematicFootprintClear(zeroWidth, loc, options, world.name()),
+        assertTrue(TeleportPipelineTask.schematicFootprintClearAsync(zeroWidth, loc, options, world.name()).join(),
                 "width == 0 should return true (clear)");
 
         LoadedSchematic zeroLength = Mockito.mock(LoadedSchematic.class);
         Mockito.when(zeroLength.width()).thenReturn(10);
         Mockito.when(zeroLength.length()).thenReturn(0);
-        assertTrue(TeleportPipelineTask.schematicFootprintClear(zeroLength, loc, options, world.name()),
+        assertTrue(TeleportPipelineTask.schematicFootprintClearAsync(zeroLength, loc, options, world.name()).join(),
                 "length == 0 should return true (clear)");
 
         LoadedSchematic negativeWidth = Mockito.mock(LoadedSchematic.class);
         Mockito.when(negativeWidth.width()).thenReturn(-1);
         Mockito.when(negativeWidth.length()).thenReturn(10);
-        assertTrue(TeleportPipelineTask.schematicFootprintClear(negativeWidth, loc, options, world.name()),
+        assertTrue(TeleportPipelineTask.schematicFootprintClearAsync(negativeWidth, loc, options, world.name()).join(),
                 "width < 0 should return true (clear)");
 
         // Non-zero dimensions: exercises loop boundary dz < length and dx < width
         LoadedSchematic validSchem = Mockito.mock(LoadedSchematic.class);
         Mockito.when(validSchem.width()).thenReturn(2);
         Mockito.when(validSchem.length()).thenReturn(2);
-        assertTrue(TeleportPipelineTask.schematicFootprintClear(validSchem, loc, options, world.name()),
+        assertTrue(TeleportPipelineTask.schematicFootprintClearAsync(validSchem, loc, options, world.name()).join(),
                 "valid dimensions with no verifiers should return true");
     }
 
@@ -3310,16 +3413,16 @@ public class TeleportPipelineTaskMutationTest {
 
         // ORIGIN anchor
         PasteOptions originOptions = new PasteOptions(PasteAnchor.ORIGIN, false, true);
-        assertTrue(TeleportPipelineTask.schematicFootprintClear(schem, loc, originOptions, world.name()));
+        assertTrue(TeleportPipelineTask.schematicFootprintClearAsync(schem, loc, originOptions, world.name()).join());
 
         // Non-positive width or length returns true immediately
         LoadedSchematic zeroSchem = new TestSchematic(0, 0, 0, 0, 0);
-        assertTrue(TeleportPipelineTask.schematicFootprintClear(zeroSchem, loc, originOptions, world.name()));
+        assertTrue(TeleportPipelineTask.schematicFootprintClearAsync(zeroSchem, loc, originOptions, world.name()).join());
 
         // Verifier returning false fails the footprint check
         GlobalRegionVerifiers.addGlobalRegionVerifier(coords -> false);
         try {
-            assertFalse(TeleportPipelineTask.schematicFootprintClear(schem, loc, originOptions, world.name()));
+            assertFalse(TeleportPipelineTask.schematicFootprintClearAsync(schem, loc, originOptions, world.name()).join());
         } finally {
             GlobalRegionVerifiers.clearGlobalRegionVerifiers();
         }

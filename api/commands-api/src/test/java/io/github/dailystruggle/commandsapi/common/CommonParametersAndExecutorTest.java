@@ -33,7 +33,6 @@ class CommonParametersAndExecutorTest {
   @Test
   @DisplayName("BooleanParameter, CoordinateParameter, FloatParameter, and EnumParameter values")
   void testParameterClasses() {
-    UUID caller = UUID.randomUUID();
 
     // BooleanParameter
     BooleanParameter boolParam = new BooleanParameter("perm.bool", "Boolean param", (u, s) -> true);

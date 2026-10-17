@@ -1,0 +1,37 @@
+# One parametrised single server for the version sweep (run-version-sweep.sh).
+# The driver sets the SWEEP_* variables per row and boots one row at a time;
+# the whole /data dir is a host bind under ./sweep/<slug>, so each row gets a
+# fresh world and its own logs. Port 25598 (game), RCON stays in-container.
+#
+# Manual use:
+#   $env:SWEEP_SLUG='paper-1_20_4'; $env:SWEEP_TYPE='PAPER'; $env:SWEEP_VERSION='1.20.4'; $env:SWEEP_IMAGE='java17'
+#   docker compose -f docker-compose.sweep.yml up -d
+
+services:
+  sweep:
+    image: itzg/minecraft-server:${SWEEP_IMAGE:-java21}
+    container_name: rtp-devstack-sweep
+    environment:
+      EULA: "TRUE"
+      ONLINE_MODE: "FALSE"
+      SKIP_CHOWN: "TRUE"
+      RUN_AS_UID: "0"
+      RUN_AS_GID: "0"
+      # Vanilla 1.21.2+ stops ticking after 60 s with no players, which parks
+      # RTP's tick-thread probes and the background cache fill.
+      PAUSE_WHEN_EMPTY_SECONDS: "0"
+      MEMORY: ${SWEEP_MEMORY:-3G}
+      TYPE: ${SWEEP_TYPE:-PAPER}
+      VERSION: ${SWEEP_VERSION:-1.21.11}
+      MODRINTH_PROJECTS: ${SWEEP_MODRINTH:-}
+      MODRINTH_ALLOWED_VERSION_TYPE: ${SWEEP_MODRINTH_TYPE:-release}
+      # Spigot has no download mirror; itzg runs BuildTools instead.
+      BUILD_FROM_SOURCE: ${SWEEP_BUILD_FROM_SOURCE:-FALSE}
+    ports:
+      - "127.0.0.1:25598:25565"
+    volumes:
+      - ./sweep/${SWEEP_SLUG:-default}:/data
+      - mc-image-cache:/data/.cache
+
+volumes:
+  mc-image-cache:

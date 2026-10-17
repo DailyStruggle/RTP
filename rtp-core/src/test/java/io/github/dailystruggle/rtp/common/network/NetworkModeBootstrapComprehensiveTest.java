@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.network;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.network.NetworkCommandHook;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPScheduler;
 import io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge;
@@ -11,6 +12,7 @@ import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
 import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import io.github.dailystruggle.rtp.proxy.common.transport.memory.InMemoryNetworkStateBinding;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespEndpoint;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -292,7 +294,7 @@ class NetworkModeBootstrapComprehensiveTest {
     @DisplayName("boot with plugin-message transport fails when bridge is missing")
     void bootPluginMessageMissingBridge() throws IOException {
         File file = new File(tempDir, "pluginmsg.yml");
-        Files.writeString(file.toPath(), "network:\n  enabled: true\n  serverId: s1\ntransport:\n  type: plugin-message\n");
+        Files.writeString(file.toPath(), "network:\n  enabled: true\n  serverId: s1\n  allowUnsigned: true\ntransport:\n  type: plugin-message\n");
 
         RTP.networkBridgeFactory = null;
         NetworkModeBootstrap bootstrap = new NetworkModeBootstrap();
@@ -305,7 +307,7 @@ class NetworkModeBootstrapComprehensiveTest {
     @DisplayName("boot with proxy-cache transport fails when bridge is missing")
     void bootProxyCacheMissingBridge() throws IOException {
         File file = new File(tempDir, "proxycache.yml");
-        Files.writeString(file.toPath(), "network:\n  enabled: true\n  serverId: s1\ntransport:\n  type: proxy-cache\n");
+        Files.writeString(file.toPath(), "network:\n  enabled: true\n  serverId: s1\n  allowUnsigned: true\ntransport:\n  type: proxy-cache\n");
 
         RTP.networkBridgeFactory = null;
         NetworkModeBootstrap bootstrap = new NetworkModeBootstrap();
@@ -318,7 +320,7 @@ class NetworkModeBootstrapComprehensiveTest {
     @DisplayName("boot with auto transport disables when bridge is missing or passive probe disarmed")
     void bootAutoTransportHandling() throws IOException {
         File file = new File(tempDir, "auto.yml");
-        Files.writeString(file.toPath(), "network:\n  enabled: true\n  serverId: s1\ntransport:\n  type: auto\n");
+        Files.writeString(file.toPath(), "network:\n  enabled: true\n  serverId: s1\n  allowUnsigned: true\ntransport:\n  type: auto\n");
 
         RTP.networkBridgeFactory = null;
         NetworkModeBootstrap bootstrap = new NetworkModeBootstrap();
@@ -342,6 +344,44 @@ class NetworkModeBootstrapComprehensiveTest {
     }
 
     @Test
+    @DisplayName("REQ-RTP-PROXY-007: plugin-message tiers without a secret stay disabled unless network.allowUnsigned is true")
+    void bootUnsignedPluginMessageRequiresOptIn() throws IOException {
+        java.util.concurrent.atomic.AtomicInteger inboundRegistrations = new java.util.concurrent.atomic.AtomicInteger();
+        NetworkBridge bridge = new NetworkBridge() {
+            @Override public boolean isAvailable() { return true; }
+            @Override public Optional<UUID> anyOnlinePlayer() { return Optional.empty(); }
+            @Override public void broadcastHeartbeat(byte[] payload) {}
+            @Override public void connect(UUID player, String targetServerId) {}
+            @Override public void registerInbound(Consumer<byte[]> heartbeatSink) { inboundRegistrations.incrementAndGet(); }
+            @Override public ProxyProbe passiveProbe() { return ProxyProbe.ARMED; }
+        };
+        RTP.networkBridgeFactory = () -> bridge;
+        RTP.backendStateSamplerFactory = lobby -> sid -> new BackendHeartbeat(
+                sid, 1, BackendHeartbeat.PluginState.READY, true, System.currentTimeMillis(),
+                20.0, 0, 100, 0L, 1L, 0, List.of(), List.of(), false
+        );
+        String base = "network:\n  enabled: true\n  serverId: s1\n  secretEnv: RTP_TEST_SECRET_THAT_IS_NEVER_SET\n";
+
+        for (String type : List.of("plugin-message", "proxy-cache", "auto")) {
+            File refused = new File(tempDir, "unsigned-" + type + ".yml");
+            Files.writeString(refused.toPath(), base + "transport:\n  type: " + type + "\n");
+            NetworkModeBootstrap bootstrap = new NetworkModeBootstrap();
+            bootstrap.boot(refused);
+            assertNull(bootstrap.transport(), type);
+            assertNull(NetworkModeBootstrap.LIVE, type);
+        }
+        assertEquals(0, inboundRegistrations.get(), "refused boots must not open an inbound listener");
+
+        File optIn = new File(tempDir, "unsigned-optin.yml");
+        Files.writeString(optIn.toPath(), base + "  allowUnsigned: true\ntransport:\n  type: plugin-message\n");
+        NetworkModeBootstrap bootstrap = new NetworkModeBootstrap();
+        bootstrap.boot(optIn);
+        assertNotNull(bootstrap.transport());
+        assertEquals(1, inboundRegistrations.get());
+        bootstrap.shutdown();
+    }
+
+    @Test
     @DisplayName("boot with proxy-direct fails when proxies list is empty")
     void bootProxyDirectEmptyProxies() throws IOException {
         File file = new File(tempDir, "proxydirect.yml");
@@ -361,5 +401,54 @@ class NetworkModeBootstrapComprehensiveTest {
         NetworkModeBootstrap bootstrap = new NetworkModeBootstrap();
         bootstrap.boot(file);
         assertNull(bootstrap.transport());
+    }
+
+    @Test
+    @DisplayName("RTP-23: parseRedisEndpoint respects tls, port defaulting, and username")
+    void parseRedisEndpointTlsAndUsername() {
+        // 1. Plain defaults
+        RtpYamlConfig cfgDefault = RtpYamlConfig.parse("redis:\n  host: localhost\n");
+        RespEndpoint epDefault = NetworkModeBootstrap.parseRedisEndpoint(cfgDefault.getConfigurationSection("redis"));
+        assertEquals("localhost", epDefault.host());
+        assertEquals(6379, epDefault.port());
+        assertFalse(epDefault.tls());
+        assertNull(epDefault.username());
+
+        // 2. TLS enabled without explicit port defaults to 6380
+        RtpYamlConfig cfgTls = RtpYamlConfig.parse("redis:\n  host: redis.internal\n  tls: true\n");
+        RespEndpoint epTls = NetworkModeBootstrap.parseRedisEndpoint(cfgTls.getConfigurationSection("redis"));
+        assertEquals("redis.internal", epTls.host());
+        assertEquals(6380, epTls.port());
+        assertTrue(epTls.tls());
+        assertNull(epTls.username());
+
+        // 3. TLS enabled with explicit port preserves port
+        RtpYamlConfig cfgTlsPort = RtpYamlConfig.parse("redis:\n  host: redis.internal\n  tls: true\n  port: 6390\n");
+        RespEndpoint epTlsPort = NetworkModeBootstrap.parseRedisEndpoint(cfgTlsPort.getConfigurationSection("redis"));
+        assertEquals("redis.internal", epTlsPort.host());
+        assertEquals(6390, epTlsPort.port());
+        assertTrue(epTlsPort.tls());
+
+        // 4. Username specified
+        RtpYamlConfig cfgUser = RtpYamlConfig.parse("redis:\n  host: redis.internal\n  username: rtp_user\n");
+        RespEndpoint epUser = NetworkModeBootstrap.parseRedisEndpoint(cfgUser.getConfigurationSection("redis"));
+        assertEquals("redis.internal", epUser.host());
+        assertEquals(6379, epUser.port());
+        assertFalse(epUser.tls());
+        assertEquals("rtp_user", epUser.username());
+
+        // 5. rediss:// URI auto-detects TLS and default port 6380
+        RtpYamlConfig cfgUri = RtpYamlConfig.parse("redis:\n  host: rediss://cluster.example.com\n");
+        RespEndpoint epUri = NetworkModeBootstrap.parseRedisEndpoint(cfgUri.getConfigurationSection("redis"));
+        assertEquals("cluster.example.com", epUri.host());
+        assertEquals(6380, epUri.port());
+        assertTrue(epUri.tls());
+
+        // 6. Null section fallback
+        RespEndpoint epNull = NetworkModeBootstrap.parseRedisEndpoint(null);
+        assertEquals("localhost", epNull.host());
+        assertEquals(6379, epNull.port());
+        assertFalse(epNull.tls());
+        assertNull(epNull.username());
     }
 }

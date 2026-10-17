@@ -1,0 +1,78 @@
+# Standalone Java 17 devstack for the unofficial pre-1.20.5 targets (ADR-113):
+# Paper 1.18.2 and Fabric 1.20.1, each a single server with no proxy/Redis.
+# The java17 image is deliberate: it proves the jar loads on a Java 17 runtime
+# (classfile 61) instead of only on the java21/java25 images the main stack uses.
+#
+# Stage:  Copy-Item rtp-plugin\build\libs\LeafRTP-Pro-<ver>.jar legacy\paper-1_18\plugins\, legacy\fabric-1_20_1\mods\
+# Boot:   docker compose -f docker-compose.legacy.yml up -d
+# Probe:  docker compose -f docker-compose.legacy.yml exec -T legacy-paper-1_18 rcon-cli "rtp test accessor"
+# Tear:   docker compose -f docker-compose.legacy.yml down
+
+services:
+  legacy-paper-1_18:
+    image: itzg/minecraft-server:java17
+    container_name: rtp-devstack-legacy-paper-1_18
+    environment:
+      EULA: "TRUE"
+      TYPE: PAPER
+      VERSION: "1.18.2"
+      MEMORY: 3G
+      ONLINE_MODE: "FALSE"
+      SKIP_CHOWN: "TRUE"
+      RUN_AS_UID: "0"
+      RUN_AS_GID: "0"
+    ports:
+      - "127.0.0.1:25591:25565"
+    volumes:
+      - ./legacy/paper-1_18/plugins:/data/plugins
+      - ./legacy/paper-1_18/world:/data/world
+      - mc-image-cache:/data/.cache
+
+  legacy-fabric-1_20_1:
+    image: itzg/minecraft-server:java17
+    container_name: rtp-devstack-legacy-fabric-1_20_1
+    environment:
+      EULA: "TRUE"
+      TYPE: FABRIC
+      VERSION: "1.20.1"
+      # Matches the main stack's Fabric backend; 3G OOMs during first-boot
+      # world generation plus RTP's background cache fill.
+      MEMORY: 6G
+      ONLINE_MODE: "FALSE"
+      SKIP_CHOWN: "TRUE"
+      RUN_AS_UID: "0"
+      RUN_AS_GID: "0"
+      # Resolves the Fabric API build matching VERSION + loader.
+      MODRINTH_PROJECTS: fabric-api
+    ports:
+      - "127.0.0.1:25592:25565"
+    volumes:
+      - ./legacy/fabric-1_20_1/mods:/data/mods
+      - ./legacy/fabric-1_20_1/world:/data/world
+      - mc-image-cache:/data/.cache
+
+  # Opt-in (`--profile fabric-1_21_1`): unofficial pre-1.21.5 Fabric, on Java 21
+  # because 1.21.x requires it. Shares the v1_21_R1 adapter's ticket path.
+  legacy-fabric-1_21_1:
+    profiles: [ fabric-1_21_1 ]
+    image: itzg/minecraft-server:java21
+    container_name: rtp-devstack-legacy-fabric-1_21_1
+    environment:
+      EULA: "TRUE"
+      TYPE: FABRIC
+      VERSION: "1.21.1"
+      MEMORY: 6G
+      ONLINE_MODE: "FALSE"
+      SKIP_CHOWN: "TRUE"
+      RUN_AS_UID: "0"
+      RUN_AS_GID: "0"
+      MODRINTH_PROJECTS: fabric-api
+    ports:
+      - "127.0.0.1:25593:25565"
+    volumes:
+      - ./legacy/fabric-1_21_1/mods:/data/mods
+      - ./legacy/fabric-1_21_1/world:/data/world
+      - mc-image-cache:/data/.cache
+
+volumes:
+  mc-image-cache:

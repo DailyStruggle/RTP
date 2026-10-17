@@ -5,15 +5,17 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumMap;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 /**
  * Factory and registry for {@link Effect} prototypes, keyed by name.
@@ -28,6 +30,17 @@ public class EffectFactory {
     //map name to effect type
     //  this is a runtime solution for effectively a switch statement, to allow addition and removal
     private static final ConcurrentHashMap<String, Effect<?>> effectMap = new ConcurrentHashMap<>();
+
+    private static final Set<String> warnedUnknownTypes = ConcurrentHashMap.newKeySet();
+
+    private static final Pattern WHITESPACE_RUN = Pattern.compile("\\s+");
+
+    /**
+     * Clear the cache of warned unknown effect types. Primarily for tests.
+     */
+    public static void clearWarnedUnknownTypes() {
+        warnedUnknownTypes.clear();
+    }
 
     /**
      * Per-platform leaf operations of the ADR-002 adaptive reading order.
@@ -132,15 +145,89 @@ public class EffectFactory {
         for (String node : permissionNodes) {
             if (node == null || !node.startsWith(permissionPrefix)) continue;
 
-            String[] val = node.replace(permissionPrefix, "").split("\\.");
-            Effect<?> proto = effectMap.get(val[0].toUpperCase());
-            if (proto == null) continue;
-            Effect<?> effect = proto.clone();
+            String raw = node.substring(permissionPrefix.length()).trim();
+            if (raw.isEmpty()) continue;
 
-            if (val.length > 1) effect.setData(Arrays.copyOfRange(val, 1, val.length));
+            int firstDot = -1;
+            int firstSpace = -1;
+            boolean escaping = false;
+
+            for (int i = 0; i < raw.length(); i++) {
+                char c = raw.charAt(i);
+                if (escaping) {
+                    escaping = false;
+                } else if (c == '\\') {
+                    escaping = true;
+                } else if (c == '.' && firstDot == -1) {
+                    firstDot = i;
+                    break;
+                } else if (Character.isWhitespace(c) && firstSpace == -1) {
+                    firstSpace = i;
+                    break;
+                }
+            }
+
+            String type;
+            String[] args;
+
+            if (firstSpace != -1) {
+                // Whitespace-delimited effect syntax (e.g. "COMMAND CONSOLE say hi" or "DEATH false")
+                type = raw.substring(0, firstSpace);
+                String rest = raw.substring(firstSpace).trim();
+                args = rest.isEmpty() ? new String[0] : WHITESPACE_RUN.split(rest);
+            } else if (firstDot != -1) {
+                // Dot-delimited permission syntax (e.g. "COMMAND.CONSOLE.say\ a\.b")
+                type = raw.substring(0, firstDot);
+                String rest = raw.substring(firstDot + 1);
+                args = splitUnescapedDots(rest);
+            } else {
+                // Bare effect name (e.g. "DROP_INVENTORY")
+                type = raw;
+                args = new String[0];
+            }
+
+            String typeUpper = type.toUpperCase(Locale.ROOT);
+            Effect<?> proto = effectMap.get(typeUpper);
+            if (proto == null) {
+                if (warnedUnknownTypes.add(typeUpper)) {
+                    Effect.warn("[EffectFactory] Unknown effect type: \"" + typeUpper + "\" in node: " + node);
+                }
+                continue;
+            }
+
+            Effect<?> effect = proto.clone();
+            if (args.length > 0) {
+                effect.setData(args);
+            }
             res.add(effect);
         }
 
         return res;
+    }
+
+    private static String[] splitUnescapedDots(String s) {
+        if (s == null || s.isEmpty()) return new String[0];
+        List<String> list = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean escaping = false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (escaping) {
+                current.append('\\').append(c);
+                escaping = false;
+            } else if (c == '\\') {
+                escaping = true;
+            } else if (c == '.') {
+                list.add(current.toString());
+                current.setLength(0);
+            } else {
+                current.append(c);
+            }
+        }
+        if (escaping) {
+            current.append('\\');
+        }
+        list.add(current.toString());
+        return list.toArray(new String[0]);
     }
 }

@@ -38,7 +38,7 @@ class SonarExclusionTest(unittest.TestCase):
     def test_global_test_filename_patterns_excluded(self):
         self.assertTrue(is_sonar_excluded("rtp-core/src/main/java/io/github/dailystruggle/rtp/RTPTestHelper.java"))
         self.assertTrue(is_sonar_excluded("rtp-core/src/main/java/io/github/dailystruggle/rtp/SpiralBenchmark.java"))
-        self.assertTrue(is_sonar_excluded("rtp-core/src/main/java/io/github/dailystruggle/rtp/benchmark/Runner.java"))
+        self.assertTrue(is_sonar_excluded("rtp-core/src/main/java/io/github/dailystruggle/rtp/benchmark/RunnerBenchmark.java"))
 
     def test_global_mock_and_testing_directories_excluded(self):
         self.assertTrue(is_sonar_excluded("rtp-core/src/main/java/io/github/dailystruggle/rtp/mock/MockServer.java"))
@@ -52,7 +52,7 @@ class SonarExclusionTest(unittest.TestCase):
         self.assertTrue(is_sonar_excluded("platforms/rtp-neoforge/rtp-neoforge-common/src/main/java/Quux.java"))
 
     def test_addons_and_helpers_directories_excluded(self):
-        self.assertTrue(is_sonar_excluded("addons/LeafRTPGroupAddon/src/main/java/Group.java"))
+        self.assertTrue(is_sonar_excluded("addons/LeafRTPActionAddon/src/main/java/RTPActionAddon.java"))
         self.assertTrue(is_sonar_excluded("addons/LeafRTPLinearAddon/src/main/java/Linear.java"))
         self.assertTrue(is_sonar_excluded("helpers/StressTestRTP/src/main/java/Stress.java"))
 

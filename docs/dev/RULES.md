@@ -24,6 +24,9 @@ Scan this table first. Read the detailed rule below only if you are touching cod
 | D-003 | Doc    | Single Source of Truth — reference, don't duplicate| self-contained                              |
 | D-004 | Doc    | Write for the audience                             | self-contained                              |
 | D-005 | Doc    | Propose architecture before implementation         | self-contained                              |
+| D-006 | Doc    | Mirror prose voice for external user copy          | self-contained                              |
+| D-007 | Doc    | New subsystem updates scope (REQUIREMENTS section 0) in the same change | `REQUIREMENTS.md` section 0      |
+| D-008 | Code   | Large deduplicated classes delegate to package-private helpers | self-contained                     |
 
 ## Core Development Rules
 
@@ -86,9 +89,19 @@ These rules govern how project documentation, requirements, and design specifica
 - **Rule D-005: Propose Architecture Before Implementation**
   - **Description**: For any refactor or new feature that touches more than one class, crosses a module boundary, or introduces a new command architecture, a written proposal must be presented and approved before any code is written.
 
+- **Rule D-006: Mirror Prose Voice for External User Copy**
+  - **Description**: When authoring external listings, README, marketing copy, or release notes, mirror the maintainer's established voice: first person, conversational, low ceremony, honest about limits and trade-offs. Prefer concrete evidence over adjectives (benchmark numbers, reproducibility notes; no AI hype buzzwords). State technical specifics plainly (spiral math, `.mca` pre-filter, async caching). Use ASCII punctuation only (hyphens/colons, no em/en dashes; see [`docs/publishing/FRONT_PAGE.md`](../publishing/FRONT_PAGE.md)). Storefront pages (BuiltByBit, Modrinth, Hangar) are generated from that one source by `scripts/release/build_front_pages.py`; paid-support copy goes in `kind: promo` blocks so it never reaches Hangar or Modrinth.
+
+- **Rule D-007: Scope Travels With the Subsystem**
+  - **Description**: A change that introduces a new subsystem (a new command family, module, bundled addon, network surface, or operator-facing engine) shall update the In Scope / Out of Scope lists in [`REQUIREMENTS.md` section 0](REQUIREMENTS.md) in the same change set, and the D-005 proposal shall state the scope impact. Features outside selection, the teleport pipeline, and the platform adapters should ship as addons against `rtp-api` (ADR-057) unless the proposal records why core is required.
+
+- **Rule D-008: Deduplicate Behind a Facade, Not Into One File**
+  - **Description**: When deduplication concentrates shared behaviour in one class (e.g. `MemoryShape`, `MenuRedeemSubcommand`, `ScanTask`, `ConfigParser`), keep that class as the single public entry point and move cohesive concerns (codec, table, persistence, rendering) into package-private helpers in the same package. Apply this opportunistically when a change already touches the concern; do not open refactor-only changes without a D-005 proposal. Public API and persisted formats shall not change as part of such a split.
+
 ## Maintenance Protocol
 
 - Any new ADR that introduces a prohibition or a new safety/architectural invariant MUST add a corresponding rule to this file (and its quick-reference row) in the same change set.
+- Any new ADR that introduces a subsystem MUST update `REQUIREMENTS.md` section 0 in the same change set (Rule D-007).
 - When a rule's underlying requirement is renamed or renumbered, update both the detailed bullet and the quick-reference table row; stale requirement IDs silently break `Rule D-001`.
 
 ---

@@ -11,6 +11,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ChunkResult;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.TicketType;
@@ -131,6 +132,15 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
     private static final TicketType RTP_TICKET_TYPE =
             new TicketType(TicketType.NO_TIMEOUT, /*persist=*/ false, TicketUse.LOADING_AND_SIMULATION);
 
+    /**
+     * Temporary load ticket for {@link #requestFullChunkAsync}. A separate instance because
+     * {@code TicketStorage} matches tickets by type identity and level: adding a second
+     * {@link #RTP_TICKET_TYPE} ticket at the same level is a no-op, so releasing the load
+     * ticket would drop a kept-cache ticket on the same chunk.
+     */
+    private static final TicketType RTP_LOAD_TICKET_TYPE =
+            new TicketType(TicketType.NO_TIMEOUT, /*persist=*/ false, TicketUse.LOADING_AND_SIMULATION);
+
     @Override
     public String mcVersion() {
         return "1.21.5+";
@@ -194,6 +204,11 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
 
 
     // Non-blocking chunk-future dispatch - see rtp-fabric-ADR-008.
+    // Binds the private ServerChunkCache#getChunkFutureMainThread(int, int, ChunkStatus,
+    // boolean) under both Mojmap and intermediary names. Three declared methods share that
+    // signature: the public getChunkFuture, which managedBlocks the tick thread until
+    // generation finishes (S-005), and a synthetic supplyAsync lambda (method_14098), so the
+    // scan must not depend on declaration order.
     private static volatile Method GET_CHUNK_FUTURE_METHOD;
 
     private static Method resolveGetChunkFutureMethod(ServerChunkCache cache) throws ReflectiveOperationException {
@@ -205,25 +220,38 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
             Method found = null;
             for (Class<?> c = cache.getClass(); c != null && found == null; c = c.getSuperclass()) {
                 for (Method m : c.getDeclaredMethods()) {
-                    if (!CompletableFuture.class.isAssignableFrom(m.getReturnType())) continue;
-                    Class<?>[] p = m.getParameterTypes();
-                    if (p.length != 4) continue;
-                    if (p[0] != int.class || p[1] != int.class) continue;
-                    if (p[2] != ChunkStatus.class) continue;
-                    if (p[3] != boolean.class) continue;
+                    if (!isNonBlockingChunkFutureMethod(m)) continue;
                     m.setAccessible(true);
                     found = m;
                     break;
                 }
             }
             if (found == null) {
+                // Fail closed: the public getChunkFuture would block the tick thread.
                 throw new NoSuchMethodException(
-                        "ServerChunkCache#getChunkFuture(int,int,ChunkStatus,boolean) not found on "
+                        "ServerChunkCache#getChunkFutureMainThread(int,int,ChunkStatus,boolean) not found on "
                                 + cache.getClass().getName());
             }
+            RTP.log(Level.INFO, "[RTP][Fabric 1.21.5+] chunk-future method bound: "
+                    + found.getDeclaringClass().getName() + "#" + found.getName());
             GET_CHUNK_FUTURE_METHOD = found;
             return found;
         }
+    }
+
+    /**
+     * {@code getChunkFutureMainThread} shape: private, non-static, non-synthetic, returns a
+     * {@link CompletableFuture}, takes {@code (int, int, ChunkStatus, boolean)}. Excludes the
+     * public, main-thread-blocking {@code getChunkFuture} and the synthetic lambda.
+     */
+    static boolean isNonBlockingChunkFutureMethod(Method m) {
+        int mod = m.getModifiers();
+        if (!java.lang.reflect.Modifier.isPrivate(mod) || java.lang.reflect.Modifier.isStatic(mod)) return false;
+        if (m.isSynthetic() || m.isBridge()) return false;
+        if (!CompletableFuture.class.isAssignableFrom(m.getReturnType())) return false;
+        Class<?>[] p = m.getParameterTypes();
+        return p.length == 4 && p[0] == int.class && p[1] == int.class
+                && p[2] == ChunkStatus.class && p[3] == boolean.class;
     }
 
     @Override
@@ -238,11 +266,11 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
 
             // Temporary load-ticket - see V1_20_R1FabricVersionAdapter#requestFullChunkAsync
             // for the rationale. 1.21.5 uses the public addTicketWithRadius /
-            // removeTicketWithRadius API.
+            // removeTicketWithRadius API; RTP_LOAD_TICKET_TYPE keeps it apart from kept tickets.
             ChunkPos cp = new ChunkPos(cx, cz);
             boolean ticketAdded = false;
             try {
-                cache.addTicketWithRadius(RTP_TICKET_TYPE, cp, RTP_TICKET_RADIUS);
+                cache.addTicketWithRadius(RTP_LOAD_TICKET_TYPE, cp, RTP_TICKET_RADIUS);
                 ticketAdded = true;
             } catch (Throwable t) {
                 RTP.log(Level.WARNING,
@@ -257,10 +285,10 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
                 return CompletableFuture.failedFuture(new IllegalStateException(
                         "getChunkFuture returned non-CompletableFuture: " + (raw == null ? "null" : raw.getClass())));
             }
-            return cf.thenApply(either -> {
-                if (either == null) return null;
-                ChunkAccess chunk = unwrapEitherLeft(either);
-                return chunk == null ? null : RTPChunkHandle.of(chunk);
+            // cf is CompletableFuture<ChunkResult<ChunkAccess>>.
+            return cf.thenApply(result -> {
+                Object value = chunkResultValue(result);
+                return value instanceof ChunkAccess chunk ? RTPChunkHandle.of(chunk) : null;
             }).whenComplete((handle, ex) -> {
                 if (addedTicket) tryRemoveLoadTicket(cache, cp);
             });
@@ -271,7 +299,7 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
 
     private static void tryRemoveLoadTicket(ServerChunkCache cache, ChunkPos cp) {
         try {
-            cache.removeTicketWithRadius(RTP_TICKET_TYPE, cp, RTP_TICKET_RADIUS);
+            cache.removeTicketWithRadius(RTP_LOAD_TICKET_TYPE, cp, RTP_TICKET_RADIUS);
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
                     "[RTP][Fabric 1.21.5+] temp load-ticket release failed for chunk=("
@@ -279,17 +307,14 @@ public final class V1_21_R5FabricVersionAdapter implements FabricVersionAdapter 
         }
     }
 
-    private static ChunkAccess unwrapEitherLeft(Object either) {
-        try {
-            Method leftMethod = either.getClass().getMethod("left");
-            Object opt = leftMethod.invoke(either);
-            if (opt == null) return null;
-            Method orElse = opt.getClass().getMethod("orElse", Object.class);
-            Object value = orElse.invoke(opt, (Object) null);
-            return (value instanceof ChunkAccess ca) ? ca : null;
-        } catch (Throwable t) {
-            return null;
-        }
+    /**
+     * Success value of a {@link ChunkResult}, {@code null} for a failed result or a
+     * non-ChunkResult. The chunk future yields {@code ChunkResult}, not DataFixerUpper
+     * {@code Either}; the old reflective {@code left()} lookup threw
+     * {@link NoSuchMethodException} and read every loaded chunk as missing.
+     */
+    static Object chunkResultValue(Object result) {
+        return result instanceof ChunkResult<?> r && r.isSuccess() ? r.orElse(null) : null;
     }
 
 

@@ -48,21 +48,23 @@ public record Heatmap2D(int width, int height, double[] values,
 
     /** Returns the sample at row {@code y}, column {@code x}. No defensive copy. */
     public double valueAt(int x, int y) {
+        if (x < 0 || x >= width || y < 0 || y >= height) {
+            throw new IndexOutOfBoundsException("Coordinates (" + x + ", " + y + ") out of bounds for " + width + "x" + height);
+        }
         return values[y * width + x];
     }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof Heatmap2D(int thatWidth, int thatHeight, double[] thatValues,
-                                     double thatMinValue, double thatMaxValue))) {
+        if (!(o instanceof Heatmap2D that)) {
             return false;
         }
-        return width == thatWidth
-                && height == thatHeight
-                && Double.compare(thatMinValue, minValue) == 0
-                && Double.compare(thatMaxValue, maxValue) == 0
-                && java.util.Arrays.equals(values, thatValues);
+        return width == that.width
+                && height == that.height
+                && Double.compare(that.minValue, minValue) == 0
+                && Double.compare(that.maxValue, maxValue) == 0
+                && java.util.Arrays.equals(values, that.values);
     }
 
     @Override

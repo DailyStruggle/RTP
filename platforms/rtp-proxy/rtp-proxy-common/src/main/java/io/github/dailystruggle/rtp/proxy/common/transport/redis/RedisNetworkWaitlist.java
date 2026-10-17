@@ -1,10 +1,10 @@
 package io.github.dailystruggle.rtp.proxy.common.transport.redis;
 
+import io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkWaitlist;
-
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.JedisPoolConfig;
+import io.github.dailystruggle.rtp.proxy.common.transport.CanonicalEnvelopes;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -33,7 +33,7 @@ import java.util.logging.Logger;
  * immediately. Design in
  * {@code rtp-proxy-ADR-015-shared-network-waitlist-and-dynamic-batched-dispatch.md}.
  *
- * <p>Mirrors {@link RedisNetworkRequestQueue}'s shape: a {@link JedisPool}
+ * <p>Mirrors {@link RedisNetworkRequestQueue}'s shape: a {@link RespPool}
  * is opened on construction (or injected from a host that already owns
  * one), all SPI calls hop onto a private single-thread executor, and the
  * impl is {@link AutoCloseable}. Pre-loads six Lua scripts via
@@ -71,6 +71,14 @@ import java.util.logging.Logger;
  * <p><strong>S-004 contract.</strong> Every async path either resolves
  * with a typed outcome or completes exceptionally with the underlying
  * Jedis throwable. There are no silent swallows.
+ *
+ * <p><strong>HMAC entries (rtp-proxy-ADR-010).</strong> With a verifier,
+ * each entry carries a trailing {@code "hmac"} field over
+ * {@link CanonicalEnvelopes#canonicalWaitlistEntry}; enrol of a
+ * delimiter-bearing field completes exceptionally. On drain, an unsigned or
+ * tampered entry is removed from the list with a REQ-RTP-S-004 WARNING and
+ * never reaches the dispatcher, so injected entries cannot occupy the peek
+ * window either.
  */
 public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseable {
 
@@ -85,11 +93,14 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
 
     private static final AtomicInteger THREAD_COUNTER = new AtomicInteger();
 
-    private final JedisPool pool;
+    private final RespPool pool;
     private final boolean ownsPool;
     private final ExecutorService executor;
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final int maxSize;
+    /** HMAC entry verifier; {@code null} disables signing and verification. */
+    private final HmacVerifier verifier;
+    private final int schemaVersion;
 
     private final RedisLuaScripts enrolScript;
     private final RedisLuaScripts peekScript;
@@ -100,7 +111,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
     private final RedisLuaScripts refreshTtlScript;
 
     /**
-     * Production constructor. Opens its own {@link JedisPool} and pre-loads
+     * Production constructor. Opens its own {@link RespPool} and pre-loads
      * all six waitlist scripts.
      *
      * @param host     Redis host
@@ -111,7 +122,19 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
      *                 {@code 0} disables the cap (use with caution)
      */
     public RedisNetworkWaitlist(String host, int port, String password, int maxSize) {
-        this(buildPool(host, port, password), true, maxSize);
+        this(buildPool(host, port, password), true, maxSize, null, 1);
+    }
+
+    /**
+     * Signed production constructor (rtp-proxy-ADR-010). Every proxy sharing
+     * the waitlist must use the same secret and {@code schemaVersion}.
+     *
+     * @param verifier      HMAC verifier; {@code null} disables signing
+     * @param schemaVersion schema version passed to {@link HmacVerifier}
+     */
+    public RedisNetworkWaitlist(String host, int port, String password, int maxSize,
+                                HmacVerifier verifier, int schemaVersion) {
+        this(buildPool(host, port, password), true, maxSize, verifier, schemaVersion);
     }
 
     /**
@@ -119,20 +142,28 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
      * pool. The caller retains ownership of the pool; this binding's
      * {@link #close()} only shuts down its executor.
      */
-    public RedisNetworkWaitlist(JedisPool pool, int maxSize) {
-        this(Objects.requireNonNull(pool, "pool"), false, maxSize);
+    public RedisNetworkWaitlist(RespPool pool, int maxSize) {
+        this(Objects.requireNonNull(pool, "pool"), false, maxSize, null, 1);
     }
 
-    private RedisNetworkWaitlist(JedisPool pool, boolean ownsPool, int maxSize) {
+    /** Pool-injection constructor with HMAC entries; see the signed host/port constructor. */
+    public RedisNetworkWaitlist(RespPool pool, int maxSize, HmacVerifier verifier, int schemaVersion) {
+        this(Objects.requireNonNull(pool, "pool"), false, maxSize, verifier, schemaVersion);
+    }
+
+    private RedisNetworkWaitlist(RespPool pool, boolean ownsPool, int maxSize,
+                                 HmacVerifier verifier, int schemaVersion) {
         if (maxSize < 0) {
             throw new IllegalArgumentException("maxSize must be >= 0, got " + maxSize);
         }
         this.pool = pool;
         this.ownsPool = ownsPool;
         this.maxSize = maxSize;
+        this.verifier = verifier;
+        this.schemaVersion = schemaVersion;
 
         // Eagerly validate connectivity.
-        try (Jedis j = pool.getResource()) {
+        try (RespConnection j = pool.getResource()) {
             j.ping();
         } catch (Exception e) {
             if (ownsPool) pool.close();
@@ -169,16 +200,8 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
         this.executor = Executors.newSingleThreadExecutor(tf);
     }
 
-    private static JedisPool buildPool(String host, int port, String password) {
-        JedisPoolConfig cfg = new JedisPoolConfig();
-        cfg.setMaxTotal(4);
-        cfg.setMaxIdle(2);
-        cfg.setMinIdle(1);
-        cfg.setTestOnBorrow(true);
-        if (password != null && !password.isEmpty()) {
-            return new JedisPool(cfg, host, port, 2000, password);
-        }
-        return new JedisPool(cfg, host, port, 2000);
+    private static RespPool buildPool(String host, int port, String password) {
+        return new RespPool(host, port, 2000, password, 4);
     }
 
     // ---- SPI ----------------------------------------------------------------
@@ -190,8 +213,16 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
             return CompletableFuture.completedFuture(EnrolOutcome.REJECTED_CLOSED);
         }
         return runAsync(() -> {
-            String json = encode(envelope);
-            try (Jedis j = pool.getResource()) {
+            String json;
+            try {
+                json = encode(envelope, sign(envelope));
+            } catch (IllegalArgumentException iae) {
+                LOG.log(Level.WARNING, "RedisNetworkWaitlist: rejecting enrol for player "
+                        + envelope.playerId() + " (correlationId=" + envelope.correlationId()
+                        + "): " + iae.getMessage() + " (REQ-RTP-S-004)");
+                throw iae;
+            }
+            try (RespConnection j = pool.getResource()) {
                 Object raw = enrolScript.evalsha(j,
                         Arrays.asList(LIST_KEY, UUID_KEY, CID_KEY),
                         Arrays.asList(
@@ -199,7 +230,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
                                 envelope.correlationId().toString(),
                                 json,
                                 Integer.toString(maxSize)));
-                String s = raw == null ? "" : raw.toString();
+                String s = raw == null ? "" : (raw instanceof byte[] b ? new String(b, java.nio.charset.StandardCharsets.UTF_8) : raw.toString());
                 switch (s) {
                     case "ACCEPTED":
                     case "ACCEPTED_IDEMPOTENT":
@@ -227,7 +258,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
         return runAsync(() -> {
             // 1. Peek head up to globalCap.
             List<String> peeked;
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 Object raw = peekScript.evalsha(j,
                         Collections.singletonList(LIST_KEY),
                         Collections.singletonList(Integer.toString(globalCap)));
@@ -253,11 +284,20 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
             // Parallel list preserving the order of envelopes we attempt to drain,
             // so the atomic remove script ARGV is FIFO too.
             List<String> drainArgv = new ArrayList<>();
+            List<String> purgeArgv = new ArrayList<>();
             int taken = 0;
             for (String json : peeked) {
                 if (taken >= globalCap) break;
                 WaitEnvelope env = decode(json);
                 if (env == null) continue;
+                if (!verified(env, json)) {
+                    LOG.log(Level.WARNING, "RedisNetworkWaitlist: HMAC verification failed for entry "
+                            + env.correlationId() + "; removing (REQ-RTP-S-004)");
+                    purgeArgv.add(env.correlationId().toString());
+                    purgeArgv.add(env.playerId().toString());
+                    purgeArgv.add(json);
+                    continue;
+                }
                 String chosen = pickBackend(remaining);
                 if (chosen == null) break;
                 tentative.computeIfAbsent(chosen, k -> new ArrayList<>()).add(env);
@@ -269,13 +309,18 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
                 else remaining.put(chosen, after);
                 taken++;
             }
+            if (!purgeArgv.isEmpty()) {
+                try (RespConnection j = pool.getResource()) {
+                    drainBatchScript.evalsha(j, Arrays.asList(LIST_KEY, UUID_KEY, CID_KEY), purgeArgv);
+                }
+            }
             if (drainArgv.isEmpty()) {
                 return Collections.<String, List<WaitEnvelope>>emptyMap();
             }
 
             // 3. Atomically remove the allocated envelopes.
             List<String> removed;
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 Object raw = drainBatchScript.evalsha(j,
                         Arrays.asList(LIST_KEY, UUID_KEY, CID_KEY),
                         drainArgv);
@@ -323,7 +368,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
     public CompletableFuture<Optional<Integer>> position(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
         return runAsync(() -> {
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 Object raw = positionScript.evalsha(j,
                         Arrays.asList(LIST_KEY, UUID_KEY),
                         Collections.singletonList(playerId.toString()));
@@ -338,7 +383,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
         Objects.requireNonNull(playerId, "playerId");
         Objects.requireNonNull(reason, "reason");
         return runAsync(() -> {
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 Object raw = removeUuidScript.evalsha(j,
                         Arrays.asList(LIST_KEY, UUID_KEY, CID_KEY),
                         Collections.singletonList(playerId.toString()));
@@ -355,7 +400,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
         }
         return runAsync(() -> {
             long now = System.currentTimeMillis();
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 Object raw = reapScript.evalsha(j,
                         Arrays.asList(LIST_KEY, UUID_KEY, CID_KEY),
                         Arrays.asList(Long.toString(now), Long.toString(maxAge.toMillis())));
@@ -367,7 +412,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
     @Override
     public CompletableFuture<Integer> size() {
         return runAsync(() -> {
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 Long n = j.llen(LIST_KEY);
                 return n == null ? 0 : n.intValue();
             }
@@ -378,7 +423,7 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
     public CompletableFuture<Integer> refreshAllTtl() {
         return runAsync(() -> {
             long now = System.currentTimeMillis();
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 Object raw = refreshTtlScript.evalsha(j,
                         Collections.singletonList(LIST_KEY),
                         Collections.singletonList(Long.toString(now)));
@@ -410,12 +455,35 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
         return f;
     }
 
+    /** HMAC for {@code env}, or {@code null} when unsigned; throws on delimiter injection. */
+    private String sign(WaitEnvelope env) {
+        if (verifier == null) return null;
+        return CanonicalEnvelopes.signWaitlistEntry(verifier, schemaVersion,
+                env.correlationId().toString(), env.playerId().toString(),
+                env.regionKey().orElse(""), env.serverHint().orElse(""), env.originServerId());
+    }
+
+    private boolean verified(WaitEnvelope env, String json) {
+        if (verifier == null) return true;
+        return CanonicalEnvelopes.verifyWaitlistEntry(verifier, schemaVersion,
+                env.correlationId().toString(), env.playerId().toString(),
+                env.regionKey().orElse(""), env.serverHint().orElse(""), env.originServerId(),
+                extractOptString(json, "hmac").orElse(""));
+    }
+
+    /** Unsigned encoding; see {@link #encode(WaitEnvelope, String)}. */
+    static String encode(WaitEnvelope env) {
+        return encode(env, null);
+    }
+
     /**
      * Minimal JSON encoder for {@link WaitEnvelope}. Field order is fixed and
      * relied upon by the Lua scripts ({@code "playerId"} appears before
      * {@code "correlationId"} and {@code "enrolledAtMs"}); do not reorder.
+     * A non-null {@code hmac} is appended last so the in-place
+     * {@code enrolledAtMs} rewrite in {@code waitlist_refresh_ttl.lua} keeps it.
      */
-    static String encode(WaitEnvelope env) {
+    static String encode(WaitEnvelope env, String hmac) {
         StringBuilder sb = new StringBuilder(192);
         sb.append('{');
         sb.append("\"playerId\":\"").append(env.playerId()).append('"');
@@ -426,6 +494,9 @@ public final class RedisNetworkWaitlist implements NetworkWaitlist, AutoCloseabl
         appendOptString(sb, env.serverHint());
         sb.append(",\"originServerId\":").append(jsonString(env.originServerId()));
         sb.append(",\"enrolledAtMs\":").append(env.enrolledAtMs());
+        if (hmac != null) {
+            sb.append(",\"hmac\":").append(jsonString(hmac));
+        }
         sb.append('}');
         return sb.toString();
     }

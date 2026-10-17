@@ -11,6 +11,9 @@ import java.util.jar.JarFile;
 import java.util.logging.Level;
 
 public class JarUtils {
+    private JarUtils() {
+    }
+
     public static void extractDocs(File dataFolder, String version) {
         File docsDir = new File(dataFolder, "docs");
         File docVersionFile = new File(docsDir, ".version");

@@ -49,6 +49,9 @@ public final class InMemoryNetworkStateBinding implements NetworkTransport {
     private final ConcurrentHashMap<String, ReservationToken> tokens = new ConcurrentHashMap<>();
     /** Players currently holding a PENDING/CLAIMED token, used to enforce per-player idempotency. */
     private final ConcurrentHashMap<UUID, String> activeByPlayer = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, Long> lastTeleportTimes = new ConcurrentHashMap<>();
+    /** Soft cap on {@link #lastTeleportTimes}; the oldest entries are evicted past it. */
+    static final int MAX_TELEPORT_TIMES = 65_536;
     private final CopyOnWriteArrayList<Sub> subscribers = new CopyOnWriteArrayList<>();
     private final ExecutorService executor =
             Executors.newFixedThreadPool(2, r -> {
@@ -277,6 +280,42 @@ public final class InMemoryNetworkStateBinding implements NetworkTransport {
         Sub sub = new Sub(sink);
         subscribers.add(sub);
         return sub;
+    }
+
+    @Override
+    public CompletableFuture<Void> setLastTeleportTime(UUID playerId, long epochMillis) {
+        Objects.requireNonNull(playerId, "playerId");
+        checkOpen();
+        return CompletableFuture.runAsync(() -> {
+            lastTeleportTimes.put(playerId, epochMillis);
+            if (lastTeleportTimes.size() > MAX_TELEPORT_TIMES) {
+                evictOldestTeleportTimes();
+            }
+        }, executor);
+    }
+
+    /**
+     * Drop the oldest quarter of entries. A dropped player reads 0 (no recent
+     * cross-server teleport), which only matters for a cooldown longer than the
+     * time it takes {@link #MAX_TELEPORT_TIMES} other players to teleport.
+     */
+    private void evictOldestTeleportTimes() {
+        long[] times = lastTeleportTimes.values().stream().mapToLong(Long::longValue).sorted().toArray();
+        if (times.length == 0) return;
+        long cutoff = times[Math.min(times.length - 1, times.length / 4)];
+        lastTeleportTimes.values().removeIf(t -> t <= cutoff);
+    }
+
+    /** Visible for tests. */
+    int lastTeleportTimeCount() {
+        return lastTeleportTimes.size();
+    }
+
+    @Override
+    public CompletableFuture<Long> getLastTeleportTime(UUID playerId) {
+        Objects.requireNonNull(playerId, "playerId");
+        checkOpen();
+        return CompletableFuture.supplyAsync(() -> lastTeleportTimes.getOrDefault(playerId, 0L), executor);
     }
 
     @Override

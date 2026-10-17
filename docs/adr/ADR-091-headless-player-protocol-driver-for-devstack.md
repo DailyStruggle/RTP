@@ -1,6 +1,6 @@
 # ADR-091 — Automated Headless Client for Devstack via Mineflayer
 
-**Status:** Proposed  
+**Status:** Proposed
 **Date:** 2026-09-08  
 
 ## Context

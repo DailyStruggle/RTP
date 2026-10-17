@@ -1,0 +1,135 @@
+# --- RTP Core Configuration ---
+# Documentation: plugins/RTP/docs/admin/configuration/CORE_CONFIG.md
+# Pick your language in language.yml.
+#
+# Where to find things (files/folders in this RTP folder):
+#   config.yml    - this file: core teleport behavior and shared defaults
+#   safety.yml    - where players may or may not land (blocks, biomes)
+#   economy.yml   - charge players for /rtp (needs Vault)
+#   language.yml  - pick your language
+#   messages/     - all player-facing text (commands, player, system, network, placeholders)
+#   effects/      - particle and sound effects on teleport
+#   regions/      - per-region settings
+#   worlds/       - per-world settings
+#   advanced/     - tuning you usually do not need (performance, database, logging, metrics, network, biomes, blocks)
+#   addons/       - config for optional add-ons (countdown, GUI menu, claim integrations)
+
+# Seconds to wait before teleporting. 0 = right away. Supports duration units (e.g. 2s, 40t, 1500ms).
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 2
+teleportDelay: 0
+
+# How far you can move before the teleport cancels.
+# @type: integer
+# @range: [0, null]
+# @unit: blocks
+# @default: 2
+cancelDistance: 2
+
+# Wait time between /rtp uses. Skipped by rtp.nocooldown. Supports duration units (e.g. 5m, 300s, 1h).
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 300
+teleportCooldown: 0
+
+# Max /rtp uses before lockout. 0 = no limit. Skipped by rtp.nolock.
+# @type: integer
+# @range: [0, null]
+# @default: 0
+lockAfterUses: 0
+
+# Seconds until the use count resets. 0 = never resets. Supports duration units (e.g. 24h, 1d).
+# @type: integer
+# @range: [0, null]
+# @unit: seconds
+# @default: 0
+lockAfterResetSeconds: 0
+
+# true = set your spawn point where you land.
+# @type: boolean
+# @default: false
+setRespawnOnTeleport: false
+
+# Console commands run after teleport. [player] = the player's name.
+# @type: list<string>
+consoleCommands:
+  - ""
+
+# Commands run as the player after teleport. [player] = their name.
+# @type: list<string>
+playerCommands:
+  - ""
+
+# Menu look. renderer = list of styles to try in order.
+menu:
+  # Menu styles to try; first one that works wins.
+  # @type: list<enum>
+  # @options: ["book", "chat"]
+  renderer:
+    - "book"
+
+# Shared defaults. A region/world value of "@config" copies the matching entry below,
+# so you change a setting once here instead of in every region file.
+defaults:
+  # Default area shape and size, used by every region whose shape is "@config".
+  # Sizes default to chunks (1 chunk = 16 blocks), e.g. 256 chunks = 4,096 blocks.
+  # Suffixes: b (blocks), c (chunks), r (regions), km (kilometers). See REGIONS.md.
+  # radius: outer bound. centerRadius: inner donut hole. centerRadius must stay below radius.
+  shape:
+    # Landing area shape algorithm.
+    # @type: enum
+    # @source: shape
+    name: "CIRCLE"
+    mode: "REROLL"
+
+    # Outer edge, in blocks (16384 blocks = 1024 chunks).
+    # Matches the pregenerated area and the other plugins in the cross-plugin run.
+    radius: 16384b
+
+    # Inner edge / donut hole, in chunks (64 chunks = 1,024 blocks). 0 = no hole.
+    centerRadius: 64
+
+    # Center of the area, in CHUNK coordinates (chunk 0,0 covers blocks 0-15).
+    centerX: 0
+    centerZ: 0
+
+    # Bias inside the centerRadius-to-radius band: >1.0 favors the center, <1.0 the edge.
+    weight: 1.0
+
+    # Keep spots from being reused. "auto" = view-distance radius (default), 0 = off, 1 = the landing chunk, N = bigger square.
+    uniquePlacements: "AUTO"
+    expand: false
+
+  # Default high/low landing window.
+  vert:
+    # Vertical placement algorithm.
+    # @type: enum
+    # @source: vert
+    name: "LINEAR"
+    minY: 32
+    maxY: 255
+
+    # Search order: 0 = bottom-up, 1 = top-down, 2 = middle-out, 3 = edges-in, else random.
+    direction: 2
+    requireSkyLight: true
+
+  # How many safe spots to pre-calculate.
+  cacheCap: 10
+
+  # Extra unverified spots kept ready. 0 = off.
+  backlogCacheCap: 0
+
+  # Max chunks kept loaded for instant teleports.
+  activeChunkCap: 5
+
+  # Bad-spot tracking precision (any positive integer, or "auto").
+  spatialResolution: "auto"
+
+  # Whether regions/worlds need permission.
+  requirePermission: false
+
+# DO NOT TOUCH VERSION NUMBER
+version: 3.1

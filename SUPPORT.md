@@ -79,6 +79,15 @@ Bug fixes and patches are released according to the following support tiers:
 | **Previous Stable (2.x)** | **Maintenance / Critical Only** | 6 months post-3.0 release | Critical security advisories and fatal data-loss bugs only. No feature backports. |
 | **Legacy (1.x and older)** | **End of Life (EOL)** | None | Unsupported. Upgrade required before filing issues. |
 
+**Minecraft versions:** bug reports are accepted for Minecraft **1.21.11 through
+the latest release**, on Spigot, Paper, Folia, Fabric and NeoForge. Older
+versions RTP still loads on (down to 1.18 on Paper and Spigot) are best-effort:
+reports from them may be closed without a fix. A later release will deprecate
+1.21.11, which moves this window up; it does not remove 1.21.11 support.
+Folia is the exception: it is experimental and only its current builds are
+maintained upstream, so Folia below 1.21.11 is not supported at all, and
+reports from it are closed.
+
 For platform, Minecraft, and Java runtime compatibility, refer to the canonical [Platform Support Matrix](docs/dev/SUPPORT_MATRIX.md).
 
 ---

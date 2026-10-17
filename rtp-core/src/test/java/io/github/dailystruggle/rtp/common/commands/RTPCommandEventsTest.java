@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands;
 
+import io.github.dailystruggle.rtp.common.commands.base.RTPCommandEvents;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 

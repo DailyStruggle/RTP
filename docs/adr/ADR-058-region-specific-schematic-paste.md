@@ -32,7 +32,7 @@ Where the prose below says "Fabric: vanilla structure NBT" or "WorldEdit clipboa
 
 ## Context
 
-The roadmap (Tier 2, [`docs/dev/ROADMAP.md`](../dev/ROADMAP.md)) carries an entry for *Region-specific schematic (`.schem`) support*: per-region arrival structures (a small platform, a lobby pad, an arrival shrine) pasted at the chosen `RTPLocation` once a teleport is confirmed. Operators want a teleporting player to land on a known, safe, decorated footprint rather than on raw generated terrain, and they want that footprint to differ per region (a hub region's pad vs. a wilderness region's stone disc).
+The roadmap (now tracked in the Linear `LeafRTP` team; see [`docs/dev/ROADMAP.md`](../dev/ROADMAP.md)) carried an entry for *Region-specific schematic (`.schem`) support*: per-region arrival structures (a small platform, a lobby pad, an arrival shrine) pasted at the chosen `RTPLocation` once a teleport is confirmed. Operators want a teleporting player to land on a known, safe, decorated footprint rather than on raw generated terrain, and they want that footprint to differ per region (a hub region's pad vs. a wilderness region's stone disc).
 
 Rule D-005 requires a proposal before implementation for any change that crosses module boundaries; this touches `rtp-api` (new SPI), `rtp-core` (config knob + paste invocation on the confirmed-location path), every backend adapter (`rtp-bukkit`/`rtp-paper`/`rtp-folia` via WorldEdit/FAWE soft-depend, `rtp-fabric` via vanilla structure NBT), and the resource/config tree. Hence this ADR.
 
@@ -158,7 +158,7 @@ This split keeps file I/O off tick threads (S-005) and block writes on the corre
 
 ## References
 
-- Roadmap entry: [`docs/dev/ROADMAP.md`](../dev/ROADMAP.md) Tier 2, *Region-specific schematic (`.schem`) support*.
+- Former roadmap entry *Region-specific schematic (`.schem`) support*: delivered; history in [`CHANGELOG.md`](../../CHANGELOG.md). Open work is tracked in the Linear `LeafRTP` team ([`docs/dev/ROADMAP.md`](../dev/ROADMAP.md) pointer).
 - Biome-getter hook prior art: `BukkitRTPWorld#setBiomeGetter` / `FoliaRTPWorld#setBiomeGetter`.
 - Scheduling contract: [`.junie/AGENTS.md`](../../.junie/AGENTS.md) *Scheduler Usage*; `RTPScheduler` (`runTask(RTPLocation, ...)`).
 - S-003 / S-004 / S-005 / S-006: [`REQUIREMENTS.md section 3`](../dev/REQUIREMENTS.md); claim integration: [ADR-019](ADR-019-claim-plugin-integrations-folded-into-plugin.md).

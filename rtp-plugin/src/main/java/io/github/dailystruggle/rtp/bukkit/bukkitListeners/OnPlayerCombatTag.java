@@ -57,9 +57,7 @@ public class OnPlayerCombatTag implements Listener {
       ProjectileSource shooter = projectile.getShooter();
       if (shooter instanceof Player p) return p;
     }
-    if (damager instanceof TNTPrimed tnt) {
-      if (tnt.getSource() instanceof Player p) return p;
-    }
+    if (damager instanceof TNTPrimed tnt && tnt.getSource() instanceof Player p) return p;
     return null;
   }
 }

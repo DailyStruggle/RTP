@@ -143,6 +143,7 @@ def on_config(config):
     if adr_nav is not None and isinstance(config.get("nav"), list):
         config["nav"].append(adr_nav)
 
+
     return config
 
 

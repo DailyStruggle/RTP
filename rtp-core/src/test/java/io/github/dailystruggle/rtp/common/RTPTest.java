@@ -41,6 +41,7 @@ class RTPTest {
         accessor = RTPTestSetup.install(tempDir.toFile());
         // Clear any leftover player-data state from previous tests
         RTP rtp = RTP.getInstance();
+        rtp.databaseAccessor = null;
         rtp.latestTeleportData.clear();
         rtp.priorTeleportData.clear();
         rtp.queuedPlayers.clear();
@@ -486,6 +487,18 @@ class RTPTest {
 
         // stop() should not throw even with completed entries
         assertDoesNotThrow(RTP::stop);
+
+        // Re-install for tearDown / subsequent tests
+        accessor = RTPTestSetup.install(tempDir.toFile());
+    }
+
+    @Test
+    void stop_withMockDatabaseAccessor_doesNotThrowNPE() {
+        RTP rtp = RTP.getInstance();
+        rtp.databaseAccessor = org.mockito.Mockito.mock(io.github.dailystruggle.rtp.common.database.DatabaseAccessor.class);
+
+        assertDoesNotThrow(RTP::stop);
+        assertNull(rtp.databaseAccessor);
 
         // Re-install for tearDown / subsequent tests
         accessor = RTPTestSetup.install(tempDir.toFile());

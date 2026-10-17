@@ -9,6 +9,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -130,5 +131,128 @@ class SparkMetricsBindingTest {
         assertFalse(b.sparkEnabled());
         assertEquals(18.0, b.tps1m(), 1e-9);
         assertEquals(55.0, b.mspt(), 1e-9);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("minTPS/maxMSPT gate: worst readings combine spark with the delegate's worst region")
+    void worst_readings_take_the_worse_of_spark_and_delegate() {
+        MetricsBinding regional = new MetricsBinding() {
+            @Override public double tps1m() { return 19.9; }
+            @Override public double worstTps1m() { return 14.0; }
+            @Override public double worstMspt() { return 70.0; }
+        };
+        SparkMetricsBinding b = new SparkMetricsBinding(regional, spark(true, 19.5, 19.5, 19.5, 30.0));
+        assertEquals(14.0, b.worstTps1m(), 1e-9, "one slow Folia region must not hide behind spark's TPS");
+        assertEquals(70.0, b.worstMspt(), 1e-9);
+
+        SparkMetricsBinding unsampledDelegate = new SparkMetricsBinding(MetricsBinding.NOOP,
+                spark(true, 18.0, 18.0, 18.0, 40.0));
+        assertEquals(18.0, unsampledDelegate.worstTps1m(), 1e-9);
+        assertEquals(40.0, unsampledDelegate.worstMspt(), 1e-9);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("ADR-087 regional circuit breaker: a regional delegate's region readings pass through unchanged")
+    void region_readings_delegate_to_regional_binding() {
+        java.util.UUID world = java.util.UUID.randomUUID();
+        MetricsBinding folia = new MetricsBinding() {
+            @Override public boolean regionalTicking() { return true; }
+            @Override public double regionTps1m(java.util.UUID w, int x, int z) { return x == 0 ? 19.9 : 1.4; }
+            @Override public double regionMspt(java.util.UUID w, int x, int z) {
+                return x == 0 ? MetricsSnapshot.UNSAMPLED : 700.0;
+            }
+        };
+        // spark's server-wide 12 TPS / 80 MSPT must not mark the healthy region unhealthy.
+        SparkMetricsBinding b = new SparkMetricsBinding(folia, spark(true, 12.0, 12.0, 12.0, 80.0));
+        assertTrue(b.regionalTicking());
+        assertEquals(19.9, b.regionTps1m(world, 0, 0), 1e-9);
+        assertTrue(Double.isNaN(b.regionMspt(world, 0, 0)));
+        assertEquals(1.4, b.regionTps1m(world, 64, 0), 1e-9);
+        assertEquals(700.0, b.regionMspt(world, 64, 0), 1e-9);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("ADR-087 regional circuit breaker: single-loop region readings take the worse of spark and the delegate")
+    void region_readings_combine_on_single_loop() {
+        java.util.UUID world = java.util.UUID.randomUUID();
+        SparkMetricsBinding b = new SparkMetricsBinding(nativeDelegate(), spark(true, 19.5, 19.5, 19.5, 60.0));
+        assertFalse(b.regionalTicking());
+        assertEquals(18.0, b.regionTps1m(world, 0, 0), 1e-9, "delegate 18 TPS is worse than spark 19.5");
+        assertEquals(60.0, b.regionMspt(world, 0, 0), 1e-9, "spark 60 MSPT is worse than delegate 55");
+
+        SparkMetricsBinding noDelegate = new SparkMetricsBinding(MetricsBinding.NOOP, spark(true, 17.0, 17.0, 17.0, 40.0));
+        assertEquals(17.0, noDelegate.regionTps1m(world, 0, 0), 1e-9);
+        assertEquals(40.0, noDelegate.regionMspt(world, 0, 0), 1e-9);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("a wrapped platform binding still recognises itself as installed")
+    void wraps_recognises_the_delegate() {
+        MetricsBinding inner = nativeDelegate();
+        SparkMetricsBinding b = new SparkMetricsBinding(inner, spark(false, 0, 0, 0, 0));
+        assertTrue(b.wraps(inner));
+        assertTrue(b.wraps(b));
+        assertFalse(b.wraps(nativeDelegate()));
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("observeRegion forwards to the delegate so Folia region probes start under spark")
+    void observeRegion_forwards_to_delegate() {
+        java.util.concurrent.atomic.AtomicBoolean observed = new java.util.concurrent.atomic.AtomicBoolean(false);
+        MetricsBinding folia = new MetricsBinding() {
+            @Override
+            public void observeRegion(Object w, int x, int z) {
+                observed.set(true);
+            }
+        };
+        SparkMetricsBinding b = new SparkMetricsBinding(folia, spark(false, 0, 0, 0, 0));
+        b.observeRegion(new Object(), 10, 20);
+        assertTrue(observed.get(), "spark decorator must forward observeRegion to delegate");
+    }
+
+    interface DummySparkMetadataProvider {
+        java.util.Map<String, Object> provide();
+    }
+
+    @Test
+    void telemetry_dataset_contains_all_required_keys_and_handles_gracefully() {
+        java.util.Map<String, Object> telemetry = SparkMetricsBinding.collectTelemetry();
+        assertNotNull(telemetry);
+
+        // Required MemoryTracker state keys
+        assertTrue(telemetry.containsKey("rtp.memory.tracked_entries_total"));
+        assertTrue(telemetry.containsKey("rtp.memory.active_tasks"));
+        assertTrue(telemetry.containsKey("rtp.memory.active_chunk_tickets"));
+        assertTrue(telemetry.containsKey("rtp.memory.ceiling_bytes"));
+
+        // Required Queue & Cache state keys
+        assertTrue(telemetry.containsKey("rtp.queue.l1_ready_count"));
+        assertTrue(telemetry.containsKey("rtp.queue.l2_cold_count"));
+        assertTrue(telemetry.containsKey("rtp.queue.l3_backlog_bins"));
+
+        // Required Teleport Pipeline keys
+        assertTrue(telemetry.containsKey("rtp.pipeline.pending_teleports"));
+        assertTrue(telemetry.containsKey("rtp.pipeline.avg_latency_ms"));
+        assertTrue(telemetry.containsKey("rtp.pipeline.slow_count"));
+    }
+
+    @Test
+    void metadata_provider_proxy_serializes_telemetry_dataset() {
+        Object proxy = ReflectiveSparkStats.createMetadataProviderProxy(DummySparkMetadataProvider.class);
+        assertNotNull(proxy);
+        assertTrue(proxy instanceof DummySparkMetadataProvider);
+
+        DummySparkMetadataProvider provider = (DummySparkMetadataProvider) proxy;
+        java.util.Map<String, Object> data = provider.provide();
+        assertNotNull(data);
+        assertTrue(data.containsKey("rtp.memory.tracked_entries_total"));
+        assertTrue(data.containsKey("rtp.queue.l1_ready_count"));
+        assertTrue(data.containsKey("rtp.pipeline.avg_latency_ms"));
+
+        // Common Object methods
+        assertEquals("RTPSparkMetadataProviderProxy", proxy.toString());
+        assertTrue(proxy.equals(proxy));
+        assertFalse(proxy.equals(null));
+        assertTrue(proxy.hashCode() != 0);
     }
 }

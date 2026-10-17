@@ -15,6 +15,7 @@ import io.github.dailystruggle.rtp.proxy.common.transport.ReservationTokenReaper
 import io.github.dailystruggle.rtp.proxy.common.transport.memory.InMemoryNetworkRequestQueue;
 import io.github.dailystruggle.rtp.proxy.common.transport.memory.InMemoryNetworkStateBinding;
 import io.github.dailystruggle.rtp.proxy.common.transport.redis.RedisNetworkStateBinding;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespEndpoint;
 import io.github.dailystruggle.rtp.proxy.common.transport.sql.SqlNetworkStateBinding;
 
 import java.io.File;
@@ -55,6 +56,8 @@ public final class NetworkModeBootstrap {
     // boot() did not complete past router wiring.
     private PeerRegionRegistry peerRegionRegistry;
     private BukkitNetworkCommandHook commandHook;
+    private String serverId;
+    private DispatchMode dispatchMode = DispatchMode.AUTO;
     // ADR-015 / REQ-RTP-NET-015: lobby-side waitlist UX.
     // - notifier: periodic player-facing 'queued, position N' message.
     // - waitlistGuard: sender-check predicate registered on RTPCmdBukkit
@@ -113,13 +116,14 @@ public final class NetworkModeBootstrap {
             return; // REQ-RTP-NET-002: parity-by-construction.
         }
 
-        String serverId = network.getString("serverId", "");
-        if (serverId == null || serverId.isEmpty()) {
+        String localServerId = network.getString("serverId", "");
+        if (localServerId == null || localServerId.isEmpty()) {
             RTP.log(Level.WARNING,
                     "[RTP] network.enabled=true but network.serverId is empty; "
                             + "refusing to enable network mode (REQ-RTP-NET-002).");
             return;
         }
+        this.serverId = localServerId;
 
         RtpYamlSection transportSec = cfg.getConfigurationSection("transport");
         String transportType = transportSec == null ? "in-memory"
@@ -150,16 +154,42 @@ public final class NetworkModeBootstrap {
         // Symmetric verifier wiring is required for cross-server `/rtp` to work.
         String secretEnv = network.getString("secretEnv", "RTP_NET_SECRET");
         int schemaVersion = (int) network.getLong("schemaVersion", 1L);
+        // Fail closed (rtp-proxy-ADR-010 Key Material) on the signing tiers
+        // (redis, proxy-direct): a missing / weak secret disables network mode
+        // rather than running unsigned. Non-signing tiers never read it.
         io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier verifier = null;
         try {
             verifier = io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier
                     .loadFromEnv(secretEnv, schemaVersion, schemaVersion);
         } catch (Throwable t) {
+            String tt = transportType == null ? "" : transportType.toLowerCase(java.util.Locale.ROOT);
+            if (tt.equals("redis") || tt.equals("sql")
+                    || tt.equals("proxy-direct") || tt.equals("proxydirect")) {
+                RTP.log(Level.SEVERE,
+                        "[RTP] HMAC verifier load failed (secretEnv='" + secretEnv
+                                + "'): " + t.getMessage()
+                                + " - transport.type=" + transportType + " requires it; network mode stays "
+                                + "DISABLED. Set the env var to a Base64 secret of >= 32 bytes on every "
+                                + "backend and proxy (REQ-RTP-PROXY-007).");
+                return;
+            }
             RTP.log(Level.WARNING,
                     "[RTP] HMAC verifier load failed (secretEnv='" + secretEnv
                             + "'): " + t.getMessage()
-                            + " - heartbeat rows will be unsigned and the proxy "
-                            + "will reject them. Set the env var to a 32+ byte secret.", t);
+                            + " - transport.type=" + transportType + " does not sign payloads; continuing.");
+        }
+
+        if (verifier == null && isClientForgeableTier(transportType)
+                && !network.getBoolean("allowUnsigned", false)) {
+            // Unsigned plugin-message rows can be injected by a modded client; running
+            // without the secret is an explicit operator opt-in (REQ-RTP-PROXY-007).
+            RTP.log(Level.SEVERE,
+                    "[RTP] transport.type=" + transportType + " has no HMAC secret (secretEnv='"
+                            + secretEnv + "'); network mode stays DISABLED. Set the env var to a Base64"
+                            + " secret of >= 32 bytes on every backend and the proxy, or set"
+                            + " network.allowUnsigned: true to accept unauthenticated heartbeats"
+                            + " (clients can then forge server/region availability).");
+            return;
         }
 
         NetworkTransport selected;
@@ -214,11 +244,11 @@ public final class NetworkModeBootstrap {
             RTP.log(Level.WARNING,
                     "[RTP] no BackendStateSampler factory installed by the platform"
                             + " adapter; network mode requires one - aborting network boot"
-                            + " for this lifecycle (serverId='" + serverId + "').");
+                            + " for this lifecycle (serverId='" + localServerId + "').");
             return;
         }
         BackendStateSampler sampler = samplerFactory.apply(lobbyMode);
-        BackendStatePublisher pub = new BackendStatePublisher(selected, sampler, serverId, intervalMs);
+        BackendStatePublisher pub = new BackendStatePublisher(selected, sampler, localServerId, intervalMs);
         pub.start();
 
         // Refresh cached snapshot periodically via async scheduler.
@@ -248,15 +278,14 @@ public final class NetworkModeBootstrap {
         if (detector != null) {
             Runnable pump = () -> {
                 try {
+                    // Only spend a handshake when a carrier player can
+                    // actually carry the plugin message.
                     if (detector.state()
                             != io.github.dailystruggle.rtp.common.network.pluginmessage
-                                    .ProxyAutoDetector.State.ENABLED) {
-                        // Only spend a handshake when a carrier player can
-                        // actually carry the plugin message.
-                        if (probeBridge == null
-                                || probeBridge.anyOnlinePlayer().isPresent()) {
-                            detector.onCarrierAvailable();
-                        }
+                                    .ProxyAutoDetector.State.ENABLED
+                            && (probeBridge == null
+                                || probeBridge.anyOnlinePlayer().isPresent())) {
+                        detector.onCarrierAvailable();
                     }
                     detector.tick();
                 } catch (Throwable ignored) {
@@ -283,7 +312,7 @@ public final class NetworkModeBootstrap {
         // proxy-direct is a remote view of the proxy store: the standard
         // JoinTriggerSource reads the reservation via findReservation/redeem
         // RPC, so no dedicated proxy-direct arrival listener is needed.
-        this.joinTriggerSource = new JoinTriggerSource(selected, serverId);
+        this.joinTriggerSource = new JoinTriggerSource(selected, localServerId);
 
         // Wire router + enrolment buffer + status cache.
         // Until then the buffer's flushSink is a no-op and the cache's
@@ -310,7 +339,7 @@ public final class NetworkModeBootstrap {
             // read, join redeem) keeps working.
             NetworkRequestQueue rq;
             try {
-                rq = openRequestQueue(transportType, transportSec);
+                rq = openRequestQueue(transportType, transportSec, verifier, schemaVersion);
             } catch (UnsupportedOperationException notReady) {
                 RTP.log(Level.INFO,
                         "[RTP] NetworkRequestQueue for transport=" + transportType
@@ -430,7 +459,7 @@ public final class NetworkModeBootstrap {
                 this.joinTriggerSource.setStatusCache(this.statusCache);
             }
             this.router = new NetworkRouter(
-                    serverId,
+                    localServerId,
                     routerMode,
                     () -> this.cachedSnapshot,
                     NetworkModeBootstrap::sumLocalKeptCount,
@@ -509,7 +538,7 @@ public final class NetworkModeBootstrap {
             }
             this.peerRegionRegistry = new PeerRegionRegistry(
                     () -> this.cachedSnapshot,
-                    serverId,
+                    localServerId,
                     loadBalancerConfig);
             // Topology supplier: seed discovered peer servers.
             this.peerRegionRegistry.setTopologyPeerSupplier(() -> {
@@ -524,6 +553,32 @@ public final class NetworkModeBootstrap {
                     this.publisher, this.lobbyRetryQueue);
             // Pre-seed sticky queued row on cross-server enrolment.
             this.commandHook.setEnrolmentSeeder(this.statusCache::seedLocal);
+
+            // Configure dispatch mode (rtp-proxy-ADR-020: Direct DB Mode).
+            String dispatchModeStr = routing == null ? "auto" : routing.getString("dispatchMode", "auto");
+            DispatchMode configuredDispatchMode = DispatchMode.parse(dispatchModeStr);
+            this.dispatchMode = DispatchMode.resolve(configuredDispatchMode, transportType, this.requestQueue != null);
+
+            if (this.dispatchMode == DispatchMode.DIRECT_DB) {
+                long reservationTtlMs = reservation == null ? 60_000L : reservation.getLong("ttlMs", 60_000L);
+                io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge bridge = openNetworkBridgeOrNull();
+                DirectDatabaseDispatcher directDispatcher = new DirectDatabaseDispatcher(
+                        selected,
+                        () -> this.cachedSnapshot,
+                        this.peerRegionRegistry,
+                        bridge,
+                        localServerId,
+                        Duration.ofMillis(reservationTtlMs),
+                        uuid -> {
+                            try { RTP.getInstance().processingPlayers.remove(uuid); } catch (Throwable ignored) {}
+                        }
+                );
+                this.commandHook.setDirectDatabaseDispatcher(directDispatcher);
+                RTP.log(Level.INFO,
+                        "[RTP] Direct DB Mode enabled (rtp-proxy-ADR-020): direct backend cross-server dispatch over "
+                                + transportType + " with native proxy Connect.");
+            }
+
             RTP.networkCommandHook = this.commandHook;
             LIVE = this;
 
@@ -532,7 +587,7 @@ public final class NetworkModeBootstrap {
                 NetworkSnapshot bootSnap = selected.readSnapshot()
                         .get(2000L, java.util.concurrent.TimeUnit.MILLISECONDS);
                 NetworkRegionCollisionWarner.auditAndWarn(
-                        bootSnap, serverId, NetworkRegionCollisionWarner.Policy.WARN);
+                        bootSnap, localServerId, NetworkRegionCollisionWarner.Policy.WARN);
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
                 RTP.log(Level.FINE,
@@ -563,7 +618,7 @@ public final class NetworkModeBootstrap {
 
         // Reconcile active network reservations on boot.
         try {
-            reconcileNetworkReservations(selected, serverId);
+            reconcileNetworkReservations(selected, localServerId);
         } catch (Throwable reconcileFail) {
             RTP.log(Level.WARNING,
                     "[RTP] boot-time reservation reconcile failed: "
@@ -573,7 +628,7 @@ public final class NetworkModeBootstrap {
         }
 
         RTP.log(Level.INFO,
-                "[RTP] Backend network mode enabled: serverId='" + serverId
+                "[RTP] Backend network mode enabled: serverId='" + localServerId
                         + "' transport=" + transportType + " intervalMs=" + intervalMs
                         + " reapIntervalMs=" + reapMs
                         + " router=" + (router == null ? "disabled" : router.mode()));
@@ -746,6 +801,9 @@ public final class NetworkModeBootstrap {
     /** Visible for tests. */
     public NetworkStatusCache statusCache() { return statusCache; }
 
+    /** Lobby auto-retry queue; null off-lobby or when wiring failed. */
+    public LobbyDispatchRetryQueue lobbyRetryQueue() { return lobbyRetryQueue; }
+
     /** Visible for tests. Null when {@code transport.type}
      *  is {@code sql} or {@code redis} and the queue is not yet wired. */
     public NetworkRequestQueue requestQueue() { return requestQueue; }
@@ -759,9 +817,21 @@ public final class NetworkModeBootstrap {
     public BukkitNetworkCommandHook commandHook() { return commandHook; }
 
     /**
+     * The configured network server ID for this backend instance.
+     */
+    public String serverId() { return serverId; }
+
+    /**
+     * The effective dispatch mode (rtp-proxy-ADR-020).
+     */
+    public DispatchMode dispatchMode() { return dispatchMode; }
+
+    /**
      * Open a {@link NetworkRequestQueue} matching the configured transport kind.
      */
-    private static NetworkRequestQueue openRequestQueue(String transportType, RtpYamlSection transportSec) {
+    private static NetworkRequestQueue openRequestQueue(String transportType, RtpYamlSection transportSec,
+                                                        io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier verifier,
+                                                        int schemaVersion) {
         String t = transportType == null ? "in-memory"
                 : transportType.toLowerCase(java.util.Locale.ROOT);
         switch (t) {
@@ -778,8 +848,9 @@ public final class NetworkModeBootstrap {
                             "transport.type=sql requires an AbstractSQLDatabaseAccessor; "
                                     + "current database.yml is not SQL-backed.");
                 }
+                // Signed entries (rtp-proxy-ADR-010): the dequeuing proxy drops unsigned rows.
                 return new io.github.dailystruggle.rtp.proxy.common.transport.sql.SqlNetworkRequestQueue(
-                        accessor.asDataSource());
+                        accessor.asDataSource(), verifier, schemaVersion);
             }
             case "redis": {
                 // Redis: source host/port/password from the same
@@ -791,11 +862,12 @@ public final class NetworkModeBootstrap {
                 // per-status HASHes (mirrors {@code NetworkBindings.openRequestQueue}).
                 RtpYamlSection redis = transportSec == null
                         ? null : transportSec.getConfigurationSection("redis");
-                String host = redis == null ? "localhost" : redis.getString("host", "localhost");
-                int port = redis == null ? 6379 : redis.getInt("port", 6379);
-                String password = redis == null ? null : redis.getString("password", null);
+                RespEndpoint ep = parseRedisEndpoint(redis);
+                String host = (ep.tls() || ep.username() != null) ? ep.toUri() : ep.host();
+                int port = ep.port();
+                String password = redisPassword(redis);
                 return new io.github.dailystruggle.rtp.proxy.common.transport.redis.RedisNetworkRequestQueue(
-                        host, port, password, 0);
+                        host, port, password, 0, verifier, schemaVersion);
             }
             case "proxy-direct":
             case "proxydirect":
@@ -925,6 +997,13 @@ public final class NetworkModeBootstrap {
     /** Default TCP port for the {@code proxy-direct} transport (rtp-proxy-ADR-017). */
     private static final int PROXY_DIRECT_DEFAULT_PORT = 25599;
 
+    /** Plugin-message tiers: inbound rows ride player connections, so unsigned rows are forgeable. */
+    static boolean isClientForgeableTier(String type) {
+        String t = type == null ? "in-memory" : type.toLowerCase(java.util.Locale.ROOT);
+        return t.equals("plugin-message") || t.equals("pluginmessage")
+                || t.equals("proxy-cache") || t.equals("proxycache") || t.equals("auto");
+    }
+
     /**
      * Open the transport binding matching {@code type}. Supports
      * {@code in-memory} (dev/test) and {@code sql} (real cross-process).
@@ -952,8 +1031,9 @@ public final class NetworkModeBootstrap {
                             "transport.type=plugin-message requires a platform NetworkBridge; "
                                     + "this platform did not install one (RTP.networkBridgeFactory is null).");
                 }
+                // verifier signs gossip + rejects unsigned/forged inbound rows.
                 return new io.github.dailystruggle.rtp.common.network.pluginmessage
-                        .PluginMessageNetworkBinding(bridge, staleAfterMs, System::currentTimeMillis);
+                        .PluginMessageNetworkBinding(bridge, staleAfterMs, System::currentTimeMillis, verifier);
             }
             case "proxy-cache":
             case "proxycache": {
@@ -969,7 +1049,7 @@ public final class NetworkModeBootstrap {
                                     + "this platform did not install one (RTP.networkBridgeFactory is null).");
                 }
                 return new io.github.dailystruggle.rtp.common.network.pluginmessage
-                        .ProxyCacheNetworkBinding(bridge, staleAfterMs, System::currentTimeMillis);
+                        .ProxyCacheNetworkBinding(bridge, staleAfterMs, System::currentTimeMillis, verifier);
             }
             case "auto": {
                 // Auto-detect proxy transport via passive probe and plugin-message bridge.
@@ -997,7 +1077,7 @@ public final class NetworkModeBootstrap {
                 this.autoDetectorBridge = bridge;
                 // Proxy-cache binding under auto mode.
                 return new io.github.dailystruggle.rtp.common.network.pluginmessage
-                        .ProxyCacheNetworkBinding(bridge, staleAfterMs, System::currentTimeMillis);
+                        .ProxyCacheNetworkBinding(bridge, staleAfterMs, System::currentTimeMillis, verifier);
             }
             case "proxy-direct":
             case "proxydirect": {
@@ -1026,9 +1106,16 @@ public final class NetworkModeBootstrap {
                         : transportSec.getInt("connectTimeoutMs", 1000);
                 int readTimeoutMs = transportSec == null ? 2000
                         : transportSec.getInt("readTimeoutMs", 2000);
+                // TLS keys (tls, keystore, truststore, *PasswordEnv, verifyHostname)
+                // sit beside transport.proxies, mirroring the proxy's transport.direct block.
+                io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectTlsConfig tls =
+                        transportSec == null
+                                ? io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectTlsConfig.unset()
+                                : io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectTlsConfig
+                                        .fromMap(transportSec.getValues(false), msg -> RTP.log(Level.WARNING, "[RTP] " + msg));
                 return new io.github.dailystruggle.rtp.common.network.direct
                         .ProxyDirectNetworkBinding(parsed, verifier, schemaVersion,
-                        staleAfterMs, connectTimeoutMs, readTimeoutMs, System::currentTimeMillis);
+                        staleAfterMs, connectTimeoutMs, readTimeoutMs, System::currentTimeMillis, tls);
             }
             case "sql": {
                 // Reuse the existing AbstractSQLDatabaseAccessor pool via asDataSource()
@@ -1039,7 +1126,7 @@ public final class NetworkModeBootstrap {
                             "transport.type=sql requires an AbstractSQLDatabaseAccessor; "
                                     + "current database.yml is not SQL-backed.");
                 }
-                return new SqlNetworkStateBinding(accessor.asDataSource(), intervalMs);
+                return new SqlNetworkStateBinding(accessor.asDataSource(), intervalMs, verifier, schemaVersion);
             }
             case "redis": {
                 // Redis: heartbeats + snapshot + pub/sub fan-out.
@@ -1049,9 +1136,10 @@ public final class NetworkModeBootstrap {
                 // verify. Passing null here silently disables signing and
                 // causes the proxy to reject every snapshot read.
                 RtpYamlSection redis = transportSec == null ? null : transportSec.getConfigurationSection("redis");
-                String host = redis == null ? "localhost" : redis.getString("host", "localhost");
-                int port = redis == null ? 6379 : redis.getInt("port", 6379);
-                String password = redis == null ? null : redis.getString("password", null);
+                RespEndpoint ep = parseRedisEndpoint(redis);
+                String host = (ep.tls() || ep.username() != null) ? ep.toUri() : ep.host();
+                int port = ep.port();
+                String password = redisPassword(redis);
                 if (verifier == null) {
                     // Fall back to the legacy 4-arg ctor only when verifier
                     // load failed - logged at WARNING above. Both ends will be
@@ -1081,6 +1169,60 @@ public final class NetworkModeBootstrap {
                             + t.getMessage() + " - plugin-message tier unavailable.", t);
             return null;
         }
+    }
+
+    private static final java.util.concurrent.atomic.AtomicBoolean YAML_REDIS_PASSWORD_WARNED =
+            new java.util.concurrent.atomic.AtomicBoolean();
+
+    /**
+     * Parse Redis endpoint settings from {@code transport.redis.*}.
+     * Respects {@code host}, {@code port}, {@code tls}, and {@code username},
+     * defaulting the port to 6380 when TLS is active without an explicit port,
+     * and 6379 otherwise.
+     */
+    static RespEndpoint parseRedisEndpoint(RtpYamlSection redis) {
+        String hostRaw = redis == null ? "localhost" : redis.getString("host", "localhost");
+        boolean tlsFlag = redis != null && redis.getBoolean("tls", false);
+        boolean tlsDetected = tlsFlag || hostRaw.trim().toLowerCase(java.util.Locale.ROOT).startsWith("rediss://");
+        int defaultPort = tlsDetected ? 6380 : 6379;
+        int port = (redis != null && redis.contains("port"))
+                ? (int) redis.getLong("port", defaultPort)
+                : defaultPort;
+        String username = redis == null ? null : redis.getString("username", null);
+        if (username != null && username.isEmpty()) {
+            username = null;
+        }
+
+        RespEndpoint ep;
+        try {
+            ep = RespEndpoint.parse(hostRaw, port);
+            boolean tls = ep.tls() || tlsFlag;
+            String user = ep.username() != null ? ep.username() : username;
+            return new RespEndpoint(ep.host(), ep.port(), tls, user);
+        } catch (IllegalArgumentException e) {
+            RTP.log(Level.WARNING, "[RTP] transport.redis.host: " + e.getMessage() + "; falling back to defaults.");
+            return new RespEndpoint("localhost", defaultPort, tlsFlag, username);
+        }
+    }
+
+    /**
+     * Redis password: env var named by {@code transport.redis.passwordEnv}
+     * (default {@code RTP_REDIS_PASSWORD}, same as the proxy) first, then the
+     * YAML {@code password} with a one-time WARNING. Never logged.
+     */
+    static String redisPassword(RtpYamlSection redis) {
+        String envName = redis == null ? "RTP_REDIS_PASSWORD"
+                : redis.getString("passwordEnv", "RTP_REDIS_PASSWORD");
+        if (envName != null && !envName.isEmpty()) {
+            String fromEnv = System.getenv(envName);
+            if (fromEnv != null && !fromEnv.isEmpty()) return fromEnv;
+        }
+        String yaml = redis == null ? null : redis.getString("password", null);
+        if (yaml != null && !yaml.isEmpty() && YAML_REDIS_PASSWORD_WARNED.compareAndSet(false, true)) {
+            RTP.log(Level.WARNING, "[RTP] transport.redis.password is set in network.yml; prefer the env var '"
+                    + envName + "' so the secret stays out of config files.");
+        }
+        return yaml;
     }
 
     private static AbstractSQLDatabaseAccessor sqlAccessorOrNull() {
@@ -1163,14 +1305,14 @@ public final class NetworkModeBootstrap {
 
     /**
      * Trivial adapter: lets the existing
-     * {@link io.github.dailystruggle.rtp.common.network.NetworkStateBinding}
+     * {@link io.github.dailystruggle.rtp.common.database.options.NetworkStateBinding}
      * slot on {@code AbstractSQLDatabaseAccessor} hold a reference to the
      * live transport. The interface's {@code transport()} default returns
      * {@code null}; this override exposes the delegate to consumers such
      * as {@code NetworkSimulationTestJob} ({@code rtp test network}).
      */
     private static final class BindingAdapter
-            implements io.github.dailystruggle.rtp.common.network.NetworkStateBinding {
+            implements io.github.dailystruggle.rtp.common.database.options.NetworkStateBinding {
         private final NetworkTransport delegate;
         BindingAdapter(NetworkTransport delegate) { this.delegate = delegate; }
         @Override

@@ -5,6 +5,8 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import io.github.dailystruggle.rtp.common.search.FuzzySearchEngine;
+import io.github.dailystruggle.rtp.common.search.ThesaurusIndex;
 import io.github.dailystruggle.rtp.common.text.LegacyColorStrip;
 import io.github.dailystruggle.rtp.common.text.LegacyColorStrip.StripResult;
 
@@ -15,10 +17,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
- * Case-insensitive substring search across loaded {@link ConfigParser} instances.
- * Matches against key names and values with raw-offset projection for highlights.
+ * Intelligent configuration search across loaded {@link ConfigParser} instances.
+ * Incorporates exact, substring, thesaurus synonym, and adaptive Levenshtein distance
+ * matching against key names and values with relevance scoring and raw-offset projection.
  */
 public final class ConfigSearchResultsBuilder {
 
@@ -31,13 +35,21 @@ public final class ConfigSearchResultsBuilder {
             String keyName,
             boolean keyMatched,
             String rawValue,
-            List<int[]> matchRanges) {
+            List<int[]> matchRanges,
+            int score,
+            String matchReason) {
         /** Validates and normalises the record components. */
         public Hit {
             if (fileName == null) throw new IllegalArgumentException("fileName");
             if (keyName == null) throw new IllegalArgumentException("keyName");
             if (rawValue == null) rawValue = "";
             matchRanges = matchRanges == null ? List.of() : List.copyOf(matchRanges);
+            if (matchReason == null) matchReason = "";
+        }
+
+        /** Backward-compatible constructor defaulting score to 0 and matchReason to empty. */
+        public Hit(String fileName, String keyName, boolean keyMatched, String rawValue, List<int[]> matchRanges) {
+            this(fileName, keyName, keyMatched, rawValue, matchRanges, 0, "");
         }
     }
 
@@ -70,11 +82,12 @@ public final class ConfigSearchResultsBuilder {
         String trimmed = query.trim();
         if (trimmed.length() < MIN_QUERY_LENGTH) return List.of();
         String needle = trimmed.toLowerCase(Locale.ROOT);
+        Set<String> matchedSynonyms = ThesaurusIndex.getInstance().getMatchingSynonyms(List.of(needle));
 
         List<Hit> hits = new ArrayList<>();
         for (ConfigParser<?> parser : configs.configParserMap.values()) {
             if (parser == null) continue;
-            collectFromParser(parser, stripYml(parser.name), needle, hits);
+            collectFromParser(parser, stripYml(parser.name), needle, matchedSynonyms, hits);
         }
         for (MultiConfigParser<?> mcp : configs.multiConfigParserMap.values()) {
             if (mcp == null) continue;
@@ -92,9 +105,19 @@ public final class ConfigSearchResultsBuilder {
                 String fileName = (kind == null || kind.isEmpty())
                         ? stripYml(sub.name)
                         : kind + "/" + stripYml(sub.name);
-                collectFromParser(sub, fileName, needle, hits);
+                collectFromParser(sub, fileName, needle, matchedSynonyms, hits);
             }
         }
+
+        // Rank descending by relevance score, with deterministic tie-breaking
+        hits.sort((a, b) -> {
+            int cmp = Integer.compare(b.score(), a.score());
+            if (cmp != 0) return cmp;
+            int fileCmp = a.fileName().compareTo(b.fileName());
+            if (fileCmp != 0) return fileCmp;
+            return a.keyName().compareTo(b.keyName());
+        });
+
         return Collections.unmodifiableList(hits);
     }
 
@@ -108,7 +131,7 @@ public final class ConfigSearchResultsBuilder {
     }
 
     private static <E extends Enum<E>> void collectFromParser(
-            ConfigParser<E> parser, String fileName, String needle, List<Hit> out) {
+            ConfigParser<E> parser, String fileName, String needle, Set<String> matchedSynonyms, List<Hit> out) {
         EnumMap<E, Object> data;
         try {
             data = parser.getData();
@@ -127,7 +150,7 @@ public final class ConfigSearchResultsBuilder {
             collectLeaves(enumKey.name(), entry.getValue(), leaves);
         }
         for (Map.Entry<String, Object> leaf : leaves.entrySet()) {
-            collectFromLeaf(fileName, leaf.getKey(), leaf.getValue(), needle, out);
+            collectFromLeaf(fileName, leaf.getKey(), leaf.getValue(), needle, matchedSynonyms, out);
         }
     }
 
@@ -169,44 +192,85 @@ public final class ConfigSearchResultsBuilder {
         }
     }
 
-    /** Run the key-name and value substring match for a single flattened leaf. */
+    /** Run the key-name and value match for a single flattened leaf with scoring and highlighting. */
     private static void collectFromLeaf(
-            String fileName, String keyName, Object value, String needle, List<Hit> out) {
+            String fileName, String keyName, Object value, String needle, Set<String> matchedSynonyms, List<Hit> out) {
         String rawValue = value == null ? "" : String.valueOf(value);
 
-        // Key match (color-stripped, though keys are rarely colorized). The
-        // dotted keyName is matched whole, so "shape" surfaces "shape.radius"
-        // and "radius" matches the leaf segment.
+        // Key match (color-stripped, though keys are rarely colorized).
         StripResult keyStrip = LegacyColorStrip.strip2(keyName);
-        if (keyStrip.stripped.toLowerCase(Locale.ROOT).contains(needle)) {
-            out.add(new Hit(fileName, keyName, true, rawValue, List.of()));
+        String strippedKey = keyStrip.stripped.toLowerCase(Locale.ROOT);
+        String normKey = FuzzySearchEngine.normalize(strippedKey);
+        String normNeedle = FuzzySearchEngine.normalize(needle);
+
+        boolean keyHitFound = false;
+        int keyScore = 0;
+        String keyReason = "";
+
+        // 1. Exact key match
+        if (strippedKey.equals(needle) || (!normKey.isEmpty() && normKey.equals(normNeedle))) {
+            keyHitFound = true;
+            keyScore = 120;
+            keyReason = "Exact Key";
+        } else if (strippedKey.startsWith(needle) || (strippedKey.contains(needle) && needle.length() >= 2)) {
+            // 2. Substring or prefix key match
+            keyHitFound = true;
+            keyScore = 80;
+            keyReason = "Key Match";
+        } else if (matchedSynonyms != null && !matchedSynonyms.isEmpty()) {
+            // 3. Thesaurus synonym match
+            for (String syn : matchedSynonyms) {
+                if (strippedKey.equals(syn) || strippedKey.contains(syn) || syn.contains(strippedKey)
+                        || (!normKey.isEmpty() && (normKey.equals(syn) || normKey.contains(syn)))) {
+                    keyHitFound = true;
+                    keyScore = 65;
+                    keyReason = "Similar: " + syn;
+                    break;
+                }
+            }
+        }
+
+        // 4. Fuzzy Levenshtein match (typo tolerance) if not already matched
+        if (!keyHitFound && needle.length() >= FuzzySearchEngine.MIN_FUZZY_LENGTH) {
+            int maxAllowed = needle.length() >= FuzzySearchEngine.LENGTH_THRESHOLD_TWO_EDITS ? 2 : 1;
+            int dist = FuzzySearchEngine.levenshtein(normNeedle, normKey, maxAllowed);
+            if (dist <= maxAllowed) {
+                keyHitFound = true;
+                keyScore = Math.max(45 - dist * 10, 20);
+                keyReason = "Fuzzy ~" + keyName;
+            }
+        }
+
+        if (keyHitFound) {
+            out.add(new Hit(fileName, keyName, true, rawValue, List.of(), keyScore, keyReason));
         }
 
         // Value match (color-stripped haystack, raw-offset projection).
-        if (rawValue.isEmpty()) return;
-        StripResult valStrip = LegacyColorStrip.strip2(rawValue);
-        String hay = valStrip.stripped.toLowerCase(Locale.ROOT);
-        List<int[]> ranges = new ArrayList<>();
-        int from = 0;
-        while (true) {
-            int idx = hay.indexOf(needle, from);
-            if (idx < 0) break;
-            int endStripped = idx + needle.length();
-            int rawStart = valStrip.strippedToRaw[idx];
-            // Raw-end-exclusive: take the raw offset of the char *after*
-            // the match's last character, or rawValue.length() if the
-            // match ends at the stripped tail.
-            int rawEnd;
-            if (endStripped < valStrip.strippedToRaw.length) {
-                rawEnd = valStrip.strippedToRaw[endStripped];
-            } else {
-                rawEnd = rawValue.length();
+        if (!rawValue.isEmpty()) {
+            StripResult valStrip = LegacyColorStrip.strip2(rawValue);
+            String hay = valStrip.stripped.toLowerCase(Locale.ROOT);
+            List<int[]> ranges = new ArrayList<>();
+            int from = 0;
+            while (true) {
+                int idx = hay.indexOf(needle, from);
+                if (idx < 0) break;
+                int endStripped = idx + needle.length();
+                int rawStart = valStrip.strippedToRaw[idx];
+                // Raw-end-exclusive: take the raw offset of the char *after*
+                // the match's last character, or rawValue.length() if the
+                // match ends at the stripped tail.
+                int rawEnd;
+                if (endStripped < valStrip.strippedToRaw.length) {
+                    rawEnd = valStrip.strippedToRaw[endStripped];
+                } else {
+                    rawEnd = rawValue.length();
+                }
+                ranges.add(new int[] {rawStart, rawEnd});
+                from = endStripped;
             }
-            ranges.add(new int[] {rawStart, rawEnd});
-            from = endStripped;
-        }
-        if (!ranges.isEmpty()) {
-            out.add(new Hit(fileName, keyName, false, rawValue, ranges));
+            if (!ranges.isEmpty()) {
+                out.add(new Hit(fileName, keyName, false, rawValue, ranges, 30, "Value Match"));
+            }
         }
     }
 }

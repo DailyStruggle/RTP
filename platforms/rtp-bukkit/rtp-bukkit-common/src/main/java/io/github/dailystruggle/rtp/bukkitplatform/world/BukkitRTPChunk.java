@@ -18,7 +18,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
-import org.bukkit.HeightMap;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.BlockData;
 
@@ -117,17 +116,8 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
     if (anvilView != null) {
       return (RTP.serverAccessor != null) ? RTP.serverAccessor.getRTPWorld(anvilWorldId) : null;
     }
-    if (chunk == null || chunk.getWorld() == null) return null;
+    if (chunk == null) return null;
     return (RTP.serverAccessor != null) ? RTP.serverAccessor.getRTPWorld(chunk.getWorld().getUID()) : null;
-  }
-
-  @Override
-  public boolean isGenerated() {
-    // An Anvil view exists only because the region file entry for the chunk existed,
-    // which is the definition of "generated and persisted". Live-chunk path delegates
-    // to the world state.
-    if (anvilView != null) return true;
-    return chunk.getWorld().isChunkGenerated(chunk.getX(), chunk.getZ());
   }
 
   @Override
@@ -160,97 +150,16 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
     }
   }
 
-  /**
-   * 5-second-throttled reconciled snapshot of {@code BlocksKeys.airBlocks}. Built
-   * from {@code RTP.configs} via {@code reconcilePaletteIdentifiers} so the
-   * canonical, tag-expanded forms (per {@code JumpAdjustor.refreshSafetySets}'s
-   * mutation of the parser) line up with both the live {@code Material.name()}
-   * comparison and the {@link AnvilChunkView#isAir(int,int,int,Set)} comparison
-   * against {@code AnvilPrefilter.DEFAULT_RECONCILER}'d palette ids. Refreshed
-   * lazily on the next {@link #isAir(int,int,int)} call after the throttle
-   * window expires; the same instance is shared across all {@link BukkitRTPChunk}
-   * instances since the configured air list is process-global.
-   */
-  private static final AtomicReference<Set<String>> AIR_BLOCKS_CACHE =
-      new AtomicReference<>(Collections.emptySet());
-  private static final AtomicLong AIR_BLOCKS_LAST_UPDATE = new AtomicLong(0);
-  private static final long AIR_BLOCKS_REFRESH_MS = 5_000L;
-
-  private static Set<String> reconciledAirBlocks() {
-    long now = System.currentTimeMillis();
-    long last = AIR_BLOCKS_LAST_UPDATE.get();
-    long dt = now - last;
-    Set<String> cached = AIR_BLOCKS_CACHE.get();
-    if (dt >= 0 && dt < AIR_BLOCKS_REFRESH_MS) return cached;
-    if (!AIR_BLOCKS_LAST_UPDATE.compareAndSet(last, now)) {
-      return AIR_BLOCKS_CACHE.get();
-    }
-    try {
-      if (RTP.configs == null) return cached;
-      Object value = RTP.configs.getConfigValue(BlocksKeys.airBlocks, new ArrayList<>());
-      if (!(value instanceof Collection<?> coll)) return cached;
-      // Tag expansion: #namespace:tag tokens (e.g. "#minecraft:leaves") are NOT
-      // resolved by Material.matchMaterial, so PaletteNormalizer.reconcileAll
-      // would coerce them to the literal "#MINECRAFT:LEAVES" string which never
-      // matches a palette/Material id. Consult the server-supplied block-tag
-      // snapshot (RTPServerAccessor.blockTagSnapshot, kept up to date by
-      // /rtp reload via rebuildBlockTagSnapshot) and replace each tag token
-      // with its member material names BEFORE reconciliation. Bare materials
-      // and state-predicated MATERIAL[prop=val] tokens pass through unchanged.
-      java.util.Map<String, java.util.Set<String>> tagSnapshot =
-          java.util.Collections.emptyMap();
-      if (RTP.serverAccessor != null) {
-        try {
-          java.util.Map<String, java.util.Set<String>> s =
-              RTP.serverAccessor.blockTagSnapshot();
-          if (s != null) tagSnapshot = s;
-        } catch (Throwable ignoredTag) {
-          // best-effort
-        }
-      }
-      Set<String> raw = new java.util.HashSet<>();
-      for (Object o : coll) {
-        if (o == null) continue;
-        String token = o.toString().trim();
-        if (token.isEmpty()) continue;
-        if (token.charAt(0) == '#') {
-          String tagId = token.substring(1);
-          if (tagId.indexOf(':') < 0) tagId = "minecraft:" + tagId;
-          tagId = tagId.toLowerCase(Locale.ROOT);
-          java.util.Set<String> members = tagSnapshot.get(tagId);
-          if (members != null && !members.isEmpty()) {
-            raw.addAll(members);
-            continue;
-          }
-          // Snapshot empty / tag missing: preserve original token so a later
-          // refresh can resolve it once the snapshot is populated.
-          raw.add(token);
-        } else {
-          raw.add(token);
-        }
-      }
-      Set<String> reconciled = (RTP.serverAccessor != null)
-          ? RTP.serverAccessor.reconcilePaletteIdentifiers(raw)
-          : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(raw);
-      AIR_BLOCKS_CACHE.set(reconciled);
-      return reconciled;
-    } catch (Throwable ignored) {
-      return cached;
-    }
-  }
-
   @Override
-  public boolean isAir(int x, int y, int z) {
-    Set<String> airSet = reconciledAirBlocks();
+  public String materialNameAt(int x, int y, int z) {
     if (anvilView != null) {
-      return anvilView.isAir(x & 0xF, y, z & 0xF, airSet);
+      String id = anvilView.blockIdAt(x & 0xF, y, z & 0xF);
+      return (id != null) ? id.toUpperCase(Locale.ROOT) : "AIR";
     }
-    org.bukkit.Material type = chunk.getBlock(x & 0xF, y, z & 0xF).getType();
-    if (type.isAir()) return true;
-    if (airSet.isEmpty()) return false;
-    return (RTP.serverAccessor != null)
-        ? RTP.serverAccessor.matchesPaletteIdentifier(type.name(), airSet)
-        : airSet.contains(io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(type.name()));
+    if (chunk == null) return "";
+    org.bukkit.World w = chunk.getWorld();
+    if (y < w.getMinHeight() || y >= w.getMaxHeight()) return "";
+    return chunk.getBlock(x & 0xF, y, z & 0xF).getType().name();
   }
 
   /**
@@ -290,23 +199,20 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
       // teleport-commit time remains authoritative for any sky-light gating.
       return 15;
     }
-    return chunk.getBlock(x & 0xF, y, z & 0xF).getLightFromSky();
-  }
-
-  @Override
-  public int getSurfaceHeight(int x, int z) {
-    x = Math.max(0, Math.min(15, x));
-    z = Math.max(0, Math.min(15, z));
-    if (anvilView != null) {
-      return anvilView.getSurfaceHeight(x, z);
+    if (chunk != null) {
+      org.bukkit.World w = chunk.getWorld();
+      if (y < w.getMinHeight() || y >= w.getMaxHeight()) return 0;
+      return chunk.getBlock(x & 0xF, y, z & 0xF).getLightFromSky();
     }
-    int globalX = (chunk.getX() << 4) + x;
-    int globalZ = (chunk.getZ() << 4) + z;
-    return chunk.getWorld().getHighestBlockYAt(globalX, globalZ, HeightMap.MOTION_BLOCKING_NO_LEAVES);
+    return 15;
   }
 
   @Override
   public boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks) {
+    if (chunk != null) {
+      org.bukkit.World w = chunk.getWorld();
+      if (y < w.getMinHeight() || y >= w.getMaxHeight()) return false;
+    }
     Set<String> reconciledUnsafeSet = (RTP.serverAccessor != null)
         ? RTP.serverAccessor.reconcilePaletteIdentifiers(unsafeBlocks)
         : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(unsafeBlocks);
@@ -317,6 +223,8 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
       Set<String> set = (reconciledUnsafe != null) ? reconciledUnsafe : reconciledUnsafeSet;
       return anvilView.isSafe(x & 0xF, y, z & 0xF, set);
     }
+    // S-001: no live chunk and no snapshot means the block is unknown, which is unsafe.
+    if (chunk == null) return false;
     // Live chunk path: reconcile both the block's material name and the raw unsafe
     // set to ensure a canonical comparison, matching the Anvil path's logic.
     String materialName = chunk.getBlock(x & 0xF, y, z & 0xF).getType().name();
@@ -348,6 +256,11 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
   public boolean isSafe(int x, int y, int z, CompiledUnsafeSet unsafeBlocks) {
     if (unsafeBlocks == null || unsafeBlocks.isEmpty()) return true;
 
+    if (chunk != null) {
+      org.bukkit.World w = chunk.getWorld();
+      if (y < w.getMinHeight() || y >= w.getMaxHeight()) return false;
+    }
+
     if (anvilView != null) {
       // Anvil-backed snapshots evaluate only the plain-material bucket of the
       // compiled set. State and tag predicates against Anvil palette data are not
@@ -357,6 +270,7 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
       Set<String> plain = (reconciledUnsafe != null) ? reconciledUnsafe : unsafeBlocks.plainMaterials();
       return anvilView.isSafe(x & 0xF, y, z & 0xF, plain);
     }
+    if (chunk == null) return false;
 
     Block block = chunk.getBlock(x & 0xF, y, z & 0xF);
     String materialName = block.getType().name();

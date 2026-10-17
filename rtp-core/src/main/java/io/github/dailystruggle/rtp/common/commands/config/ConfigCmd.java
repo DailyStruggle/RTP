@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.config;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
@@ -51,6 +51,12 @@ public class ConfigCmd extends BaseRTPCmdImpl {
   public void addCommands() {
     if (!getCommandLookup().containsKey("language")) {
       addSubCommand(new LanguageCmd(this));
+    }
+
+    if (!getCommandLookup().containsKey("IMPORT") && !getCommandLookup().containsKey("import")) {
+      ConfigImportCmd importCmd = new ConfigImportCmd(this);
+      addSubCommand(importCmd);
+      getCommandLookup().put("import", importCmd);
     }
 
     // Register the submit-landing leaf for the menu config-search anvil prompt. The

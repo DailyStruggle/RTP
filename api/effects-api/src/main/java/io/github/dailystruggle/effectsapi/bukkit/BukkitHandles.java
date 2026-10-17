@@ -74,13 +74,113 @@ public final class BukkitHandles implements HandleProvider {
      * evaluate from {@code effects-api} (which has no compile-time dependency
      * on Folia API).
      */
-    static boolean isFolia() {
+    public static boolean isFolia() {
         try {
             Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
             return true;
         } catch (ClassNotFoundException e) {
             return false;
         }
+    }
+
+    /**
+     * Schedules a delayed task across Bukkit or Folia schedulers. Returns a
+     * canceller runnable.
+     */
+    public static Runnable scheduleDelayed(org.bukkit.plugin.Plugin caller, @Nullable Player player, long delayTicks, Runnable task) {
+        if (isFolia()) {
+            if (player != null) {
+                try {
+                    Object entityScheduler = player.getClass().getMethod("getScheduler").invoke(player);
+                    Object scheduledTask = entityScheduler.getClass()
+                            .getMethod("runDelayed", org.bukkit.plugin.Plugin.class, java.util.function.Consumer.class, Runnable.class, long.class)
+                            .invoke(entityScheduler, caller, (java.util.function.Consumer<Object>) t -> task.run(), null, delayTicks);
+                    if (scheduledTask != null) {
+                        return () -> {
+                            try {
+                                scheduledTask.getClass().getMethod("cancel").invoke(scheduledTask);
+                            } catch (Throwable ignored) {}
+                        };
+                    }
+                } catch (Throwable ignored) {}
+            }
+            try {
+                Object globalRegionScheduler = org.bukkit.Bukkit.class
+                        .getMethod("getGlobalRegionScheduler").invoke(null);
+                Object scheduledTask = globalRegionScheduler.getClass()
+                        .getMethod("runDelayed", org.bukkit.plugin.Plugin.class, java.util.function.Consumer.class, long.class)
+                        .invoke(globalRegionScheduler, caller, (java.util.function.Consumer<Object>) t -> task.run(), delayTicks);
+                if (scheduledTask != null) {
+                    return () -> {
+                        try {
+                            scheduledTask.getClass().getMethod("cancel").invoke(scheduledTask);
+                        } catch (Throwable ignored) {}
+                    };
+                }
+            } catch (Throwable t) {
+                task.run();
+                return () -> {};
+            }
+        }
+        org.bukkit.scheduler.BukkitTask bTask = org.bukkit.Bukkit.getScheduler().runTaskLater(caller, task, delayTicks);
+        return () -> {
+            try {
+                bTask.cancel();
+            } catch (Throwable ignored) {}
+        };
+    }
+
+    private static final int MAX_ENTITY_REDISPATCH = 5;
+
+    /**
+     * {@code true} when the current thread may mutate {@code entity}: always off Folia, and on Folia
+     * only when the thread owns the entity's region. Fails open when the probe is unavailable.
+     */
+    public static boolean ownedByCurrentRegion(Entity entity) {
+        if (!isFolia()) return true;
+        try {
+            return (boolean) org.bukkit.Bukkit.class
+                    .getMethod("isOwnedByCurrentRegion", Entity.class).invoke(null, entity);
+        } catch (Throwable t) {
+            return true;
+        }
+    }
+
+    /**
+     * Runs {@code task} on the region thread that owns {@code player}. Executes inline when the current
+     * thread already owns it; otherwise re-dispatches through the entity scheduler (a bounded number of
+     * times, since a player mid-teleport can briefly belong to no ticking region). The task is dropped
+     * when the entity is retired or never becomes owned.
+     */
+    public static void runOnOwningRegion(Player player, Runnable task) {
+        runOnOwningRegion(player, task, MAX_ENTITY_REDISPATCH);
+    }
+
+    private static void runOnOwningRegion(Player player, Runnable task, int attemptsLeft) {
+        if (ownedByCurrentRegion(player)) {
+            task.run();
+            return;
+        }
+        if (attemptsLeft <= 0) return;
+        try {
+            org.bukkit.plugin.Plugin caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();
+            Object entityScheduler = player.getClass().getMethod("getScheduler").invoke(player);
+            entityScheduler.getClass()
+                    .getMethod("runDelayed", org.bukkit.plugin.Plugin.class, java.util.function.Consumer.class,
+                            Runnable.class, long.class)
+                    .invoke(entityScheduler, caller,
+                            (java.util.function.Consumer<Object>) t -> runOnOwningRegion(player, task, attemptsLeft - 1),
+                            null, 1L);
+        } catch (Throwable ignored) {
+            // scheduler unavailable or plugin disabled: dropping a cosmetic effect beats an off-thread mutation
+        }
+    }
+
+    /**
+     * Runs a delayed task across Bukkit or Folia schedulers.
+     */
+    public static void runDelayed(org.bukkit.plugin.Plugin caller, long delayTicks, Runnable task) {
+        scheduleDelayed(caller, null, delayTicks, task);
     }
 
     @Override
@@ -188,12 +288,17 @@ public final class BukkitHandles implements HandleProvider {
 
         @Override
         public void spawnParticle(Object type, int count, double dx, double dy, double dz, double speed) {
-            player.spawnParticle((Particle) type, player.getLocation().add(dx, dy, dz), count, 0, 0, 0, speed);
+            int clampedCount = Math.max(1, Math.min(256, count));
+            player.spawnParticle((Particle) type, player.getLocation().add(dx, dy, dz), clampedCount, 0, 0, 0, speed);
         }
 
         @Override
         public void applyPotionEffect(Object type, int duration, int amplifier, boolean ambient, boolean particles, boolean icon) {
-            player.addPotionEffect(new org.bukkit.potion.PotionEffect((org.bukkit.potion.PotionEffectType) type, duration, amplifier, ambient, particles, icon));
+            runOnOwningRegion(player, () -> {
+                if (player.isValid() && !player.isDead()) {
+                    player.addPotionEffect(new org.bukkit.potion.PotionEffect((org.bukkit.potion.PotionEffectType) type, duration, amplifier, ambient, particles, icon));
+                }
+            });
         }
 
         @Override
@@ -347,7 +452,7 @@ public final class BukkitHandles implements HandleProvider {
             } catch (Throwable t) {
                 // S-004: don't swallow silently; surface via plugin logger.
                 org.bukkit.plugin.Plugin caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();
-                if (caller != null) caller.getLogger().warning(
+                caller.getLogger().warning(
                         "GlideEffect failed to start glide for " + player.getName() + ": " + t.getMessage());
                 return;
             }
@@ -364,20 +469,18 @@ public final class BukkitHandles implements HandleProvider {
             // schedule entirely to avoid a long-lived task that will never fire.
             if (landingTimeoutTicks > 0 && landingTimeoutTicks < Integer.MAX_VALUE) {
                 org.bukkit.plugin.Plugin caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();
-                if (caller != null) {
-                    try {
-                        org.bukkit.scheduler.BukkitTask task = org.bukkit.Bukkit.getScheduler().runTaskLater(caller, () -> {
-                            Player p = org.bukkit.Bukkit.getPlayer(state.playerId);
-                            if (p != null && io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.GlideSafetyListener.isGliding(state.playerId)) {
-                                io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.GlideSafetyListener.endGlide(
-                                        p, io.github.dailystruggle.effectsapi.bukkit.events.PlayerLandEvent.Reason.TIMEOUT);
-                            }
-                        }, landingTimeoutTicks);
-                        state.watchdogTaskId = task.getTaskId();
-                    } catch (Throwable t) {
-                        caller.getLogger().warning(
-                                "GlideEffect could not schedule timeout watchdog: " + t.getMessage());
-                    }
+                try {
+                    Runnable timeoutTask = () -> {
+                        Player p = org.bukkit.Bukkit.getPlayer(state.playerId);
+                        if (p != null && io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.GlideSafetyListener.isGliding(state.playerId)) {
+                            io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.GlideSafetyListener.endGlide(
+                                    p, io.github.dailystruggle.effectsapi.bukkit.events.PlayerLandEvent.Reason.TIMEOUT);
+                        }
+                    };
+                    state.watchdogCanceller = scheduleDelayed(caller, player, landingTimeoutTicks, timeoutTask);
+                } catch (Throwable t) {
+                    caller.getLogger().warning(
+                            "GlideEffect could not schedule timeout watchdog: " + t.getMessage());
                 }
             }
         }
@@ -446,8 +549,9 @@ public final class BukkitHandles implements HandleProvider {
 
         @Override
         public void spawnParticle(Object type, int count, double dx, double dy, double dz, double speed) {
+            int clampedCount = Math.max(1, Math.min(256, count));
             World world = location.getWorld();
-            if (world != null) world.spawnParticle((Particle) type, location.add(dx, dy, dz), count, 0, 0, 0, speed);
+            if (world != null) world.spawnParticle((Particle) type, location.add(dx, dy, dz), clampedCount, 0, 0, 0, speed);
         }
 
         @Override
@@ -505,7 +609,7 @@ public final class BukkitHandles implements HandleProvider {
         boolean flicker = false, trail = false, safe = true;
 
         Object o = data.get("NUMBER");
-        if (o instanceof Number) numFireworks = ((Number) o).intValue();
+        if (o instanceof Number) numFireworks = Math.max(1, Math.min(8, ((Number) o).intValue()));
 
         o = data.get("DX");
         if (o instanceof Number) dx = ((Number) o).doubleValue();

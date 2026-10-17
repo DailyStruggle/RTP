@@ -22,22 +22,22 @@ The general-purpose location pool inside `RegionQueueManager` is layered into ti
 | Tier | Field | State of entries | Chunk I/O on use | Configuration cap | Persisted to DB |
 |---|---|---|---|---|---|
 | **Hot (kept)** | `keptLocations` (`LockFreeLocationBuffer`) | Fully verified; chunks currently held with `keep(true)` (plugin chunk ticket) | None - chunks already loaded | `activeChunkCap` | Yes |
-| **Cold (unkept)** | `unkeptLocations` (`LockFreeLocationBuffer`) | Fully verified through the teleport pipeline; chunk reservations released | One async chunk re-load on promotion to hot | `cacheCap` | Yes |
-| **Backlog (binned)** *(implemented, [ADR-028](../adr/ADR-028-l3-backlog-cache.md))* | `backlogLocations` (`BacklogLocationBuffer`, nullable) | **Unverified** spiral picks with a tri-state per-entry `Validity` (`UNVERIFIED` / `VALIDATED` / `INVALIDATED`); head-blocking FIFO | None on the backlog itself; verification is region-prefilter only (Anvil `.mca` / Linear `.linear`, [ADR-016](../adr/ADR-016-anvil-subsystem.md), [ADR-077](../adr/ADR-077-multi-format-region-support.md)) | `backlogCacheCap` (default `1000`; lite default `0` ⇒ disabled) | No |
+| **Cold (unkept)** | `unkeptLocations` (`LockFreeLocationBuffer`) | Cold-fill results (fully verified) and pre-filter-accepted backlog entries (surface screened only); chunk reservations released | One async chunk load on promotion to hot, which re-runs the vertical adjustor and then border, biome, safety and claims (`Region#promotionChecks`) | `cacheCap` | Yes |
+| **Backlog (binned)** *(implemented, [ADR-028](../adr/ADR-028-l3-backlog-cache.md))* | `backlogLocations` (`BacklogLocationBuffer`, nullable) | **Unverified** spiral picks with a per-entry `Validity` (`UNVERIFIED` / `VALIDATED` / `UNKNOWN` / `INVALIDATED`); head-blocking FIFO | None on the backlog itself; verification is region-prefilter only (Anvil `.mca` or an addon-registered format, [ADR-016](../adr/ADR-016-anvil-subsystem.md), [ADR-077](../adr/ADR-077-multi-format-region-support.md)); `UNKNOWN` entries are loaded and checked one at a time by the cold fill | `backlogCacheCap` (default `1000`; lite default `0` ⇒ disabled) | No |
 
 Refill / promotion flow:
 
 ```
 shape pick ─▶ backlog ─(region-verified, in-order)─▶ cold (unkept) ─▶ hot (kept) ─▶ /rtp
                      ▲ refill (pure math, no chunk I/O)
-                     │ verify: one bin (32×32 chunks = one .mca/.linear) per Region.execute() pulse
+                     │ verify: one bin (32×32 chunks = one region file) per Region.execute() pulse
 ```
 
 Backlog design invariants ([ADR-028](../adr/ADR-028-l3-backlog-cache.md), which keeps its historical `L3` title as the record of the decision):
 
 - **Order preservation.** Entries are inserted in spiral-selection order and never reordered. The promotion contract to the cold stage is *head-only, contiguous-verified*: an unverified entry at the backlog head blocks all later entries from advancing, even if those later entries have already been anvil-verified. This preserves the spatial-distribution semantics established by the Archimedean spiral mapping ([ADR-001](../adr/ADR-001-archimedean-spiral-1d-mapping.md)).
-- **One bin per pulse.** Each `Region.execute()` pulse picks the bin (region file = 32 × 32 chunks; `.linear` or `.mca` per [ADR-077](../adr/ADR-077-multi-format-region-support.md)) containing the *oldest* unverified backlog entry, runs the region pre-filter for every backlog entry whose chunk lies inside that bin, and marks each entry's `verified` flag. This bounds per-pulse work (count-bound on Folia per [ADR-015](../adr/ADR-015-stale-chunk-guard-countbound-pipes.md)) and amortizes the single region-file read across all in-bin candidates.
-- **Anvil/Linear-only verification.** Backlog verification is a cheap *rejection filter* - prefilter passes still face the full pipeline (chunk load + vert + biome + safety) at cold -> hot promotion. Prefilter rejects are dropped without chunk I/O, DB row, or chunk reservation. On platforms / worlds where the region pre-filter is unavailable (e.g. unflushed region files, custom generators, Fabric pre-stabilization), backlog entries fall through as "verified by default" so the backlog never stalls a freshly generated world.
+- **One bin per pulse.** Each `Region.execute()` pulse picks the bin (region file = 32 × 32 chunks; `.mca` or an addon-registered format per [ADR-077](../adr/ADR-077-multi-format-region-support.md)) containing the *oldest* unverified backlog entry, runs the region pre-filter for every backlog entry whose chunk lies inside that bin, and marks each entry's `verified` flag. This bounds per-pulse work (count-bound on Folia per [ADR-015](../adr/ADR-015-stale-chunk-guard-countbound-pipes.md)) and amortizes the single region-file read across all in-bin candidates.
+- **Region-prefilter-only verification.** Backlog verification is a cheap *rejection filter* that never loads a chunk. Prefilter passes (`VALIDATED`) drain into cold with no load and face the rest of the check at cold -> hot promotion: the chunk load that promotion already does, the vertical adjustor, then world border, biome, safety scan and claims (`Region#promotionChecks`). Prefilter rejects are dropped without chunk I/O, DB row, or chunk reservation. Where the region pre-filter has no answer (ungenerated or unflushed chunks, an unregistered region format such as `.linear`, custom generators, no provider bound), entries go `UNKNOWN` and the single-flight cold fill takes them one at a time in place of a shape draw, checking each through the speculative pipeline with a load validated on load (ADR-110). A region file of ungenerated chunks therefore never becomes a burst of generation requests, and the backlog never stalls a freshly generated world.
 - **No DB persistence.** Unverified entries are not written through `installDatabaseCallbacks`; spiral re-selection after restart is cheap and avoids a "tentative row" schema delta.
 - **Default-off in lite.** The `rtp-lite` assembly ([ADR-024](../adr/ADR-024-rtp-lite-assembly-variant.md)) ships with the key omitted; runtime default `0` keeps the trimmed memory profile. The full assembly defaults to `1000`, sized well above `cacheCap` so binning yields meaningful amortization.
 
@@ -77,7 +77,35 @@ To guarantee system stability and prevent server exhaustion, RTP employs a rigor
 The `rtp-api` module provides a strict, defined interface for external integrations:
 - **Safe Extensibility**: Developers can inject custom `Shape` algorithms or claim-plugin validations (e.g., GriefPrevention) via the API without modifying or compromising the reliability guarantees of the `rtp-core` module.
 
+### Web Editor Extensions
+Addons contribute data, message handlers and tabs to the web editor through `RTPAPI.hooks().editorExtensions()` ([ADR-107](../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation.md), extending [ADR-106](../adr/ADR-106-shape-curve-helpers-and-signed-editor-channel.md)). This follows the GUI-addon pattern: the GUI reads typed `rtp-api` objects that core fills from the network snapshot, and never reads heartbeats. In the same way, an editor extension supplies values, and core decides when and how they travel.
+
+Ownership split:
+
+| Concern | Owner |
+|---------|-------|
+| Transport, envelope, signing, trust, challenge / `seq` checks | core (`EditorChannel`, never published) |
+| Schedule: snapshot build, live-state polling, push pacing, bundles | core (`EditorSessionManager`, `EditorLiveFeed`) |
+| Type prefixing (`<id>.<type>`), routing, inbound rate limit | core (`EditorChannelWiring`) |
+| Budget shares and drop priority | core |
+| Snapshot data, live state, tab descriptors, message handling | extension (`EditorExtension`) |
+| Addon YAML validation and reload after Hot-Apply | extension (`validate`, `applied`) |
+| Rendering of tier 1 widgets; sandbox for tier 2 frames | page (`docs/editor/index.html`) |
+
+Invariants:
+- **Namespace.** Undotted types belong to core in every release. Extension types are `<id>.<local>`, and core adds and strips the prefix, so an extension can't send or receive another extension's or core's types.
+- **Negotiation.** The snapshot carries `protocol {channel, extensions}` and an `extensions[]` descriptor list, and `hello-reply` repeats them. Each peer ignores what it doesn't know: unknown members, unknown descriptor fields, unknown widget kinds as placeholders, and well-formed bundle items or frames with no handler, ignored without a drop. Neither side infers features from `pluginVersion`.
+- **Delivery.** Every message is `reply`, `latest` (coalesced, droppable) or `ordered` (held in order, refused when full). Pacing and bundling read the class, not a fixed type list.
+- **Budget.** Extension traffic counts against the session budget (2 MiB/min). It is also capped per extension (256 KiB/min) and for all extensions together (25 % of the budget), and it is dropped before core `land` / `hazard-delta`. Replies and `curve` are never dropped.
+- **Threading (S-005).** Snapshot and descriptor getters run on the async payload build. `stateJson()` runs on the feed's async tick. `onMessage` runs on the transport thread and must not block. `validate` / `applied` run on the Hot-Apply pipeline. None runs on a main or region thread. Work that needs the world is scheduled through `RTP.scheduler`.
+- **Isolation.** Every extension call is wrapped. An exception or an oversized result is logged, rate-limited to one line per extension per minute, and refused. Three failures mark the extension `failed` for that session, and core and other extensions carry on.
+- **No page-origin code.** Tier 1 descriptors are data rendered by the page as text and sanitised markdown. Tier 2 code runs only in an opaque-origin sandboxed iframe, checked by SHA-256 and reached over `postMessage`. It sees only its own extension's data, and it can stage but never apply.
+- **One write path (S-004).** Addon YAML listed in `configFiles()` joins the session `files` map and goes through Hot-Apply only: path checks, structural checks, then `validate`, `.bak`, atomic write and `applied`. Errors return in `apply_ack`.
+- **Fail closed (S-006).** The registry throws `IllegalStateException` before core loads. A session's extension list is fixed when its snapshot is built.
+
 ## Platform Adapter Design Details
+
+> **Authoritative Specification:** For complete SPI function requirements, method-by-method contracts, threading rules, and a step-by-step implementation checklist for authoring a new platform adapter, see [`SERVER_ADAPTER_GUIDE.md`](SERVER_ADAPTER_GUIDE.md).
 
 ### rtp-core Implementation Notes
 - **Lock-Free Configuration Storage**: Configuration data is stored in `EnumMap`/`ConcurrentHashMap` structures that guarantee O(1) read access. Public methods return immutable views or primitive values accessed via `FactoryValue.getData()`.
@@ -106,7 +134,20 @@ The `rtp-api` module provides a strict, defined interface for external integrati
 - **Ticket Lifecycle**: Same plugin-owned chunk ticket approach as `rtp-bukkit`; Paper's async API handles ticket acquisition internally, and explicit release is still performed via `reservation.close()` in all exit paths.
 
 ### rtp-folia Implementation Notes
-- **Thread Ownership Checks**: Before scheduling a regional task, the adapter calls `Bukkit.isOwnedByCurrentRegion(entity/location)`. If ownership is confirmed, the task runs immediately; otherwise it is submitted via `RegionScheduler.run(plugin, location, task)`.
-- **Count-Bound Execution**: Within regional threads, iterative background operations use `CountBoundTaskPipe` with a fixed instruction count (not wall-clock time), because Folia's per-region ticks make time-based slicing non-deterministic.
+- **Thread Ownership Checks**: Before scheduling a regional task, the adapter calls `Bukkit.isOwnedByCurrentRegion(entity/location)`. If ownership is confirmed and the thread's per-region budget is not spent and nothing is queued for that region, the task runs immediately; otherwise it joins that region's queue.
+- **Per-Region Slices** ([ADR-112](../adr/ADR-112-per-region-work-division-on-folia.md)): one-shot regional tasks join a FIFO per region cell (8x8 chunks). One slice per cell runs on the owning region thread via `RegionScheduler.run`, runs tasks until the thread's `RegionThreadBudget` (`syncAllottedTime` per region tick, never accumulating beyond one budget) or the 32-task cap is reached, then re-queues behind other regions. Slow or late regions run one task per slice and report `isRegionSaturated`, which cold-to-hot promotion uses to pick candidates elsewhere.
+- **Off-Region Continuations**: `FoliaRTPWorld` completes RTP chunk futures on Folia's async scheduler, so selection logic chained on a chunk load never runs on the region thread that loaded it; live block reads re-enter through `runTask`.
+- **Count-Bound Execution**: `CountBoundTaskPipe` bounds each drain by a fixed task count and by the time budget on the draining thread, and always runs one task when the budget is positive.
 - **Economy Delegation**: Vault economy calls (`withdraw`, `deposit`, `getBalance`) are never invoked on a Folia region thread. They are dispatched to `GlobalRegionScheduler` or `AsyncScheduler`, and results are piped back to the originating region via a follow-up scheduled task.
 - **Chunk Ticket Lifecycle**: `getChunkAtAsync` allocates a Folia chunk ticket for validation, and `reservation.close()` explicitly removes the ticket when the chunk is no longer needed, preventing permanent force-loading.
+
+### rtp-fabric Implementation Notes
+- **Event-Driven Bootstrap**: `FabricEventBridge` listens to `ServerLifecycleEvents` (`SERVER_STARTED`, `SERVER_STOPPING`), `ServerTickEvents`, and `ServerPlayConnectionEvents` via reflection-guarded proxies to survive trimmed or variant runtimes.
+- **Scheduling & Tick Budgeting**: `FabricScheduler` uses a private daemon thread pool for async execution and executes delayed/repeating tasks under a `TickBudget.syncNanos()` slice driven by `END_SERVER_TICK`.
+- **Mapping & Version Isolation**: `FabricVersionAdapterRegistry` decouples intermediary mappings from Mojang deobfuscated mappings across Minecraft versions.
+- **Commands**: Integrates with Brigadier via `FabricCommandRegistrar`.
+
+### rtp-neoforge Implementation Notes
+- **Mojmap Runtime**: Compiles directly against Mojang-mapped runtime names without intermediary mapping shims.
+- **Event Bus Wiring**: Driven by NeoForge `@EventBusSubscriber` / `@Mod` lifecycle events (`ServerStartedEvent`, `ServerStoppingEvent`, `ServerTickEvent.Post`, `RegisterCommandsEvent`).
+- **Scheduling**: `NeoForgeScheduler` drives sync tasks via `MinecraftServer.execute` and drains tick-budgeted timer queues during `ServerTickEvent.Post`.

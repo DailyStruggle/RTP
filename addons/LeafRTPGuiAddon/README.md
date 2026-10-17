@@ -84,6 +84,20 @@ menu open; if the map subsystem is unavailable, the region has no scanned biome 
 the renderer cannot draw it, the row falls back to the `iconRegion` material automatically.
 The default is `material` (the static icon), so this is strictly opt-in.
 
+### Custom item icons and visual status cues
+
+Destination and filler icons in `guimenu.yml` support prefix-routed custom items, player heads, and CustomModelData:
+- `ia:<id>` or `itemsadder:<id>`: ItemsAdder items via reflection (`CustomStack`).
+- `oraxen:<id>`: Oraxen items via reflection (`OraxenItems`).
+- `nexo:<id>`: Nexo items via reflection (`NexoItems`).
+- `hdb:<id>`: HeadDatabase skulls via reflection (`HeadDatabaseAPI`).
+- `head:<name>`: Player skin head.
+- `base64:<hash>`: Base64 custom textured skull.
+- `<MATERIAL>:<cmd>` or `<MATERIAL>#<cmd>`: CustomModelData.
+- `<MATERIAL>`: Vanilla Bukkit material.
+
+When `barrierOnUnavailable: true` (default), destinations on cooldown, in PvP combat, lacking funds, or missing permission display as barrier blocks for immediate at-a-glance readability. Configurable hover lore templates support `{status}`, `{cooldown}`, `{delay}`, `{cost}`, `{target}`, `{world}`, and `{region}` placeholders. Compatibility with proprietary commercial plugins is maintained on a best-effort basis (see `docs/admin/CUSTOM_ITEMS.md`).
+
 ## The security boundary (unchanged)
 
 - **RTP owns safety and validation.** Permission gating, cooldown/cost resolution, and the
@@ -131,7 +145,7 @@ The default is `material` (the static icon), so this is strictly opt-in.
   and the common addon on `ServerStartedEvent`.
 - `NeoForgeMenuRenderer` / `DestinationPickerMenu` - the NeoForge counterparts of the Fabric pair.
 
-## Planned: "Virtual Rift" warmup effect (ROADMAP Tier 2)
+## Planned: "Virtual Rift" warmup effect
 
 A separate companion addon, `addons/rtp-effects-rift`, is planned as a **demo of the
 RTP/EffectsAPI extension surface**: a registrable warmup effect that, during the teleport

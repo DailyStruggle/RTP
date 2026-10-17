@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.selection.region.BacklogLocationBuffer;
+import io.github.dailystruggle.rtp.common.tools.ChartOutputHelper;
 import io.github.dailystruggle.rtp.common.selection.region.BacklogLocationBuffer.BacklogEntry;
 import io.github.dailystruggle.rtp.common.selection.region.BacklogLocationBuffer.Validity;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
@@ -16,13 +17,10 @@ import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import javax.imageio.ImageIO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -32,6 +30,7 @@ public class L3ComputeSafetyVisualizerTest {
   private static final int DIAMETER = R * 2;
   private static final int TOTAL_CHUNKS = DIAMETER * DIAMETER;
   private static final int TOTAL_BINS = (DIAMETER / 32) * (DIAMETER / 32); // 32x32 bins = 1024 bins
+  private static final long SEED = 20260923L;
 
   record Point(int x, int z) {}
 
@@ -44,6 +43,7 @@ public class L3ComputeSafetyVisualizerTest {
     System.out.println("[DEBUG_LOG] 1. Testing Slot-Nulling & Recycling Lifecycle under Churn...");
     int bufferCap = 256;
     BacklogLocationBuffer buffer = new BacklogLocationBuffer(bufferCap);
+    buffer.setRng(new java.util.Random(SEED));
 
     int totalOffered = 5000;
     int totalPromoted = 0;
@@ -53,12 +53,11 @@ public class L3ComputeSafetyVisualizerTest {
       RTPCoords coords = new RTPCoords("world", cycle * 16, 64, (cycle % 100) * 16);
       RTPLocation loc = new RTPLocation(coords, 0L);
 
-      int sizeBefore = buffer.size();
       BacklogEntry entry = buffer.offerUnverified(loc);
 
       if (entry == null) {
         // Buffer reached capacity, validate existing entries and randomly poll to simulate L3 -> L2 drain
-        List<BacklogEntry> toValidate = buffer.pollRandomValidated(0); // non-destructive probe
+        buffer.pollRandomValidated(0); // non-destructive probe
         // Mark everything currently in buffer as validated to simulate background Anvil prefilter
         BacklogEntry[] rawState = buffer.snapshot();
         for (BacklogEntry e : rawState) {
@@ -137,6 +136,7 @@ public class L3ComputeSafetyVisualizerTest {
     shape.set(GenericMemoryShapeParams.radius, (long) R);
     shape.set(GenericMemoryShapeParams.centerRadius, 0L);
     shape.set(GenericMemoryShapeParams.mode, "ACCUMULATE");
+    shape.setRng(new java.util.Random(SEED));
 
     int sampleCount = 5000;
     List<Point> l3Points = new ArrayList<>(sampleCount);
@@ -258,22 +258,10 @@ public class L3ComputeSafetyVisualizerTest {
 
     g.dispose();
 
-    // Export image to reports and docs assets
-    File reportDir = new File("build/reports/l3_compute");
-    if (!reportDir.exists()) reportDir.mkdirs();
-    File chartFile = new File(reportDir, "l3_compute_safety_chart.png");
-    ImageIO.write(img, "PNG", chartFile);
+    // Export image to canonical reports and docs assets
+    ChartOutputHelper.writeChart(img, "l3_compute", "l3_compute_safety_chart.png");
 
-    File rootFile = new File("l3_compute_safety_chart.png");
-    ImageIO.write(img, "PNG", rootFile);
-
-    File docsAsset = new File("docs/assets/img/l3_compute_safety_chart.png");
-    if (docsAsset.getParentFile() != null && !docsAsset.getParentFile().exists()) {
-      docsAsset.getParentFile().mkdirs();
-    }
-    Files.copy(chartFile.toPath(), docsAsset.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-
-    System.out.println("[DEBUG_LOG] Successfully rendered diagnostic chart to: " + chartFile.getAbsolutePath());
+    System.out.println("[DEBUG_LOG] Successfully rendered diagnostic chart to canonical destinations: " + ChartOutputHelper.getDocsAssetFile("l3_compute_safety_chart.png").getAbsolutePath());
   }
 
   private void drawSpatialDispersionPanel(Graphics2D g, int x, int y, int w, int h, List<Point> points) {

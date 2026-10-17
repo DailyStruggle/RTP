@@ -1,7 +1,5 @@
 package io.github.dailystruggle.rtp.common.commands.prefab;
 
-import io.github.dailystruggle.rtp.common.commands.prefab.builtin.HighPerformance;
-import io.github.dailystruggle.rtp.common.commands.prefab.builtin.LowPerformance;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -42,13 +40,13 @@ class PrefabApplierTest {
         nested.put("foo", "bar");
         nested.put("baz", 7);
         perf.put("nested", nested);
-        trees.put("performance", perf);
+        trees.put("advanced/performance", perf);
 
         Map<String, Object> region = new LinkedHashMap<>();
         region.put("cacheCap", 50);
         region.put("activeChunkCap", 20);
         region.put("world", "world");
-        trees.put("regions/default", region);
+        trees.put("definitions/regions/default", region);
         return trees;
     }
 
@@ -80,9 +78,9 @@ class PrefabApplierTest {
         Map<String, Map<String, Object>> base = baseline();
         PrefabApplier.Result r = PrefabApplier.apply(base, LowPerformance.INSTANCE);
 
-        Map<String, Object> newPerf = r.newTrees().get("performance");
+        Map<String, Object> newPerf = r.newTrees().get("advanced/performance");
         assertEquals(60, newPerf.get("period"));
-        assertEquals(20, newPerf.get("syncAllottedTime"));
+        assertEquals(3, newPerf.get("syncAllottedTime"));
         assertEquals(false, newPerf.get("loginCacheEnabled"));
         // preserved keys
         assertEquals(false, newPerf.get("postTeleportQueueing"));
@@ -93,20 +91,20 @@ class PrefabApplierTest {
         Map<String, Object> nested = (Map<String, Object>) newPerf.get("nested");
         assertEquals("bar", nested.get("foo"));
 
-        Map<String, Object> newRegion = r.newTrees().get("regions/default");
+        Map<String, Object> newRegion = r.newTrees().get("definitions/regions/default");
         assertEquals(10, newRegion.get("cacheCap"));
         assertEquals(4, newRegion.get("activeChunkCap"));
         assertEquals("world", newRegion.get("world"));
 
         // diff carries old + new values
-        List<PrefabApplier.Change> perfDiff = r.perFileDiff().get("performance");
+        List<PrefabApplier.Change> perfDiff = r.perFileDiff().get("advanced/performance");
         assertEquals(5, perfDiff.size());
         PrefabApplier.Change periodChange = perfDiff.stream()
                 .filter(c -> c.keyPath().equals("period")).findFirst().orElseThrow();
         assertEquals(20, periodChange.oldValue());
         assertEquals(60, periodChange.newValue());
 
-        assertFalse(r.perFileDiff().get("regions/default").isEmpty());
+        assertFalse(r.perFileDiff().get("definitions/regions/default").isEmpty());
     }
 
     @Test
@@ -125,7 +123,7 @@ class PrefabApplierTest {
         for (Prefab p : PrefabRegistry.list()) {
             Map<String, Map<String, Object>> base = baseline();
             // remove the seed so we are sure the prefab can't smuggle it in
-            base.get("performance").remove("backlogCacheCap");
+            base.get("advanced/performance").remove("backlogCacheCap");
             PrefabApplier.Result r = PrefabApplier.apply(base, p);
             for (Map<String, Object> tree : r.newTrees().values()) {
                 assertFalse(containsKeyDeep(tree, "backlogCacheCap"),
@@ -151,7 +149,7 @@ class PrefabApplierTest {
         base.put("safety", safety);
 
         PrefabApplier.Result r = PrefabApplier.apply(base,
-                io.github.dailystruggle.rtp.common.commands.prefab.builtin.OneBlock.INSTANCE);
+                OneBlock.INSTANCE);
 
         Map<String, Object> newSafety = r.newTrees().get("safety");
         assertEquals(0, newSafety.get("platformRadius"), "platform must be enabled (radius 0)");
@@ -176,7 +174,7 @@ class PrefabApplierTest {
         Map<String, Map<String, Object>> base = new LinkedHashMap<>();
         Map<String, Object> perf = new LinkedHashMap<>();
         perf.put("items", new ArrayList<>(List.of("a", "b", "c")));
-        base.put("performance", perf);
+        base.put("advanced/performance", perf);
 
         Prefab overlayPrefab = new Prefab(
                 "test-list-overlay", "k", "k", "d",
@@ -186,7 +184,7 @@ class PrefabApplierTest {
                 false
         );
         PrefabApplier.Result r = PrefabApplier.apply(base, overlayPrefab);
-        assertEquals(List.of("x", "y"), r.newTrees().get("performance").get("items"));
+        assertEquals(List.of("x", "y"), r.newTrees().get("advanced/performance").get("items"));
     }
 
     @Test
@@ -201,10 +199,10 @@ class PrefabApplierTest {
                 false
         );
         PrefabApplier.Result r = PrefabApplier.apply(base, newRegionPrefab);
-        Map<String, Object> created = r.newTrees().get("regions/brandNew");
+        Map<String, Object> created = r.newTrees().get("definitions/regions/brandNew");
         assertEquals("nether", created.get("world"));
         assertEquals(5, created.get("cacheCap"));
-        List<PrefabApplier.Change> diff = r.perFileDiff().get("regions/brandNew");
+        List<PrefabApplier.Change> diff = r.perFileDiff().get("definitions/regions/brandNew");
         assertEquals(2, diff.size());
         // old values must be null for previously absent keys
         for (PrefabApplier.Change c : diff) {
@@ -217,10 +215,10 @@ class PrefabApplierTest {
     void returnedTreesAreIndependent() {
         Map<String, Map<String, Object>> base = baseline();
         PrefabApplier.Result r = PrefabApplier.apply(base, LowPerformance.INSTANCE);
-        assertNotSame(base.get("performance"), r.newTrees().get("performance"));
+        assertNotSame(base.get("advanced/performance"), r.newTrees().get("advanced/performance"));
         // mutate the result and ensure the original baseline-rebuilt tree is unaffected
-        r.newTrees().get("performance").put("period", -1);
-        assertEquals(20, baseline().get("performance").get("period"));
+        r.newTrees().get("advanced/performance").put("period", -1);
+        assertEquals(20, base.get("advanced/performance").get("period"));
     }
 
     private static boolean containsKeyDeep(Map<String, Object> map, String needle) {

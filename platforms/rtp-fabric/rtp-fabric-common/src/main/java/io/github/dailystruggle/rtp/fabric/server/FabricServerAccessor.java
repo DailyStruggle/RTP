@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
+import io.github.dailystruggle.rtp.common.world.BiomeOverride;
 import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
@@ -80,13 +81,6 @@ public final class FabricServerAccessor implements RTPServerAccessor {
    */
   private Function<String, ?> shapeFunction = this::createNativeShape;
 
-  /**
-   * Per-location biome resolver. Default uses the level's dynamic biome
-   * registry via {@link ServerLevel#getBiome(net.minecraft.core.BlockPos)} on
-   * the server thread; addons override via {@link #setBiomeGetter(Function)}.
-   * Mirrors {@code AbstractServerAccessor.biomeGetter} (Bukkit parity).
-   */
-  private Function<RTPLocation, String> biomeGetter = this::defaultBiomeAt;
 
   /**
    * Per-world biome-set resolver. Default returns every biome key registered
@@ -109,6 +103,20 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   private final Map<String, io.github.dailystruggle.rtp.api.world.RTPWorld<?>> worldsByName = new ConcurrentHashMap<>();
   private final Map<UUID, io.github.dailystruggle.rtp.api.world.RTPWorld<?>> worldsById = new ConcurrentHashMap<>();
   private volatile @Nullable MinecraftServer server;
+
+  // ---------------------------------------------------------------------------
+  // Memoized reflective player lookup handles for Fabric lazy resolution
+  // (Path 3: multi-candidate Mojang + Intermediary lookup).
+  // Prevents repeated NoSuchMethodException overhead and log noise on
+  // intermediary runtimes (1.20 - 1.21.11) while remaining forward-compatible
+  // with deobfuscated runtimes (MC 26.1+).
+  // ---------------------------------------------------------------------------
+  private volatile @Nullable Class<?> cachedServerClass = null;
+  private volatile @Nullable java.lang.reflect.Method cachedGetPlayerListMethod = null;
+  private volatile @Nullable java.lang.reflect.Method cachedGetPlayerByUuidMethod = null;
+  private volatile @Nullable java.lang.reflect.Method cachedGetPlayerByNameMethod = null;
+  private volatile boolean lazyPlayerMethodsInitialized = false;
+  private volatile boolean playerListInstanceMethodsProbed = false;
 
   /** Called by {@code FabricEventBridge} on SERVER_STARTED. */
   public void bindServer(MinecraftServer server) {
@@ -150,6 +158,12 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     this.playersByName.clear();
     this.worldsByName.clear();
     this.worldsById.clear();
+    this.lazyPlayerMethodsInitialized = false;
+    this.cachedServerClass = null;
+    this.cachedGetPlayerListMethod = null;
+    this.cachedGetPlayerByUuidMethod = null;
+    this.cachedGetPlayerByNameMethod = null;
+    this.playerListInstanceMethodsProbed = false;
   }
 
   /** Called by {@code FabricEventBridge} on world load. */
@@ -391,11 +405,6 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     return new LocationGenerator();
   }
 
-  private static UnsupportedOperationException notYet(String method) {
-    return new UnsupportedOperationException(
-        "[RTP] FabricServerAccessor." + method + " not yet implemented.");
-  }
-
   @Override
   public String getServerVersion() {
     // Loom compiles `MinecraftServer#getServerVersion` to the intermediary alias
@@ -537,19 +546,87 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     return registerPlayerObject(sp);
   }
 
-  private Object lookupOnlineServerPlayerByName(String name) {
-    MinecraftServer s = this.server;
-    if (s == null) return null;
+  synchronized void initLazyPlayerMethods(Class<?> serverClass) {
+    if (this.lazyPlayerMethodsInitialized && this.cachedServerClass == serverClass) {
+      return;
+    }
+    this.cachedServerClass = serverClass;
+    this.cachedGetPlayerListMethod = null;
+    this.cachedGetPlayerByUuidMethod = null;
+    this.cachedGetPlayerByNameMethod = null;
+    this.playerListInstanceMethodsProbed = false;
+
     try {
-      Object playerList = s.getClass().getMethod("getPlayerList").invoke(s);
-      if (playerList == null) return null;
-      for (String candidate : new String[]{"getPlayerByName", "getPlayer"}) {
+      // 1. Probe getPlayerList on MinecraftServer (Mojang name first, then Intermediary)
+      for (String mName : new String[]{"getPlayerList", "method_3760"}) {
         try {
-          java.lang.reflect.Method m = playerList.getClass().getMethod(candidate, String.class);
-          Object res = m.invoke(playerList, name);
-          if (res != null) return res;
+          java.lang.reflect.Method m = serverClass.getMethod(mName);
+          try { m.setAccessible(true); } catch (Throwable ignored) {}
+          this.cachedGetPlayerListMethod = m;
+          break;
         } catch (NoSuchMethodException ignored) {}
       }
+
+      if (this.cachedGetPlayerListMethod != null) {
+        Class<?> retType = this.cachedGetPlayerListMethod.getReturnType();
+        if (retType != null && retType != void.class && retType != Object.class) {
+          initPlayerListMethods(retType);
+        }
+      }
+    } catch (Throwable t) {
+      RTP.log(Level.FINE,
+          "[RTP][Fabric] Failed to discover player lookup methods: " + t.getMessage());
+    } finally {
+      this.lazyPlayerMethodsInitialized = true;
+    }
+  }
+
+  private void initPlayerListMethods(Class<?> playerListClass) {
+    if (this.cachedGetPlayerByUuidMethod == null) {
+      for (String mName : new String[]{"getPlayer", "method_14602", "method_14574"}) {
+        try {
+          java.lang.reflect.Method m = playerListClass.getMethod(mName, UUID.class);
+          try { m.setAccessible(true); } catch (Throwable ignored) {}
+          this.cachedGetPlayerByUuidMethod = m;
+          break;
+        } catch (NoSuchMethodException ignored) {}
+      }
+    }
+    if (this.cachedGetPlayerByNameMethod == null) {
+      for (String mName : new String[]{"getPlayerByName", "getPlayer", "method_14566", "method_74003", "method_14582", "method_14581"}) {
+        try {
+          java.lang.reflect.Method m = playerListClass.getMethod(mName, String.class);
+          try { m.setAccessible(true); } catch (Throwable ignored) {}
+          this.cachedGetPlayerByNameMethod = m;
+          break;
+        } catch (NoSuchMethodException ignored) {}
+      }
+    }
+  }
+
+  Object lookupOnlineServerPlayerByName(String name) {
+    return lookupOnlineServerPlayerByName(this.server, name);
+  }
+
+  Object lookupOnlineServerPlayerByName(@Nullable Object s, @Nullable String name) {
+    if (s == null || name == null) return null;
+    initLazyPlayerMethods(s.getClass());
+    java.lang.reflect.Method listGetter = this.cachedGetPlayerListMethod;
+    if (listGetter == null) return null;
+    try {
+      Object playerList = listGetter.invoke(s);
+      if (playerList == null) return null;
+      if (this.cachedGetPlayerByNameMethod == null && !this.playerListInstanceMethodsProbed) {
+        synchronized (this) {
+          if (!this.playerListInstanceMethodsProbed) {
+            initPlayerListMethods(playerList.getClass());
+            this.playerListInstanceMethodsProbed = true;
+          }
+        }
+      }
+      java.lang.reflect.Method lookupMethod = this.cachedGetPlayerByNameMethod;
+      if (lookupMethod == null) return null;
+      return lookupMethod.invoke(playerList, name);
     } catch (Throwable t) {
       RTP.log(Level.FINE,
           "[RTP][Fabric] lazyResolveByName failed: " + t.getClass().getSimpleName()
@@ -558,23 +635,47 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     return null;
   }
 
-  private Object lookupOnlineServerPlayerByUuid(UUID uuid) {
-    MinecraftServer s = this.server;
-    if (s == null) return null;
+  Object lookupOnlineServerPlayerByUuid(UUID uuid) {
+    return lookupOnlineServerPlayerByUuid(this.server, uuid);
+  }
+
+  Object lookupOnlineServerPlayerByUuid(@Nullable Object s, @Nullable UUID uuid) {
+    if (s == null || uuid == null) return null;
+    initLazyPlayerMethods(s.getClass());
+    java.lang.reflect.Method listGetter = this.cachedGetPlayerListMethod;
+    if (listGetter == null) return null;
     try {
-      Object playerList = s.getClass().getMethod("getPlayerList").invoke(s);
+      Object playerList = listGetter.invoke(s);
       if (playerList == null) return null;
-      try {
-        java.lang.reflect.Method m = playerList.getClass().getMethod("getPlayer", UUID.class);
-        Object res = m.invoke(playerList, uuid);
-        if (res != null) return res;
-      } catch (NoSuchMethodException ignored) {}
+      if (this.cachedGetPlayerByUuidMethod == null && !this.playerListInstanceMethodsProbed) {
+        synchronized (this) {
+          if (!this.playerListInstanceMethodsProbed) {
+            initPlayerListMethods(playerList.getClass());
+            this.playerListInstanceMethodsProbed = true;
+          }
+        }
+      }
+      java.lang.reflect.Method lookupMethod = this.cachedGetPlayerByUuidMethod;
+      if (lookupMethod == null) return null;
+      return lookupMethod.invoke(playerList, uuid);
     } catch (Throwable t) {
       RTP.log(Level.FINE,
           "[RTP][Fabric] lazyResolveByUuid failed: " + t.getClass().getSimpleName()
               + ": " + t.getMessage());
     }
     return null;
+  }
+
+  @Nullable java.lang.reflect.Method getCachedGetPlayerListMethod() {
+    return this.cachedGetPlayerListMethod;
+  }
+
+  @Nullable java.lang.reflect.Method getCachedGetPlayerByUuidMethod() {
+    return this.cachedGetPlayerByUuidMethod;
+  }
+
+  @Nullable java.lang.reflect.Method getCachedGetPlayerByNameMethod() {
+    return this.cachedGetPlayerByNameMethod;
   }
 
   /**
@@ -1178,6 +1279,18 @@ public final class FabricServerAccessor implements RTPServerAccessor {
    */
   private volatile boolean blockTagSnapshotPermanentlyUnavailable = false;
 
+  /**
+   * An empty snapshot is retried by {@code SafetyTokenExpander} every ~2 s; warn once,
+   * then log repeats at FINE.
+   */
+  private volatile boolean blockTagEmptyWarned = false;
+
+  private void warnEmptyBlockTagSnapshot(String message) {
+    Level level = blockTagEmptyWarned ? Level.FINE : Level.WARNING;
+    blockTagEmptyWarned = true;
+    log(level, message);
+  }
+
   @Override
   public Map<String, Set<String>> blockTagSnapshot() {
     Map<String, Set<String>> snap = this.blockTagSnapshot;
@@ -1374,7 +1487,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
       return Collections.emptyMap();
     }
     if (out.isEmpty()) {
-      log(Level.WARNING,
+      warnEmptyBlockTagSnapshot(
           "[RTP][Fabric] Block-tag registry yielded no usable tags"
               + " (BuiltInRegistries.BLOCK may not be populated yet);"
               + " #tag tokens in safety.airBlocks/unsafeBlocks will not be flattened.");
@@ -1532,7 +1645,7 @@ public final class FabricServerAccessor implements RTPServerAccessor {
       return Collections.emptyMap();
     }
     if (out.isEmpty()) {
-      log(Level.WARNING,
+      warnEmptyBlockTagSnapshot(
           "[RTP][Fabric] Block-tag registry yielded no usable tags via reflection"
               + " (BuiltInRegistries.BLOCK may not be populated yet);"
               + " #tag tokens in safety.airBlocks/unsafeBlocks will not be flattened.");
@@ -1900,10 +2013,9 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   @Override
   public void setBiomeGetter(Function<RTPLocation, String> getter) {
-    // Mirror AbstractServerAccessor.setBiomeGetter - addons can override the
-    // per-location biome resolver. Default lookup happens via the level's
-    // dynamic biome registry (see #defaultBiomeAt).
-    this.biomeGetter = getter;
+    // Mirror AbstractServerAccessor.setBiomeGetter - the resolver is forwarded
+    // to the shared holder that every Fabric world adapter reads on lookup.
+    BiomeOverride.set(getter);
   }
 
   @Override
@@ -1915,30 +2027,6 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   // Default biome resolvers (Bukkit parity)
   // ---------------------------------------------------------------------------
 
-  /**
-   * Resolve the biome at a given {@link RTPLocation} via the level's dynamic
-   * biome registry. Returns the biome's {@code namespace:path} key, or
-   * {@code null} when the world is not a {@link FabricRTPWorld} (foreign
-   * impl) or the lookup is invoked off the server thread without a bound
-   * server. Caller is expected to hop to the server thread when needed.
-   */
-  private @Nullable String defaultBiomeAt(RTPLocation location) {
-    if (location == null) return null;
-    RTPWorld<?> w = location.world();
-    if (!(w instanceof FabricRTPWorld fw)) return null;
-    ServerLevel level = fw.level();
-    net.minecraft.core.BlockPos pos =
-        new net.minecraft.core.BlockPos(location.getBlockX(), location.getBlockY(), location.getBlockZ());
-    var holder = level.getBiome(pos);
-    String raw = holder.unwrapKey().map(k -> k.location().toString()).orElse(null);
-    if (raw == null) return null;
-    // Match the form `defaultBiomesFor` and the anvil probe adapter expose,
-    // and the form Spigot's `Biome.name()` produces (upper-case path-only).
-    // Without this, live-load biome comparisons would mismatch the allow-list.
-    String n = io.github.dailystruggle.rtp.api.configuration
-        .PaletteIdentifierNormalizer.normalize(raw);
-    return (n != null && !n.isEmpty()) ? n : raw;
-  }
 
   /**
    * Typed fast-path for {@link #defaultBiomesFor}: enumerate the bound server's
@@ -2431,6 +2519,116 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     @Override public RTPCommandSender clone() { return new FabricConsoleSender(server); }
   }
 
+  /** Upper bound an off-thread caller waits for a captured command to run on the server thread. */
+  private static final long CAPTURE_TIMEOUT_SECONDS = 10L;
+
+  @Override
+  public boolean executeCommand(UUID senderId, String commandLine) {
+    if (commandLine == null || commandLine.isBlank()) return false;
+    MinecraftServer s = server;
+    if (s == null) return false;
+    if (!isPrimaryThread() && RTP.scheduler != null) {
+      // Command dispatch mutates single-threaded server state; queue it onto the server thread.
+      // Off-thread, true means "dispatched"; failures are logged by dispatchCommandNow.
+      RTP.scheduler.runTask(() -> dispatchCommandNow(s, senderId, commandLine));
+      return true;
+    }
+    return dispatchCommandNow(s, senderId, commandLine);
+  }
+
+  private boolean dispatchCommandNow(MinecraftServer s, UUID senderId, String commandLine) {
+    try {
+      if (senderId != null && !senderId.equals(RTPAPI.serverId)) {
+        RTPPlayer player = getPlayer(senderId);
+        if (player != null) {
+          player.performCommand(null, commandLine);
+          return true;
+        }
+      }
+      new FabricConsoleSender(s).performCommand(null, commandLine);
+      return true;
+    } catch (Throwable t) {
+      log(Level.WARNING, "[RTP][Fabric] executeCommand failed for '" + commandLine + "': " + t.getMessage(), t);
+      return false;
+    }
+  }
+
+  @Override
+  public boolean executeCommandWithCapture(String commandLine, java.util.function.Consumer<String> lineConsumer) {
+    if (commandLine == null || commandLine.isBlank()) return false;
+    MinecraftServer s = server;
+    if (s == null) return false;
+    if (!isPrimaryThread() && RTP.scheduler != null) {
+      // Callers consume the captured lines synchronously, so block on the server-thread run.
+      java.util.concurrent.atomic.AtomicBoolean timedOut = new java.util.concurrent.atomic.AtomicBoolean(false);
+      java.util.function.Consumer<String> guardedConsumer = sLine -> {
+        if (!timedOut.get() && lineConsumer != null) {
+          lineConsumer.accept(sLine);
+        }
+      };
+      java.util.concurrent.CompletableFuture<Boolean> done = new java.util.concurrent.CompletableFuture<>();
+      RTP.scheduler.runTask(() -> {
+        if (!timedOut.get()) {
+          done.complete(captureCommandNow(s, commandLine, guardedConsumer));
+        }
+      });
+      try {
+        return done.get(CAPTURE_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        timedOut.set(true);
+        Thread.currentThread().interrupt();
+        log(Level.WARNING, "[RTP][Fabric] executeCommandWithCapture interrupted for '" + commandLine + "'", e);
+        return false;
+      } catch (java.util.concurrent.ExecutionException | java.util.concurrent.TimeoutException e) {
+        timedOut.set(true);
+        log(Level.WARNING, "[RTP][Fabric] executeCommandWithCapture did not complete on the server thread for '"
+            + commandLine + "': " + e, e);
+        return false;
+      }
+    }
+    return captureCommandNow(s, commandLine, lineConsumer);
+  }
+
+  private boolean captureCommandNow(MinecraftServer s, String commandLine,
+                                    java.util.function.Consumer<String> lineConsumer) {
+    try {
+      RTPCommandSender capturingSender = new FabricCapturingConsoleSender(s, lineConsumer);
+      capturingSender.performCommand(null, commandLine);
+      return true;
+    } catch (Throwable t) {
+      log(Level.WARNING, "[RTP][Fabric] executeCommandWithCapture failed for '" + commandLine + "': " + t.getMessage(), t);
+      return false;
+    }
+  }
+
+  private static final class FabricCapturingConsoleSender implements RTPCommandSender {
+    private final @Nullable MinecraftServer server;
+    private final java.util.function.Consumer<String> lineConsumer;
+
+    FabricCapturingConsoleSender(@Nullable MinecraftServer server, java.util.function.Consumer<String> lineConsumer) {
+      this.server = server;
+      this.lineConsumer = lineConsumer;
+    }
+
+    @Override public UUID uuid() { return RTPAPI.serverId; }
+    @Override public String name() { return "Console"; }
+    @Override public boolean hasPermission(String permission) { return true; }
+    @Override public Set<String> getEffectivePermissions() {
+      return io.github.dailystruggle.rtp.fabric.player.FabricEffectivePermissionsResolver.resolveConsole();
+    }
+    @Override public long cooldown() { return 0L; }
+    @Override public long delay() { return 0L; }
+    @Override public void performCommand(@Nullable RTPPlayer player, String command) {
+      new FabricConsoleSender(server).performCommand(player, command);
+    }
+    @Override public void sendMessage(String message) {
+      if (message != null && lineConsumer != null) {
+        lineConsumer.accept(message);
+      }
+    }
+    @Override public RTPCommandSender clone() { return new FabricCapturingConsoleSender(server, lineConsumer); }
+  }
+
   // ---------------------------------------------------------------------------
   // Command registration SPI
   // ---------------------------------------------------------------------------
@@ -2457,5 +2655,59 @@ public final class FabricServerAccessor implements RTPServerAccessor {
             });
     io.github.dailystruggle.rtp.fabric.commands.FabricCommandRegistrar
         .registerRtpCommand(rootCommand, bridgeCtx, aliases);
+
+    MinecraftServer s = this.server;
+    if (s != null && rootCommand instanceof io.github.dailystruggle.commandsapi.common.CommandsAPICommand cmd) {
+      try {
+        com.mojang.brigadier.CommandDispatcher dispatcher = s.getCommands().getDispatcher();
+        io.github.dailystruggle.rtp.fabric.commands.RTPCmdFabric.register(dispatcher, cmd, bridgeCtx, aliases);
+        try {
+          Object playerList = s.getPlayerList();
+          java.lang.reflect.Method getPlayers = playerList.getClass().getMethod("getPlayers");
+          java.util.List<?> players = (java.util.List<?>) getPlayers.invoke(playerList);
+          java.lang.reflect.Method sendCommands = s.getCommands().getClass().getMethod("sendCommands", Class.forName("net.minecraft.server.level.ServerPlayer"));
+          for (Object p : players) {
+            sendCommands.invoke(s.getCommands(), p);
+          }
+        } catch (Throwable ignored) {
+          // best-effort tree resync; online clients refresh on relog
+        }
+      } catch (Throwable t) {
+        log(Level.WARNING, "[RTP][Fabric] Dynamic runtime command registration failed: " + t.getMessage());
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Cartography MapBinding SPI (ADR-047 / REQ-RTP-MAP-006)
+  // ---------------------------------------------------------------------------
+
+  @Override
+  public void setupMapBinding() {
+    try {
+      io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter mapAdapter =
+          io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
+      if (mapAdapter != null && mapAdapter.supportsMapCharts()) {
+        io.github.dailystruggle.rtp.fabric.maps.FabricMapBinding mapBinding =
+            new io.github.dailystruggle.rtp.fabric.maps.FabricMapBinding();
+        io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.setMapBinding(mapBinding);
+        getFabricPlayerLifecycleHook().onPlayerQuit(uuid ->
+            io.github.dailystruggle.rtp.common.commands.maps.MapDispatch.firePlayerQuit(uuid));
+        RTP.log(Level.INFO,
+            "[RTP] Fabric map binding installed (FabricMapBinding, carrier="
+                + mapAdapter.mcVersion() + ").");
+      } else {
+        RTP.log(Level.INFO,
+            "[RTP] Fabric map binding NOT installed: version adapter "
+                + (mapAdapter == null ? "<none>" : mapAdapter.mcVersion())
+                + " does not support map charts; /rtp visualizations will report"
+                + " mapBindingMissing (NoopMapBinding active).");
+      }
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING,
+          "[RTP] onInitialize MapBinding install failed; MapDispatch will fall back"
+              + " to NoopMapBinding: " + t.getClass().getSimpleName() + ": "
+              + t.getMessage(), t);
+    }
   }
 }

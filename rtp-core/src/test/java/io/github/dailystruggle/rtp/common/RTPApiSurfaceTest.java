@@ -7,6 +7,12 @@ import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
+import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.pvp.PvPGate;
+import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
@@ -151,6 +157,56 @@ class RTPApiSurfaceTest {
         RtpTargetStatus status = RTPAPI.getTargetStatus(id, RtpTarget.world("default"));
         assertNotNull(status);
         assertNotNull(status.availability());
+        assertNull(status.label(), "World target should not inherit fallback region name as its label");
+    }
+
+    @Test
+    @Timeout(10)
+    void getTargetStatus_biomeTarget_returnsStatusAndLabel() {
+        UUID id = UUID.randomUUID();
+        MockRTPPlayer player = new MockRTPPlayer(
+                id, "BiomeTargetPlayer",
+                new RTPLocation(new MockRTPWorld("default"), 0, 0, 0)) {
+            @Override
+            public boolean hasPermission(String perm) {
+                return "rtp.biome.plains".equalsIgnoreCase(perm) || "rtp.biome.*".equals(perm);
+            }
+        };
+        accessor.addPlayer(player);
+
+        RtpTargetStatus status = RTPAPI.getTargetStatus(id, RtpTarget.biome("plains"));
+        assertNotNull(status);
+        assertNotNull(status.availability());
+        assertEquals("Biome: plains", status.label());
+
+        // Without permission
+        MockRTPPlayer noPermPlayer = playerInWorld(UUID.randomUUID(), "NoPermBiome", "default");
+        RtpTargetStatus noPermStatus = RTPAPI.getTargetStatus(noPermPlayer.uuid(), RtpTarget.biome("plains"));
+        assertNotNull(noPermStatus);
+        // If region is null in this test environment it may be DISABLED, otherwise NO_PERMISSION
+        assertTrue(noPermStatus.availability() == RtpTargetStatus.Availability.NO_PERMISSION
+                || noPermStatus.availability() == RtpTargetStatus.Availability.DISABLED);
+    }
+
+    @Test
+    @Timeout(10)
+    void getAllowedTargets_enumeratesConfiguredWorldsAndBiomes() {
+        UUID id = UUID.randomUUID();
+        MockRTPPlayer player = new MockRTPPlayer(
+                id, "PermPlayer",
+                new RTPLocation(new MockRTPWorld("default"), 0, 0, 0)) {
+            @Override
+            public boolean hasPermission(String perm) {
+                return "rtp.worlds.*".equals(perm) || "rtp.biome.*".equals(perm);
+            }
+        };
+        accessor.addPlayer(player);
+        accessor.addWorld(new MockRTPWorld("custom_nether"));
+
+        List<RtpTarget> targets = RTPAPI.getAllowedTargets(id);
+        assertNotNull(targets);
+        assertTrue(targets.stream().anyMatch(t -> t.kind() == RtpTarget.Kind.WORLD),
+                "Should contain world targets");
     }
 
     @Test
@@ -227,6 +283,98 @@ class RTPApiSurfaceTest {
         } finally {
             eco.setData(saved);
             RTP.economy = savedEconomy;
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    @SuppressWarnings("unchecked")
+    void getTargetStatus_inCombat_reportsInCombatWithRemaining() {
+        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>)
+                RTP.configs.getParser(SafetyKeys.class);
+        EnumMap<SafetyKeys, Object> saved = safety.getData();
+        MockRTPWorld defaultWorld = (MockRTPWorld) accessor.getRTPWorld("default");
+        if (defaultWorld == null) {
+            defaultWorld = new MockRTPWorld("default");
+            accessor.addWorld(defaultWorld);
+        }
+        Square shape = new Square();
+        LinearAdjustor vert = new LinearAdjustor(new java.util.ArrayList<>());
+        RegionSettings regSettings = new RegionSettings(
+            "default", defaultWorld, shape, vert,
+            false, false,
+            10L, 1000L, 0L, 5, 0.0, 1L, "", false);
+        Region mockRegion = org.mockito.Mockito.mock(Region.class);
+        mockRegion.name = "default";
+        org.mockito.Mockito.doReturn(defaultWorld).when(mockRegion).getWorld();
+        org.mockito.Mockito.doReturn(regSettings).when(mockRegion).getSettings();
+        org.mockito.Mockito.doReturn(shape).when(mockRegion).getShape();
+        org.mockito.Mockito.doReturn(vert).when(mockRegion).getVert();
+        RTP.selectionAPI.permRegionLookup.put("default", mockRegion);
+        try {
+            EnumMap<SafetyKeys, Object> mutated = new EnumMap<>(saved);
+            mutated.put(SafetyKeys.pvpCheckEnabled, true);
+            mutated.put(SafetyKeys.pvpCombatTagSeconds, 15L);
+            mutated.put(SafetyKeys.pvpOnCombat, "DENY");
+            safety.setData(mutated);
+
+            UUID id = UUID.randomUUID();
+            MockRTPPlayer player = new MockRTPPlayer(
+                    id, "CombatStatus",
+                    new RTPLocation(defaultWorld, 0, 0, 0));
+            accessor.addPlayer(player);
+
+            PvPGate.nativeTracker().stamp(id, System.currentTimeMillis());
+
+            RtpTargetStatus status = RTPAPI.getTargetStatus(id, RtpTarget.region("default"));
+            assertNotNull(status);
+            assertEquals(RtpTargetStatus.Availability.IN_COMBAT, status.availability());
+            assertTrue(status.combatRemainingMillis() > 0L);
+        } finally {
+            safety.setData(saved);
+            PvPGate.nativeTracker().clearAll();
+            RTP.selectionAPI.permRegionLookup.remove("default");
+        }
+    }
+
+    @Test
+    @Timeout(10)
+    void getTargetStatus_warmupDelayExposed() {
+        MockRTPWorld defaultWorld = (MockRTPWorld) accessor.getRTPWorld("default");
+        if (defaultWorld == null) {
+            defaultWorld = new MockRTPWorld("default");
+            accessor.addWorld(defaultWorld);
+        }
+        Square shape = new Square();
+        LinearAdjustor vert = new LinearAdjustor(new java.util.ArrayList<>());
+        RegionSettings regSettings = new RegionSettings(
+            "default", defaultWorld, shape, vert,
+            false, false,
+            10L, 1000L, 0L, 5, 0.0, 1L, "", false);
+        Region mockRegion = org.mockito.Mockito.mock(Region.class);
+        mockRegion.name = "default";
+        org.mockito.Mockito.doReturn(defaultWorld).when(mockRegion).getWorld();
+        org.mockito.Mockito.doReturn(regSettings).when(mockRegion).getSettings();
+        org.mockito.Mockito.doReturn(shape).when(mockRegion).getShape();
+        org.mockito.Mockito.doReturn(vert).when(mockRegion).getVert();
+        RTP.selectionAPI.permRegionLookup.put("default", mockRegion);
+        try {
+            UUID id = UUID.randomUUID();
+            MockRTPPlayer player = new MockRTPPlayer(
+                    id, "DelayStatus",
+                    new RTPLocation(defaultWorld, 0, 0, 0)) {
+                @Override
+                public long delay() {
+                    return 3500L;
+                }
+            };
+            accessor.addPlayer(player);
+
+            RtpTargetStatus status = RTPAPI.getTargetStatus(id, RtpTarget.region("default"));
+            assertNotNull(status);
+            assertEquals(3500L, status.delayMillis());
+        } finally {
+            RTP.selectionAPI.permRegionLookup.remove("default");
         }
     }
 

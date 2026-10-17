@@ -69,16 +69,16 @@ to match.
 
 | Variable | Value applied | Why |
 |---|---|---|
-| Outer radius | **16384 blocks (1024 chunks), every plugin** | Raised from 4096 for the next run set. Equalize selectable area. RTP region `radius: 1024` chunks; BetterRTP `MaxRadius`, EzRTP `radius.max`, JustRTP per-world `radius.max` raised to match. |
-| Inner radius | left per-plugin (RTP 1024, EzRTP 500, BetterRTP 10) | Negligible central exclusion at this scale. |
+| Outer radius | **16384 blocks (1024 chunks), every plugin** | Equalize selectable area across all 6 contenders. RTP region `radius: 16384b` (1024 chunks); BetterRTP `MaxRadius: 17408` (yields 16384 effective blocks due to formula truncation); EzRTP `radius.max: 16384`; JustRTP `max_radius: 16384`; JakesRTP `radius.max: 16384`; HuskHomes `region.max: 16384`. |
+| Inner radius | **1024 blocks (64 chunks), every plugin** | Full inner exclusion parity. RTP `centerRadius: 64` chunks (64 * 16 = 1024 blocks); BetterRTP `MinRadius: 1024`; EzRTP `radius.min: 1024`; JustRTP `min_radius: 1024`; JakesRTP `radius.min: 1024`; HuskHomes `region.min: 1024`. |
 | Pregen envelope | must cover the full 16384 radius per cell | Binding constraint on the radius increase - past the pregenerated edge the run silently becomes a worldgen benchmark. |
 | Cooldowns / delays / countdowns | zeroed on every plugin | Cooldown is anti-spam policy, not throughput. |
 | Worldgen | pregenerated world retained | A fresh world neutralizes RTP's anvil prefilter and turns the test into a worldgen benchmark. |
 | `delay-chunk-unloads-by` (Paper) | 10s -> 0s | Default lets each teleport coast on the retention cache instead of paying a real load. |
-| Phase length | ~600 s per plugin, one plugin dispatched per phase | Steady state; avoids cross-plugin residency bleed. |
-| Sequence gap | 240 s | TPS settle between phases. |
+| Workload unit | **4,096 teleports (`per-target-count: 4096`)** | Standardized sample size (N=4,096) across both burst and paced runs. Ensures spatial dispersion, duplicate rates, and chunk loads are directly comparable. |
+| Sequence gap | 180 s (3 minutes) | TPS and G1GC settle between phases, allowing background chunk unloads to stabilize. |
 | JIT warm-up | 30 s, 1 cycle through every target | Without it the first plugin pays the harness's JIT tax. CSV and spark writes disabled during warm-up. |
-| Per-player dispatch gap | 3 ticks (default) or 0 ticks (throughput-ceiling runs) | gap=0 is unthrottled dispatch; never compare a gap=0 number against a gap=3 one. |
+| Dispatch regime | Test A: unthrottled (gap=0, immediate-redispatch: true)<br>Test B: paced 5.0 TP/s (interval=200ms, gap=4t) | Count and rate are decoupled: Test A measures peak capacity / clearance under surge; Test B measures steady-state tick impact. |
 | Per-attempt timeout | 5 s | Capture-window expiry, not a server failure. See section 4. |
 | Client load | 3 real OPed accounts, concurrency 4, burst 10 | No fake-player infrastructure. |
 | Server JVM | Java 21, `-Xmx` 16 GB, default G1GC | REQ-RTP-SYS-001. |
@@ -93,6 +93,94 @@ or refill 16x more often, and the section 8 residency, GC and heap-pressure
 columns finally have signal to read. Consequence: **no 16384-radius number is
 comparable to any 4096-radius number in section 5** - the radius is now part of
 the run condition, like the dispatch gap.
+
+### 3.1 The Decoupled 4,096-Teleport Benchmark Architecture
+
+Earlier benchmark iterations coupled attempt counts to elapsed wall time (e.g. 1-hour unpaced runs),
+causing fast engines to deliver vastly more attempts than slower engines (130,120 attempts for
+LeafRTP vs 16,573 for JustRTP). Comparing cumulative wall time, gross GC churn, or spatial
+scatter density across an 8x sample-size divergence introduces severe statistical skew.
+
+In this updated methodology, **Count** and **Rate** are treated as orthogonal variables:
+- **Workload Unit:** A fixed quota of **N = 4,096 teleports** (`per-target-count: 4096`) is held
+  constant across all contenders.
+- **Two Operational Regimes:** The identical 4,096-teleport workload is evaluated under two
+  complementary testing regimes answering distinct administrative questions:
+
+```
+                    THE 4,096-TELEPORT BENCHMARK MATRIX
+                   (Fixed Work Unit: N = 4,096 teleports)
+                                     │
+           ┌─────────────────────────┴─────────────────────────┐
+           ▼                                                   ▼
+Test A: Burst Saturation ("Faster 4,096")     Test B: Steady-State Paced ("Slower 4,096")
+────────────────────────────────────────      ───────────────────────────────────────────
+• Pacing: Unthrottled / Rate-Unlimited         • Pacing: Matched 5.0 TP/s (200 ms interval)
+• Question: "What is peak capacity under       • Question: "During regular gameplay, what
+  queue spikes and DoS bursts?"                 does the server actually feel?"
+• Harness Settings:                            • Harness Settings:
+  - per-target-count: 4096                       - per-target-count: 4096
+  - immediate-redispatch: true                   - immediate-redispatch: false
+  - dispatch-interval-ms: 0                      - dispatch-interval-ms: 200
+  - per-player-gap-ticks: 0                      - per-player-gap-ticks: 4
+  - default-concurrency: 4                       - default-concurrency: 4
+• Primary Metrics:                             • Primary Metrics:
+  - 4,096 queue clearance wall time (s)          - Marginal tick impact (ΔMSPT)
+  - Sustained throughput ceiling (TP/s)          - Main-thread CPU utilization (%)
+  - Tail latency under surge (p95, p99)          - STW GC pause duration per 1,000 teleports
+  - Minimum TPS during phase                     - Async chunk load share (%)
+  - Folia / Paper watchdog stalls (S-005)
+           │                                                   │
+           └─────────────────────────┬─────────────────────────┘
+                                     ▼
+                      UNIFIED ARTIFACTS & ANALYSIS
+                      ────────────────────────────
+• Spatial Analysis: Clark-Evans dispersion (R), nearest-neighbor distances,
+  duplicate landing counts, and 6-plugin scatter plots (N = 4,096 everywhere).
+• Chunk Economics: Total chunk loads generated to find 4,096 safe destinations.
+• Memory Churn: JFR-attributed target package bytes allocated across 4,096 attempts.
+```
+
+#### Why Test A Matters (Burst Saturation / Queue Clearance)
+When multiple players join simultaneously, a faction runs an automated command script, or an
+adversary attempts to DoS the server via command spam, how does each engine behave?
+Test A runs unthrottled with `immediate-redispatch: true` and `per-player-gap-ticks: 0`. It
+measures:
+1. **Queue Clearance Time:** How many seconds or minutes does it take to clear 4,096 requests?
+2. **Throughput Ceiling:** Sustained TP/s under 100% saturation.
+3. **Resilience & Watchdogs:** Does the engine lock up region threads, trip Folia watchdogs,
+   or crash into multi-second GC pauses?
+
+#### Why Test B Matters (Steady-State Server Overhead)
+During ordinary gameplay, player traffic is paced. An administrator wants to know:
+*"At 5 teleports per second, which plugin introduces the least lag and jitter?"*
+Comparing gross CPU in Test A penalizes fast engines for executing more work per second.
+In Test B, every plugin delivers the exact same 5.0 TP/s. Throughput is eliminated as a variable,
+isolating pure algorithmic overhead:
+1. **Marginal Tick Overhead ($\Delta$MSPT):** Computed as `MSPT_phase - MSPT_settle_baseline`,
+   isolating the exact tick time added by the plugin's workload above ambient server background.
+2. **Main-Thread CPU %:** Percentage of the primary server tick thread consumed by teleport logic.
+3. **STW GC Freeze Ratio:** Percentage of real wall-clock time spent in Stop-The-World garbage
+   collection pauses while recycling candidate objects.
+4. **Off-Tick Chunk Share:** Percentage of chunk reads performed asynchronously (S-005 compliance).
+
+#### Spatial Analysis Parity (Why Constant N is Essential)
+Nearest-neighbor spatial metrics like the Clark-Evans dispersion index ($R = \bar{r}_A / \bar{r}_E$)
+rely on expected Poisson distance $\bar{r}_E = 1 / (2\sqrt{\rho})$, where spatial point density
+$\rho = N / A$. If $N$ diverges across plugins (e.g. 130,000 dots vs 16,000 dots within the same
+area $A$), $\rho$ shifts by nearly an order of magnitude. This makes scatter plots visually
+deceptive and distorts nearest-neighbor distances. Standardizing $N = 4,096$ across all 6 engines
+ensures identical density $\rho$, making Clark-Evans $R$, duplicate counts, and 3-chunk proximity
+clustering mathematically comparable.
+
+#### Publication Architecture: Lab Working Notes vs Public MkDocs
+- **Internal Scratchpad (`helpers/StressTestRTP/`):** Houses raw test harness code, local CSV files,
+  execution logs, and working notes (`PRE_WRITEUP.md`).
+- **Canonical Public Documentation (`docs/site/benchmarks.md`):** Final consolidated results,
+  comparative tables, spatial charts, and reproduction guides will be authored under `docs/site/`
+  and published automatically via MkDocs to `https://dailystruggle.github.io/RTP/site/benchmarks/`.
+  This provides responsive mobile tables, dark/light theme support, client-side search indexing,
+  and permanent, durable links from public storefront pages (`FRONT_PAGE.md`).
 
 ---
 
@@ -415,6 +503,152 @@ Findings:
 - **Server pause overhead is drastically reduced**: across the 4,096 teleports, LeafRTP cost the server only 21.7 s of total stop-the-world GC pause time, compared to 47.9 s for EzRTP and 138.8 s (over 2.3 minutes) for JustRTP.
 - **Player-region TPS floor stayed solid**: LeafRTP's 5s minimum TPS remained at 18.79 (only 0.03% of samples below target), whereas EzRTP dropped to 13.04 (0.76% below target).
 
+### 5.7 Paper 26.2 unthrottled dispatch - `20261008-003310` (Test A: 6-plugin 4,096-teleport saturation run)
+
+The definitive multi-plugin saturation benchmark on Paper 26.2 (AMD Ryzen 9 3900X, 16 GB heap). 3 OPed clients, concurrency 4, unpaced dispatch (`immediate-redispatch: true`, `dispatch-interval-ms: 0`, `per-player-gap-ticks: 0`). Outer radius equalized across all contenders to 16,384 blocks with a 1,024-block void around spawn. EzRTP was evaluated with biome validation active (`plugins/EzRTP/rtp.yml`), resolving the candidate-skipping anomaly from earlier runs.
+
+| Metric | LeafRTP | JakesRTP | BetterRTP | HuskHomes | EzRTP | JustRTP |
+|---|---|---|---|---|---|---|
+| Attempts / Successes | **4,096 / 4,096 (100 %)** | 4,096 / 4,096 (100 %) | 4,096 / 4,096 (100 %) | 4,096 / 4,096 (100 %) | 4,096 / 4,096 (100 %) | 4,088 / 4,096 (99.8 %) |
+| Failures | **0** | 0 | 0 | 0 | 0 | 8 (TIMEOUTs) |
+| Wall-clock time (4k quota) | **97.2 s (1.6 min)** | 176.5 s (2.9 min) | 444.2 s (7.4 min) | 489.3 s (8.2 min) | 517.7 s (8.6 min) | 923.8 s (15.4 min) |
+| Throughput | **42.15 TP/s** | 23.20 TP/s | 9.22 TP/s | 8.37 TP/s | 7.91 TP/s | 4.43 TP/s |
+| Latency cold / p50 | **7.0 ms / 5.0 ms** | 1.0 ms / 21.0 ms | 135 ms / 223.0 ms | 212 ms / 258.0 ms | 184 ms / 240.0 ms | 263 ms / 418.0 ms |
+| Latency p95 / p99 | **7.0 ms / 9.0 ms** | 73.0 ms / 114.0 ms | 628.0 ms / 1,013.0 ms | 411.0 ms / 748.0 ms | 748.0 ms / 1,125.0 ms | 1,724.0 ms / 2,721.0 ms |
+| Fast mode served fraction | **99.97 %** | 0.0 % | 0.0 % | 0.0 % | 0.0 % | 0.0 % |
+| Chunks loaded / att (attributed) | **0.18** | 7.14 | 24.96 | 31.66 | 30.94 | 89.53 |
+| Chunks loaded / att (inclusive) | **2.92** | 8.46 | 26.06 | 32.22 | 32.07 | 91.79 |
+| Main-thread CPU / attempt | **9.92 ms** | 13.17 ms | 24.86 ms | 30.72 ms | 34.35 ms | 82.79 ms |
+| Process CPU / attempt (total) | **77.16 ms** | 74.77 ms | 197.80 ms | 226.54 ms | 240.56 ms | 530.12 ms |
+| Min TPS (Mean TPS) | 16.19 (17.82) | 12.14 (15.02) | 13.23 (19.16) | **19.92 (20.00)** | 18.01 (19.57) | 19.83 (19.99) |
+| MSPT p50 / p99 | 56.4 ms / 80.6 ms | 61.8 ms / 104.8 ms | 23.4 ms / 120.2 ms | **12.7 ms / 17.8 ms** | 23.3 ms / 88.3 ms | 16.8 ms / 26.9 ms |
+| Peak Heap MB | 16,296 MB | 14,511 MB | 15,003 MB | 14,339 MB | 14,157 MB | 13,459 MB |
+| Exact duplicate landings | **0 (0.0 %)** | 0 (0.0 %) | 2 (0.05 %) | 0 (0.0 %) | 0 (0.0 %) | 0 (0.0 %) |
+| Near pairs (<= 48 blocks) | **0** (random: 82) | 108 (random: 82) | 123 (random: 78) | 136 (random: 85) | 153 (random: 125) | 115 (random: 78) |
+| Clark-Evans R (spacing) | **0.977** (uniform) | 0.919 | 0.906 | 0.907 | 0.914 | 0.897 (clustered) |
+| Landing safety audit | **99.5 % safe** (547/550) | 78.8 % safe (730 noFloor) | 99.7 % safe (6 hazard) | 98.7 % safe (32 noFloor) | 87.9 % safe (441 water) | 100.0 % safe (8/8) |
+
+Findings:
+
+1. **Resolution of the EzRTP biome discrepancy**: In the earlier run without biome filtering (`20261006-135938`), EzRTP skipped candidate placement checks, reporting artificial throughput of 29.47 TP/s with only 13.0 chunks/att. With biome checks active in `plugins/EzRTP/rtp.yml`, throughput normalized to 7.91 TP/s with 30.94 chunks/att and 34.35 ms main CPU, perfectly matching the search cost profile of un-indexed candidate discovery. However, 441 of its landings still occurred on water surfaces due to lenient surface checks.
+2. **Instant queue clearance under saturation**: LeafRTP cleared the full 4,096 teleports in 97.2 seconds (42.15 TP/s) with a median latency of 5.0 ms and p99 of 9.0 ms, driven by a 99.97% pre-warmed queue hit rate. It loaded only 0.18 attributed candidate chunks per attempt (2.92 inclusive chunks).
+3. **Tick degradation under unconstrained search (JakesRTP)**: JakesRTP achieved the second highest throughput (23.20 TP/s), but heavily loaded the main tick thread, driving mean TPS down to 15.02 (min 12.14) and MSPT p99 to 104.8 ms. Furthermore, 730 landings lacked ground blocks (`noFloor`), dropping safe landing percentage to 78.8%.
+4. **Search timeouts and tail latency (JustRTP)**: JustRTP required 89.53 chunks and 82.79 ms main CPU per attempt, resulting in 8 failed attempts and a p99 latency of 2,721 ms (max 4,751 ms), showing that un-indexed cache replenishment under strict biome rules experiences candidate timeout.
+5. **Tick preservation through throttling (HuskHomes)**: HuskHomes maintained near-perfect tick stability (20.00 avg TPS, 17.8 ms MSPT p99) by evaluating candidates synchronously at a modest 8.37 TP/s (258 ms median latency).
+6. **Mathematical spatial uniformity**: LeafRTP achieved 0 exact duplicate landings and 0 pairs within 48 blocks (Clark-Evans R = 0.977, nearest pair 75.2 blocks), while competitors produced between 108 and 153 closely adjacent pairs.
+
+### 5.8 Paper 26.2 paced dispatch at 5 TP/s - `20261008-024412` (Test B: 6-plugin 4,096-teleport steady-state run)
+
+Same server, world, radius, clients and plugin configs as section 5.7. Dispatch paced at one `/rtp` every 200 ms (`immediate-redispatch: false`, `dispatch-interval-ms: 200`, `per-player-gap-ticks: 4`), 180 s settle gap, spark profiling on for every phase (`rotate-seconds: 0`, so one profile per phase and the same profiler overhead for every plugin). Phase order: LeafRTP, BetterRTP, EzRTP, JustRTP, JakesRTP, HuskHomes. Supersedes the earlier Test B attempt `20261008-020859`.
+
+Achieved rate is attempts / phase wall time. Five plugins held 4.50-4.63 TP/s against the 5.0 TP/s dispatch target; JustRTP fell behind at 3.84 TP/s, so its phase ran 1,065.6 s against 884.6-909.5 s for the others. Latency percentiles are over all 4,096 attempts per plugin; MSPT and TPS come from the 50 ms `-heap.csv` sampler restricted to each phase window.
+
+| Metric | LeafRTP | JakesRTP | BetterRTP | HuskHomes | EzRTP | JustRTP |
+|---|---|---|---|---|---|---|
+| Attempts / Successes | **4,096 / 4,096 (100 %)** | 4,096 / 4,096 (100 %) | 4,096 / 4,096 (100 %) | 4,096 / 4,096 (100 %) | 4,096 / 4,096 (100 %) | 4,094 / 4,096 (99.95 %, 2 TIMEOUTs) |
+| Phase wall time | 884.6 s | 897.6 s | 909.5 s | 895.1 s | 899.2 s | 1,065.6 s |
+| Achieved rate | **4.63 TP/s** | 4.56 TP/s | 4.50 TP/s | 4.58 TP/s | 4.55 TP/s | 3.84 TP/s |
+| Latency p50 / p99 / max | 6 ms / **14 ms** / **34 ms** | **0 ms** / 76 ms / 710 ms | 203 ms / 898 ms / 2,151 ms | 264 ms / 626 ms / 3,995 ms | 171 ms / 923 ms / 1,649 ms | 345 ms / 2,729 ms / 5,000 ms |
+| Chunks loaded / att (attributed / inclusive) | 9.44 / **58.87** | **3.88** / 64.58 | 27.89 / 64.25 | 38.63 / 62.48 | 25.17 / 63.48 | 89.42 / 102.46 |
+| Main-thread CPU / attempt | **55.49 ms** | 69.50 ms | 60.42 ms | 72.83 ms | 63.74 ms | 96.42 ms |
+| Process CPU / attempt (total) | **537.1 ms** | 581.6 ms | 566.4 ms | 585.7 ms | 555.6 ms | 751.2 ms |
+| MSPT p50 / p99 / max | **16.4 / 22.6 / 24.5 ms** | 28.8 / 54.5 / 92.1 ms | 27.9 / 54.6 / 166.6 ms | 21.1 / 32.3 / 37.8 ms | 25.7 / 42.8 / 49.4 ms | 23.4 / 34.3 / 36.3 ms |
+| Ticks > 50 ms | **0 / 17,692** | 271 / 17,846 (1.52 %) | 329 / 17,992 (1.83 %) | 0 / 17,901 | 0 / 17,964 | 0 / 21,314 |
+| Min TPS (Mean TPS) | 19.89 (20.00) | 18.55 (19.88) | 16.86 (19.80) | 19.90 (20.00) | 19.70 (19.98) | **19.92 (20.00)** |
+| Settle-gap MSPT p50 -> phase MSPT p50 | 12.2 -> 16.4 ms (+4.3) | 13.3 -> 28.8 ms (+15.5) | 10.8 -> 27.9 ms (+17.1) | 17.6 -> 21.1 ms (+3.4) | 12.6 -> 25.7 ms (+13.1) | 12.9 -> 23.4 ms (+10.5) |
+| GC pause total (collections) | 7.9 s (118) | 8.1 s (132) | 7.5 s (115) | 7.9 s (129) | 7.5 s (134) | 10.0 s (170) |
+| Exact duplicate landings | **0** | 0 | 0 | 0 | 0 | 0 |
+| Near pairs (<= 48 blocks) | **0** (random: 81) | 127 (random: 84) | 126 (random: 84) | 105 (random: 82) | 142 (random: 129) | 129 (random: 85) |
+| Nearest pair | **70.0 blocks** | 4.5 blocks | 2.2 blocks | 2.2 blocks | 4.1 blocks | 4.0 blocks |
+| Chunks reused | **0** | 2 | 7 | 5 | 3 | 7 |
+| Clark-Evans R (land-adjusted) | **0.978** | 0.897 | 0.899 | 0.920 | 0.917 | 0.901 |
+| Landing safety audit | 99.7 % safe (4,083 / 4,096; 6 noFloor, 5 water, 2 blocked) | 77.2 % safe (186 / 241; 55 noFloor) | 99.7 % safe (4,082 / 4,096; 12 hazard, 2 noFloor) | 98.9 % safe (2,275 / 2,301; 26 noFloor) | 88.5 % safe (3,625 / 4,096; 424 water, 37 blocked, 10 hazard) | 100.0 % safe (8 / 8 checked) |
+
+Spatial columns use successful landings only. The "random" figure is the near-pair count of a random scatter with the plugin's own landing intensity per (terrain class, equal-area ring) cell, from `CrossPluginDestinationScatterVisualizerTest`; it absorbs water and biome rejection and each plugin's radial profile, so it is the land-adjusted expectation, not a uniform disc. EzRTP's baseline is the highest because its landings concentrate into the smallest effective area (450 km² against 698-725 km² for the others). Chunks reused counts `floor(block / 16)` collisions.
+
+Findings:
+
+1. **Latency at equal offered rate.** LeafRTP answered at p50 6 ms / p99 14 ms / max 34 ms from its pre-verified queue. The plugins that search per command took p50 171-345 ms and p99 626-2,729 ms. JakesRTP answered most commands without a live search (p50 0 ms) but its tail reached p99 76 ms and max 710 ms.
+2. **Tick cost at equal work.** LeafRTP had the lowest MSPT at p50, p99 and max of all six (16.4 / 22.6 / 24.5 ms) and no tick over 50 ms. BetterRTP (329 ticks over 50 ms, max 166.6 ms, min TPS 16.86) and JakesRTP (271 ticks over 50 ms, max 92.1 ms, min TPS 18.55) stalled ticks at 5 TP/s. JakesRTP's low attributed chunk count (3.88) did not make it cheap per tick: its MSPT p50 of 28.8 ms was the highest of the six.
+3. **Settle-gap delta.** Against the median MSPT of the last 120 s before each phase, LeafRTP added 4.3 ms and HuskHomes 3.4 ms; the other four added 10.5-17.1 ms. HuskHomes' baseline (17.6 ms) was measured straight after the JakesRTP phase and sits 4-7 ms above the other five baselines (10.8-13.3 ms), so its delta is taken from a raised floor. The absolute phase MSPT columns above do not depend on the baseline.
+4. **CPU per teleport.** LeafRTP had the lowest main-thread CPU (55.49 ms) and process CPU (537.1 ms) per attempt. Both include the server's own tick work over the phase, which is near-equal across phases because wall time is near-equal; JustRTP's 96.42 / 751.2 ms also carries its 20 % longer phase.
+5. **Chunks.** LeafRTP loaded the fewest chunks per attempt inclusive of the landing area (58.87 against 62.48-102.46). Its attributed count rose from 0.18 in Test A to 9.44 here, above JakesRTP's 3.88. The 885 s phase spans background refill cycles of the pre-verified queue (`backlogRefillThreshold` 0.5 hysteresis) that the 97 s Test A phase mostly did not; the per-cause split of the 9.44 is not broken out yet.
+6. **Spacing.** LeafRTP: 0 pairs within 48 blocks against 81 expected at random over the land it used, nearest pair 70.0 blocks, no chunk reused. Each other plugin landed more close pairs than its own random baseline (105-142 against 82-129), with nearest pairs of 2.2-4.5 blocks and 2-7 reused chunks. This is the count that decides how few rolls it takes to land on someone else's arrival point; mean nearest-neighbour distance moves far less.
+7. **JustRTP could not hold the pace.** At 89.42 attributed chunks and 96.42 ms main-thread CPU per attempt it averaged 3.84 TP/s and timed out twice. Correction to working notes: the "1 exact duplicate, nearest pair 0.0 blocks" figure for this phase came from counting those 2 failed attempts, which the harness records at the (0, 0) placeholder. Over its 4,094 landings JustRTP had 0 duplicates and a 4.0-block nearest pair.
+
+### 5.9 Folia 26.2 paced dispatch at 5 TP/s - `20261008-052141` (Test B: 4-plugin 4,096-teleport steady-state run)
+
+Executed on Folia 26.2 (16 GB heap, Ryzen 9 3900X) on the exact same world seed, radius (1,024 to 16,384 blocks), 3 OPed clients, and paced harness settings (`dispatch-interval-ms: 200`, `per-player-gap-ticks: 4`, `sequence.gap-seconds: 180`, `sequence.per-target-seconds: 1800`, spark `rotate-seconds: 0`) as Paper Test B (section 5.8). JakesRTP was excluded (does not declare Folia support in `plugin.yml`).
+
+Contender fate on Folia:
+- **BetterRTP**: Pruned during 30 s warm-up after 6 of 6 attempts threw `IllegalStateException: Thread failed main thread check: Cannot retrieve chunk asynchronously, context=[thread=Folia Region Scheduler Thread, region={null}]`.
+- **EzRTP**: Suffered an unhandled `TickThread` `Cannot retrieve chunk asynchronously` in `getHighestBlockYAt` on regional threads. Because EzRTP only invokes its completion callback on normal execution, the exception permanently locked out 2 of 3 player accounts into infinite "active attempt" states. The phase reached the 1,800 s cap at only 1,415 successful teleports and 949 consecutive 5 s timeouts.
+- **JustRTP**: Saturated Folia's asynchronous worker queues with unindexed random candidate chunk loading (136.6 attributed chunks/att). Could not sustain 5.0 TP/s, averaging 2.25 TP/s, and timed out at 1,800 s after completing 4,056 attempts. Caused 5.17 % of regional 5-second TPS samples to drop below 20 TPS.
+- **HuskHomes & LeafRTP**: Both completed cleanly at full pace (4.63 TP/s and 4.83 TP/s).
+
+| Metric | LeafRTP | HuskHomes | JustRTP | EzRTP |
+|---|---|---|---|---|
+| Attempts / Successes | **4,096 / 4,096 (100 %)** | 4,095 / 4,096 (99.98 %, 1 timeout) | 4,056 / 4,087 (99.24 %, 31 timeouts) | 1,415 / 2,364 (59.86 %, 949 timeouts) |
+| Phase wall time | **848.8 s** | 884.7 s | 1,800.3 s (capped) | 1,804.8 s (capped) |
+| Achieved rate | **4.83 TP/s** | 4.63 TP/s | 2.25 TP/s | 0.78 TP/s |
+| Latency p50 / p95 / p99 / max | **137 ms / 203 ms / 206 ms / 399 ms** | 404 ms / 785 ms / 1,065 ms / 4,928 ms | 901 ms / 3,050 ms / 4,746 ms / 5,004 ms | 455 ms / 4,995 ms / 5,010 ms / 5,151 ms |
+| Latency p50 / p95 (successful only) | **137 ms / 203 ms** | 404 ms / 785 ms | 900 ms / 2,905 ms | 303 ms / 605 ms |
+| Chunks loaded / att (attributed / inclusive) | 32.40 / 69.27 | 36.08 / **42.40** | 136.62 / 138.47 | **23.87** / 25.28 |
+| Region-thread CPU / attempt | **60.38 ms** | 109.31 ms | 287.32 ms | 291.03 ms |
+| Process CPU / attempt (total) | **368.36 ms** | 407.94 ms | 1,149.74 ms | 580.37 ms |
+| Regional TPS 5s min / mean | 8.52 / 19.89 | **15.85 / 19.97** | 6.33 / 19.81 | 6.09 / 19.98 |
+| Regional ticks < 20 TPS % | 0.88 % | **0.63 %** | 5.17 % | 0.32 % (mostly idle) |
+| GC pause total (collections) | 7.3 s (102) | **6.5 s (159)** | 16.8 s (301) | 1.6 s (89) |
+| Exact duplicate landings | **1 (0 in live)** | 0 | 0 | 0 |
+| Near pairs (<= 48 blocks) | **16 (0 in live)** (random: 81) | 108 (random: 82) | 96 (random: 84) | 15 (random: 12) |
+| Nearest pair | **50.8 blocks (live)** | 4.5 blocks | 1.4 blocks | 14.3 blocks |
+| Chunks reused | **1 (0 in live)** | 5 | 7 | 0 |
+| Clark-Evans R | **0.937** | 0.893 | 0.890 | inf |
+| Landing safety audit | **99.9 % safe** (4,093 safe, 2 noFloor, 1 suffocating, 0 water) | 98.9 % safe (4,049 safe, 46 noFloor, 0 water) | 99.7 % safe (4,044 safe, 12 hazard, 0 water) | 87.8 % safe (1,242 safe, **154 water**, 17 suffocating, 2 hazard) |
+
+Findings:
+
+1. **LeafRTP CPU efficiency scales on Folia.** Gross process CPU per attempt dropped 31.5 % compared to Paper Test B (368.4 ms vs 537.1 ms). LeafRTP’s Anvil region prefilter and Hilbert selection do zero synchronous work on region threads, enabling Folia's threaded regions to tick with minimal contention.
+2. **The Folia latency floor.** On Paper, LeafRTP's median latency was 6 ms. On Folia, it rose to 137 ms. This ~100-150 ms transition is the intrinsic scheduling cost of Folia's regional entity transfer between the originating and destination region threads across tick boundaries.
+3. **JustRTP computational explosion.** JustRTP required 136.62 attributed chunk loads and 1,149.74 ms process CPU per attempt (+53 % vs Paper). Its lack of spatial indexing caused heavy thread context switching and worker queue saturation on Folia, degrading regional TPS (5.17 % samples below 20 TPS).
+4. **EzRTP regional thread violation and account lockout.** EzRTP calls `getHighestBlockYAt` on coordinates outside the current region's bounds. Folia throws `IllegalStateException: Thread failed main thread check: Cannot retrieve chunk asynchronously`. EzRTP fails to clear its `activeAttempt` state on exception, rendering that player permanently incapable of using `/rtp` until a plugin restart.
+5. **Persistent EzRTP water landings.** EzRTP placed players on water surfaces in 10.9 % of all successful teleports (154 landings), matching the ~10.4-10.8 % water rate seen across Paper Test A and Test B.
+
+### 5.10 Paper 26.2 Linux open-loop ramp - 2026-10-09 overnight (Test C, partial)
+
+First open-loop stress-point data (method in section 8.1). Rig: AMD Threadripper 7970X, NVMe, Ubuntu 24.04, Paper 26.2, OpenJDK 25, `-Xmx16G`, default G1. Roster: 48 offline-mode Mineflayer bots (`devstack/clients/bench-swarm.js`) on a separate Windows machine over the network, non-op, granted each plugin's use node plus its queue/cooldown/delay bypass (`rtp.unqueued` for LeafRTP, `ezrtp.forcertp` + `ezrtp.queue.bypass` for EzRTP). Server `view-distance=4`, `simulation-distance=2`, and the harness caps each bot's server-side view and simulation distance to 2 during a ramp (`ramp.player-view-distance`), so every plugin pays the same landing-area load. Broadcast message and per-teleport success logging off, spark off. Stage 120 s for the flat 100 TP/s runs and 60 s per ladder stage, 30 s unrecorded warm-up, 5 s attempt timeout. EzRTP config is the same 1,024-16,384 block circle as sections 5.7-5.9; LeafRTP's region file was carried over from the same setup but was not re-read for this write-up.
+
+**Validity.** The overnight driver (`scripts/bench_overnight.py`) ran 39 ramps. Only 5 measured the intended plugin. The driver isolated each target by renaming the other RTP jars while the server was down, but the new JVM had already scanned `plugins/` by then, so each session loaded the previous target's jar set. Server logs confirm the loaded set per session; every ramp listed below ran with its target enabled. The other 34 rows (BetterRTP, HuskHomes, justRTP, JakesRTP, and LeafRTP/EzRTP ramps that ran in the wrong session) are 0-success rows against a server without that plugin and are discarded, not counted as failures. Fix for the next run: rename the jars before sending `restart`.
+
+| Run | Plugins loaded | Target | Offered | Achieved | Successes / attempts | Timeouts | Harness shed | Latency p50 / p95 / p99 | MSPT p50 / p95 | TPS min | Heap peak | Verdict |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| `20261009-044336` | all six | LeafRTP | 100 | 96.2 TP/s | 11,548 / 11,548 | 0 | 446 | 129 / 701 / 967 ms | 69.4 / 121.8 ms | 7.3 | 16,226 MB | FAIL `MSPT_P95` |
+| `20261009-054148` | LeafRTP only | LeafRTP | 100 | 98.7 TP/s | 11,843 / 11,843 | 0 | 154 | 63 / 547 / 778 ms | 50.0 / 103.3 ms | 8.6 | 16,351 MB | FAIL `MSPT_P95` |
+| `20261009-070736` | LeafRTP only | LeafRTP | 100 | 97.7 TP/s | 11,722 / 11,722 | 0 | 272 | 86 / 662 / 948 ms | 93.2 / 111.1 ms | 7.5 | 16,266 MB | FAIL `MSPT_P95` |
+| `20261009-051201` | EzRTP only | EzRTP | 5 | 4.98 TP/s | 299 / 299 | 0 | 0 | 156 / 505 / 908 ms | 22.5 / 23.7 ms | 20.0 | 12,997 MB | PASS |
+| | | | 10 | 7.15 TP/s | 429 / 599 | 170 (28.4 %) | 0 | 2,710 / 4,059 / 4,813 ms | 24.9 / 26.4 ms | 19.9 | 13,331 MB | FAIL achieved, failure rate |
+| | | | 20 | 8.18 TP/s | 491 / 788 | 297 (37.7 %) | 411 | 3,505 / 3,651 / 4,415 ms | 25.3 / 29.2 ms | 16.6 | 13,046 MB | FAIL achieved, failure rate, `HARNESS_SATURATED` |
+| `20261009-063819` | EzRTP only | EzRTP | 5 | 4.98 TP/s | 299 / 299 | 0 | 0 | 155 / 607 / 918 ms | 22.1 / 23.3 ms | 20.0 | 13,364 MB | PASS |
+| | | | 10 | 7.72 TP/s | 463 / 599 | 136 (22.7 %) | 0 | 2,261 / 4,109 / 4,809 ms | 25.5 / 27.4 ms | 20.0 | 13,276 MB | FAIL achieved, failure rate |
+| | | | 20 | 8.30 TP/s | 498 / 788 | 290 (36.8 %) | 411 | 3,505 / 3,558 / 4,357 ms | 25.5 / 29.3 ms | 19.9 | 13,169 MB | FAIL achieved, failure rate, `HARNESS_SATURATED` |
+
+Offered and achieved are TP/s. Achieved = successful teleports / stage seconds. Latency is dispatch to arrival over completed attempts. No errors and no console-visible busy rejections were recorded in any row.
+
+Findings:
+
+1. **LeafRTP at 100 TP/s offered: 35,113 of 35,113 teleports succeeded across three 2-minute runs, and the server stayed up.** Achieved 96.2-98.7 TP/s (all above the 95 % line); the stages failed only the MSPT p95 <= 50 ms criterion (103-122 ms), with TPS dipping to 7.3-8.6. So the tick budget ran out before LeafRTP's pipeline did. 100 TP/s is past LeafRTP's stress point on this rig; no valid LeafRTP ladder ran, so where between 5 and 100 TP/s the 50 ms line sits is not measured. The run with all six plugins loaded (`044336`) carried the other plugins' background work (EzRTP's biome cache warm-up and pre-cache among it) and was the slowest of the three.
+2. **LeafRTP latency at 100 TP/s is mostly queueing outside the pipeline.** 154-446 dispatch slots per run found no idle bot (48-bot roster), and every command waits for a tick that takes ~100 ms. A 16-bot ramp on the same rig earlier that night measured LeafRTP's own dispatch-to-teleport time at p50 3 ms / p95 5 ms in its 100 TP/s stage, with the rest spent before the command reached LeafRTP; that run was stopped by hand and is not tabulated.
+3. **LeafRTP cost at 100 TP/s (`054148`):** 7.7 ms main-thread CPU and 94 ms process CPU per teleport; chunk-system threads used 588 s CPU against 91 s on the main thread; ~8.9 chunks loaded per teleport (landing area included); GC time 5.9 % of wall. No idle baseline was recorded (see below), so these are gross, not net.
+4. **EzRTP stress point: 5 TP/s, reproduced in both runs.** Asked for 10 and 20 TP/s it completed 7.2-8.3 TP/s, timed out 23-38 % of attempts, and its p50 latency rose to 2.3-3.5 s, while MSPT p95 stayed at 26-29 ms. Its limit is its own pipeline, not server load. This matches its 7.91 TP/s closed-loop ceiling on the 3900X (section 5.7). The 20 TP/s stages are also `HARNESS_SATURATED` (all 48 bots waiting on slow attempts), which does not change the verdict since the 10 TP/s stage had already failed with no shed slots.
+5. **Heap reached the 16 GB ceiling in all three LeafRTP runs** (16.2-16.4 GB peak) and stayed near 13 GB for EzRTP's lower rates. Peak heap is the `-Xmx` ceiling under G1 (caveat 11), but whether this is retention at 100 TP/s or G1 deferring collection has not been separated; check post-GC troughs before claiming either.
+
+Gaps in this run's data (backfill later):
+
+- `net_*` / `idle_*` columns are empty: the ramp idle baseline did not record on the server (deployed jar or config predates it, or the window was not saved). Costs above are gross.
+- Sync-load attribution self-test reported `FAIL_TICKET`, so `chunks_sync_*` is `-1`. That result is a finding about the server (ticket promotion counted as a blocking load), not a broken self-test, but it leaves the column empty.
+- EzRTP's timeouts were not cross-checked against the swarm's `busy_chat` count. A player-only busy reply would surface as a timeout (section 8.1 known limit).
+- n=3 for LeafRTP (one with every plugin loaded) and n=2 for EzRTP. BetterRTP, HuskHomes, justRTP and JakesRTP have no valid Test C result.
+
 ---
 
 ## 6. Recorded test parameters
@@ -483,6 +717,11 @@ survive competitor releases. Anything version-pinned belongs in section 5.
 - Cold-start carries no first-attempt penalty: the pre-warmed `keptLocations`
   queue serves the first `/rtp` of a phase as fast as the thousandth.
 - Bounded p99 is the direct payoff of the count-bound pipeline (ADR-015).
+- **Unit convention verification:** In `config.yml`, `radius: 16384b` explicitly
+  uses the `b` suffix for blocks, while `centerRadius: 64` defaults to chunks
+  (64 chunks * 16 blocks/chunk = 1,024 blocks). This confirms that LeafRTP
+  operates on the exact 1,024 to 16,384 block boundary, maintaining 1:1 parity
+  with all competitor configs without discrepancy.
 - **No entry TTL by default.** Queue entries are invalidated by events (served,
   config change, spatial-memory rejection), not by a clock, so in a claim-free
   and edit-free world effective entry lifetime is "until served". Prior
@@ -501,6 +740,32 @@ survive competitor releases. Anything version-pinned belongs in section 5.
 
 - **Config edits revert on shutdown.** Verify the radius actually took effect
   via the destination scatter, or `attrib +R` the file after editing.
+- **Radius calculation bug (`RandomLocation.generateRound()`):** Decompilation of
+  `me.SuperRonanCraft.BetterRTP.references.rtpinfo.RandomLocation.generateRound()`
+  reveals an arithmetic bug in its annulus boundary calculation:
+  ```java
+  int minRadius = rtpWorld.getMinRadius();
+  int maxRadius = rtpWorld.getMaxRadius();
+  int delta = maxRadius - minRadius;
+  // Factoring error: substitutes delta instead of maxRadius into the area formula:
+  double d5 = Math.PI * (delta - minRadius) * (delta + minRadius);
+  double rand = d5 * random.nextDouble();
+  double r = Math.sqrt(rand / Math.PI + (minRadius * minRadius));
+  ```
+  Substituting `delta = maxRadius - minRadius` reduces the area factor to:
+  `d5 = PI * (max - 2*min) * max`. When `random.nextDouble()` approaches 1.0,
+  the maximum distance evaluates to:
+  `R_effective = sqrt((max - 2*min)*max + min^2) = maxRadius - minRadius`.
+  Because BetterRTP unintentionally subtracts `minRadius` from its outer reach,
+  configuring `MaxRadius: 16384` with `MinRadius: 1024` only searches up to
+  **15,360 blocks** (a 1,024-block truncation). Setting `MaxRadius: 17408` is
+  the mathematically necessary compensation to achieve the intended **16,384-block**
+  outer perimeter (`17408 - 1024 = 16384`).
+- **Radial striping and spiral banding:** BetterRTP calculates its angle as
+  `theta = 2 * Math.PI * (r - Math.floor(r))`. Because the angle is coupled
+  directly to the fractional remainder of the distance rather than an
+  independent uniform random angle, candidate destinations cluster into
+  distinct spiral stripes and radial bands visible in scatter plots.
 - `MaxAttempts: 32` retry loop: failures surface as long latency on the one
   successful retry, not as failure rows.
 - Has a `Queue.Enabled` pre-warm; serialises per-player ("already rtp'ing"
@@ -553,6 +818,8 @@ survive competitor releases. Anything version-pinned belongs in section 5.
   but the same class of bug: a live block-height query issued off the owning
   region thread. On Folia this is a hard per-attempt failure, not just a stall,
   and corroborates the section 5.3 "inline on region threads" note above.
+  Reproduced unchanged on EzRTP 3.4.3 / Folia 26.2 (run `20261008-052141`, 2026-10-08):
+  same stack, `chunk_pos=[9, 111]` requested from the region centred at `[145, -584]`.
 - **Non-thread-safe message formatting and database cache (`ConcurrentModificationException`)**
   (observed 2026-09-21 and 2026-09-22, Folia 26.1.2, runs `20260921-025943` and `20260922-132724`).
   Under concurrent `/rtp` dispatch EzRTP's `MessageProvider.format` mutated a shared `HashMap`
@@ -570,6 +837,20 @@ survive competitor releases. Anything version-pinned belongs in section 5.
   the 3 test players consecutively without recovering.
   Contrasts with LeafRTP's S-004 fail-safe completion guarantees (`CompletableFuture.whenComplete`
   in `MemoryTracker`), which ensure player state cleanup on all exit paths.
+  **Third reproduction, EzRTP 3.4.3 / Folia 26.2** (run `20261008-052141`, Test B paced at 200 ms,
+  2026-10-08). Trigger this time is the `getHighestBlockYAt` main-thread violation above, not the
+  `ConcurrentModificationException`, so any unhandled exception inside `/rtp` locks the account.
+  `TeleportExecutor` adds the player to an active-attempt set (`ConcurrentHashMap.newKeySet()`)
+  when a request starts and removes them only through its completion callback
+  (`withActiveAttemptCleanup` -> `clearActiveAttempt`); the thrown `CommandException` never reaches
+  that callback. Observed: `leaf_27` threw at 05:43:11 and `leaf_26` at 05:43:44 (one exception
+  each); from then on every `/rtp` from those two accounts went unanswered (92 and 86 consecutive
+  5 s timeouts by 05:51, zero successes), while `leaf26`, which never threw, kept succeeding
+  (1,150 OK, 2 timeouts). EzRTP gives no message and logs nothing after the first exception. The
+  lock persisted for the rest of the phase; recovery without a plugin restart (e.g. relog) was not
+  tested. The harness keeps dispatching to locked accounts by design: the timeouts are what a real
+  player on that server gets, so they stay in EzRTP's Folia success rate and latency, and its
+  cost-per-teleport figures for that phase come almost entirely from the one unlocked account.
 - **Retains spatial state rather than short-TTL entries.** Its memory of where
   it has already looked is not on a ~minutes timer, so like RTP it belongs in
   the amortizing class of section 4, not the time-expired one: a longer run
@@ -712,41 +993,79 @@ means NOT AVAILABLE. The harness writes its own schema notes alongside the CSVs.
 | Chunk residency | `peak_resident_chunks`, `peak_plugin_tickets`, `peak_target_plugin_tickets` | Separates a design that keeps coordinate tuples and releases its tickets from one that keeps chunk neighbourhoods resident. Peaks, not averages - an average hides retention. The ticket census needs Paper's `World#getPluginChunkTickets()` and runs on its own slow timer (`ticket-sample-period-ms`, min 250 ms) because the query walks every ticketed chunk; it is `-1` on Spigot and Folia. |
 | Heap-pressure triggers | `heap_pressure_events`, `heap_pressure_first_heap_used_mb`, `heap_pressure_first_trigger`, plus `<stamp>-heap-triggers.csv` | Some engines govern their own heap and cut max attempts / serve cache-only above a limit; a comparison drawn across that boundary is not like-for-like. The harness records the trigger line and the heap level only - no response is inferred. Patterns are deliberately narrow (`heap-pressure-patterns`), since a false positive becomes a claimed behaviour change that never happened. |
 | Crash-safe phase capture | `<stamp>-phases-partial.csv` | The per-attempt and 50 ms heap CSVs already flush per row, but the phase *summary* was only written at phase end, so the section 5.2 crash lost its aggregate. `flushPartialPhase()` now snapshots the in-flight phase (self-throttled to once per 2 s, called from `Runner.tick()`); `endPhase` deletes the sidecar, so a leftover file is itself the signal that the phase it describes crashed. |
+| Open-loop stress point | `<stamp>-ramp.csv` (one row per fixed-rate stage: `offered_tps`, `achieved_tps`, `busy_rejections`, `harness_shed`, `mspt_p95`, `tps_min`, `verdict`, `fail_criteria`), `<stamp>-ramp-summary.txt` | Closed-loop modes cap offered rate at `in-flight / latency` (Little's law), so a fast plugin's throughput measured there is the harness's ceiling. The ramp offers load at a fixed rate and reports the highest rate each plugin sustains; see section 8.1. |
 
-Method work to do before the next run:
+Method work and status for the 4,096-attempt benchmark series:
 
-1. Set the base `chunk-load-cost-us` per platform so `cpu_ms_with_chunks*`
-   becomes quotable (section 6 calibration note).
-2. Configure `residency-target-plugin` per arm, or leave one target per run so
-   the harness can infer it, otherwise `peak_target_plugin_tickets` stays `-1`.
-3. Override `heap-pressure-patterns` with the vocabulary of each plugin under
-   test; the built-in defaults will not match a competitor's wording.
-4. Narrow `console-fail-patterns` - the empty default is what produced the
-   spurious warm-up "zero successful attempts" warning in every run above.
-5. Fill the HuskHomes gap=0 slot, dispatched **last** (section 5.2).
-6. Arrival-block safety audit (classify landings: safe / water / lava / cave /
-   suffocating / void) on the pregenerated world. This is the correctness axis
-   the whole benchmark still lacks: a plugin can look fast precisely because it
-   skips verification, and the harness counts a completed `PlayerTeleportEvent`
-   without asking whether the landing was safe.
-7. Re-cut the world at the section 3 radius (16384 blocks) and pregen every cell
-   to the full envelope before dispatching. Retire the 4096-radius rows from the
-   comparison table rather than mixing scales.
-8. Add the JustRTP arm: plugin-unique dispatch verified by `<TAB>`, per-world
-   radius raised to match, cache TTL and cap recorded in section 6.
-9. **Long-phase run for every cache-based engine.** At least 2x the longest
-   *finite* cache TTL in the roster (~30 min per phase against JustRTP's
-   ~15 min), reported first-half vs second-half so the drain and the refill are
-   separable. This is the run that makes section 4's practicality axis quotable,
-   and the one the new residency / GC / heap-pressure columns exist for. Note
-   the asymmetry: for a time-expired cache the long phase reveals hit-rate
-   decay, while for an event-invalidated one (RTP, and EzRTP's spatial state) it
-   reveals whether residency plateaus or keeps climbing. Report those as two
-   different questions, not one column.
-10. **Confirm RTP's unbounded entry lifetime at the raised radius.** The "no TTL
-    in a claim-free world" claim rests on earlier lifecycle measurement at 4096;
-    re-derive it from `peak_resident_chunks`, `peak_plugin_tickets` and queue
-    occupancy at 16384 before publishing it as a design advantage.
+1. **[DONE] Equalize search boundary across all 6 contenders:** Fully audited and aligned on the
+   Paper 26.2 test server to a 1,024 to 16,384 block radius:
+   - LeafRTP: `radius: 16384b`, `centerRadius: 64` (chunks = 1,024b), `centerX: 0`, `centerZ: 0`.
+   - BetterRTP: `MaxRadius: 17408` (yielding 16,384b effective due to the delta truncation bug),
+     `MinRadius: 1024`, `CenterX: 0`, `CenterZ: 0`, `Shape: circle`.
+   - EzRTP: `radius.min: 1024`, `radius.max: 16384`, `center: 0, 0`, `search-pattern: circle`.
+   - JustRTP: `min_radius: 1024`, `max_radius: 16384`, `center_x: 0`, `center_z: 0`.
+   - JakesRTP: `radius.min: 1024`, `radius.max: 16384`, `shape: circle`, `center: 0, 0`.
+   - HuskHomes: `region.min: 1024`, `region.max: 16384`.
+2. **[DONE] Test A (Burst Saturation / Queue Clearance):**
+   - Executed in run `20261008-003310` across all 6 contenders with biome verification active.
+   - Evaluated peak throughput ceiling, total 4,096-attempt clearance time, surge tail latencies,
+     and spatial distributions. Full results recorded in section 5.7 and `RESULTS.md`.
+3. **[DONE] Test B (Steady-State Paced at 5.0 TP/s - Paper 26.2):**
+   - Executed in run `20261008-024412` across all 6 contenders (supersedes `20261008-020859`).
+     In `plugins/StressTestRTP/config.yml`: `per-target-count: 4096`, `immediate-redispatch: false`,
+     `dispatch-interval-ms: 200`, `per-player-gap-ticks: 4`, `per-player-gap-ms: -1`, `sequence.gap-seconds: 180`,
+     `sequence.per-target-seconds: 1800`, spark `rotate-seconds: 0`.
+   - Evaluated tick impact (absolute MSPT and $\Delta$MSPT against the settle baseline), main-thread and
+     process CPU per attempt, GC, chunk loads and spatial distributions at equal offered rate. Full results
+     recorded in section 5.8 and `RESULTS.md`. `chunks_off_tick_share` reads 0.000 for every plugin on
+     Paper and does not discriminate there.
+4. **[DONE] Test B (Steady-State Paced at 5.0 TP/s - Folia 26.2):**
+   - Executed in run `20261008-052141` across LeafRTP, EzRTP, JustRTP, and HuskHomes.
+   - Identified BetterRTP warm-up crash, EzRTP thread violation lockout and water landing bug, JustRTP 1,150 ms CPU scaling issue, and LeafRTP 31.5 % CPU reduction. Full results in section 5.9 and `RESULTS.md`.
+5. **[CONFIGURED / NEXT] Test A (Burst Saturation / Queue Clearance - Folia 26.2):**
+   - Configured in `C:\GameServers\Minecraft\testServer\RTP-Folia\26.2\plugins\StressTestRTP\config.yml` with `dispatch-interval-ms: 0`, `immediate-redispatch: true`, `per-player-gap-ticks: 0`, `per-target-count: 4096`.
+   - BetterRTP and EzRTP disabled due to fatal Folia threading incompatibilities; LeafRTP, JustRTP, and HuskHomes in active roster.
+6. **[IN PROGRESS] Publication Pipeline to MkDocs (`docs/site/benchmarks.md`):**
+   - Synthesize Test A and Test B CSV outputs, Spark flame graphs, and JFR allocations directly
+     into `docs/site/benchmarks.md` for web publishing and storefront links.
+7. Set the base `chunk-load-cost-us` per platform if chunk-amended CPU modeling is desired (section 6 calibration note).
+8. Configure `residency-target-plugin` per arm if isolated per-plugin ticket counts are desired in multi-target sequence CSVs.
+9. **[DONE] Arrival-block safety audit:** Integrated into Test A and Test B runs via `MetricsRecorder` (`landing_floor`, `landing_feet`, `landing_head`, `landing_class`) across Paper and Folia. Successfully identified EzRTP depositing ~10.9 % of arrivals into water surfaces, and HuskHomes/JakesRTP void/noFloor landings.
+10. **[PARTIAL] Test C (Stress point ramp - Paper 26.2, Linux):** `/rtpstress ramp <target>` per
+    contender, server restart between targets, roster of 48 offline-mode bots from
+    `devstack/clients/bench-swarm.js` (`connection-throttle: -1`), cooldowns disabled. Definition in
+    section 8.1. Overnight 2026-10-09: valid for LeafRTP (flat 100 TP/s, n=3) and EzRTP (ladder,
+    n=2) only; results and the jar-isolation ordering bug in section 5.10. Remaining: BetterRTP,
+    HuskHomes, justRTP, JakesRTP, and a LeafRTP ladder.
+
+### 8.1 Stress point definition (Test C)
+
+The stress point is the highest offered rate a plugin sustains on this rig,
+measured open-loop so it is not bounded by the harness.
+
+- **Offered load:** fixed-rate stages, default 5, 10, 20, 40, 80, 160, 320
+  TP/s, 60 s each, after a 30 s unrecorded warm-up. Dispatch slots are
+  issued on schedule whether or not earlier attempts have completed; each
+  slot goes to an idle roster player (one attempt in flight per player).
+- **Harness saturation is separated from plugin saturation:** a slot with
+  no idle player is `harness_shed`. A failing stage whose shed slots alone
+  exceed the 5 % allowance is tagged `HARNESS_SATURATED`, and any stress
+  point just below it is reported as a lower bound.
+- **Pass criteria (all):** achieved (successful teleports / stage seconds)
+  at least 95 % of offered; MSPT p95 at most 50 ms; (timeouts + errors) at most 1 % of
+  attempts. Plugin-side busy rejections are shed load, reported per stage,
+  and count against achieved, not against the failure rate.
+- **Stress point** = highest passing stage. **Stop rules:** two consecutive
+  failing stages, or wall-clock TPS < 5 continuously for 10 s (that stage
+  is aborted, recorded, and fails `LOW_TPS_ABORT`). Each stage row is
+  flushed before the next stage, so a crash keeps every completed stage.
+- **Report:** stress point (stage, offered TP/s) plus the first failing
+  stage and the criterion it failed. A plugin that fails stage 0 has no
+  stress point on this rig; say so, do not interpolate.
+- **Known limit:** busy rejections are counted only when the plugin's
+  reply reaches the console. Player-only chat replies surface as timeouts,
+  so a plugin that politely sheds load via chat is billed as failing.
+  Cross-check with the swarm's `busy_chat` count before publishing such a row.
 
 ---
 
@@ -757,9 +1076,11 @@ Must appear in the public write-up.
 **Rig and load**
 
 1. **Single-server, single-machine** rig; not a multi-server / proxy setup.
-2. **Three real online accounts**, not hundreds of players. Absolute numbers are
-   a floor; with 50 real players everything degrades but the *ranking* should
-   hold. Fake-player infrastructure (`helpers/StressTestRTPBots`) is future work.
+2. **Three real online accounts** in the closed-loop runs (sections 5.1-5.9), not
+   hundreds of players. Absolute numbers are a floor; with 50 real players
+   everything degrades but the *ranking* should hold. The open-loop ramp (section
+   5.10) uses 48 idle Mineflayer bots with server view distance capped at 2: real
+   connections and chunk sends, but not 48 players moving and building.
 3. **Cooldowns and countdowns disabled** everywhere - pipeline throughput, not
    anti-spam or UX policy.
 4. **All plugins forced to the same outer radius** (4096 blocks in section 5's

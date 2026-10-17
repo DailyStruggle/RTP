@@ -1,8 +1,8 @@
-﻿# Multi-Server (Proxy) Support Roadmap
+# Multi-Server (Proxy) Support Roadmap
 
-This document outlines the plan for RTP's multi-server (proxy / network) expansion. It is **distinct from** [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md): that plan covers running on additional Minecraft server flavours (Spigot/Paper/Folia/Fabric); *this* plan covers coordinating RTP across **multiple concurrent backend servers** — and, as of 2026-05-07, **multiple concurrent proxy instances** — sitting in front of those backends (Velocity, BungeeCord, Waterfall).
+This document outlines the plan for RTP's multi-server (proxy / network) expansion. It is distinct from the platform expansion work ([rtp-fabric-ADR-002](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md), [ADR-033](../adr/ADR-033-neoforge-platform-in-scope.md)): those covered running on additional Minecraft server flavours (Spigot/Paper/Folia/Fabric/NeoForge); *this* plan covers coordinating RTP across **multiple concurrent backend servers** — and, as of 2026-05-07, **multiple concurrent proxy instances** — sitting in front of those backends (Velocity, BungeeCord, Waterfall).
 
-> Status: **Phase 0 (Scope Unlock) and Phase 1 (Core SPI) both complete; Phase 2 (Velocity adapter + Redis/SQL transports) in flight as of 2026-05-19.** Requirements authored (REQ-RTP-NET-001…014); GLOSSARY entries (`backend`, `proxy`, `reservation token`, `transport`, `network snapshot`, `backend selector`) live in [`GLOSSARY.md`](GLOSSARY.md); umbrella decision captured in [ADR-036](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) (Accepted 2026-05-14) and refined by ten subproject ADRs under [`platforms/rtp-proxy/docs/adr/`](../../platforms/rtp-proxy/docs/adr/); [`INDEX.md`](INDEX.md) and [`AGENTS.md`](../../.junie/AGENTS.md) updated to co-list network mode as an active frontier. Phase 2 landed slices: 2a (Velocity no-op shell), 2b (participant skeleton + `network.yml` loader), 2c-Î± (`ServerPreConnectEvent` redemption), 2c-Î² / 2d (Brigadier `/rtp` + `CommandTriggerSource`), 2e-SQL (`SqlNetworkStateBinding`), 2e-Redis A1 (heartbeats + snapshot + pub/sub). Open Phase 2 work: Redis A2-A4, reservation-token TTL reaper, D4 HMAC distribution, regression suite, 2-proxy + 2-backend devstack acceptance.
+> Status: **Phase 0 (Scope Unlock) and Phase 1 (Core SPI) both complete; Phase 2 (Velocity adapter + Redis/SQL transports) in flight as of 2026-05-19.** Requirements authored (REQ-RTP-NET-001…014); GLOSSARY entries (`backend`, `proxy`, `reservation token`, `transport`, `network snapshot`, `backend selector`) live in [`GLOSSARY.md`](GLOSSARY.md); umbrella decision captured in [ADR-036](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) (Accepted 2026-05-14) and refined by ten subproject ADRs under [`platforms/rtp-proxy/docs/adr/`](../../platforms/rtp-proxy/docs/adr/); [`INDEX.md`](INDEX.md) and [`AGENTS.md`](../../.junie/AGENTS.md) updated to co-list network mode as an active frontier. Phase 2 landed slices: 2a (Velocity no-op shell), 2b (participant skeleton + `network.yml` loader), 2c-α (`ServerPreConnectEvent` redemption), 2c-β / 2d (Brigadier `/rtp` + `CommandTriggerSource`), 2e-SQL (`SqlNetworkStateBinding`), 2e-Redis A1 (heartbeats + snapshot + pub/sub). Open Phase 2 work: Redis A2-A4, reservation-token TTL reaper, D4 HMAC distribution, regression suite, 2-proxy + 2-backend devstack acceptance.
 
 > Cross-references: [rtp-fabric-ADR-002 (Fabric in scope; formerly ADR-022)](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) is **orthogonal** to this plan and is **not** superseded. [ADR-036](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) is the ratified umbrella for multi-server proxy support; subproject refinements live under [`platforms/rtp-proxy/docs/adr/`](../../platforms/rtp-proxy/docs/adr/). Visual companion (mermaid topology / sequence / state-machine diagrams): [`../architecture/12-network-model.md`](../architecture/12-network-model.md).
 
@@ -57,7 +57,7 @@ These constraints are part of the acceptance criteria for ADR-036; any deviation
 
 - No proxy-side chunk logic, world data, or entity manipulation. The proxy never owns world state.
 - No replacement of the existing single-server pipeline. With `network.enabled: false`, behaviour is byte-identical to today.
-- No Forge / NeoForge proxy support. (Out of scope until Fabric platform stabilises — see `MULTI_PLATFORM_PLAN.md` Phase 4.)
+- No Forge / NeoForge proxy support. (Out of scope; proxy architecture focuses on Velocity and BungeeCord.)
 - No first-class Fabric backend networking support. Decision recorded 2026-05-24: networked Fabric setups (Velocity / BungeeCord in front of a Fabric backend) are **supported only at the SPI level** (the `rtp-proxy-common` dispatcher is platform-agnostic, and the devstack's `backend-c` Fabric instance exercises that) but are **not a prioritized feature** and ship with no documented forwarding-mode recipe until a modpack operator files a concrete request. Operators wanting to try it today use Velocity legacy forwarding + the third-party FabricProxy-Lite mod at their own risk; RTP itself adds nothing Fabric-specific to the proxy path. Revisit if demand materializes.
 - No cross-version protocol breakage without a `schemaVersion` bump.
 - **No post-arrival coordinate resolution.** Coordinates are resolved on the destination *before* the player transfers; see *Coordinate Resolution Timing* below.
@@ -174,7 +174,7 @@ Additional locked-in decisions:
 
 - **Proxy primary**: Velocity. **Secondary**: BungeeCord/Waterfall. Both eventually required.
 - **Transport preference order**: Redis (most responsive — and any RESP-compatible drop-in such as DragonflyDB or KeyDB; Redis is the reference implementation), Postgres (co-equal candidate, needs analysis), generic SQL (MySQL/MariaDB) for universal fallback, `plugin-message` for dev only.
-- **Commands**: extend `commands-api` rather than fork. Brigadier bridge work (Step G of `MULTI_PLATFORM_PLAN.md`) carries over for Velocity.
+- **Commands**: extend `commands-api` rather than fork. Brigadier bridge work (from the Fabric/NeoForge command adapter) carries over for Velocity.
 
 ### Amendment: Plugin-Message Default Tier (ratified 2026-06-12, repo owner leaf)
 
@@ -355,7 +355,7 @@ Special cases collapse cleanly:
 
 #### Defaults shipped with v1
 
-The example block above is the **shipped default**. Rationale per metric noted inline. Operators can disable any line by setting `weight: 0`. The defaults must be benchmarked against a reference Velocity + 2Ã— Paper devstack before Phase 2 release; tuning notes will land in `LESSONS_LEARNED.md`.
+The example block above is the **shipped default**. Rationale per metric noted inline. Operators can disable any line by setting `weight: 0`. The defaults must be benchmarked against a reference Velocity + 2× Paper devstack before Phase 2 release; tuning notes will land in `LESSONS_LEARNED.md`.
 
 #### Documentation follow-up
 
@@ -473,7 +473,7 @@ JSON columns become `JSONB` on Postgres; TEXT/CSV on SQLite (which is dev-only a
 
 - The publisher (`BackendStatePublisher`) lives in **`rtp-core`** as part of the `NetworkBridge` optional subsystem. Default-disabled when `network.enabled: false` — REQ-RTP-NET-002 must remain green.
 - The accessor member (per D3) exposes `writeBackendState(BackendStateRow)` and `readNetworkSnapshot()`. Concrete bindings (Redis / Postgres / generic SQL / in-memory) implement both.
-- No platform imports in the publisher — TPS/MSPT/heap/region data come through `RTP.serverAccessor` extensions (a small additive surface to spec in ADR-036; the *April 2026 gap analysis* in `MULTI_PLATFORM_PLAN.md` does **not** cover these new methods).
+- No platform imports in the publisher — TPS/MSPT/heap/region data come through `RTP.serverAccessor` extensions (a small additive surface to spec in ADR-036; the initial platform gap analysis does not cover these new methods).
 
 ### Open items folded into existing placeholders
 
@@ -526,7 +526,7 @@ Single shared keyspace owned by the network-state member of the accessor:
 - Fields: `token (UUID PK)`, `playerUuid`, `targetServerId`, `worldKey`, `x/y/z/yaw/pitch`, `issuedAt`, `expiresAt`, `state ∈ {PENDING, CLAIMED, CONSUMED, EXPIRED}`.
 - **Issued** by the destination backend after its pipeline produces a safe location.
 - **Claimed** atomically when the proxy commits to a transfer.
-- **Consumed** by the destination backend on player join (PaperMC `PlayerJoinEvent` / Fabric server-join event / equivalent). Idempotent: `UPDATE … WHERE state='CLAIMED'` returning row-count; >1 â‡’ replay, refuse and log under S-004.
+- **Consumed** by the destination backend on player join (PaperMC `PlayerJoinEvent` / Fabric server-join event / equivalent). Idempotent: `UPDATE … WHERE state='CLAIMED'` returning row-count; >1 ⇒ replay, refuse and log under S-004.
 - **Reaped** by a scheduled `RTP.scheduler.runTaskTimerAsynchronously` on each backend, which releases `MemoryTracker` entries on local rows it owns.
 - TTL: configurable, default 30s.
 
@@ -536,9 +536,9 @@ Per D2, durable reservation tokens **must survive a proxy restart**, which is wh
 
 | State transition | Initiator | Atomicity primitive | Failure handling |
 |------------------|-----------|---------------------|------------------|
-| `—` → `PENDING` | Destination backend (after pipeline produces safe location) | INSERT under unique `(playerUuid, state=PENDING)` partial index; conflict â‡’ reuse existing row | If conflict happens during a retry, the destination returns the existing token rather than minting a new one |
-| `PENDING` → `CLAIMED` | Proxy (just before issuing the transfer) | `UPDATE … SET state='CLAIMED', claimedAtEpochMs=now WHERE token=? AND state='PENDING'` returning row-count | row-count `= 0` â‡’ race lost (token expired or was claimed by a parallel proxy instance); proxy aborts the transfer and surfaces a `messages.yml` failure (REQ-RTP-NET-006) |
-| `CLAIMED` → `CONSUMED` | Destination backend (in the join handler) | `UPDATE … SET state='CONSUMED' WHERE token=? AND state='CLAIMED'` returning row-count | row-count `> 1` â‡’ replay attempt; reject the duplicate join, log under S-004 |
+| `—` → `PENDING` | Destination backend (after pipeline produces safe location) | INSERT under unique `(playerUuid, state=PENDING)` partial index; conflict ⇒ reuse existing row | If conflict happens during a retry, the destination returns the existing token rather than minting a new one |
+| `PENDING` → `CLAIMED` | Proxy (just before issuing the transfer) | `UPDATE … SET state='CLAIMED', claimedAtEpochMs=now WHERE token=? AND state='PENDING'` returning row-count | row-count `= 0` ⇒ race lost (token expired or was claimed by a parallel proxy instance); proxy aborts the transfer and surfaces a `messages.yml` failure (REQ-RTP-NET-006) |
+| `CLAIMED` → `CONSUMED` | Destination backend (in the join handler) | `UPDATE … SET state='CONSUMED' WHERE token=? AND state='CLAIMED'` returning row-count | row-count `> 1` ⇒ replay attempt; reject the duplicate join, log under S-004 |
 | `PENDING` \| `CLAIMED` → `EXPIRED` | Reaper (each backend, async timer) | `UPDATE … SET state='EXPIRED' WHERE expiresAtEpochMs<now AND state IN ('PENDING','CLAIMED')` | Token is no longer valid; if it was `CLAIMED`, the destination releases the underlying `keptLocations` entry back to its source buffer and emits a `MemoryTracker` release; an audit row is logged |
 
 Proxy-restart recovery: on startup the proxy runs `UPDATE … SET state='PENDING' WHERE state='CLAIMED' AND claimedAtEpochMs < now - claimReanimateMs` (default `claimReanimateMs = 5000`). This re-opens any token claimed by a proxy that died before completing the transfer, letting the next proxy instance pick it up rather than orphaning it until TTL expiry.
@@ -563,7 +563,7 @@ A dedicated regression suite analogous to `ReqRtpS004NullChunkAttributionTest` i
 - `NetworkAwareCommand` mixin — when present, execution is routed through `RtpDispatcher` instead of run locally. Single-server commands stay untouched.
 - `ProxySender` abstraction in `commands-api` — adapts both Velocity's `CommandSource` and BungeeCord's `CommandSender` so `/rtp` works identically whether issued on a backend or on the proxy itself.
 - Tab-completion routing: proxy queries any backend on the transport, merges results, applies a local cache TTL.
-- Brigadier bridge (`BrigadierCommandAdapter` / `BrigadierBridgeContext` from Step G of `MULTI_PLATFORM_PLAN.md`) carries over for Velocity, which uses Brigadier internally.
+- Brigadier bridge (`BrigadierCommandAdapter` / `BrigadierBridgeContext` from `commands-api` and modded platform adapters) carries over for Velocity, which uses Brigadier internally.
 
 ---
 
@@ -650,7 +650,7 @@ The canonical wording for every `REQ-RTP-NET-NNN` requirement lives in [`REQUIRE
 
 ## Phased Roadmap
 
-Mirrors the structure of [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) so contributors can navigate either plan with the same mental model.
+Structured in phases so contributors can navigate the roadmap with a consistent mental model.
 
 ### Phase 0 — Scope Unlock *(docs only; D-005 gate)*
 
@@ -721,10 +721,10 @@ etwork.secretEnv). Guarded by two new cases in SqlNetworkStateBindingH2Test (10/
 
 > **Phase 2 reservation-token TTL reaper adapter wiring landed 2026-05-19.** Follow-on to the reaper component slice above. `RtpVelocityPlugin` (proxy) and `NetworkModeBootstrap` (backend, `rtp-plugin`) both construct a `ReservationTokenReaper` alongside the active `NetworkTransport` when `enabled:true`, start it after the heartbeat publisher, and `close()` it before transport teardown in reverse-order shutdown. Velocity reads cadence from `NetworkConfig.reservationReapIntervalMs()`; backend reads it inline from `network.yml` `reservation.reapIntervalMs` with the same default (30000) and non-positive clamp. REQ-RTP-NET-002 byte-identical no-op preserved on both adapters (no reaper is constructed when `enabled:false` or `network.yml` is absent). Existing `RtpVelocityPluginPhase2bTest`/`2c`/`2d` suites still green (23/23 in `:rtp-proxy-velocity:test`); no new automated test this slice (lifecycle is structurally identical to the existing publisher wiring, already covered by the Phase 2b/2c/2d structural guards). Live multi-proxy reaper contention exercised on the deferred Phase 2 acceptance devstack.
 - [x] Reservation tokens end-to-end with TTL reaper. (Token *redemption* at connect time landed in Phase 2c; the periodic TTL reaper sweep landed 2026-05-19 - see *Phase 2 reservation-token TTL reaper landed 2026-05-19* callout below.)
-- [x] `ServerPreConnectEvent` hook (Velocity) for backend rewrite. *(Phase 2c-Î± landed 2026-05-19: `NetworkTransport.findReservation(playerId)` SPI default; in-memory and SQL bindings override; `RtpVelocityPlugin.onServerPreConnect` rewrites the target to the token's `serverId`, transitions `CLAIMED -> CONSUMED`, S-004 WARNING + fall-through on miss/expiry/unknown-server/lookup-error. Guarded by `RtpVelocityPluginPhase2cTest` (4/4 - disabled-no-op, no-reservation-fallthrough, active-reservation-rewrites, unknown-target-fallthrough) and the new `findReservationCrossesInstances` case in `SqlNetworkStateBindingH2Test`. `CommandTriggerSource` adapter intentionally deferred to Phase 2d so it lands next to Brigadier `/rtp`.)*
-- [x] `CommandTriggerSource` wired through dispatcher. *(Phase 2c-Î² / Phase 2d landed 2026-05-19. `RtpTriggerSource` promoted from `rtp-core` to `rtp-api` (`io.github.dailystruggle.rtp.api.network.RtpTriggerSource`) so both producer sides (`rtp-proxy-common`, `rtp-core` platform adapters) implement it without module-boundary crossings. New `CommandTriggerSource` in `rtp-proxy-common/.../trigger/`. Brigadier `/rtp` registered on the Velocity proxy in `RtpVelocityPlugin.registerRtpCommand()` (REQ-RTP-PROXY-VELOCITY-002); executor fires the trigger source; consumer (`onCommandTrigger`) runs selector -> `transport.claim` -> `player.createConnectionRequest`, with `ServerPreConnectEvent` (Phase 2c-Î±) redeeming the token at the connect boundary. Guarded by `CommandTriggerSourceTest` (6/6 - lifecycle, fire-before-start no-op, double-start rejection, stop idempotency, null guard) and `RtpVelocityPluginPhase2dTest` (3/3 - structural guards on `registerRtpCommand`, `onCommandTrigger`, test accessors). The proxy `/rtp` is player-only; console invocations emit a hint and return. Token TTL is 30s by default. Phase 2d does not add a config knob; world argument is parsed-and-ignored pending a richer `Trigger` record.)*
+- [x] `ServerPreConnectEvent` hook (Velocity) for backend rewrite. *(Phase 2c-α landed 2026-05-19: `NetworkTransport.findReservation(playerId)` SPI default; in-memory and SQL bindings override; `RtpVelocityPlugin.onServerPreConnect` rewrites the target to the token's `serverId`, transitions `CLAIMED -> CONSUMED`, S-004 WARNING + fall-through on miss/expiry/unknown-server/lookup-error. Guarded by `RtpVelocityPluginPhase2cTest` (4/4 - disabled-no-op, no-reservation-fallthrough, active-reservation-rewrites, unknown-target-fallthrough) and the new `findReservationCrossesInstances` case in `SqlNetworkStateBindingH2Test`. `CommandTriggerSource` adapter intentionally deferred to Phase 2d so it lands next to Brigadier `/rtp`.)*
+- [x] `CommandTriggerSource` wired through dispatcher. *(Phase 2c-β / Phase 2d landed 2026-05-19. `RtpTriggerSource` promoted from `rtp-core` to `rtp-api` (`io.github.dailystruggle.rtp.api.network.RtpTriggerSource`) so both producer sides (`rtp-proxy-common`, `rtp-core` platform adapters) implement it without module-boundary crossings. New `CommandTriggerSource` in `rtp-proxy-common/.../trigger/`. Brigadier `/rtp` registered on the Velocity proxy in `RtpVelocityPlugin.registerRtpCommand()` (REQ-RTP-PROXY-VELOCITY-002); executor fires the trigger source; consumer (`onCommandTrigger`) runs selector -> `transport.claim` -> `player.createConnectionRequest`, with `ServerPreConnectEvent` (Phase 2c-α) redeeming the token at the connect boundary. Guarded by `CommandTriggerSourceTest` (6/6 - lifecycle, fire-before-start no-op, double-start rejection, stop idempotency, null guard) and `RtpVelocityPluginPhase2dTest` (3/3 - structural guards on `registerRtpCommand`, `onCommandTrigger`, test accessors). The proxy `/rtp` is player-only; console invocations emit a hint and return. Token TTL is 30s by default. Phase 2d does not add a config knob; world argument is parsed-and-ignored pending a richer `Trigger` record.)*
 - [ ] Resolve D4 (HMAC key distribution) before security review.
-- [ ] **Acceptance**: cross-server `/rtp` round-trip on **2Ã— Velocity (behind L4) + 2Ã— Paper** devstack with Redis. The two-proxy baseline exercises REQ-RTP-NET-014 (multi-proxy concurrency + reanimation); single-proxy is the `N=1` degenerate case and remains green by construction.
+- [ ] **Acceptance**: cross-server `/rtp` round-trip on **2× Velocity (behind L4) + 2× Paper** devstack with Redis. The two-proxy baseline exercises REQ-RTP-NET-014 (multi-proxy concurrency + reanimation); single-proxy is the `N=1` degenerate case and remains green by construction.
 - [ ] **Acceptance (RESP compatibility)**: same cross-server `/rtp` round-trip green against **DragonflyDB** as the shared store, using the unmodified `RedisNetworkStateBinding`. One extra container in the devstack compose; no new code paths. Any observed RESP divergence (Lua/`EVAL`, Streams consumer groups, persistence semantics) is recorded in `LESSONS_LEARNED.md`, not branched on in code.
 - [x] Regression suite for reservation token replay / TTL / orphaned-MemoryTracker scenarios. *(Landed 2026-05-19 as `ReservationTokenRegressionTest` in `rtp-proxy-common`: 9/9 cases covering double-redeem rejection, expired-token invisibility to `findReservation`, orphan release via `ReservationTokenReaper.reapNow`, reaper idempotency across passes, reaper-skips-terminal, concurrent-release idempotency, claim race-loss surface, reaper-on-empty no-op, reaper-races-manual-release safety. Driven against `InMemoryNetworkStateBinding` with a virtual clock; SQL-binding parity is covered by `SqlNetworkStateBindingH2Test`; live-Redis parity deferred to the Phase 2 acceptance devstack alongside Redis A3/A4.)*
 

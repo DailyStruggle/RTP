@@ -250,15 +250,15 @@ public class ReqRtpWorldFallbackRebindTest {
         RtpOutcomeStats.GLOBAL.reset();
         assertEquals(0L, RtpOutcomeStats.GLOBAL.successCount());
 
-        long seed = fallbackWorld.getSeed();
+        long seed = region.cacheKeyLong();
         java.util.List<DatabaseAccessor.StoredLocation> rows = new ArrayList<>();
         rows.add(new DatabaseAccessor.StoredLocation(
-                "id-1", "stats_region", "world", 100, 64, 200, 1, seed, null));
+                "id-1", "stats_region", "world", 1600, 64, 1600, 1, seed, null));
         rows.add(new DatabaseAccessor.StoredLocation(
-                "id-2", "stats_region", "world", 300, 64, 400, 1, seed, null));
+                "id-2", "stats_region", "world", -1600, 64, 1600, 1, seed, null));
         // Stale-seed row: must NOT increment RtpOutcomeStats
         rows.add(new DatabaseAccessor.StoredLocation(
-                "id-stale", "stats_region", "world", 0, 64, 0, 1, seed + 100, null));
+                "id-stale", "stats_region", "world", 1600, 64, 1600, 1, seed + 100, null));
 
         region.hydrateCacheFromDatabase(rows);
 

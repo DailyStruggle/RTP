@@ -1,0 +1,58 @@
+package io.github.dailystruggle.rtp.common.commands.base;
+
+import io.github.dailystruggle.commandsapi.common.CommandParameter;
+import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
+import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
+import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.RTP;
+
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * Platform-neutral {@link PlatformCommandParameters} implementation backed by
+ * {@link io.github.dailystruggle.rtp.api.server.RTPServerAccessor} for Fabric and NeoForge.
+ */
+public final class ServerAccessorCommandParameters implements PlatformCommandParameters {
+
+  @Override
+  public CommandParameter playerParameter() {
+    return new CommandParameter(
+        "rtp.other",
+        "teleport someone else",
+        (uuid, s) -> {
+          RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
+          if (sender == null || !sender.hasPermission("rtp.other")) return false;
+          RTPPlayer target = RTP.serverAccessor.getPlayer(s);
+          if (target == null || !target.name().equalsIgnoreCase(s)) return false;
+          RTPCommandSender targetSender = RTP.serverAccessor.getSender(target.uuid());
+          // Console (non-player sender) or callers with rtp.* or rtp.notme.bypass are exempt from rtp.notme
+          if (targetSender == null) return true;
+          if (!(sender instanceof RTPPlayer)) return true;
+          if (!targetSender.hasPermission("rtp.notme")) return true;
+          return sender.hasPermission("rtp.*") || sender.hasPermission("rtp.notme.bypass");
+        }) {
+      @Override
+      public Set<String> values() {
+        return RTP.serverAccessor.getOnlinePlayerNames();
+      }
+    };
+  }
+
+  @Override
+  public CommandParameter worldParameter() {
+    return new CommandParameter(
+        "rtp.world",
+        "select a world to teleport to",
+        (uuid, s) ->
+            RTP.serverAccessor.getRTPWorld(s) != null
+                && RTP.serverAccessor.getSender(uuid).hasPermission("rtp.worlds." + s)) {
+      @Override
+      public Set<String> values() {
+        return RTP.serverAccessor.getRTPWorlds().stream()
+            .map(RTPWorld::name)
+            .collect(Collectors.toSet());
+      }
+    };
+  }
+}

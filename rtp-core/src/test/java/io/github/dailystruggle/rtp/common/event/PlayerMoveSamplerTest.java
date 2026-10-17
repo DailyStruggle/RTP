@@ -157,4 +157,24 @@ class PlayerMoveSamplerTest {
 
         assertTrue(received.isEmpty(), "no watcher => no work, no event");
     }
+
+    @Test
+    void globalWatcherSamplesAllOnlinePlayers() {
+        List<PlayerMoveEvent> received = new ArrayList<>();
+        handles.add(RTPAPI.playerMoveEvents.watchAll(received::add));
+
+        UUID id = UUID.randomUUID();
+        MockRTPPlayer player =
+                new MockRTPPlayer(id, "global_watched", new RTPLocation(new MockRTPWorld("world"), 0, 64, 0));
+        accessor.addPlayer(player);
+
+        PlayerMoveSampler sampler = new PlayerMoveSampler();
+        sampler.sample(); // baseline
+        assertTrue(received.isEmpty());
+
+        player.setLocation(new RTPLocation(new MockRTPWorld("world"), 1, 64, 0));
+        sampler.sample();
+        assertEquals(1, received.size());
+        assertEquals(1, received.get(0).toX());
+    }
 }

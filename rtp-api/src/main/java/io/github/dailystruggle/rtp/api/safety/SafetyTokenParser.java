@@ -81,6 +81,104 @@ public final class SafetyTokenParser {
       return;
     }
 
+    // Split token by subtraction operators (' - ' or '-' preceding identifier/tag) outside of '[...]'.
+    List<String> segments = splitSubtractions(token);
+    if (segments.size() > 1) {
+      String basePart = segments.get(0).trim();
+      if (basePart.isEmpty()) {
+        rejected.add(new Rejection(source, "base token before subtraction '-' is empty"));
+        return;
+      }
+      List<SafetyToken> baseTokens = new ArrayList<>(1);
+      parseSimpleToken(source, basePart, baseTokens, rejected);
+      if (baseTokens.isEmpty()) {
+        return;
+      }
+      SafetyToken baseToken = baseTokens.get(0);
+
+      List<SafetyToken> subtractions = new ArrayList<>(segments.size() - 1);
+      for (int i = 1; i < segments.size(); i++) {
+        String subPart = segments.get(i).trim();
+        if (subPart.isEmpty()) {
+          rejected.add(new Rejection(source, "subtraction segment #" + i + " is empty"));
+          return;
+        }
+        List<SafetyToken> subTokens = new ArrayList<>(1);
+        parseSimpleToken(source, subPart, subTokens, rejected);
+        if (subTokens.isEmpty()) {
+          // parseSimpleToken already added rejection
+          return;
+        }
+        subtractions.add(subTokens.get(0));
+      }
+
+      // Construct combined SafetyToken with subtractions
+      if (baseToken.kind() == SafetyToken.Kind.TAG) {
+        out.add(SafetyToken.tag(baseToken.identifier(), baseToken.predicates(), subtractions, source));
+      } else {
+        out.add(SafetyToken.material(baseToken.identifier(), baseToken.predicates(), subtractions, source));
+      }
+      return;
+    }
+
+    parseSimpleToken(source, token, out, rejected);
+  }
+
+  /**
+   * Splits a token string by set subtraction operators ('-' outside of brackets).
+   * Supports ' - ' as well as '-' immediately adjacent to whitespace or valid identifier / tag start.
+   */
+  private static List<String> splitSubtractions(String token) {
+    List<String> parts = new ArrayList<>();
+    int len = token.length();
+    int bracketDepth = 0;
+    int lastStart = 0;
+
+    for (int i = 0; i < len; i++) {
+      char c = token.charAt(i);
+      if (c == '[') {
+        bracketDepth++;
+      } else if (c == ']') {
+        if (bracketDepth > 0) bracketDepth--;
+      } else if (c == '-' && bracketDepth == 0) {
+        // Must distinguish subtraction operator from hyphens in tag names (e.g. #my-ns:my-tag)
+        // or leading hyphens.
+        // A '-' is a subtraction operator if:
+        // 1. Surrounded by whitespace: ' - '
+        // 2. Preceded by whitespace and followed by non-whitespace: ' -tag'
+        // 3. Preceded by closing bracket or identifier char, followed by whitespace: 'tag - ' or 'tag[...]-'
+        // 4. Preceded by closing bracket ']' or tag/material character and followed by '#' or identifier.
+        // But note: inside namespace or path, a hyphen connects words (e.g. 'my-ns').
+        // Standard syntax: 'token ( "-" subtraction )*'.
+        // If there's whitespace around '-' (e.g., ' - ' or ' -' or '- '), it's subtraction.
+        // If no whitespace: if followed by '#', it's tag subtraction ('#a-#b').
+        // If preceded by ']' and followed by valid start, it's subtraction.
+        // In all other cases without whitespace, an embedded hyphen in an identifier/tag is part of the tag name.
+        boolean isOperator = false;
+        boolean hasLeadingWs = (i > 0 && Character.isWhitespace(token.charAt(i - 1)));
+        boolean hasTrailingWs = (i + 1 < len && Character.isWhitespace(token.charAt(i + 1)));
+
+        if (hasLeadingWs || hasTrailingWs) {
+          isOperator = true;
+        } else if (i > 0 && token.charAt(i - 1) == ']') {
+          isOperator = true;
+        } else if (i + 1 < len && token.charAt(i + 1) == '#') {
+          isOperator = true;
+        }
+
+        if (isOperator) {
+          parts.add(token.substring(lastStart, i));
+          lastStart = i + 1;
+        }
+      }
+    }
+
+    parts.add(token.substring(lastStart));
+    return parts;
+  }
+
+  private static void parseSimpleToken(String source, String token,
+                                       List<SafetyToken> out, List<Rejection> rejected) {
     // Structural head/body split, shared with the schematic decoder (ADR-058 Amendment 1).
     String head;
     String body;
@@ -105,7 +203,7 @@ public final class SafetyTokenParser {
     }
 
     // Tag vs material dispatch.
-    if (head.charAt(0) == '#') {
+    if (!head.isEmpty() && head.charAt(0) == '#') {
       parseTagHead(source, head, predicates, out, rejected);
     } else {
       parseMaterialHead(source, head, predicates, out, rejected);

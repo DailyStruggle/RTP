@@ -1,0 +1,11 @@
+StressTestRTP ramp summary
+target: ezrtp = `ezrtp:forcertp {player} world`
+stages_tps: [5.0, 10.0, 20.0, 40.0, 80.0, 160.0, 320.0]
+stage_seconds: 60
+thresholds: Thresholds[minAchievedFraction=0.95, maxMsptP95=50.0, maxFailFraction=0.01, maxConsecutiveFails=2, lowTpsThreshold=5.0, lowTpsWindowMs=10000]
+stress_point_stage: 0
+stress_point_offered_tps: 5
+first_failure_stage: 1
+first_failure_criteria: ACHIEVED_BELOW_OFFERED+FAILURE_RATE
+stop_reason: CONSECUTIVE_FAILURES
+ramp ezrtp: stress point stage 0 @ 5 TP/s; first failure stage 1 @ 10 TP/s failed on ACHIEVED_BELOW_OFFERED+FAILURE_RATE (achieved=7.15 TP/s, mspt_p95=26.39, fail=28.38%); stop=CONSECUTIVE_FAILURES; stages=3

@@ -387,6 +387,45 @@ class PlaceholderProviderTest {
     }
 
     @Test
+    void scanLandPercentage_readsScanTaskTally_notShapeCounts() {
+        RTPTestSetup.install(tempDir.toFile());
+        io.github.dailystruggle.rtp.common.mock.MockRTPWorld world =
+                new io.github.dailystruggle.rtp.common.mock.MockRTPWorld("scan_land_world");
+        io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor vert =
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(java.util.Collections.emptyList());
+        io.github.dailystruggle.rtp.common.selection.region.Region regionA =
+                new io.github.dailystruggle.rtp.common.selection.region.Region("landA",
+                        new io.github.dailystruggle.rtp.common.selection.region.RegionSettings(
+                                "landA", world, new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square(),
+                                vert, false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false));
+        io.github.dailystruggle.rtp.common.selection.region.Region regionB =
+                new io.github.dailystruggle.rtp.common.selection.region.Region("landB",
+                        new io.github.dailystruggle.rtp.common.selection.region.RegionSettings(
+                                "landB", world, new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square(),
+                                vert, false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false));
+
+        io.github.dailystruggle.rtp.common.tasks.ScanTask taskA =
+                new io.github.dailystruggle.rtp.common.tasks.ScanTask(regionA, 0L);
+        taskA.latestLandPercentage = 80.0;
+        io.github.dailystruggle.rtp.common.tasks.ScanTask taskB =
+                new io.github.dailystruggle.rtp.common.tasks.ScanTask(regionB, 0L);
+        taskB.latestLandPercentage = 40.0;
+        RTP.getInstance().scanTasks.put("landA", taskA);
+        RTP.getInstance().scanTasks.put("landB", taskB);
+
+        try {
+            assertEquals("60.00", PlaceholderProvider.fillPlaceholders("[scan_landPercentage]", DUMMY_UUID));
+            RTP.regionContext.set(regionA);
+            assertEquals("80.00", PlaceholderProvider.fillPlaceholders("[scan_landPercentage]", DUMMY_UUID));
+            RTP.getInstance().scanTasks.remove("landA");
+            assertEquals("0.00", PlaceholderProvider.fillPlaceholders("[scan_landPercentage]", DUMMY_UUID));
+        } finally {
+            RTP.regionContext.remove();
+            RTP.getInstance().scanTasks.clear();
+        }
+    }
+
+    @Test
     void allBuiltInPlaceholders_resolvedWithoutExceptions() {
         MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
         io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = accessor.getRTPWorld("world");
@@ -599,6 +638,33 @@ class PlaceholderProviderTest {
         PlaceholderProvider.pushSnapshot(snap);
         assertEquals(snap, PlaceholderProvider.currentSnapshot());
         PlaceholderProvider.popSnapshot();
+    }
+
+    @Test
+    void fillPlaceholders_keyWithRegexMetacharacters_matchedLiterally() {
+        String key = "a.b$(c";
+        PlaceholderProvider.placeholders.put(key, uuid -> "V");
+        try {
+            String result = PlaceholderProvider.fillPlaceholders("[a.b$(c] %A.B$(C% <a.b$(c> [axb$(c]", DUMMY_UUID);
+            assertEquals("V V V [axb$(c]", result);
+        } finally {
+            PlaceholderProvider.placeholders.remove(key);
+        }
+    }
+
+    @Test
+    void replaceDelimited_adjacentAndPartialTokens() {
+        assertEquals("XX", PlaceholderProvider.replaceDelimited("[k][K]", '[', "k", ']', "X"));
+        assertEquals("%X", PlaceholderProvider.replaceDelimited("%%k%", '%', "k", '%', "X"));
+        assertEquals("[k", PlaceholderProvider.replaceDelimited("[k", '[', "k", ']', "X"));
+        assertEquals("$1\\", PlaceholderProvider.replaceDelimited("<k>", '<', "k", '>', "$1\\"));
+    }
+
+    @Test
+    void fillNumericPlaceholders_emptyIndexBeforeValidToken_onlyValidTokenReplaced() {
+        assertEquals("[p] [invalid]", PlaceholderProvider.fillNumericPlaceholders("[p] [p999]"));
+        assertEquals("%p%p999%", PlaceholderProvider.fillNumericPlaceholders("%p%p999%"));
+        assertEquals("[p99999999999]", PlaceholderProvider.fillNumericPlaceholders("[p99999999999]"));
     }
 
     @Test

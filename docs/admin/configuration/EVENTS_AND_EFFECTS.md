@@ -164,13 +164,13 @@ Since 3.0.0-beta.2, the firework parser walks the canonical key order with a non
 Executes arbitrary commands at any trigger stage (`presetup`, `postteleport`, `cancel`, `death`, etc.):
 
 - **Format in `definitions/effects/*.yml`:**
-  - `COMMAND CONSOLE <command>`: Executes the command with server console privileges.
-  - `COMMAND PLAYER <command>`: Executes the command as the player.
+  - `COMMAND CONSOLE <command>`: Executes the command with server console privileges (dotted form `COMMAND.CONSOLE.<command>` also supported).
+  - `COMMAND PLAYER <command>`: Executes the command as the player (dotted form `COMMAND.PLAYER.<command>` also supported).
   - Supports quotes and backslash escapes for arguments.
 - **Format in permissions:**
   - `rtp.effect.<stage>.command.console.<command>`
   - `rtp.effect.<stage>.command.player.<command>`
-  - Whitespace and special characters in permissions can be escaped with backslashes (e.g. `rtp.effect.death.command.console.broadcast\ [player]\ died`).
+  - Whitespace and special characters in permissions can be escaped with backslashes (e.g. `rtp.effect.death.command.console.broadcast\ [player]\ died`). Escaped dots (`\.`) in commands are preserved.
 - **Dynamic placeholders:**
   - `[player]` or `{player}`: Target player's username.
   - `[uuid]` or `{uuid}`: Target player's UUID.

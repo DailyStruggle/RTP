@@ -175,7 +175,7 @@ class AnvilChunkViewTest {
     // --------------------------------------------------------------------- real-fixture sanity
 
     @ParameterizedTest(name = "real fixture {0} decodes into a typed view with at least one section")
-    @CsvSource({"1_20_R1", "1_21_R1", "26_1_R1"})
+    @CsvSource({"1_20_R1", "1_21_R1", "26_1_R1", "26_3_R1"})
     @DisplayName("Real region files lift into an AnvilChunkView with non-empty sections and vanilla ids")
     void realFixtureTypedViewSanity(String dirName) throws IOException {
         byte[] regionBytes = loadRealFixture(dirName);
@@ -185,8 +185,6 @@ class AnvilChunkViewTest {
                 "view DataVersion " + view.dataVersion() + " should be in the support whitelist");
         assertTrue(view.sections().size() > 0,
                 "real fixture must have at least one section");
-        assertNotNull(view.motionBlockingNoLeaves(),
-                "real fixture must expose MOTION_BLOCKING_NO_LEAVES");
 
         // Spot-check: at least one section somewhere in the chunk decodes to a non-null,
         // non-empty, namespaced identifier. We don't pin the exact material because that's

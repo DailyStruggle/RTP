@@ -7,10 +7,18 @@ import io.github.dailystruggle.rtp.proxy.common.spi.ReservationToken;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Shared wire protocol for the {@code proxy-direct} transport tier
@@ -24,18 +32,26 @@ import java.util.UUID;
  * {@code NetworkTransport} + {@code NetworkRequestQueue} are the store, reached
  * over this socket instead of a Redis/JDBC server.</p>
  *
- * <p>Every connection is one RPC: {@code byte opcode}, one signed request
- * payload, then a response (a single signed payload, or a count-framed list of
- * signed payloads). The opcode maps 1:1 to the SPI method invoked
+ * <p>Every connection is one RPC. Request header (wire v{@value #FRAME_VERSION}):
+ * {@code [byte opcode][byte frameVersion][long sentAtMs][UTF nonce]}, then the
+ * request body, then the response. A body is one signed block
+ * {@code [int schemaVersion][UTF hmacHex][UTF payload]} or a count-framed list
+ * {@code [int count]} + signed blocks. The opcode maps 1:1 to the SPI method invoked
  * <em>from a backend</em> (the only RPC direction; the proxy never dials a
  * backend). Proxy-local methods ({@code claim}, {@code dequeueReady},
  * {@code transition}, {@code release}, {@code reapExpired}) are never sent here -
  * they run on the proxy against its own store.</p>
  *
- * <p>Payloads are HMAC-signed when a {@link HmacVerifier} is supplied
- * (rtp-proxy-ADR-010), unsigned otherwise. Verification failure yields
- * {@code null} from {@link #readSignedPayload}, never an exception - the caller
- * drops the row and logs at WARNING (REQ-RTP-S-004).</p>
+ * <p>Every payload is HMAC-signed (rtp-proxy-ADR-010); there is no unsigned
+ * mode. The MAC covers direction, opcode, sentAtMs, nonce, row index and row
+ * count (see {@link #canonical}); a response is signed with its request's
+ * context, so it is bound to that request and list rows cannot be reordered,
+ * dropped or duplicated. Freshness / nonce reuse are checked by the listener
+ * after the MAC verifies ({@link #isFresh}, {@link ProxyDirectReplayCache}).
+ * A {@code null} verifier fails closed: writers throw, readers reject
+ * every payload. Verification failure yields {@code null} from
+ * {@link #readSignedPayload}, never an exception - the caller drops the row
+ * and logs at WARNING (REQ-RTP-S-004); {@link #readList} fails the whole list.</p>
  *
  * <p>Pure I/O glue, no threading; the proxy listener thread and the backend's
  * scheduler-driven calls own their own sockets.</p>
@@ -91,45 +107,230 @@ public final class ProxyDirectWire {
      */
     public static final byte OP_LIST_ACTIVE = 7;
 
+    /** Every opcode a listener accepts; anything else is rejected before the body is read. */
+    public static final Set<Byte> KNOWN_OPCODES = Set.of(OP_HEARTBEAT, OP_FLUSH_PENDING, OP_POLL_STATUS,
+            OP_CANCEL, OP_FIND_RESERVATION, OP_REDEEM, OP_LIST_ACTIVE);
+
+    /**
+     * Request-header frame version. Independent of the config {@code schemaVersion}
+     * (shared with other transports); proxy and backends must run the same frame version.
+     */
+    public static final int FRAME_VERSION = 2;
+
+    /** Max |receiver clock - sentAtMs| accepted for a request (REQ-RTP-PROXY-007). */
+    public static final long MAX_CLOCK_SKEW_MS = 30_000L;
+
+    /** Max nonce length accepted in a request header (writers emit 32 hex chars). */
+    public static final int MAX_NONCE_LENGTH = 64;
+
     /** Field delimiter inside a single multi-field payload string. */
     public static final char FS = '\u0001';
+
+    /**
+     * Upper bound on rows in one count-framed list. Sized well above any real
+     * snapshot / batch (servers, queued players, active tokens per backend)
+     * while capping per-connection allocation from a hostile count.
+     */
+    public static final int MAX_LIST_COUNT = 4096;
+
+    /** Characters of a token id kept by {@link #redactToken}. */
+    public static final int TOKEN_LOG_PREFIX = 8;
+
+    private static final Logger LOG = Logger.getLogger(ProxyDirectWire.class.getName());
+    /** Minimum gap between rejected-list WARNINGs (tamper / secret-mismatch flood guard). */
+    private static final long REJECT_LOG_INTERVAL_MS = 10_000L;
+    private static final AtomicLong lastRejectLogMs = new AtomicLong(Long.MIN_VALUE);
+    private static final AtomicLong suppressedRejects = new AtomicLong();
+    private static final SecureRandom NONCE_RANDOM = new SecureRandom();
+    private static final int NONCE_BYTES = 16;
 
     private ProxyDirectWire() {
     }
 
-    // ---- opcode -----------------------------------------------------------
+    /** MAC direction tag: request (backend -> proxy) or response (proxy -> backend). */
+    public enum Direction {
+        REQUEST('Q'), RESPONSE('R');
 
-    /** Write the one-byte RPC opcode. */
-    public static void writeOpcode(DataOutputStream out, byte opcode) throws IOException {
-        out.writeByte(opcode);
+        private final char tag;
+
+        Direction(char tag) {
+            this.tag = tag;
+        }
     }
 
-    /** Read the one-byte RPC opcode. */
-    public static byte readOpcode(DataInputStream in) throws IOException {
-        return in.readByte();
+    /** Per-RPC MAC context: request and response blocks are all signed against it. */
+    public record WireContext(byte opcode, long sentAtMs, String nonce) {
+        public WireContext {
+            Objects.requireNonNull(nonce, "nonce");
+        }
+    }
+
+    /** Decoded request header; only produced for a known opcode at {@link #FRAME_VERSION}. */
+    public record RequestHeader(byte opcode, int frameVersion, long sentAtMs, String nonce) {
+        public WireContext context() {
+            return new WireContext(opcode, sentAtMs, nonce);
+        }
+    }
+
+    /** Request header refused before any body byte is read. */
+    public static final class FrameRejectedException extends IOException {
+        private static final long serialVersionUID = 1L;
+
+        /** Why the header was refused. */
+        public enum Reason { UNKNOWN_OPCODE, UNSUPPORTED_FRAME_VERSION, MALFORMED_HEADER }
+
+        private final Reason reason;
+        private final int value;
+
+        public FrameRejectedException(Reason reason, int value, String message) {
+            super(message);
+            this.reason = reason;
+            this.value = value;
+        }
+
+        public Reason reason() {
+            return reason;
+        }
+
+        /** Offending opcode (unsigned) or frame version; {@code -1} when not applicable. */
+        public int value() {
+            return value;
+        }
+    }
+
+    /** True for every opcode in {@link #KNOWN_OPCODES}. */
+    public static boolean isKnownOpcode(byte opcode) {
+        return KNOWN_OPCODES.contains(opcode);
+    }
+
+    /** True when {@code sentAtMs} lies within {@link #MAX_CLOCK_SKEW_MS} of {@code nowMs} (overflow-safe). */
+    public static boolean isFresh(long sentAtMs, long nowMs) {
+        return sentAtMs >= nowMs - MAX_CLOCK_SKEW_MS && sentAtMs <= nowMs + MAX_CLOCK_SKEW_MS;
+    }
+
+    /**
+     * Log-safe form of a reservation token id: first {@value #TOKEN_LOG_PREFIX}
+     * chars + ellipsis. A full id is a bearer value for redeem.
+     */
+    public static String redactToken(String tokenId) {
+        if (tokenId == null) return "null";
+        return tokenId.length() <= TOKEN_LOG_PREFIX ? tokenId : tokenId.substring(0, TOKEN_LOG_PREFIX) + "...";
+    }
+
+    // ---- request header ---------------------------------------------------
+
+    /** Write a request header stamped with the wall clock; returns the context to sign against. */
+    public static WireContext writeRequestHeader(DataOutputStream out, byte opcode) throws IOException {
+        return writeRequestHeader(out, opcode, System::currentTimeMillis);
+    }
+
+    /**
+     * Write {@code [opcode][frameVersion][sentAtMs][nonce]} with a fresh
+     * 16-byte {@link SecureRandom} hex nonce.
+     *
+     * @throws IllegalArgumentException for an opcode outside {@link #KNOWN_OPCODES}
+     */
+    public static WireContext writeRequestHeader(DataOutputStream out, byte opcode, LongSupplier clock)
+            throws IOException {
+        if (!isKnownOpcode(opcode)) {
+            throw new IllegalArgumentException("unknown proxy-direct opcode " + (opcode & 0xFF));
+        }
+        byte[] raw = new byte[NONCE_BYTES];
+        NONCE_RANDOM.nextBytes(raw);
+        WireContext ctx = new WireContext(opcode, clock.getAsLong(), HexFormat.of().formatHex(raw));
+        out.writeByte(opcode);
+        out.writeByte(FRAME_VERSION);
+        out.writeLong(ctx.sentAtMs());
+        out.writeUTF(ctx.nonce());
+        return ctx;
+    }
+
+    /**
+     * Read a request header. The opcode is checked first, then the frame
+     * version, both before any further byte is consumed.
+     *
+     * @throws FrameRejectedException unknown opcode, frame version other than
+     *                                {@link #FRAME_VERSION}, or an empty / oversized nonce
+     */
+    public static RequestHeader readRequestHeader(DataInputStream in) throws IOException {
+        byte opcode = in.readByte();
+        if (!isKnownOpcode(opcode)) {
+            throw new FrameRejectedException(FrameRejectedException.Reason.UNKNOWN_OPCODE, opcode & 0xFF,
+                    "unknown proxy-direct opcode " + (opcode & 0xFF));
+        }
+        int frameVersion = in.readUnsignedByte();
+        if (frameVersion != FRAME_VERSION) {
+            // v1 frames had no version byte: the schemaVersion int's high byte (0) lands here.
+            int peer = frameVersion <= 1 ? 1 : frameVersion;
+            throw new FrameRejectedException(FrameRejectedException.Reason.UNSUPPORTED_FRAME_VERSION, peer,
+                    "peer speaks wire v" + peer + ", this node speaks v" + FRAME_VERSION
+                            + "; upgrade proxy and backends together");
+        }
+        long sentAtMs = in.readLong();
+        String nonce = in.readUTF();
+        if (nonce.isEmpty() || nonce.length() > MAX_NONCE_LENGTH) {
+            throw new FrameRejectedException(FrameRejectedException.Reason.MALFORMED_HEADER, -1,
+                    "proxy-direct request nonce length out of range: " + nonce.length());
+        }
+        return new RequestHeader(opcode, frameVersion, sentAtMs, nonce);
+    }
+
+    /**
+     * MAC input for one block (passed to {@code HmacVerifier.sign/verify} as the canonical payload):
+     * {@code pd2|dir|opcode|sentAtMs|nonce|index|count|payload}. Single payloads use index 0, count 1.
+     */
+    static String canonical(Direction dir, WireContext ctx, int index, int count, String payload) {
+        return "pd2|" + dir.tag + '|' + (ctx.opcode() & 0xFF) + '|' + ctx.sentAtMs() + '|' + ctx.nonce()
+                + '|' + index + '|' + count + '|' + payload;
     }
 
     // ---- single signed payload -------------------------------------------
 
-    /** Write one schema-tagged, optionally HMAC-signed payload string. */
-    public static void writeSignedPayload(DataOutputStream out, String payload,
+    /**
+     * Write one schema-tagged, HMAC-signed payload string bound to {@code ctx} / {@code dir}.
+     *
+     * @throws IllegalStateException when {@code verifier} is null (no unsigned mode)
+     */
+    public static void writeSignedPayload(DataOutputStream out, WireContext ctx, Direction dir, String payload,
                                           HmacVerifier verifier, int schemaVersion) throws IOException {
-        String p = payload == null ? "" : payload;
-        out.writeInt(schemaVersion);
-        out.writeUTF(verifier == null ? "" : verifier.sign(schemaVersion, p));
-        out.writeUTF(p);
+        writeBlock(out, new BlockSlot(ctx, dir, 0, 1), payload, verifier, schemaVersion);
     }
 
     /**
-     * Read one schema-tagged payload, verifying its HMAC when {@code verifier}
-     * is non-null. Returns {@code null} on a verification failure (caller drops
-     * + logs); throws only on a genuine stream/IO error.
+     * Read one schema-tagged payload and verify its HMAC against {@code ctx} /
+     * {@code dir}. Returns {@code null} on verification failure or when
+     * {@code verifier} is null (fail closed: the frame is still consumed so
+     * stream framing stays intact); throws only on a genuine stream/IO error.
      */
-    public static String readSignedPayload(DataInputStream in, HmacVerifier verifier) throws IOException {
+    public static String readSignedPayload(DataInputStream in, WireContext ctx, Direction dir,
+                                           HmacVerifier verifier) throws IOException {
+        return readBlock(in, ctx, dir, 0, 1, verifier);
+    }
+
+    /** MAC binding of one block: frame context, direction and position within its list. */
+    private record BlockSlot(WireContext ctx, Direction dir, int index, int count) {}
+
+    private static void writeBlock(DataOutputStream out, BlockSlot slot, String payload,
+                                   HmacVerifier verifier, int schemaVersion) throws IOException {
+        if (verifier == null) {
+            throw new IllegalStateException(
+                    "proxy-direct requires an HmacVerifier (network.secretEnv); refusing to send unsigned payload");
+        }
+        Objects.requireNonNull(slot.ctx(), "ctx");
+        Objects.requireNonNull(slot.dir(), "dir");
+        String p = payload == null ? "" : payload;
+        out.writeInt(schemaVersion);
+        out.writeUTF(verifier.sign(schemaVersion, canonical(slot.dir(), slot.ctx(), slot.index(), slot.count(), p)));
+        out.writeUTF(p);
+    }
+
+    private static String readBlock(DataInputStream in, WireContext ctx, Direction dir, int index, int count,
+                                    HmacVerifier verifier) throws IOException {
         int schemaVersion = in.readInt();
         String hmacHex = in.readUTF();
         String payload = in.readUTF();
-        if (verifier != null && !verifier.verify(schemaVersion, payload, hmacHex)) {
+        if (verifier == null || ctx == null || dir == null
+                || !verifier.verify(schemaVersion, canonical(dir, ctx, index, count, payload), hmacHex)) {
             return null;
         }
         return payload;
@@ -137,46 +338,77 @@ public final class ProxyDirectWire {
 
     // ---- count-framed list of signed payloads ----------------------------
 
-    /** Write a list response/request: a count followed by one signed payload per row. */
-    public static void writeList(DataOutputStream out, List<String> payloads,
+    /** Write a list: a count, then one signed block per row bound to its index and the count. */
+    public static void writeList(DataOutputStream out, WireContext ctx, Direction dir, List<String> payloads,
                                  HmacVerifier verifier, int schemaVersion) throws IOException {
-        out.writeInt(payloads.size());
-        for (String p : payloads) {
-            writeSignedPayload(out, p, verifier, schemaVersion);
+        int count = payloads.size();
+        if (count > MAX_LIST_COUNT) {
+            throw new IOException("proxy-direct list too large: " + count
+                    + " > " + MAX_LIST_COUNT);
+        }
+        out.writeInt(count);
+        for (int i = 0; i < count; i++) {
+            writeBlock(out, new BlockSlot(ctx, dir, i, count), payloads.get(i), verifier, schemaVersion);
         }
         out.flush();
     }
 
     /**
-     * Read a count-framed list. Rows that fail HMAC verification are dropped
-     * (omitted from the returned list) rather than aborting the whole read.
+     * Read a count-framed list. Any row failing HMAC verification fails the
+     * whole list with an {@link IOException} (WARNING logged, throttled): a
+     * partial batch would otherwise pass as success (partial enrolment, missing
+     * status rows) and hide tampering or a secret mismatch (REQ-RTP-S-004).
+     * Every frame is consumed first so the error is not a framing artefact.
      */
-    public static List<String> readList(DataInputStream in, HmacVerifier verifier) throws IOException {
+    public static List<String> readList(DataInputStream in, WireContext ctx, Direction dir,
+                                        HmacVerifier verifier) throws IOException {
         int count = in.readInt();
-        if (count < 0 || count > 100_000) {
+        if (count < 0 || count > MAX_LIST_COUNT) {
             throw new IOException("proxy-direct list count out of range: " + count);
         }
         List<String> out = new ArrayList<>(count);
+        int rejected = 0;
         for (int i = 0; i < count; i++) {
-            String p = readSignedPayload(in, verifier);
+            String p = readBlock(in, ctx, dir, i, count, verifier);
             if (p != null) out.add(p);
+            else rejected++;
+        }
+        if (rejected > 0) {
+            String msg = "proxy-direct: " + rejected + " of " + count + " list row(s) failed HMAC "
+                    + "verification (tampering or network.secretEnv mismatch); rejecting the list";
+            logRejectedList(msg);
+            throw new IOException(msg);
         }
         return out;
     }
 
-    // Back-compat aliases retained for the heartbeat/snapshot exchange.
-
-    /** @deprecated use {@link #writeList}; kept for the heartbeat snapshot reply. */
-    @Deprecated
-    public static void writeSnapshot(DataOutputStream out, List<String> payloads,
-                                     HmacVerifier verifier, int schemaVersion) throws IOException {
-        writeList(out, payloads, verifier, schemaVersion);
+    private static void logRejectedList(String msg) {
+        long now = System.currentTimeMillis();
+        long last = lastRejectLogMs.get();
+        if ((last == Long.MIN_VALUE || now - last >= REJECT_LOG_INTERVAL_MS)
+                && lastRejectLogMs.compareAndSet(last, now)) {
+            long suppressed = suppressedRejects.getAndSet(0L);
+            LOG.log(Level.WARNING, msg + (suppressed > 0 ? " (" + suppressed + " similar suppressed)" : "")
+                    + " (REQ-RTP-S-004)");
+        } else {
+            suppressedRejects.incrementAndGet();
+        }
     }
 
-    /** @deprecated use {@link #readList}; kept for the heartbeat snapshot reply. */
-    @Deprecated
-    public static List<String> readSnapshot(DataInputStream in, HmacVerifier verifier) throws IOException {
-        return readList(in, verifier);
+    /**
+     * Split a multi-field payload on {@link #FS}, keeping trailing empty fields:
+     * identical to {@code payload.split(String.valueOf(FS), -1)} without the regex dispatch.
+     */
+    public static String[] splitFields(String payload) {
+        List<String> out = new ArrayList<>();
+        int from = 0;
+        int at;
+        while ((at = payload.indexOf(FS, from)) >= 0) {
+            out.add(payload.substring(from, at));
+            from = at + 1;
+        }
+        out.add(payload.substring(from));
+        return out.toArray(new String[0]);
     }
 
     // ---- structured record codecs ----------------------------------------
@@ -197,7 +429,7 @@ public final class ProxyDirectWire {
     /** Decode a token payload; {@code null}/empty -> {@code null} (no reservation). */
     public static ReservationToken decodeToken(String payload) {
         if (payload == null || payload.isEmpty()) return null;
-        String[] f = payload.split(String.valueOf(FS), -1);
+        String[] f = splitFields(payload);
         if (f.length < 6) return null;
         try {
             String regionKey = f[5].isEmpty() ? null : f[5];
@@ -226,7 +458,7 @@ public final class ProxyDirectWire {
     /** Decode an enrolment envelope; returns {@code null} when malformed. */
     public static NetworkRequestQueue.EnrolmentEnvelope decodeEnvelope(String payload) {
         if (payload == null || payload.isEmpty()) return null;
-        String[] f = payload.split(String.valueOf(FS), -1);
+        String[] f = splitFields(payload);
         if (f.length < 5) return null;
         try {
             Optional<String> regionKey = f[2].isEmpty() ? Optional.empty() : Optional.of(f[2]);
@@ -255,7 +487,7 @@ public final class ProxyDirectWire {
     /** Decode a queue-status payload; returns {@code null} when malformed. */
     public static NetworkRequestQueue.QueueStatus decodeStatus(String payload) {
         if (payload == null || payload.isEmpty()) return null;
-        String[] f = payload.split(String.valueOf(FS), -1);
+        String[] f = splitFields(payload);
         if (f.length < 6) return null;
         try {
             Optional<String> serverId = f[3].isEmpty() ? Optional.empty() : Optional.of(f[3]);

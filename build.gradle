@@ -18,7 +18,7 @@ spotless {
     lineEndings = 'UNIX'
     java {
         target 'rtp-*/**/*.java', 'addons/**/*.java', 'api/**/*.java'
-        targetExclude '**/build/**', '**/.gradle/**', '**/generated/**', '**/target/**', 'api/**/build/**'
+        targetExclude '**/build/**', '**/.gradle/**', '**/generated/**', '**/target/**', 'api/**/build/**', 'rtp-*/**/build/**'
         removeUnusedImports()
         trimTrailingWhitespace()
         endWithNewline()
@@ -51,15 +51,37 @@ allprojects {
     repositories {
         mavenLocal()
         mavenCentral()
-        maven { url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+        maven {
+            url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'
+            mavenContent {
+                snapshotsOnly()
+            }
+        }
         maven { url = 'https://repo.papermc.io/repository/maven-public/' }
-        maven { url = 'https://repo.papermc.io/repository/maven-snapshots/' }
-        maven { url = 'https://repo.extendedclip.com/content/repositories/placeholderapi/' }
-        maven { url = 'https://nexus.sirblobman.xyz/public/' }
+        maven {
+            url = 'https://repo.papermc.io/repository/maven-snapshots/'
+            mavenContent {
+                snapshotsOnly()
+            }
+        }
+        maven {
+            url = 'https://repo.extendedclip.com/content/repositories/placeholderapi/'
+            content {
+                includeGroupByRegex 'me\\.clip.*'
+            }
+        }
+        maven {
+            url = 'https://nexus.sirblobman.xyz/public/'
+            content {
+                includeGroupByRegex 'com\\.github\\.sirblobman.*'
+                includeGroupByRegex 'com\\.sirblobman.*'
+            }
+        }
         maven {
             url = 'https://jitpack.io'
             content {
                 excludeGroupByRegex 'com\\.github\\.sirblobman.*'
+                excludeGroupByRegex 'com\\.sirblobman.*'
             }
         }
         maven { url = 'https://repo.codemc.io/repository/maven-public/' }
@@ -72,7 +94,7 @@ subprojects {
 
     java {
         toolchain {
-            languageVersion = JavaLanguageVersion.of(Integer.parseInt(libs.versions.javaToolchain.get()))
+            languageVersion = JavaLanguageVersion.of(Integer.parseInt(rootProject.libs.versions.javaToolchain.get()))
         }
         // `-sources` / `-javadoc` jars are intentionally NOT produced: the build
         // only ships the executable artifacts. The addon-API publish closure
@@ -82,6 +104,102 @@ subprojects {
 
     tasks.withType(JavaCompile).configureEach {
         options.encoding = 'UTF-8'
+    }
+
+    // ADR-113: the platform-neutral shared closure ships Java 17 bytecode
+    // (classfile 61) from the shared toolchain, so `--release 17` also rejects
+    // Java 18+ APIs. The pre-1.20.5 carrier path (Bukkit/Paper/Folia v1_20_R1,
+    // Fabric v1_20_R1, their common modules and rtp-plugin's own classes) is
+    // Java 17 too, so the jar loads on 1.18-1.20.4 servers. The 1.21+ and 26.x
+    // carriers keep the toolchain level; they only load on Java 21+ runtimes.
+    // The bundled addons' Bukkit path is Java 17 so it loads there too, and so
+    // is rtp-neoforge-common: the unified jar's ServiceLoader files list its menu
+    // providers, which every platform instantiates before the family filter.
+    // Tests are not shipped and stay on the toolchain level.
+    def java17Modules = [
+            ':rtp-api', ':rtp-core', ':anvil-api', ':yaml-api', ':commands-api',
+            ':effects-api', ':metrics-api', ':bstats-api', ':maps-api',
+            ':rtp-proxy:rtp-proxy-common',
+            ':rtp-bukkit:rtp-bukkit-common', ':rtp-bukkit:rtp-bukkit-v1_20_R1',
+            ':rtp-paper:rtp-paper-common', ':rtp-paper:rtp-paper-v1_20_R1',
+            ':rtp-folia:rtp-folia-common', ':rtp-folia:rtp-folia-v1_20_R1',
+            ':rtp-fabric:rtp-fabric-common', ':rtp-fabric:rtp-fabric-v1_20_R1',
+            ':rtp-plugin',
+            ':rtp-neoforge:rtp-neoforge-common',
+            ':addons:LeafRTPCountdownAddon', ':addons:LeafRTPRiftAddon',
+            ':addons:LeafRTPClaimAddon', ':addons:LeafRTPActionAddon',
+            ':addons:LeafRTPGuiAddon:rtp-gui-common', ':addons:LeafRTPGuiAddon:rtp-gui-bukkit',
+    ]
+    if (project.path in java17Modules) {
+        tasks.named('compileJava', JavaCompile).configure {
+            options.release = 17
+        }
+    }
+    // ADR-113 bytecode gate: `release = 17` is a request, not proof. Fail the build unless every
+    // main-source class (including rtp-plugin's lite set) is classfile 61, so a Java 21 class
+    // cannot reach a pre-1.20.5 jar unnoticed. Test classes are excluded and stay on the toolchain.
+    if (project.path in java17Modules) {
+        tasks.register('verifyJava17Bytecode') {
+            group = 'verification'
+            description = 'ADR-113: fails unless every main-source class of this Java 17 module is classfile 61.'
+            dependsOn tasks.named('classes')
+            dependsOn tasks.matching { it.name == 'compileLiteJava' }
+            doLast {
+                def scanned = 0
+                def offenders = []
+                ['main', 'lite'].each { setName ->
+                    def set = project.sourceSets.findByName(setName)
+                    if (set == null) return
+                    set.output.classesDirs.files.each { dir ->
+                        if (!dir.isDirectory()) return
+                        dir.eachFileRecurse(groovy.io.FileType.FILES) { f ->
+                            if (!f.name.endsWith('.class')) return
+                            scanned++
+                            def major = new DataInputStream(new BufferedInputStream(new FileInputStream(f))).withCloseable { dis ->
+                                dis.readInt()
+                                dis.readUnsignedShort()
+                                dis.readUnsignedShort()
+                            }
+                            if (major != 61) offenders << "${f.path} (classfile major ${major})"
+                        }
+                    }
+                }
+                if (scanned == 0) {
+                    throw new GradleException("verifyJava17Bytecode: no compiled classes found in ${project.path}")
+                }
+                if (!offenders.isEmpty()) {
+                    throw new GradleException("ADR-113: ${project.path} emits non-Java-17 classes:\n  " + offenders.join('\n  '))
+                }
+            }
+        }
+        tasks.named('check').configure { dependsOn 'verifyJava17Bytecode' }
+    }
+    // These Java 17 modules compile against Java 21 artifacts that only load on
+    // Java 21+ runtimes (1.21+/26.x carriers and Velocity in rtp-plugin, NeoForge
+    // 21.1, WorldGuard 7.0.12), so their classpaths keep requesting JVM 21
+    // variants instead of the JVM 17 that `release = 17` would imply.
+    def java17OnJava21Classpath = [
+            ':rtp-plugin', ':rtp-neoforge:rtp-neoforge-common', ':addons:LeafRTPClaimAddon',
+    ]
+    // Test classpaths of the Java 17 addons that consume Java 21-only test helpers (rtp-core
+    // test fixtures, helpers:MockItemPlugins) keep requesting JVM 21 variants; test sources
+    // stay on the toolchain level.
+    def java17TestOnJava21Classpath = [
+            ':addons:LeafRTPActionAddon', ':addons:LeafRTPClaimAddon', ':addons:LeafRTPGuiAddon:rtp-gui-bukkit',
+    ]
+    def jvm21Configurations = []
+    if (project.path in java17OnJava21Classpath) {
+        jvm21Configurations += ['compileClasspath', 'runtimeClasspath']
+    }
+    if (project.path in java17TestOnJava21Classpath) {
+        jvm21Configurations += ['testCompileClasspath', 'testRuntimeClasspath']
+    }
+    jvm21Configurations.each { cfg ->
+        configurations.named(cfg) {
+            attributes {
+                attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 21)
+            }
+        }
     }
 
     // Javadoc strictness is concentrated on the addon-facing surface. rtp-api and
@@ -100,17 +218,17 @@ subprojects {
 
     dependencies {
         // Shared versions are centralized in gradle/libs.versions.toml.
-        compileOnly libs.jetbrains.annotations
+        compileOnly rootProject.libs.jetbrains.annotations
         // Checker Framework qualifier annotations (compile-time only; not shipped in JARs).
         // The Resource Leak Checker reads @MustCall, @Owning, and @EnsuresCalledMethods
         // from this artifact during annotation processing.
-        compileOnly libs.checker.qual
-        testCompileOnly libs.checker.qual
-        testImplementation platform(libs.junit.bom)
-        testImplementation libs.junit.jupiter
-        testImplementation libs.mockito.core
-        testImplementation libs.jetbrains.annotations
-        testRuntimeOnly libs.junit.platform.launcher
+        compileOnly rootProject.libs.checker.qual
+        testCompileOnly rootProject.libs.checker.qual
+        testImplementation platform(rootProject.libs.junit.bom)
+        testImplementation rootProject.libs.junit.jupiter
+        testImplementation rootProject.libs.mockito.core
+        testImplementation rootProject.libs.jetbrains.annotations
+        testRuntimeOnly rootProject.libs.junit.platform.launcher
     }
 
     // Verbose test output (per-test start/pass lines + full stdout/stderr streaming)
@@ -163,6 +281,13 @@ subprojects {
         // Re-run when the tier toggle flips so cached results from the other
         // tier are not silently reused.
         inputs.property 'fullTests', fullTests
+        // Jazzer fuzz mode (JAZZER_FUZZ) is read from the environment of the forked
+        // test JVM; without these a cached result would be reused and nothing fuzzed.
+        inputs.property 'jazzerFuzz', System.getenv('JAZZER_FUZZ') ?: ''
+        inputs.property 'jazzerMaxDuration', System.getenv('JAZZER_MAX_DURATION') ?: ''
+        if (System.getenv('JAZZER_FUZZ')) {
+            outputs.upToDateWhen { false }
+        }
         testLogging {
             events = (verboseTests ? ['started', 'passed', 'skipped', 'failed'] : ['skipped', 'failed'])
             showStandardStreams = verboseTests
@@ -176,7 +301,7 @@ subprojects {
     // instrumentation agent and dual-format report are pure overhead for local
     // dev); CI runs coverage with `-Pcoverage`.
     apply plugin: 'jacoco'
-    jacoco { toolVersion = libs.versions.jacoco.get() }
+    jacoco { toolVersion = rootProject.libs.versions.jacoco.get() }
     if (project.hasProperty('coverage')) {
         def isPlatformOrAddonProject = project.projectDir.canonicalPath.contains(File.separator + 'platforms' + File.separator) ||
                 project.projectDir.canonicalPath.contains(File.separator + 'addons' + File.separator) ||
@@ -192,16 +317,10 @@ subprojects {
                 project.path == ':rtp-proxy:rtp-proxy-velocity' ||
                 project.path == ':effects-api:effects-api-fabric-unobf'
 
-        if (!isPlatformOrAddonProject) {
-            tasks.withType(Test).configureEach { finalizedBy jacocoTestReport }
-            jacocoTestReport {
-                dependsOn test
-                reports { html.required = true; xml.required = true }
-            }
-        } else {
-            jacocoTestReport {
-                reports { html.required = false; xml.required = false }
-            }
+        tasks.withType(Test).configureEach { finalizedBy jacocoTestReport }
+        jacocoTestReport {
+            dependsOn test
+            reports { html.required = true; xml.required = true }
         }
     }
 
@@ -233,16 +352,18 @@ subprojects {
             // metrics-api measured: 100% instruction / 94.6% branch.
             // Sits at Stage A target (0.95/0.85). ENTERPRISE_READINESS.md 4.2 item 13.
             ':metrics-api': [instruction: 0.95, branch: 0.85],
+            // bstats-api: new module; floor set at the Stage A strict gate.
+            ':bstats-api': [instruction: 0.90, branch: 0.80],
             // yaml-api measured: 97.0% instruction / 88.1% branch.
             // Sits at 0.92/0.80. ENTERPRISE_READINESS.md 4.2 item 7.
             ':yaml-api': [instruction: 0.92, branch: 0.80],
             // tags-api measured: 98.2% instruction / 90.9% branch.
             // Sits at Stage A target (0.95/0.85). ENTERPRISE_READINESS.md 4.2 item 8.
             ':tags-api': [instruction: 0.95, branch: 0.85],
-            // anvil-api measured: 90.5% instruction / 80.5% branch.
-            ':anvil-api': [instruction: 0.86, branch: 0.75],
-            // maps-api measured: 94.7% instruction / 82.1% branch.
-            ':maps-api': [instruction: 0.90, branch: 0.78],
+            // anvil-api measured via jacocoTestReport (2026-10-13): 91.7% instruction / 82.7% branch.
+            ':anvil-api': [instruction: 0.90, branch: 0.80],
+            // maps-api measured via jacocoTestReport (2026-10-08): 96.2% instruction / 84.6% branch.
+            ':maps-api': [instruction: 0.90, branch: 0.80],
             // rtp-api measured: 95.7% instruction / 81.3% branch.
             // Sits at Stage A strict 90/80 JaCoCo gate.
             ':rtp-api': [instruction: 0.90, branch: 0.80],
@@ -314,10 +435,15 @@ subprojects {
     // violation - this is the local + CI static-analysis gate.
     //   Local / CI gate : .\gradlew.bat check -PstaticAnalysis
     //   Whole build      : .\gradlew.bat build -PstaticAnalysis
-    if (project.hasProperty('staticAnalysis')) {
+    // `pmdRegexMain` is a separate ADVISORY scan (config/pmd/regex.xml, never
+    // fails the build) that flags avoidable regex use. It runs under either
+    // flag; `-PregexAnalysis` alone runs only it, skipping the gating tasks.
+    //   Regex advisory  : .\gradlew.bat pmdRegexMain -PregexAnalysis
+    def pmdGate = project.hasProperty('staticAnalysis')
+    if (pmdGate || project.hasProperty('regexAnalysis')) {
         apply plugin: 'pmd'
         pmd {
-            toolVersion = libs.versions.pmd.get()
+            toolVersion = rootProject.libs.versions.pmd.get()
             // The starter ruleset is the single source of truth; disable PMD's
             // built-in default set so only our curated/appended rules run.
             ruleSetFiles = rootProject.files('config/pmd/ruleset.xml')
@@ -327,6 +453,43 @@ subprojects {
             ignoreFailures = false
             // Analyse production + test sources; skip generated/remapped output.
             incrementalAnalysis = true
+        }
+        def pmdRegexMain = tasks.register('pmdRegexMain', Pmd) {
+            group = 'verification'
+            description = 'Advisory PMD scan for avoidable regex use (config/pmd/regex.xml); never fails the build.'
+            ruleSetFiles = rootProject.files('config/pmd/regex.xml')
+            ruleSets = []
+            source = sourceSets.main.allJava
+            // Type resolution for pmd-java:matchesSig (String / Pattern receivers).
+            classpath = sourceSets.main.output + sourceSets.main.compileClasspath
+            ignoreFailures = true
+            consoleOutput = true
+            reports {
+                xml.required = true
+                xml.outputLocation = layout.buildDirectory.file('reports/pmd/regexMain.xml')
+                html.required = true
+                html.outputLocation = layout.buildDirectory.file('reports/pmd/regexMain.html')
+            }
+        }
+        tasks.named('check').configure { dependsOn pmdRegexMain }
+        tasks.withType(Pmd).configureEach {
+            if (!pmdGate && name != 'pmdRegexMain') enabled = false
+        }
+        afterEvaluate {
+            def jrtFsFiles = files(javaToolchains.launcherFor(java.toolchain).map {
+                it.metadata.installationPath.file('lib/jrt-fs.jar').asFile
+            }).filter { it.exists() }
+            def fallbackJrtFs = new File(System.getProperty('java.home'), 'lib/jrt-fs.jar')
+            if (jrtFsFiles.isEmpty() && fallbackJrtFs.exists()) {
+                jrtFsFiles = files(fallbackJrtFs)
+            }
+            tasks.withType(Pmd).configureEach {
+                // AuxClasspathLoader treats every non-directory file as a JAR/ZIP archive. Filter out non-archives
+                // (such as POM artifacts resolved by pom-packaging dependencies) to prevent ZipException crashes.
+                if (classpath != null) {
+                    classpath = files(classpath.filter { it.isDirectory() || it.name.endsWith('.jar') || it.name.endsWith('.zip') }, jrtFsFiles)
+                }
+            }
         }
     }
 
@@ -360,7 +523,7 @@ subprojects {
 // Closure rationale (transitive `api`/`implementation` project edges):
 //   rtp-api  -> commands-api, yaml-api, metrics-api
 //   rtp-core -> rtp-api, commands-api, yaml-api, effects-api, metrics-api,
-//               maps-api, rtp-proxy:rtp-proxy-common
+//               bstats-api, maps-api, rtp-proxy:rtp-proxy-common
 //   rtp-proxy-common   -> rtp-api
 // Every coordinate that can appear in a generated POM must itself be published,
 // otherwise a consumer's transitive resolution fails. commands-api and
@@ -373,6 +536,7 @@ def publishedModulePaths = [
         ':effects-api',
         ':yaml-api',
         ':metrics-api',
+        ':bstats-api',
         ':maps-api',
         ':rtp-proxy:rtp-proxy-common',
 ]
@@ -399,7 +563,7 @@ apiModulesForBinaryCheck.each { modulePath ->
     project(modulePath) {
         apply plugin: 'me.champeau.gradle.japicmp'
 
-        def baselineVersion = project.findProperty('japicmpBaselineVersion') as String ?: '3.2.0'
+        def baselineVersion = project.findProperty('japicmpBaselineVersion') as String ?: '3.2.1'
         def baselineArtifact = "io.github.dailystruggle:${project.name}:${baselineVersion}"
 
         configurations {
@@ -426,7 +590,7 @@ apiModulesForBinaryCheck.each { modulePath ->
             description = "Checks binary compatibility of ${project.name} against version ${baselineVersion}."
 
             // Compare newly built jar against resolved baseline.
-            // In Loom-managed modules (such as :effects-api), `remapJar` produces the shippable jar
+            // In Loom-managed modules, `remapJar` produces the shippable jar
             // in build/libs, whereas `jar` outputs to build/devlibs/*-dev.jar.
             def jarTask = tasks.findByName('remapJar') ?: tasks.named('jar')
             newClasspath = files(jarTask)
@@ -438,7 +602,9 @@ apiModulesForBinaryCheck.each { modulePath ->
             failOnModification = false
             failOnSourceIncompatibility = false
             ignoreMissingClasses = true
-            // Platform/internal adapter implementation packages are not public API
+            // Platform/internal adapter implementation packages are not public API.
+            // effectsapi.fabric moved to rtp-fabric-common (effects-api-ADR-003
+            // amendment 2026-10-15); kept excluded so the baseline diff stays quiet.
             packageExcludes = [
                     'io.github.dailystruggle.effectsapi.fabric'
             ]
@@ -600,7 +766,6 @@ if (findProject(':rtp-plugin') != null) {
 def executableAddonHelperPaths = [
         ':addons:LeafRTPGuiAddon:rtp-gui',
         ':addons:LeafRTPCountdownAddon',
-        ':addons:LeafRTPLinearAddon',
         ':helpers:PeriodicWorldSaver',
         ':helpers:StressTestRTP',
 ].findAll { findProject(it) != null }
@@ -820,12 +985,12 @@ tasks.register('jacocoServerReport', JacocoReport) {
     description = 'Generates JaCoCo coverage report for live server/devstack test execution data.'
     group = 'verification'
 
-    def execFiles = fileTree(dir: rootDir, includes: [
-            '**/devstack/jacoco/*.exec',
+    executionData = fileTree(dir: rootDir, includes: [
+            'devstack/jacoco/backend*.exec',
+            '**/build/jacoco/*.exec',
             '**/build/jacoco/server*.exec',
             '**/build/jacoco/backend*.exec'
-    ]).filter { it.isFile() && it.length() > 50 }
-    executionData.from = execFiles
+    ])
 
     def serverProjects = subprojects.findAll {
         !it.name.toLowerCase().contains('fabric') && !it.name.toLowerCase().contains('neoforge')
@@ -845,7 +1010,13 @@ tasks.register('jacocoServerReport', JacocoReport) {
         classDirectories.from = files(
                 zipTree(pluginJar.singleFile).matching {
                     include 'io/github/dailystruggle/rtp/**'
-                    exclude '**/unobf/**', '**/*Unobf*', '**/*unobf*', '**/v26_*/**', '**/neoforge/**', '**/*NeoForge*'
+                    exclude(
+                            '**/unobf/**', '**/*Unobf*', '**/*unobf*', '**/neoforge/**', '**/*NeoForge*',
+                            // Multi-version adapter deduplication: dormant legacy NMS/carrier shims
+                            // that are structurally isomorphic to the active test platform (1.21.11)
+                            '**/bukkit/v1_20*/**', '**/bukkit/v1_21_R1/**', '**/bukkit/v1_21_R5/**',
+                            '**/fabric/v1_20*/**', '**/fabric/v1_21_R1/**', '**/fabric/v1_21_R5/**', '**/v26_*/**'
+                    )
                 },
                 addonClassTrees
         )
@@ -854,12 +1025,9 @@ tasks.register('jacocoServerReport', JacocoReport) {
             it.fileTree(dir: it.layout.buildDirectory,
                     includes: ['classes/java/main/**', 'classes/kotlin/main/**'],
                     excludes: [
-                            '**/unobf/**',
-                            '**/*Unobf*',
-                            '**/*unobf*',
-                            '**/v26_*/**',
-                            '**/neoforge/**',
-                            '**/*NeoForge*'
+                            '**/unobf/**', '**/*Unobf*', '**/*unobf*', '**/neoforge/**', '**/*NeoForge*',
+                            '**/bukkit/v1_20*/**', '**/bukkit/v1_21_R1/**', '**/bukkit/v1_21_R5/**',
+                            '**/fabric/v1_20*/**', '**/fabric/v1_21_R1/**', '**/fabric/v1_21_R5/**', '**/v26_*/**'
                     ])
         })
     }
@@ -905,61 +1073,58 @@ sonar {
                 'api/**/*Unobf/**',
                 '**/server/ServerAccessorImpl.java'
         ].join(',')
-        // ADR-094: Ignore java:S3077 (volatile on non-primitive/array) globally across the project.
-        // Volatile reference publication is an intentional lock-free pattern used across spatial caches,
-        // configuration reloads, and platform handle caches.
-        // Also ignore java:S2975: public clone() implementations across Cloneable domain models.
-        // Also ignore architectural patterns:
-        // - java:S2176: per-version adapter subclasses share common interface/scheduler names.
-        // - java:S1452: public SPI return types with wildcard generics (RTPWorld<?>, FactoryValue<?>).
+        // ADR-094: Ignore architectural patterns and intentional conventions globally across Sonar analysis:
+        // - java:S3077: volatile reference publication pattern (spatial caches, config reloads).
+        // - java:S2975: public clone() implementations across Cloneable domain models.
+        // - java:S2176: per-version adapter subclasses sharing common interface/scheduler names.
+        // - java:S1452: public SPI wildcard return types (RTPWorld<?>, FactoryValue<?>).
         // - java:S2696: singleton instance initialization updating static fields.
         // - java:S1186: empty methods in test mocks/listeners/stubs.
-        // - java:S1192: repeated string literals across test suites, serialization codecs, and command trees.
-        // - java:S115: YAML/config/message enums intentionally using lowerCamelCase to map directly to YAML/lang keys.
-        // - java:S3776: cognitive complexity across spatial math, polygon verification, chunk scanning, and platform version bridges.
-        // - java:S1181: catching Throwable for multi-platform / multi-version isolation, claim addons, and resilient task loops.
-        // - java:S3011: audited reflection accessibility (setAccessible) across platform bridges and NMS accessors (ADR-026).
+        // - java:S1192: repeated string literals across test suites, codecs, and command trees.
+        // - java:S115: YAML/config/message enums using lowerCamelCase for YAML key alignment.
+        // - java:S3776: cognitive complexity across spatial math, polygon verification, and version bridges.
+        // - java:S1181: catching Throwable for multi-platform / multi-version isolation and task loops.
+        // - java:S3011: audited reflection accessibility across platform bridges and NMS accessors (ADR-026).
         // - java:S1141: nested try blocks across multi-version fallbacks and deserializers.
         // - java:S5785: assertEquals/assertNotEquals in test assertions.
         // - java:S5778: assertThrows single-invocation constraint in test suites.
         // - java:S2925: Thread.sleep in asynchronous, transport, and benchmark stress tests.
-        property 'sonar.issue.ignore.multicriteria', 's3077,s2975,s2176,s1452,s2696,s1186test,s1192,s115,s3776,s1181,s3011,s1141,s5785test,s5778test,s2925test'
-        property 'sonar.issue.ignore.multicriteria.s3077.ruleKey', 'java:S3077'
-        property 'sonar.issue.ignore.multicriteria.s3077.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s2975.ruleKey', 'java:S2975'
-        property 'sonar.issue.ignore.multicriteria.s2975.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s2176.ruleKey', 'java:S2176'
-        property 'sonar.issue.ignore.multicriteria.s2176.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s1452.ruleKey', 'java:S1452'
-        property 'sonar.issue.ignore.multicriteria.s1452.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s2696.ruleKey', 'java:S2696'
-        property 'sonar.issue.ignore.multicriteria.s2696.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s1186test.ruleKey', 'java:S1186'
-        property 'sonar.issue.ignore.multicriteria.s1186test.resourceKey', '**/src/test/**/*'
-        property 'sonar.issue.ignore.multicriteria.s1192.ruleKey', 'java:S1192'
-        property 'sonar.issue.ignore.multicriteria.s1192.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s115.ruleKey', 'java:S115'
-        property 'sonar.issue.ignore.multicriteria.s115.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s3776.ruleKey', 'java:S3776'
-        property 'sonar.issue.ignore.multicriteria.s3776.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s1181.ruleKey', 'java:S1181'
-        property 'sonar.issue.ignore.multicriteria.s1181.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s3011.ruleKey', 'java:S3011'
-        property 'sonar.issue.ignore.multicriteria.s3011.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s1141.ruleKey', 'java:S1141'
-        property 'sonar.issue.ignore.multicriteria.s1141.resourceKey', '**/*'
-        property 'sonar.issue.ignore.multicriteria.s5785test.ruleKey', 'java:S5785'
-        property 'sonar.issue.ignore.multicriteria.s5785test.resourceKey', '**/src/test/**/*'
-        property 'sonar.issue.ignore.multicriteria.s5778test.ruleKey', 'java:S5778'
-        property 'sonar.issue.ignore.multicriteria.s5778test.resourceKey', '**/src/test/**/*'
-        property 'sonar.issue.ignore.multicriteria.s2925test.ruleKey', 'java:S2925'
-        property 'sonar.issue.ignore.multicriteria.s2925test.resourceKey', '**/src/test/**/*'
+        // - java:S3516: onCommand and command handlers intentionally returning boolean flag.
+        // - java:S1845: command permission constants and static factory methods.
+        def ignoredRuleExceptions = [
+                s3077: [rule: 'java:S3077'],
+                s2975: [rule: 'java:S2975'],
+                s2176: [rule: 'java:S2176'],
+                s1452: [rule: 'java:S1452'],
+                s2696: [rule: 'java:S2696'],
+                s1186test: [rule: 'java:S1186', resource: '**/src/test/**/*'],
+                s1192: [rule: 'java:S1192'],
+                s115: [rule: 'java:S115'],
+                s3776: [rule: 'java:S3776'],
+                s1181: [rule: 'java:S1181'],
+                s3011: [rule: 'java:S3011'],
+                s1141: [rule: 'java:S1141'],
+                s5785test: [rule: 'java:S5785', resource: '**/src/test/**/*'],
+                s5778test: [rule: 'java:S5778', resource: '**/src/test/**/*'],
+                s2925test: [rule: 'java:S2925', resource: '**/src/test/**/*'],
+                s3516: [rule: 'java:S3516'],
+                s1845: [rule: 'java:S1845']
+        ]
+        property 'sonar.issue.ignore.multicriteria', ignoredRuleExceptions.keySet().join(',')
+        ignoredRuleExceptions.each { key, cfg ->
+            property "sonar.issue.ignore.multicriteria.${key}.ruleKey", cfg.rule
+            property "sonar.issue.ignore.multicriteria.${key}.resourceKey", cfg.resource ?: '**/*'
+        }
     }
 }
 
 subprojects {
     sonar {
         properties {
+            if (sourceSets.main.allJava.isEmpty() && sourceSets.test.allJava.isEmpty()) {
+                property 'sonar.skip', 'true'
+            }
+
             def isPlatformOrAddon = project.projectDir.canonicalPath.contains(File.separator + 'platforms' + File.separator) ||
                     project.projectDir.canonicalPath.contains(File.separator + 'addons' + File.separator) ||
                     project.projectDir.canonicalPath.contains(File.separator + 'helpers' + File.separator) ||
@@ -979,6 +1144,10 @@ subprojects {
                 property 'sonar.cpd.exclusions', '**/*'
             }
 
+            if (project.path == ':effects-api') {
+                property 'sonar.coverage.exclusions', '**/effectsapi/bukkit/**'
+            }
+
             def isVersionAdapterOrCarrier = project.name.matches('v[0-9]+.*') ||
                     project.name.contains('unobf') ||
                     project.path.matches('.*:(v[0-9]+.*|.*unobf.*)')
@@ -986,17 +1155,20 @@ subprojects {
                 property 'sonar.cpd.exclusions', '**/*'
             }
 
+            // External PMD issues for SonarCloud: custom Java rule plugins cannot be
+            // installed on SonarCloud, so project-specific PMD rules surface this way.
+            if (project.hasProperty('staticAnalysis') || project.hasProperty('regexAnalysis')) {
+                def pmdReports = [layout.buildDirectory.file('reports/pmd/regexMain.xml').get().asFile]
+                if (project.hasProperty('staticAnalysis')) {
+                    pmdReports << layout.buildDirectory.file('reports/pmd/main.xml').get().asFile
+                }
+                property 'sonar.java.pmd.reportPaths', pmdReports*.absolutePath.join(',')
+            }
+
             if (!isPlatformOrAddon) {
                 def jacocoReport = layout.buildDirectory.file('reports/jacoco/test/jacocoTestReport.xml').get().asFile
                 if (jacocoReport.exists()) {
                     property 'sonar.coverage.jacoco.xmlReportPaths', jacocoReport.absolutePath
-                }
-            } else {
-                // Prevent Sonar JaCoCo plugin from falling back to default locations and reporting
-                // unmatched coverage on modules where source coverage is excluded.
-                tasks.matching { it.name == 'jacocoTestReport' }.configureEach {
-                    reports.xml.required = false
-                    reports.html.required = false
                 }
             }
         }

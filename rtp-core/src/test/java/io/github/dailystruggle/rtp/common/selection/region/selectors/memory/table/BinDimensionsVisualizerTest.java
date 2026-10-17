@@ -1,13 +1,12 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table;
 
+import io.github.dailystruggle.rtp.common.tools.ChartOutputHelper;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import javax.imageio.ImageIO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -108,26 +107,9 @@ public class BinDimensionsVisualizerTest {
 
     g.dispose();
 
-    // Save image to build reports, docs/assets/img, and root
-    File outReportsDir = new File("build/reports/bin_dimensions");
-    if (!outReportsDir.exists()) outReportsDir.mkdirs();
-
-    File chartReports = new File(outReportsDir, "bin_dimensions_behavior_chart.png");
-    File chartRoot = new File("bin_dimensions_behavior_chart.png");
-    ImageIO.write(img, "png", chartReports);
-    ImageIO.write(img, "png", chartRoot);
-
-    File[] candidateDocsDirs = new File[] {
-        new File("docs/assets/img"),
-        new File("../docs/assets/img")
-    };
-    for (File dir : candidateDocsDirs) {
-      if (dir.exists()) {
-        ImageIO.write(img, "png", new File(dir, "bin_dimensions_behavior_chart.png"));
-      }
-    }
-
-    System.out.println("[DEBUG_LOG] Successfully rendered bin dimensions chart to: " + chartRoot.getAbsolutePath());
+    // Save image to canonical docs and report destinations
+    ChartOutputHelper.writeChart(img, "bin_dimensions", "bin_dimensions_behavior_chart.png");
+    System.out.println("[DEBUG_LOG] Successfully rendered bin dimensions chart to: " + ChartOutputHelper.getDocsAssetFile("bin_dimensions_behavior_chart.png").getAbsolutePath());
   }
 
   private void renderPanel1Physical32x32(Graphics2D g, int x, int y, int w, int h) {

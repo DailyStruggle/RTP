@@ -1,0 +1,67 @@
+# ----------------------------------------------------------------
+# JustRTP Animation Engine by kotori
+# ----------------------------------------------------------------
+# CONFIG VERSION - DO NOT CHANGE THIS
+config-version: 2
+# ----------------------------------------------------------------
+#
+# Create your own custom particle animations here.
+# Each animation consists of one or more "steps".
+# Delay animations will loop through their steps. Success animations play once.
+#
+# PARAMETERS FOR EACH STEP:
+#   particle: The name of the particle. (List: https://hub.spigotmc.org/javadocs/spigot/org/bukkit/Particle.html)
+#   shape: The shape of the particle spawn. Available: CIRCLE, SPHERE, POINT
+#   count: The number of particles to spawn in this step.
+#
+# SHAPE-SPECIFIC PARAMETERS:
+#   For CIRCLE & SPHERE:
+#     radius: The radius of the shape in blocks.
+#
+# OPTIONAL PARAMETERS FOR ALL SHAPES:
+#   offset: Move the spawn location relative to the player.
+#     x: 0.0
+#     y: 0.0
+#     z: 0.0
+#
+# ----------------------------------------------------------------
+
+animations:
+  # A vortex of particles that swirls upwards around the player. (Ideal for delay animation)
+  swirling_vortex:
+    steps:
+      - { particle: "WITCH", shape: "CIRCLE", radius: 1.0, count: 15, offset: { y: 0.2 } }
+      - { particle: "WITCH", shape: "CIRCLE", radius: 0.9, count: 15, offset: { y: 0.4 } }
+      - { particle: "WITCH", shape: "CIRCLE", radius: 0.8, count: 15, offset: { y: 0.6 } }
+      - { particle: "WITCH", shape: "CIRCLE", radius: 0.7, count: 15, offset: { y: 0.8 } }
+      - { particle: "WITCH", shape: "CIRCLE", radius: 0.6, count: 15, offset: { y: 1.0 } }
+      - { particle: "WITCH", shape: "CIRCLE", radius: 0.5, count: 15, offset: { y: 1.2 } }
+      - { particle: "WITCH", shape: "CIRCLE", radius: 0.4, count: 15, offset: { y: 1.4 } }
+      - { particle: "WITCH", shape: "CIRCLE", radius: 0.3, count: 15, offset: { y: 1.6 } }
+
+  # A burst of particles that explodes outwards from the player. (Ideal for success animation)
+  nova_burst:
+    steps:
+      - { particle: "END_ROD", shape: "SPHERE", radius: 1.5, count: 100 }
+
+  # A simple, static ring of particles.
+  enchant_ring:
+    steps:
+      - { particle: "ENCHANTMENT_TABLE", shape: "CIRCLE", radius: 0.8, count: 40, offset: { y: 1.0 } }
+
+  # A pulse of hearts.
+  heart_pulse:
+    steps:
+      - { particle: "HEART", shape: "POINT", count: 5, offset: { y: 2.2 } }
+
+  # Orbital particles during delay (default delay animation)
+  orbit_delay:
+    steps:
+      - { particle: "ENCHANTMENT_TABLE", shape: "CIRCLE", radius: 1.2, count: 20, offset: { y: 1.0 } }
+      - { particle: "ENCHANTMENT_TABLE", shape: "CIRCLE", radius: 1.1, count: 20, offset: { y: 1.1 } }
+      - { particle: "ENCHANTMENT_TABLE", shape: "CIRCLE", radius: 1.0, count: 20, offset: { y: 1.2 } }
+
+  # Burst effect on successful teleport (default success animation)
+  burst_success:
+    steps:
+      - { particle: "FIREWORKS_SPARK", shape: "SPHERE", radius: 1.5, count: 50 }

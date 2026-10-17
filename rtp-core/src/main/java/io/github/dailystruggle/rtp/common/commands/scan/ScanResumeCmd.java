@@ -44,6 +44,7 @@ public class ScanResumeCmd extends ScanSubCmd {
         continue;
       }
 
+      scanTask.resetStatusWindow();
       scanTask.pause.set(false);
       RTP.scheduler.runTaskAsynchronously(scanTask);
 

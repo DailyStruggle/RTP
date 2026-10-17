@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.neoforge.effects.local;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
-import io.github.dailystruggle.effectsapi.fabric.LocalEffects.enums.FabricSoundKeys;
 import io.github.dailystruggle.rtp.neoforge.player.NeoForgeRTPPlayer;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -24,20 +23,20 @@ import java.util.EnumMap;
  * arities and {@code Entity#level()} drift). S-004: cosmetic; never breaks
  * teleport.
  */
-public class NeoForgeSoundEffect extends Effect<FabricSoundKeys> {
+public class NeoForgeSoundEffect extends Effect<NeoForgeSoundKeys> {
 
     private static final SoundEvent DEFAULT_SOUND =
             NeoForgeRegistryResolver.resolve(BuiltInRegistries.SOUND_EVENT, "minecraft:entity.player.levelup");
 
     public NeoForgeSoundEffect() throws IllegalArgumentException {
-        super(new EnumMap<>(FabricSoundKeys.class));
-        EnumMap<FabricSoundKeys, Object> d = getData();
-        d.put(FabricSoundKeys.TYPE, DEFAULT_SOUND);
-        d.put(FabricSoundKeys.VOLUME, 100);
-        d.put(FabricSoundKeys.PITCH, 100);
-        d.put(FabricSoundKeys.DX, 0.0);
-        d.put(FabricSoundKeys.DY, 0.0);
-        d.put(FabricSoundKeys.DZ, 0.0);
+        super(new EnumMap<>(NeoForgeSoundKeys.class));
+        EnumMap<NeoForgeSoundKeys, Object> d = getData();
+        d.put(NeoForgeSoundKeys.TYPE, DEFAULT_SOUND);
+        d.put(NeoForgeSoundKeys.VOLUME, 100);
+        d.put(NeoForgeSoundKeys.PITCH, 100);
+        d.put(NeoForgeSoundKeys.DX, 0.0);
+        d.put(NeoForgeSoundKeys.DY, 0.0);
+        d.put(NeoForgeSoundKeys.DZ, 0.0);
         this.data = d;
         this.defaults = d.clone();
     }
@@ -47,15 +46,15 @@ public class NeoForgeSoundEffect extends Effect<FabricSoundKeys> {
         if (!(target instanceof ServerPlayer)) return;
         ServerPlayer player = (ServerPlayer) target;
 
-        Object typeObj = data.get(FabricSoundKeys.TYPE);
+        Object typeObj = data.get(NeoForgeSoundKeys.TYPE);
         if (!(typeObj instanceof SoundEvent)) return;
         SoundEvent sound = (SoundEvent) typeObj;
 
-        float volume = numAsFloat(data.get(FabricSoundKeys.VOLUME), 100) / 100f;
-        float pitch  = numAsFloat(data.get(FabricSoundKeys.PITCH), 100) / 100f;
-        double dx = numAsDouble(data.get(FabricSoundKeys.DX), 0.0);
-        double dy = numAsDouble(data.get(FabricSoundKeys.DY), 0.0);
-        double dz = numAsDouble(data.get(FabricSoundKeys.DZ), 0.0);
+        float volume = numAsFloat(data.get(NeoForgeSoundKeys.VOLUME), 100) / 100f;
+        float pitch  = numAsFloat(data.get(NeoForgeSoundKeys.PITCH), 100) / 100f;
+        double dx = numAsDouble(data.get(NeoForgeSoundKeys.DX), 0.0);
+        double dy = numAsDouble(data.get(NeoForgeSoundKeys.DY), 0.0);
+        double dz = numAsDouble(data.get(NeoForgeSoundKeys.DZ), 0.0);
 
         // Preferred: direct-to-connection so the packet bypasses the chunk
         // tracker (broadcast packets are dropped right after a long teleport).
@@ -268,12 +267,12 @@ public class NeoForgeSoundEffect extends Effect<FabricSoundKeys> {
 
     @Override
     public String toPermission() {
-        return data.get(FabricSoundKeys.TYPE) + "."
-                + data.get(FabricSoundKeys.VOLUME) + "."
-                + data.get(FabricSoundKeys.PITCH) + "."
-                + data.get(FabricSoundKeys.DX) + "."
-                + data.get(FabricSoundKeys.DY) + "."
-                + data.get(FabricSoundKeys.DZ);
+        return data.get(NeoForgeSoundKeys.TYPE) + "."
+                + data.get(NeoForgeSoundKeys.VOLUME) + "."
+                + data.get(NeoForgeSoundKeys.PITCH) + "."
+                + data.get(NeoForgeSoundKeys.DX) + "."
+                + data.get(NeoForgeSoundKeys.DY) + "."
+                + data.get(NeoForgeSoundKeys.DZ);
     }
 
     @Override
@@ -281,9 +280,9 @@ public class NeoForgeSoundEffect extends Effect<FabricSoundKeys> {
         applyByType(KEY_ORDER, data);
     }
 
-    private static final FabricSoundKeys[] KEY_ORDER = {
-            FabricSoundKeys.TYPE, FabricSoundKeys.VOLUME, FabricSoundKeys.PITCH,
-            FabricSoundKeys.DX, FabricSoundKeys.DY, FabricSoundKeys.DZ
+    private static final NeoForgeSoundKeys[] KEY_ORDER = {
+            NeoForgeSoundKeys.TYPE, NeoForgeSoundKeys.VOLUME, NeoForgeSoundKeys.PITCH,
+            NeoForgeSoundKeys.DX, NeoForgeSoundKeys.DY, NeoForgeSoundKeys.DZ
     };
 
     private static float numAsFloat(Object o, float fallback) {

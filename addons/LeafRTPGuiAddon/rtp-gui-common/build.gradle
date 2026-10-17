@@ -4,8 +4,8 @@ plugins {
 group = 'io.github.dailystruggle'
 version = '1.0.0'
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 repositories {
     mavenCentral()
@@ -20,6 +20,11 @@ dependencies {
     // Exposed transitively by rtp-api; declared so the MetricsSnapshot import is
     // self-documenting.
     compileOnly project(':metrics-api')
+
+    testImplementation project(':rtp-api')
+    testImplementation project(':rtp-core')
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
 }
 test {
     useJUnitPlatform()

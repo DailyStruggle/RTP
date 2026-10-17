@@ -6,9 +6,11 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmd;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.ConfigSubtreeRegistrar;
+import io.github.dailystruggle.rtp.common.commands.base.NetherEndConfigAmender;
 import io.github.dailystruggle.rtp.common.commands.parameters.*;
-import io.github.dailystruggle.rtp.common.commands.reload.ReloadCmd;
 import io.github.dailystruggle.rtp.common.commands.config.list.ListCmd;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
@@ -28,7 +30,7 @@ import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
-public class SubConfigCmd extends BaseRTPCmdImpl {
+public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistrar {
 
   /**
    * Thin {@link BaseRTPCmdImpl} alias exposing the target {@link SubConfigCmd}'s parameter and
@@ -124,8 +126,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
         ConfigParser<RegionKeys> regionParser = (ConfigParser<RegionKeys>) configParser;
         RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(parameterValues.get("world").get(0));
         if (rtpWorld != null) {
-          io.github.dailystruggle.rtp.common.commands.menu.multiconfig.NetherEndConfigAmender
-              .amend(parameterValues, regionParser, rtpWorld);
+          NetherEndConfigAmender.amend(parameterValues, regionParser, rtpWorld);
         }
       }
 
@@ -188,10 +189,10 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
 
           subParams.put("name", fv.name);
           for (Map.Entry<? extends Enum<?>, Object> entry : data.entrySet()) {
-            String name = entry.getKey().name();
-            List<String> strings = parameterValues.get(name.toLowerCase());
+            String paramName = entry.getKey().name();
+            List<String> strings = parameterValues.get(paramName.toLowerCase());
             if (strings != null && !strings.isEmpty()) {
-              subParams.put(name, strings.get(0));
+              subParams.put(paramName, strings.get(0));
             }
           }
           value = subParams;
@@ -231,9 +232,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
       if (updatedMsg != null) updatedMsg = updatedMsg.replace("[filename]", configParser.name);
       RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updatedMsg);
 
-      CommandsAPICommand reload =
-              RTP.baseCommand.getCommandLookup().getOrDefault("reload", new ReloadCmd(RTP.baseCommand));
-      reload.onCommand(callerId, new HashMap<>(), null);
+      BaseRTPCmd.dispatchReload(callerId);
     } else if (factoryValue instanceof MultiConfigParser) {
       MultiConfigParser<?> parser = (MultiConfigParser<?>) this.factoryValue;
       List<String> remove = parameterValues.getOrDefault("remove", new ArrayList<>());
@@ -264,27 +263,25 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
       for (String target : add) {
         parser.addParser(target);
         ConfigParser<?> configParser = parser.getParser(target);
-        SubConfigCmd subUpdateCmd = new SubConfigCmd(this, configParser.name, configParser);
-        subUpdateCmd.addParameters();
-        addSubCommand(subUpdateCmd);
-        // Parity with flat ConfigCmd.addCommands (lines 56-67) and the
-        // addParameters() initial registration below: also register a
-        // bare (suffix-stripped) {@link Alias} so `/rtp config <kind>
-        // <entry>` resolves without the .yml suffix. Use `addSubCommand`
-        // (the supported registration route) rather than touching
-        // `commandLookup` directly.
-        String bareAdd = configParser.name.replace(".yml", "").replace(".YML", "");
-        if (!bareAdd.equalsIgnoreCase(configParser.name)) {
-          addSubCommand(new Alias(this, bareAdd, subUpdateCmd));
-        }
+        registerChildParser(configParser);
       }
 
-      CommandsAPICommand reload =
-              RTP.baseCommand.getCommandLookup().getOrDefault("reload", new ReloadCmd(RTP.baseCommand));
-      reload.onCommand(callerId, new HashMap<>(), null);
+      BaseRTPCmd.dispatchReload(callerId);
     }
     });
     return true;
+  }
+
+  @Override
+  public void registerChildParser(ConfigParser<?> configParser) {
+    if (configParser == null) return;
+    SubConfigCmd subUpdateCmd = new SubConfigCmd(this, configParser.name, configParser);
+    subUpdateCmd.addParameters();
+    addSubCommand(subUpdateCmd);
+    String bareAdd = configParser.name.replace(".yml", "").replace(".YML", "");
+    if (!bareAdd.equalsIgnoreCase(configParser.name)) {
+      addSubCommand(new Alias(this, bareAdd, subUpdateCmd));
+    }
   }
 
   @Override
@@ -522,26 +519,26 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
       }
       EnumMap<?, ?> data = configParser.getData();
       for (Map.Entry<? extends Enum<?>, ?> e : data.entrySet()) {
-        String name = e.getKey().name();
-        if (name.equalsIgnoreCase("version")) continue;
-        String s = name;
-        Object nameObj = configParser.language_mapping.get(name);
+        String keyName = e.getKey().name();
+        if (keyName.equalsIgnoreCase("version")) continue;
+        String s = keyName;
+        Object nameObj = configParser.language_mapping.get(keyName);
         if (nameObj != null) s = nameObj.toString();
         Object o = e.getValue();
         // Try the in-file display name first (s), then fall back to the enum
         // name - the yaml is keyed by whichever the language_mapping points to.
         String desc = descriptionFromComment(parserYaml, s);
-        if (desc.isEmpty() && !s.equals(name)) desc = descriptionFromComment(parserYaml, name);
+        if (desc.isEmpty() && !s.equals(keyName)) desc = descriptionFromComment(parserYaml, keyName);
 
-        if (name.contains("world")) {
+        if (keyName.contains("world")) {
           addParameter(s, new WorldParameter("rtp.update", desc, (uuid, s1) -> true));
-        } else if (name.contains("region")) {
+        } else if (keyName.contains("region")) {
           addParameter(s, new RegionParameter("rtp.update", desc, (uuid, s1) -> true));
-        } else if (o instanceof String && name.equalsIgnoreCase("shape")) {
+        } else if (o instanceof String && keyName.equalsIgnoreCase("shape")) {
           // Referenced shape (@config or bare name): register ShapeParameter and factory dotted leaves.
           addParameter(s, new ShapeParameter("rtp.update", desc, (uuid, s1) -> true));
           addFactoryReferenceDottedParameters(s, RTP.factoryNames.shape);
-        } else if (o instanceof String && name.equalsIgnoreCase("vert")) {
+        } else if (o instanceof String && keyName.equalsIgnoreCase("vert")) {
           // Referenced vert (@config or bare name): register VertParameter and factory dotted leaves.
           addParameter(s, new VertParameter("rtp.update", desc, (uuid, s1) -> true));
           addFactoryReferenceDottedParameters(s, RTP.factoryNames.vert);
@@ -585,9 +582,9 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
           }
         } else if (o instanceof List) {
           Supplier<Set<String>> values = HashSet::new;
-          if (name.contains("block")) {
+          if (keyName.contains("block")) {
             values = () -> RTP.serverAccessor.materials();
-          } else if (name.contains("biome")) {
+          } else if (keyName.contains("biome")) {
             values =
                 () -> {
                   Set<String> res = new HashSet<>();
@@ -599,7 +596,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl {
                 };
           }
           RtpYamlConfig RtpYamlConfig = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
-          if (RtpYamlConfig != null) addSubCommand(new ListCmd(name, this, values, RtpYamlConfig, s));
+          if (RtpYamlConfig != null) addSubCommand(new ListCmd(keyName, this, values, RtpYamlConfig, s));
         }
       }
     } else if (factoryValue instanceof MultiConfigParser<?> parser) {

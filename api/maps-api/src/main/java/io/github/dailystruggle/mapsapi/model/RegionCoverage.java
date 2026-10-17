@@ -56,15 +56,14 @@ public record RegionCoverage(String regionName, int centerX, int centerZ,
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof RegionCoverage(String thatRegionName, int thatCenterX, int thatCenterZ, int thatRadius,
-                                          byte[] thatStates))) {
+        if (!(o instanceof RegionCoverage that)) {
             return false;
         }
-        return centerX == thatCenterX
-                && centerZ == thatCenterZ
-                && radius == thatRadius
-                && regionName.equals(thatRegionName)
-                && java.util.Arrays.equals(states, thatStates);
+        return centerX == that.centerX
+                && centerZ == that.centerZ
+                && radius == that.radius
+                && regionName.equals(that.regionName)
+                && java.util.Arrays.equals(states, that.states);
     }
 
     @Override

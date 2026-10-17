@@ -71,13 +71,20 @@ public final class ConfigDefaultResolver {
     ConfigParser<ConfigKeys> cp = (ConfigParser<ConfigKeys>) fv;
     Object defaultsObj = cp.getData(ConfigKeys.defaults);
     Map<String, Object> defaults = asMap(defaultsObj);
-    if (defaults == null || !defaults.containsKey(settingName)) {
-      RTP.log(Level.WARNING,
-          "[RTP] ADR-073: config.yml#defaults." + settingName
-              + " is missing; using fallback " + fallback);
-      return fallback;
+    if (defaults != null && defaults.containsKey(settingName)) {
+      return defaults.get(settingName);
     }
-    return defaults.get(settingName);
+    if ("cooldown".equalsIgnoreCase(settingName)) {
+      Object cd = cp.getData(ConfigKeys.teleportCooldown);
+      if (cd != null) return cd;
+    } else if ("delay".equalsIgnoreCase(settingName)) {
+      Object dl = cp.getData(ConfigKeys.teleportDelay);
+      if (dl != null) return dl;
+    }
+    RTP.log(Level.WARNING,
+        "[RTP] ADR-073: config.yml#defaults." + settingName
+            + " is missing; using fallback " + fallback);
+    return fallback;
   }
 
   private static <T extends Enum<T>> Object fromParser(Class<T> enumClass, String settingName,

@@ -1,10 +1,9 @@
 package io.github.dailystruggle.rtp.common.network.pluginmessage;
 
+import io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
-import io.github.dailystruggle.rtp.proxy.common.transport.codec.BackendHeartbeatCodec;
 
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.LongSupplier;
 import java.util.logging.Level;
@@ -29,6 +28,12 @@ public final class PluginMessageNetworkBinding extends AbstractPluginMessageNetw
         super(bridge, staleTimeoutMillis, clock);
     }
 
+    /** @param verifier signs outbound / verifies inbound envelopes; {@code null} = unsigned */
+    public PluginMessageNetworkBinding(NetworkBridge bridge, long staleTimeoutMillis, LongSupplier clock,
+                                       HmacVerifier verifier) {
+        super(bridge, staleTimeoutMillis, clock, verifier);
+    }
+
     // ---- heartbeat gossip ------------------------------------------------
 
     @Override
@@ -38,8 +43,8 @@ public final class PluginMessageNetworkBinding extends AbstractPluginMessageNetw
                     new IllegalStateException("PluginMessageNetworkBinding is closed"));
         }
         try {
-            byte[] payload = BackendHeartbeatCodec.encode(row).getBytes(StandardCharsets.UTF_8);
-            bridge.broadcastHeartbeat(payload);
+            byte[] payload = encodeOutbound(row);
+            if (payload != null) bridge.broadcastHeartbeat(payload);
         } catch (Throwable t) {
             // S-004: a transmit failure (no carrier player, channel hiccup) is
             // logged, not swallowed silently and not propagated as a fatal

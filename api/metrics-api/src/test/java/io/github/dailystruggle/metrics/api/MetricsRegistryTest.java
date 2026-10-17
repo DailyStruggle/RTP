@@ -48,6 +48,22 @@ class MetricsRegistryTest {
     }
 
     @Test
+    @DisplayName("ADR-087 regional circuit breaker: region readings default to the server values on single-loop bindings")
+    void regionDefaultsFollowServerValues() {
+        java.util.UUID world = java.util.UUID.randomUUID();
+        MetricsBinding b = new MetricsBinding() {
+            @Override public double tps1m() { return 18.5; }
+            @Override public double mspt() { return 42.0; }
+        };
+        assertFalse(b.regionalTicking());
+        assertEquals(18.5, b.regionTps1m(world, 10, -10));
+        assertEquals(42.0, b.regionMspt(world, 10, -10));
+        assertFalse(MetricsBinding.NOOP.regionalTicking());
+        assertTrue(Double.isNaN(MetricsBinding.NOOP.regionTps1m(world, 0, 0)));
+        assertTrue(Double.isNaN(MetricsBinding.NOOP.regionMspt(world, 0, 0)));
+    }
+
+    @Test
     @DisplayName("currentBinding defaults to NOOP before any registration")
     void currentBindingDefault() {
         assertSame(MetricsBinding.NOOP, Metrics.currentBinding());
@@ -101,6 +117,26 @@ class MetricsRegistryTest {
         Metrics.resetRegistryForTesting();
         assertSame(MetricsBinding.NOOP, Metrics.currentBinding());
         assertTrue(Metrics.registeredExtensions().isEmpty());
+    }
+
+    @Test
+    @DisplayName("MetricsBinding default worst readings and wraps check")
+    void bindingDefaultsWorstAndWraps() {
+        MetricsBinding b = new MetricsBinding() {
+            @Override public double tps1m() { return 19.2; }
+            @Override public double mspt() { return 15.0; }
+        };
+        assertEquals(19.2, b.worstTps1m());
+        assertEquals(15.0, b.worstMspt());
+        assertTrue(b.wraps(b));
+        assertFalse(b.wraps(MetricsBinding.NOOP));
+    }
+
+    @Test
+    @DisplayName("MetricsBinding default observeRegion is a safe no-op")
+    void observeRegionDefaultNoop() {
+        assertDoesNotThrow(() -> MetricsBinding.NOOP.observeRegion(new Object(), 0, 0));
+        assertDoesNotThrow(() -> MetricsBinding.NOOP.observeRegion(null, -5, 12));
     }
 
     static final class Ext implements MetricsExtension<Ext> {

@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
+import io.github.dailystruggle.rtp.folia.thread.AnyThread;
 import io.github.dailystruggle.rtp.folia.thread.GlobalRegionThread;
 import io.github.dailystruggle.rtp.folia.thread.RegionThread;
 import java.util.ArrayList;
@@ -16,10 +17,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.bukkit.Chunk;
-import org.bukkit.HeightMap;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.BlockData;
 
@@ -30,7 +31,7 @@ import org.bukkit.block.data.BlockData;
  * a single branch on the populated source field.
  *
  * <p>Anvil-backed instances are constructed by
- * {@link FoliaRTPWorld#getCachedChunk(long)} when the pre-filter previously
+ * {@code FoliaRTPWorld#getCachedChunk(long)} when the pre-filter previously
  * produced a decoded view for this chunk key. They carry the decoded snapshot
  * plus the world identity + chunk coordinates needed to answer RTPChunk queries
  * without ever hopping to the Region Thread. The authoritative live
@@ -126,7 +127,7 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
     if (anvilView != null) {
       return (RTP.serverAccessor != null) ? RTP.serverAccessor.getRTPWorld(anvilWorldId) : null;
     }
-    if (chunk == null || chunk.getWorld() == null) return null;
+    if (chunk == null) return null;
     return (RTP.serverAccessor != null) ? RTP.serverAccessor.getRTPWorld(chunk.getWorld().getUID()) : null;
   }
 
@@ -144,104 +145,89 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
     return chunk.isLoaded();
   }
 
+  /** Latest requested ticket state; each reconcile applies this, not the state it was queued with. */
+  private final AtomicBoolean keepDesired = new AtomicBoolean(false);
+  /** Whether this instance currently holds the plugin ticket; mutated only on the owning region. */
+  private final AtomicBoolean ticketHeld = new AtomicBoolean(false);
+
+  /**
+   * Ticket calls must run on the chunk's owning region (Folia region ownership), never the global
+   * region. Every call records the desired state and schedules a reconcile that applies the latest
+   * one, so a release can never be overtaken by its add (inline vs queued runs) and a held ticket
+   * is removed exactly once (S-002). Ownership is per instance: pair keep(true)/keep(false) on the
+   * same {@code FoliaRTPChunk}; ref-counted tickets go through {@code FoliaRTPWorld#setForceLoaded}.
+   */
   @Override
-  @GlobalRegionThread
+  @AnyThread
   public void keep(boolean keep) {
     if (anvilView != null) return; // No live ticket to acquire on a snapshot.
     org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
     if (plugin == null || !plugin.isEnabled()) return;
-    RTP.serverAccessor.getScheduler().runTask(() -> {
-      if (keep) {
+    keepDesired.set(keep);
+    org.bukkit.World world = chunk.getWorld();
+    int cx = chunk.getX();
+    int cz = chunk.getZ();
+    Runnable reconcile = () -> reconcileTicket(plugin);
+    try {
+      if (org.bukkit.Bukkit.isOwnedByCurrentRegion(world, cx, cz)) {
+        reconcile.run();
+        return;
+      }
+      io.github.dailystruggle.rtp.api.scheduling.RTPScheduler scheduler =
+          RTP.serverAccessor == null ? null : RTP.serverAccessor.getScheduler();
+      RTPWorld<?> rtpWorld =
+          RTP.serverAccessor == null ? null : RTP.serverAccessor.getRTPWorld(world.getUID());
+      if (scheduler != null && rtpWorld != null) {
+        scheduler.runTask(rtpWorld, cx, cz, reconcile);
+      } else {
+        org.bukkit.Bukkit.getRegionScheduler().run(plugin, world, cx, cz, st -> reconcile.run());
+      }
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.WARNING, "[RTP] Folia chunk ticket " + (keep ? "add" : "release")
+          + " dispatch failed for chunk (" + cx + "," + cz + ")", t);
+    }
+  }
+
+  @RegionThread
+  private void reconcileTicket(org.bukkit.plugin.Plugin plugin) {
+    try {
+      if (keepDesired.get()) {
+        if (ticketHeld.get()) return;
+        // A ticket on an unloaded chunk loads it synchronously on this thread (S-005).
+        if (!chunk.isLoaded()) {
+          RTP.log(java.util.logging.Level.FINE, "[RTP] Skipping Folia chunk ticket add; chunk ("
+              + chunk.getX() + "," + chunk.getZ() + ") is no longer loaded");
+          return;
+        }
         if (!chunk.getPluginChunkTickets().contains(plugin)) {
           chunk.addPluginChunkTicket(plugin);
         }
-      } else {
+        ticketHeld.set(true);
+      } else if (ticketHeld.compareAndSet(true, false)) {
         chunk.removePluginChunkTicket(plugin);
       }
-    });
+    } catch (Throwable t) {
+      RTP.log(java.util.logging.Level.WARNING, "[RTP] Folia chunk ticket reconcile failed for chunk ("
+          + chunk.getX() + "," + chunk.getZ() + ")", t);
+    }
   }
 
-  /**
-   * 5-second-throttled reconciled snapshot of {@code BlocksKeys.airBlocks}.
-   * Mirror of the cache in {@code BukkitRTPChunk} - see that class for rationale.
-   * Process-global, refreshed lazily on the next {@link #isAir(int,int,int)}
-   * call after the throttle window expires.
-   */
-  private static final AtomicReference<Set<String>> AIR_BLOCKS_CACHE =
-      new AtomicReference<>(Collections.emptySet());
-  private static final AtomicLong AIR_BLOCKS_LAST_UPDATE = new AtomicLong(0);
-  private static final long AIR_BLOCKS_REFRESH_MS = 5_000L;
-
-  private static Set<String> reconciledAirBlocks() {
-    long now = System.currentTimeMillis();
-    long last = AIR_BLOCKS_LAST_UPDATE.get();
-    long dt = now - last;
-    Set<String> cached = AIR_BLOCKS_CACHE.get();
-    if (dt >= 0 && dt < AIR_BLOCKS_REFRESH_MS) return cached;
-    if (!AIR_BLOCKS_LAST_UPDATE.compareAndSet(last, now)) {
-      return AIR_BLOCKS_CACHE.get();
+  @Override
+  public String materialNameAt(int x, int y, int z) {
+    if (anvilView != null) {
+      String id = anvilView.blockIdAt(x & 0xF, y, z & 0xF);
+      return (id != null) ? id.toUpperCase(Locale.ROOT) : "AIR";
     }
-    try {
-      if (RTP.configs == null) return cached;
-      Object value = RTP.configs.getConfigValue(BlocksKeys.airBlocks, new ArrayList<>());
-      if (!(value instanceof Collection<?> coll)) return cached;
-      // Tag expansion: see BukkitRTPChunk#reconciledAirBlocks for rationale.
-      // #namespace:tag tokens (e.g. "#minecraft:leaves") are NOT resolved by
-      // Material.matchMaterial, so we expand them via the server-supplied
-      // block-tag snapshot before reconciliation.
-      java.util.Map<String, java.util.Set<String>> tagSnapshot =
-          java.util.Collections.emptyMap();
-      if (RTP.serverAccessor != null) {
-        try {
-          java.util.Map<String, java.util.Set<String>> s =
-              RTP.serverAccessor.blockTagSnapshot();
-          if (s != null) tagSnapshot = s;
-        } catch (Throwable ignoredTag) {
-          // best-effort
-        }
-      }
-      Set<String> raw = new java.util.HashSet<>();
-      for (Object o : coll) {
-        if (o == null) continue;
-        String token = o.toString().trim();
-        if (token.isEmpty()) continue;
-        if (token.charAt(0) == '#') {
-          String tagId = token.substring(1);
-          if (tagId.indexOf(':') < 0) tagId = "minecraft:" + tagId;
-          tagId = tagId.toLowerCase(Locale.ROOT);
-          java.util.Set<String> members = tagSnapshot.get(tagId);
-          if (members != null && !members.isEmpty()) {
-            raw.addAll(members);
-            continue;
-          }
-          raw.add(token);
-        } else {
-          raw.add(token);
-        }
-      }
-      Set<String> reconciled = (RTP.serverAccessor != null)
-          ? RTP.serverAccessor.reconcilePaletteIdentifiers(raw)
-          : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(raw);
-      AIR_BLOCKS_CACHE.set(reconciled);
-      return reconciled;
-    } catch (Throwable ignored) {
-      return cached;
-    }
+    if (chunk == null) return "";
+    org.bukkit.World w = chunk.getWorld();
+    if (y < w.getMinHeight() || y >= w.getMaxHeight()) return "";
+    return chunk.getBlock(x & 0xF, y, z & 0xF).getType().name();
   }
 
   @Override
   @RegionThread
   public boolean isAir(int x, int y, int z) {
-    Set<String> airSet = reconciledAirBlocks();
-    if (anvilView != null) {
-      return anvilView.isAir(x & 0xF, y, z & 0xF, airSet);
-    }
-    org.bukkit.Material type = chunk.getBlock(x & 0xF, y, z & 0xF).getType();
-    if (type.isAir()) return true;
-    if (airSet.isEmpty()) return false;
-    return (RTP.serverAccessor != null)
-        ? RTP.serverAccessor.matchesPaletteIdentifier(type.name(), airSet)
-        : airSet.contains(io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(type.name()));
+    return super.isAir(x, y, z);
   }
 
   /**
@@ -290,25 +276,21 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
       // teleport-commit time remains authoritative for any sky-light gating.
       return 15;
     }
-    return chunk.getBlock(x & 0xF, y, z & 0xF).getLightFromSky();
-  }
-
-  @Override
-  @RegionThread
-  public int getSurfaceHeight(int x, int z) {
-    x = Math.max(0, Math.min(15, x));
-    z = Math.max(0, Math.min(15, z));
-    if (anvilView != null) {
-      return anvilView.getSurfaceHeight(x, z);
+    if (chunk != null) {
+      org.bukkit.World w = chunk.getWorld();
+      if (y < w.getMinHeight() || y >= w.getMaxHeight()) return 0;
+      return chunk.getBlock(x & 0xF, y, z & 0xF).getLightFromSky();
     }
-    int globalX = (chunk.getX() << 4) + x;
-    int globalZ = (chunk.getZ() << 4) + z;
-    return chunk.getWorld().getHighestBlockYAt(globalX, globalZ, HeightMap.MOTION_BLOCKING_NO_LEAVES);
+    return 15;
   }
 
   @Override
   @RegionThread
   public boolean isSafe(int x, int y, int z, Set<String> unsafeBlocks) {
+    if (chunk != null) {
+      org.bukkit.World w = chunk.getWorld();
+      if (y < w.getMinHeight() || y >= w.getMaxHeight()) return false;
+    }
     if (anvilView != null) {
       Set<String> effective = (reconciledUnsafe != null)
           ? reconciledUnsafe
@@ -317,6 +299,7 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
               : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(unsafeBlocks));
       return anvilView.isSafe(x & 0xF, y, z & 0xF, effective);
     }
+    if (chunk == null) return true;
     // Callers are required to invoke this on the chunk's owning region thread
     // (enforced upstream in QueueTask.evaluateSafety / Region.execute, which
     // dispatch via RTP.scheduler.runTask(world, cx, cz, ...)). No defensive
@@ -341,6 +324,11 @@ public final class FoliaRTPChunk extends RTPChunk<Chunk> {
   @RegionThread
   public boolean isSafe(int x, int y, int z, CompiledUnsafeSet unsafeBlocks) {
     if (unsafeBlocks == null || unsafeBlocks.isEmpty()) return true;
+
+    if (chunk != null) {
+      org.bukkit.World w = chunk.getWorld();
+      if (y < w.getMinHeight() || y >= w.getMaxHeight()) return false;
+    }
 
     if (anvilView != null) {
       Set<String> plain = (reconciledUnsafe != null) ? reconciledUnsafe : unsafeBlocks.plainMaterials();

@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.neoforge.effects.local;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
-import io.github.dailystruggle.effectsapi.fabric.LocalEffects.enums.FabricParticleKeys;
 import io.github.dailystruggle.rtp.neoforge.player.NeoForgeRTPPlayer;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleType;
@@ -21,17 +20,17 @@ import java.util.EnumMap;
  * across 1.21.x). Prefers the targeted (recipient) overload so the packet
  * bypasses the chunk tracker right after a long teleport. S-004 cosmetic.
  */
-public class NeoForgeParticleEffect extends Effect<FabricParticleKeys> {
+public class NeoForgeParticleEffect extends Effect<NeoForgeParticleKeys> {
 
     public NeoForgeParticleEffect() throws IllegalArgumentException {
-        super(new EnumMap<>(FabricParticleKeys.class));
-        EnumMap<FabricParticleKeys, Object> d = getData();
-        d.put(FabricParticleKeys.TYPE, ParticleTypes.HAPPY_VILLAGER);
-        d.put(FabricParticleKeys.COUNT, 32);
-        d.put(FabricParticleKeys.DX, 1.0);
-        d.put(FabricParticleKeys.DY, 1.0);
-        d.put(FabricParticleKeys.DZ, 1.0);
-        d.put(FabricParticleKeys.SPEED, 0.0);
+        super(new EnumMap<>(NeoForgeParticleKeys.class));
+        EnumMap<NeoForgeParticleKeys, Object> d = getData();
+        d.put(NeoForgeParticleKeys.TYPE, ParticleTypes.HAPPY_VILLAGER);
+        d.put(NeoForgeParticleKeys.COUNT, 32);
+        d.put(NeoForgeParticleKeys.DX, 1.0);
+        d.put(NeoForgeParticleKeys.DY, 1.0);
+        d.put(NeoForgeParticleKeys.DZ, 1.0);
+        d.put(NeoForgeParticleKeys.SPEED, 0.0);
         this.data = d;
         this.defaults = d.clone();
     }
@@ -41,7 +40,7 @@ public class NeoForgeParticleEffect extends Effect<FabricParticleKeys> {
         if (!(target instanceof ServerPlayer)) return;
         ServerPlayer player = (ServerPlayer) target;
 
-        Object typeObj = data.get(FabricParticleKeys.TYPE);
+        Object typeObj = data.get(NeoForgeParticleKeys.TYPE);
         ParticleOptions opts;
         if (typeObj instanceof ParticleOptions) {
             opts = (ParticleOptions) typeObj;
@@ -53,11 +52,11 @@ public class NeoForgeParticleEffect extends Effect<FabricParticleKeys> {
             return;
         }
 
-        int count = numAsInt(data.get(FabricParticleKeys.COUNT), 32);
-        double dx = numAsDouble(data.get(FabricParticleKeys.DX), 1.0);
-        double dy = numAsDouble(data.get(FabricParticleKeys.DY), 1.0);
-        double dz = numAsDouble(data.get(FabricParticleKeys.DZ), 1.0);
-        double speed = numAsDouble(data.get(FabricParticleKeys.SPEED), 0.0);
+        int count = numAsInt(data.get(NeoForgeParticleKeys.COUNT), 32);
+        double dx = numAsDouble(data.get(NeoForgeParticleKeys.DX), 1.0);
+        double dy = numAsDouble(data.get(NeoForgeParticleKeys.DY), 1.0);
+        double dz = numAsDouble(data.get(NeoForgeParticleKeys.DZ), 1.0);
+        double speed = numAsDouble(data.get(NeoForgeParticleKeys.SPEED), 0.0);
 
         double px = player.getX();
         double py = player.getY() + 1.0;
@@ -176,12 +175,12 @@ public class NeoForgeParticleEffect extends Effect<FabricParticleKeys> {
 
     @Override
     public String toPermission() {
-        return data.get(FabricParticleKeys.TYPE) + "."
-                + data.get(FabricParticleKeys.COUNT) + "."
-                + data.get(FabricParticleKeys.DX) + "."
-                + data.get(FabricParticleKeys.DY) + "."
-                + data.get(FabricParticleKeys.DZ) + "."
-                + data.get(FabricParticleKeys.SPEED);
+        return data.get(NeoForgeParticleKeys.TYPE) + "."
+                + data.get(NeoForgeParticleKeys.COUNT) + "."
+                + data.get(NeoForgeParticleKeys.DX) + "."
+                + data.get(NeoForgeParticleKeys.DY) + "."
+                + data.get(NeoForgeParticleKeys.DZ) + "."
+                + data.get(NeoForgeParticleKeys.SPEED);
     }
 
     @Override
@@ -189,10 +188,10 @@ public class NeoForgeParticleEffect extends Effect<FabricParticleKeys> {
         applyByType(KEY_ORDER, data);
     }
 
-    private static final FabricParticleKeys[] KEY_ORDER = {
-            FabricParticleKeys.TYPE, FabricParticleKeys.COUNT,
-            FabricParticleKeys.DX, FabricParticleKeys.DY, FabricParticleKeys.DZ,
-            FabricParticleKeys.SPEED
+    private static final NeoForgeParticleKeys[] KEY_ORDER = {
+            NeoForgeParticleKeys.TYPE, NeoForgeParticleKeys.COUNT,
+            NeoForgeParticleKeys.DX, NeoForgeParticleKeys.DY, NeoForgeParticleKeys.DZ,
+            NeoForgeParticleKeys.SPEED
     };
 
     private static int numAsInt(Object o, int fallback) {

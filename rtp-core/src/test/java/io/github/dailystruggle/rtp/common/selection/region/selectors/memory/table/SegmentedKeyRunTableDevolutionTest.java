@@ -72,6 +72,33 @@ class SegmentedKeyRunTableDevolutionTest {
     }
   }
 
+  @Test
+  @DisplayName("resolveAccumulate skips fully solid bad bins across multi-bin tables")
+  void skipsSolidBadBins() {
+    long range = 1000L;
+    long binSize = 100L; // 10 bins of 100
+    // Make bins 1, 2, 3 completely bad: runs [100, 400)
+    // Make bin 5 partially bad: [520, 550)
+    long[] starts = {100L, 520L};
+    long[] lengths = {300L, 30L};
+    SegmentedKeyRunTable table =
+        SegmentedKeyRunTable.fromRuns(starts, lengths, starts.length, range, binSize, 0L);
+
+    boolean[] bad = expand(range, starts, lengths);
+    List<Long> goodSlots = new ArrayList<>();
+    for (long k = 0; k < range; k++) {
+      if (!bad[(int) k]) goodSlots.add(k);
+    }
+
+    assertEquals(range - table.totalCovered(), (long) goodSlots.size());
+    for (int t = 0; t < goodSlots.size(); t++) {
+      assertEquals(
+          (long) goodSlots.get(t),
+          table.resolveAccumulate(t),
+          "resolveAccumulate mismatch across solid bins at target " + t);
+    }
+  }
+
   private static SegmentedKeyRunTable buildTable(long range, long binSize) {
     // One small run so the table is non-trivial but tiny.
     return SegmentedKeyRunTable.fromRuns(new long[] {1L}, new long[] {2L}, 1, range, binSize, 0L);

@@ -4,6 +4,7 @@ import io.github.dailystruggle.mapsapi.BiomeColorSource;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
+import io.github.dailystruggle.rtp.common.selection.region.BiomeMenuSource;
 
 import java.util.Map;
 

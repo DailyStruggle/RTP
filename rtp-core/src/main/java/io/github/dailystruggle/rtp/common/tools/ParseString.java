@@ -4,6 +4,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class ParseString {
+  private ParseString() {}
   public static Set<String> keywords(
       String input, Set<String> placeholders, Set<Character> front, Set<Character> back) {
     Set<String> res = new HashSet<>();

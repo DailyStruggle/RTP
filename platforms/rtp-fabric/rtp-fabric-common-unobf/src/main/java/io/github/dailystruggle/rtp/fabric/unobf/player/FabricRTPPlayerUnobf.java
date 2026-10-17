@@ -32,12 +32,15 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
 
     private final UUID uuid;
     private final String name;
-    private volatile @Nullable ServerPlayer handle;
+    // Weak: a cached copy of this wrapper (teleport history, cooldown records) must never pin a
+    // quit player's ServerPlayer graph. The server's player list keeps it alive while online.
+    private volatile java.lang.ref.WeakReference<ServerPlayer> handleRef =
+            new java.lang.ref.WeakReference<>(null);
 
     public FabricRTPPlayerUnobf(ServerPlayer player) {
         this.uuid = player.getUUID();
         this.name = resolveName(player);
-        this.handle = player;
+        this.handleRef = new java.lang.ref.WeakReference<>(player);
     }
 
     /**
@@ -64,7 +67,7 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
 
     /** Called by the event bridge when a player rejoins; refreshes the handle. */
     public void rebind(ServerPlayer player) {
-        this.handle = player;
+        this.handleRef = new java.lang.ref.WeakReference<>(player);
     }
 
     /**
@@ -74,12 +77,12 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
      *         platform-typed target object via {@code Effect#setTarget(Object)}.
      */
     public @Nullable ServerPlayer handle() {
-        return handle;
+        return handleRef.get();
     }
 
     /** Called by the event bridge on disconnect; subsequent calls treat the player as offline. */
     public void unbind() {
-        this.handle = null;
+        this.handleRef = new java.lang.ref.WeakReference<>(null);
     }
 
     @Override
@@ -109,7 +112,7 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
         // perms-api's own fallback ultimately calls the same op-level check, but
         // we wrap with a LinkageError guard and route the no-perms-api branch
         // through PlayerList.isOp(GameProfile), which is stable across versions.
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null) return false;
         if (permission == null || permission.isEmpty()) return true;
         // PRIMARY: consult fabric-permissions-api (LuckPerms-Fabric, Cyan,
@@ -208,14 +211,12 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
         try {
             if (p.level() instanceof ServerLevel lvl) {
                 net.minecraft.server.MinecraftServer srv = lvl.getServer();
-                if (srv != null) {
-                    java.io.File opsFile = srv.getPlayerList().getOps().getFile();
-                    if (opsFile != null && opsFile.isFile()) {
-                        String body = new String(java.nio.file.Files.readAllBytes(opsFile.toPath()),
-                                java.nio.charset.StandardCharsets.UTF_8);
-                        if (body.contains("\"" + uuid.toString() + "\"")) {
-                            opFallback = true;
-                        }
+                java.io.File opsFile = srv.getPlayerList().getOps().getFile();
+                if (opsFile != null && opsFile.isFile()) {
+                    String body = new String(java.nio.file.Files.readAllBytes(opsFile.toPath()),
+                            java.nio.charset.StandardCharsets.UTF_8);
+                    if (body.contains("\"" + uuid.toString() + "\"")) {
+                        opFallback = true;
                     }
                 }
             }
@@ -236,7 +237,7 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
         // (rtp.effect.*, rtp.onevent.*) registry-probe fallback. Op status is
         // detected by probing a known default:op node through hasPermission so the
         // ops.json scan / perms-api verdict is honoured without duplicating logic.
-        if (handle == null) return Collections.emptySet();
+        if (handleRef.get() == null) return Collections.emptySet();
         boolean isOp = hasPermission("rtp.reload");
         return io.github.dailystruggle.rtp.fabric.player.FabricEffectivePermissionsResolver
                 .resolve(uuid, isOp, this::hasPermission);
@@ -264,7 +265,7 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
      * lower-level API across versions.
      */
     public void sendComponent(Component component) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || component == null) return;
         try {
             if (p.connection != null) {
@@ -295,7 +296,7 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
      * patch releases (NoSuchMethodError on 1.21.11).
      */
     public void sendTitle(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null) return;
         if ((title == null || title.isEmpty()) && (subtitle == null || subtitle.isEmpty())) return;
         try {
@@ -328,7 +329,7 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
      * same intermediary-stability rationale as {@link #sendTitle}.
      */
     public void sendActionbar(String message) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null) return;
         if (message == null || message.isEmpty()) return;
         try {
@@ -354,7 +355,7 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
 
     @Override
     public void performCommand(@Nullable RTPPlayer player, String command) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || command == null) return;
         // Use Entity#getServer() rather than ServerPlayer#server - see setLocation
         // for the IllegalAccessError rationale (intermediary field_13995 is
@@ -373,7 +374,7 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
     public RTPCommandSender clone() {
         // Same identity, same handle snapshot. Cloneable contract is loose for
         // command senders - the clone shares the handle until a rebind/unbind.
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null) {
             // No handle to clone from; return a detached placeholder that will
             // no-op on subsequent calls. Acceptable per the offline contract.
@@ -384,7 +385,7 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
 
     @Override
     public CompletableFuture<Boolean> setLocation(RTPLocation to) {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || to == null) {
             return CompletableFuture.completedFuture(false);
         }
@@ -418,7 +419,7 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
         final double ty = to.getBlockY();
         final double tz = to.getBlockZ() + 0.5;
         return srv.submit(() -> {
-            ServerPlayer cur = handle;
+            ServerPlayer cur = handleRef.get();
             if (cur == null || cur.isRemoved()) return false;
             return performTeleport(cur, target, tx, ty, tz, cur.getYRot(), cur.getXRot());
         });
@@ -429,7 +430,7 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
         // BetterRTP SetAsRespawn parity. Anchors the respawn point on the server
         // thread via reflective setRespawnPosition (signature drift across MC
         // versions). S-004: failures are logged, never swallowed.
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || to == null) return;
         RTPWorld<?> rtpWorld = to.world();
         if (!(rtpWorld instanceof FabricRTPWorldUnobf fw)) return;
@@ -445,7 +446,7 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
         final int bz = to.getBlockZ();
         final ServerLevel targetFinal = target;
         srv.submit(() -> {
-            ServerPlayer cur = handle;
+            ServerPlayer cur = handleRef.get();
             if (cur == null || cur.isRemoved()) return Boolean.FALSE;
             anchorRespawn(cur, targetFinal, bx, by, bz);
             return Boolean.TRUE;
@@ -569,7 +570,7 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
 
     @Override
     public RTPLocation getLocation() {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null) return null;
         ServerLevel level = ((ServerLevel) p.level());
         RTPWorld<?> rtpWorld = RTP.serverAccessor == null
@@ -581,7 +582,7 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
 
     @Override
     public boolean isOnline() {
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         return p != null && !p.isRemoved();
     }
 
@@ -595,7 +596,7 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
 
     @Override
     public String getClientBlock(RTPLocation location) {
-        if (location == null || handle == null) return null;
+        if (location == null || handleRef.get() == null) return null;
         if (!(location.world() instanceof FabricRTPWorldUnobf fw)) return null;
         ServerLevel level = fw.level();
         if (level == null) return null;
@@ -618,7 +619,7 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
     @Override
     public void sendClientBlockChange(RTPLocation location, String blockData) {
         if (location == null || blockData == null) return;
-        ServerPlayer p = handle;
+        ServerPlayer p = handleRef.get();
         if (p == null || p.connection == null) return;
         if (!(location.world() instanceof FabricRTPWorldUnobf fw)) return;
         ServerLevel level = fw.level();

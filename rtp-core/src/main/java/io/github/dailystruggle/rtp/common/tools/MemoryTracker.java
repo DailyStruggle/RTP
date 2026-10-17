@@ -29,6 +29,10 @@ public class MemoryTracker {
   static {
     // Inject the core untrack logic into the API
     RTPRunnable.untrackHook = MemoryTracker::untrack;
+    io.github.dailystruggle.rtp.common.metrics.CoreMetrics.setMemoryTrackerSuppliers(
+        MemoryTracker::trackedCount,
+        MemoryTracker::trackedCountByLabel
+    );
   }
 
   private MemoryTracker() {
@@ -171,7 +175,7 @@ public class MemoryTracker {
       Object target = obj.getTarget();
       if ("TeleportPipelineTask".equals(label)
           || target instanceof io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask
-          || target instanceof io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask) {
+          || target instanceof io.github.dailystruggle.rtp.common.tasks.TrackableTask) {
         tasks++;
       }
     }
@@ -215,6 +219,46 @@ public class MemoryTracker {
     return ceiling > 0 && allocatedBytes > ceiling;
   }
 
+  /**
+   * Players owning a live, non-leaking, non-cancelled tracked pipeline task, and players with a
+   * live tracked TeleportData record. Weakly consistent; safe from any thread.
+   */
+  static void collectLiveOwners(java.util.Set<UUID> pipelines, java.util.Set<UUID> data) {
+    for (TrackedObject tracked : trackedObjects.values()) {
+      Object target = tracked.getTarget();
+      if (target instanceof io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask wrapper
+          && wrapper.getTask() != null) {
+        target = wrapper.getTask();
+      }
+      if (target instanceof io.github.dailystruggle.rtp.common.tasks.TrackableTask task) {
+        if (tracked.isLeaking() || task.isCancelled()) {
+          continue;
+        }
+        io.github.dailystruggle.rtp.api.entity.RTPPlayer player = task.player();
+        if (player != null) {
+          pipelines.add(player.uuid());
+        }
+      } else if (target instanceof io.github.dailystruggle.rtp.common.playerData.TeleportData) {
+        UUID id = teleportDataPlayerId(tracked.getLabel());
+        if (id != null) {
+          data.add(id);
+        }
+      }
+    }
+  }
+
+  /** Player id from a {@code TeleportData-<uuid>} tracker label, or {@code null}. */
+  static UUID teleportDataPlayerId(String label) {
+    if (label == null || !label.startsWith("TeleportData-")) {
+      return null;
+    }
+    try {
+      return UUID.fromString(label.substring("TeleportData-".length()));
+    } catch (IllegalArgumentException e) {
+      return null;
+    }
+  }
+
   public static void runDiagnostics() {
     // Spark-profiler tagged entry: dispatch through a method whose name matches the
     // documented allow-list tag so the async sampler attributes diagram-04 work
@@ -232,6 +276,9 @@ public class MemoryTracker {
     log(Level.FINE,
             "[RTP][GC] Sweep pulse start: tracked={0}",
             trackedObjects.size());
+    // Owners captured before the purge, so a TeleportData whose pipeline is alive is spared.
+    java.util.Set<UUID> livePipelinesBefore = new java.util.HashSet<>();
+    collectLiveOwners(livePipelinesBefore, new java.util.HashSet<>());
     trackedObjects
             .entrySet()
             .removeIf(
@@ -279,17 +326,19 @@ public class MemoryTracker {
                         }
 
                         // Active Cleanup Injection
-                        if (actualTask instanceof io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask pipelineTask) {
+                        if (actualTask instanceof io.github.dailystruggle.rtp.common.tasks.TrackableTask trackableTask) {
                           // Diagram 04: ForceClose -> DecCounter -> Untrack. FINE because each occurrence
                           // represents a real cleanup action (cancellation + chunk release scheduling).
                           log(Level.FINE,
                                   "[RTP][GC] ForceClose stalled pipeline label={0} ageOverBudgetMs={1}",
                                   label, leakDuration);
                           // Force the abandoned pipeline into its CLEANUP phase
-                          pipelineTask.setCancelled(true);
+                          trackableTask.setCancelled(true);
 
                           // Schedule it on the primary thread to safely release chunks
-                          RTP.scheduler.runTask(pipelineTask);
+                          if (RTP.scheduler != null) {
+                            RTP.scheduler.runTask(trackableTask);
+                          }
 
                           // Return true to instantly purge it from the tracker
                           // to prevent infinite log looping
@@ -297,28 +346,53 @@ public class MemoryTracker {
                         }
 
                         if (actualTask instanceof io.github.dailystruggle.rtp.common.playerData.TeleportData teleportData) {
+                          // The label names the teleported player; the sender may be someone else.
+                          UUID targetPlayerId = teleportDataPlayerId(label);
+                          if (targetPlayerId == null
+                              && teleportData.sender instanceof io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer) {
+                            targetPlayerId = rtpPlayer.uuid();
+                          }
+                          // The 120 s budget excludes the warm-up delay and legitimate waits (queue,
+                          // death hold, live pipeline, network): keep the record; re-checked next sweep.
+                          if (!teleportData.completed && targetPlayerId != null
+                              && (leakDuration <= Math.max(0L, teleportData.delay)
+                                  || ProcessingLockSweeper.isHeld(targetPlayerId, livePipelinesBefore))) {
+                            log(Level.FINER,
+                                    "[RTP][GC] Keeping TeleportData label={0}: delay or wait still in progress",
+                                    label);
+                            return false;
+                          }
                           log(Level.FINE,
                                   "[RTP][GC] Purging stalled TeleportData label={0} ageOverBudgetMs={1}",
                                   label, leakDuration);
                           teleportData.completed = true;
-                          UUID targetPlayerId = null;
-                          if (teleportData.sender instanceof io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer) {
-                            targetPlayerId = rtpPlayer.uuid();
-                          } else if (label != null && label.startsWith("TeleportData-")) {
-                            try {
-                              targetPlayerId = UUID.fromString(label.substring("TeleportData-".length()));
-                            } catch (IllegalArgumentException ignored) {
-                            }
-                          }
                           if (targetPlayerId != null && RTP.getInstance() != null) {
                             RTP.getInstance().processingPlayers.remove(targetPlayerId);
                             RTP.getInstance().latestTeleportData.remove(targetPlayerId, teleportData);
                           }
                           return true;
                         }
+
+                        if (actualTask instanceof io.github.dailystruggle.rtp.api.action.ActionSession session) {
+                          log(Level.WARNING,
+                              "[RTP][GC] Force-disarming stalled ActionSession label={0} ageOverBudgetMs={1}",
+                              label, leakDuration);
+                          session.disarm();
+                          return true;
+                        }
                       }
                       return false;
                     });
+
+    // S-004 safety net: release processingPlayers entries nothing owns any more.
+    try {
+      java.util.Set<UUID> livePipelines = new java.util.HashSet<>();
+      java.util.Set<UUID> liveData = new java.util.HashSet<>();
+      collectLiveOwners(livePipelines, liveData);
+      ProcessingLockSweeper.sweep(livePipelines, liveData);
+    } catch (RuntimeException e) {
+      RTP.log(Level.WARNING, "[RTP][GC] stale teleport lock sweep failed", e);
+    }
 
     RTP rtp = RTP.getInstance();
     if (rtp != null) {
@@ -386,6 +460,9 @@ public class MemoryTracker {
       long finalTotalLoads = totalLoads;
       long finalPluginForced = pluginForced;
       long finalTrackedTickets = trackedTickets;
+      // Post-arrival holds (REQ-RTP-S-005) are owned, time-bounded tickets, not orphans.
+      long arrivalHolds = io.github.dailystruggle.rtp.common.tasks.ChunkTicketHolder
+          .heldChunkTicketCount();
       long finalTotalActiveChunkCap = totalActiveChunkCap;
       long finalTotalLocationQueueSize = totalLocationQueueSize;
       long finalTotalCacheCap = totalCacheCap;
@@ -403,7 +480,7 @@ public class MemoryTracker {
         }
 
         // Enforce the cap on expected tickets to reveal locAssChunks hoarding
-        long expectedTickets = Math.min(finalTrackedTickets, finalTotalActiveChunkCap);
+        long expectedTickets = Math.min(finalTrackedTickets, finalTotalActiveChunkCap) + arrivalHolds;
         long discrepancy = finalActiveTickets - expectedTickets;
 
         if (isSystemLoggingEnabled()) {
@@ -427,7 +504,9 @@ public class MemoryTracker {
 
           for (Region sweepRegion : allRegions) {
             // Gate the sweep to prevent race conditions with asynchronous location generation
-            if (sweepRegion.inFlightCalculations.get() > 0) continue;
+            // Pending kept promotions hold tickets not yet in keptLocations; sweeping would drop them.
+            if (sweepRegion.inFlightCalculations.get() > 0
+                || sweepRegion.pendingKeptPromotions.get() > 0) continue;
 
             RTPWorld<?> sweepWorld = sweepRegion.getWorld();
             if (sweepWorld == null) continue;
@@ -454,6 +533,14 @@ public class MemoryTracker {
                 keepAliveKeys.add(data.selectedCoords.getChunkKey());
               }
             }
+          }
+
+          // 3b. Keep chunks pinned by pending post-arrival holds (worlds already being swept)
+          for (java.util.Map.Entry<RTPWorld<?>, java.util.Set<Long>> hold
+              : io.github.dailystruggle.rtp.common.tasks.ChunkTicketHolder
+                  .arrivalHoldChunkKeys().entrySet()) {
+            java.util.Set<Long> keepAliveKeys = keepAliveByWorld.get(hold.getKey());
+            if (keepAliveKeys != null) keepAliveKeys.addAll(hold.getValue());
           }
 
           // 4. For each world, release any active chunk tickets not in the keep-alive set

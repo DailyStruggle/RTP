@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.mock.MockRTPScheduler;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -18,7 +19,10 @@ import java.io.File;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -149,6 +153,119 @@ class ScanTaskTest {
     }
 
     @Test
+    void setCancelled_runsTeardownOffCallingThread() throws Exception {
+        MockRTPScheduler scheduler = ((MockRTPScheduler) RTP.scheduler).enableServerThreads();
+        try {
+            RecordingSquare recorder = new RecordingSquare();
+            Region threadedRegion = new Region("scan_region_async", new RegionSettings(
+                    "scan_region_async", world, recorder, region.getVert(),
+                    false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false));
+            ScanTask task = new ScanTask(threadedRegion, 10L);
+            recorder.clearRecords();
+
+            Thread caller = Thread.currentThread();
+            task.setCancelled(true);
+            assertTrue(task.isCancelled(), "Cancel flag must be set synchronously on the caller");
+
+            awaitRecord(recorder);
+            task.teardownFuture().get(5, TimeUnit.SECONDS);
+            assertNotSame(caller, recorder.rebuildThreads.get(0),
+                    "flushAndRebuild must not run on the calling thread");
+            assertEquals(MockRTPScheduler.Lane.ASYNC, recorder.rebuildLanes.get(0),
+                    "flushAndRebuild must run on the RTP.scheduler async lane");
+        } finally {
+            scheduler.shutdown();
+        }
+    }
+
+    @Test
+    void pause_runsTeardownOffCallingThread() throws Exception {
+        MockRTPScheduler scheduler = ((MockRTPScheduler) RTP.scheduler).enableServerThreads();
+        try {
+            RecordingSquare recorder = new RecordingSquare();
+            Region threadedRegion = new Region("scan_region_async", new RegionSettings(
+                    "scan_region_async", world, recorder, region.getVert(),
+                    false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false));
+            ScanTask task = new ScanTask(threadedRegion, 10L);
+            recorder.clearRecords();
+
+            Thread caller = Thread.currentThread();
+            task.pause();
+            assertTrue(task.pause.get(), "Pause flag must be set synchronously on the caller");
+
+            awaitRecord(recorder);
+            task.teardownFuture().get(5, TimeUnit.SECONDS);
+            assertNotSame(caller, recorder.rebuildThreads.get(0),
+                    "flushAndRebuild must not run on the calling thread");
+            assertEquals(MockRTPScheduler.Lane.ASYNC, recorder.rebuildLanes.get(0),
+                    "flushAndRebuild must run on the RTP.scheduler async lane");
+        } finally {
+            scheduler.shutdown();
+        }
+    }
+
+    @Test
+    void pause_resetsStatusWindowStartMs() {
+        ScanTask task = new ScanTask(region, 0L);
+        task.scanIncrement.set(10L);
+        task.run();
+        assertTrue(task.getStatusWindowStartMs() > 0, "statusWindowStartMs should be positive after run()");
+
+        task.pause();
+        assertEquals(-1L, task.getStatusWindowStartMs(), "pause must reset statusWindowStartMs to -1");
+    }
+
+    @Test
+    void resetStatusWindow_invalidatesWindow() {
+        ScanTask task = new ScanTask(region, 0L);
+        task.scanIncrement.set(10L);
+        task.run();
+        assertTrue(task.getStatusWindowStartMs() > 0);
+
+        task.resetStatusWindow();
+        assertEquals(-1L, task.getStatusWindowStartMs());
+    }
+
+    @Test
+    void isTeardownPending_detectsPendingTeardown() {
+        assertFalse(ScanTask.isTeardownPending(region.name));
+        CompletableFuture<Void> gate = new CompletableFuture<>();
+        ScanTask.setPendingTeardownForTesting(region.name, gate);
+        try {
+            assertTrue(ScanTask.isTeardownPending(region.name));
+            gate.complete(null);
+            assertFalse(ScanTask.isTeardownPending(region.name));
+        } finally {
+            ScanTask.setPendingTeardownForTesting(region.name, null);
+        }
+    }
+
+    private static void awaitRecord(RecordingSquare recorder) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (recorder.rebuildThreads.isEmpty() && System.nanoTime() < deadline) {
+            Thread.sleep(5L);
+        }
+        assertFalse(recorder.rebuildThreads.isEmpty(), "flushAndRebuild never ran");
+    }
+
+    private static final class RecordingSquare extends Square {
+        final List<Thread> rebuildThreads = new CopyOnWriteArrayList<>();
+        final List<MockRTPScheduler.Lane> rebuildLanes = new CopyOnWriteArrayList<>();
+
+        @Override
+        public void flushAndRebuild(long spatialResolution) {
+            rebuildThreads.add(Thread.currentThread());
+            rebuildLanes.add(((MockRTPScheduler) RTP.scheduler).currentLane());
+            super.flushAndRebuild(spatialResolution);
+        }
+
+        void clearRecords() {
+            rebuildThreads.clear();
+            rebuildLanes.clear();
+        }
+    }
+
+    @Test
     void kill_cancelsAllAndClearsScanTasks() {
         ScanTask task1 = new ScanTask(region, 10L);
         RegionSettings settings2 = new RegionSettings(
@@ -269,5 +386,90 @@ class ScanTaskTest {
         // latestLandPercentage must reflect actual tested outcomes and not be 0.00% when land is found.
         assertTrue(task.latestLandPercentage > 0.0,
                 "Land percentage should be > 0.0% when valid land is found, got: " + task.latestLandPercentage);
+    }
+
+    @Test
+    void testClaimBoundingBoxBlanking_encapsulatesWholeClaimAndSkipsSubsequent() {
+        square.set(GenericMemoryShapeParams.radius, 300L);
+        square.set(GenericMemoryShapeParams.centerRadius, 0L);
+
+        // Mock a claim boundary at (100, 100) -> (200, 200)
+        io.github.dailystruggle.rtp.common.selection.region.claim.ClaimAnchoredRegionTrackerTest.RectangularClaimBoundary boundary =
+                new io.github.dailystruggle.rtp.common.selection.region.claim.ClaimAnchoredRegionTrackerTest.RectangularClaimBoundary(
+                        "claim_test_1", "scan_test_world", 100, 100, 200, 200);
+
+        io.github.dailystruggle.rtp.api.claim.ClaimBoundaryProvider provider =
+                new io.github.dailystruggle.rtp.api.claim.ClaimBoundaryProvider() {
+                    @Override
+                    public String namespace() {
+                        return "mock_claims";
+                    }
+
+                    @Override
+                    public java.util.Optional<io.github.dailystruggle.rtp.api.claim.ClaimBoundary> getBoundary(
+                            java.util.UUID playerId, String worldName) {
+                        return java.util.Optional.of(boundary);
+                    }
+
+                    @Override
+                    public java.util.Optional<io.github.dailystruggle.rtp.api.claim.ClaimBoundary> getBoundaryAt(
+                            String worldName, int x, int z) {
+                        if ("scan_test_world".equalsIgnoreCase(worldName) && boundary.contains(x, z)) {
+                            return java.util.Optional.of(boundary);
+                        }
+                        return java.util.Optional.empty();
+                    }
+                };
+
+        io.github.dailystruggle.rtp.api.hooks.ClaimBoundaryRegistry claimRegistry =
+                io.github.dailystruggle.rtp.api.RTPAPI.hooks().claimBoundaries();
+        AutoCloseable claimHandle = claimRegistry.register(provider);
+
+        java.util.concurrent.atomic.AtomicInteger verifierInvocations = new java.util.concurrent.atomic.AtomicInteger(0);
+        AutoCloseable verifierHandle = io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers.addGlobalRegionVerifier(
+                loc -> {
+                    if (boundary.contains(loc.x(), loc.z())) {
+                        verifierInvocations.incrementAndGet();
+                        return false;
+                    }
+                    return true;
+                });
+
+        try {
+            ScanTask task = new ScanTask(region, 0L);
+            task.scanPhase.set(ScanTask.PHASE_FULLSCAN);
+            long posFirst = square.xzToLocation(100, 100);
+            assertTrue(posFirst >= 0);
+
+            // Start scan task crossing (100, 100)
+            CompletableFuture<Boolean> futFirst = task.testPos(
+                    region, posFirst, 100, 100, 2,
+                    Collections.emptySet(), Collections.singleton("PLAINS"), false, null);
+
+            assertNotNull(futFirst);
+            assertFalse(futFirst.join(), "First test within claim must be rejected");
+            assertEquals(1, verifierInvocations.get(), "External verifier should be called on first hit");
+
+            // Confirm subsequent points within [100..200, 100..200] are skipped without re-evaluating external verifiers
+            long posSubsequent = square.xzToLocation(150, 150);
+            assertTrue(posSubsequent >= 0);
+            CompletableFuture<Boolean> futSubsequent = task.testPos(
+                    region, posSubsequent, 150, 150, 2,
+                    Collections.emptySet(), Collections.singleton("PLAINS"), false, null);
+
+            assertNotNull(futSubsequent);
+            assertFalse(futSubsequent.join());
+            assertTrue(verifierInvocations.get() >= 1, "External verifiers was evaluated");
+
+        } finally {
+            try {
+                claimHandle.close();
+            } catch (Exception ignored) {
+            }
+            try {
+                verifierHandle.close();
+            } catch (Exception ignored) {
+            }
+        }
     }
 }

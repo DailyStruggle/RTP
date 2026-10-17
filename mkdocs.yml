@@ -87,14 +87,18 @@ nav:
       - What NOT to do: site/what-not-to-do.md
       - Prefabs: admin/PREFABS.md
       - Commands: admin/COMMANDS.md
+      - Actions & arenas: admin/ACTIONS.md
       - FAQ: admin/FAQ.md
       - Common recipes: admin/RECIPES.md
+      - Features: site/features.md
       - Migration guide: admin/MIGRATION.md
   - Operations:
       - Runbook: admin/RUNBOOK.md
-      - Hazard register: admin/HAZARDS.md
-      - Region file reading: admin/REGION_FILE_READING.md
+      - Web Workspace & Editor: admin/WEB_EDITOR_GUIDE.md
+      - Hazard register: dev/HAZARDS.md
       - Addons: admin/ADDONS.md
+      - Custom items & menus: admin/CUSTOM_ITEMS.md
+      - Claim compatibility: admin/CLAIM_PLUGIN_COMPATIBILITY.md
   - Configuration:
       - Overview: admin/configuration/CONFIGURATION.md
       - Config lifecycle: admin/configuration/CONFIG_LIFECYCLE.md
@@ -119,6 +123,8 @@ nav:
       - Cross-server verification: admin/proxies/CROSS_SERVER_VERIFICATION.md
   - Developers:
       - Why LeafRTP exists: site/why.md
+      - How it works: site/how-it-works.md
+      - Testing and quality gates: site/quality-gates.md
       - Shape algorithm testing & charts: site/shape-algorithms.md
       - Addon developers: FOR_ADDON_DEVELOPERS.md
       - Addon quickstart: ADDON_QUICKSTART.md
@@ -133,6 +139,9 @@ exclude_docs: |
   # trees (which are not published); it is meaningless to operators and its
   # links resolve into unpublished pages, so it is kept out of the site.
   /MAP.md
+  # publishing/FRONT_PAGE.md is the tagged storefront source; its edition and
+  # audience blocks are only resolved by scripts/release/build_front_pages.py.
+  /publishing/
 
 # Keep the build honest: internal-only trees are not part of the site, so do
 # not warn about them being absent from nav.
@@ -143,6 +152,3 @@ not_in_nav: |
   /assets/
   /site/README.md
   /site/index.md
-  /FRONT_PAGE*.md
-  /FRONT_PAGE*.bbcode
-  /FRONT_PAGE_LITE_MODRINTH.md

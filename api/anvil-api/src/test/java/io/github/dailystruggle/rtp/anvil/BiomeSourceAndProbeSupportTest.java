@@ -154,16 +154,15 @@ class BiomeSourceAndProbeSupportTest {
   }
 
   @Test
-  @DisplayName("AnvilChunkView query methods: isAir, isSafe, getSurfaceHeight, and minHeight")
+  @DisplayName("AnvilChunkView query methods: isAir, isSafe, and minHeight")
   void testAnvilChunkViewQueries() {
     PaletteSection sec0 = new PaletteSection(0, java.util.List.of("minecraft:stone", "minecraft:air", "minecraft:lava"), new long[4]);
     PaletteSection sec1 = new PaletteSection(1, java.util.List.of("minecraft:bedrock"), new long[4]);
 
-    AnvilChunkView view = new AnvilChunkView(2975, java.util.List.of(sec0, sec1), new long[37]);
+    AnvilChunkView view = new AnvilChunkView(2975, java.util.List.of(sec0, sec1));
     assertEquals(0, view.minHeight());
     assertEquals(2975, view.dataVersion());
     assertEquals(2, view.sections().size());
-    assertEquals(37, view.motionBlockingNoLeaves().length);
     assertTrue(view.biomeSections().isEmpty());
 
     // Out of section Y returns null blockId, treated as air and safe
@@ -184,9 +183,8 @@ class BiomeSourceAndProbeSupportTest {
     assertTrue(view.isAir(0, 0, 0, java.util.Set.of("STONE"))); // STONE counted as passable
 
     // View with empty sections
-    AnvilChunkView emptyView = new AnvilChunkView(2975, java.util.Collections.emptyList(), null);
+    AnvilChunkView emptyView = new AnvilChunkView(2975, java.util.Collections.emptyList());
     assertEquals(0, emptyView.minHeight());
-    assertEquals(0, emptyView.getSurfaceHeight(0, 0));
     assertTrue(emptyView.isAir(0, 0, 0));
     assertTrue(emptyView.isSafe(0, 0, 0, java.util.Set.of("LAVA")));
     assertNull(emptyView.getBiomeAt(0, 0, 0));

@@ -14,7 +14,7 @@ escaneamentoAtivo: "&c[P0] já existe uma tarefa de escaneamento em andamento pa
 escaneamentoNaoAtivo: "&c[P0] não há tarefa de escaneamento em andamento para as regiões: [scan_regions]"
 
 # espaços reservados: [scan_chunks], [scan_totalChunks], [scan_cps], [scan_landPercentage], [scan_eta]
-estadoEscaneamento: "[P0] &8» &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 terra &8| &7ETA #7E9CC8[scan_eta]"
+estadoEscaneamento: "[P0] &8> &7[scan_regions] &8| &7[scan_chunks]&8/&7[scan_totalChunks] &8| #7E9CC8[scan_cps]&7 cps &8| #7E9CC8[scan_landPercentage]%&7 terra &8| &7ETA #7E9CC8[scan_eta]"
 
 # Título da boss-bar exibido aos jogadores com permissão rtp.scan enquanto a varredura do mundo está em andamento.
 # Defina como uma cadeia vazia para desativar a boss-bar.
@@ -216,6 +216,7 @@ menuAdminPanelHint: "&7click an option; destructive actions show a warning hover
 
 # Divisores de seção no painel de administração. Sem espaços reservados.
 menuAdminPanelSectionConfig: "&8--- &7configuração &8---"
+menuAdminPanelSectionDocs: "&8--- &7documentação e editor &8---"
 menuAdminPanelSectionDiagnostics: "&8--- &7diagnósticos &8---"
 menuAdminPanelSectionLifecycle: "&8--- &7ciclo de vida &8---"
 menuAdminPanelSectionBrowse: "&8--- &7navegar &8---"
@@ -223,6 +224,10 @@ menuAdminPanelSectionBrowse: "&8--- &7navegar &8---"
 # Linhas do painel de administração + tooltips. Sem espaços reservados.
 menuAdminPanelRowConfig: "&b▶ editor de configuração"
 menuAdminPanelHoverConfig: "&7abrir o seletor de configuração curado"
+menuAdminPanelRowDocs: "#5FB3B3▶ documentação"
+menuAdminPanelHoverDocs: "&7abrir os manuais de documentação integrados no jogo"
+menuAdminPanelRowEditor: "#5FB3B3▶ editor web e manual"
+menuAdminPanelHoverEditor: "&7iniciar uma sessão efêmera de editor web com documentação integrada"
 menuAdminPanelRowRegions: "#5FB3B3▶ regiões"
 menuAdminPanelHoverRegions: "&7adicionar, remover ou editar configurações por região"
 menuAdminPanelRowWorlds: "#5FB3B3▶ mundos"
@@ -403,11 +408,11 @@ mapResolverMissing: "&c[P0] nenhum resolvedor de gráficos registrado para esta 
 # Enviado quando um resolvedor é executado, mas a fonte de dados subjacente não está disponível
 # para o alvo solicitado (região desconhecida, ainda sem dados, mundo descarregado).
 # Espaço reservado: [region] - o nome da região solicitada (pode estar vazio).
-mapUnavailable: "&e[P1] os dados do gráfico não estão disponíveis no momento."
+mapUnavailable: "&e[P0] os dados do gráfico não estão disponíveis no momento."
 
 # Enviado quando o serviço de mapas não pode alocar um mapa no momento (ex.: limite
 # por visualizador atingido).
-mapBusy: "&e[P1] o serviço de mapas está ocupado; tente novamente em breve."
+mapBusy: "&e[P0] o serviço de mapas está ocupado; tente novamente em breve."
 
 # Rótulo para a linha clicável do menu \"/rtp info\" que renderiza um mapa térmico dos
 # locais inseguros conhecidos da região atual. Oculto se a renderização de mapas não
@@ -477,6 +482,35 @@ multiconfigResultNameInvalid: "&co nome '[name]' não é permitido; use letras, 
 # Mensagem de resultado quando uma ADIÇÃO colide com um nome de entrada existente.
 # Espaço reservado: [name].
 multiconfigResultNameTaken: "&cjá existe uma entrada chamada '[name]'."
+
+docsNotFound: "&c[RTP] Tópico de documentação '[topic]' não encontrado. Use /rtp docs list para ver os tópicos disponíveis."
+docsEmpty: "&c[RTP] Não há tópicos de documentação registrados no momento."
+docsExportSuccess: "&a[RTP] Pacote HTML da documentação exportado com sucesso para [path]."
+docsExportFailed: "&c[RTP] Falha ao exportar pacote de documentação: [reason]."
+
+# --- Web editor channel (ADR-106) ---
+editorTrustPrompt: "&e[P0] Uma página do editor web pede acesso com o código &b[nonce]&e. Se a sua página mostrar o mesmo código, clique aqui para confiar neste navegador."
+editorTrustPromptHover: "&7/rtp editor trust nonce=[nonce] &8(chave [fingerprint])"
+editorTrustAccepted: "&a[P0] Navegador confiável: a página do editor com o código [nonce] já pode pré-visualizar e usar Hot-Apply."
+editorTrustAlready: "&7[P0] O navegador com o código [nonce] já era confiável."
+editorTrustUnknown: "&c[P0] Nenhuma sessão aberta do editor emitiu o código [nonce]."
+editorTrustExpired: "&c[P0] O código [nonce] expirou. Recarregue a página do editor para obter um novo."
+editorTrustUsage: "&c[P0] Uso: /rtp editor trust nonce=<código mostrado pela página do editor>"
+editorChannelOpened: "&a[P0] Canal do editor web aberto. Confie no seu navegador quando solicitado para ativar as pré-visualizações e o Hot-Apply."
+editorChannelLost: "&e[P0] Canal do editor web perdido: [reason]. A página continua a funcionar a partir do seu instantâneo."
+editorChannelExpired: "&7[P0] O canal do editor web expirou após [minutes] minutos. Execute novamente o comando do editor para continuar."
+editorTrustRateLimited: "&c[P0] Muitos códigos de confiança do editor incorretos. Aguarde um minuto e tente novamente."
+editorUntrustUsage: "&c[P0] Uso: /rtp editor untrust key=<prefixo da impressão digital, pelo menos 4 caracteres | all>"
+editorUntrustRemoved: "&a[P0] Confiança removida de [count] navegador(es) do editor web; eles precisam ser confiados de novo para pré-visualizar ou usar Hot-Apply."
+editorUntrustNone: "&7[P0] Nenhum navegador confiável do editor corresponde a [key]."
+editorUntrustFailed: "&c[P0] Não foi possível atualizar a lista de editores confiáveis: [reason]"
+editorApplyDigestMissing: "&c[P0] O payload do editor não tem checksum sha256, por isso não foi aplicado. Confirme novamente a partir de uma página do editor atualizada."
+editorApplyFileUnreadable: "&e[P0] Não foi possível ler o arquivo de aplicação offline ([reason]); tentando o armazenamento de bytes."
+editorApplyUsage: "&c[P0] Uso: /rtp editor apply token=<token>"
+editorApplyFetching: "&7[P0] Obtendo o payload de configuração..."
+editorApplyValidating: "&7[P0] Validando a integridade e a sintaxe do payload..."
+editorApplySuccess: "&a[P0] Configuração aplicada e recarregada a quente! (cópias .bak criadas para os arquivos modificados)"
+editorApplyFailed: "&c[P0] Não foi possível aplicar o payload: [reason]"
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

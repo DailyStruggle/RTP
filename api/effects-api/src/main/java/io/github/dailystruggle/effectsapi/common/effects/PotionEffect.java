@@ -63,8 +63,8 @@ public class PotionEffect extends Effect<PotionEffect.PotionKeys> {
 
     @Override
     public String toPermission() {
-        return data.get(PotionKeys.TYPE).toString().replaceAll("\\.*", "") +
-               data.get(PotionKeys.DURATION).toString().replaceAll("\\.*", "") +
-               data.get(PotionKeys.AMPLIFIER).toString().replaceAll("\\.*", "");
+        return data.get(PotionKeys.TYPE).toString().replace(".", "") +
+               data.get(PotionKeys.DURATION).toString().replace(".", "") +
+               data.get(PotionKeys.AMPLIFIER).toString().replace(".", "");
     }
 }

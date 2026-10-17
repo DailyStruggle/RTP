@@ -3,11 +3,13 @@ package io.github.dailystruggle.rtp.neoforge.world;
 import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
+import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.world.BiomeOverride;
 import io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter;
 import io.github.dailystruggle.rtp.neoforge.version.NeoForgeVersionAdapter;
 import io.github.dailystruggle.rtp.neoforge.version.NeoForgeVersionAdapterRegistry;
@@ -168,12 +170,25 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public CompletableFuture<Long> getChunkAt(int chunkX, int chunkZ) {
+        return resolveChunkKey(chunkX, chunkZ, true);
+    }
+
+    /**
+     * ADR-110: resident chunk or region-file view only; {@code null} where only a native load
+     * (or generation) could answer.
+     */
+    @Override
+    public CompletableFuture<Long> getChunkIfReadable(int chunkX, int chunkZ) {
+        return resolveChunkKey(chunkX, chunkZ, false);
+    }
+
+    private CompletableFuture<Long> resolveChunkKey(int chunkX, int chunkZ, boolean allowLive) {
         final long key = ((long) chunkX & 0xffffffffL) | ((long) chunkZ << 32);
 
         if (shouldPrefilter(chunkX, chunkZ)) {
             ServerLevel probeLevel = world;
-            MinecraftServer probeServer = (probeLevel != null) ? probeLevel.getServer() : null;
-            if (probeLevel != null && probeServer != null) {
+            if (probeLevel != null) {
+                MinecraftServer probeServer = probeLevel.getServer();
                 java.nio.file.Path worldFolder;
                 try {
                     worldFolder = probeServer.getWorldPath(LevelResource.ROOT);
@@ -199,12 +214,15 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                                     }
                                     return CompletableFuture.completedFuture(key);
                                 }
-                                return loadLiveChunk(chunkX, chunkZ, key);
+                                return allowLive
+                                        ? loadLiveChunk(chunkX, chunkZ, key)
+                                        : CompletableFuture.completedFuture(null);
                             });
                 }
             }
         }
 
+        if (!allowLive && !isChunkLoaded(chunkX, chunkZ)) return CompletableFuture.completedFuture(null);
         return loadLiveChunk(chunkX, chunkZ, key);
     }
 
@@ -259,64 +277,8 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
             return result;
         }
 
-        final int inFlightNow = liveLoadInFlight.incrementAndGet();
-        totalChunkLoads.incrementAndGet();
-
-        // Trace the live-load dispatch end to end at FINER: whether the
-        // server.execute runnable runs on the tick thread, what the adapter
-        // handed back, and whether the chunk future ultimately resolves.
         final long dispatchStartNanos = System.nanoTime();
-        RTP.log(java.util.logging.Level.FINER,
-                "[RTP][NeoForge] dispatch SUBMIT world=" + name
-                        + " chunk=(" + chunkX + "," + chunkZ + ") inFlight=" + inFlightNow
-                        + " serverThread.isSameThread=" + server.isSameThread());
-
-        CompletableFuture<CompletableFuture<ChunkAccess>> bridge = new CompletableFuture<>();
-        server.execute(() -> {
-            RTP.log(java.util.logging.Level.FINER,
-                    "[RTP][NeoForge] dispatch RUN (on tick thread) world=" + name
-                            + " chunk=(" + chunkX + "," + chunkZ + ") waitedMs="
-                            + ((System.nanoTime() - dispatchStartNanos) / 1_000_000L));
-            try {
-                CompletableFuture<ChunkAccess> adapterFuture = adapter.requestFullChunkAsync(world, chunkX, chunkZ);
-                RTP.log(java.util.logging.Level.FINER,
-                        "[RTP][NeoForge] adapter.requestFullChunkAsync RETURNED future="
-                                + (adapterFuture == null ? "null" : "id@" + System.identityHashCode(adapterFuture)
-                                        + " done=" + adapterFuture.isDone())
-                                + " world=" + name + " chunk=(" + chunkX + "," + chunkZ + ")");
-                if (adapterFuture != null) {
-                    adapterFuture.whenComplete((ca, ex) -> RTP.log(java.util.logging.Level.FINER,
-                            "[RTP][NeoForge] adapter future COMPLETE world=" + name
-                                    + " chunk=(" + chunkX + "," + chunkZ + ") chunk="
-                                    + (ca == null ? "null" : ca.getClass().getSimpleName())
-                                    + (ex == null ? "" : " ex=" + ex.getClass().getSimpleName() + ":" + ex.getMessage())
-                                    + " elapsedMs=" + ((System.nanoTime() - dispatchStartNanos) / 1_000_000L)));
-                }
-                bridge.complete(adapterFuture);
-            } catch (Throwable t) {
-                RTP.log(java.util.logging.Level.WARNING,
-                        "[RTP][NeoForge] adapter.requestFullChunkAsync THREW world=" + name
-                                + " chunk=(" + chunkX + "," + chunkZ + "): "
-                                + t.getClass().getSimpleName() + ": " + t.getMessage());
-                bridge.completeExceptionally(t);
-            }
-        });
-        // NO short pre-dispatch timeout here. The bridge only completes once the
-        // server.execute runnable actually runs on the tick thread and returns
-        // the adapter's (pending) chunk future. A previous bridge.orTimeout(1_500ms)
-        // failed the whole load whenever the tick thread was momentarily behind:
-        // when the server logs "Running NNNNms behind" (e.g. first-chunk worldgen
-        // bursts), the execute runnable cannot start within 1.5s, so the bridge
-        // timed out and PregenTask attributed a spurious TimeoutException - L1
-        // never promoted and /rtp never landed. The proven Fabric 26.1 carrier has
-        // no such short pre-dispatch deadline; the only deadline is the generation
-        // bound below. We rely solely on the LIVE_LOAD_DEADLINE_MS deadline applied
-        // to the composed chain, which still bounds a genuinely dead dispatch.
-        CompletableFuture<ChunkAccess> dispatch =
-                bridge.thenCompose(f -> f == null ? CompletableFuture.completedFuture(null) : f);
-        dispatch = dispatch.orTimeout(LIVE_LOAD_DEADLINE_MS, TimeUnit.MILLISECONDS);
-        dispatch.whenComplete((chunk, error) -> {
-            liveLoadInFlight.decrementAndGet();
+        dispatchFullChunk(server, adapter, chunkX, chunkZ).whenComplete((chunk, error) -> {
             inFlightLiveLoads.remove(key, result);
             if (error != null) {
                 Throwable cause = (error instanceof CompletionException && error.getCause() != null)
@@ -372,6 +334,80 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
             result.complete(key);
         });
         return result;
+    }
+
+    /**
+     * Native-load dispatch for {@link #loadLiveChunk}:
+     * hops onto the tick thread, issues the adapter's non-blocking FULL request (S-005) and
+     * bounds the chain by {@link #LIVE_LOAD_DEADLINE_MS}. Counts one {@code totalChunkLoads}.
+     * Stores nothing; callers decide whether the chunk is cached.
+     */
+    private CompletableFuture<ChunkAccess> dispatchFullChunk(
+            MinecraftServer server, NeoForgeVersionAdapter adapter, int chunkX, int chunkZ) {
+        final int inFlightNow = liveLoadInFlight.incrementAndGet();
+        totalChunkLoads.incrementAndGet();
+
+        // Trace the live-load dispatch end to end at FINER: whether the
+        // server.execute runnable runs on the tick thread, what the adapter
+        // handed back, and whether the chunk future ultimately resolves.
+        final long dispatchStartNanos = System.nanoTime();
+        RTP.log(java.util.logging.Level.FINER,
+                "[RTP][NeoForge] dispatch SUBMIT world=" + name
+                        + " chunk=(" + chunkX + "," + chunkZ + ") inFlight=" + inFlightNow
+                        + " serverThread.isSameThread=" + server.isSameThread());
+
+        CompletableFuture<CompletableFuture<ChunkAccess>> bridge = new CompletableFuture<>();
+        Runnable dispatchOnTick = () -> {
+            RTP.log(java.util.logging.Level.FINER,
+                    "[RTP][NeoForge] dispatch RUN (on tick thread) world=" + name
+                            + " chunk=(" + chunkX + "," + chunkZ + ") waitedMs="
+                            + ((System.nanoTime() - dispatchStartNanos) / 1_000_000L));
+            try {
+                CompletableFuture<ChunkAccess> adapterFuture = adapter.requestFullChunkAsync(world, chunkX, chunkZ);
+                RTP.log(java.util.logging.Level.FINER,
+                        "[RTP][NeoForge] adapter.requestFullChunkAsync RETURNED future="
+                                + (adapterFuture == null ? "null" : "id@" + System.identityHashCode(adapterFuture)
+                                        + " done=" + adapterFuture.isDone())
+                                + " world=" + name + " chunk=(" + chunkX + "," + chunkZ + ")");
+                if (adapterFuture != null) {
+                    adapterFuture.whenComplete((ca, ex) -> RTP.log(java.util.logging.Level.FINER,
+                            "[RTP][NeoForge] adapter future COMPLETE world=" + name
+                                    + " chunk=(" + chunkX + "," + chunkZ + ") chunk="
+                                    + (ca == null ? "null" : ca.getClass().getSimpleName())
+                                    + (ex == null ? "" : " ex=" + ex.getClass().getSimpleName() + ":" + ex.getMessage())
+                                    + " elapsedMs=" + ((System.nanoTime() - dispatchStartNanos) / 1_000_000L)));
+                }
+                bridge.complete(adapterFuture);
+            } catch (Throwable t) {
+                RTP.log(java.util.logging.Level.WARNING,
+                        "[RTP][NeoForge] adapter.requestFullChunkAsync THREW world=" + name
+                                + " chunk=(" + chunkX + "," + chunkZ + "): "
+                                + t.getClass().getSimpleName() + ": " + t.getMessage());
+                bridge.completeExceptionally(t);
+            }
+        };
+        // A rejected submit (server stopping) fails the bridge so the in-flight count and the
+        // callers' futures still settle.
+        try {
+            server.execute(dispatchOnTick);
+        } catch (Throwable rejected) {
+            bridge.completeExceptionally(rejected);
+        }
+        // NO short pre-dispatch timeout here. The bridge only completes once the
+        // server.execute runnable actually runs on the tick thread and returns
+        // the adapter's (pending) chunk future. A previous bridge.orTimeout(1_500ms)
+        // failed the whole load whenever the tick thread was momentarily behind:
+        // when the server logs "Running NNNNms behind" (e.g. first-chunk worldgen
+        // bursts), the execute runnable cannot start within 1.5s, so the bridge
+        // timed out and PregenTask attributed a spurious TimeoutException - L1
+        // never promoted and /rtp never landed. The proven Fabric 26.1 carrier has
+        // no such short pre-dispatch deadline; the only deadline is the generation
+        // bound below. We rely solely on the LIVE_LOAD_DEADLINE_MS deadline applied
+        // to the composed chain, which still bounds a genuinely dead dispatch.
+        CompletableFuture<ChunkAccess> dispatch =
+                bridge.thenCompose(f -> f == null ? CompletableFuture.completedFuture(null) : f);
+        return dispatch.orTimeout(LIVE_LOAD_DEADLINE_MS, TimeUnit.MILLISECONDS)
+                .whenComplete((chunk, error) -> liveLoadInFlight.decrementAndGet());
     }
 
     @Override
@@ -456,19 +492,11 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         final int finalMinY = minY;
         final int finalMaxY = maxY;
 
-        return CompletableFuture.supplyAsync(() -> {
+        // Coalesced on AnvilIoPool: pending probes for one r.X.Z.mca share one open (S-005).
+        return io.github.dailystruggle.rtp.anvil.AnvilPrefilter.probeColumnAsync(
+                worldFolder, dim, cx, cz, finalMinY, finalMaxY).handle((probe, err) -> {
             try {
-                java.nio.file.Path regionFile =
-                    io.github.dailystruggle.rtp.anvil.AnvilPrefilter
-                        .regionFileFor(worldFolder, dim, cx, cz);
-                byte[] regionBytes =
-                    io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
-                if (regionBytes == null) return null;
-                int rx = Math.floorMod(cx, 32);
-                int rz = Math.floorMod(cz, 32);
-                io.github.dailystruggle.rtp.anvil.ColumnProbe probe =
-                    io.github.dailystruggle.rtp.anvil.AnvilReader.readColumnProbe(
-                        regionBytes, rx, rz, finalMinY, finalMaxY);
+                if (err != null) throw err;
                 if (probe == null) return null;
                 return ChunkColumnProbe.of(new AnvilColumnProbeAdapter(probe, cx, cz,
                     s -> (RTP.serverAccessor != null)
@@ -481,7 +509,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                         + t.getClass().getSimpleName() + ": " + t.getMessage());
                 return null;
             }
-        }, io.github.dailystruggle.rtp.anvil.AnvilIoPool.get());
+        });
     }
 
     @Override
@@ -502,37 +530,97 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                 io.github.dailystruggle.rtp.anvil.AnvilPrefilter
                     .regionFileFor(worldFolder, dim, rcx << 5, rcz << 5);
             if (regionFile == null) return java.util.Collections.emptyMap();
-            byte[] regionBytes =
-                io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
-            if (regionBytes == null) return java.util.Collections.emptyMap();
-            java.util.HashMap<Long, String> out = new java.util.HashMap<>(1024);
-            for (int rx = 0; rx < 32; rx++) {
-                for (int rz = 0; rz < 32; rz++) {
-                    try {
-                        io.github.dailystruggle.rtp.anvil.AnvilChunkView view =
-                            io.github.dailystruggle.rtp.anvil.AnvilReader.readChunkView(
-                                regionBytes, rx, rz);
-                        if (view == null) continue;
-                        String raw = view.getBiomeAt(8, y, 8);
-                        if (raw == null) continue;
-                        String canonical = canonicaliseBiome(raw);
-                        if (canonical == null || canonical.isEmpty()) continue;
-                        int cx = (rcx << 5) | rx;
-                        int cz = (rcz << 5) | rz;
-                        long key = ((long) cx << 32) | (cz & 0xFFFF_FFFFL);
-                        out.put(key, canonical);
-                    } catch (Throwable ignored) {
-                        // chunk not present / unreadable; skip silently.
-                    }
-                }
-            }
-            return out;
+            // One whole-file read under a pooled-buffer lease.
+            return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.readAllBiomes(
+                regionFile, rcx, rcz, y, NeoForgeRTPWorld::canonicaliseBiome);
         } catch (Throwable t) {
             RTP.log(java.util.logging.Level.FINE,
                 "[RTP] NeoForgeRTPWorld.readBiomesInRegionFile failed for world=" + name
                     + " region=(" + rcx + "," + rcz + "): "
                     + t.getClass().getSimpleName() + ": " + t.getMessage());
             return java.util.Collections.emptyMap();
+        }
+    }
+
+    /** {@inheritDoc} Header + requested-sector read (ADR-104 section 4.6); S-005: off-tick only. */
+    @Override
+    public java.util.Map<Long, String> sampleBiomesInRegionFile(
+            int rcx, int rcz, int y, int[] localIndices) {
+        ServerLevel level = world;
+        if (level == null) return java.util.Collections.emptyMap();
+        try {
+            java.nio.file.Path worldFolder = level.getServer().getWorldPath(LevelResource.ROOT);
+            java.nio.file.Path regionFile =
+                io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(
+                    worldFolder, dimensionRegionSubpath(worldFolder, level), rcx << 5, rcz << 5);
+            if (regionFile == null) return java.util.Collections.emptyMap();
+            return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.sampleBiomesOrThrow(
+                regionFile, rcx, rcz, y, localIndices, NeoForgeRTPWorld::canonicaliseBiome);
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.FINE,
+                "[RTP] NeoForgeRTPWorld.sampleBiomesInRegionFile failed for world=" + name
+                    + " region=(" + rcx + "," + rcz + "): "
+                    + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return java.util.Collections.emptyMap();
+        }
+    }
+
+    @Override
+    public java.nio.file.Path anvilWorldFolder() {
+        ServerLevel level = world;
+        if (level == null) return null;
+        try {
+            return level.getServer().getWorldPath(LevelResource.ROOT);
+        } catch (Throwable t) {
+            // detached level (no server): no world folder
+            return null;
+        }
+    }
+
+    @Override
+    public String anvilDimensionSubpath() {
+        ServerLevel level = world;
+        java.nio.file.Path worldFolder = anvilWorldFolder();
+        if (level == null || worldFolder == null) return "";
+        try {
+            return dimensionRegionSubpath(worldFolder, level);
+        } catch (Throwable t) {
+            return "";
+        }
+    }
+
+    /** {@inheritDoc} S-005: blocking stat, off-tick only. */
+    @Override
+    public long regionFileModifiedMillis(int rcx, int rcz) {
+        ServerLevel level = world;
+        if (level == null) return -1L;
+        try {
+            java.nio.file.Path worldFolder = level.getServer().getWorldPath(LevelResource.ROOT);
+            return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.lastModifiedMillis(
+                io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(
+                    worldFolder, dimensionRegionSubpath(worldFolder, level), rcx << 5, rcz << 5));
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.FINE,
+                "[RTP] NeoForgeRTPWorld.regionFileModifiedMillis failed for world=" + name
+                    + " region=(" + rcx + "," + rcz + "): " + t.getMessage());
+            return -1L;
+        }
+    }
+
+    /** {@inheritDoc} Lists this dimension's region directory; S-005: off-tick only. */
+    @Override
+    public java.util.List<int[]> listRegionFiles() {
+        ServerLevel level = world;
+        if (level == null) return null;
+        try {
+            java.nio.file.Path worldFolder = level.getServer().getWorldPath(LevelResource.ROOT);
+            return io.github.dailystruggle.rtp.anvil.RegionFileResolver.listAnvilRegionCoords(
+                io.github.dailystruggle.rtp.anvil.RegionFileResolver.regionDirectoryFor(
+                    worldFolder, dimensionRegionSubpath(worldFolder, level)));
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.WARNING,
+                "[RTP] NeoForgeRTPWorld.listRegionFiles failed for world=" + name + ": " + t.getMessage(), t);
+            return null;
         }
     }
 
@@ -817,6 +905,11 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public String getBiome(int x, int y, int z) {
+        var override = BiomeOverride.get();
+        if (override != null) {
+            String fromAddon = override.apply(new RTPLocation(this, x, y, z));
+            if (fromAddon != null) return fromAddon;
+        }
         try {
             var holder = world.getBiome(new BlockPos(x, y, z));
             return holder.unwrapKey()

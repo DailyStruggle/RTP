@@ -105,7 +105,7 @@ RTP uses a structured requirements workflow enforced by CI. If you add or modify
 3. **Update `docs/DESIGN.md`** if the requirement introduces a new architectural decision.
 4. **Write or update a test.** For architectural rules, add a rule to `RTPArchitectureTest.java`. For behavioral requirements, add a unit or integration test. For platform-specific behavior that cannot be automated, note `— (manual)` in the Test column.
 
-The CI `Traceability Check` stage runs `check_traceability.sh` before the build and will fail with a list of untraced IDs if step 2 is skipped.
+The CI `Traceability Check` stage runs `scripts/check_traceability.sh` before the build and will fail with a list of untraced IDs if step 2 is skipped.
 
 For the full ID scheme and category reference, see [REQUIREMENTS.md](docs/dev/REQUIREMENTS.md).
 For term definitions used in requirements, see [GLOSSARY.md](docs/dev/GLOSSARY.md).
@@ -113,7 +113,40 @@ For actor and stakeholder context, see [STAKEHOLDERS.md](docs/dev/STAKEHOLDERS.m
 
 ## Pull Requests
 
-A PR template is provided at `.github/PULL_REQUEST_TEMPLATE.md` and will be pre-filled automatically when you open a PR on GitHub.
+Pull requests are the standard mechanism for contributing changes to RTP. For the complete operational guide covering architecture gates, CI pipeline anatomy, and review workflows, see [`docs/dev/PULL_REQUEST_PROCESS.md`](docs/dev/PULL_REQUEST_PROCESS.md).
+
+### Pre-PR Local Verification
+
+Before opening or updating a Pull Request, run the local verification suite:
+
+```sh
+# Format code
+./gradlew spotlessApply
+
+# Validate requirements traceability
+./scripts/check_traceability.sh
+
+# Verify UTF-8 encoding and prevent mojibake
+python scripts/check-mojibake.py
+
+# Verify public API binary compatibility
+./gradlew checkBinaryCompatibility
+
+# Run tests
+./gradlew test
+
+# Validate changed-line coverage (minimum 80% on changed lines)
+python scripts/diff-coverage.py --baseline origin/V3 --min 0.80
+```
+
+### Pull Request Lifecycle
+
+1. **Branch from `V3`:** Active development branches off `V3` (the default branch). Use descriptive prefixes (see table below).
+2. **Implement & Test:** Ensure all changes adhere to S-001..S-007 safety prohibitions. Add unit tests for new behavior.
+3. **Run Pre-PR Checks:** Execute the verification commands above.
+4. **Open Pull Request:** Complete the checklist and descriptions in `.github/PULL_REQUEST_TEMPLATE.md`.
+5. **CI Status Checks:** Ensure both `build-reduced-jdk21` and `build-full` workflows pass in GitHub Actions.
+6. **Code Review:** Address feedback with follow-up commits.
 
 ### Branch Naming
 

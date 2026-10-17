@@ -83,7 +83,7 @@ class CacheNomenclatureGuardTest {
         for (String relative : new String[] {
                 "rtp-core/src/main/java/io/github/dailystruggle/rtp/common/selection/region",
                 "rtp-core/src/main/java/io/github/dailystruggle/rtp/common/commands/admin",
-                "addons/LeafRTPGroupAddon/src/main/java"}) {
+                "addons/LeafRTPActionAddon/src/main/java"}) {
             Path fromRepoRoot = Path.of(relative);
             roots.add(Files.isDirectory(fromRepoRoot) ? fromRepoRoot : Path.of("..").resolve(relative));
         }

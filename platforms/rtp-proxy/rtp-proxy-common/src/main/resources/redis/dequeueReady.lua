@@ -13,7 +13,9 @@
 -- Returns either an empty array {} when the FIFO is empty (race against
 -- another worker after BLPOP), or a flat Lua array of alternating field/value
 -- strings consisting of: { 'correlationId', C, 'playerId', P, 'regionKey', R,
--- 'serverHint', H, 'createdAtMs', T, 'dequeuedAtMs', N }.
+-- 'serverHint', H, 'createdAtMs', T, 'dequeuedAtMs', N, 'hmac', S }. The
+-- player's pending marker is cleared when it still names this cid.
+-- Java verifies the hmac before dispatch.
 local cid = redis.call('LPOP', KEYS[1])
 if not cid then
     return {}
@@ -28,6 +30,7 @@ local pid = ''
 local region = ''
 local hint = ''
 local createdAt = ''
+local hmac = ''
 for j = 1, #env, 2 do
     local k = env[j]
     local v = env[j+1]
@@ -35,6 +38,7 @@ for j = 1, #env, 2 do
     elseif k == 'regionKey' then region = v
     elseif k == 'serverHint' then hint = v
     elseif k == 'createdAtMs' then createdAt = v
+    elseif k == 'hmac' then hmac = v
     end
 end
 local nowMs = ARGV[1]
@@ -47,6 +51,10 @@ if pid ~= '' then
     if ttl > 0 then
         redis.call('EXPIRE', statusKey, ttl)
     end
+    local pendingKey = 'rtp:net:wq:pending:' .. pid
+    if redis.call('GET', pendingKey) == cid then
+        redis.call('DEL', pendingKey)
+    end
 end
 return {
     'correlationId', cid,
@@ -54,5 +62,6 @@ return {
     'regionKey', region,
     'serverHint', hint,
     'createdAtMs', createdAt,
-    'dequeuedAtMs', nowMs
+    'dequeuedAtMs', nowMs,
+    'hmac', hmac
 }

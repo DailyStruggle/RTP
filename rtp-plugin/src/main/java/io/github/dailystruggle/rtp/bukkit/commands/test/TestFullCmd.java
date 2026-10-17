@@ -7,7 +7,7 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandSuccessEvent;
 import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandFailEvent;
@@ -110,6 +110,8 @@ public class TestFullCmd extends BaseRTPCmdImpl {
               "config-set",
               "full",
               "all",
+              // Visual diagnostic: spawns holograms in player world context.
+              "hologram",
               // Player-context diagnostic: needs the caller's live world + origin
               // chunk to seed the A/B timing; the umbrella sweep fires under
               // RTPAPI.serverId which has no location. Runs on-demand only.
@@ -259,31 +261,29 @@ public class TestFullCmd extends BaseRTPCmdImpl {
 
       if (isEvents) {
         try {
-          if (Bukkit.getServer() != null && Bukkit.getPluginManager() != null) {
-            Plugin plugin = Bukkit.getPluginManager().getPlugin("RTP");
-            if (plugin == null) {
-              Plugin[] plugins = Bukkit.getPluginManager().getPlugins();
-              if (plugins != null && plugins.length > 0) {
-                plugin = plugins[0];
-              }
+          Plugin plugin = Bukkit.getPluginManager().getPlugin("RTP");
+          if (plugin == null) {
+            Plugin[] plugins = Bukkit.getPluginManager().getPlugins();
+            if (plugins.length > 0) {
+              plugin = plugins[0];
             }
-            if (plugin != null) {
-              BukkitCommandEvents.register();
-              Listener l =
-                  new Listener() {
-                    @EventHandler
-                    public void onSuccess(TeleportCommandSuccessEvent event) {
-                      successFired.set(true);
-                    }
+          }
+          if (plugin != null) {
+            BukkitCommandEvents.register();
+            Listener l =
+                new Listener() {
+                  @EventHandler
+                  public void onSuccess(TeleportCommandSuccessEvent event) {
+                    successFired.set(true);
+                  }
 
-                    @EventHandler
-                    public void onFail(TeleportCommandFailEvent event) {
-                      failFired.set(true);
-                    }
-                  };
-              tempListenerHolder[0] = l;
-              Bukkit.getPluginManager().registerEvents(l, plugin);
-            }
+                  @EventHandler
+                  public void onFail(TeleportCommandFailEvent event) {
+                    failFired.set(true);
+                  }
+                };
+            tempListenerHolder[0] = l;
+            Bukkit.getPluginManager().registerEvents(l, plugin);
           }
         } catch (Throwable t) {
           // Bukkit environment not available or mock/headless
@@ -709,6 +709,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
    * unknown-player path fires (loudly) if the lookup fails.
    */
   private String resolveName(UUID callerId) {
+    if (callerId == null) return "CONSOLE";
     try {
       var player = RTP.serverAccessor.getPlayer(callerId);
       if (player != null) return player.name();

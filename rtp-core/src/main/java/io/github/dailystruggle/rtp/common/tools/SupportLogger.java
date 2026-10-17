@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import java.util.logging.Level;
 
 public class SupportLogger {
+    private SupportLogger() {}
     public static void logException(Level level, String context, Throwable throwable) {
         String report = "[RTP ERROR REPORT]\n" +
                 "Context: " + context + "\n" +

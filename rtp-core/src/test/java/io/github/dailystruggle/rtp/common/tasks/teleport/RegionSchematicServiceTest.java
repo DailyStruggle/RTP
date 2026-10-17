@@ -17,7 +17,7 @@ import io.github.dailystruggle.rtp.api.schematic.SchematicSource;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabSchematicInstaller;
-import io.github.dailystruggle.rtp.common.commands.prefab.builtin.Skyblock;
+import io.github.dailystruggle.rtp.common.commands.prefab.Skyblock;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import java.io.File;
 import java.io.InputStream;
@@ -94,6 +94,20 @@ class RegionSchematicServiceTest {
     assertTrue(Files.isRegularFile(src.path()));
     // A different region with no file stays on the default platform path.
     assertNull(RegionSchematicService.resolveSource("wild"));
+  }
+
+  @Test
+  @DisplayName("presence answer is reused within the TTL and dropped by invalidateCache")
+  void presenceAnswerIsCachedUntilInvalidated() throws Exception {
+    installFixture("hub");
+    SchematicSource first = RegionSchematicService.resolveSource("hub");
+    assertNotNull(first);
+    Files.delete(first.path());
+    assertSame(first, RegionSchematicService.resolveSource("hub"),
+        "a repeat lookup within the TTL must not touch the file system");
+    RegionSchematicService.invalidateCache();
+    assertNull(RegionSchematicService.resolveSource("hub"),
+        "after invalidation the deleted file is no longer reported");
   }
 
   @Test

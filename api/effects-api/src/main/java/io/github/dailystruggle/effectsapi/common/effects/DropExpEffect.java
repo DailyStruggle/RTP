@@ -40,7 +40,9 @@ public class DropExpEffect extends Effect<DropExpEffect.DropExpKeys> {
     @Override
     public void setData(EnumMap<DropExpKeys, Object> data) {
         if (data == null) return;
-        this.data.putAll(data);
+        EnumMap<DropExpKeys, Object> copy = (this.defaults != null) ? this.defaults.clone() : new EnumMap<>(DropExpKeys.class);
+        copy.putAll(data);
+        this.data = copy;
     }
 
     @Override

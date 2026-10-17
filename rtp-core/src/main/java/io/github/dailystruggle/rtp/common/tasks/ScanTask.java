@@ -34,10 +34,35 @@ import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 /** Task for pre-scanning a region with valid teleport locations */
-public class ScanTask extends RTPRunnable {
+public class ScanTask extends RTPRunnable implements ScanProgressView {
   /** Spark-profiler frame tag (diagram 05). See {@link RTPRunnable#sparkFrameName()}. */
   @Override
   protected String sparkFrameName() { return "rtp_scan_crawler"; }
+
+  @Override
+  public long absolutePos() {
+    return latestAbsolutePos;
+  }
+
+  @Override
+  public long absoluteTotal() {
+    return latestAbsoluteTotal;
+  }
+
+  @Override
+  public long cps() {
+    return latestCps;
+  }
+
+  @Override
+  public double landPercentage() {
+    return latestLandPercentage;
+  }
+
+  @Override
+  public long etaSeconds() {
+    return latestEtaSeconds;
+  }
 
   /** Number of locations to process in each step */
   public final AtomicLong scanIncrement = new AtomicLong(0L);
@@ -64,7 +89,7 @@ public class ScanTask extends RTPRunnable {
   public static final int PHASE_PRESCAN = 0;
   public static final int PHASE_FULLSCAN = 1;
   public static final int PHASE_GENSCAN = 2;
-  private final AtomicInteger scanPhase = new AtomicInteger(PHASE_PRESCAN);
+  final AtomicInteger scanPhase = new AtomicInteger(PHASE_PRESCAN);
 
   /** Whether the task is currently paused */
   public AtomicBoolean pause = new AtomicBoolean(false);
@@ -79,6 +104,10 @@ public class ScanTask extends RTPRunnable {
   // are already guarded (they check isCancelled()/pause and complete false
   // without mutating shape state), so proceeding after the timeout is safe.
   private static final long DRAIN_TIMEOUT_MS = 5_000L;
+
+  // Region name -> latest async cancel/pause teardown; read by ScanStartCmd to refuse a restart mid-teardown.
+  private static final java.util.concurrent.ConcurrentHashMap<String, CompletableFuture<Void>> PENDING_TEARDOWNS =
+          new java.util.concurrent.ConcurrentHashMap<>();
 
   // In-flight chunk-load futures dispatched by runFullLoadPath. Tracked so a
   // cancel/pause can actively cancel them instead of waiting out the per-future
@@ -183,10 +212,21 @@ public class ScanTask extends RTPRunnable {
   // sweep (PRESCAN) is the active phase, and mistake long initial runtimes for
   // a stalled fullscan. Logged once per run() entry when phase==PRESCAN.
   private final AtomicBoolean prescanAnnounced = new AtomicBoolean(false);
-  private final AtomicBoolean fullscanAnnounced = new AtomicBoolean(false);
-  private final AtomicBoolean genscanAnnounced = new AtomicBoolean(false);
 
   private long lastSaveTime = 0;
+
+  // Status-window origin for the reported cps/ETA: wall time and spiral position. A single
+  // batch is ~1 region file, so its rate swings 20x between a cold and a warm .mca read.
+  private volatile long statusWindowStartMs = -1L;
+  private volatile long statusWindowStartPos = 0L;
+
+  public long getStatusWindowStartMs() {
+    return statusWindowStartMs;
+  }
+
+  public void resetStatusWindow() {
+    statusWindowStartMs = -1L;
+  }
 
   private BigInteger cps_all = BigInteger.ZERO;
   private BigInteger cps_divisor = BigInteger.ZERO;
@@ -227,10 +267,9 @@ public class ScanTask extends RTPRunnable {
     // When resuming mid-FULLSCAN with scanIter persisted as 0 (fresh Pass 2),
     // the Pass 1 bad-location bitmap must be preserved so Pass 2 can skip
     // positions already marked bad.
-    if(start == 0 && (scanPhase.get() == PHASE_PRESCAN || scanPhase.get() == PHASE_GENSCAN)) {
-      if (region.shape instanceof MemoryShape<?> memoryShape) {
-        memoryShape.clear();
-      }
+    if (start == 0 && (scanPhase.get() == PHASE_PRESCAN || scanPhase.get() == PHASE_GENSCAN)
+        && region.shape instanceof MemoryShape<?> memoryShape) {
+      memoryShape.clear();
     }
   }
 
@@ -298,19 +337,8 @@ public class ScanTask extends RTPRunnable {
     // Phase transitions already log in wrapUpBatch; this covers the initial
     // entry into a phase (fresh start, resume after pause, or resume after
     // restart with a persisted phase).
-    int currentPhase = scanPhase.get();
-    if (currentPhase == PHASE_GENSCAN) {
-      if (genscanAnnounced.compareAndSet(false, true)) {
-        RTP.log(Level.INFO, "[RTP] starting genscan (chunk-generation sweep; anvil prefilter bypassed for ungenerated areas) for region=" + region.name);
-      }
-    } else if (currentPhase == PHASE_PRESCAN) {
-      if (prescanAnnounced.compareAndSet(false, true)) {
-        RTP.log(Level.INFO, "[RTP] starting prescan (anvil probe sweep) for region=" + region.name);
-      }
-    } else if (currentPhase == PHASE_FULLSCAN) {
-      if (fullscanAnnounced.compareAndSet(false, true)) {
-        RTP.log(Level.INFO, "[RTP] starting fullscan (full-load verification pass) for region=" + region.name);
-      }
+    if (prescanAnnounced.compareAndSet(false, true)) {
+      RTP.log(Level.INFO, "[RTP] starting scan (hybrid MCA off-tick / full-load generation) for region=" + region.name);
     }
 
     if (pause.get() || isCancelled() || scanIncrement.get() <= 0) {
@@ -394,12 +422,8 @@ public class ScanTask extends RTPRunnable {
     long range = shape.getRange();
     long pos;
     long limit = scanIncrement.get();
-    long stride = Math.max(1L, (shape instanceof MemoryShape<?> ms) ? ms.minBridgingStride() : shape.spatialResolution());
     long currentStart = scanIter.get();
-    if (currentStart == 0) {
-      currentStart = currentOffset;
-    }
-    long limitEnd = currentStart + (limit * stride);
+    long limitEnd = Math.min(range, currentStart + limit);
     MutableRTPCoords cursor = new MutableRTPCoords(0, 0);
     cursor.setWorldName(region.getWorld().name());
 
@@ -416,15 +440,22 @@ public class ScanTask extends RTPRunnable {
     // binHeaders value: {count, capacity} tracking per-bin fill; initial capacity 64, grows 2x.
 
     pos = currentStart;
-    while (pos < range && pos < limitEnd) {
+    while (pos < limitEnd) {
       if (pause.get() || isCancelled()) {
         break;
       }
       if (shape.isKnownBad(pos) && shape.biomeAt(pos) != null) {
-        pos += stride;
+        pos++;
         continue;
       }
       shape.locationToXZ(pos, cursor);
+      // Circumscribing key spaces (dual-layer circle: square rings) hold keys outside the shape.
+      // Skip them unrecorded: marking them bad would feed expand's learned bad area and grow the
+      // effective radius for land that was never selectable.
+      if (!shape.contains(cursor.x, cursor.z)) {
+        pos++;
+        continue;
+      }
       long key = (((long) (cursor.x >> 5)) << 32) | ((cursor.z >> 5) & 0xFFFFFFFFL);
       long[] header = binHeaders.get(key);
       long[] positions;
@@ -465,7 +496,7 @@ public class ScanTask extends RTPRunnable {
       cxArr[count] = cursor.x;
       czArr[count] = cursor.z;
       header[0] = count + 1L;
-      pos += stride;
+      pos++;
     }
 
     // Dispatch bin-by-bin: one full region file's worth of candidates completes before the next
@@ -492,6 +523,10 @@ public class ScanTask extends RTPRunnable {
           break outer;
         }
         final long currentPos = positions[bi];
+        if (shape.isKnownBad(currentPos)) {
+          scanBadCount.incrementAndGet();
+          continue;
+        }
         int centerBlockX = (cxArr[bi] << 4) + 8;
         int centerBlockZ = (czArr[bi] << 4) + 8;
 
@@ -514,7 +549,7 @@ public class ScanTask extends RTPRunnable {
           posFuture.whenComplete((res, err) -> {
             inFlight.decrementAndGet();
             inFlightGate.release();
-            if (err == null && res != null && scanPhase.get() != PHASE_GENSCAN) {
+            if (err == null && res != null) {
               if (res) scanGoodCount.incrementAndGet();
               else scanBadCount.incrementAndGet();
             }
@@ -527,9 +562,7 @@ public class ScanTask extends RTPRunnable {
           // deterministic, so re-rolling onto the same chunk produces the same placement and
           // the same failure. Mark the twin spiral index too.
           shape.addBadChunk(currentPos);
-          if (scanPhase.get() != PHASE_GENSCAN) {
-            scanBadCount.incrementAndGet();
-          }
+          scanBadCount.incrementAndGet();
           RTP.log(Level.WARNING, "Synchronous calculation failure at " + currentPos, e);
         }
       }
@@ -570,44 +603,41 @@ public class ScanTask extends RTPRunnable {
       cps_divisor = cps_divisor.add(increment_big);
       cps.set((cps.get() * 7 / 8) + cps_local / 8);
 
-      long etaSeconds = getEtaSeconds(range, finalPos1, shape, cps_local);
+      if (statusWindowStartMs < 0 || finalPos1 < statusWindowStartPos) {
+        statusWindowStartMs = timingStart;
+        statusWindowStartPos = scanIter.get();
+      }
+      long windowMs = Math.max(1L, System.currentTimeMillis() - statusWindowStartMs);
+      long windowCps = Math.max(0L, finalPos1 - statusWindowStartPos) * 1000L / windowMs;
+
+      long etaSeconds = getEtaSeconds(range, finalPos1, shape, windowCps);
 
       // --- LAND PERCENTAGE CALCULATION ---
       // Derived from scanGoodCount / (scanGoodCount + scanBadCount) accumulated
-      // during PRESCAN/FULLSCAN. MemoryShape.getEffectiveBadCount() is not used
+      // during the scan. MemoryShape.getEffectiveBadCount() is not used
       // directly as a numerator or subtractor against finalPos1 because totalBadCount
       // includes gap-bridged runs and outer-ring preimages that can exceed finalPos1.
       double landPercentage;
-      int phaseNow = scanPhase.get();
-      if (phaseNow == PHASE_GENSCAN) {
-        landPercentage = 0.0;
-      } else {
-        long good = scanGoodCount.get();
-        long bad = scanBadCount.get();
-        double totalEvaluated = (double) good + bad;
-        landPercentage = (totalEvaluated > 0.0) ? (good * 100.0 / totalEvaluated) : 0.0;
-      }
+      long good = scanGoodCount.get();
+      long bad = scanBadCount.get();
+      double totalEvaluated = (double) good + bad;
+      landPercentage = (totalEvaluated > 0.0) ? (good * 100.0 / totalEvaluated) : 0.0;
       this.latestLandPercentage = landPercentage;
       // ------------------------------------
 
-      long stride = Math.max(1L, (shape instanceof MemoryShape<?> ms) ? ms.minBridgingStride() : shape.spatialResolution());
-      this.latestAbsolutePos = ((currentOffset * range) + finalPos1) / stride;
+      this.latestAbsolutePos = finalPos1;
       this.latestAbsoluteTotal = range;
-      this.latestCps = cps_local;
+      this.latestCps = windowCps;
       this.latestEtaSeconds = etaSeconds;
 
       long now = System.currentTimeMillis();
       if (now - lastSaveTime > 5000 || finalPos1 >= range || pause.get() || isCancelled()) {
         shape.flushAndRebuild(shape.spatialResolution());
 
-        if (phaseNow == PHASE_GENSCAN) {
-          landPercentage = 0.0;
-        } else {
-          long good = scanGoodCount.get();
-          long bad = scanBadCount.get();
-          double totalEvaluated = (double) good + bad;
-          landPercentage = (totalEvaluated > 0.0) ? (good * 100.0 / totalEvaluated) : 0.0;
-        }
+        good = scanGoodCount.get();
+        bad = scanBadCount.get();
+        totalEvaluated = (double) good + bad;
+        landPercentage = (totalEvaluated > 0.0) ? (good * 100.0 / totalEvaluated) : 0.0;
         this.latestLandPercentage = landPercentage;
 
         RTP.log(Level.FINE, "[ScanTask] checkpoint region=" + region.name
@@ -615,6 +645,8 @@ public class ScanTask extends RTPRunnable {
                 + " cps=" + cps_local + " etaSec=" + etaSeconds
                 + " land%=" + String.format("%.2f", landPercentage));
         lastSaveTime = now;
+        statusWindowStartMs = now;
+        statusWindowStartPos = finalPos1;
 
         // Concurrency gauge: observed peak in-flight probes this window vs the
         // MAX_PENDING_CHUNKS cap. peak well below cap => driver-loop serialization (root-cause fix is driver
@@ -640,7 +672,7 @@ public class ScanTask extends RTPRunnable {
           msg = msg.replace("[region]", region.name);
           msg = msg.replace("[scan_chunks]", String.valueOf(this.latestAbsolutePos));
           msg = msg.replace("[scan_totalChunks]", String.valueOf(this.latestAbsoluteTotal));
-          msg = msg.replace("[scan_cps]", String.valueOf(cps_local));
+          msg = msg.replace("[scan_cps]", String.valueOf(windowCps));
           msg = msg.replace("[scan_landPercentage]", String.format(java.util.Locale.ROOT, "%.2f", landPercentage));
           msg = msg.replace("[scan_eta]", io.github.dailystruggle.rtp.common.tools.PlaceholderProvider.formatEta(etaSeconds));
           RTP.serverAccessor.announce(msg, "rtp.scan", "");
@@ -667,70 +699,7 @@ public class ScanTask extends RTPRunnable {
     scanIter.set(finalPos1);
 
     if (finalPos1 >= range) {
-      long strideLimit = Math.max(1L, (shape instanceof MemoryShape<?> ms) ? ms.minBridgingStride() : shape.spatialResolution());
-      if (currentOffset < strideLimit - 1) {
-        currentOffset++;
-        scanIter.set(0);
-        shape.flushAndRebuild(shape.spatialResolution());
-        save();
-        shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
-        shape.exportDebugJson(region.name, region.getWorld().name());
-        isRunning.set(false);
-        if (!isCancelled() && !pause.get()) {
-          RTP.scheduler.runTaskAsynchronously(this);
-        }
-        return;
-      }
-
-      // GENSCAN complete: transition to PRESCAN, or directly to FULLSCAN if ungenerated chunks were found.
-      if (scanPhase.get() == PHASE_GENSCAN) {
-        long ungen = genscanUngeneratedTotal.get();
-        int nextPhase = (ungen > 0L) ? PHASE_FULLSCAN : PHASE_PRESCAN;
-        scanPhase.set(nextPhase);
-        scanGoodCount.set(0L);
-        scanBadCount.set(0L);
-        currentOffset = 0L;
-        scanIter.set(0);
-        shape.flushAndRebuild(shape.spatialResolution());
-        save();
-        shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
-        shape.exportDebugJson(region.name, region.getWorld().name());
-        if (nextPhase == PHASE_FULLSCAN) {
-          RTP.log(Level.INFO, "[RTP] genscan complete for region=" + region.name
-                  + "; ungenerated chunks detected (" + ungen + ") -> skipping prescan, starting full-load verification pass");
-        } else {
-          RTP.log(Level.INFO, "[RTP] genscan complete for region=" + region.name
-                  + "; starting prescan (anvil probe sweep)");
-        }
-        isRunning.set(false);
-        if (!isCancelled() && !pause.get()) {
-          RTP.scheduler.runTaskAsynchronously(this);
-        }
-        return;
-      }
-
-      // Pass 1 / PRESCAN complete -> flip to Pass 2 / FULLSCAN instead of
-      // terminating. Pass 2 re-sweeps every position that Pass 1 did not
-      // mark bad, running runFullLoadPath for authoritative (2r+1)^3
-      // safety verification.
-      if (scanPhase.get() == PHASE_PRESCAN) {
-        scanPhase.set(PHASE_FULLSCAN);
-        scanGoodCount.set(0L);
-        scanBadCount.set(0L);
-        currentOffset = 0L;
-        scanIter.set(0);
-        shape.flushAndRebuild(shape.spatialResolution());
-        save();
-        shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
-        shape.exportDebugJson(region.name, region.getWorld().name());
-        RTP.log(Level.INFO, "[RTP] prescan complete for region=" + region.name
-                + "; starting full-load verification pass");
-        isRunning.set(false);
-        if (!isCancelled() && !pause.get()) {
-          RTP.scheduler.runTaskAsynchronously(this);
-        }
-        return;
-      }
+      RTP.log(Level.INFO, "[RTP] scan complete for region=" + region.name);
 
       RTP.log(Level.FINE, "[ScanTask] scan complete region=" + region.name
               + " finalPos=" + finalPos1 + " range=" + range);
@@ -744,6 +713,9 @@ public class ScanTask extends RTPRunnable {
       // scanCompleted to avoid driving live-load chunk traffic while the
       // pre-generation crawler is still consuming tick-thread budget.
       region.scanCompleted = true;
+      // Scan-time page cache, coalescing and learned rejects no longer describe the fill/consume
+      // paths; let the probe-first governors re-learn (ADR-109).
+      io.github.dailystruggle.rtp.common.selection.region.ProbeFirstGovernor.reset(region.name);
       done.complete(true);
       super.setCancelled(true);
       isRunning.set(false);
@@ -954,12 +926,7 @@ public class ScanTask extends RTPRunnable {
   }
 
   public long getEtaSeconds(long range, long finalPos1, MemoryShape<?> shape, long cpsLocal) {
-    long stride = Math.max(1L, shape.minBridgingStride());
-    long remainingThisPass = Math.max(0L, (range - finalPos1 + stride - 1) / stride);
-    long remainingPasses = Math.max(0L, stride - 1 - currentOffset);
-    long pointsPerPass = Math.max(0L, (range + stride - 1) / stride);
-    long totalRemainingPoints = remainingThisPass + (remainingPasses * pointsPerPass);
-    if (totalRemainingPoints < 0) totalRemainingPoints = 0;
+    long totalRemainingPoints = Math.max(0L, range - finalPos1);
     long effectiveBad = shape.getEffectiveBadCount();
     long totalEvaluated = shape.getEffectiveGoodCount() + effectiveBad;
     double badDensity = (double) effectiveBad / (double) Math.max(1, totalEvaluated);
@@ -1220,75 +1187,40 @@ public class ScanTask extends RTPRunnable {
       int finalSafetyRadius = safetyRadius;
       final int midY = (vert.maxY() + vert.minY()) / 2;
 
-      // Multi-pass scan: PRESCAN uses fast anvil probing; FULLSCAN runs full chunk-load safety verification.
-      if (scanPhase.get() == PHASE_FULLSCAN) {
+      // Chunk-by-chunk decision:
+      // 1. Check if chunk is generated on disk.
+      // 2. If generated, attempt off-tick region-file column probe first.
+      // 3. If ungenerated or probe UNKNOWN / unreadable, route to full-load path.
+      boolean generated = true;
+      try {
+        generated = world.isChunkGenerated(cx, cz);
+        if (generated) {
+          genscanGenerated.incrementAndGet();
+        } else {
+          genscanUngenerated.incrementAndGet();
+          genscanUngeneratedTotal.incrementAndGet();
+        }
+      } catch (Throwable t) {
+        RTP.log(Level.FINE, "[ScanTask] isChunkGenerated threw for world=" + world.name()
+                + " chunk=(" + cx + "," + cz + "): " + t);
+        generated = true;
+        genscanThrew.incrementAndGet();
+      }
+
+      if (!generated) {
+        // Chunk is ungenerated: trigger generation and validation via full load path
         runFullLoadPath(region, world, vert, shape, pos, blockX, blockZ, midY,
                 finalSafetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, res);
         return res;
       }
 
-      // GENSCAN: ensure the chunk is generated on disk before the anvil
-      // prefilter sees it. If the chunk is already generated, skip - PRESCAN
-      // will handle it via the cheap anvil probe. If NOT generated, bypass
-      // the anvil prefilter entirely and run the full load path: chunk
-      // loading will generate the chunk and we authoritatively validate it
-      // in the same I/O so we never load the same chunk twice.
-      if (scanPhase.get() == PHASE_GENSCAN) {
-        boolean generated;
-        try {
-          generated = world.isChunkGenerated(cx, cz);
-          if (generated) {
-            genscanGenerated.incrementAndGet();
-          } else {
-            genscanUngenerated.incrementAndGet();
-            genscanUngeneratedTotal.incrementAndGet();
-          }
-        } catch (Throwable t) {
-          RTP.log(Level.FINE, "[ScanTask] isChunkGenerated threw for world=" + world.name()
-                  + " chunk=(" + cx + "," + cz + "): " + t);
-          // Conservative on error: treat as generated and defer to PRESCAN.
-          generated = true;
-          genscanThrew.incrementAndGet();
-        }
-        if (!generated) {
-          runFullLoadPath(region, world, vert, shape, pos, blockX, blockZ, midY,
-                  finalSafetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, res);
-          return res;
-        }
-        // Already generated - defer to PRESCAN. Complete with `false` so the
-        // caller's gate is released and the position is not counted as good;
-        // crucially, do NOT mark the position bad on the shape so PRESCAN
-        // re-evaluates it via the anvil probe.
-        res.complete(false);
-        return res;
-      }
-
-      // PRESCAN detects ungenerated chunks and switches the scan to FULLSCAN if found.
-      if (scanPhase.get() == PHASE_PRESCAN) {
-        boolean generated = true;
-        try {
-          generated = world.isChunkGenerated(cx, cz);
-        } catch (Throwable t) {
-          RTP.log(Level.FINE, "[ScanTask] isChunkGenerated threw for world=" + world.name()
-                  + " chunk=(" + cx + "," + cz + "): " + t);
-        }
-        if (!generated) {
-          if (scanPhase.compareAndSet(PHASE_PRESCAN, PHASE_FULLSCAN)) {
-            RTP.log(Level.INFO, "[RTP] prescan encountered ungenerated chunk for region="
-                    + region.name + " at (" + cx + "," + cz + ") -> switching to full-load scan");
-          }
-          runFullLoadPath(region, world, vert, shape, pos, blockX, blockZ, midY,
-                  finalSafetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, res);
-          return res;
-        }
-      }
-
-      // Probe-first fast path: evaluate via column probe before loading full chunk.
+      // Chunk is generated: attempt off-tick MCA probe first.
       if (tryProbeFirstScan(region, world, vert, shape, pos, blockX, blockZ,
               finalSafetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, res)) {
         return res;
       }
 
+      // Probe returned UNKNOWN or unsupported: fall through to authoritative full load.
       runFullLoadPath(region, world, vert, shape, pos, blockX, blockZ, midY,
               finalSafetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, res);
       return res;
@@ -1714,19 +1646,96 @@ public class ScanTask extends RTPRunnable {
                         return;
                       }
 
-                      if (pass) pass = GlobalRegionVerifiers.checkGlobalRegionVerifiers(localCursor).join();
-
-                      if (pass) {
+                      // Claim verifiers may complete on another thread: continue from their
+                      // future instead of join()ing, which blocked this tick thread (S-005).
+                      java.util.function.BiConsumer<Boolean, GlobalRegionVerifiers.VerifierCheckResult> finish =
+                          (ok, verResult) -> { try {
+                      if (ok) {
                         fullLoadOutcomeAccept.incrementAndGet();
                         res.complete(true);
                       } else {
-                        // addBadChunk: chunk-uniform - within a chunk the per-column
-                        // selection order is deterministic, so the twin spiral index picks
-                        // the same column and the same (2r+1)^3 safety scan rejects again.
-                        shape.addBadChunk(pos);
+                        boolean claimEncapsulated = false;
+                        if (verResult != null && !verResult.passed()) {
+                          try {
+                            io.github.dailystruggle.rtp.api.hooks.ClaimBoundaryRegistry claimRegistry =
+                                (io.github.dailystruggle.rtp.api.RTPAPI.hooks() != null)
+                                    ? io.github.dailystruggle.rtp.api.RTPAPI.hooks().claimBoundaries() : null;
+                            if (claimRegistry != null) {
+                              Optional<io.github.dailystruggle.rtp.api.claim.ClaimBoundary> claimOpt =
+                                  claimRegistry.resolveAt(world.name(), localCursor.x, localCursor.z);
+                              if (claimOpt.isEmpty()) {
+                                claimOpt = claimRegistry.resolveAt(world.name(), blockX, blockZ);
+                              }
+                              if (claimOpt.isPresent()) {
+                                io.github.dailystruggle.rtp.api.claim.ClaimBoundary boundary = claimOpt.get();
+                                int bMinX = boundary.minX();
+                                int bMinZ = boundary.minZ();
+                                int bMaxX = boundary.maxX();
+                                int bMaxZ = boundary.maxZ();
+
+                                int newlyMarked = 0;
+                                for (int bx = bMinX; bx <= bMaxX; bx++) {
+                                  for (int bz = bMinZ; bz <= bMaxZ; bz++) {
+                                    long loc = shape.xzToLocation(bx, bz);
+                                    if (loc >= 0 && loc < shape.getEffectiveRange() && !shape.isKnownBad(loc)) {
+                                      shape.addBadLocation(loc, io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.safetyExternal);
+                                      newlyMarked++;
+                                    }
+                                  }
+                                }
+
+                                long pointsApprox = (newlyMarked > 0)
+                                    ? newlyMarked
+                                    : Math.max(1L, (long) (bMaxX - bMinX + 1) * (bMaxZ - bMinZ + 1));
+                                scanBadCount.addAndGet(pointsApprox);
+
+                                RTP.log(Level.FINE, "[ScanTask] Encapsulated claim boundary '" + boundary.id()
+                                    + "' [" + bMinX + "," + bMinZ + " -> " + bMaxX + "," + bMaxZ
+                                    + "] in region '" + region.name + "'");
+                                claimEncapsulated = true;
+                              }
+                            }
+                          } catch (Throwable t) {
+                            RTP.log(Level.WARNING, "[ScanTask] Error encapsulating claim boundary at " + localCursor, t);
+                          }
+                        }
+
+                        if (!claimEncapsulated) {
+                          // addBadChunk: chunk-uniform - within a chunk the per-column
+                          // selection order is deterministic, so the twin spiral index picks
+                          // the same column and the same (2r+1)^3 safety scan rejects again.
+                          shape.addBadChunk(pos);
+                        }
                         fullLoadOutcomeSafetyScan.incrementAndGet();
                         res.complete(false);
                       }
+                      } catch (Throwable t) {
+                        RTP.log(Level.SEVERE, "[ScanTask] Verifier verdict crashed at location " + pos, t);
+                        shape.addBadChunk(pos);
+                        fullLoadOutcomeCrashed.incrementAndGet();
+                        res.complete(false);
+                      } };
+
+                      if (!pass) {
+                        finish.accept(false, null);
+                        return;
+                      }
+                      CompletableFuture<GlobalRegionVerifiers.VerifierCheckResult> verdict =
+                          GlobalRegionVerifiers.checkGlobalRegionVerifiersDetailed(localCursor.toImmutable());
+                      if (verdict == null) {
+                        finish.accept(false, null);
+                        return;
+                      }
+                      verdict.whenComplete((vr, ex) -> {
+                        if (ex != null) {
+                          RTP.log(Level.SEVERE, "[ScanTask] Claim verifier failed at location " + pos, ex);
+                          shape.addBadChunk(pos);
+                          fullLoadOutcomeCrashed.incrementAndGet();
+                          res.complete(false);
+                          return;
+                        }
+                        finish.accept(vr != null && vr.passed(), vr);
+                      });
                     } catch (Throwable t) {
                       RTP.log(Level.SEVERE, "[ScanTask] Validation crashed on Region Thread at location " + pos, t);
                       // addBadChunk: chunk-uniform - within a chunk the per-column
@@ -1854,21 +1863,45 @@ public class ScanTask extends RTPRunnable {
     }
   }
 
+  /**
+   * Pauses the scan. The flag is set and in-flight loads are cancelled on the caller;
+   * the drain, shape rebuild and saves run on the async lane via {@link #teardownAsync}.
+   */
   @SuppressWarnings("java:S1845") // Method pause() operates on AtomicBoolean pause flag
   public void pause() {
+    pause(null);
+  }
+
+  /**
+   * Pause variant that reports the teardown outcome to {@code onDone} on the main lane.
+   *
+   * @param onDone receives null on success, or the teardown failure (S-004); may be null
+   */
+  public void pause(java.util.function.Consumer<Throwable> onDone) {
     RTP.log(Level.FINE, "[ScanTask] pause requested region=" + region.name
             + " inFlight=" + inFlight.get());
     pause.set(true);
-    // Drain in-flight chunk futures before saving to prevent ghost callbacks.
-    drainInFlight("pause", DRAIN_TIMEOUT_MS);
-    MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
-    shape.flushAndRebuild(shape.spatialResolution());
-    save();
-    shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
+    statusWindowStartMs = -1L;
+    cancelInFlightChunkFutures();
+    teardownAsync("pause", true, onDone);
   }
 
+  /**
+   * Cancels the scan. The flag is set and in-flight loads are cancelled on the caller;
+   * the drain, shape rebuild and saves run on the async lane via {@link #teardownAsync}.
+   */
   @Override
   public void setCancelled(boolean cancelled) {
+    setCancelled(cancelled, null);
+  }
+
+  /**
+   * Cancel variant that reports the teardown outcome to {@code onDone} on the main lane.
+   *
+   * @param cancelled the cancel flag
+   * @param onDone receives null on success, or the teardown failure (S-004); may be null
+   */
+  public void setCancelled(boolean cancelled, java.util.function.Consumer<Throwable> onDone) {
     if (cancelled) {
       RTP.log(Level.FINE, "[ScanTask] cancellation requested region=" + region.name
               + " inFlight=" + inFlight.get());
@@ -1877,16 +1910,83 @@ public class ScanTask extends RTPRunnable {
       try {
         done.cancel(true);
       } catch (CancellationException | CompletionException ignored) { }
-      // Drain in-flight chunk futures before saving to prevent ghost callbacks.
-      drainInFlight("cancel", DRAIN_TIMEOUT_MS);
-      MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
-      if (shape != null) {
-        shape.flushAndRebuild(shape.spatialResolution());
-        shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
-      }
-      save();
-      RTP.getInstance().scanTasks.remove(region.name, this);
+      cancelInFlightChunkFutures();
+      teardownAsync("cancel", false, onDone);
+      return;
     }
-    super.setCancelled(cancelled);
+    super.setCancelled(false);
+  }
+
+  private void cancelInFlightChunkFutures() {
+    for (CompletableFuture<?> f : inFlightChunkFutures) {
+      try {
+        f.cancel(true);
+      } catch (Throwable ignored) { }
+    }
+  }
+
+  /**
+   * Off-caller teardown: bounded drain, shape rebuild, saves, scan-map removal.
+   * Completion or failure is reported to {@code onDone} on the main lane (S-004).
+   * A later start waits on {@link #teardownDone} so it never rebuilds over a stale frontier.
+   */
+  private void teardownAsync(String reason, boolean pauseSave, java.util.function.Consumer<Throwable> onDone) {
+    CompletableFuture<Void> gate = new CompletableFuture<>();
+    teardownDone = gate;
+    PENDING_TEARDOWNS.put(region.name, gate);
+    RTP.scheduler.runTaskAsynchronously(() -> {
+      try {
+        drainInFlight(reason, DRAIN_TIMEOUT_MS);
+        MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
+        if (shape != null) {
+          shape.flushAndRebuild(shape.spatialResolution());
+          if (pauseSave) {
+            shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
+          } else {
+            shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
+          }
+        }
+        save();
+        if (!pauseSave) {
+          delete(region.name);
+          RTP.getInstance().scanTasks.remove(region.name, this);
+        }
+        gate.complete(null);
+        reportTeardown(onDone, null);
+      } catch (Throwable t) {
+        RTP.log(Level.WARNING, "[ScanTask] " + reason + " teardown failed region=" + region.name, t);
+        gate.completeExceptionally(t);
+        reportTeardown(onDone, t);
+      } finally {
+        PENDING_TEARDOWNS.remove(region.name, gate);
+      }
+    });
+  }
+
+  private static void reportTeardown(java.util.function.Consumer<Throwable> onDone, Throwable failure) {
+    if (onDone == null) return;
+    RTP.scheduler.runTask(() -> onDone.accept(failure));
+  }
+
+  /** Completes when the most recent teardown has finished; used to order a restart after it. */
+  private volatile CompletableFuture<Void> teardownDone = CompletableFuture.completedFuture(null);
+
+  /** @return future that completes after the last cancel/pause teardown has run. */
+  public CompletableFuture<Void> teardownFuture() {
+    return teardownDone;
+  }
+
+  /** @return true while a cancel/pause teardown for {@code regionName} has not finished. */
+  public static boolean isTeardownPending(String regionName) {
+    CompletableFuture<Void> pending = PENDING_TEARDOWNS.get(regionName);
+    return pending != null && !pending.isDone();
+  }
+
+  public static void setPendingTeardownForTesting(String regionName, CompletableFuture<Void> gate) {
+    if (gate == null) {
+      PENDING_TEARDOWNS.remove(regionName);
+    } else {
+      PENDING_TEARDOWNS.put(regionName, gate);
+    }
   }
 }

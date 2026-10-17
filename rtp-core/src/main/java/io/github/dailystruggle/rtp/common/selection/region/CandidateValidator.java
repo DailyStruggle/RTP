@@ -32,4 +32,16 @@ public interface CandidateValidator {
    */
   @Nullable
   RTPLocation validate(int worldX, int worldZ);
+
+  /**
+   * Asynchronously validates a world column on demand, loading or fetching required chunks in the
+   * background without hard-depending on prior memory cache presence (S-005).
+   *
+   * @param worldX absolute world block X
+   * @param worldZ absolute world block Z
+   * @return future completing with a verified {@link RTPLocation}, or {@code null} on rejection
+   */
+  default java.util.concurrent.CompletableFuture<RTPLocation> validateAsync(int worldX, int worldZ) {
+    return java.util.concurrent.CompletableFuture.completedFuture(validate(worldX, worldZ));
+  }
 }

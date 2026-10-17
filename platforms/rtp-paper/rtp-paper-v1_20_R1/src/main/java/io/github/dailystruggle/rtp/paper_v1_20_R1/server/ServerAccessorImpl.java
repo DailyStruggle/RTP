@@ -26,12 +26,14 @@ public class ServerAccessorImpl extends PaperServerAccessor {
     // Emit both bare upper-cased (`BADLANDS`) and raw namespaced
     // (`minecraft:badlands`) forms so Brigadier-suggested namespaced ids
     // pass /rtp's biome param validator.
+    // Plain iteration: Registry#stream() only exists from 1.20, and this
+    // carrier also serves 1.18-1.19 (ADR-113).
     java.util.Set<String> out = new java.util.HashSet<>();
-    org.bukkit.Registry.BIOME.stream().forEach(biome -> {
+    for (org.bukkit.block.Biome biome : org.bukkit.Registry.BIOME) {
       org.bukkit.NamespacedKey k = biome.getKey();
       out.add(k.getKey().toUpperCase());
       out.add(k.getNamespace() + ":" + k.getKey());
-    });
+    }
     return out;
   }
 

@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.bukkit.commands.test;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -147,12 +147,14 @@ public class TestCommandsCmd extends BaseRTPCmdImpl {
 
   /**
    * Recognises the one intentional alias in the tree: {@code ALL} -&gt; {@link TestFullCmd}
-   * as documented in {@link TestCmd}. If more aliases are introduced, add them here
-   * (and, preferably, promote aliases to a first-class concept in {@link TreeCommand}).
+   * under the {@code test} node, as documented in {@code TestCmd}. Matched by node name, not by
+   * type, so this audit does not depend on the parent that registers it. If more aliases are
+   * introduced, add them here (and, preferably, promote aliases to a first-class concept in
+   * {@link TreeCommand}).
    */
   private static boolean isDeclaredAlias(
       CommandsAPICommand parent, String key, CommandsAPICommand child) {
-    if (parent instanceof TestCmd
+    if ("test".equalsIgnoreCase(safeName(parent))
         && "ALL".equals(key)
         && child instanceof TestFullCmd) return true;
     return false;

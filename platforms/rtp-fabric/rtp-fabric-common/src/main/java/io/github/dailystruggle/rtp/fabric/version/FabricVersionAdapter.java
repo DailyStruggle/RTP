@@ -176,6 +176,18 @@ public interface FabricVersionAdapter {
         return false;
     }
 
+    /**
+     * Dispatch {@code command} as {@code player} (a {@code ServerPlayer}) through
+     * carrier-typed descriptors. {@code Commands#performPrefixedCommand} returns
+     * {@code int} on 1.20.1 and {@code void} from 1.20.3, so the common call site
+     * does not link on every runtime.
+     *
+     * @return true if dispatched, false to use the common fallback
+     */
+    default boolean dispatchPlayerCommand(Object player, String command) {
+        return false;
+    }
+
     // --- Brigadier source bridge ---
 
     /**

@@ -100,7 +100,7 @@ public class CommandsAPI {
      * @return remaining commands
      */
     public static long execute(long availableTime) {
-        if(commandPipeline.size()==0) return 0;
+        if (commandPipeline.isEmpty()) return 0;
 
         long start = System.nanoTime();
 
@@ -116,10 +116,10 @@ public class CommandsAPI {
 
 
             long t = System.nanoTime();
-            if(t<start) start = -(Long.MAX_VALUE-start); //overflow correction
-            dt = t-start;
-        } while (commandPipeline.size()>0 && dt+avgTime< availableTime);
+            if (t < start) start = -(Long.MAX_VALUE - start); //overflow correction
+            dt = t - start;
+        } while (!commandPipeline.isEmpty() && dt + avgTime < availableTime);
 
-        return commandPipeline.size();
+        return commandPipeline.isEmpty() ? 0 : commandPipeline.size();
     }
 }

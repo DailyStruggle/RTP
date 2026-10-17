@@ -17,17 +17,19 @@
          /rtp opens the chest menu (delegates to add-gui-addon.ps1). Opt out
          with -NoGuiAddon.
 
-    Each backend's single `default` region is committed under its
-    rtp-config/regions/default.yml and seeded into the running containers by the
-    docker-compose entrypoint shims - no action needed here. Each default region
+    Each backend's single `default` region lives in its
+    rtp-config/regions/default.yml and is seeded into the running containers by the
+    docker-compose entrypoint shims - no action needed here. Only the backend-c and
+    backend-d files are tracked; backend-a/backend-b rtp-config is gitignored. Each default region
     lands in a distinct dimension and carries a configurable displayName:
 
-      backend-a (Paper)  : Overworld  ->  Verdant Wilds
-      backend-b (Folia)  : Nether     ->  Ashen Wastes
-      backend-c (Folia)  : End        ->  Void Reaches
+      backend-a (Paper)    : Overworld  ->  Verdant Wilds
+      backend-b (Folia)    : Nether     ->  Ashen Wastes
+      backend-c (Fabric)   : End        ->  Void Reaches
+      backend-d (NeoForge) : Overworld  ->  Neo Forge Frontier
 
     On a lobby (lobby-a / lobby-b) the menu shows the cross-server peer regions
-    advertised by all three backends (each labelled by its displayName), so /rtp
+    advertised by all four backends (each labelled by its displayName), so /rtp
     from the lobby dispatches across the network - the multi-server demo.
 
     Run while the stack is DOWN, then `docker compose up`.
@@ -88,5 +90,5 @@ Write-Host "  cd `"$devstack`""
 Write-Host "  docker compose up -d"
 Write-Host "  # connect a 1.21.x client to localhost:25577 (proxy-a) -> lands on a lobby"
 Write-Host "  # run /rtp to open the GUI; lobby shows cross-server peer regions,"
-Write-Host "  # /server backend-a|backend-b|backend-c then /rtp teleports into that"
-Write-Host "  # backend's default region (Overworld / Nether / End respectively)."
+Write-Host "  # /server backend-a|backend-b|backend-c|backend-d then /rtp teleports into that"
+Write-Host "  # backend's default region (Overworld / Nether / End / Overworld respectively)."

@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.prefab;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 
 import java.util.List;
 import java.util.Map;
@@ -22,7 +22,7 @@ import org.jetbrains.annotations.Nullable;
 public class PrefabCommand extends BaseRTPCmdImpl {
 
     /** Permission key for the {@code prefab} subtree (every verb shares it). */
-    public static final String PERMISSION = "rtp.admin.prefab";
+    public static final String PERMISSION = PrefabPermission.PERMISSION;
 
     private final PrefabNonceStore nonceStore;
 

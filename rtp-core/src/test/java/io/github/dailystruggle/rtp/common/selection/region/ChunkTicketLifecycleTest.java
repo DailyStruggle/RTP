@@ -79,7 +79,7 @@ public class ChunkTicketLifecycleTest {
         LocationGenerator.setRng(new Random(42L));
 
         // Run the full pipeline to obtain a valid location
-        GenerationResult result = LocationGenerator.getLocation(region, (Set<String>) null);
+        GenerationResult result = LocationGenerator.getLocationFuture(region, (Set<String>) null).get();
         assertNotNull(result, "GenerationResult must not be null");
         assertNotNull(result.coords(), "Pipeline must find a valid location with TrackedMockWorld");
 

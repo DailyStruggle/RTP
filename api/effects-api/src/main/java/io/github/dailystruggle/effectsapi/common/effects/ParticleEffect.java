@@ -30,7 +30,7 @@ public class ParticleEffect extends Effect<ParticleEffect.ParticleKeys> {
         double dx = 0, dy = 0, dz = 0, speed = 0;
 
         Object o = data.get(ParticleKeys.NUMBER);
-        if (o instanceof Number) count = ((Number) o).intValue();
+        if (o instanceof Number) count = Math.max(1, Math.min(256, ((Number) o).intValue()));
         o = data.get(ParticleKeys.DX);
         if (o instanceof Number) dx = ((Number) o).doubleValue();
         o = data.get(ParticleKeys.DY);
@@ -53,11 +53,15 @@ public class ParticleEffect extends Effect<ParticleEffect.ParticleKeys> {
     @Override
     public void setData(String... data) {
         applyByType(ParticleKeys.values(), data);
+        Object n = this.data.get(ParticleKeys.NUMBER);
+        if (n instanceof Number) {
+            this.data.put(ParticleKeys.NUMBER, Math.max(1, Math.min(256, ((Number) n).intValue())));
+        }
     }
 
     @Override
     public String toPermission() {
-        return data.get(ParticleKeys.TYPE).toString().replaceAll("\\.*", "") +
-               data.get(ParticleKeys.NUMBER).toString().replaceAll("\\.*", "");
+        return data.get(ParticleKeys.TYPE).toString().replace(".", "") +
+               data.get(ParticleKeys.NUMBER).toString().replace(".", "");
     }
 }

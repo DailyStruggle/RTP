@@ -39,7 +39,7 @@ class MockChunkFutureTest {
         ChunkSet chunkSet = world.getChunkAtAsync(0, 0).get();
 
         assertFalse(chunkSet.chunks().isEmpty(),
-                "chunks list must contain at least one entry so .getFirst() does not throw");
+                "chunks list must contain at least one entry so .get(0) does not throw");
     }
 
     @Test
@@ -47,7 +47,7 @@ class MockChunkFutureTest {
     void getChunkAtAsync_firstChunkFutureIsAlreadyCompleted() throws ExecutionException, InterruptedException {
         MockRTPWorld world = new MockRTPWorld();
         ChunkSet chunkSet = world.getChunkAtAsync(0, 0).get();
-        CompletableFuture<Long> firstChunk = chunkSet.chunks().getFirst();
+        CompletableFuture<Long> firstChunk = chunkSet.chunks().get(0);
 
         assertTrue(firstChunk.isDone(),
                 "first chunk future must be pre-completed so .get() does not block");
@@ -88,7 +88,7 @@ class MockChunkFutureTest {
 
         assertNotNull(result.verifiedChunks(), "GenerationResult must carry a ChunkSet");
         assertFalse(result.verifiedChunks().chunks().isEmpty(),
-                "chunks list must be non-empty so LocationGenerator can call .getFirst()");
+                "chunks list must be non-empty so LocationGenerator can call .get(0)");
     }
 
     @Test
@@ -96,7 +96,7 @@ class MockChunkFutureTest {
     void mockLocationGenerator_buildResult_firstChunkFutureIsAlreadyCompleted()
             throws ExecutionException, InterruptedException {
         MockLocationGenerator gen = new MockLocationGenerator();
-        CompletableFuture<Long> firstChunk = gen.buildResult().verifiedChunks().chunks().getFirst();
+        CompletableFuture<Long> firstChunk = gen.buildResult().verifiedChunks().chunks().get(0);
 
         assertTrue(firstChunk.isDone(),
                 "first chunk future in GenerationResult must be pre-completed");

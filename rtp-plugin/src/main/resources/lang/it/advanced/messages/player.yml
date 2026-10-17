@@ -7,6 +7,8 @@
 # ###############################################################################
 # durante il teletrasporto, mostra questo
 giàTeletrasporto: "&7[P0] ⚡ ti stai già teletrasportando!"
+giàInSessione: "&c[P0] [player] è già in una sessione di partita attiva."
+nonInSessione: "&c[P0] Non sei in una partita di questa azione."
 
 # se il plugin si sta attualmente ricaricando
 teletrasportoNegatoRicaricamento: "&7[P0] i teletrasporti sono temporaneamente disattivati mentre il plugin si ricarica. Riprova tra poco."
@@ -55,6 +57,10 @@ millisecondi: "ms"
 # il mondo non esiste in Bukkit
 # segnaposto: [world] - il nome del mondo
 mondoNonValido: "&7[P0] impossibile trovare il mondo '[world]'"
+
+nessunaPosizionePrecedente: "&c[P0] Nessuna posizione di teletrasporto precedente trovata."
+
+ritornoSuccesso: "<gradient:#5FB3B3:#9D7CD8>[P0] ⚡ Tornato alla posizione precedente.</gradient>"
 
 # il plugin non ha il comando richiesto dall'utente
 # segnaposto: [arg] - l'argomento tentato

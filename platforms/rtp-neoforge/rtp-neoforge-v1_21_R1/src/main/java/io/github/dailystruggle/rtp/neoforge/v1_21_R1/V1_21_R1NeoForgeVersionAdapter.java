@@ -220,7 +220,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         // dispatches us via MinecraftServer#execute (tick thread), so hop to an RTP
         // async worker before invoking vanilla. The persistent kept-cache ticket is
         // applied separately after cold->hot promotion, so S-002 is unaffected.
-        if (server != null && server.isSameThread()) {
+        if (server.isSameThread()) {
             CompletableFuture<ChunkAccess> out = new CompletableFuture<>();
             RTP.scheduler.runTaskAsynchronously(() ->
                     invokeGetChunkFuture(level, cx, cz, cp, addedTicket).whenComplete((ca, ex) -> {
@@ -271,7 +271,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
     private static void scheduleTicketRemoval(ServerLevel level, ChunkPos cp) {
         MinecraftServer server = level.getServer();
         Runnable remove = () -> tryRemoveLoadTicket(level.getChunkSource(), cp);
-        if (server != null && !server.isSameThread()) {
+        if (!server.isSameThread()) {
             server.execute(remove);
         } else {
             remove.run();
@@ -965,7 +965,7 @@ public final class V1_21_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         for (int packed = 0; packed < 256; packed++) {
             net.minecraft.world.level.material.MapColor color =
                     net.minecraft.world.level.material.MapColor.byId(packed >> 2);
-            if (color == null || color.id == 0) continue; // skip NONE (transparent)
+            if (color.id == 0) continue; // skip NONE (transparent)
             int rgb = net.minecraft.world.level.material.MapColor.getColorFromPackedId(packed);
             int rr = (rgb >> 16) & 0xFF;
             int gg = (rgb >> 8) & 0xFF;

@@ -42,6 +42,55 @@ class RtpApiModelsTest {
     assertEquals("world_nether", world.name());
     assertNull(world.serverId());
 
+    RtpTarget biome = RtpTarget.biome("plains");
+    assertEquals(RtpTarget.Kind.BIOME, biome.kind());
+    assertEquals("plains", biome.name());
+    assertNull(biome.serverId());
+    assertEquals(biome, RtpTarget.biome("plains"));
+    assertEquals(biome.hashCode(), RtpTarget.biome("plains").hashCode());
+    assertNotEquals(reg, biome);
+    assertNotEquals(world, biome);
+
+    RtpTarget action = RtpTarget.action("menu:biomes:0");
+    assertEquals(RtpTarget.Kind.ACTION, action.kind());
+    assertEquals("menu:biomes:0", action.name());
+    assertEquals(action, RtpTarget.action("menu:biomes:0"));
+    assertNotEquals(biome, action);
+
+    RtpTarget coord = RtpTarget.coordinate("survival-1", "world", 100, 64, -200);
+    assertEquals(RtpTarget.Kind.COORDINATE, coord.kind());
+    assertEquals("world:100,64,-200", coord.name());
+    assertEquals("survival-1", coord.serverId());
+    assertEquals("world", coord.worldName());
+    assertEquals(100, coord.x());
+    assertEquals(64, coord.y());
+    assertEquals(-200, coord.z());
+    assertTrue(coord.toString().contains("(100,64,-200)"));
+    assertEquals(coord, RtpTarget.coordinate("survival-1", "world", 100, 64, -200));
+    assertEquals(coord.hashCode(), RtpTarget.coordinate("survival-1", "world", 100, 64, -200).hashCode());
+
+    RtpTarget coordLocal = RtpTarget.coordinate(null, "world_nether", 50, 70, 50);
+    assertNull(coordLocal.serverId());
+    assertEquals("world_nether", coordLocal.worldName());
+    assertTrue(coordLocal.toString().contains("world_nether"));
+    assertTrue(coordLocal.toString().contains("(50,70,50)"));
+    assertTrue(coord.toString().contains("survival-1"));
+    assertTrue(def.toString().contains("DEFAULT"));
+
+    // Coordinate equality branches
+    RtpTarget coordDiffX = RtpTarget.coordinate("survival-1", "world", 101, 64, -200);
+    RtpTarget coordDiffY = RtpTarget.coordinate("survival-1", "world", 100, 65, -200);
+    RtpTarget coordDiffZ = RtpTarget.coordinate("survival-1", "world", 100, 64, -201);
+    RtpTarget coordDiffWorld = RtpTarget.coordinate("survival-1", "world_the_end", 100, 64, -200);
+    RtpTarget coordDiffServer = RtpTarget.coordinate("survival-2", "world", 100, 64, -200);
+
+    assertNotEquals(coord, coordDiffX);
+    assertNotEquals(coord, coordDiffY);
+    assertNotEquals(coord, coordDiffZ);
+    assertNotEquals(coord, coordDiffWorld);
+    assertNotEquals(coord, coordDiffServer);
+    assertNotEquals(coord, reg);
+
     RtpTarget net = RtpTarget.network("survival-1", "wild");
     assertEquals(RtpTarget.Kind.NETWORK, net.kind());
     assertEquals("wild", net.name());
@@ -68,10 +117,16 @@ class RtpApiModelsTest {
     assertThrows(IllegalArgumentException.class, () -> RtpTarget.world((String) null));
     assertThrows(IllegalArgumentException.class, () -> RtpTarget.world("  "));
     assertThrows(IllegalArgumentException.class, () -> RtpTarget.world((RTPWorld<?>) null));
+    assertThrows(IllegalArgumentException.class, () -> RtpTarget.biome(null));
+    assertThrows(IllegalArgumentException.class, () -> RtpTarget.biome("  "));
     assertThrows(IllegalArgumentException.class, () -> RtpTarget.network(null, "r"));
     assertThrows(IllegalArgumentException.class, () -> RtpTarget.network("s", null));
     assertThrows(IllegalArgumentException.class, () -> RtpTarget.network("  ", "r"));
     assertThrows(IllegalArgumentException.class, () -> RtpTarget.network("s", "  "));
+    assertThrows(IllegalArgumentException.class, () -> RtpTarget.coordinate(null, null, 0, 0, 0));
+    assertThrows(IllegalArgumentException.class, () -> RtpTarget.coordinate(null, "  ", 0, 0, 0));
+    assertThrows(IllegalArgumentException.class, () -> RtpTarget.action(null));
+    assertThrows(IllegalArgumentException.class, () -> RtpTarget.action("  "));
   }
 
   @Test
@@ -118,6 +173,8 @@ class RtpApiModelsTest {
     assertTrue(s1.isReady());
     assertEquals(0L, s1.remainingCooldownMillis());
     assertEquals(50.0, s1.cost());
+    assertEquals(0L, s1.delayMillis());
+    assertEquals(0L, s1.combatRemainingMillis());
     assertNull(s1.iconBlock());
     assertNull(s1.environment());
     assertNull(s1.label());
@@ -127,9 +184,19 @@ class RtpApiModelsTest {
     assertFalse(s2.isReady());
     assertEquals(5000L, s2.remainingCooldownMillis());
     assertEquals(0.0, s2.cost()); // negative clamped to 0
+    assertEquals(0L, s2.delayMillis());
+    assertEquals(0L, s2.combatRemainingMillis());
     assertEquals("DIRT", s2.iconBlock());
     assertEquals("NORMAL", s2.environment());
     assertEquals("Wilderness", s2.label());
+
+    RtpTargetStatus sCombat = new RtpTargetStatus(
+        RtpTargetStatus.Availability.IN_COMBAT, 0L, 0.0, "BARRIER", "NORMAL", "Wilderness", 2000L, 12000L);
+    assertFalse(sCombat.isReady());
+    assertEquals(RtpTargetStatus.Availability.IN_COMBAT, sCombat.availability());
+    assertEquals(2000L, sCombat.delayMillis());
+    assertEquals(12000L, sCombat.combatRemainingMillis());
+    assertTrue(sCombat.toString().contains("combatMs=12000"));
 
     RtpTargetStatus s3 = new RtpTargetStatus(
         RtpTargetStatus.Availability.ON_COOLDOWN, 5000L, 0.0, "DIRT", "NORMAL", "Wilderness");
@@ -348,6 +415,41 @@ class RtpApiModelsTest {
     }
     assertEquals(io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.DENY,
         io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.valueOf("DENY"));
+    assertEquals(io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.DENY,
+        io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.fromConfig(null));
+    assertEquals(io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.DENY,
+        io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.fromConfig("   "));
+    assertEquals(io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.DENY,
+        io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.fromConfig("unknown_value"));
+    assertEquals(io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.ALLOW,
+        io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.fromConfig("allow"));
+    assertEquals(io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.DELAY,
+        io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.fromConfig("DELAY"));
+    assertEquals(io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.CANCEL,
+        io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.fromConfig("cancel"));
+
+    io.github.dailystruggle.rtp.api.action.ActionDefinition.SubcommandSpec subSpec1 =
+        new io.github.dailystruggle.rtp.api.action.ActionDefinition.SubcommandSpec(
+            "sub", "rtp.sub", "desc", List.of("s1"), List.of());
+    assertEquals("sub", subSpec1.name());
+    assertEquals("rtp.sub", subSpec1.permission());
+    assertEquals("desc", subSpec1.description());
+    assertEquals(List.of("s1"), subSpec1.aliases());
+    assertTrue(subSpec1.actions().isEmpty());
+
+    io.github.dailystruggle.rtp.api.action.ActionDefinition.SubcommandSpec subSpec2 =
+        new io.github.dailystruggle.rtp.api.action.ActionDefinition.SubcommandSpec(
+            null, null, null, null, null);
+    assertEquals("", subSpec2.name());
+    assertEquals("", subSpec2.permission());
+    assertEquals("", subSpec2.description());
+    assertTrue(subSpec2.aliases().isEmpty());
+    assertTrue(subSpec2.actions().isEmpty());
+
+    io.github.dailystruggle.rtp.api.action.ActionDefinition.SubcommandSpec subSpec3 =
+        new io.github.dailystruggle.rtp.api.action.ActionDefinition.SubcommandSpec(
+            "sub3", "perm3", "desc3", List.of());
+    assertEquals("sub3", subSpec3.name());
 
     for (io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry.Provider.Decision d :
         io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry.Provider.Decision.values()) {

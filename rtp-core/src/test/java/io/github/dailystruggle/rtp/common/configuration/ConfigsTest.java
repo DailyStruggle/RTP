@@ -147,8 +147,8 @@ public class ConfigsTest {
 
     @Test
     void testGetWorldParserForRegisteredWorld() throws IOException {
-        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
         // "world" is registered by default in MockRTPServerAccessor
+        assertInstanceOf(MockRTPServerAccessor.class, RTP.serverAccessor);
 
         Configs configs = new Configs(tempDir.toFile());
         RTP.configs = configs;
@@ -272,4 +272,5 @@ public class ConfigsTest {
                 "MultiConfigParser child parsers must reuse the shared map; found stray in-folder maps: "
                         + java.util.Arrays.toString(strays));
     }
+
 }

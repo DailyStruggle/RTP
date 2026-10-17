@@ -44,6 +44,19 @@ public final class PlayerMoveSampler {
         if (RTP.serverAccessor == null) return;
 
         Set<UUID> watched = dispatcher.watchedPlayers();
+        if (watched.isEmpty() && dispatcher.hasWatchers()) {
+            // Global watchers are active: sample all online players
+            java.util.Collection<RTPPlayer> online = RTP.serverAccessor.getOnlinePlayers();
+            for (RTPPlayer p : online) {
+                if (p == null) continue;
+                try {
+                    sampleOne(p.uuid(), dispatcher);
+                } catch (Throwable t) {
+                    RTP.log(Level.FINER, "[RTP] PlayerMoveSampler: sampling " + p.uuid() + " raised: " + t.getMessage());
+                }
+            }
+            return;
+        }
 
         // Prune baselines for players no longer watched (disconnect / disarm).
         for (Iterator<UUID> it = lastSeen.keySet().iterator(); it.hasNext(); ) {

@@ -27,6 +27,7 @@ install:
       :effects-api:publishToMavenLocal
       :yaml-api:publishToMavenLocal
       :metrics-api:publishToMavenLocal
+      :bstats-api:publishToMavenLocal
       :maps-api:publishToMavenLocal
       :rtp-proxy:rtp-proxy-common:publishToMavenLocal
       :rtp-api:publishToMavenLocal

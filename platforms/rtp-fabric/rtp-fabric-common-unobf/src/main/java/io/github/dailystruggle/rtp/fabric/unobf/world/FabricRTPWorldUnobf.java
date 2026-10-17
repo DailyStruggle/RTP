@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.world.BiomeOverride;
 import io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.storage.LevelResource;
@@ -185,6 +186,19 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      */
     @Override
     public CompletableFuture<Long> getChunkAt(int chunkX, int chunkZ) {
+        return resolveChunkKey(chunkX, chunkZ, true);
+    }
+
+    /**
+     * ADR-110: resident chunk or region-file view only; {@code null} where only a native load
+     * (or generation) could answer.
+     */
+    @Override
+    public CompletableFuture<Long> getChunkIfReadable(int chunkX, int chunkZ) {
+        return resolveChunkKey(chunkX, chunkZ, false);
+    }
+
+    private CompletableFuture<Long> resolveChunkKey(int chunkX, int chunkZ, boolean allowLive) {
         // Probe-entry: do NOT bump totalChunkLoads here. The increment happens inside
         // the server.submit body below, on the actual live chunk load. This avoids the
         // double-count via RTPWorld.getOrLoadChunk's probe-then-live composition; see
@@ -238,12 +252,15 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
                                     return CompletableFuture.completedFuture(key);
                                 }
                                 // No view available (UNKNOWN) → live load is authoritative.
-                                return loadLiveChunk(chunkX, chunkZ, key);
+                                return allowLive
+                                        ? loadLiveChunk(chunkX, chunkZ, key)
+                                        : CompletableFuture.completedFuture(null);
                             });
                 }
             }
         }
 
+        if (!allowLive && !isChunkLoaded(chunkX, chunkZ)) return CompletableFuture.completedFuture(null);
         return loadLiveChunk(chunkX, chunkZ, key);
     }
 
@@ -832,8 +849,10 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      */
     @Override
     public boolean isChunkLoaded(int cx, int cz) {
+        ServerLevel level = world;
+        if (level == null) return false;
         try {
-            ServerChunkCache cache = world.getChunkSource();
+            ServerChunkCache cache = level.getChunkSource();
             return cache.hasChunk(cx, cz);
         } catch (Throwable ignored) {
             return false;
@@ -897,23 +916,14 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
         final int finalMinY = minY;
         final int finalMaxY = maxY;
 
-        // Mirrors the Spigot dispatch contract: AnvilIoPool runs blocking .mca
-        // reads off-tick with disk-parallelism sizing. Probe-cache hit / miss
-        // metrics are owned by ScanTask's probeOutcome* counters and the anvil
-        // module's own diagLog channel - no per-call counter is owned here.
-        return CompletableFuture.supplyAsync(() -> {
+        // Mirrors the Spigot dispatch contract: pending probes for one r.X.Z.mca are
+        // coalesced onto AnvilIoPool and share one open (S-005: no I/O on the caller).
+        // Probe-cache hit / miss metrics are owned by ScanTask's probeOutcome* counters
+        // and the anvil module's own diagLog channel - no per-call counter is owned here.
+        return io.github.dailystruggle.rtp.anvil.AnvilPrefilter.probeColumnAsync(
+                worldFolder, dim, cx, cz, finalMinY, finalMaxY).handle((probe, err) -> {
             try {
-                java.nio.file.Path regionFile =
-                    io.github.dailystruggle.rtp.anvil.AnvilPrefilter
-                        .regionFileFor(worldFolder, dim, cx, cz);
-                byte[] regionBytes =
-                    io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
-                if (regionBytes == null) return null;
-                int rx = Math.floorMod(cx, 32);
-                int rz = Math.floorMod(cz, 32);
-                io.github.dailystruggle.rtp.anvil.ColumnProbe probe =
-                    io.github.dailystruggle.rtp.anvil.AnvilReader.readColumnProbe(
-                        regionBytes, rx, rz, finalMinY, finalMaxY);
+                if (err != null) throw err;
                 if (probe == null) return null;
                 return ChunkColumnProbe.of(new AnvilColumnProbeAdapter(probe, cx, cz,
                     s -> (RTP.serverAccessor != null)
@@ -926,15 +936,15 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
                         + t.getClass().getSimpleName() + ": " + t.getMessage());
                 return null;
             }
-        }, io.github.dailystruggle.rtp.anvil.AnvilIoPool.get());
+        });
     }
 
     /**
      * {@inheritDoc}
      *
      * <p>Fabric-unobf mirror of {@code BukkitRTPWorld#readBiomesInRegionFile}.
-     * Reads {@code r.<rcx>.<rcz>.mca} once, decodes every chunk, samples the
-     * biome at chunk-local {@code (8, y, 8)}, canonicalises to the uppercase
+     * Reads {@code r.<rcx>.<rcz>.mca} once under a pooled-buffer lease, samples each
+     * chunk's biome at chunk-local {@code (8, y, 8)}, canonicalises to the uppercase
      * {@code minecraft:}-stripped form. S-005: no tick-thread chunk I/O.
      */
     @Override
@@ -955,37 +965,94 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
                 io.github.dailystruggle.rtp.anvil.AnvilPrefilter
                     .regionFileFor(worldFolder, dim, rcx << 5, rcz << 5);
             if (regionFile == null) return java.util.Collections.emptyMap();
-            byte[] regionBytes =
-                io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache.get(regionFile);
-            if (regionBytes == null) return java.util.Collections.emptyMap();
-            java.util.HashMap<Long, String> out = new java.util.HashMap<>(1024);
-            for (int rx = 0; rx < 32; rx++) {
-                for (int rz = 0; rz < 32; rz++) {
-                    try {
-                        io.github.dailystruggle.rtp.anvil.AnvilChunkView view =
-                            io.github.dailystruggle.rtp.anvil.AnvilReader.readChunkView(
-                                regionBytes, rx, rz);
-                        if (view == null) continue;
-                        String raw = view.getBiomeAt(8, y, 8);
-                        if (raw == null) continue;
-                        String canonical = canonicaliseBiome(raw);
-                        if (canonical == null || canonical.isEmpty()) continue;
-                        int cx = (rcx << 5) | rx;
-                        int cz = (rcz << 5) | rz;
-                        long key = ((long) cx << 32) | (cz & 0xFFFF_FFFFL);
-                        out.put(key, canonical);
-                    } catch (Throwable ignored) {
-                        // chunk not present / unreadable; skip silently.
-                    }
-                }
-            }
-            return out;
+            return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.readAllBiomes(
+                regionFile, rcx, rcz, y, FabricRTPWorldUnobf::canonicaliseBiome);
         } catch (Throwable t) {
             RTP.log(java.util.logging.Level.FINE,
                 "[RTP] FabricRTPWorldUnobf.readBiomesInRegionFile failed for world=" + name
                     + " region=(" + rcx + "," + rcz + "): "
                     + t.getClass().getSimpleName() + ": " + t.getMessage());
             return java.util.Collections.emptyMap();
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>Reads only the region header plus each requested chunk's sectors via {@link
+     * io.github.dailystruggle.rtp.anvil.AnvilRegionSampler} (ADR-104 section 4.6). S-005:
+     * blocking, off-tick only.
+     */
+    @Override
+    public java.util.Map<Long, String> sampleBiomesInRegionFile(
+            int rcx, int rcz, int y, int[] localIndices) {
+        ServerLevel level = world;
+        if (level == null || level.getServer() == null) return java.util.Collections.emptyMap();
+        try {
+            java.nio.file.Path regionFile =
+                io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(
+                    level.getServer().getWorldPath(LevelResource.ROOT),
+                    dimensionRegionSubpath(level), rcx << 5, rcz << 5);
+            if (regionFile == null) return java.util.Collections.emptyMap();
+            return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.sampleBiomesOrThrow(
+                regionFile, rcx, rcz, y, localIndices, FabricRTPWorldUnobf::canonicaliseBiome);
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.FINE,
+                "[RTP] FabricRTPWorldUnobf.sampleBiomesInRegionFile failed for world=" + name
+                    + " region=(" + rcx + "," + rcz + "): "
+                    + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return java.util.Collections.emptyMap();
+        }
+    }
+
+    @Override
+    public java.nio.file.Path anvilWorldFolder() {
+        ServerLevel level = world;
+        if (level == null || level.getServer() == null) return null;
+        try {
+            return level.getServer().getWorldPath(LevelResource.ROOT);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    @Override
+    public String anvilDimensionSubpath() {
+        return dimensionRegionSubpath(world);
+    }
+
+    /** {@inheritDoc} S-005: blocking stat, off-tick only. */
+    @Override
+    public long regionFileModifiedMillis(int rcx, int rcz) {
+        ServerLevel level = world;
+        if (level == null || level.getServer() == null) return -1L;
+        try {
+            return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.lastModifiedMillis(
+                io.github.dailystruggle.rtp.anvil.AnvilPrefilter.regionFileFor(
+                    level.getServer().getWorldPath(LevelResource.ROOT),
+                    dimensionRegionSubpath(level), rcx << 5, rcz << 5));
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.FINE,
+                "[RTP] FabricRTPWorldUnobf.regionFileModifiedMillis failed for world=" + name
+                    + " region=(" + rcx + "," + rcz + "): " + t.getMessage());
+            return -1L;
+        }
+    }
+
+    /** {@inheritDoc} Lists this dimension's region directory; S-005: off-tick only. */
+    @Override
+    public java.util.List<int[]> listRegionFiles() {
+        ServerLevel level = world;
+        if (level == null || level.getServer() == null) return null;
+        try {
+            java.nio.file.Path worldFolder = level.getServer().getWorldPath(LevelResource.ROOT);
+            return io.github.dailystruggle.rtp.anvil.RegionFileResolver.listAnvilRegionCoords(
+                io.github.dailystruggle.rtp.anvil.RegionFileResolver.regionDirectoryFor(
+                    worldFolder, dimensionRegionSubpath(level)));
+        } catch (Throwable t) {
+            RTP.log(java.util.logging.Level.WARNING,
+                "[RTP] FabricRTPWorldUnobf.listRegionFiles failed for world=" + name + ": " + t.getMessage(), t);
+            return null;
         }
     }
 
@@ -1063,77 +1130,6 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
     // ---------------------------------------------------------------------------
     // Region-file backed isChunkGenerated probe
     // ---------------------------------------------------------------------------
-
-    /**
-     * Reflective handles into Mojang internals for the non-blocking
-     * &quot;does an .mca entry exist for this chunk?&quot; question. Lazily
-     * resolved on first use; cached for the JVM lifetime. Reflection is used
-     * (rather than an AccessWidener / accessor mixin) to keep this change
-     * self-contained - {@code rtp-fabric-common} has no AW/mixin config today.
-     *
-     * <p>Resolution chain: {@code ServerChunkCache#chunkMap} field →
-     * {@code ChunkMap#read(ChunkPos)} method returning
-     * {@code CompletableFuture<Optional<CompoundTag>>}. The future is fed by
-     * the {@code IOWorker} async region-file reader; it does NOT touch the
-     * chunk system and does NOT trigger generation, so it satisfies the
-     * S-005 non-blocking pre-check contract.</p>
-     */
-    private static volatile java.lang.reflect.Field CHUNK_MAP_FIELD;
-    private static volatile java.lang.reflect.Method CHUNK_MAP_READ_METHOD;
-    private static volatile boolean REFLECTION_RESOLVED = false;
-    private static volatile boolean REFLECTION_AVAILABLE = false;
-
-    private static void resolveReflectionOnce(@NotNull ServerChunkCache sample) {
-        if (REFLECTION_RESOLVED) return;
-        synchronized (FabricRTPWorldUnobf.class) {
-            if (REFLECTION_RESOLVED) return;
-            try {
-                // ServerChunkCache#chunkMap - package-private final field; mappings
-                // stable since 1.18 under the deobf name "chunkMap".
-                java.lang.reflect.Field f = null;
-                for (java.lang.reflect.Field cand : sample.getClass().getDeclaredFields()) {
-                    if ("chunkMap".equals(cand.getName())
-                        || net.minecraft.server.level.ChunkMap.class.isAssignableFrom(cand.getType())) {
-                        f = cand;
-                        break;
-                    }
-                }
-                if (f == null) {
-                    REFLECTION_RESOLVED = true;
-                    return;
-                }
-                f.setAccessible(true);
-                CHUNK_MAP_FIELD = f;
-
-                // ChunkMap#read(ChunkPos) - protected method; returns
-                // CompletableFuture<Optional<CompoundTag>>.
-                Class<?> chunkMapClass = f.getType();
-                java.lang.reflect.Method read = null;
-                Class<?> chunkPosClass = net.minecraft.world.level.ChunkPos.class;
-                for (java.lang.reflect.Method m : chunkMapClass.getDeclaredMethods()) {
-                    if (!m.getName().equals("read")) continue;
-                    Class<?>[] params = m.getParameterTypes();
-                    if (params.length == 1 && params[0] == chunkPosClass) {
-                        read = m;
-                        break;
-                    }
-                }
-                if (read == null) {
-                    REFLECTION_RESOLVED = true;
-                    return;
-                }
-                read.setAccessible(true);
-                CHUNK_MAP_READ_METHOD = read;
-                REFLECTION_AVAILABLE = true;
-            } catch (Throwable t) {
-                RTP.log(java.util.logging.Level.WARNING,
-                    "[RTP] FabricRTPWorldUnobf.isChunkGenerated reflection setup failed: "
-                        + t.getClass().getSimpleName() + ": " + t.getMessage());
-            } finally {
-                REFLECTION_RESOLVED = true;
-            }
-        }
-    }
 
     /**
      * Non-blocking check for whether the chunk has been generated and persisted
@@ -1413,6 +1409,11 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      */
     @Override
     public String getBiome(int x, int y, int z) {
+        var override = BiomeOverride.get();
+        if (override != null) {
+            String fromAddon = override.apply(new RTPLocation(this, x, y, z));
+            if (fromAddon != null) return fromAddon;
+        }
         if (world == null) return "";
         try {
             net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> holder =
@@ -1432,10 +1433,10 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
                     .orElseGet(() -> {
                         // Fallback: registry reverse lookup.
                         try {
-                            Identifier id = world.registryAccess()
+                            Identifier biomeId = world.registryAccess()
                                     .lookupOrThrow(net.minecraft.core.registries.Registries.BIOME)
                                     .getKey(holder.value());
-                            return (id == null) ? "" : id.toString();
+                            return (biomeId == null) ? "" : biomeId.toString();
                         } catch (Throwable t) {
                             return "";
                         }

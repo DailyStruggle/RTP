@@ -1,6 +1,6 @@
 # ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution
 
-**Status:** Proposed  
+**Status:** Proposed
 **Date:** 2026-09-07  
 
 ## Context
@@ -93,7 +93,7 @@ To prevent the EzRTP failure mode (where creating more active Folia regions than
    - When new disjoint region instantiations approach the concurrency ceiling:
      $$C_{\text{max\_regional\_inflight}} \le \max\left(1, \left\lfloor \frac{\text{availableProcessors}}{2} \right\rfloor\right)$$
      The scheduler defers new candidate regional dispatches until in-flight checks complete, preventing the creation of disjoint Folia regions faster than the server's thread pool can process them.
-   - *Why RTP has avoided stalls historically up to ~14 TP/s:* RTP's single-threaded async pulse (`AsyncTaskProcessing`) combined with the Anvil/Linear off-tick prefilter (ADR-016, ADR-077) evaluates candidates directly from disk without touching live chunks or creating Folia regions. Live regional dispatches only occur on the final promotion path. However, when the prefilter is disabled, on custom ungenerated worlds, or under high burst loads, formalizing this in-scheduler gating ensures RTP remains immune to Folia region exhaustion across all deployments.
+   - *Why RTP has avoided stalls historically up to ~14 TP/s:* RTP's single-threaded async pulse (`AsyncTaskProcessing`) combined with the Anvil/Linear off-tick prefilter (ADR-016, ADR-077; 2026-10-06: Linear reader withdrawn from core, see ADR-077, so Linear references in this ADR apply only to addon-registered readers) evaluates candidates directly from disk without touching live chunks or creating Folia regions. Live regional dispatches only occur on the final promotion path. However, when the prefilter is disabled, on custom ungenerated worlds, or under high burst loads, formalizing this in-scheduler gating ensures RTP remains immune to Folia region exhaustion across all deployments.
 3. **Spatial Distribution Balance and Candidate Compute Reordering:**
    - In RTP's tiered pipeline (ADR-078), new Folia ticking regions are primarily instantiated at two specific transition points:
      1. **L2 (Cold) $\to$ L1 (Hot) Promotion:** Activating a chunk ticket (`keep(true)`) and binding coordinates to live server state.

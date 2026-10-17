@@ -4,7 +4,7 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 
 import java.util.List;
 import java.util.Map;
@@ -26,7 +26,16 @@ public class AdminCmd extends BaseRTPCmdImpl {
     /** Permission key for the bare {@code /rtp admin} form. Mirrors {@code MenuRedeemSubcommand.ADMIN_MENU_PERMISSION}. */
     public static final String PERMISSION = "rtp.menu.admin";
 
-    private final @Nullable Consumer<UUID> openAdminPanel;
+    private @Nullable Consumer<UUID> openAdminPanel;
+
+    /**
+     * Updates or wires the admin-panel opener callback after construction.
+     *
+     * @param openAdminPanel opener callback, or null to disable bare-form opener
+     */
+    public void setOpenAdminPanel(@Nullable Consumer<UUID> openAdminPanel) {
+        this.openAdminPanel = openAdminPanel;
+    }
 
     /**
      * Production constructor with an injected admin-panel opener.
@@ -70,7 +79,7 @@ public class AdminCmd extends BaseRTPCmdImpl {
                              Map<String, List<String>> parameterValues,
                              @Nullable CommandsAPICommand nextCommand) {
         if (nextCommand != null) {
-            return nextCommand.onCommand(callerId, parameterValues, null);
+            return true;
         }
         if (openAdminPanel == null) {
             RTP.log(Level.WARNING,

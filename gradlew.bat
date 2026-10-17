@@ -70,12 +70,18 @@ echo location of your Java installation. 1>&2
 :execute
 @rem Setup the command line
 
-@rem Transparent concurrency serialization: delegate through PowerShell mutex if not already holding lock
-if not "%RTP_GRADLE_LOCKED%"=="1" (
-    set RTP_GRADLE_LOCKED=1
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "$mutex = [System.Threading.Mutex]::new($false, 'Global\RTP_Gradle_Build_Mutex'); $hasLock = $false; try { $waited = 0; while (-not $hasLock) { try { $hasLock = $mutex.WaitOne(5000) } catch [System.Threading.AbandonedMutexException] { $hasLock = $true }; if ($hasLock) { break }; $waited += 5; [Console]::Out.WriteLine('[gradlew] Waiting for build lock... (' + $waited + 's)'); if ($waited -ge 600) { Write-Error '[gradlew] Timed out waiting for Gradle build lock.'; exit 1 } }; & cmd.exe /c \"\"%~f0\" %*\"; exit $LASTEXITCODE } finally { if ($hasLock) { try { $mutex.ReleaseMutex() } catch {} }; $mutex.Dispose() }"
-    goto exitWithErrorLevel
-)
+@rem Transparent concurrency serialization: re-run this script under a mutex (gradle\rtp-gradle-lock.ps1)
+@rem unless already holding one. The arguments travel as data in RTP_GRADLE_RAW_ARGS and are never
+@rem spliced into PowerShell source, so quoted arguments such as --tests "*Foo*" survive. Unquoted set
+@rem and no parenthesized block: the arguments' own quotes keep their special characters literal.
+if "%RTP_GRADLE_LOCKED%"=="1" goto runGradle
+set RTP_GRADLE_LOCKED=1
+set RTP_GRADLE_SELF=%~f0
+set RTP_GRADLE_RAW_ARGS=%*
+powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%APP_HOME%\gradle\rtp-gradle-lock.ps1"
+goto exitWithErrorLevel
+
+:runGradle
 
 @rem Execute Gradle
 @rem endlocal doesn't take effect until after the line is parsed and variables are expanded

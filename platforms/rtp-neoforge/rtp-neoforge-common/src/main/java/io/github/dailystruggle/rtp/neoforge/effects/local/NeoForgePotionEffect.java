@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.neoforge.effects.local;
 
 import io.github.dailystruggle.effectsapi.common.Effect;
-import io.github.dailystruggle.effectsapi.fabric.LocalEffects.enums.FabricPotionKeys;
 import io.github.dailystruggle.rtp.common.RTP;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -21,20 +20,20 @@ import java.util.logging.Level;
  * {@code Holder<MobEffect>}) in 1.20.5 and {@code addEffect} drifts across the
  * line. S-004 cosmetic; dropped with no exception on a resolution miss.
  */
-public class NeoForgePotionEffect extends Effect<FabricPotionKeys> {
+public class NeoForgePotionEffect extends Effect<NeoForgePotionKeys> {
 
     private static final MobEffect DEFAULT_POTION =
             NeoForgeRegistryResolver.resolve(BuiltInRegistries.MOB_EFFECT, "minecraft:speed");
 
     public NeoForgePotionEffect() throws IllegalArgumentException {
-        super(new EnumMap<>(FabricPotionKeys.class));
-        EnumMap<FabricPotionKeys, Object> d = getData();
-        d.put(FabricPotionKeys.TYPE, DEFAULT_POTION);
-        d.put(FabricPotionKeys.DURATION, 200);
-        d.put(FabricPotionKeys.AMPLIFIER, 0);
-        d.put(FabricPotionKeys.AMBIENT, false);
-        d.put(FabricPotionKeys.PARTICLES, true);
-        d.put(FabricPotionKeys.ICON, true);
+        super(new EnumMap<>(NeoForgePotionKeys.class));
+        EnumMap<NeoForgePotionKeys, Object> d = getData();
+        d.put(NeoForgePotionKeys.TYPE, DEFAULT_POTION);
+        d.put(NeoForgePotionKeys.DURATION, 200);
+        d.put(NeoForgePotionKeys.AMPLIFIER, 0);
+        d.put(NeoForgePotionKeys.AMBIENT, false);
+        d.put(NeoForgePotionKeys.PARTICLES, true);
+        d.put(NeoForgePotionKeys.ICON, true);
         this.data = d;
         this.defaults = d.clone();
     }
@@ -44,15 +43,15 @@ public class NeoForgePotionEffect extends Effect<FabricPotionKeys> {
         if (!(target instanceof ServerPlayer)) return;
         ServerPlayer player = (ServerPlayer) target;
 
-        Object typeObj = data.get(FabricPotionKeys.TYPE);
+        Object typeObj = data.get(NeoForgePotionKeys.TYPE);
         if (!(typeObj instanceof MobEffect)) return;
         MobEffect potion = (MobEffect) typeObj;
 
-        int duration  = numAsInt(data.get(FabricPotionKeys.DURATION),  200);
-        int amplifier = numAsInt(data.get(FabricPotionKeys.AMPLIFIER), 0);
-        boolean ambient   = boolOrDefault(data.get(FabricPotionKeys.AMBIENT),   false);
-        boolean particles = boolOrDefault(data.get(FabricPotionKeys.PARTICLES), true);
-        boolean icon      = boolOrDefault(data.get(FabricPotionKeys.ICON),      true);
+        int duration  = numAsInt(data.get(NeoForgePotionKeys.DURATION),  200);
+        int amplifier = numAsInt(data.get(NeoForgePotionKeys.AMPLIFIER), 0);
+        boolean ambient   = boolOrDefault(data.get(NeoForgePotionKeys.AMBIENT),   false);
+        boolean particles = boolOrDefault(data.get(NeoForgePotionKeys.PARTICLES), true);
+        boolean icon      = boolOrDefault(data.get(NeoForgePotionKeys.ICON),      true);
 
         Object instance = buildInstance(potion, duration, amplifier, ambient, particles, icon);
         if (instance == null) {
@@ -181,12 +180,12 @@ public class NeoForgePotionEffect extends Effect<FabricPotionKeys> {
 
     @Override
     public String toPermission() {
-        return data.get(FabricPotionKeys.TYPE) + "."
-                + data.get(FabricPotionKeys.DURATION) + "."
-                + data.get(FabricPotionKeys.AMPLIFIER) + "."
-                + data.get(FabricPotionKeys.AMBIENT) + "."
-                + data.get(FabricPotionKeys.PARTICLES) + "."
-                + data.get(FabricPotionKeys.ICON);
+        return data.get(NeoForgePotionKeys.TYPE) + "."
+                + data.get(NeoForgePotionKeys.DURATION) + "."
+                + data.get(NeoForgePotionKeys.AMPLIFIER) + "."
+                + data.get(NeoForgePotionKeys.AMBIENT) + "."
+                + data.get(NeoForgePotionKeys.PARTICLES) + "."
+                + data.get(NeoForgePotionKeys.ICON);
     }
 
     @Override
@@ -194,9 +193,9 @@ public class NeoForgePotionEffect extends Effect<FabricPotionKeys> {
         applyByType(KEY_ORDER, data);
     }
 
-    private static final FabricPotionKeys[] KEY_ORDER = {
-            FabricPotionKeys.TYPE, FabricPotionKeys.DURATION, FabricPotionKeys.AMPLIFIER,
-            FabricPotionKeys.AMBIENT, FabricPotionKeys.PARTICLES, FabricPotionKeys.ICON
+    private static final NeoForgePotionKeys[] KEY_ORDER = {
+            NeoForgePotionKeys.TYPE, NeoForgePotionKeys.DURATION, NeoForgePotionKeys.AMPLIFIER,
+            NeoForgePotionKeys.AMBIENT, NeoForgePotionKeys.PARTICLES, NeoForgePotionKeys.ICON
     };
 
     private static int numAsInt(Object o, int fallback) {

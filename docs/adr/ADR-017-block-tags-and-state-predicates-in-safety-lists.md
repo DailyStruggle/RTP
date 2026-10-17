@@ -210,6 +210,23 @@ integer    := '-'? [0-9]+
 
 Implementation: `StatePredicate` gains an immutable `NumericComparison` (key, `Comparator` operator, `long` bound) list alongside the existing equality map; `SafetyTokenParser` locates the operator and routes equalities vs. comparisons. No change to `CompiledUnsafeSet` bucket structure (range predicates ride inside the same per-material / per-tag / wildcard `StatePredicate` buckets), so the section 4 hot-path fast-path and `hasWildcardStatePredicate` flag are unaffected. The Anvil path (section 5) reads the same NBT `Properties` compound. This stays pure and Bukkit-free in `rtp-api`. Regression coverage: `SafetyTokenParserTest`, `CompiledUnsafeSetTest`.
 
+## Amendment (tag-group set subtraction)
+
+**Date:** 2026-09-30 — closes the ROADMAP Tier 2 "Safety-list grammar expansion → tag-group composition with set subtraction" item for release **v3.3.0**.
+
+The safety-list grammar of section 1 is extended to support set subtraction syntax:
+
+```
+token       := baseToken ( '-' subtraction )*
+baseToken   := material | tag | predicated
+subtraction := material | tag | predicated
+```
+
+- Operators may subtract specific items or tags from a tag group (e.g. `#minecraft:slabs - OAK_SLAB`, `#minecraft:leaves - AZALEA_LEAVES - FLOWERING_AZALEA_LEAVES`, `#minecraft:slabs[waterlogged=true] - OAK_SLAB`).
+- Malformed subtraction segments (empty identifier, invalid characters) are rejected at parse time with a warning logged (REQ-RTP-S-004 compliance).
+- Evaluation & expansion: Subtracted canonical materials or matching tag elements are excluded during tag expansion (`SafetyTokenExpander`, `JumpAdjustor`) and in compiled safety sets (`CompiledUnsafeSet`).
+- Keeps `rtp-api` strictly pure and Bukkit-free (ADR-011).
+
 ## References
 
 - `docs/dev/REQUIREMENTS.md section 3` — REQ-RTP-S-001 (unsafe-block prohibition) and REQ-RTP-S-004 (never-silent failure).

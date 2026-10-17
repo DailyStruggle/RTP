@@ -16,18 +16,18 @@ import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
-import io.github.dailystruggle.rtp.common.tasks.ScanTask;
+import io.github.dailystruggle.rtp.common.tasks.ScanProgressView;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
-import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
+import io.github.dailystruggle.rtp.common.tasks.TrackableTask;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.function.IntFunction;
 
 public class PlaceholderProvider {
+    private PlaceholderProvider() {}
     public static final Map<String, Function<UUID, String>> placeholders = new ConcurrentHashMap<>();
 
     /**
@@ -563,20 +563,20 @@ public class PlaceholderProvider {
         placeholders.put(
                 "genSuccessRate",
                 uuid -> {
-                    double r = io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL.successRate();
+                    double r = io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL.successRate();
                     return Double.isNaN(r) ? "n/a" : String.format("%.1f%%", r * 100.0);
                 });
         placeholders.put(
                 "genFailureRate",
                 uuid -> {
-                    double r = io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL.successRate();
+                    double r = io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL.successRate();
                     return Double.isNaN(r) ? "n/a" : String.format("%.1f%%", (1.0 - r) * 100.0);
                 });
         placeholders.put(
                 "genOutcomeTotal",
                 uuid -> {
-                    io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats stats =
-                            io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL;
+                    io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats stats =
+                            io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL;
                     return String.valueOf(stats.successCount() + stats.totalFailures());
                 });
         placeholders.put(
@@ -584,7 +584,7 @@ public class PlaceholderProvider {
                 uuid -> {
                     Map<io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes, Long>
                             breakdown =
-                            io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL.failureBreakdown();
+                            io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL.failureBreakdown();
                     // Comma-separated "cause=N" list, omitting zero buckets, busiest first.
                     String out = breakdown.entrySet().stream()
                             .filter(e -> e.getValue() > 0L)
@@ -598,7 +598,7 @@ public class PlaceholderProvider {
                 uuid -> {
                     Map<io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes, Long>
                             breakdown =
-                            io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL.failureBreakdown();
+                            io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL.failureBreakdown();
                     return breakdown.entrySet().stream()
                             .filter(e -> e.getValue() > 0L)
                             .max(java.util.Map.Entry.comparingByValue())
@@ -610,7 +610,7 @@ public class PlaceholderProvider {
                 uuid -> {
                     Map<io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes, Long>
                             breakdown =
-                            io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats.GLOBAL.failureBreakdown();
+                            io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL.failureBreakdown();
                     long total = 0L;
                     long top = 0L;
                     for (long v : breakdown.values()) {
@@ -716,6 +716,38 @@ public class PlaceholderProvider {
                     return replacement;
                 });
         placeholders.put(
+                "distance",
+                uuid -> {
+                    if (RTP.getInstance() == null) return "0.0";
+                    TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
+                    if (teleportData == null) return "0.0";
+                    return String.format(java.util.Locale.US, "%.1f", teleportData.distance);
+                });
+        placeholders.put(
+                "distance_blocks",
+                uuid -> {
+                    if (RTP.getInstance() == null) return "0";
+                    TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
+                    if (teleportData == null) return "0";
+                    return String.valueOf(Math.round(teleportData.distance));
+                });
+        placeholders.put(
+                "distance_center",
+                uuid -> {
+                    if (RTP.getInstance() == null) return "0.0";
+                    TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
+                    if (teleportData == null) return "0.0";
+                    return String.format(java.util.Locale.US, "%.1f", teleportData.distanceFromCenter);
+                });
+        placeholders.put(
+                "distance_center_blocks",
+                uuid -> {
+                    if (RTP.getInstance() == null) return "0";
+                    TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
+                    if (teleportData == null) return "0";
+                    return String.valueOf(Math.round(teleportData.distanceFromCenter));
+                });
+        placeholders.put(
                 "spot",
                 uuid -> {
                     if (RTP.getInstance() == null) return "0";
@@ -766,14 +798,13 @@ public class PlaceholderProvider {
                     }
 
                     RTPRunnable nextTask = data.nextTask;
-                    if (nextTask instanceof TeleportPipelineTask) {
-                        TeleportPipelineTask task = (TeleportPipelineTask) nextTask;
-                        switch (task.getPhase()) {
-                            case TELEPORT:
+                    if (nextTask instanceof TrackableTask task) {
+                        switch (task.phaseName()) {
+                            case "TELEPORT":
                                 return RTP.configs.getConfigValue(PlayerMessages.PLAYER_TELEPORTING, "").toString();
-                            case LOAD:
+                            case "LOAD":
                                 return RTP.configs.getConfigValue(PlayerMessages.PLAYER_LOADING, "").toString();
-                            case SETUP:
+                            case "SETUP":
                                 return RTP.configs.getConfigValue(PlayerMessages.PLAYER_SETUP, "").toString();
                             default:
                                 break;
@@ -894,12 +925,12 @@ public class PlaceholderProvider {
                     if (RTP.getInstance() == null) return "0";
                     Region region = RTP.regionContext.get();
                     if (region != null) {
-                        ScanTask task = RTP.getInstance().scanTasks.get(region.name);
-                        return (task != null) ? String.valueOf(task.latestAbsolutePos) : "0";
+                        ScanProgressView task = RTP.getInstance().scanTasks.get(region.name);
+                        return (task != null) ? String.valueOf(task.absolutePos()) : "0";
                     }
                     long total = 0;
-                    for (ScanTask task : RTP.getInstance().scanTasks.values()) {
-                        total += task.latestAbsolutePos;
+                    for (ScanProgressView task : RTP.getInstance().scanTasks.values()) {
+                        if (task != null) total += task.absolutePos();
                     }
                     return String.valueOf(total);
                 });
@@ -909,12 +940,12 @@ public class PlaceholderProvider {
                     if (RTP.getInstance() == null) return "0";
                     Region region = RTP.regionContext.get();
                     if (region != null) {
-                        ScanTask task = RTP.getInstance().scanTasks.get(region.name);
-                        return (task != null) ? String.valueOf(task.latestAbsoluteTotal) : "0";
+                        ScanProgressView task = RTP.getInstance().scanTasks.get(region.name);
+                        return (task != null) ? String.valueOf(task.absoluteTotal()) : "0";
                     }
                     long total = 0;
-                    for (ScanTask task : RTP.getInstance().scanTasks.values()) {
-                        total += task.latestAbsoluteTotal;
+                    for (ScanProgressView task : RTP.getInstance().scanTasks.values()) {
+                        if (task != null) total += task.absoluteTotal();
                     }
                     return String.valueOf(total);
                 });
@@ -924,12 +955,12 @@ public class PlaceholderProvider {
                     if (RTP.getInstance() == null) return "0";
                     Region region = RTP.regionContext.get();
                     if (region != null) {
-                        ScanTask task = RTP.getInstance().scanTasks.get(region.name);
-                        return (task != null) ? String.valueOf(task.latestCps) : "0";
+                        ScanProgressView task = RTP.getInstance().scanTasks.get(region.name);
+                        return (task != null) ? String.valueOf(task.cps()) : "0";
                     }
                     long total = 0;
-                    for (ScanTask task : RTP.getInstance().scanTasks.values()) {
-                        total += task.latestCps;
+                    for (ScanProgressView task : RTP.getInstance().scanTasks.values()) {
+                        if (task != null) total += task.cps();
                     }
                     return String.valueOf(total);
                 });
@@ -945,26 +976,17 @@ public class PlaceholderProvider {
                 "scan_landPercentage",
                 uuid -> {
                     if (RTP.getInstance() == null) return "0.00";
+                    // Read ScanProgressView's good/(good+bad) tally; MemoryShape bad counts include
+                    // gap-bridged runs and outer-ring preimages, so a shape-derived ratio
+                    // drifts or clamps to 0 mid-scan.
                     Region r = RTP.regionContext.get();
-                    if (r != null && r.getShape() instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape<?> ms) {
-                        long bad = ms.getEffectiveBadCount();
-                        long denom = ms.getEffectiveGoodCount() + bad;
-                        if (denom <= 0) return "0.00";
-                        double pct = ((denom - bad) * 100.0) / denom;
-                        return String.format(java.util.Locale.ROOT, "%.2f", pct);
+                    double pct;
+                    if (r != null) {
+                        ScanProgressView task = RTP.getInstance().scanTasks.get(r.name);
+                        pct = (task != null) ? task.landPercentage() : 0.0;
+                    } else {
+                        pct = averageLandPercentage(RTP.getInstance().scanTasks.values());
                     }
-                    long totalBad = 0;
-                    long totalEvaluated = 0;
-                    for (ScanTask task : RTP.getInstance().scanTasks.values()) {
-                        if (task.region.getShape() instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape<?> ms) {
-                            long bad = ms.getEffectiveBadCount();
-                            long denom = ms.getEffectiveGoodCount() + bad;
-                            totalBad += bad;
-                            totalEvaluated += denom;
-                        }
-                    }
-                    if (totalEvaluated <= 0) return "0.00";
-                    double pct = ((totalEvaluated - totalBad) * 100.0) / totalEvaluated;
                     return String.format(java.util.Locale.ROOT, "%.2f", pct);
                 });
         placeholders.put(
@@ -974,14 +996,14 @@ public class PlaceholderProvider {
                         if (RTP.getInstance() == null) return "0s";
                         Region region = RTP.regionContext.get();
                         if (region != null) {
-                            ScanTask task = RTP.getInstance().scanTasks.get(region.name);
-                            long eta = (task != null) ? task.latestEtaSeconds : 0L;
+                            ScanProgressView task = RTP.getInstance().scanTasks.get(region.name);
+                            long eta = (task != null) ? task.etaSeconds() : 0L;
                             return formatEta(eta);
                         }
 
                         long maxEta = 0;
-                        for (ScanTask task : RTP.getInstance().scanTasks.values()) {
-                            if (task.latestEtaSeconds > maxEta) maxEta = task.latestEtaSeconds;
+                        for (ScanProgressView task : RTP.getInstance().scanTasks.values()) {
+                            if (task != null && task.etaSeconds() > maxEta) maxEta = task.etaSeconds();
                         }
 
                         return formatEta(maxEta);
@@ -1255,63 +1277,136 @@ public class PlaceholderProvider {
         return String.format(java.util.Locale.ROOT, "%.2f%%", v);
     }
 
+    /**
+     * Mean of {@link ScanProgressView#landPercentage} across {@code tasks}; {@code 0.0} when empty.
+     * Unweighted: each task's figure is already a per-region good/(good+bad) ratio.
+     */
+    public static double averageLandPercentage(java.util.Collection<? extends ScanProgressView> tasks) {
+        if (tasks == null || tasks.isEmpty()) return 0.0;
+        double sum = 0.0;
+        int n = 0;
+        for (ScanProgressView task : tasks) {
+            if (task == null) continue;
+            sum += task.landPercentage();
+            n++;
+        }
+        return n == 0 ? 0.0 : sum / n;
+    }
+
     public static String fillPlaceholders(String text, UUID uuid) {
         Set<String> keywords =
                 ParseString.keywords(
                         text,
                         placeholders.keySet(),
-                        new HashSet<>(Arrays.asList('[', '%')),
-                        new HashSet<>(Arrays.asList(']', '%')));
+                        new HashSet<>(Arrays.asList('[', '%', '<')),
+                        new HashSet<>(Arrays.asList(']', '%', '>')));
 
         for (String s : keywords) {
             Function<UUID, String> function = placeholders.get(s);
             if (function == null) continue;
             String value = function.apply(uuid);
-            String quotedValue = Matcher.quoteReplacement(value);
-            text = Pattern.compile("\\[" + s + "]", Pattern.CASE_INSENSITIVE)
-                    .matcher(text)
-                    .replaceAll(quotedValue);
-            text = Pattern.compile("%" + s + "%", Pattern.CASE_INSENSITIVE)
-                    .matcher(text)
-                    .replaceAll(quotedValue);
+            text = replaceDelimited(text, '[', s, ']', value);
+            text = replaceDelimited(text, '%', s, '%', value);
+            text = replaceDelimited(text, '<', s, '>', value);
         }
         return text;
+    }
+
+    /**
+     * Replaces every {@code open + key + close} (key matched case-insensitively, literally)
+     * with {@code value}, left to right, non-overlapping. Keys come from the addon-writable
+     * {@link #placeholders} map, so they must never be interpreted as regex syntax.
+     */
+    static String replaceDelimited(String text, char open, String key, char close, String value) {
+        int keyLen = key.length();
+        int tokenLen = keyLen + 2;
+        int from = text.indexOf(open);
+        if (from < 0) return text;
+        StringBuilder sb = null;
+        int copied = 0;
+        int last = text.length() - tokenLen;
+        for (int i = from; i >= 0 && i <= last; ) {
+            if (text.charAt(i + tokenLen - 1) == close && text.regionMatches(true, i + 1, key, 0, keyLen)) {
+                if (sb == null) sb = new StringBuilder(text.length() + Math.max(0, value.length() - tokenLen));
+                sb.append(text, copied, i).append(value);
+                copied = i + tokenLen;
+                i = text.indexOf(open, copied);
+            } else {
+                i = text.indexOf(open, i + 1);
+            }
+        }
+        if (sb == null) return text;
+        return sb.append(text, copied, text.length()).toString();
     }
 
     public static String fillNumericPlaceholders(String text) {
         if (RTP.configs == null) return text;
+        List<?>[] list = new List<?>[1];
+        IntFunction<String> lookup = index -> {
+            if (list[0] == null) {
+                Object o = RTP.configs.getConfigValue(PlaceholderMessages.placeholders, new ArrayList<>());
+                list[0] = o instanceof List<?> pList ? pList : Collections.emptyList();
+            }
+            return list[0].size() > index ? String.valueOf(list[0].get(index)) : "[invalid]";
+        };
         // [p0], [p1]...
-        text = fillNumericPlaceholders(text, Pattern.compile("\\[([Pp])(\\d*)]"), "\\[[Pp]\\d*]");
+        text = fillNumericPlaceholders(text, '[', ']', lookup);
         // %p0%, %p1%...
-        text = fillNumericPlaceholders(text, Pattern.compile("%([Pp])(\\d*)%"), "%[Pp]\\d*%");
+        text = fillNumericPlaceholders(text, '%', '%', lookup);
         return text;
     }
 
-    private static String fillNumericPlaceholders(String text, Pattern pattern, String removeRegex) {
-        Matcher matcher = pattern.matcher(text);
-        while (matcher.find()) {
-            String group = matcher.group(2);
-            int bits;
-            try {
-                bits = Integer.parseInt(group);
-            } catch (NumberFormatException ignored) {
+    /**
+     * Single left-to-right pass over {@code open [Pp] digits close} tokens. Replacement text is
+     * not rescanned, and same-syntax tokens are stripped from it so a configured value cannot
+     * re-introduce a placeholder. Tokens with an empty or unparseable index are kept verbatim.
+     */
+    private static String fillNumericPlaceholders(String text, char open, char close, IntFunction<String> lookup) {
+        return scanNumericTokens(text, open, close, index -> {
+            if (index < 0) return null;
+            return scanNumericTokens(lookup.apply(index), open, close, ignored -> "");
+        });
+    }
+
+    /**
+     * Visits each {@code open [Pp] [0-9]* close} token; {@code replacer} receives the parsed index
+     * ({@code -1} when empty or overflowing) and returns the substitute, or {@code null} to keep it.
+     */
+    private static String scanNumericTokens(String text, char open, char close, IntFunction<String> replacer) {
+        int i = text.indexOf(open);
+        if (i < 0) return text;
+        StringBuilder sb = null;
+        int copied = 0;
+        int n = text.length();
+        while (i >= 0 && i + 2 < n) {
+            char p = text.charAt(i + 1);
+            if (p != 'p' && p != 'P') {
+                i = text.indexOf(open, i + 1);
                 continue;
             }
-            matcher.reset();
-
-            String replacement = "[invalid]";
-            Object o = RTP.configs.getConfigValue(PlaceholderMessages.placeholders, new ArrayList<>());
-            if (o instanceof List<?> pList) {
-                if (pList.size() > bits) {
-                    replacement = pList.get(bits).toString();
+            int j = i + 2;
+            while (j < n && text.charAt(j) >= '0' && text.charAt(j) <= '9') j++;
+            if (j >= n || text.charAt(j) != close) {
+                i = text.indexOf(open, i + 1);
+                continue;
+            }
+            int index = -1;
+            if (j > i + 2) {
+                try {
+                    index = Integer.parseInt(text, i + 2, j, 10);
+                } catch (NumberFormatException ignored) {
+                    index = -1;
                 }
             }
-
-            replacement = Pattern.compile(removeRegex).matcher(replacement).replaceAll("");
-
-            text = matcher.replaceFirst(Matcher.quoteReplacement(replacement));
-            matcher = pattern.matcher(text);
+            String replacement = replacer.apply(index);
+            if (replacement != null) {
+                if (sb == null) sb = new StringBuilder(n);
+                sb.append(text, copied, i).append(replacement);
+                copied = j + 1;
+            }
+            i = text.indexOf(open, j + 1);
         }
-        return text;
+        if (sb == null) return text;
+        return sb.append(text, copied, n).toString();
     }
 }

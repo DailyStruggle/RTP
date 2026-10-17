@@ -192,4 +192,86 @@ class CommandEffectTest {
         assertEquals(1, consoleCommandsRun.size());
         assertEquals("msg TestPlayer Welcome to world_nether (100, 64, -200)", consoleCommandsRun.get(0));
     }
+
+    @Test
+    void testMultipleCommandEffectsInOneStage() {
+        List<String> nodes = List.of(
+                "rtp.effect.postteleport.COMMAND.CONSOLE.say a",
+                "rtp.effect.postteleport.COMMAND.PLAYER.me b"
+        );
+        List<io.github.dailystruggle.effectsapi.common.Effect<?>> effects =
+                EffectFactory.buildEffects("rtp.effect.postteleport", nodes);
+        assertEquals(2, effects.size());
+
+        for (var effect : effects) {
+            effect.setTarget(testPlayer);
+            effect.run();
+        }
+
+        assertEquals(1, consoleCommandsRun.size(), "console command should run once");
+        assertEquals("say a", consoleCommandsRun.get(0));
+        assertEquals(1, playerCommandsRun.size(), "player command should run once");
+        assertEquals("me b", playerCommandsRun.get(0));
+    }
+
+    @Test
+    void testSpaceSyntaxCommandEffect() {
+        List<String> nodes = List.of(
+                "rtp.effect.postteleport.COMMAND CONSOLE say hi",
+                "rtp.effect.postteleport.COMMAND PLAYER me hi"
+        );
+        List<io.github.dailystruggle.effectsapi.common.Effect<?>> effects =
+                EffectFactory.buildEffects("rtp.effect.postteleport", nodes);
+        assertEquals(2, effects.size());
+
+        for (var effect : effects) {
+            effect.setTarget(testPlayer);
+            effect.run();
+        }
+
+        assertEquals(1, consoleCommandsRun.size());
+        assertEquals("say hi", consoleCommandsRun.get(0));
+        assertEquals(1, playerCommandsRun.size());
+        assertEquals("me hi", playerCommandsRun.get(0));
+    }
+
+    @Test
+    void testEscapedDotsInCommandEffect() {
+        CommandEffect effect = new CommandEffect();
+        effect.setData("CONSOLE", "say", "a.b");
+        String perm = effect.toPermission();
+        assertEquals("console.say\\ a\\.b", perm);
+
+        List<String> nodes = List.of("rtp.effect.postteleport.COMMAND." + perm);
+        List<io.github.dailystruggle.effectsapi.common.Effect<?>> effects =
+                EffectFactory.buildEffects("rtp.effect.postteleport", nodes);
+        assertEquals(1, effects.size());
+
+        effects.get(0).setTarget(testPlayer);
+        effects.get(0).run();
+
+        assertEquals(1, consoleCommandsRun.size());
+        assertEquals("say a.b", consoleCommandsRun.get(0));
+    }
+
+    @Test
+    void testUnknownEffectTypeWarnsOnce() {
+        EffectFactory.clearWarnedUnknownTypes();
+        List<String> warnings = new ArrayList<>();
+        io.github.dailystruggle.effectsapi.common.Effect.setDefaultWarn(warnings::add);
+
+        try {
+            List<String> nodes = List.of(
+                    "rtp.effect.postteleport.NON_EXISTENT_EFFECT.arg1",
+                    "rtp.effect.postteleport.NON_EXISTENT_EFFECT.arg2"
+            );
+            List<io.github.dailystruggle.effectsapi.common.Effect<?>> effects =
+                    EffectFactory.buildEffects("rtp.effect.postteleport", nodes);
+            assertTrue(effects.isEmpty());
+            assertEquals(1, warnings.size(), "should warn once for unknown effect type");
+            assertTrue(warnings.get(0).contains("NON_EXISTENT_EFFECT"));
+        } finally {
+            io.github.dailystruggle.effectsapi.common.Effect.setDefaultWarn(null);
+        }
+    }
 }

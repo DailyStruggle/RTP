@@ -1,0 +1,212 @@
+package io.github.dailystruggle.rtp.common.permission;
+
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporter;
+import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporterRegistry;
+import io.github.dailystruggle.rtp.common.importer.UniversalConfigImporter;
+import io.github.dailystruggle.rtp.common.search.FuzzySearchEngine;
+import io.github.dailystruggle.rtp.common.search.ThesaurusIndex;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Derives permission-migration sources from the server's plugin folders when no {@code source=} is named.
+ *
+ * <p>A folder counts as a foreign rtp plugin when its YAML keys hit at least {@link #MIN_CONCEPTS} distinct
+ * rtp concepts (radius, center, cooldown, delay, worlds) and one of them is {@link #REQUIRED_CONCEPT}:
+ * cooldown/delay alone are common to every teleport, home or warp plugin. Keys match a concept through the
+ * editor search thesaurus ({@code synonyms} in the packaged {@code /editor/editor-data.json}) plus
+ * Levenshtein distance. General teleport suites ({@link #NON_RTP_SUITES}) never qualify: stock EssentialsX
+ * keys ({@code near-radius}, {@code teleport-to-center}, {@code teleport-delay}) hit every concept, and their
+ * per-world nodes must not become {@code rtp.worlds.*} by inference. A node prefix then best-matches a derived
+ * source by normalized equality, containment or edit distance, so an unlisted {@code FooRTP} works while
+ * {@code worldedit.*} (a {@code config.yml} with only a brush radius) does not.
+ */
+public final class PermissionSourceResolver {
+
+    /** Distinct rtp concepts a folder's YAML keys must hit to count as a source. */
+    static final int MIN_CONCEPTS = 2;
+    /** Concept every source must hit; rtp plugins configure a radius, generic teleport suites rarely do. */
+    static final String REQUIRED_CONCEPT = "radius";
+    /** Normalized folder names / node prefixes of general teleport suites; only {@code source=} maps them. */
+    static final Set<String> NON_RTP_SUITES = Set.of("essentials", "essentialsx", "cmi", "huskhomes");
+    /** Maximum edit distance for a fuzzy key or prefix match. */
+    static final int MAX_EDIT_DISTANCE = FuzzySearchEngine.MAX_EDIT_DISTANCE;
+    /** Terms shorter than this only match exactly (containment / edit distance are too noisy). */
+    static final int MIN_FUZZY_LENGTH = 5;
+    /** Shortest name allowed to match by containment ({@code rtp} itself never does). */
+    static final int MIN_CONTAINMENT_LENGTH = FuzzySearchEngine.MIN_CONTAINMENT_LENGTH;
+
+    static final String THESAURUS_RESOURCE = ThesaurusIndex.THESAURUS_RESOURCE;
+
+    private static final int MAX_FILES_PER_FOLDER = 32;
+    private static final long MAX_FILE_BYTES = 512L * 1024L;
+    private static final Pattern YAML_KEY = Pattern.compile("^\\s*(?:-\\s+)?[\"']?([A-Za-z0-9_.\\-]+)[\"']?\\s*:");
+
+    /** Concept -> normalized LeafRTP (or common foreign) key spellings. */
+    private static final Map<String, Set<String>> CANONICAL = Map.of(
+            "radius", Set.of("radius", "maxradius", "minradius", "centerradius", "range", "maxrange", "minrange"),
+            "center", Set.of("center", "centerx", "centerz"),
+            "cooldown", Set.of("cooldown", "teleportcooldown"),
+            "delay", Set.of("delay", "teleportdelay", "warmup"),
+            "worlds", Set.of("worlds", "customworlds", "enabledworlds"));
+
+    private PermissionSourceResolver() {}
+
+    /** Server {@code plugins/} directory (parent of RTP's data folder), or {@code null} when unknown. */
+    @Nullable
+    public static Path resolvePluginsDir() {
+        File pluginDir = null;
+        if (RTP.configs != null && RTP.configs.pluginDirectory != null) {
+            pluginDir = RTP.configs.pluginDirectory;
+        } else if (RTP.serverAccessor != null) {
+            pluginDir = RTP.serverAccessor.getPluginDirectory();
+        }
+        if (pluginDir == null) return null;
+        File parent = pluginDir.getAbsoluteFile().getParentFile();
+        return parent != null ? parent.toPath() : null;
+    }
+
+    /**
+     * Normalized source names (folder names plus aliases of matching importers) for every folder under
+     * {@code pluginsDir} that looks like a foreign rtp plugin. Empty when the directory is unknown.
+     */
+    @NotNull
+    public static Set<String> deriveSources(@Nullable Path pluginsDir) {
+        Set<String> sources = new LinkedHashSet<>();
+        if (pluginsDir == null || !Files.isDirectory(pluginsDir)) return sources;
+        for (Map.Entry<String, Path> e : ForeignConfigImporterRegistry.detectAvailableSources(pluginsDir).entrySet()) {
+            String folder = normalize(e.getKey());
+            if (folder.isEmpty() || NON_RTP_SUITES.contains(folder)) continue;
+            if (!isRtpLikeFolder(e.getValue())) continue;
+            sources.add(folder);
+            for (ForeignConfigImporter importer : ForeignConfigImporterRegistry.getAllImporters()) {
+                if (importer instanceof UniversalConfigImporter) continue;
+                if (!nameMatches(folder, normalize(importer.sourceName()))) continue;
+                sources.add(normalize(importer.sourceName()));
+                for (String alias : importer.directoryAliases()) {
+                    String a = normalize(alias);
+                    if (!a.isEmpty()) sources.add(a);
+                }
+            }
+        }
+        return sources;
+    }
+
+    /** True when the permission node's plugin prefix best-matches one of {@code sources}. */
+    public static boolean matchesSource(@Nullable String permissionNode, @Nullable Collection<String> sources) {
+        if (permissionNode == null || sources == null || sources.isEmpty()) return false;
+        String lower = permissionNode.trim().toLowerCase(Locale.ROOT);
+        int dot = lower.indexOf('.');
+        String prefix = normalize(dot > 0 ? lower.substring(0, dot) : lower);
+        if (prefix.isEmpty() || "rtp".equals(prefix) || NON_RTP_SUITES.contains(prefix)) return false;
+        for (String s : sources) {
+            if (nameMatches(prefix, normalize(s))) return true;
+        }
+        return false;
+    }
+
+    /** True when the folder's YAML keys hit {@link #REQUIRED_CONCEPT} and at least {@link #MIN_CONCEPTS} concepts. */
+    static boolean isRtpLikeFolder(@Nullable Path dir) {
+        Set<String> hit = conceptHits(dir);
+        return hit.size() >= MIN_CONCEPTS && hit.contains(REQUIRED_CONCEPT);
+    }
+
+    static int conceptCount(@Nullable Path dir) {
+        return conceptHits(dir).size();
+    }
+
+    static Set<String> conceptHits(@Nullable Path dir) {
+        if (dir == null || !Files.isDirectory(dir)) return Set.of();
+        Set<String> keys = collectYamlKeys(dir);
+        Map<String, Set<String>> terms = conceptTerms();
+        Set<String> hit = new HashSet<>();
+        for (String key : keys) {
+            for (Map.Entry<String, Set<String>> c : terms.entrySet()) {
+                if (hit.contains(c.getKey())) continue;
+                for (String term : c.getValue()) {
+                    if (keyMatches(key, term)) {
+                        hit.add(c.getKey());
+                        break;
+                    }
+                }
+            }
+            if (hit.size() == terms.size()) break;
+        }
+        return hit;
+    }
+
+    static boolean keyMatches(String key, String term) {
+        return FuzzySearchEngine.keyMatches(key, term);
+    }
+
+    static boolean nameMatches(String a, String b) {
+        return FuzzySearchEngine.nameMatches(a, b);
+    }
+
+    /** Lower-case ASCII letters and digits only. */
+    static String normalize(@Nullable String s) {
+        return FuzzySearchEngine.normalize(s);
+    }
+
+    static int levenshtein(String a, String b) {
+        return FuzzySearchEngine.levenshtein(a, b);
+    }
+
+    /** Normalized YAML keys (whole and per dotted segment) from the folder root and one subdirectory level. */
+    private static Set<String> collectYamlKeys(Path dir) {
+        Set<String> keys = new HashSet<>();
+        List<Path> files = new ArrayList<>();
+        listYaml(dir, files);
+        try (DirectoryStream<Path> subs = Files.newDirectoryStream(dir, Files::isDirectory)) {
+            for (Path sub : subs) {
+                if (files.size() >= MAX_FILES_PER_FOLDER) break;
+                listYaml(sub, files);
+            }
+        } catch (IOException | RuntimeException ignored) {
+            // Unreadable subdirectories just contribute no keys.
+        }
+        for (Path f : files) {
+            try {
+                if (Files.size(f) > MAX_FILE_BYTES) continue;
+                for (String line : Files.readAllLines(f, StandardCharsets.UTF_8)) {
+                    Matcher m = YAML_KEY.matcher(line);
+                    if (!m.find()) continue;
+                    String raw = m.group(1);
+                    keys.add(normalize(raw));
+                    for (String seg : raw.split("\\.")) keys.add(normalize(seg));
+                }
+            } catch (IOException | RuntimeException ignored) {
+                // Non-UTF-8 or unreadable files contribute no keys.
+            }
+        }
+        keys.remove("");
+        return keys;
+    }
+
+    private static void listYaml(Path dir, List<Path> out) {
+        try (DirectoryStream<Path> s = Files.newDirectoryStream(dir, "*.{yml,yaml}")) {
+            for (Path p : s) {
+                if (out.size() >= MAX_FILES_PER_FOLDER) return;
+                if (Files.isRegularFile(p)) out.add(p);
+            }
+        } catch (IOException | RuntimeException ignored) {
+            // Unreadable directory: no candidates.
+        }
+    }
+
+    /** Canonical spellings plus every thesaurus word whose key list names one of them. */
+    static Map<String, Set<String>> conceptTerms() {
+        return ThesaurusIndex.getInstance().getConceptTerms(CANONICAL);
+    }
+}

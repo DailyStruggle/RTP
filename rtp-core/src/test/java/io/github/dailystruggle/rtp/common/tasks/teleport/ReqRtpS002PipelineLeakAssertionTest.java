@@ -131,6 +131,11 @@ class ReqRtpS002PipelineLeakAssertionTest {
     task.run();
     accessor.getMockScheduler().tick(1);
 
+    // REQ-RTP-S-005: the arrival ticket outlives the teleport tick, then is released (S-002).
+    assertEquals(1, world.getActiveTicketCount(),
+        "Arrival chunk ticket must be held after teleport until the player's own ticket holds it");
+    accessor.getMockScheduler().tick(TeleportPipelineTask.ARRIVAL_HOLD_TICKS);
+
     assertEquals(0, world.getActiveTicketCount(),
         "Active chunk tickets must return to 0 after normal pipeline completion (S-002)");
     assertEquals(0, MemoryTracker.trackedCount(),

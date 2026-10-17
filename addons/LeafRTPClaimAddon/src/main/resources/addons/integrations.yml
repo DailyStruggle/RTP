@@ -48,6 +48,16 @@ rerollCrashClaim: false
 # @default: false
 rerollHuskClaims: false
 
+# Reroll the location if it lands inside a HuskTowns town claim.
+# @type: boolean
+# @default: false
+rerollHuskTowns: false
+
+# Reroll the location if it lands inside a PlotSquared plot or road.
+# @type: boolean
+# @default: false
+rerollPlotSquared: false
+
 # Reroll the location if it lands inside KingdomsX claimed land.
 # @type: boolean
 # @default: false
@@ -63,5 +73,29 @@ rerollTownyAdvanced: false
 # @default: false
 rerollWorldGuard: false
 
+# Reroll the location if it lands inside an UltimateClaims claim.
+# @type: boolean
+# @default: false
+rerollUltimateClaims: false
+
+# Reroll the location if it lands inside a MinePlots plot or claim.
+# @type: boolean
+# @default: false
+rerollMinePlots: false
+
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0
+
+# --- Permission Migration & Command Templates ---
+# Templates used when querying/migrating competitor permissions or modifying permissions via /rtp perm.
+# Available placeholders: [group], [user], [permission], [value], [contexts]
+permissions:
+  command_templates:
+    group_list: "lp listgroups"
+    group_get: "lp group [group] permission info"
+    group_set: "lp group [group] permission set [permission] [value] [contexts]"
+    group_unset: "lp group [group] permission unset [permission] [contexts]"
+    user_list: "lp listusers"
+    user_get: "lp user [user] permission info"
+    user_set: "lp user [user] permission set [permission] [value] [contexts]"
+    user_unset: "lp user [user] permission unset [permission] [contexts]"

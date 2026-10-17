@@ -1,6 +1,6 @@
 # ADR-092 — Hybrid Bit-Packed and 16-Bit Run Container Hazard Table
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-10-05) - in production: `HybridHazardTable` backs the `MemoryShape` hazard mirror, and `AnvilRegionBinHazardTable` / `StrideGroupResidencyManager` back stride-group bin residency.
 - **Date:** 2026-09-09
 - **Deciders:** Maintainer, Architectural Review
 - **Consulted:** ADR-079, ADR-081, ADR-085, ADR-088, ADR-089

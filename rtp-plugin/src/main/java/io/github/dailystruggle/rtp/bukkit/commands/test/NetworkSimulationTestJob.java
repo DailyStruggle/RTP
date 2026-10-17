@@ -4,10 +4,9 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
 import io.github.dailystruggle.rtp.common.database.options.AbstractSQLDatabaseAccessor;
-import io.github.dailystruggle.rtp.common.network.NetworkStateBinding;
+import io.github.dailystruggle.rtp.common.database.options.NetworkStateBinding;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
@@ -56,31 +55,13 @@ import org.jetbrains.annotations.Nullable;
  * pattern so {@code rtp test full} blocks on this probe when invoked via
  * the umbrella.</p>
  */
-public class NetworkSimulationTestJob extends BaseRTPCmdImpl {
+public class NetworkSimulationTestJob extends NetworkProbeTarget {
 
   /** Per-step wall-clock timeout (publish/await/cleanup). */
   static final long PROBE_TIMEOUT_MS = 2_000L;
 
-  /** Default number of synthetic peers when invoked without an argument. */
-  static final int DEFAULT_PEER_COUNT = 3;
-
-  /** Default observation window in ms - sleep between publish and assert. */
-  static final long DEFAULT_OBSERVE_MS = 500L;
-
-  /** Hard upper bound on peer count to keep the probe lightweight. */
-  static final int MAX_PEER_COUNT = 16;
-
   /** Audit-row identifier for synthetic peers; downstream filters can detect them. */
   static final String SYNTHETIC_PREFIX = "rtp-sim-";
-
-  /** Default number of synthetic reservation tokens when invoked without an argument. */
-  static final int DEFAULT_TOKEN_COUNT = 2;
-
-  /** Hard upper bound on the token-probe peer count to keep the probe lightweight. */
-  static final int MAX_TOKEN_COUNT = 8;
-
-  /** Default reservation TTL for the token probe (ms). */
-  static final long DEFAULT_TOKEN_TTL_MS = 2_000L;
 
   /**
    * Minimum observation window for the TTL-reap step, in ms. Independent of
@@ -88,15 +69,6 @@ public class NetworkSimulationTestJob extends BaseRTPCmdImpl {
    * needs a floor even when the operator passes a smaller observe window.
    */
   static final long MIN_REAP_OBSERVE_MS = 250L;
-
-  /** Parameter name for the peer / token count (positional N replacement). */
-  public static final String PARAM_COUNT = "count";
-
-  /** Parameter name for the heartbeat observe window in ms. */
-  public static final String PARAM_OBSERVE_MS = "observeMs";
-
-  /** Parameter name for the per-token TTL in ms (tokens probe). */
-  public static final String PARAM_TTL_MS = "ttlMs";
 
   public NetworkSimulationTestJob(@Nullable CommandsAPICommand parent) {
     super(parent);
@@ -142,9 +114,6 @@ public class NetworkSimulationTestJob extends BaseRTPCmdImpl {
     return true;
   }
 
-  /** Which probe a subcommand selected. Used only inside {@link #dispatchProbe}. */
-  enum ProbeKind { HEARTBEAT, TOKENS, ALL }
-
   /**
    * Common dispatch path for all probe-mode subcommands and the bare
    * {@code /rtp test network} default. Resolves the live transport, gates on
@@ -152,6 +121,7 @@ public class NetworkSimulationTestJob extends BaseRTPCmdImpl {
    * the job with {@link ActiveTestJobs}, and runs the selected probe on
    * the async scheduler.
    */
+  @Override
   void dispatchProbe(UUID callerId, ProbeKind kind,
           int peerCount, long observeWindowMs, long tokenTtlMs) {
     RTPScheduler scheduler = RTP.scheduler;
@@ -619,14 +589,6 @@ public class NetworkSimulationTestJob extends BaseRTPCmdImpl {
     if (transport == null) return false;
     String n = transport.getClass().getSimpleName();
     return n != null && n.contains("InMemory");
-  }
-
-  static int clamp(int v, int lo, int hi) {
-    return Math.max(lo, Math.min(hi, v));
-  }
-
-  static long clamp(long v, long lo, long hi) {
-    return Math.max(lo, Math.min(hi, v));
   }
 
   private void audit(UUID callerId, String verdict, String detail) {

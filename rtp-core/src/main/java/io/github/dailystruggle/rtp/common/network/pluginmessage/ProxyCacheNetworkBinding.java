@@ -1,10 +1,9 @@
 package io.github.dailystruggle.rtp.common.network.pluginmessage;
 
+import io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
-import io.github.dailystruggle.rtp.proxy.common.transport.codec.BackendHeartbeatCodec;
 
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.LongSupplier;
 import java.util.logging.Level;
@@ -30,6 +29,15 @@ public final class ProxyCacheNetworkBinding extends AbstractPluginMessageNetwork
         super(bridge, staleTimeoutMillis, clock);
     }
 
+    /**
+     * @param verifier signs pushes / verifies proxy snapshot rows; must share the
+     *                 proxy companion's secret. {@code null} = unsigned
+     */
+    public ProxyCacheNetworkBinding(NetworkBridge bridge, long staleTimeoutMillis, LongSupplier clock,
+                                    HmacVerifier verifier) {
+        super(bridge, staleTimeoutMillis, clock, verifier);
+    }
+
     // ---- heartbeat publish + snapshot refresh ----------------------------
 
     @Override
@@ -39,8 +47,8 @@ public final class ProxyCacheNetworkBinding extends AbstractPluginMessageNetwork
                     new IllegalStateException("ProxyCacheNetworkBinding is closed"));
         }
         try {
-            byte[] payload = BackendHeartbeatCodec.encode(row).getBytes(StandardCharsets.UTF_8);
-            bridge.pushHeartbeatToProxy(payload);
+            byte[] payload = encodeOutbound(row);
+            if (payload != null) bridge.pushHeartbeatToProxy(payload);
         } catch (Throwable t) {
             // S-004: a push failure (no carrier player, channel hiccup) is
             // logged, not swallowed silently and not propagated - the next

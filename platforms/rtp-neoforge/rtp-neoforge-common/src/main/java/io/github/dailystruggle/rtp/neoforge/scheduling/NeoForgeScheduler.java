@@ -8,14 +8,20 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
+import io.github.dailystruggle.rtp.common.tasks.tick.TickBudget;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.server.MinecraftServer;
 
@@ -31,31 +37,75 @@ import net.minecraft.server.MinecraftServer;
  * {@code ServerStartedEvent} / {@code ServerStoppingEvent}.</p>
  *
  * <ul>
- *   <li><b>Async:</b> a private daemon cached thread pool ({@link #ASYNC_EXECUTOR}).</li>
+ *   <li><b>Async:</b> a private daemon bounded thread pool ({@link #ASYNC_EXECUTOR}).</li>
  *   <li><b>Sync:</b> {@link MinecraftServer#execute} (inline if already on the
  *       server thread). Submissions made before {@link #setServer} are buffered
  *       and drained on {@code ServerStartedEvent}, matching Bukkit's always-queue
  *       {@code runTask} semantics.</li>
- *   <li><b>Delayed / repeating:</b> tick-counted entries drained by {@link #tick}.</li>
+ *   <li><b>Delayed / repeating:</b> tick-counted entries drained by {@link #tick}
+ *       under the {@link TickBudget#syncNanos()} budget; due callbacks past the
+ *       budget run first on the next tick.</li>
  *   <li>Region-aware overloads delegate (no regions on NeoForge).</li>
  * </ul>
  */
 public class NeoForgeScheduler implements RTPScheduler {
 
-  /** Private cached daemon thread pool used for all async work. */
-  private static final Executor ASYNC_EXECUTOR = Executors.newCachedThreadPool(new ThreadFactory() {
-    private final AtomicInteger n = new AtomicInteger(1);
-    @Override public Thread newThread(Runnable r) {
-      Thread t = new Thread(r, "RTP-NeoForge-Async-" + n.getAndIncrement());
-      t.setDaemon(true);
-      return t;
-    }
-  });
+  /** Async worker cap: half the cores (min 2) so RTP never starves the server or other mods. */
+  static final int ASYNC_MAX_THREADS = Math.max(2, Runtime.getRuntime().availableProcessors() / 2);
+
+  /**
+   * Private bounded daemon thread pool used for all async work. Unbounded
+   * queue: excess work waits instead of spawning threads (with a
+   * LinkedBlockingQueue the pool never grows past its core size, so core = max).
+   */
+  private static final ThreadPoolExecutor ASYNC_EXECUTOR = newAsyncExecutor();
+
+  private static ThreadPoolExecutor newAsyncExecutor() {
+    ThreadPoolExecutor pool = new ThreadPoolExecutor(
+        ASYNC_MAX_THREADS, ASYNC_MAX_THREADS, 60L, TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>(),
+        new ThreadFactory() {
+          private final AtomicInteger n = new AtomicInteger(1);
+          @Override public Thread newThread(Runnable r) {
+            Thread t = new Thread(r, "RTP-NeoForge-Async-" + n.getAndIncrement());
+            t.setDaemon(true);
+            return t;
+          }
+        });
+    pool.allowCoreThreadTimeOut(true);
+    return pool;
+  }
+
+  static ThreadPoolExecutor asyncExecutor() {
+    return ASYNC_EXECUTOR;
+  }
+
+  /**
+   * Wall-clock scheduled executor for asynchronous timers (e.g. heartbeat publishing).
+   * Runs independently of server ticks so paused servers with no players continue
+   * publishing state across the network (RTP-3).
+   */
+  private static final java.util.concurrent.ScheduledExecutorService ASYNC_TIMER_EXECUTOR =
+      Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
+        private final AtomicInteger n = new AtomicInteger(1);
+        @Override public Thread newThread(Runnable r) {
+          Thread t = new Thread(r, "RTP-NeoForge-AsyncTimer-" + n.getAndIncrement());
+          t.setDaemon(true);
+          return t;
+        }
+      });
 
   private volatile MinecraftServer server;
 
   private final AtomicInteger nextTaskId = new AtomicInteger(1);
   private final ConcurrentHashMap<Integer, ScheduledEntry> scheduled = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<Integer, java.util.concurrent.ScheduledFuture<?>> asyncTimers = new ConcurrentHashMap<>();
+
+  /**
+   * Due entries not yet run, FIFO. Entries left over when the sync budget ran
+   * out stay at the head so they run before anything that becomes due later.
+   */
+  private final ConcurrentLinkedDeque<ScheduledEntry> pendingDue = new ConcurrentLinkedDeque<>();
 
   /**
    * Pre-start buffer. Tasks submitted before {@link #setServer(MinecraftServer)}
@@ -81,17 +131,39 @@ public class NeoForgeScheduler implements RTPScheduler {
   /** Clears the server reference. Called from {@code ServerStoppingEvent}. */
   public void clearServer() {
     this.server = null;
+    for (var f : asyncTimers.values()) {
+      try { f.cancel(false); } catch (Throwable ignored) {}
+    }
+    this.asyncTimers.clear();
     this.scheduled.clear();
+    this.pendingDue.clear();
     this.preStartQueue.clear();
   }
 
   /**
-   * Drains due scheduled entries. Invoked from {@code ServerTickEvent.Post}.
+   * Drains due scheduled entries within {@link TickBudget#syncNanos()}. Invoked
+   * from {@code ServerTickEvent.Post}.
    *
    * @param server the live server (passed through for parity with the event signature)
    */
   public void tick(MinecraftServer server) {
+    drainDueWithinTickBudget();
+  }
+
+  /** MC-free entry point; the test classpath has no {@code MinecraftServer}. */
+  void drainDueWithinTickBudget() {
     if (scheduled.isEmpty()) return;
+    drainDue(TickBudget.syncNanos());
+  }
+
+  /**
+   * One tick of the sync loop. Deferred entries keep their place and are not
+   * re-counted, so a due task is never dropped or pushed back a full period;
+   * at least one callback runs per tick so the backlog always shrinks.
+   */
+  void drainDue(long budgetNanos) {
+    long start = System.nanoTime();
+    List<ScheduledEntry> newlyDue = new ArrayList<>();
     List<Integer> toRemove = new ArrayList<>();
     for (var e : scheduled.entrySet()) {
       ScheduledEntry entry = e.getValue();
@@ -99,21 +171,40 @@ public class NeoForgeScheduler implements RTPScheduler {
         toRemove.add(e.getKey());
         continue;
       }
+      if (entry.pending) continue;
       if (--entry.remainingTicks <= 0) {
-        try {
-          entry.task.run();
-        } catch (Throwable t) {
-          RTP.log(java.util.logging.Level.WARNING,
-              "[NeoForgeScheduler] scheduled task threw", t);
-        }
-        if (entry.periodTicks > 0) {
-          entry.remainingTicks = entry.periodTicks;
-        } else {
-          toRemove.add(e.getKey());
-        }
+        entry.pending = true;
+        newlyDue.add(entry);
       }
     }
     for (Integer id : toRemove) scheduled.remove(id);
+    // Ids grow with submission order; CHM iteration order does not.
+    newlyDue.sort(Comparator.comparingInt(en -> en.id));
+    pendingDue.addAll(newlyDue);
+
+    int ran = 0;
+    ScheduledEntry entry;
+    while ((entry = pendingDue.peekFirst()) != null) {
+      if (ran > 0 && System.nanoTime() - start >= budgetNanos) break;
+      pendingDue.pollFirst();
+      if (entry.cancelled || scheduled.get(entry.id) != entry) {
+        scheduled.remove(entry.id, entry);
+        continue;
+      }
+      ran++;
+      try {
+        entry.task.run();
+      } catch (Throwable t) {
+        RTP.log(java.util.logging.Level.WARNING,
+            "[NeoForgeScheduler] scheduled task threw", t);
+      }
+      entry.pending = false;
+      if (entry.periodTicks > 0 && !entry.cancelled) {
+        entry.remainingTicks = entry.periodTicks;
+      } else {
+        scheduled.remove(entry.id, entry);
+      }
+    }
   }
 
   // ---------------------------------------------------------------- async ---
@@ -131,7 +222,34 @@ public class NeoForgeScheduler implements RTPScheduler {
 
   @Override
   public Object runTaskTimerAsynchronously(Runnable task, long delay, long period) {
-    return scheduleTimer(() -> ASYNC_EXECUTOR.execute(task), delay, period);
+    int id = nextTaskId.getAndIncrement();
+    long delayMs = Math.max(0L, delay * 50L);
+    long periodMs = Math.max(50L, period * 50L);
+    // Skip a firing while the previous one still runs, so a slow callback
+    // cannot fan out across every pool thread.
+    AtomicBoolean running = new AtomicBoolean(false);
+    Runnable body = () -> {
+      try {
+        task.run();
+      } catch (Throwable t) {
+        RTP.log(java.util.logging.Level.WARNING,
+            "[NeoForgeScheduler] async timer task threw", t);
+      } finally {
+        running.set(false);
+      }
+    };
+    java.util.concurrent.ScheduledFuture<?> future = ASYNC_TIMER_EXECUTOR.scheduleAtFixedRate(() -> {
+      if (!running.compareAndSet(false, true)) return;
+      try {
+        ASYNC_EXECUTOR.execute(body);
+      } catch (Throwable t) {
+        running.set(false);
+        RTP.log(java.util.logging.Level.WARNING,
+            "[NeoForgeScheduler] async timer task dispatch failed", t);
+      }
+    }, delayMs, periodMs, java.util.concurrent.TimeUnit.MILLISECONDS);
+    asyncTimers.put(id, future);
+    return id;
   }
 
   // ----------------------------------------------------------------- sync ---
@@ -184,6 +302,8 @@ public class NeoForgeScheduler implements RTPScheduler {
   @Override
   public void cancelTask(Object task) {
     if (task instanceof Integer id) {
+      java.util.concurrent.ScheduledFuture<?> f = asyncTimers.remove(id);
+      if (f != null) f.cancel(false);
       ScheduledEntry e = scheduled.get(id);
       if (e != null) e.cancelled = true;
     }
@@ -212,6 +332,7 @@ public class NeoForgeScheduler implements RTPScheduler {
   private Integer scheduleTimer(Runnable task, long delay, long period) {
     int id = nextTaskId.getAndIncrement();
     ScheduledEntry e = new ScheduledEntry();
+    e.id = id;
     e.task = task;
     e.remainingTicks = Math.max(1L, delay);
     e.periodTicks = Math.max(0L, period);
@@ -250,9 +371,12 @@ public class NeoForgeScheduler implements RTPScheduler {
   }
 
   private static final class ScheduledEntry {
+    int id;
     Runnable task;
     long remainingTicks;
     long periodTicks;
+    /** Due and queued in {@link #pendingDue}; countdown frozen until it runs. */
+    boolean pending;
     volatile boolean cancelled;
   }
 }

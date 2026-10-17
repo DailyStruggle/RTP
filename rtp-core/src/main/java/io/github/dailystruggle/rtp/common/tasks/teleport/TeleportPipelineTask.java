@@ -18,21 +18,26 @@ import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.tasks.ChunkTicketHolder;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
+import io.github.dailystruggle.rtp.common.tasks.TrackableTask;
 import io.github.dailystruggle.rtp.common.tools.SupportLogger;
 import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 
-public final class TeleportPipelineTask extends RTPRunnable {
+public final class TeleportPipelineTask extends RTPRunnable implements TrackableTask {
   public enum Phase {
     SETUP,
     LOAD,
@@ -63,6 +68,85 @@ public final class TeleportPipelineTask extends RTPRunnable {
   public static final List<Consumer<TeleportPipelineTask>> cleanupPreActions = new CopyOnWriteArrayList<>();
   public static final List<Consumer<TeleportPipelineTask>> cleanupPostActions = new CopyOnWriteArrayList<>();
 
+  /**
+   * Ticks a successful arrival keeps its destination reservation after {@code setLocation}.
+   * Releasing in the teleport tick lets the landing chunk unload (e.g. Paper
+   * {@code delay-chunk-unloads-by: 0s}) before the player's own chunk ticket holds it, so the
+   * player's first tick sync-loads it on the main thread (S-005). Spans several player
+   * chunk-loader cycles; tickets are reference-counted, so overlapping holds are safe.
+   */
+  static final long ARRIVAL_HOLD_TICKS = 20L;
+  /** Arrival reservations awaiting their deferred release, by world; drained by {@code RTP.stop} (S-002). */
+  private static final Map<ChunkReservation, RTPWorld<?>> pendingArrivalReleases = new ConcurrentHashMap<>();
+
+  /**
+   * Defers {@code held.close()} by {@link #ARRIVAL_HOLD_TICKS} on the destination chunk's thread.
+   * Falls back to an immediate release when the hold cannot be scheduled.
+   */
+  static void holdArrivalReservation(ChunkReservation held, RTPWorld<?> world, int cx, int cz) {
+    if (held == null) return;
+    if (RTP.scheduler == null || world == null) {
+      held.close();
+      return;
+    }
+    pendingArrivalReleases.put(held, world);
+    try {
+      RTP.scheduler.runTaskLater(world, cx, cz, () -> releaseArrivalReservation(held), ARRIVAL_HOLD_TICKS);
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING, "[RTP] arrival chunk hold could not be scheduled; releasing now", t);
+      releaseArrivalReservation(held);
+    }
+  }
+
+  /** Map removal gates the close, so the delayed task and a shutdown flush never both release. */
+  private static boolean releaseArrivalReservation(ChunkReservation held) {
+    if (pendingArrivalReleases.remove(held) == null) return false;
+    try {
+      held.close();
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING, "[RTP] arrival chunk release failed", t);
+    }
+    return true;
+  }
+
+  /**
+   * Releases every pending arrival reservation now. Delayed tasks do not run after disable.
+   *
+   * @return number of reservations released
+   */
+  public static int flushArrivalReservations() {
+    int released = 0;
+    for (ChunkReservation held : pendingArrivalReleases.keySet()) {
+      if (releaseArrivalReservation(held)) released++;
+    }
+    return released;
+  }
+
+  /**
+   * Chunk keys pinned by pending arrival holds, per world. MemoryTracker treats these as live so
+   * its orphan sweep neither counts them as a leak nor releases them early.
+   */
+  public static Map<RTPWorld<?>, Set<Long>> arrivalHoldChunkKeys() {
+    Map<RTPWorld<?>, Set<Long>> keys = new java.util.HashMap<>();
+    for (Map.Entry<ChunkReservation, RTPWorld<?>> e : pendingArrivalReleases.entrySet()) {
+      ChunkSet set = e.getKey().getChunkSet();
+      if (set == null) continue;
+      long key = ((long) set.getX() & 0xffffffffL) | ((long) set.getZ() << 32);
+      keys.computeIfAbsent(e.getValue(), w -> new java.util.HashSet<>()).add(key);
+    }
+    return keys;
+  }
+
+  static {
+    ChunkTicketHolder.heldChunkTicketCounter = TeleportPipelineTask::pendingArrivalReleaseCount;
+    ChunkTicketHolder.arrivalHoldKeysSupplier = TeleportPipelineTask::arrivalHoldChunkKeys;
+  }
+
+  /** Pending deferred arrival releases; diagnostics and tests. */
+  public static int pendingArrivalReleaseCount() {
+    return pendingArrivalReleases.size();
+  }
+
   public static class ConfigCache {
     public static String unsafe = "";
     public static String teleportMessage = "";
@@ -84,6 +168,8 @@ public final class TeleportPipelineTask extends RTPRunnable {
       Configs.onReload(ConfigCache::reload);
       if (!RTP.reloading.get()) reload();
     }
+
+    private ConfigCache() {}
 
     public static void reload() {
       unsafe = RTP.configs.getConfigValue(PlayerMessages.unsafe, "").toString();
@@ -126,6 +212,14 @@ public final class TeleportPipelineTask extends RTPRunnable {
   private ChunkReservation reservation;
   private ChunkSet chunkSet;
 
+  public final Map<String, String> placeholderMap = new ConcurrentHashMap<>();
+  private double distance = 0.0;
+  private double distanceFromCenter = 0.0;
+  private RTPLocation destination = null;
+  // First pre-teleport player location; the post-teleport recompute would otherwise read the
+  // player at the destination and report 0 when teleportData.originalCoords is absent.
+  private RTPLocation originSnapshot = null;
+
   /**
    * ADR-058 - region-specific schematic paste. When a {@code schematics/<region>.schem} file
    * is present, {@link #runLoad} (off the region thread) kicks off the decode into this future
@@ -142,6 +236,20 @@ public final class TeleportPipelineTask extends RTPRunnable {
    * {@code null} when no {@code schematics/<region>.schem} file exists (the silent, expected case).
    */
   private io.github.dailystruggle.rtp.api.schematic.SchematicSource schematicSource;
+  /**
+   * ADR-058 / REQ-RTP-S-003: footprint claim verdict, started off-thread in {@link #runLoad} once
+   * the schematic decodes, so the destination region thread never joins a claim verifier.
+   * Read in {@link #runTeleport} only when done; pending, failed or {@code false} suppresses the
+   * paste (fail-safe) and the default platform runs instead.
+   */
+  private volatile java.util.concurrent.CompletableFuture<Boolean> schematicFootprint;
+
+  /** ADR-058 arrival paste options; shared by the off-thread footprint check and the paste. */
+  static io.github.dailystruggle.rtp.api.schematic.PasteOptions arrivalPasteOptions() {
+    // SURFACE_CENTER: the player lands on a standable floor in the schematic's center column.
+    return new io.github.dailystruggle.rtp.api.schematic.PasteOptions(
+        io.github.dailystruggle.rtp.api.schematic.PasteAnchor.SURFACE_CENTER, false, true);
+  }
 
   /**
    * ADR-058 / S-004: regions where platform-level schematic fallback was logged.
@@ -186,6 +294,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
     this.currentPhase = Phase.LOAD;
     this.immediateTeleport = true;
     initTracking();
+    computeDistance();
   }
 
   public TeleportPipelineTask(GenerationContext context, Region region, RTPCoords preSelectedCoords, ChunkReservation reservation) {
@@ -199,6 +308,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
     // covered separately by the queue-growth audit (section 2b).
     this.immediateTeleport = false;
     initTracking();
+    computeDistance();
   }
 
   /** Spark-profiler frame tag (diagram 01 / 08). See {@link RTPRunnable#sparkFrameName()}. */
@@ -207,6 +317,161 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
   public Phase getPhase() {
     return this.currentPhase;
+  }
+
+  @Override
+  public String phaseName() {
+    return this.currentPhase != null ? this.currentPhase.name() : "";
+  }
+
+  public double getDistance() {
+    return distance;
+  }
+
+  public double getDistanceFromCenter() {
+    return distanceFromCenter;
+  }
+
+  public RTPLocation getDestination() {
+    return destination;
+  }
+
+  public Map<String, String> getPlaceholderMap() {
+    return placeholderMap;
+  }
+
+  /**
+   * Recompute distance placeholders. Never throws: it runs inside the teleport success callback
+   * ahead of invulnerability/tracking cleanup, so a cosmetic failure must not skip that cleanup.
+   */
+  public void computeDistance() {
+    try {
+      computeDistanceUnchecked();
+    } catch (RuntimeException e) {
+      RTP.log(Level.WARNING, "[RTP] distance placeholder computation failed; continuing teleport", e);
+    }
+  }
+
+  private void computeDistanceUnchecked() {
+    if (coords == null) return;
+    RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(coords.worldName());
+    if (world == null && region != null) world = region.getWorld();
+    this.destination = new RTPLocation(world, coords.x(), coords.y(), coords.z(), reservation);
+
+    RTPLocation origin = null;
+    if (teleportData != null && teleportData.originalCoords != null) {
+      RTPWorld<?> origWorld = RTP.serverAccessor.getRTPWorld(teleportData.originalCoords.worldName());
+      origin = new RTPLocation(origWorld, teleportData.originalCoords.x(), teleportData.originalCoords.y(), teleportData.originalCoords.z());
+    } else if (originSnapshot != null) {
+      origin = originSnapshot;
+    } else if (context != null && context.player() != null) {
+      origin = context.player().getLocation();
+      originSnapshot = origin;
+    }
+
+    if (origin != null) {
+      this.distance = Math.hypot((double) this.destination.x() - origin.x(), (double) this.destination.z() - origin.z());
+    } else {
+      this.distance = 0.0;
+    }
+
+    // Distance from region center (for fixed region references)
+    double[] center = getRegionCenter(region);
+    this.distanceFromCenter = Math.hypot(this.destination.x() - center[0], this.destination.z() - center[1]);
+
+    RTPPlayer player = (context != null) ? context.player() : null;
+    UUID playerId = (player != null) ? player.uuid() : null;
+    TeleportData targetData = teleportData;
+    if (targetData == null && playerId != null && RTP.getInstance() != null) {
+      targetData = RTP.getInstance().latestTeleportData.get(playerId);
+    }
+
+    if (targetData != null) {
+      targetData.distance = this.distance;
+      targetData.distanceFromCenter = this.distanceFromCenter;
+    }
+
+    updatePlaceholderMap();
+  }
+
+  public static double[] getRegionCenter(Region region) {
+    if (region == null) return new double[] {0.0, 0.0};
+    Object shapeObj = region.getShape();
+    if (shapeObj == null) return new double[] {0.0, 0.0};
+    if (shapeObj instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SubspaceShape subspaceShape) {
+      io.github.dailystruggle.rtp.common.selection.region.RTPLocation anchor = subspaceShape.getAnchor();
+      if (anchor != null) {
+        return new double[] {anchor.coords().x(), anchor.coords().z()};
+      }
+    }
+    if (shapeObj instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?> shape) {
+      double cx = Double.NaN;
+      double cz = Double.NaN;
+      for (Map.Entry<? extends Enum<?>, Object> entry : shape.getData().entrySet()) {
+        String name = entry.getKey().name();
+        if ((name.equalsIgnoreCase("centerX") || name.equalsIgnoreCase("center_x") || name.equalsIgnoreCase("cx"))
+            && entry.getValue() instanceof Number n) {
+          cx = n.doubleValue();
+        } else if ((name.equalsIgnoreCase("centerZ") || name.equalsIgnoreCase("center_z") || name.equalsIgnoreCase("cz"))
+            && entry.getValue() instanceof Number n) {
+          cz = n.doubleValue();
+        }
+      }
+      if (!Double.isNaN(cx) && !Double.isNaN(cz)) {
+        if (shape instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape<?>) {
+          return new double[] {cx * 16.0, cz * 16.0};
+        }
+        return new double[] {cx, cz};
+      }
+    }
+    return new double[] {0.0, 0.0};
+  }
+
+  private void updatePlaceholderMap() {
+    String formattedDistance = String.format(java.util.Locale.US, "%.1f", this.distance);
+    String formattedDistanceBlocks = String.valueOf(Math.round(this.distance));
+    String formattedDistanceCenter = String.format(java.util.Locale.US, "%.1f", this.distanceFromCenter);
+    String formattedDistanceCenterBlocks = String.valueOf(Math.round(this.distanceFromCenter));
+
+    placeholderMap.put("<distance>", formattedDistance);
+    placeholderMap.put("<distance_blocks>", formattedDistanceBlocks);
+    placeholderMap.put("<distance_center>", formattedDistanceCenter);
+    placeholderMap.put("<distance_center_blocks>", formattedDistanceCenterBlocks);
+    placeholderMap.put("distance", formattedDistance);
+    placeholderMap.put("distance_blocks", formattedDistanceBlocks);
+    placeholderMap.put("distance_center", formattedDistanceCenter);
+    placeholderMap.put("distance_center_blocks", formattedDistanceCenterBlocks);
+    placeholderMap.put("[distance]", formattedDistance);
+    placeholderMap.put("[distance_blocks]", formattedDistanceBlocks);
+    placeholderMap.put("%distance%", formattedDistance);
+    placeholderMap.put("%distance_blocks%", formattedDistanceBlocks);
+  }
+
+  private static final String[] ORDERED_TOKENS = new String[] {
+      "<distance_center_blocks>",
+      "[distance_center_blocks]",
+      "%distance_center_blocks%",
+      "<distance_blocks>",
+      "[distance_blocks]",
+      "%distance_blocks%",
+      "<distance_center>",
+      "[distance_center]",
+      "%distance_center%",
+      "<distance>",
+      "[distance]",
+      "%distance%"
+  };
+
+  public String formatWithPlaceholders(String text, UUID playerId) {
+    if (text == null || text.isEmpty()) return text;
+    // Replace delimited tokens first (longer tokens first to avoid partial collision)
+    for (String token : ORDERED_TOKENS) {
+      String val = placeholderMap.get(token);
+      if (val != null) {
+        text = text.replace(token, val);
+      }
+    }
+    return io.github.dailystruggle.rtp.common.tools.PlaceholderProvider.fillPlaceholders(text, playerId);
   }
 
   public void setPhase(Phase phase) {
@@ -284,8 +549,13 @@ public final class TeleportPipelineTask extends RTPRunnable {
         teleportData.sender = (context.sender() != null) ? context.sender() : player;
         teleportData.completed = false;
         teleportData.time = System.currentTimeMillis();
-        teleportData.delay = teleportData.sender.delay();
+        teleportData.delay = RTP.getDelay(teleportData.sender, region != null ? region.getSettings() : null);
         teleportData.targetRegion = region;
+        teleportData.originWorldName = player.getLocation().world().name();
+        teleportData.originServerId =
+                (io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE != null)
+                        ? io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE.serverId()
+                        : null;
         teleportData.originalCoords =
                 new RTPCoords(
                         player.getLocation().world().name(),
@@ -302,12 +572,13 @@ public final class TeleportPipelineTask extends RTPRunnable {
       if (locationFuture.isDone()) {
         processGenerationResult(locationFuture.join());
       } else {
-        locationFuture.thenAccept(this::processGenerationResult).exceptionally(e -> {
-          SupportLogger.logException(Level.WARNING, "Error in getLocationFuture", e);
-          currentPhase = Phase.CLEANUP;
-          runCleanup();
-          return null;
-        });
+        locationFuture.thenAcceptAsync(this::processGenerationResult, TeleportPipelineTask::continueOffRegion)
+            .exceptionally(e -> {
+              SupportLogger.logException(Level.WARNING, "Error in getLocationFuture", e);
+              currentPhase = Phase.CLEANUP;
+              runCleanup();
+              return null;
+            });
       }
     } catch (Exception e) {
       SupportLogger.logException(Level.WARNING, "Error in runSetup", e);
@@ -315,6 +586,25 @@ public final class TeleportPipelineTask extends RTPRunnable {
       currentPhase = Phase.CLEANUP;
       runCleanup();
     }
+  }
+
+  /**
+   * Folia completes generation results on whichever region thread finished the last chunk read;
+   * the result handling (messages, addon hooks, destination chunk-set setup) has no region
+   * affinity, so it continues off that thread instead of stacking on it (ADR-112). Elsewhere
+   * it runs inline, as before.
+   */
+  static void continueOffRegion(Runnable r) {
+    try {
+      if (RTP.serverAccessor != null && RTP.scheduler != null
+          && "Folia".equals(RTP.serverAccessor.getPlatform()) && RTP.serverAccessor.isPrimaryThread()) {
+        RTP.scheduler.runTaskAsynchronously(r);
+        return;
+      }
+    } catch (Throwable t) {
+      RTP.log(Level.FINE, "[RTP] off-region hop unavailable; continuing inline: " + t);
+    }
+    r.run();
   }
 
   @SuppressWarnings("java:S2093") // ChunkReservation ownership is transferred into this instance; closing in try-with-resources would invalidate chunk reservations
@@ -336,18 +626,33 @@ public final class TeleportPipelineTask extends RTPRunnable {
       boolean success = false;
       try {
         if (res == null) {
-          // If the player was successfully queued, gracefully halt this thread.
-          // Region.execute() will spawn a new pipeline task when a location is ready.
-          if (RTP.getInstance().processingPlayers.contains(playerId)) {
-            RTP.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] TeleportPipelineTask silent-halt (processingPlayers.contains==true) playerId=" + playerId);
+          // Queued: the enqueue branch registered the player in queuedPlayers, and
+          // Region.execute() spawns a new pipeline task when a location is ready.
+          // processingPlayers is not a discriminator: /rtp always holds it here.
+          if (RTP.getInstance().queuedPlayers.contains(playerId)) {
+            RTP.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] TeleportPipelineTask silent-halt (queued) playerId=" + playerId);
             if (region != null && handledInFlight.compareAndSet(false, true)) {
               region.inFlightCalculations.getAndDecrement();
+            }
+            // This task is done; the queue owns the wait. Untracked so the leak sweep cannot
+            // force-close it mid-wait and tear down the queued player's TeleportData.
+            if (this.trackingId != null) {
+              io.github.dailystruggle.rtp.common.tools.MemoryTracker.untrack(this.trackingId);
+              this.trackingId = null;
             }
             return;
           }
 
-          // Otherwise, generation failed entirely (e.g., custom biome search failed).
-          RTP.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] TeleportPipelineTask null-result CLEANUP playerId=" + playerId);
+          // Otherwise generation failed (start failure, biome search miss): S-004 - tell the
+          // player, refund, and release the busy lock so the next /rtp is not refused.
+          RTP.log(Level.WARNING, "[RTP] location generation returned no result for player "
+                  + playerId + " region=" + (region != null ? region.name : "null")
+                  + "; teleport aborted (S-004)");
+          RTPCommandSender failSender = sender();
+          RTP.serverAccessor.sendMessage(
+                  failSender != null ? failSender.uuid() : playerId, playerId, ConfigCache.unsafe);
+          RTPTeleportCancel.refund(playerId);
+          RTP.getInstance().processingPlayers.remove(playerId);
           currentPhase = Phase.CLEANUP;
           runCleanup();
           return;
@@ -368,6 +673,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
         teleportData.selectedCoords = coords;
         teleportData.attempts = attempts;
+        computeDistance();
         success = true;
       } catch (Exception e) {
         SupportLogger.logException(Level.WARNING, "Error in runSetup", e);
@@ -448,8 +754,13 @@ public final class TeleportPipelineTask extends RTPRunnable {
           teleportData.sender = (context.sender() != null) ? context.sender() : player;
           teleportData.completed = false;
           teleportData.time = System.currentTimeMillis();
-          teleportData.delay = teleportData.sender.delay();
+          teleportData.delay = RTP.getDelay(teleportData.sender, region != null ? region.getSettings() : null);
           teleportData.targetRegion = region;
+          teleportData.originWorldName = player.getLocation().world().name();
+          teleportData.originServerId =
+                  (io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE != null)
+                          ? io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE.serverId()
+                          : null;
           teleportData.originalCoords =
                   new RTPCoords(
                           player.getLocation().world().name(),
@@ -461,6 +772,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
         teleportData.nextTask = this;
         teleportData.targetRegion = region;
         teleportData.selectedCoords = coords;
+        computeDistance();
       }
 
       if (coords == null && teleportData.selectedCoords != null) {
@@ -512,6 +824,15 @@ public final class TeleportPipelineTask extends RTPRunnable {
             } else {
               schematicPaster = paster;
               schematicLoad = paster.load(src);
+              final RTPLocation footprintAt =
+                  new RTPLocation(schemWorld, coords.x(), coords.y(), coords.z());
+              final String footprintWorld = coords.worldName();
+              if (schematicLoad != null) {
+                schematicFootprint = schematicLoad.thenCompose(loaded -> loaded == null
+                    ? CompletableFuture.completedFuture(Boolean.FALSE)
+                    : schematicFootprintClearAsync(
+                        loaded, footprintAt, arrivalPasteOptions(), footprintWorld));
+              }
               // load() never throws (it returns a null-completed future on decode failure),
               // so detect that here and surface it; the underlying cause is logged by the
               // paster's load() implementation.
@@ -594,7 +915,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
                 long start = System.currentTimeMillis();
                 long lastTime = teleportData.time;
-                long delay = sender().delay();
+                long delay = RTP.getDelay(sender(), region != null ? region.getSettings() : null);
                 long dT = (start - lastTime);
                 long remainingTime = delay - dT;
                 long toTicks = remainingTime / 50;
@@ -665,6 +986,9 @@ public final class TeleportPipelineTask extends RTPRunnable {
     try {
       RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(coords.worldName());
       if (world == null) world = region.getWorld();
+      if (teleportData != null && teleportData.targetRegion == null && region != null) {
+        teleportData.targetRegion = region;
+      }
       RTPLocation location = new RTPLocation(world, coords.x(), coords.y(), coords.z());
       location.setReservation(reservation);
       boolean buildPlatform = shouldBuildPlatform(world, coords);
@@ -676,7 +1000,6 @@ public final class TeleportPipelineTask extends RTPRunnable {
       // the schematic provides the footing the platform would have. The paste is best-effort
       // (S-004) - any skip/failure is audited and the default platform path still runs so the
       // player never lands without footing.
-      boolean pastedSchematic = false;
       io.github.dailystruggle.rtp.api.schematic.LoadedSchematic loadedSchematic =
           (schematicLoad != null && schematicLoad.isDone()) ? schematicLoad.join() : null;
       // S-004 - a region with a schematic file on disk that nonetheless reaches this point
@@ -700,70 +1023,116 @@ public final class TeleportPipelineTask extends RTPRunnable {
         // destination region differs from the player's current region. Bounce the paste - and
         // its platform fallback - to the destination region via RTP.scheduler.runTask(location).
         // On non-Folia platforms this dispatches to the main thread / runs inline.
+        // S-001: setLocation is chained after the paste/platform inside that task, so the
+        // player never arrives before the footing exists; a throw there fails closed.
         final io.github.dailystruggle.rtp.api.schematic.LoadedSchematic loadedFinal =
             loadedSchematic;
         final RTPLocation locFinal = location;
         final boolean buildPlatformFinal = buildPlatform;
         final String worldNameFinal = coords.worldName();
-        pastedSchematic = true; // platform fallback is handled inside the region task below
+        // ADR-058 / REQ-RTP-S-003: verdict normally precomputed in runLoad; the fallback only
+        // starts the verifier futures and is read non-blocking like the precomputed one.
+        final CompletableFuture<Boolean> footprintFinal = (schematicFootprint != null)
+            ? schematicFootprint
+            : schematicFootprintClearAsync(
+                loadedFinal, locFinal, arrivalPasteOptions(), worldNameFinal);
         RTP.scheduler.runTask(locFinal, () -> {
-          boolean pasted = false;
-          // ADR-058 - anchor SURFACE_CENTER (not the BOTTOM_CENTER default): the schematic is
-          // dropped so the player lands on a standable floor in its center column instead of
-          // being buried under blocks pasted around their feet. The drop is computed from the
-          // schematic data in one pass, so the arrival point is standable without re-pasting.
-          io.github.dailystruggle.rtp.api.schematic.PasteOptions pasteOptions =
-              new io.github.dailystruggle.rtp.api.schematic.PasteOptions(
-                  io.github.dailystruggle.rtp.api.schematic.PasteAnchor.SURFACE_CENTER,
-                  false, true);
-          // ADR-058 / REQ-RTP-S-003 - footprint claim check. Before writing any block, verify
-          // the schematic's horizontal footprint against the GlobalRegionVerifiers registry (the
-          // sanctioned claim/protection mechanism - never an inline claim-plugin call). If any
-          // footprint cell intersects protected land, the paste is suppressed and the default
-          // platform path runs instead, so the paste never overwrites a claim.
-          if (pasteOptions.claimAware()
-              && !schematicFootprintClear(loadedFinal, locFinal, pasteOptions, worldNameFinal)) {
-            RTP.log(Level.INFO, "[RTP] region schematic '" + region.name
-                + "' footprint intersects a claim; paste suppressed (S-003), falling back to "
-                + "default platform.");
-          } else {
-            try {
-              io.github.dailystruggle.rtp.api.schematic.PasteResult pasteResult =
-                  schematicPaster.paste(loadedFinal, locFinal, pasteOptions);
-              if (pasteResult != null && pasteResult.placed()) {
-                pasted = true;
-                RTP.log(Level.FINE, "[PIPELINE_TRACE] runTeleport pasted region schematic '"
-                    + region.name + "'");
-              } else {
-                RTP.log(Level.WARNING, "[RTP] region schematic '" + region.name
-                    + "' not pasted (" + pasteResult + "); falling back to default platform "
-                    + "(S-004). See the preceding schematic-paste log line for the per-block "
-                    + "cause.");
+          try {
+            boolean pasted = false;
+            io.github.dailystruggle.rtp.api.schematic.PasteOptions pasteOptions =
+                arrivalPasteOptions();
+            // Footprint claim check (sanctioned GlobalRegionVerifiers registry, never an inline
+            // claim-plugin call): any protected, pending or failed verdict suppresses the paste
+            // and the default platform runs instead, so the paste never overwrites a claim.
+            if (pasteOptions.claimAware() && !footprintVerdictClear(footprintFinal)) {
+              RTP.log(Level.INFO, "[RTP] region schematic '" + region.name + "' "
+                  + (footprintFinal.isDone() ? "footprint intersects a claim"
+                      : "footprint claim check still pending at paste time")
+                  + "; paste suppressed (S-003), falling back to default platform.");
+            } else {
+              try {
+                io.github.dailystruggle.rtp.api.schematic.PasteResult pasteResult =
+                    schematicPaster.paste(loadedFinal, locFinal, pasteOptions);
+                if (pasteResult != null && pasteResult.placed()) {
+                  pasted = true;
+                  RTP.log(Level.FINE, "[PIPELINE_TRACE] runTeleport pasted region schematic '"
+                      + region.name + "'");
+                } else {
+                  RTP.log(Level.WARNING, "[RTP] region schematic '" + region.name
+                      + "' not pasted (" + pasteResult + "); falling back to default platform "
+                      + "(S-004). See the preceding schematic-paste log line for the per-block "
+                      + "cause.");
+                }
+              } catch (Exception e) {
+                SupportLogger.logException(Level.WARNING,
+                    "region schematic paste failed for '" + region.name + "'", e);
               }
-            } catch (Exception e) {
-              SupportLogger.logException(Level.WARNING,
-                  "region schematic paste failed for '" + region.name + "'", e);
             }
+            if (!pasted && buildPlatformFinal) {
+              buildArrivalPlatform(locFinal);
+            }
+          } catch (Throwable t) {
+            failArrivalFooting(playerId, t);
+            return;
           }
-          if (!pasted && buildPlatformFinal) {
-            buildArrivalPlatform(locFinal);
-          }
+          finishTeleport(player, playerId, locFinal);
         });
+        return;
       }
 
-      if (!pastedSchematic && buildPlatform) {
-        buildArrivalPlatform(location);
+      if (buildPlatform) {
+        try {
+          buildArrivalPlatform(location);
+        } catch (Throwable t) {
+          failArrivalFooting(playerId, t);
+          return;
+        }
       }
+      finishTeleport(player, playerId, location);
+    } catch (Exception e) {
+      SupportLogger.logException(Level.SEVERE, "Error in runTeleport", e);
+      currentPhase = Phase.CLEANUP;
+      runCleanup();
+    }
+  }
 
+  /**
+   * S-001 / S-004: arrival footing (schematic paste or platform) could not be placed. The
+   * player is not teleported; they are told, refunded and released, and the task cleans up.
+   */
+  private void failArrivalFooting(UUID playerId, Throwable cause) {
+    try {
+      SupportLogger.logException(Level.WARNING,
+          "arrival footing failed for " + playerId + "; teleport aborted (S-001)", cause);
+      RTP.serverAccessor.sendMessage(playerId, ConfigCache.unsafe);
+      RTPTeleportCancel.refund(playerId);
+    } finally {
+      RTP.getInstance().processingPlayers.remove(playerId);
+      currentPhase = Phase.CLEANUP;
+      runCleanup();
+    }
+  }
+
+  /** Non-blocking read of a footprint verdict: only a completed {@code TRUE} is clear. */
+  static boolean footprintVerdictClear(CompletableFuture<Boolean> verdict) {
+    return verdict != null && verdict.isDone() && !verdict.isCompletedExceptionally()
+        && Boolean.TRUE.equals(verdict.getNow(Boolean.FALSE));
+  }
+
+  /** Arrival tail, run once the footing exists: death hold, bookkeeping, setLocation. */
+  private void finishTeleport(RTPPlayer player, UUID playerId, RTPLocation location) {
+    try {
       if (deathEffectTriggered || RTP.deathEffectInFlight.contains(playerId)) {
         RTP.log(Level.FINE, "[PIPELINE_TRACE] runTeleport deathEffect active playerId=" + playerId
             + "; putting teleport on hold until respawn");
         RTP.pendingDeathTeleports.put(playerId, this);
-        teleportData.processingTime = System.currentTimeMillis() - teleportData.time;
-        RTP.getInstance().processingPlayers.remove(playerId);
-        if (RTP.getInstance().databaseAccessor != null) {
-          RTP.getInstance().databaseAccessor.cacheValue(teleportData);
+        if (teleportData != null) {
+          teleportData.processingTime = System.currentTimeMillis() - teleportData.time;
+          if (teleportData.sender != null && RTP.getInstance().databaseAccessor != null) {
+            RTP.getInstance().databaseAccessor.cacheValue(teleportData);
+          }
         }
+        RTP.getInstance().processingPlayers.remove(playerId);
         return;
       }
 
@@ -771,6 +1140,10 @@ public final class TeleportPipelineTask extends RTPRunnable {
 
       teleportData.completed = true;
       teleportData.processingTime = System.currentTimeMillis() - teleportData.time;
+      RTP.updateSharedLastTeleportTime(playerId, teleportData.time);
+      if (region != null && region.name != null) {
+        RTP.setLastRegionTeleportTime(playerId, region.name, teleportData.time);
+      }
       RTP.getInstance().processingPlayers.remove(playerId);
 
       // ADR-072: clamp the player's view distance immediately before the teleport so the engine's
@@ -784,7 +1157,10 @@ public final class TeleportPipelineTask extends RTPRunnable {
       RTP.log(Level.FINE, "[PIPELINE_TRACE] runTeleport setLocation dispatched playerId=" + playerId
               + " attempts=" + teleportData.attempts
               + " processingTime=" + teleportData.processingTime + "ms");
-      RTP.getInstance().databaseAccessor.cacheValue(teleportData);
+      // Guarded: a throw here would skip the completion callback below (arrival hold, S-004 audit).
+      if (RTP.getInstance().databaseAccessor != null) {
+        RTP.getInstance().databaseAccessor.cacheValue(teleportData);
+      }
 
       setLocation.whenComplete(
           (aBoolean, throwable) -> {
@@ -793,14 +1169,24 @@ public final class TeleportPipelineTask extends RTPRunnable {
                       + " success=" + aBoolean
                       + " throwable=" + (throwable != null ? throwable.getClass().getSimpleName() : "none"));
               if (reservation != null) {
-                reservation.close();
+                ChunkReservation held = reservation;
                 this.reservation = null;
+                if (throwable == null && aBoolean != null && aBoolean) {
+                  holdArrivalReservation(held, location.world(), location.x() >> 4, location.z() >> 4);
+                } else {
+                  held.close();
+                }
               }
               if (throwable != null) {
                 SupportLogger.logException(Level.SEVERE, "Error in setLocation callback", throwable);
               }
               if (aBoolean != null && aBoolean) {
-                RTP.serverAccessor.sendMessage(playerId, ConfigCache.teleportMessage);
+                computeDistance();
+                // ADR-104 heatmap layer: bounded in-memory per-chunk landing count
+                io.github.dailystruggle.rtp.common.metrics.LandingHeatmap.record(
+                    region != null ? region.name : null, location.x(), location.z());
+                String message = formatWithPlaceholders(ConfigCache.teleportMessage, playerId);
+                RTP.serverAccessor.sendMessage(playerId, message);
 
                 // BetterRTP SetAsRespawn parity: anchor the player's respawn to the
                 // landed location. Runs on the teleport completion thread (the owning
@@ -910,7 +1296,13 @@ public final class TeleportPipelineTask extends RTPRunnable {
           teleportData.completed = true;
         }
         if (playerId != null) {
-          RTP.serverAccessor.sendMessage(playerId, ConfigCache.teleportMessage);
+          computeDistance();
+          if (destination != null) {
+            io.github.dailystruggle.rtp.common.metrics.LandingHeatmap.record(
+                region != null ? region.name : null, destination.x(), destination.z());
+          }
+          String message = formatWithPlaceholders(ConfigCache.teleportMessage, playerId);
+          RTP.serverAccessor.sendMessage(playerId, message);
 
           if (ConfigCache.lockAfterUses > 0) {
             RTP.getInstance().teleportLimitStore.recordSuccess(playerId,
@@ -1053,15 +1445,21 @@ public final class TeleportPipelineTask extends RTPRunnable {
       RTP.log(Level.FINE, "[PIPELINE_TRACE] platform creator '" + platformCreator.creatorName()
           + "' declined; using default platform");
     }
-    at.world().platform(at);
+    // Reservation-free copy: platform() implementations close the location's reservation, which
+    // would drop the arrival ticket before setLocation. The pipeline owns that release.
+    at.world().platform(new RTPLocation(at.world(), at.x(), at.y(), at.z()));
   }
 
   /**
    * ADR-058 / REQ-RTP-S-003: footprint claim guard for region schematic pastes.
    *
-   * @return {@code true} when footprint is clear (or no verifiers registered)
+   * Never joins: the per-cell verifier futures are combined, so the caller (off-thread in
+   * {@link #runLoad}) does not block and the region thread only reads the completed verdict.
+   *
+   * @return future of {@code true} when footprint is clear (or no verifiers registered);
+   *     {@code false} when any cell is protected or any check errors (fail-safe)
    */
-  static boolean schematicFootprintClear(
+  static CompletableFuture<Boolean> schematicFootprintClearAsync(
       io.github.dailystruggle.rtp.api.schematic.LoadedSchematic schematic,
       RTPLocation at,
       io.github.dailystruggle.rtp.api.schematic.PasteOptions options,
@@ -1069,7 +1467,7 @@ public final class TeleportPipelineTask extends RTPRunnable {
     int width = schematic.width();
     int length = schematic.length();
     if (width <= 0 || length <= 0) {
-      return true;
+      return CompletableFuture.completedFuture(Boolean.TRUE);
     }
     int baseX;
     int baseZ;
@@ -1087,26 +1485,46 @@ public final class TeleportPipelineTask extends RTPRunnable {
     }
     String worldName = (at.world() != null) ? at.world().name() : fallbackWorldName;
     int y = at.y();
+    List<CompletableFuture<Boolean>> checks = new ArrayList<>(width * length);
     for (int dz = 0; dz < length; dz++) {
       for (int dx = 0; dx < width; dx++) {
         RTPCoords cell = new RTPCoords(worldName, baseX + dx, y, baseZ + dz);
         try {
           CompletableFuture<Boolean> check =
               GlobalRegionVerifiers.checkGlobalRegionVerifiers(cell);
-          Boolean ok = check.join();
-          if (ok != null && !ok) {
-            return false;
+          if (check == null) {
+            return CompletableFuture.completedFuture(Boolean.FALSE);
           }
+          // A cell already known protected short-circuits without issuing the rest.
+          if (check.isDone() && !check.isCompletedExceptionally()
+              && Boolean.FALSE.equals(check.getNow(null))) {
+            return CompletableFuture.completedFuture(Boolean.FALSE);
+          }
+          checks.add(check);
         } catch (Throwable t) {
           // Fail-safe (S-003): if the footprint claim check itself errors, treat the cell as
           // protected and suppress the paste rather than risk overwriting a claim.
           SupportLogger.logException(Level.FINE,
               "schematic footprint claim check failed; suppressing paste", t);
-          return false;
+          return CompletableFuture.completedFuture(Boolean.FALSE);
         }
       }
     }
-    return true;
+    return CompletableFuture.allOf(checks.toArray(new CompletableFuture[0]))
+        .handle((ignored, err) -> {
+          if (err != null) {
+            SupportLogger.logException(Level.FINE,
+                "schematic footprint claim check failed; suppressing paste", err);
+            return Boolean.FALSE;
+          }
+          for (CompletableFuture<Boolean> check : checks) {
+            // All complete normally here; getNow never blocks.
+            if (Boolean.FALSE.equals(check.getNow(null))) {
+              return Boolean.FALSE;
+            }
+          }
+          return Boolean.TRUE;
+        });
   }
 
   private void runCleanup() {
@@ -1148,6 +1566,13 @@ public final class TeleportPipelineTask extends RTPRunnable {
     // No-op for teleports not initiated through the public API.
     if (this.teleportData != null) {
       this.teleportData.fireOnComplete();
+      this.teleportData.onComplete = null;
+      if (this.teleportData.sender != null) {
+        this.teleportData.sender = this.teleportData.sender.toPureData();
+      }
+      if (this.teleportData.targetRegion != null) {
+        this.teleportData.targetRegionName = this.teleportData.targetRegion.name;
+      }
     }
     try {
       // Explicitly untrack the data to prevent false positive leak alerts

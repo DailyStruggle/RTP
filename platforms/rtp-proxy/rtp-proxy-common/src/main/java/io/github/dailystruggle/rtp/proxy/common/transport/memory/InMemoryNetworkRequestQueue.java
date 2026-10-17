@@ -19,6 +19,8 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Reference {@link NetworkRequestQueue} implementation backed by in-process
@@ -34,10 +36,24 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * a consumer that blocks on a returned future will deadlock the same way it
  * would against a real binding.</p>
  *
- * <p>Capacity: unbounded. Operators wiring this in production paths should
- * front it with the backend's own {@code queueMaxDepth} guard.</p>
+ * <p>Capacity: at most {@link #MAX_READY_DEPTH} undequeued envelopes; further
+ * enrolments resolve {@link EnrolOutcome#REJECTED} so the backend buffer retries
+ * later. Correlation ids leave the idempotency set on terminal transition or
+ * cancel (parity with {@code transition.lua}), and the set is compacted past
+ * {@link #MAX_SEEN_CORRELATIONS}.</p>
+ *
+ * <p>One pending request per player: a second correlation id for a player
+ * with an undequeued envelope is rejected ({@link #enrol}) or skipped with a
+ * WARNING ({@link #flushPending}). No HMAC: state never leaves this JVM.</p>
  */
 public final class InMemoryNetworkRequestQueue implements NetworkRequestQueue {
+
+    private static final Logger LOG = Logger.getLogger(InMemoryNetworkRequestQueue.class.getName());
+
+    /** Hard cap on undequeued envelopes. */
+    static final int MAX_READY_DEPTH = 10_000;
+    /** Compaction threshold for {@link #seenCorrelations}. */
+    static final int MAX_SEEN_CORRELATIONS = 65_536;
 
     /** FIFO of envelopes awaiting proxy dequeue. */
     private final ConcurrentLinkedDeque<QueueEnvelope> ready = new ConcurrentLinkedDeque<>();
@@ -51,6 +67,9 @@ public final class InMemoryNetworkRequestQueue implements NetworkRequestQueue {
 
     /** Correlation ids we've already accepted (idempotency guard). */
     private final Set<UUID> seenCorrelations = ConcurrentHashMap.newKeySet();
+
+    /** Live correlation id per player, so a terminal transition can scrub {@link #seenCorrelations}. */
+    private final Map<UUID, UUID> cidByPlayer = new ConcurrentHashMap<>();
 
     private final ExecutorService executor;
     private final AtomicBoolean closed = new AtomicBoolean(false);
@@ -68,10 +87,14 @@ public final class InMemoryNetworkRequestQueue implements NetworkRequestQueue {
         Objects.requireNonNull(envelope, "envelope");
         return runAsync(() -> {
             if (closed.get()) return EnrolOutcome.REJECTED;
-            if (!seenCorrelations.add(envelope.correlationId())) {
+            if (hasOtherPending(envelope)) return EnrolOutcome.REJECTED;
+            if (seenCorrelations.contains(envelope.correlationId())) {
                 // idempotent replay
                 return EnrolOutcome.ACCEPTED;
             }
+            if (atCapacity()) return EnrolOutcome.REJECTED;
+            seenCorrelations.add(envelope.correlationId());
+            cidByPlayer.put(envelope.playerId(), envelope.correlationId());
             long now = System.currentTimeMillis();
             QueueEnvelope qe = new QueueEnvelope(
                     envelope.playerId(),
@@ -99,9 +122,18 @@ public final class InMemoryNetworkRequestQueue implements NetworkRequestQueue {
         return runAsync(() -> {
             if (closed.get()) return EnrolOutcome.REJECTED;
             long now = System.currentTimeMillis();
+            boolean full = false;
             for (EnrolmentEnvelope env : batch) {
                 if (env == null) continue;
-                if (!seenCorrelations.add(env.correlationId())) continue;
+                if (hasOtherPending(env)) continue;
+                if (seenCorrelations.contains(env.correlationId())) continue;
+                if (atCapacity()) {
+                    // REJECTED makes the backend retry the batch; accepted rows replay idempotently.
+                    full = true;
+                    continue;
+                }
+                seenCorrelations.add(env.correlationId());
+                cidByPlayer.put(env.playerId(), env.correlationId());
                 ready.add(new QueueEnvelope(
                         env.playerId(),
                         env.correlationId(),
@@ -116,6 +148,11 @@ public final class InMemoryNetworkRequestQueue implements NetworkRequestQueue {
                         Optional.empty(),
                         env.regionKey(),
                         now));
+            }
+            if (full) {
+                LOG.log(Level.WARNING, "InMemoryNetworkRequestQueue: ready depth reached " + MAX_READY_DEPTH
+                        + "; rejecting the remainder of the batch for retry (REQ-RTP-S-004)");
+                return EnrolOutcome.REJECTED;
             }
             return EnrolOutcome.ACCEPTED;
         });
@@ -185,6 +222,7 @@ public final class InMemoryNetworkRequestQueue implements NetworkRequestQueue {
                         System.currentTimeMillis());
                 if (isTerminal(next)) {
                     statuses.remove(playerId);
+                    forgetCorrelation(playerId);
                 } else {
                     statuses.put(playerId, updated);
                 }
@@ -203,6 +241,7 @@ public final class InMemoryNetworkRequestQueue implements NetworkRequestQueue {
             }
             // best-effort scrub of any unpopped ready entry
             ready.removeIf(q -> playerId.equals(q.playerId()));
+            forgetCorrelation(playerId);
             return null;
         });
     }
@@ -227,6 +266,43 @@ public final class InMemoryNetworkRequestQueue implements NetworkRequestQueue {
         ready.clear();
         synchronized (statuses) { statuses.clear(); }
         seenCorrelations.clear();
+        cidByPlayer.clear();
+    }
+
+    /** Visible for tests. */
+    int seenCorrelationCount() {
+        return seenCorrelations.size();
+    }
+
+    private void forgetCorrelation(UUID playerId) {
+        UUID cid = cidByPlayer.remove(playerId);
+        if (cid != null) seenCorrelations.remove(cid);
+    }
+
+    /**
+     * {@code true} when the ready FIFO is full. Also compacts the idempotency
+     * set past its threshold, keeping only ids that are queued or still live.
+     */
+    private boolean atCapacity() {
+        if (seenCorrelations.size() > MAX_SEEN_CORRELATIONS) {
+            Set<UUID> keep = new HashSet<>(cidByPlayer.values());
+            for (QueueEnvelope q : ready) keep.add(q.correlationId());
+            seenCorrelations.retainAll(keep);
+        }
+        return ready.size() >= MAX_READY_DEPTH;
+    }
+
+    /** {@code true} (WARNING logged) when the player already has an undequeued envelope under another cid. */
+    private boolean hasOtherPending(EnrolmentEnvelope env) {
+        for (QueueEnvelope q : ready) {
+            if (env.playerId().equals(q.playerId()) && !env.correlationId().equals(q.correlationId())) {
+                LOG.log(Level.WARNING, "InMemoryNetworkRequestQueue: player " + env.playerId()
+                        + " already has a pending request; skipping correlationId="
+                        + env.correlationId() + " (REQ-RTP-S-004)");
+                return true;
+            }
+        }
+        return false;
     }
 
     private void putStatus(QueueStatus s) {

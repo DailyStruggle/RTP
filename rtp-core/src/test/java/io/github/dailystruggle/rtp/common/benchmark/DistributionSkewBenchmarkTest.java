@@ -185,8 +185,6 @@ public class DistributionSkewBenchmarkTest {
     }
     square.flushAndRebuild(1L);
 
-    Random rngLeafA = new Random(1001L);
-    Random rngLeafB = new Random(2002L);
     MutableRTPCoords coords = new MutableRTPCoords(0, 0);
 
     for (int i = 0; i < totalRequests; i++) {

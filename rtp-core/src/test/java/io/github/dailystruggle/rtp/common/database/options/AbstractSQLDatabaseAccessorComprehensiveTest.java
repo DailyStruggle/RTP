@@ -4,7 +4,6 @@ import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
-import io.github.dailystruggle.rtp.common.network.NetworkStateBinding;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -199,6 +198,7 @@ class AbstractSQLDatabaseAccessorComprehensiveTest {
         data.put("originalY", 64);
         data.put("originalZ", 0);
         data.put("originalWorldName", "world");
+        data.put("originServerId", "srv-1");
 
         accessor.cacheValue("rtp_teleport_data", data);
         assertEquals(1, accessor.writeQueue.size());
@@ -213,6 +213,8 @@ class AbstractSQLDatabaseAccessorComprehensiveTest {
         assertEquals("world", queued.selectedCoords.worldName());
         assertNotNull(queued.originalCoords);
         assertEquals(0, queued.originalCoords.x());
+        assertEquals("srv-1", queued.originServerId);
+        assertEquals("world", queued.originWorldName);
     }
 
     @Test

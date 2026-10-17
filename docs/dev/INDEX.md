@@ -15,9 +15,15 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Configuration write / `/rtp config` save path (atomic rename, audit, rollback) | [`../architecture/11-configuration-write-and-persist.md`](../architecture/11-configuration-write-and-persist.md) |
 | Network model diagrams (multi-server / multi-proxy topology, `/rtp` sequence, reservation-token state machine) | [`../architecture/12-network-model.md`](../architecture/12-network-model.md) |
 | Dual-layer shape architecture, spatial memory & L3 backlog selection diagrams | [`../architecture/13-dual-layer-shape-architecture-and-l3-selection.md`](../architecture/13-dual-layer-shape-architecture-and-l3-selection.md) |
+| Action Engine & subspace placement diagrams (anchors, multi-slot separation, confinement) | [`../architecture/14-group-placement-anchor-flow.md`](../architecture/14-group-placement-anchor-flow.md) ([ADR-093](../adr/ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement.md), [ADR-095](../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives.md)) |
+| Cost-governed chunk resolution & native admission diagrams (purpose-gating, deduplication threshold, MCA checks) | [`../architecture/15-cost-governed-chunk-reads-and-native-admission.md`](../architecture/15-cost-governed-chunk-reads-and-native-admission.md) ([ADR-110](../adr/ADR-110-purpose-gated-live-loads.md), [ADR-114](../adr/ADR-114-cost-governed-on-demand-chunk-reads.md)) |
+| Core package hierarchy, 4-tier DAG diagram & decision traceability | [`../architecture/16-package-dag-and-decision-preservation-graph.md`](../architecture/16-package-dag-and-decision-preservation-graph.md) ([ADR-115](../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph.md)) |
+| Full visual architecture catalog & diagram index | [`../architecture/README.md`](../architecture/README.md) |
 | `/rtp config` command semantics + save mechanics (target spec) | [`CONFIG_COMMAND_SPEC.md`](CONFIG_COMMAND_SPEC.md) ([ADR-037](../adr/ADR-037-harden-rtp-config-commands.md) decision, [ADR-041](../adr/ADR-041-config-command-and-save-implementation.md) implementation) |
 | What absolute rules apply? | [`REQUIREMENTS.md section 3`](REQUIREMENTS.md#3-prohibition-requirements) (S-001 … S-007) |
 | Where does my code go? | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| Where does my code go in `rtp-core`? (Tier 1..4 package map) | [`../architecture/16-package-dag-and-decision-preservation-graph.md#5-component-tier-taxonomy`](../architecture/16-package-dag-and-decision-preservation-graph.md#5-component-tier-taxonomy) |
+| Implementing a new server adapter (SPI requirements & functions) | [`SERVER_ADAPTER_GUIDE.md`](SERVER_ADAPTER_GUIDE.md) |
 | Threading / Folia / chunk I/O | [`DESIGN.md#threading`](DESIGN.md#threading) |
 | Memory lifecycle | [`DESIGN.md#memorytracker`](DESIGN.md#memorytracker) |
 | Domain term meaning | [`GLOSSARY.md`](GLOSSARY.md) |
@@ -27,31 +33,39 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | Commenting an option in a shipped YAML config | [`CONFIG_COMMENT_STYLE.md`](CONFIG_COMMENT_STYLE.md) |
 | A decision (why something is the way it is) | [`../adr/README.md`](../adr/README.md) |
 | How a developer ought to work in this repo, and why (full lifecycle: intake, planning, read-document-modify, design records, verification, divergence handling, communication, self-maintenance, optional AI tooling) | [`../adr/ADR-000-development-workflow.md`](../adr/ADR-000-development-workflow.md) |
-| Fabric status / blockers | [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) |
+| Pull Request (PR) lifecycle, pre-PR verification gates & CI pipeline reference | [`PULL_REQUEST_PROCESS.md`](PULL_REQUEST_PROCESS.md) |
 | Multi-server / proxy (Velocity, BungeeCord) plan | [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md) (D-005 gated; admin stub: [`../admin/proxies/INDEX.md`](../admin/proxies/INDEX.md)) |
 | Why network mode (multi-server, multi-proxy) is in scope | [`../adr/ADR-036-network-mode-multi-server-multi-proxy.md`](../adr/ADR-036-network-mode-multi-server-multi-proxy.md) (umbrella; subproject refinements under [`../../platforms/rtp-proxy/docs/adr/`](../../platforms/rtp-proxy/docs/adr/)) |
 | Runtime metrics SPI (TPS / MSPT / heap / pipeline samples) | [`METRICS_PLAN.md`](METRICS_PLAN.md) |
-| Why Fabric is in scope (and Forge / NeoForge are not) | [`../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md`](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) (renumbered from ADR-022) |
+| Behaviour fuzzing beyond leaks (finding oracles, live-server coverage, fault-only mode) | [`BEHAVIOUR_FUZZING_PLAN.md`](BEHAVIOUR_FUZZING_PLAN.md); decision record [`../adr/ADR-111-live-server-behaviour-fuzzing.md`](../adr/ADR-111-live-server-behaviour-fuzzing.md) |
+| Why Fabric is in scope | [`../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md`](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) (renumbered from ADR-022) |
+| Why NeoForge is in scope | [`../adr/ADR-033-neoforge-platform-in-scope.md`](../adr/ADR-033-neoforge-platform-in-scope.md) |
 | Why legacy MC / Java are out of scope | [`../adr/ADR-021-legacy-mc-and-java-support-scope.md`](../adr/ADR-021-legacy-mc-and-java-support-scope.md) |
 | Adding or updating a locale / translation | [`TRANSLATION_GUIDE.md`](TRANSLATION_GUIDE.md) |
 | Spiral 1D math | [`../adr/ADR-001-archimedean-spiral-1d-mapping.md`](../adr/ADR-001-archimedean-spiral-1d-mapping.md) |
 | Anvil prefilter / biome / shared module | [`../adr/ADR-016-anvil-subsystem.md`](../adr/ADR-016-anvil-subsystem.md) |
 | Block tags / state predicates in safety lists | [`../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md`](../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists.md) |
+| Testing guide (what to test when: unit, mutation, devstack) | [`TESTING_GUIDE.md`](TESTING_GUIDE.md) |
 | Coverage targets | [`COVERAGE_PLAN.md`](COVERAGE_PLAN.md) |
+| Verification gates and research references | [`VERIFICATION_GATES.md`](VERIFICATION_GATES.md) |
+| PR audit protocol (blocker classes, large-PR triage, report template) | [`PR_AUDIT_PROTOCOL.md`](PR_AUDIT_PROTOCOL.md) |
+| Contributor review experience (stable blocker ledger, comment form, newcomers) | [`CONTRIBUTOR_REVIEW_EXPERIENCE.md`](CONTRIBUTOR_REVIEW_EXPERIENCE.md) |
 | Enterprise readiness (gates, evidence, compatibility matrix) | [`ENTERPRISE_READINESS.md`](ENTERPRISE_READINESS.md) |
 | Platform support matrix (Spigot/Paper/Folia/Fabric/NeoForge/Velocity) | [`SUPPORT_MATRIX.md`](SUPPORT_MATRIX.md) |
 | Semantic Versioning (SemVer) contract (public vs internal API) | [`SEMVER.md`](SEMVER.md) |
 | Licensing clarity & Pro/Lite edition split | [`LICENSING.md`](LICENSING.md) |
 | Deprecation and API evolution policy | [`DEPRECATION_POLICY.md`](DEPRECATION_POLICY.md) |
-| Server-admin docs | [`../FOR_SERVER_ADMINS.md`](../FOR_SERVER_ADMINS.md) → [`../admin/`](../admin/) ([CONFIGURATION.md](../admin/configuration/CONFIGURATION.md), [REGIONS.md](../admin/configuration/REGIONS.md), [CORE_CONFIG.md](../admin/configuration/CORE_CONFIG.md), [PERFORMANCE.md](../admin/configuration/PERFORMANCE.md), [ECONOMY.md](../admin/configuration/ECONOMY.md), [SAFETY.md](../admin/configuration/SAFETY.md)) |
+| Server-admin docs | [`../FOR_SERVER_ADMINS.md`](../FOR_SERVER_ADMINS.md) → [`../admin/`](../admin/) ([CONFIGURATION.md](../admin/configuration/CONFIGURATION.md), [REGIONS.md](../admin/configuration/REGIONS.md), [CORE_CONFIG.md](../admin/configuration/CORE_CONFIG.md), [PERFORMANCE.md](../admin/configuration/PERFORMANCE.md), [ECONOMY.md](../admin/configuration/ECONOMY.md), [SAFETY.md](../admin/configuration/SAFETY.md), [ACTIONS.md](../admin/ACTIONS.md)) |
 | Addon author docs | [`../FOR_ADDON_DEVELOPERS.md`](../FOR_ADDON_DEVELOPERS.md) |
 | Build a destination menu / GUI on `rtp-api` | [`ADDON_MENUS.md`](ADDON_MENUS.md) |
 | Offer remote (network-mode) destinations from an addon | [`ADDON_CROSS_SERVER.md`](ADDON_CROSS_SERVER.md) |
 | How to load / deploy an addon (ServiceLoader, classpath, lifecycle) | [`ADDON_LOADING.md`](ADDON_LOADING.md) (ADR-057) |
+| Publish rtp-api / rtp-core artifacts (JitPack, GitHub Packages, Maven Central) | [`PUBLISHING.md`](PUBLISHING.md) |
 | Flat map of every doc | [`../MAP.md`](../MAP.md) |
-| Hazards and failure modes | [`../admin/HAZARDS.md`](../admin/HAZARDS.md) |
-| Failure detection and responses | [`../admin/HAZARDS.md#failure-modes`](../admin/HAZARDS.md#failure-modes) |
+| Hazards and failure modes | [`HAZARDS.md`](HAZARDS.md) |
+| Failure detection and responses | [`HAZARDS.md#failure-modes`](HAZARDS.md#failure-modes) |
 | External hooks (claim verifiers, economy, placeholders, world border, anvil prefilter) | [`EXTERNAL_HOOKS.md`](EXTERNAL_HOOKS.md) (ADR-026) |
+| Player archetypes, utility functions & valuation weights | [`PLAYER_TAXONOMY_VALUATION.md`](PLAYER_TAXONOMY_VALUATION.md) |
 | How and why AI tooling is used in this repository | [`AI_USAGE.md`](AI_USAGE.md) |
 
 ## Normative (read before writing code)
@@ -75,15 +89,21 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 | [`COVERAGE_PLAN.md`](COVERAGE_PLAN.md) | JaCoCo baseline and targets. |
 | [`ENTERPRISE_READINESS.md`](ENTERPRISE_READINESS.md) | Repo-wide plan to make the quality and compatibility claims externally verifiable: measured per-module coverage baseline, enforced gates, supply chain, support matrix. |
 | [`SUPPORT_MATRIX.md`](SUPPORT_MATRIX.md) | Platform family x Minecraft version x Java version support matrix. |
+| [`SERVER_ADAPTER_GUIDE.md`](SERVER_ADAPTER_GUIDE.md) | Server adapter requirements specification, SPI function catalog, threading, and checklist. |
 | [`SEMVER.md`](SEMVER.md) | Semantic versioning contract: public API vs internal boundaries, deprecation rules. |
-| [`LICENSING.md`](LICENSING.md) | Open-core dual-licensing model, MIT vs PolyForm boundaries, Pro vs Lite editions. |
+| [`LICENSING.md`](LICENSING.md) | All-MIT licensing (ADR-108), per-module licence matrix, Pro (support tier) vs Lite editions. |
 | [`DEPRECATION_POLICY.md`](DEPRECATION_POLICY.md) | Deprecation lifecycle, notice window, and compiler annotation policy. |
-| [`MULTI_PLATFORM_PLAN.md`](MULTI_PLATFORM_PLAN.md) | Active Fabric frontier status. |
+| [`PUBLISHING.md`](PUBLISHING.md) | Addon artifact publishing guide (JitPack, GitHub Packages, Maven Central). |
+| [`PULL_REQUEST_PROCESS.md`](PULL_REQUEST_PROCESS.md) | Pull request workflow: branching, local pre-PR verification gates, CI pipeline anatomy, and merge criteria. |
 | [`MULTI_SERVER_PLAN.md`](MULTI_SERVER_PLAN.md) | Proxy / multi-server (Velocity, BungeeCord) roadmap; D-005 gated. |
 | [`METRICS_PLAN.md`](METRICS_PLAN.md) | Runtime metrics SPI (TPS/MSPT/heap/queue/pipeline); implementation eligible. |
-| [`ROADMAP.md`](ROADMAP.md) | Forward-looking work. |
+| [`ROADMAP.md`](ROADMAP.md) | Pointer to the Linear `LeafRTP` team, where forward-looking work is tracked. |
 | [`STAKEHOLDERS.md`](STAKEHOLDERS.md) | Roles and review expectations. |
+| [`PLAYER_TAXONOMY_VALUATION.md`](PLAYER_TAXONOMY_VALUATION.md) | Player taxonomy, utility functions, site valuation weights, and behavioral benchmark models. |
 | [`LESSONS_LEARNED.md`](LESSONS_LEARNED.md) | Dated engineering notes. |
+| [`../../helpers/StressTestRTP/LEAK_FUZZING.md`](../../helpers/StressTestRTP/LEAK_FUZZING.md) | Behaviour leak fuzzer (`scripts/bench_fuzz.py`): goals, methodology, reading a run, findings (BetterRTP, LeafRTP 3.3.0), limitations. |
+| [`BEHAVIOUR_FUZZING_PLAN.md`](BEHAVIOUR_FUZZING_PLAN.md) | Generalising `bench_fuzz.py` to coverage-guided fault finding: what is generic, detector defects, goals, staged plan (finding oracles done; JaCoCo coverage, fault-only mode, new oracles, vocabulary D-005 gated). Governed by [ADR-111](../adr/ADR-111-live-server-behaviour-fuzzing.md). |
+| [`SECURITY_AUDIT_v3.3.0.md`](SECURITY_AUDIT_v3.3.0.md) | v3.3.0 pre-release security and severe-bug audit: fixed, open, sound and uncovered areas. |
 
 > Plans that shipped or were superseded are removed; the ADR is the durable record. Pre-deletion state is recoverable from git.
 
@@ -93,4 +113,5 @@ Canonical entry point. One-line purpose per doc, plus a task → file(+anchor) r
 |-----|---------|
 | [`../../.junie/AGENTS.md`](../../.junie/AGENTS.md) | Top-level operational guide. Start here. |
 | [`../../CONTRIBUTING.md`](../../CONTRIBUTING.md) | Human contributor workflow. |
+| [`PULL_REQUEST_PROCESS.md`](PULL_REQUEST_PROCESS.md) | Pull request lifecycle, verification gates, and merge criteria. |
 | [`../../CHANGELOG.md`](../../CHANGELOG.md) | Release notes. |

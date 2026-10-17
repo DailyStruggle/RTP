@@ -1,9 +1,17 @@
-# Minimalny TPS serwera wymagany do kontynuowania kolejkowania w tle.
-# Praca w tle wstrzymuje się, gdy TPS spadnie poniżej tego progu.
+# Wstrzymaj wypełnianie pamięci podręcznej w tle, gdy TPS spadnie poniżej tej wartości.
+# Na Folii liczy się najwolniejszy region. Oczekujący gracze nadal są obsługiwani. 0 = wył.
 # @type: number
 # @range: [0.0, 20.0]
 # @default: 19.0
 minTPS: 19.0
+
+# Wstrzymaj wypełnianie pamięci podręcznej w tle, gdy tick trwa dłużej niż ta wartość (ms).
+# Wykrywa lag ukryty przez TPS (TPS pozostaje na poziomie 20 do 50 ms). 0 = wył.
+# @type: number
+# @range: [0.0, null]
+# @unit: ms
+# @default: 45.0
+maxMSPT: 45.0
 
 # Maks. użycie sterty JVM (% maksimum), zanim wstrzymane zostanie wypełnianie
 # bufora w tle. Już zbuforowane lokacje są nadal serwowane. 0 lub 100 wyłącza.
@@ -20,26 +28,26 @@ maxHeapProcent: 85.0
 # @default: 32
 maksProby: 32
 
-# Ticki między cyklami pamięci podręcznej w tle (wstępne wypełnianie regionu, uzupełnianie kolejki).
+# Ticki między uzupełnieniami tego samego regionu. Regiony działają na zmianę.
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
 # @default: 20
 okres: 20
 
-# Maksymalna liczba milisekund na tick poświęcana zadaniom synchronicznym.
+# Maks. ms na tick dla pracy w głównym wątku. Ograniczono do 25.
 # @type: integer
-# @range: [1, null]
+# @range: [1, 25]
 # @unit: ms
-# @default: 50
-przydzielonyCzasSync: 50
+# @default: 5
+przydzielonyCzasSync: 5
 
-# Maksymalna liczba milisekund na tick poświęcana zadaniom asynchronicznym.
+# Maks. ms na impuls dla pracy w tle. Ograniczono do 25.
 # @type: integer
-# @range: [1, null]
+# @range: [1, 25]
 # @unit: ms
-# @default: 50
-przydzielonyCzasAsync: 50
+# @default: 25
+przydzielonyCzasAsync: 25
 
 # Promień chunków ładowanych wokół kandydującej lokalizacji podczas wyboru.
 # 0 ładuje tylko chunk kandydata.
@@ -144,6 +152,13 @@ progOstrzezeniaWzrostuKolejki: 0
 # @type: boolean
 # @default: false
 ladowanieSync: false
+
+# Ścieżka teleportu na Paper. AUTO = teleport w tym samym ticku, gdy chunk docelowy jest
+# już załadowany, w przeciwnym razie teleportAsync. ASYNC = zawsze teleportAsync (o jeden tick wolniej).
+# @type: string
+# @options: ["AUTO", "ASYNC"]
+# @default: "AUTO"
+sciezkaTeleportu: "AUTO"
 
 # Ponownie parsuj węzły uprawnień przy każdym zdarzeniu zamiast buforowania.
 # @type: boolean

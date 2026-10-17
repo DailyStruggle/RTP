@@ -50,11 +50,6 @@ public class LocationGenerator implements ILocationGenerator {
      */
     static final AtomicInteger platformDepthCache = new AtomicInteger(1);
 
-    /**
-     * ADR-016 section 13.3 (2026-04-20 revision): pre-chunk-load biome pre-check disabled by
-     * default (preserved as dead code for a potential future biome-targeted workload).
-     */
-    private static final boolean PRE_CHUNK_BIOME_PRECHECK_ENABLED = false;
 
     /** Timeout for the sync-shim join-on-async-future. Tests run well under this. */
     private static final long SYNC_SHIM_TIMEOUT_SECONDS = 60L;
@@ -230,6 +225,28 @@ public class LocationGenerator implements ILocationGenerator {
      */
     public static CompletableFuture<GenerationResult> getLocationFuture(
             Region region, @Nullable Set<String> biomeNames) {
+        return getLocationFuture(region, biomeNames, LoadPurpose.IMMEDIATE);
+    }
+
+    /**
+     * Pregen path with an explicit {@link LoadPurpose} (ADR-110). {@link LoadPurpose#SPECULATIVE}
+     * verifies from resident chunks and region-file reads first; a native load returns a pinned
+     * result (with a reservation the caller must hand to the kept queue or close) when a kept slot
+     * is free, else an unpinned result without the success ring.
+     */
+    public static CompletableFuture<GenerationResult> getLocationFuture(
+            Region region, @Nullable Set<String> biomeNames, LoadPurpose purpose) {
+        return getLocationFuture(region, biomeNames, purpose, null);
+    }
+
+    /**
+     * As above; with a non-null {@code backlog}, each attempt takes the backlog's oldest UNKNOWN
+     * entry instead of a shape draw (ADR-028). The shape is drawn only while the backlog is empty;
+     * the run completes without coordinates when entries exist but none is UNKNOWN.
+     */
+    static CompletableFuture<GenerationResult> getLocationFuture(
+            Region region, @Nullable Set<String> biomeNames, LoadPurpose purpose,
+            @Nullable BacklogLocationBuffer backlog) {
         CfDiag.locationGenPregenEntry.increment();
         CfDiag.ensureStarted();
         CompletableFuture<GenerationResult> result = new CompletableFuture<>();
@@ -240,6 +257,8 @@ public class LocationGenerator implements ILocationGenerator {
                 result.complete(null);
                 return result;
             }
+            state.purpose = (purpose == null) ? LoadPurpose.IMMEDIATE : purpose;
+            state.backlog = backlog;
             PregenTask task = new PregenTask(state, result, 1L);
             RTP.serverAccessor.getScheduler().runTaskAsynchronously(task);
         } catch (Throwable t) {

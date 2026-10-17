@@ -93,7 +93,6 @@ class PregeneratedPreferenceTest {
                 if (++consecutive >= cap) return iterations; // break
                 continue;
             }
-            consecutive = 0;
             // accepted: in the real loop we'd offer to backlog and continue;
             // for this test, simulate a single accepted pick then exit.
             return iterations;

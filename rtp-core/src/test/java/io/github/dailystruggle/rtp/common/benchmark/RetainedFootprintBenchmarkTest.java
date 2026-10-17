@@ -127,9 +127,7 @@ class RetainedFootprintBenchmarkTest {
   private static double retainedBytesPerInstance(IntFunction<Object> builder) {
     // Build one throwaway first so the builder's own classes are loaded and its lazily-created
     // statics exist before the baseline is taken; otherwise class-loading lands inside the delta.
-    Object discard = builder.apply(-1);
-    if (discard == null) throw new AssertionError("builder returned null");
-    discard = null;
+    if (builder.apply(-1) == null) throw new AssertionError("builder returned null");
 
     settle();
     long before = usedHeap();

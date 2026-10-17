@@ -2,8 +2,13 @@ package io.github.dailystruggle.rtp.common.commands;
 
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.commands.admin.AdminCmd;
 import io.github.dailystruggle.rtp.common.commands.admin.ClearCmd;
+import io.github.dailystruggle.rtp.common.commands.back.BackCmd;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmd;
+import io.github.dailystruggle.rtp.common.commands.base.PlatformCommandParameters;
 import io.github.dailystruggle.rtp.common.commands.config.ConfigCmd;
+import io.github.dailystruggle.rtp.common.commands.editor.EditorCmd;
 import io.github.dailystruggle.rtp.common.commands.gui.GuiCmd;
 import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
 import io.github.dailystruggle.rtp.common.commands.parameters.BiomeParameter;
@@ -55,6 +60,7 @@ public final class CoreCommandTreeBuilder {
    * @param root the {@code /rtp} root command
    */
   public static void attachCommonSubcommands(BaseRTPCmd root) {
+    root.addSubCommand(new BackCmd(root));
     root.addSubCommand(new ReloadCmd(root));
     root.addSubCommand(new GuiCmd(root));
     root.addSubCommand(new ConfigCmd(root));
@@ -64,6 +70,11 @@ public final class CoreCommandTreeBuilder {
     root.addSubCommand(versionCmd);
     root.getCommandLookup().put(VersionCmd.ALIAS.toUpperCase(Locale.ROOT), versionCmd);
     root.addSubCommand(new ClearCmd(root));
+    root.addSubCommand(new EditorCmd(root));
+    AdminCmd adminCmd = new AdminCmd(root);
+    adminCmd.addSubCommand(new io.github.dailystruggle.rtp.common.commands.prefab.PrefabCommand(adminCmd));
+    adminCmd.addSubCommand(new io.github.dailystruggle.rtp.common.commands.setup.SetupCmd(adminCmd));
+    root.addSubCommand(adminCmd);
   }
 
   /**

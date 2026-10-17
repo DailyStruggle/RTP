@@ -27,11 +27,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  acceptance-smoke:
-    name: Devstack Acceptance Smoke
+  package:
+    name: Build devstack plugin jar
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -44,7 +48,38 @@ jobs:
             21
             25
           distribution: 'temurin'
-          cache: gradle
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@d9c87d481d55275bb5441eef3fe0e46805f9ef70 # v3.5.0
+
+      - name: Grant execute permissions
+        run: chmod +x gradlew
+
+      - name: Build devstack plugin jar
+        run: ./gradlew :rtp-plugin:remapJar --console=plain
+
+      - name: Upload plugin jar artifact
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: devstack-plugin-jar
+          path: rtp-plugin/build/libs/
+          retention-days: 1
+
+  acceptance-smoke:
+    name: Devstack Acceptance Smoke
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Download plugin jar
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
+        with:
+          name: devstack-plugin-jar
+          path: rtp-plugin/build/libs/
 
       - name: Set up Node.js
         uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
@@ -52,13 +87,7 @@ jobs:
           node-version: '20'
 
       - name: Grant execute permissions
-        run: |
-          chmod +x gradlew
-          chmod +x devstack/*.sh
-
-      - name: Pre-build devstack plugin jar
-        run: |
-          ./gradlew :rtp-plugin:remapJar --console=plain
+        run: chmod +x devstack/*.sh
 
       - name: Install bot dependencies (for roundtrip scenario)
         working-directory: devstack/clients
@@ -89,3 +118,48 @@ jobs:
         run: |
           cd devstack
           ./run-acceptance.sh --scenario down --purge || true
+
+  # ADR-113: the bug-report window runs to the latest release, which the
+  # multi-server stack above (1.21.11) does not boot. One single-server job per
+  # service in docker-compose.versions.yml; bump VERSION there on each release.
+  versions-smoke:
+    name: Latest release smoke (${{ matrix.service }})
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - versions-paper-26
+          - versions-fabric-26
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Download plugin jar
+        uses: actions/download-artifact@cc203385981b70ca67e1cc392babf9cc229d5806 # v4.1.9
+        with:
+          name: devstack-plugin-jar
+          path: rtp-plugin/build/libs/
+
+      - name: Grant execute permissions
+        run: chmod +x devstack/*.sh
+
+      - name: Boot and check ${{ matrix.service }}
+        run: |
+          ./devstack/run-versions-smoke.sh --service "${{ matrix.service }}" --fresh
+
+      - name: Archive server log
+        if: always()
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: versions-smoke-${{ matrix.service }}
+          path: devstack/logs/versions-*/*.log
+          retention-days: 30
+
+      - name: Cleanup containers
+        if: always()
+        run: |
+          docker compose -f devstack/docker-compose.versions.yml down || true

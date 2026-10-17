@@ -6,7 +6,7 @@ This document provides step-by-step diagnosis and resolution procedures for comm
 problems. Each section follows the pattern: **Symptom → Diagnosis → Resolution**.
 
 For the full list of failure modes and their defined system responses, and the hazard
-register, see [`HAZARDS.md`](HAZARDS.md).
+register, see [`HAZARDS.md`](../dev/HAZARDS.md).
 
 ---
 
@@ -90,9 +90,10 @@ air, or into a claimed region they cannot build in.
 | Paper | 1.20.x | `rtp-paper-v1_20_R1` |
 | Paper | 1.21.x | `rtp-paper-v1_21_R1` |
 | Paper | 26.1 | `rtp-paper-v26_1_R1` |
-| Folia | 1.20.x | `rtp-folia-v1_20_R1` |
-| Folia | 1.21.x | `rtp-folia-v1_21_R1` |
+| Folia | 1.21.11 | `rtp-folia-v1_21_R1` |
 | Folia | 26.1 | `rtp-folia-v26_1_R1` |
+
+Folia below 1.21.11 is not supported (ADR-113): Folia is experimental and its older builds are not maintained, so a crash there may not come from RTP at all. Upgrade Folia before troubleshooting.
 
 Replace the installed jar with the correct version and restart.
 
@@ -130,6 +131,32 @@ fix the reported line, and restart.
   recovery periods between scan cycles.
 - If the mapping process has genuinely stalled (no log activity for > 5 minutes): run
   `/rtp scan cancel <region>` then `/rtp scan start <region>` to restart it.
+
+---
+
+## `/rtp biome=<x>` Lands in an Unexpected Region or World
+
+**Symptom:** A biome teleport such as `rtp player=<name> biome=MEADOW,PLAINS` sends the player
+to a different region or world than the one they were in, or never uses a gated
+(`requirePermission: true`) region the player has access to.
+
+**Diagnosis:** When `region=` is omitted, LeafRTP picks the region automatically (ADR-063):
+1. It starts from the region mapped to the target player's current world (or to `world=<w>`
+   if given).
+2. If that region has not yet recorded the **first** biome in the list, it switches to the
+   region that has seen that biome most often. That region can be in any world.
+3. The switch checks `rtp.regions.<name>` against the command **sender**. A player sender
+   needs the exact node; `rtp.regions.*` alone is not enough. A console sender holds none, so
+   gated regions are always skipped, even when the target player has the node.
+
+**Resolution:**
+- Pass `region=<name>` explicitly in command runners, actions, and menus. An explicit region
+  is used as given. `world=<w>` alone does not pin it: auto-selection still runs from that
+  world's region.
+- If you rely on auto-selection, put first a biome the home region has already recorded.
+  Only the first entry decides the region; the rest still count when picking the spot.
+- See [Recipes](RECIPES.md#curated-biome-lists-per-world-or-region) for the console-run
+  pattern.
 
 ---
 

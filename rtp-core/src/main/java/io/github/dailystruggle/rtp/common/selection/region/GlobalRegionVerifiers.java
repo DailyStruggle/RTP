@@ -90,14 +90,10 @@ public class GlobalRegionVerifiers {
         if (source == null) return 0;
         int removed = 0;
         for (RegisteredSyncVerifier v : regionVerifiers) {
-            if (source.equals(v.source())) {
-                if (regionVerifiers.remove(v)) removed++;
-            }
+            if (source.equals(v.source()) && regionVerifiers.remove(v)) removed++;
         }
         for (RegisteredAsyncVerifier v : asyncRegionVerifiers) {
-            if (source.equals(v.source())) {
-                if (asyncRegionVerifiers.remove(v)) removed++;
-            }
+            if (source.equals(v.source()) && asyncRegionVerifiers.remove(v)) removed++;
         }
         return removed;
     }

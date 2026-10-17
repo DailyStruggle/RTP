@@ -3,8 +3,11 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.PolygonMemoryShapeParams;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Level;
@@ -117,11 +120,14 @@ public class Polygon extends Square {
     long centerX = ((long) lx + (long) hx) / 2;
     long centerZ = ((long) lz + (long) hz) / 2;
 
-    data.put(GenericMemoryShapeParams.radius, (int) radius);
-    data.put(GenericMemoryShapeParams.centerX, (int) centerX);
-    data.put(GenericMemoryShapeParams.centerZ, (int) centerZ);
-    data.put(GenericMemoryShapeParams.centerRadius, 0);
-    data.put(GenericMemoryShapeParams.expand, false);
+    // Copy-on-write: the shape may already be shared with lock-free readers.
+    java.util.EnumMap<GenericMemoryShapeParams, Object> rebuilt = getData();
+    rebuilt.put(GenericMemoryShapeParams.radius, (int) radius);
+    rebuilt.put(GenericMemoryShapeParams.centerX, (int) centerX);
+    rebuilt.put(GenericMemoryShapeParams.centerZ, (int) centerZ);
+    rebuilt.put(GenericMemoryShapeParams.centerRadius, 0);
+    rebuilt.put(GenericMemoryShapeParams.expand, false);
+    replaceData(rebuilt);
 
     // Schedule the async curve-walker iff the segmented bad-locations store is
     // currently empty. A prior session's serialized mask or runtime discoveries
@@ -310,10 +316,12 @@ public class Polygon extends Square {
     return abx * acz - abz * acx;
   }
 
+  /** {@link PolygonMemoryShapeParams} names; the bounding-square keys come from the vertices. */
+  private static final Collection<String> POLYGON_KEYS =
+      Arrays.stream(PolygonMemoryShapeParams.values()).map(Enum::name).toList();
+
   @Override
-  public java.util.Collection<String> keys() {
-    // Reuse Square's key set; polygon-specific 'vertices' is handled outside the
-    // generic CommandParameter surface (it's a structured config value).
-    return super.keys();
+  public Collection<String> keys() {
+    return POLYGON_KEYS;
   }
 }

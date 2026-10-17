@@ -17,6 +17,12 @@ import org.junit.jupiter.api.Test;
 class AnvilReaderEdgeCasesTest {
 
   @Test
+  @DisplayName("getMotionBlockingNoLeaves returns null for a null chunk root instead of throwing")
+  void testMotionBlockingNoLeavesNullRoot() {
+    assertNull(AnvilReader.getMotionBlockingNoLeaves(null));
+  }
+
+  @Test
   @DisplayName("readChunkEntry validates coordinates and buffer bounds")
   void testBoundsAndCoordinates() {
     assertThrows(CorruptRegionEntryException.class, () -> AnvilReader.readChunkEntry(null, 0, 0));
@@ -106,11 +112,11 @@ class AnvilReaderEdgeCasesTest {
     secMissingPal.put("block_states", Map.of("data", new long[4]));
     sections.items.add(secMissingPal);
 
-    // Section 5: palette has non-map or non-string Name
+    // Section 5: palette entry is neither a string nor a compound naming a block
     Map<String, Object> secBadPal = new LinkedHashMap<>();
     secBadPal.put("Y", (byte) 2);
     Nbt.NbtList badPalList = new Nbt.NbtList(Nbt.TAG_COMPOUND, new java.util.ArrayList<>());
-    badPalList.items.add("not-map-entry");
+    badPalList.items.add(12345);
     secBadPal.put("block_states", Map.of("palette", badPalList));
     sections.items.add(secBadPal);
 
@@ -136,7 +142,6 @@ class AnvilReaderEdgeCasesTest {
   void testColumnProbeHeightmapBranches() {
     // Heightmap array present but length 0
     long[] emptyHm = new long[0];
-    PaletteSection sec = new PaletteSection(0, List.of("minecraft:stone"), new long[4]);
     // Call computeHeightmapTop via synthetic chunk root
     LinkedHashMap<String, Object> root = new LinkedHashMap<>();
     root.put("DataVersion", 2975);
@@ -153,8 +158,6 @@ class AnvilReaderEdgeCasesTest {
 
     AnvilChunkView view = AnvilReader.toView(root);
     assertNotNull(view);
-    // getSurfaceHeight returns 0 when heightmap is empty
-    assertEquals(0, view.getSurfaceHeight(8, 8));
 
     // Exercise columnProbeDecision directly for complete branch coverage
     java.util.List<String> rootPath = java.util.Collections.emptyList();

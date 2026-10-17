@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
@@ -17,7 +18,9 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -38,16 +41,22 @@ class AsyncTaskProcessingTest {
         RTPTestSetup.install(tempDir);
         RTP.futures.clear();
         RTP.selectionAPI.permRegionLookup.clear();
+        RTP.selectionAPI.selectionPipelineUrgent.clear();
+        RTP.selectionAPI.selectionPipeline.clear();
         RTP.getInstance().cancelTasks.clear();
         RTP.getInstance().cancelTasks.start();
         RTP.getInstance().miscAsyncTasks.clear();
         RTP.getInstance().miscAsyncTasks.start();
+        AsyncTaskProcessing.resetRotationForTesting();
+        TickBudget.clear();
     }
 
     @AfterEach
     void tearDown() {
         RTP.futures.clear();
         RTP.selectionAPI.permRegionLookup.clear();
+        RTP.selectionAPI.selectionPipelineUrgent.clear();
+        RTP.selectionAPI.selectionPipeline.clear();
     }
 
     private Region newRegion(String name) {
@@ -134,5 +143,141 @@ class AsyncTaskProcessingTest {
     void run_withZeroAvailableTime_doesNotThrow() {
         RTP.selectionAPI.permRegionLookup.put("regionA", newRegion("regionA"));
         assertDoesNotThrow(() -> new AsyncTaskProcessing(0L).run());
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    void run_withPerformanceConfig_executesRegionAndHandlesException() {
+        // Set up mock region that throws an exception during execute to test error handling
+        Region base = newRegion("throwingRegion");
+        Region throwingRegion = new Region("throwingRegion", base.getSettings()) {
+            @Override
+            public void execute(long allottedTime) {
+                throw new RuntimeException("simulated region execute error");
+            }
+        };
+        RTP.selectionAPI.permRegionLookup.put("throwingRegion", throwingRegion);
+
+        // Run pulse, verifying it catches the exception and logs it rather than crashing
+        assertDoesNotThrow(() -> new AsyncTaskProcessing(100_000L).run());
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    @DisplayName("REQ-RTP-S-004: a pulse that is still running makes later ticks skip instead of stacking")
+    void overlappingPulse_isSkipped_whilePreviousRuns() throws Exception {
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicInteger executions = new AtomicInteger();
+        Region base = newRegion("blockingRegion");
+        Region blocking = new Region("blockingRegion", base.getSettings()) {
+            @Override
+            public void execute(long allottedTime) {
+                executions.incrementAndGet();
+                entered.countDown();
+                try {
+                    release.await(5, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        };
+        RTP.selectionAPI.permRegionLookup.put("blockingRegion", blocking);
+
+        Thread first = new Thread(() -> new AsyncTaskProcessing(Long.MAX_VALUE).run(), "pulse-1");
+        first.start();
+        try {
+            assertTrue(entered.await(5, TimeUnit.SECONDS), "first pulse never reached the region");
+            assertTrue(AsyncTaskProcessing.isPulseActive());
+
+            boolean[] drained = {false};
+            RTP.getInstance().miscAsyncTasks.add(() -> drained[0] = true);
+            for (int i = 0; i < 5; i++) new AsyncTaskProcessing(Long.MAX_VALUE).run();
+
+            assertEquals(1, executions.get(), "overlapping ticks must not re-enter the region");
+            assertFalse(drained[0], "a skipped tick must not drain pipes");
+        } finally {
+            release.countDown();
+            first.join(5_000);
+        }
+        assertFalse(AsyncTaskProcessing.isPulseActive(), "guard must clear once the pulse ends");
+    }
+
+    @Test
+    @Timeout(value = 10, unit = TimeUnit.SECONDS)
+    @DisplayName("performance.yml period: a single region refills exactly once per `period` pulses")
+    void period_singleRegion_runsOncePerPeriod() {
+        AtomicInteger executions = new AtomicInteger();
+        Region base = newRegion("countingRegion");
+        Region counting = new Region("countingRegion", base.getSettings()) {
+            @Override
+            public void execute(long allottedTime) {
+                executions.incrementAndGet();
+            }
+        };
+        RTP.selectionAPI.permRegionLookup.put("countingRegion", counting);
+
+        long period = TickBudget.periodTicks();
+        assertTrue(period > 1, "precondition: default period spans several pulses");
+        for (long i = 0; i < period * 3; i++) new AsyncTaskProcessing(Long.MAX_VALUE).run();
+
+        assertEquals(3, executions.get(), "one turn per period, not per period-1");
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    @DisplayName("asyncAllottedTime: region budget never exceeds the documented 25 ms ceiling")
+    void regionBudget_isClampedToCeiling() {
+        long[] seen = {-1L};
+        Region base = newRegion("budgetRegion");
+        Region probe = new Region("budgetRegion", base.getSettings()) {
+            @Override
+            public void execute(long allottedTime) {
+                seen[0] = allottedTime;
+            }
+        };
+        RTP.selectionAPI.permRegionLookup.put("budgetRegion", probe);
+
+        new AsyncTaskProcessing(Long.MAX_VALUE).run();
+
+        assertTrue(seen[0] > 0, "region must receive a positive budget");
+        assertTrue(seen[0] <= TimeUnit.MILLISECONDS.toNanos(TickBudget.MAX_ALLOTTED_MS),
+                "budget " + seen[0] + "ns exceeds the ceiling");
+    }
+
+    @Test
+    @DisplayName("sparkFrameName tag returns rtp_async_task_drain")
+    void testSparkFrameName() {
+        AsyncTaskProcessing proc = new AsyncTaskProcessing(100L);
+        assertEquals("rtp_async_task_drain", proc.sparkFrameName());
+    }
+
+    @Test
+    @DisplayName("SelectionAPI compute drains urgent and standard pipelines, tolerating task errors")
+    void selectionApi_compute_drainsPipelines() {
+        AtomicInteger urgentRan = new AtomicInteger();
+        AtomicInteger standardRan = new AtomicInteger();
+        RTP.selectionAPI.selectionPipelineUrgent.add(urgentRan::incrementAndGet);
+        RTP.selectionAPI.selectionPipelineUrgent.add(() -> { throw new RuntimeException("simulated task error"); });
+        RTP.selectionAPI.selectionPipeline.add(standardRan::incrementAndGet);
+
+        assertDoesNotThrow(() -> RTP.selectionAPI.compute());
+
+        assertEquals(1, urgentRan.get());
+        assertEquals(1, standardRan.get());
+        assertTrue(RTP.selectionAPI.selectionPipelineUrgent.isEmpty());
+        assertTrue(RTP.selectionAPI.selectionPipeline.isEmpty());
+    }
+
+    @Test
+    @DisplayName("AsyncTaskProcessing uses availableTime fallback when configs is null")
+    void run_usesConstructorTimeWhenConfigsNull() {
+        io.github.dailystruggle.rtp.common.configuration.Configs saved = RTP.configs;
+        RTP.configs = null;
+        try {
+            assertDoesNotThrow(() -> new AsyncTaskProcessing(1_000_000L).run());
+        } finally {
+            RTP.configs = saved;
+        }
     }
 }

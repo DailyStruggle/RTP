@@ -59,7 +59,9 @@ public class DeathEffect extends Effect<DeathEffect.DeathKeys> {
     @Override
     public void setData(EnumMap<DeathKeys, Object> data) {
         if (data == null) return;
-        this.data.putAll(data);
+        EnumMap<DeathKeys, Object> copy = (this.defaults != null) ? this.defaults.clone() : new EnumMap<>(DeathKeys.class);
+        copy.putAll(data);
+        this.data = copy;
     }
 
     @Override

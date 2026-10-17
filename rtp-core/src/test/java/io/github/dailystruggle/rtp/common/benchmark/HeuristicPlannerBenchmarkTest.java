@@ -513,7 +513,7 @@ public class HeuristicPlannerBenchmarkTest {
     assertTrue(
         tight.modeledResidentBytes() <= tight.budgetBytes(),
         "the chosen directory must fit the derived budget");
-    assertEquals(radius, 20480, "radius under test");
+    assertEquals(20480, radius, "radius under test");
 
     REPORT.add("heap response", "8GB free", "chosen config", roomy.config().toString(), Provenance.MODELED);
     REPORT.add("heap response", "8GB free", "resident bytes", String.valueOf(roomy.modeledResidentBytes()), Provenance.MODELED);

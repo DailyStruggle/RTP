@@ -1,4 +1,4 @@
-﻿# Devstack backend-b network.yml.
+# Devstack backend-b network.yml.
 network:
   enabled: true
   serverId: "backend-b"
@@ -15,6 +15,9 @@ heartbeat:
 reservation:
   ttlMs: 30000
   reapIntervalMs: 5000
+
+routing:
+  dispatchMode: direct-db
 
 # Load balancer scoring table (rtp-proxy-ADR-004 *Region-Pair Scoring*).
 # Devstack uses an active block so acceptance runs exercise the curve

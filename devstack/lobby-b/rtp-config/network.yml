@@ -1,4 +1,4 @@
-﻿# Devstack backend-a network.yml.
+# Devstack backend-a network.yml.
 network:
   enabled: true
   serverId: "lobby-b"
@@ -20,6 +20,7 @@ routing:
   # Lobby mode disables local region pre-fill/scan/hydrate.
   # Lobby backends only dispatch players to peer backends via cross-server /rtp.
   lobbyMode: true
+  dispatchMode: direct-db
 
 # Load balancer scoring table (rtp-proxy-ADR-004 *Region-Pair Scoring*).
 # Devstack uses an active block so acceptance runs exercise the curve

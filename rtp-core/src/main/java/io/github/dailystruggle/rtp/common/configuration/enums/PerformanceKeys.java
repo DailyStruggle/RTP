@@ -6,6 +6,7 @@ public enum PerformanceKeys {
   syncAllottedTime,
   asyncAllottedTime,
   minTPS,
+  maxMSPT,
   maxHeapPercent,
   viewDistanceSelect,
   viewDistanceTeleport,
@@ -25,5 +26,6 @@ public enum PerformanceKeys {
   backlogGenerationStrategy,
   slowPipelineThresholdMs,
   queueGrowthWarnThreshold,
+  teleportPath,
   version
 }

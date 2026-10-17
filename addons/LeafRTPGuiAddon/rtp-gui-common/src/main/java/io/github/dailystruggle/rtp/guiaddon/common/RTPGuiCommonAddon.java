@@ -209,7 +209,7 @@ public final class RTPGuiCommonAddon implements RTPAddon {
         }
       } catch (Throwable badEntry) {
         RTP.log(Level.FINE, "[RTP-GUI] skipped a MenuRenderer service entry '"
-            + className + "'", badEntry);
+            + className + "': " + badEntry.getClass().getSimpleName() + " " + badEntry.getMessage());
       }
     }
   }

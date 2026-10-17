@@ -492,6 +492,90 @@ class TeleportPipelineTaskPhaseTest {
         assertEquals(TeleportPipelineTask.Phase.CLEANUP, task.getPhase());
     }
 
+    /** Runs the setup phase against a generator that completes with a null result. */
+    private TeleportPipelineTask runSetupWithNullResult(String name, boolean queued,
+                                                        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer[] out) {
+        io.github.dailystruggle.rtp.common.mock.TrackedMockWorld world = new io.github.dailystruggle.rtp.common.mock.TrackedMockWorld(name + "_w");
+        io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.RTP.serverAccessor;
+        accessor.addWorld(world);
+        io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle circle =
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle();
+        circle.setRng(new java.util.Random(42L));
+        io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor vert =
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(new ArrayList<>());
+        io.github.dailystruggle.rtp.common.selection.region.RegionSettings settings =
+                new io.github.dailystruggle.rtp.common.selection.region.RegionSettings(
+                        name + "_reg", world, circle, vert, false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
+        io.github.dailystruggle.rtp.common.selection.region.Region reg =
+                new io.github.dailystruggle.rtp.common.selection.region.Region(name + "_reg", settings);
+        io.github.dailystruggle.rtp.common.RTP.selectionAPI.permRegionLookup.put(reg.name, reg);
+
+        java.util.UUID pid = java.util.UUID.randomUUID();
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer p = new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(
+                pid, name + "P", new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 0, 64, 0));
+        accessor.addPlayer(p);
+        out[0] = p;
+
+        accessor.setLocationGenerator(new io.github.dailystruggle.rtp.common.mock.MockLocationGenerator(world) {
+            @Override
+            public java.util.concurrent.CompletableFuture<io.github.dailystruggle.rtp.api.selection.GenerationResult> getLocation(Object r, io.github.dailystruggle.rtp.api.selection.GenerationContext c) {
+                return java.util.concurrent.CompletableFuture.completedFuture(null);
+            }
+        });
+
+        // /rtp holds processingPlayers for the whole attempt (acquired in RTPCmd.onCommand).
+        io.github.dailystruggle.rtp.common.RTP.getInstance().processingPlayers.add(pid);
+        if (queued) io.github.dailystruggle.rtp.common.RTP.getInstance().queuedPlayers.add(pid);
+
+        TeleportPipelineTask task = new TeleportPipelineTask(
+                new io.github.dailystruggle.rtp.api.selection.GenerationContext(p, p, null), reg);
+        task.run();
+        return task;
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    @org.junit.jupiter.api.DisplayName("S-004: a null generation result for a non-queued player fails with a message and releases the busy lock")
+    void setup_null_result_not_queued_fails_visibly() {
+        String savedUnsafe = TeleportPipelineTask.ConfigCache.unsafe;
+        TeleportPipelineTask.ConfigCache.unsafe = "UNSAFE_NULL_RESULT";
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer[] p = new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer[1];
+        try {
+            TeleportPipelineTask task = runSetupWithNullResult("null_fail", false, p);
+            assertEquals(TeleportPipelineTask.Phase.CLEANUP, task.getPhase());
+            assertFalse(io.github.dailystruggle.rtp.common.RTP.getInstance().processingPlayers.contains(p[0].uuid()),
+                    "a failed generation must not leave the player 'already teleporting'");
+            assertTrue(p[0].sentMessages.stream().anyMatch(m -> m.contains("UNSAFE_NULL_RESULT")),
+                    "the failure must be reported to the player");
+        } finally {
+            TeleportPipelineTask.ConfigCache.unsafe = savedUnsafe;
+            if (p[0] != null) io.github.dailystruggle.rtp.common.RTP.getInstance().processingPlayers.remove(p[0].uuid());
+        }
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    @org.junit.jupiter.api.DisplayName("S-004: a null generation result for a queued player halts silently and keeps the lock")
+    void setup_null_result_queued_halts_silently() {
+        String savedUnsafe = TeleportPipelineTask.ConfigCache.unsafe;
+        TeleportPipelineTask.ConfigCache.unsafe = "UNSAFE_NULL_RESULT";
+        io.github.dailystruggle.rtp.common.mock.MockRTPPlayer[] p = new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer[1];
+        try {
+            TeleportPipelineTask task = runSetupWithNullResult("null_queued", true, p);
+            assertNotEquals(TeleportPipelineTask.Phase.CLEANUP, task.getPhase(),
+                    "a queued player is served later by Region.execute(); the attempt must not clean up");
+            assertTrue(io.github.dailystruggle.rtp.common.RTP.getInstance().processingPlayers.contains(p[0].uuid()));
+            assertFalse(p[0].sentMessages.stream().anyMatch(m -> m.contains("UNSAFE_NULL_RESULT")));
+        } finally {
+            TeleportPipelineTask.ConfigCache.unsafe = savedUnsafe;
+            if (p[0] != null) {
+                io.github.dailystruggle.rtp.common.RTP.getInstance().processingPlayers.remove(p[0].uuid());
+                io.github.dailystruggle.rtp.common.RTP.getInstance().queuedPlayers.remove(p[0].uuid());
+            }
+        }
+    }
+
     private record DummySchematic(int width, int height, int length, int offsetX, int offsetY, int offsetZ) implements io.github.dailystruggle.rtp.api.schematic.LoadedSchematic {
         @Override
         public io.github.dailystruggle.rtp.api.schematic.SchematicSource source() { return null; }
@@ -510,12 +594,12 @@ class TeleportPipelineTaskPhaseTest {
 
         io.github.dailystruggle.rtp.api.schematic.LoadedSchematic emptySchematic =
                 new DummySchematic(0, 0, 0, 0, 0, 0);
-        assertTrue(TeleportPipelineTask.schematicFootprintClear(emptySchematic, loc, optionsCenter, world.name()));
+        assertTrue(TeleportPipelineTask.schematicFootprintClearAsync(emptySchematic, loc, optionsCenter, world.name()).join());
 
         io.github.dailystruggle.rtp.api.schematic.LoadedSchematic nonNullSchematic =
                 new DummySchematic(2, 2, 2, 1, 0, 1);
-        assertTrue(TeleportPipelineTask.schematicFootprintClear(nonNullSchematic, loc, optionsCenter, world.name()));
-        assertTrue(TeleportPipelineTask.schematicFootprintClear(nonNullSchematic, loc, optionsOrigin, world.name()));
+        assertTrue(TeleportPipelineTask.schematicFootprintClearAsync(nonNullSchematic, loc, optionsCenter, world.name()).join());
+        assertTrue(TeleportPipelineTask.schematicFootprintClearAsync(nonNullSchematic, loc, optionsOrigin, world.name()).join());
     }
 
     @Test
@@ -534,7 +618,7 @@ class TeleportPipelineTaskPhaseTest {
         java.util.function.Predicate<io.github.dailystruggle.rtp.api.world.RTPCoords> rejectVerifier = c -> false;
         io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers.addGlobalRegionVerifier(rejectVerifier);
         try {
-            assertFalse(TeleportPipelineTask.schematicFootprintClear(schematic, loc, optionsCenter, world.name()));
+            assertFalse(TeleportPipelineTask.schematicFootprintClearAsync(schematic, loc, optionsCenter, world.name()).join());
         } finally {
             io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers.clearGlobalRegionVerifiers();
         }
@@ -543,7 +627,7 @@ class TeleportPipelineTaskPhaseTest {
         java.util.function.Predicate<io.github.dailystruggle.rtp.api.world.RTPCoords> throwingVerifier = c -> { throw new RuntimeException("fail"); };
         io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers.addGlobalRegionVerifier(throwingVerifier);
         try {
-            assertFalse(TeleportPipelineTask.schematicFootprintClear(schematic, loc, optionsCenter, world.name()));
+            assertFalse(TeleportPipelineTask.schematicFootprintClearAsync(schematic, loc, optionsCenter, world.name()).join());
         } finally {
             io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers.clearGlobalRegionVerifiers();
         }
@@ -674,7 +758,8 @@ class TeleportPipelineTaskPhaseTest {
 
     @Test
     @Timeout(value = 5, unit = TimeUnit.SECONDS)
-    void processGenerationResult_null_result_when_player_in_processing_halts() throws Exception {
+    @org.junit.jupiter.api.DisplayName("S-004: a null generation result halts silently only for a queued player")
+    void processGenerationResult_null_result_when_player_queued_halts() throws Exception {
         io.github.dailystruggle.rtp.common.mock.TrackedMockWorld world = new io.github.dailystruggle.rtp.common.mock.TrackedMockWorld("pgr_null_proc_w");
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
                 (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.RTP.serverAccessor;
@@ -686,6 +771,8 @@ class TeleportPipelineTaskPhaseTest {
         accessor.addPlayer(p);
 
         io.github.dailystruggle.rtp.common.RTP.getInstance().processingPlayers.add(pid);
+        // The enqueue branch registers queued players; only they are served later by Region.execute().
+        io.github.dailystruggle.rtp.common.RTP.getInstance().queuedPlayers.add(pid);
         try {
             io.github.dailystruggle.rtp.api.selection.GenerationContext ctx =
                     new io.github.dailystruggle.rtp.api.selection.GenerationContext(p, p, null);
@@ -694,12 +781,21 @@ class TeleportPipelineTaskPhaseTest {
             java.lang.reflect.Method m = TeleportPipelineTask.class.getDeclaredMethod("processGenerationResult",
                     io.github.dailystruggle.rtp.api.selection.GenerationResult.class);
             m.setAccessible(true);
+            java.lang.reflect.Field trackingId =
+                    io.github.dailystruggle.rtp.common.tasks.RTPRunnable.class.getDeclaredField("trackingId");
+            trackingId.setAccessible(true);
+            assertNotNull(trackingId.get(task), "pipeline is leak-tracked before the halt");
+
             m.invoke(task, (Object) null);
 
             // Phase should not have progressed to LOAD or CLEANUP
             assertEquals(TeleportPipelineTask.Phase.SETUP, task.getPhase());
+            // The queue owns the wait: the halted task is untracked so the leak sweep never
+            // force-closes it and tears down the queued player's state.
+            assertNull(trackingId.get(task), "halted queued pipeline must be untracked");
         } finally {
             io.github.dailystruggle.rtp.common.RTP.getInstance().processingPlayers.remove(pid);
+            io.github.dailystruggle.rtp.common.RTP.getInstance().queuedPlayers.remove(pid);
         }
     }
 

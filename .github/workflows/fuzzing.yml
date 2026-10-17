@@ -1,0 +1,82 @@
+name: Fuzz Testing
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration:
+        description: 'Duration for fuzzing each target method (e.g. 1m, 5m, 15m)'
+        required: false
+        default: '5m'
+        type: string
+  schedule:
+    # Run weekly on Sunday at 04:00 UTC (staggered after mutation testing at 03:00)
+    - cron: '0 4 * * 0'
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: Fuzz (${{ matrix.target.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          # Jazzer runs one @FuzzTest per invocation, so each method is its own job.
+          - name: anvil-chunk-view
+            project: ':anvil-api:test'
+            test: 'io.github.dailystruggle.rtp.anvil.AnvilRegionFuzzTest.fuzzReadChunkView'
+          - name: anvil-column-probe
+            project: ':anvil-api:test'
+            test: 'io.github.dailystruggle.rtp.anvil.AnvilRegionFuzzTest.fuzzReadColumnProbe'
+          - name: anvil-lz4
+            project: ':anvil-api:test'
+            test: 'io.github.dailystruggle.rtp.anvil.AnvilRegionFuzzTest.fuzzLz4BlockDecoder'
+          - name: anvil-nbt
+            project: ':anvil-api:test'
+            test: 'io.github.dailystruggle.rtp.anvil.AnvilRegionFuzzTest.fuzzNbtReaders'
+          - name: resp-protocol
+            project: ':rtp-proxy:rtp-proxy-common:test'
+            test: 'io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespProtocolFuzzTest.fuzzReadReply'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Java 21
+        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@d9c87d481d55275bb5441eef3fe0e46805f9ef70 # v3.5.0
+
+      - name: Run Jazzer Coverage-Guided Fuzzing
+        env:
+          JAZZER_FUZZ: '1'
+          DURATION_INPUT: ${{ github.event.inputs.duration }}
+        run: |
+          DURATION="${DURATION_INPUT:-5m}"
+          if [[ ! "$DURATION" =~ ^[0-9]+[smh]$ ]]; then
+            echo "::error::Invalid duration format: ${DURATION}"
+            exit 1
+          fi
+          echo "Executing fuzz testing for ${{ matrix.target.name }} with duration ${DURATION}..."
+          export JAZZER_MAX_DURATION="${DURATION}"
+          ./gradlew ${{ matrix.target.project }} \
+            --tests "${{ matrix.target.test }}" \
+            --no-daemon
+
+      - name: Archive Fuzz Crash Artifacts
+        if: failure()
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: fuzz-crash-${{ matrix.target.name }}
+          path: |
+            **/crash-*
+            **/timeout-*
+            **/slow-unit-*
+            **/build/reports/tests/test/
+          if-no-files-found: ignore

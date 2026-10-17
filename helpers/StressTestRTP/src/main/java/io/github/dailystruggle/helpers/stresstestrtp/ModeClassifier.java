@@ -89,6 +89,7 @@ public final class ModeClassifier {
     private static final double LOG_HI = 5.0d;
 
     private final long[] hist = new long[BINS];
+    private final Object lock = new Object();
     private long[] latencies = new long[1024];
     private long[] selections = new long[1024];
     private int n = 0;
@@ -101,7 +102,7 @@ public final class ModeClassifier {
 
     /** Resets to an empty population. Called at phase start. */
     public void reset() {
-        synchronized (this) {
+        synchronized (lock) {
             Arrays.fill(hist, 0L);
             n = 0;
             unknownCount = 0;
@@ -123,7 +124,7 @@ public final class ModeClassifier {
      *                        {@link #NO_DATA} when no counter was wired
      */
     public Mode record(long latencyMs, long selectionChunks) {
-        synchronized (this) {
+        synchronized (lock) {
             if (latencyMs < 0) {
                 unknownCount++;
                 return Mode.UNKNOWN;
@@ -151,7 +152,7 @@ public final class ModeClassifier {
      * validate the inferred boundary.
      */
     public void recordDirect(Mode direct) {
-        synchronized (this) {
+        synchronized (lock) {
             if (direct == Mode.FAST) directFast++;
             else if (direct == Mode.COLD) directCold++;
         }
@@ -159,7 +160,7 @@ public final class ModeClassifier {
 
     /** Threshold in effect right now, {@link #NO_DATA} before estimation. */
     public long thresholdMs() {
-        synchronized (this) {
+        synchronized (lock) {
             return thresholdMs;
         }
     }
@@ -220,7 +221,7 @@ public final class ModeClassifier {
      * written against a provisional one.
      */
     public Summary summarise() {
-        synchronized (this) {
+        synchronized (lock) {
             long finalThreshold = n >= MIN_SAMPLES ? otsuThresholdMs() : NO_DATA;
             String method = finalThreshold >= 0 ? "OTSU_LOG10_LATENCY" : "INSUFFICIENT_SAMPLES";
             long directTotal = (long) directFast + directCold;

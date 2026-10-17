@@ -1,13 +1,18 @@
 package io.github.dailystruggle.rtp.bukkitplatform.entity;
 
+import java.util.Optional;
+import io.github.dailystruggle.rtp.bukkitplatform.tools.BukkitServers;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import io.github.dailystruggle.rtp.bukkitplatform.world.BukkitRTPWorld;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -23,87 +28,196 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.Nullable;
 
+/**
+ * Bukkit-family {@link RTPPlayer}: identity and permission snapshot held strongly, the live
+ * {@link Player} only through a {@link WeakReference}. A cached copy (teleport history, cooldown
+ * records) can therefore never pin a quit player's {@code ServerPlayer} graph, whichever exit path
+ * created it. Every live call resolves the player first and degrades to the snapshot (or a no-op)
+ * when the player is gone.
+ */
 public class BukkitRTPPlayer implements RTPPlayer {
-  private final Player player;
+  private static final WeakReference<Player> NO_PLAYER = new WeakReference<>(null);
+
+  private volatile WeakReference<Player> playerRef;
+  private final UUID uuid;
+  private final String name;
+  private final long cooldown;
+  private final long delay;
+  private final Set<String> effectivePermissions;
 
   public BukkitRTPPlayer(Player player) {
-    this.player = player;
+    this.playerRef = new WeakReference<>(player);
+    this.uuid = player.getUniqueId();
+    this.name = player.getName();
+    BukkitRTPCommandSender senderWrapper = new BukkitRTPCommandSender(player);
+    this.cooldown = senderWrapper.cooldown();
+    this.delay = senderWrapper.delay();
+    this.effectivePermissions = senderWrapper.getEffectivePermissions();
+  }
+
+  public BukkitRTPPlayer(
+      UUID uuid,
+      String name,
+      long cooldown,
+      long delay,
+      Set<String> effectivePermissions) {
+    this.playerRef = NO_PLAYER;
+    this.uuid = uuid;
+    this.name = (name != null) ? name : uuid.toString();
+    this.cooldown = cooldown;
+    this.delay = delay;
+    this.effectivePermissions = (effectivePermissions != null) ? Set.copyOf(effectivePermissions) : Collections.emptySet();
+  }
+
+  /** Copy sharing the same weak handle and snapshot; used by {@link #clone()} in subclasses. */
+  protected BukkitRTPPlayer(BukkitRTPPlayer other) {
+    this.playerRef = other.playerRef;
+    this.uuid = other.uuid;
+    this.name = other.name;
+    this.cooldown = other.cooldown;
+    this.delay = other.delay;
+    this.effectivePermissions = other.effectivePermissions;
   }
 
   @Override
   public UUID uuid() {
-    return player.getUniqueId();
+    return uuid;
+  }
+
+  /** Always {@code true}: the live handle is weak, so this wrapper never pins a {@link Player}. */
+  @Override
+  public boolean isSelfContained() {
+    return true;
+  }
+
+  @Override
+  public RTPPlayer toPureData() {
+    return this;
+  }
+
+  @Override
+  public @Nullable Object getLiveSender() {
+    return player();
+  }
+
+  public void unbind() {
+    this.playerRef = NO_PLAYER;
+  }
+
+  public void rebind(Player player) {
+    this.playerRef = (player != null) ? new WeakReference<>(player) : NO_PLAYER;
+  }
+
+  /** The online player for this UUID, or {@code null}. Re-binding only refreshes the weak handle. */
+  public @Nullable Player player() {
+    Player p = this.playerRef.get();
+    if (p != null && p.isOnline()) return p;
+    if (BukkitServers.absent()) return null;
+    p = Bukkit.getPlayer(uuid);
+    if (p != null) {
+      this.playerRef = new WeakReference<>(p);
+      return p;
+    }
+    return null;
+  }
+
+  /**
+   * Handle for actions on the player (teleport, block changes, bars): the online player if any,
+   * else the last bound one while it is still reachable elsewhere. Never strengthens the handle.
+   */
+  protected @Nullable Player liveOrLast() {
+    Player p = player();
+    return (p != null) ? p : this.playerRef.get();
   }
 
   @Override
   public boolean hasPermission(String permission) {
-    return player.hasPermission(permission);
+    Player p = player();
+    if (p != null) return p.hasPermission(permission);
+    if (effectivePermissions.contains("rtp.*") || effectivePermissions.contains("*")) return true;
+    return effectivePermissions.contains(permission.toLowerCase(Locale.ROOT));
   }
 
   @Override
   public void sendMessage(String message) {
-    SendMessage.sendMessage(player, message);
+    Player p = player();
+    if (p != null) SendMessage.sendMessage(p, message);
   }
 
   @Override
   public long cooldown() {
-    return new BukkitRTPCommandSender(player).cooldown();
+    Player p = player();
+    if (p != null) return new BukkitRTPCommandSender(p).cooldown();
+    return this.cooldown;
   }
 
   @Override
   public long delay() {
-    return new BukkitRTPCommandSender(player).delay();
+    Player p = player();
+    if (p != null) return new BukkitRTPCommandSender(p).delay();
+    return this.delay;
   }
 
   @Override
   public String name() {
-    return player.getName();
+    return name;
   }
 
   @Override
   public Set<String> getEffectivePermissions() {
-    return player.getEffectivePermissions().stream()
-        .map(
-            permissionAttachmentInfo -> {
-              if (permissionAttachmentInfo.getValue())
-                return permissionAttachmentInfo.getPermission().toLowerCase();
-              else return null;
-            })
-        .filter(Objects::nonNull)
-        .collect(Collectors.toSet());
+    Player p = player();
+    if (p != null) return new BukkitRTPCommandSender(p).getEffectivePermissions();
+    return effectivePermissions;
   }
 
   @Override
   public void performCommand(RTPPlayer rtpPlayer, String command) {
-    OfflinePlayer player;
-    if (rtpPlayer == null) player = player();
-    else player = ((BukkitRTPPlayer) rtpPlayer).player();
-    command = SendMessage.formatNoColor(player, command);
-    player().performCommand(command);
+    Player p = player();
+    if (p == null) return;
+    OfflinePlayer targetPlayer;
+    if (rtpPlayer == null) targetPlayer = p;
+    else targetPlayer = Bukkit.getOfflinePlayer(rtpPlayer.uuid());
+    command = SendMessage.formatNoColor(targetPlayer, command);
+    p.performCommand(command);
   }
 
   @Override
   public RTPCommandSender clone() {
-    return new BukkitRTPPlayer(player);
+    return new BukkitRTPPlayer(this);
   }
 
-  /**
-   * Class-probe for Folia. Cached: the runtime platform never changes mid-process. Lives here
-   * (not in the rtp-plugin {@code BukkitServerProvider}) because this Spigot-classpath module
-   * cannot reference it, and the basic Folia path in the free build needs an async teleport.
-   */
-  private static final boolean IS_FOLIA;
+  private static volatile java.lang.reflect.Method cachedTeleportAsync;
+  private static volatile boolean teleportAsyncResolved = false;
 
-  static {
-    boolean folia;
-    try {
-      Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
-      folia = true;
-    } catch (ClassNotFoundException e) {
-      folia = false;
+  private static java.lang.reflect.Method getTeleportAsyncMethod(Player p) {
+    if (!teleportAsyncResolved) {
+      synchronized (BukkitRTPPlayer.class) {
+        if (!teleportAsyncResolved) {
+          java.lang.reflect.Method m = null;
+          try {
+            m = p.getClass().getMethod("teleportAsync", Location.class);
+          } catch (Throwable t) {
+            try {
+              m = Player.class.getMethod("teleportAsync", Location.class);
+            } catch (Throwable ignored) {
+              m = null;
+            }
+          }
+          cachedTeleportAsync = m;
+          teleportAsyncResolved = true;
+        }
+      }
     }
-    IS_FOLIA = folia;
+    return cachedTeleportAsync;
+  }
+
+  static void resetTeleportAsyncResolutionForTesting() {
+    synchronized (BukkitRTPPlayer.class) {
+      cachedTeleportAsync = null;
+      teleportAsyncResolved = false;
+    }
   }
 
   @Override
@@ -112,20 +226,33 @@ public class BukkitRTPPlayer implements RTPPlayer {
     double x = to.x() + 0.5;
     double y = to.y();
     double z = to.z() + 0.5;
-    Location location = new Location(world, x, y, z);
+    Player player = liveOrLast();
+    if (player == null) {
+      RTP.log(Level.WARNING, "[RTP] teleport target " + name + " (" + uuid + ") is offline");
+      return CompletableFuture.completedFuture(false);
+    }
+    Optional<Location> current = BukkitServers.location(player);
+    Location location =
+        new Location(
+            world,
+            x,
+            y,
+            z,
+            current.map(Location::getYaw).orElse(0f),
+            current.map(Location::getPitch).orElse(0f));
 
     CompletableFuture<Boolean> future = new CompletableFuture<>();
 
-    // Basic Folia path (free build, ADR-024 / ADR-061): a synchronous player.teleport() throws
-    // on Folia because the RTP destination is almost always in a region other than the one this
-    // thread owns. paper-api's Entity#teleportAsync is callable from any thread and performs the
-    // cross-region hop itself, so route through it reflectively (this module compiles against the
-    // Spigot API, which lacks teleportAsync). The tuned rtp-folia adapter (Pro) uses the
-    // first-class FoliaRTPPlayer teleport path instead.
-    if (IS_FOLIA) {
+    // Async teleport path (Paper / Folia / Purpur): Paper and Folia provide Entity#teleportAsync(Location),
+    // which loads the target chunk asynchronously and avoids synchronous chunk loads (S-005) or cross-region
+    // exceptions on Folia. We route through it reflectively here because this module compiles against the
+    // Spigot API (which lacks teleportAsync at compile time). On pure Spigot / CraftBukkit where teleportAsync
+    // is absent, we fall back to synchronous player.teleport(Location) on the main thread.
+    java.lang.reflect.Method asyncMethod = getTeleportAsyncMethod(player);
+    if (asyncMethod != null) {
+      if (tryDirectTeleport(location, to.x(), to.z(), future)) return future;
       try {
-        Object result =
-            player.getClass().getMethod("teleportAsync", Location.class).invoke(player, location);
+        Object result = asyncMethod.invoke(player, location);
         if (result instanceof CompletableFuture) {
           @SuppressWarnings("unchecked")
           CompletableFuture<Boolean> async = (CompletableFuture<Boolean>) result;
@@ -153,8 +280,32 @@ public class BukkitRTPPlayer implements RTPPlayer {
     return future;
   }
 
+  /**
+   * Same-tick teleport when {@link TeleportPathSelector} allows it, saving the tick that
+   * {@code teleportAsync} spends in Paper's main-thread queue. Completes {@code future} with the
+   * teleport result and returns true; returns false (future untouched) when the async path must run,
+   * including after an inline throw (logged, S-004).
+   */
+  protected boolean tryDirectTeleport(
+      Location location, int blockX, int blockZ, CompletableFuture<Boolean> future) {
+    if (!TeleportPathSelector.canTeleportDirect(location.getWorld(), blockX, blockZ)) return false;
+    Player player = liveOrLast();
+    if (player == null) return false;
+    boolean success;
+    try {
+      success = player.teleport(location);
+    } catch (Throwable t) {
+      RTP.log(Level.WARNING, "[RTP] direct teleport threw, falling back to teleportAsync", t);
+      return false;
+    }
+    future.complete(success);
+    return true;
+  }
+
   @Override
   public RTPLocation getLocation() {
+    Player player = liveOrLast();
+    if (player == null) return null;
     Location location = player.getLocation();
     return new RTPLocation(
         RTP.serverAccessor.getRTPWorld(player.getWorld().getUID()),
@@ -165,7 +316,8 @@ public class BukkitRTPPlayer implements RTPPlayer {
 
   @Override
   public boolean isOnline() {
-    return player.isOnline();
+    Player p = player();
+    return p != null && p.isOnline();
   }
 
   @Override
@@ -175,6 +327,8 @@ public class BukkitRTPPlayer implements RTPPlayer {
     // landed location. setBedSpawnLocation(Location, force=true) is used over the
     // newer setRespawnLocation(...) for compatibility with the Spigot API this
     // module compiles against; the force flag persists the anchor even with no bed.
+    Player player = liveOrLast();
+    if (player == null) return;
     World world = ((BukkitRTPWorld) to.world()).world();
     Location location = new Location(world, to.x() + 0.5, to.y(), to.z() + 0.5);
     player.setBedSpawnLocation(location, true);
@@ -192,6 +346,8 @@ public class BukkitRTPPlayer implements RTPPlayer {
   @Override
   public void sendClientBlockChange(RTPLocation location, String blockData) {
     if (location == null || blockData == null) return;
+    Player player = liveOrLast();
+    if (player == null) return;
     World world = ((BukkitRTPWorld) location.world()).world();
     if (!world.isChunkLoaded(location.x() >> 4, location.z() >> 4)) return;
     BlockData parsed = parseBlockData(blockData);
@@ -202,6 +358,8 @@ public class BukkitRTPPlayer implements RTPPlayer {
   @Override
   public void sendClientBlockChanges(Map<RTPLocation, String> changes) {
     if (changes == null || changes.isEmpty()) return;
+    Player player = liveOrLast();
+    if (player == null) return;
     // Bin the changes into BlockState snapshots and hand them to Bukkit's bulk sender, which
     // packs them into one multi-block-change packet per chunk section instead of one packet per
     // block. The snapshots are detached copies (block.getState()), so re-typing them never
@@ -220,8 +378,25 @@ public class BukkitRTPPlayer implements RTPPlayer {
       state.setBlockData(parsed);
       states.add(state);
     }
-    if (!states.isEmpty()) {
+    if (states.isEmpty()) return;
+    if (BULK_BLOCK_CHANGES) {
       player.sendBlockChanges(states);
+    } else {
+      for (BlockState state : states) {
+        player.sendBlockChange(state.getLocation(), state.getBlockData());
+      }
+    }
+  }
+
+  /** {@code Player#sendBlockChanges(Collection)} is absent from the 1.18.2 API; older servers send one by one (ADR-113). */
+  private static final boolean BULK_BLOCK_CHANGES = hasBulkBlockChanges();
+
+  private static boolean hasBulkBlockChanges() {
+    try {
+      Player.class.getMethod("sendBlockChanges", java.util.Collection.class);
+      return true;
+    } catch (NoSuchMethodException e) {
+      return false;
     }
   }
 
@@ -238,53 +413,26 @@ public class BukkitRTPPlayer implements RTPPlayer {
     }
   }
 
-  /**
-   * Personal boss-bars keyed by {@code "<player-uuid>:<bar-id>"}. Static so a fresh
-   * {@link BukkitRTPPlayer} wrapper (these are created on demand) still reconciles against the
-   * same bar. Accessed only on the primary thread (per {@link RTPPlayer} threading contract).
-   */
-  private static final Map<String, org.bukkit.boss.BossBar> personalBars =
-      new java.util.concurrent.ConcurrentHashMap<>();
-
-  private String barKey(String id) {
-    return uuid() + ":" + id;
-  }
-
   @Override
   public void showProgressBar(String id, String title, double progress) {
     if (id == null) return;
-    String key = barKey(id);
-    org.bukkit.boss.BarColor color = barColorFromTemplate(title);
-    String shown = sanitizeBarTitle(title);
     double clamped = Math.max(0.0, Math.min(1.0, progress));
-
-    org.bukkit.boss.BossBar bar = personalBars.get(key);
-    if (bar == null) {
-      bar = Bukkit.createBossBar(shown, color, org.bukkit.boss.BarStyle.SOLID);
-      bar.addPlayer(player);
-      personalBars.put(key, bar);
-    } else {
-      bar.setTitle(shown);
-      bar.setColor(color);
-      if (!bar.getPlayers().contains(player)) bar.addPlayer(player);
-    }
-    bar.setProgress(clamped);
+    PersonalBossBars.show(liveOrLast(), id, sanitizeBarTitle(title), barColorFromTemplate(title), clamped);
   }
 
   @Override
   public void clearProgressBar(String id) {
-    if (id == null) return;
-    org.bukkit.boss.BossBar bar = personalBars.remove(barKey(id));
-    if (bar != null) bar.removeAll();
+    PersonalBossBars.clear(uuid, id);
   }
 
   /**
-   * Strips legacy {@code &x} color codes and {@code #RRGGBB} hex codes from a bar title (boss-bar
-   * titles render as plain text on most clients) and truncates to Bukkit's 64-character limit.
+   * Strips legacy {@code &x} / {@code §x} color codes and {@code #RRGGBB} / {@code &#RRGGBB} hex codes
+   * from a bar title (boss-bar titles render as plain text on most clients) and truncates to Bukkit's
+   * 64-character limit. Regex-free: runs on every bar update.
    */
   private static String sanitizeBarTitle(String title) {
     if (title == null) return "";
-    String out = title.replaceAll("&[0-9a-fA-FklmnorKLMNOR]", "").replaceAll("#[0-9a-fA-F]{6}", "");
+    String out = io.github.dailystruggle.rtp.common.text.LegacyColorStrip.strip(title);
     return out.length() > 64 ? out.substring(0, 64) : out;
   }
 
@@ -352,9 +500,10 @@ public class BukkitRTPPlayer implements RTPPlayer {
 
   @Override
   public int getViewDistance() {
-    if (GET_VIEW_DISTANCE == null) return -1;
+    Player p = player();
+    if (p == null || GET_VIEW_DISTANCE == null) return -1;
     try {
-      Object v = GET_VIEW_DISTANCE.invoke(player);
+      Object v = GET_VIEW_DISTANCE.invoke(p);
       return (v instanceof Integer) ? (Integer) v : -1;
     } catch (Throwable t) {
       RTP.log(Level.FINE, "[RTP] getViewDistance unavailable for " + uuid(), t);
@@ -364,33 +513,30 @@ public class BukkitRTPPlayer implements RTPPlayer {
 
   @Override
   public void setViewDistance(int viewDistance) {
-    if (SET_VIEW_DISTANCE == null) return;
+    Player p = player();
+    if (p == null || SET_VIEW_DISTANCE == null) return;
     try {
-      SET_VIEW_DISTANCE.invoke(player, viewDistance);
+      SET_VIEW_DISTANCE.invoke(p, viewDistance);
     } catch (Throwable t) {
       RTP.log(Level.FINE, "[RTP] setViewDistance(" + viewDistance + ") failed for " + uuid(), t);
     }
   }
 
-  public Player player() {
-    return player;
-  }
-
   @Override
   public boolean equals(Object obj) {
     if (obj == this) return true;
-    if (obj == null || obj.getClass() != this.getClass()) return false;
-    BukkitRTPPlayer that = (BukkitRTPPlayer) obj;
-    return Objects.equals(this.player, that.player);
+    if (obj == null || !(obj instanceof RTPPlayer)) return false;
+    RTPPlayer that = (RTPPlayer) obj;
+    return Objects.equals(this.uuid, that.uuid());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(player);
+    return Objects.hash(uuid);
   }
 
   @Override
   public String toString() {
-    return "BukkitRTPPlayer[" + "player=" + player + ']';
+    return "BukkitRTPPlayer[" + "uuid=" + uuid + ", name=" + name + ", bound=" + (playerRef.get() != null) + ']';
   }
 }

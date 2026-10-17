@@ -150,9 +150,9 @@ class RegionQueueManagerHotSinkLifecycleTest {
         assertFalse(kept.accepts(reservedLoc(otherWorld, 10, 10, resOther)));
         resOther.close();
 
-        // Valid location with reservation in correct world
-        CountingReservation resGood = new CountingReservation(world, 0, 0);
-        RTPLocation goodLoc = reservedLoc(world, 0, 0, resGood);
+        // Valid location with reservation in correct world (within circle [64, 256] chunk radius)
+        CountingReservation resGood = new CountingReservation(world, 100, 100);
+        RTPLocation goodLoc = reservedLoc(world, 1600, 1600, resGood);
         assertTrue(kept.accepts(goodLoc));
         resGood.close();
     }
@@ -238,7 +238,6 @@ class RegionQueueManagerHotSinkLifecycleTest {
     @DisplayName("perPlayerStage partitions and personalAggregateStage branches")
     void perPlayerStage_andPersonalAggregateStage() {
         UUID player1 = UUID.randomUUID();
-        UUID player2 = UUID.randomUUID();
 
         CacheStage<RTPLocation> p1Stage = qm.perPlayerStage.open(player1, 1);
         assertEquals("perPlayerLocationQueue:" + player1, p1Stage.name());

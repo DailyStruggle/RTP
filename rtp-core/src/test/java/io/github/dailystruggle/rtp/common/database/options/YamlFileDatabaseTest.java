@@ -81,6 +81,17 @@ class YamlFileDatabaseTest {
     }
 
     @Test
+    void connect_skipsLanguageBootstrapFile() throws IOException {
+        Files.writeString(tempDir.resolve("language.yml"), "language: en\n");
+
+        Map<String, RtpYamlConfig> result = db.connect();
+        assertFalse(result.containsKey("language.yml"),
+                "language.yml is plugin configuration, not a database table, and must be skipped");
+        assertFalse(db.getValue("language.yml", "language").isPresent(),
+                "language.yml must not be added to localTables");
+    }
+
+    @Test
     void connect_usesCacheWhenFileUnchanged() throws IOException {
         Files.writeString(tempDir.resolve("cached.yml"), "x: 1\n");
 

@@ -69,6 +69,7 @@ public final class JfrAllocationProfiler {
 
     /** JFR usable at all (probed once). */
     private final boolean capable;
+    private final Object lock = new Object();
 
     private volatile Recording recording;
     private volatile Path currentDump;
@@ -130,46 +131,55 @@ public final class JfrAllocationProfiler {
     /** Package prefix configured for a phase label, or empty when unmapped. */
     public String targetPackageFor(String label) {
         if (label == null) return "";
-        String p = trackedPrefixes.get(label.toLowerCase(Locale.ROOT));
+        String p = trackedPrefixes.get(baseLabel(label));
         return p == null ? "" : p;
+    }
+
+    /** Target label without a phase suffix: ramp stages are {@code rtp@ramp0-20tps}. */
+    static String baseLabel(String label) {
+        if (label == null) return "";
+        int at = label.indexOf('@');
+        return (at >= 0 ? label.substring(0, at) : label).toLowerCase(Locale.ROOT);
     }
 
     /** Starts a fresh recording for one phase. A recording already open (e.g. a
      *  mode switch that re-entered {@code beginPhase}) is discarded first. */
-    public synchronized void beginPhase(String label) {
-        if (!capable) return;
-        stopQuietly();
-        currentLabel = label == null ? "" : label;
-        Path dump = null;
-        Recording rec = null;
-        try {
-            Path dir = this.tempDir;
-            if (dir == null) {
-                dir = Path.of("temp");
+    public void beginPhase(String label) {
+        synchronized (lock) {
+            if (!capable) return;
+            stopQuietly();
+            currentLabel = label == null ? "" : label;
+            Path dump = null;
+            Recording rec = null;
+            try {
+                Path dir = this.tempDir;
+                if (dir == null) {
+                    dir = Path.of("temp");
+                }
+                Files.createDirectories(dir);
+                dump = Files.createTempFile(dir, "stressrtp-jfr-", ".jfr");
+                rec = new Recording();
+                rec.enable("jdk.ObjectAllocationSample").with("throttle", throttle);
+                rec.setToDisk(true);
+                rec.setMaxSize(maxSizeBytes);
+                rec.setDestination(dump);
+                rec.start();
+                this.currentDump = dump;
+                this.recording = rec;
+            } catch (Throwable t) {
+                if (rec != null) {
+                    try { rec.close(); } catch (Throwable ignored) { /* best effort */ }
+                }
+                if (dump != null) {
+                    try { Files.deleteIfExists(dump); } catch (Throwable ignored) { /* best effort */ }
+                }
+                if (log != null) {
+                    log.log(Level.WARNING, "[StressTestRTP] JFR recording failed to start for phase '"
+                            + currentLabel + "'; JFR columns not measured this phase: " + t);
+                }
+                this.recording = null;
+                this.currentDump = null;
             }
-            Files.createDirectories(dir);
-            dump = Files.createTempFile(dir, "stressrtp-jfr-", ".jfr");
-            rec = new Recording();
-            rec.enable("jdk.ObjectAllocationSample").with("throttle", throttle);
-            rec.setToDisk(true);
-            rec.setMaxSize(maxSizeBytes);
-            rec.setDestination(dump);
-            rec.start();
-            this.currentDump = dump;
-            this.recording = rec;
-        } catch (Throwable t) {
-            if (rec != null) {
-                try { rec.close(); } catch (Throwable ignored) { /* best effort */ }
-            }
-            if (dump != null) {
-                try { Files.deleteIfExists(dump); } catch (Throwable ignored) { /* best effort */ }
-            }
-            if (log != null) {
-                log.log(Level.WARNING, "[StressTestRTP] JFR recording failed to start for phase '"
-                        + currentLabel + "'; JFR columns not measured this phase: " + t);
-            }
-            this.recording = null;
-            this.currentDump = null;
         }
     }
 
@@ -178,32 +188,34 @@ public final class JfrAllocationProfiler {
      * Called once at the phase boundary. Never invoked by the periodic
      * partial-phase flush, so a 600 s recording is parsed at most once.
      */
-    public synchronized Result endPhaseAndParse() {
-        if (!capable || recording == null) {
-            return Result.unavailable();
-        }
-        Recording rec = this.recording;
-        Path dump = this.currentDump;
-        String label = this.currentLabel;
-        this.recording = null;
-        this.currentDump = null;
-        try {
-            rec.stop();
-        } catch (Throwable t) {
-            if (log != null) log.log(Level.WARNING, "[StressTestRTP] JFR stop failed: " + t);
-        } finally {
-            try { rec.close(); } catch (Throwable ignored) { /* best effort */ }
-        }
-        try {
-            Result r = parse(dump, label);
-            return r;
-        } catch (Throwable t) {
-            if (log != null) log.log(Level.WARNING, "[StressTestRTP] JFR parse failed for phase '"
-                    + label + "': " + t);
-            return Result.unavailable();
-        } finally {
-            if (dump != null) {
-                try { Files.deleteIfExists(dump); } catch (Throwable ignored) { /* best effort */ }
+    public Result endPhaseAndParse() {
+        synchronized (lock) {
+            if (!capable || recording == null) {
+                return Result.unavailable();
+            }
+            Recording rec = this.recording;
+            Path dump = this.currentDump;
+            String label = this.currentLabel;
+            this.recording = null;
+            this.currentDump = null;
+            try {
+                rec.stop();
+            } catch (Throwable t) {
+                if (log != null) log.log(Level.WARNING, "[StressTestRTP] JFR stop failed: " + t);
+            } finally {
+                try { rec.close(); } catch (Throwable ignored) { /* best effort */ }
+            }
+            try {
+                Result r = parse(dump, label);
+                return r;
+            } catch (Throwable t) {
+                if (log != null) log.log(Level.WARNING, "[StressTestRTP] JFR parse failed for phase '"
+                        + label + "': " + t);
+                return Result.unavailable();
+            } finally {
+                if (dump != null) {
+                    try { Files.deleteIfExists(dump); } catch (Throwable ignored) { /* best effort */ }
+                }
             }
         }
     }
@@ -217,12 +229,15 @@ public final class JfrAllocationProfiler {
         if (dump == null || !Files.exists(dump)) {
             return Result.unavailable();
         }
-        List<RecordedEvent> events = RecordingFile.readAllEvents(dump);
+        List<RecordedEvent> events = new ArrayList<>(RecordingFile.readAllEvents(dump));
+        events.sort((x, y) -> x.getStartTime().compareTo(y.getStartTime()));
+        ThreadBaseline baseline = new ThreadBaseline();
         for (RecordedEvent e : events) {
             String type = e.getEventType().getName();
             if (!"jdk.ObjectAllocationSample".equals(type)) continue;
             long weight = eventWeight(e);
             if (weight <= 0) weight = 0;
+            if (!baseline.accept(threadId(e))) continue;
             samples++;
             totalBytes += weight;
             RecordedStackTrace st = e.getStackTrace();
@@ -237,7 +252,7 @@ public final class JfrAllocationProfiler {
             acc[0] += weight;
             acc[1] += 1;
         }
-        String targetLabel = label == null ? "" : label.toLowerCase(Locale.ROOT);
+        String targetLabel = baseLabel(label);
         long targetBytes = -1L;
         String targetPackage = "";
         if (trackedPrefixes.containsKey(targetLabel)) {
@@ -262,6 +277,34 @@ public final class JfrAllocationProfiler {
             if (e.hasField("allocationSize")) return e.getLong("allocationSize");
         } catch (Throwable ignored) { /* fall through */ }
         return 0L;
+    }
+
+    private static long threadId(RecordedEvent e) {
+        try {
+            if (e.getThread() != null) return e.getThread().getJavaThreadId();
+        } catch (Throwable ignored) { /* fall through */ }
+        return -1L;
+    }
+
+    /**
+     * Drops each thread's first sample in a recording.
+     *
+     * <p>Why: the JVM computes a sample's weight as the thread's allocated bytes
+     * since that thread's previous sample, and that per-thread mark survives
+     * across recordings. The first sample of a long-lived thread in a new
+     * recording therefore carries everything it allocated while no recording
+     * ran, so per-phase totals grew with server uptime (~133 GB per ramp on
+     * the bench) instead of with phase allocation. Dropping it under-counts by
+     * one inter-sample interval per thread, negligible at the default throttle.
+     */
+    static final class ThreadBaseline {
+        private final java.util.Set<Long> seen = new java.util.HashSet<>();
+
+        /** True when the sample's weight belongs to this recording. Samples
+         *  without a thread (id -1) carry no cross-recording mark and count. */
+        boolean accept(long threadId) {
+            return threadId < 0 || !seen.add(threadId);
+        }
     }
 
     /** First tracked plugin label whose package owns a frame, top of stack

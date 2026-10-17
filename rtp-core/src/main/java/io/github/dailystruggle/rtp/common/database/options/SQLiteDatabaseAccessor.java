@@ -104,9 +104,9 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
   @Override
   public void startup() {
     DriverManager.setLoginTimeout(30);
-    Connection connection;
+    Connection conn;
     try {
-      connection = getConnection();
+      conn = getConnection();
     } catch (SQLException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
       return;
@@ -114,16 +114,16 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
 
     @NotNull
     Optional<Map<String, Object>> read =
-        read(connection, "referenceData", new AbstractMap.SimpleEntry<>("UUID", new UUID(0, 0)));
+        read(conn, "referenceData", new AbstractMap.SimpleEntry<>("UUID", new UUID(0, 0)));
     if (!read.isPresent()) {
       return;
     }
 
-    // get full table
+    // get table
     String sql = "SELECT senderId, time, selectedWorldName, selectedX, selectedY, selectedZ, "
         + "originalWorldName, originalX, originalY, originalZ, cost FROM rtp_teleport_data";
 
-    try (PreparedStatement statement = connection.prepareStatement(sql);
+    try (PreparedStatement statement = conn.prepareStatement(sql);
         ResultSet resultSet = statement.executeQuery()) {
       if (resultSet == null) {
         return;
@@ -137,6 +137,8 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
         UUID uuid = UUID.fromString(uuidStr);
 
         TeleportData teleportData = new TeleportData();
+        teleportData.sender = new io.github.dailystruggle.rtp.common.playerData.PureDataRTPCommandSender(
+            uuid, uuidStr, 0, 0, java.util.Collections.emptySet());
         teleportData.completed = true;
         teleportData.time = Long.parseLong(resultSet.getString("time"));
         teleportData.selectedCoords =
@@ -151,9 +153,12 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
                 Integer.parseInt(resultSet.getString("originalX")),
                 Integer.parseInt(resultSet.getString("originalY")),
                 Integer.parseInt(resultSet.getString("originalZ")));
+        teleportData.originWorldName = resultSet.getString("originalWorldName");
         teleportData.cost = Double.parseDouble(resultSet.getString("cost"));
 
-        RTP.getInstance().latestTeleportData.put(uuid, teleportData);
+        if (RTP.getInstance() != null && RTP.getInstance().latestTeleportData != null) {
+          RTP.getInstance().latestTeleportData.put(uuid, teleportData, teleportData.time);
+        }
       }
     } catch (SQLException throwables) {
       RTP.log(Level.WARNING, "Failed to load cached locations from SQLite", throwables);

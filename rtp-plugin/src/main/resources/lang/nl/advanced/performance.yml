@@ -1,11 +1,17 @@
-# Minimale TPS-vereiste
-# Minimale server-TPS voordat een nieuwe locatie in de cache wordt geplaatst.
-# Bereik: 0.0 - 20.0.
-# Impact: LAAG — voorkomt dat de plugin lag toevoegt wanneer de server het moeilijk heeft.
+# Pauzeer het vullen van de achtergrondcache als de TPS onder deze waarde daalt.
+# Op Folia telt de langzaamste regio. Wachtende spelers worden nog steeds geholpen. 0 = uit.
 # @type: number
 # @range: [0.0, 20.0]
 # @default: 19.0
 minimaalTPS: 19.0
+
+# Pauzeer het vullen van de achtergrondcache als een tick langer duurt dan deze waarde (ms).
+# Vangt lag op die TPS verbergen (TPS blijft tot 50 ms op 20). 0 = uit.
+# @type: number
+# @range: [0.0, null]
+# @unit: ms
+# @default: 45.0
+maxMSPT: 45.0
 
 # Max. JVM-heapgebruik (% van max) voordat het achtergrond-cachevullen pauzeert.
 # Reeds gecachte locaties worden nog bediend. 0 of 100 schakelt het uit.
@@ -24,32 +30,26 @@ maxHeapPercentage: 85.0
 # @default: 32
 maximaalPogingen: 10
 
-# Selectiefrequentie (spelticks)
-# Tijd tussen zoekopdrachten naar nieuwe locaties om regiocaches te vullen.
-# ( 20 ticks = 1 seconde ).
-# Impact: GEMIDDELD — lagere waarden vullen de cache sneller maar gebruiken meer CPU.
+# Ticks tussen het opnieuw vullen van dezelfde regio. Regio's komen om de beurt aan.
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
 # @default: 20
 periode: 20
 
-# Toegewezen tijd per taak (milliseconden)
-# Maximale tijd (ms) besteed aan RTP-taken per tick.
-# Bereik: 0 - 50.
-# Impact: GEMIDDELD — hoge waarden verwerken sneller maar riskeren ticktijd.
+# Max. ms per tick voor werk op de hoofdthread. Begrensd op 25.
 # @type: integer
-# @range: [1, null]
+# @range: [1, 25]
 # @unit: ms
-# @default: 50
-synchroonToegewezenTijd: 50
+# @default: 5
+synchroonToegewezenTijd: 5
 
-# Maximaal aantal milliseconden per tick besteed aan asynchrone taken.
+# Max. ms per puls voor achtergrondwerk. Begrensd op 25.
 # @type: integer
-# @range: [1, null]
+# @range: [1, 25]
 # @unit: ms
-# @default: 50
-asynchroonToegewezenTijd: 50
+# @default: 25
+asynchroonToegewezenTijd: 25
 
 # Voorlaadafstand bestemming (chunks)
 # Straal van chunks die rondom de bestemming worden voorgeladen.
@@ -162,6 +162,13 @@ wachtrijGroeiWaarschuwDrempel: 0
 # @type: boolean
 # @default: false
 synchroonLaden: false
+
+# Teleportpad op Paper. AUTO = teleport in dezelfde tick als de doelchunk al geladen is,
+# anders teleportAsync. ASYNC = altijd teleportAsync (één tick trager).
+# @type: string
+# @options: ["AUTO", "ASYNC"]
+# @default: "AUTO"
+teleportPad: "AUTO"
 
 # Rechtenparsering (opstarten)
 # verwerking_bijGebeurtenis: Incompatibel met brede rechten zoals *.*.

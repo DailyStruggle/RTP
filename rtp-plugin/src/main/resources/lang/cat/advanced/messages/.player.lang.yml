@@ -2,6 +2,8 @@
 # Maps internal baseline keys (left) to user-visible key names (right)
 # used in player.yml. Co-located dotfile sibling (ADR-076).
 alreadyTeleporting: "already_pouncing"
+alreadyInSession: "already_in_session"
+notInSession: "not_in_session"
 teleportDeniedReloading: "pounce_denied_grooming"
 delayMessage: "hold_paw_message"
 chunkLoading: "kibble_loading"
@@ -15,6 +17,8 @@ noLocationsQueued: "no_warm_spots_left"
 queueUpdate: "line_of_kitties_shuffled"
 notEnoughMoney: "not_enough_treats"
 invalidWorld: "not_a_real_box"
+noBackLocation: "no_prior_box"
+backSuccess: "back_to_old_box"
 badArg: "silly_word"
 invalidCommand: "silly_meow"
 noPerms: "no_treats_for_you"

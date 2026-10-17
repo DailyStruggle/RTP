@@ -1,6 +1,6 @@
 # ADR-061 — Open-Core Dual Licensing
 
-**Status:** Accepted
+**Status:** Superseded by [ADR-108](ADR-108-all-mit-licensing-pro-as-support.md) (2026-10-05 - all source MIT; Pro is a support tier)
 **Date:** 2026-06-02
 
 ## Context

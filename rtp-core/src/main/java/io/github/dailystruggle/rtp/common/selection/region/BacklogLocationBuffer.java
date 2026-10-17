@@ -21,13 +21,22 @@ public final class BacklogLocationBuffer {
   private static final BacklogEntry[] EMPTY = new BacklogEntry[0];
   private static final int MAX_CAS_RETRIES = 64;
 
-  /** Tri-state per-entry validity tag. */
+  /** Per-entry validity tag, set by the region-file pre-filter. */
   public enum Validity {
-    /** Not yet examined by the Anvil pre-filter. Blocks promotion at the head. */
+    /** Not yet examined by the pre-filter. Blocks promotion at the head. */
     UNVERIFIED,
-    /** Passed the Anvil pre-filter; eligible for promotion. */
+    /**
+     * Pre-filter accepted the on-disk surface; drained into cold without a chunk load. Promotion
+     * to hot runs the rest of the check (vertical adjustor, biome, safety, claims) on the chunk.
+     */
     VALIDATED,
-    /** Failed the Anvil pre-filter; dropped from the head, never promoted. */
+    /**
+     * No on-disk data to decide from (not generated, unreadable, or no pre-filter bound). The
+     * cold fill takes it with {@link #pollOldest} and checks it with a chunk load. Blocks
+     * promotion at the head until taken.
+     */
+    UNKNOWN,
+    /** Pre-filter rejected; dropped, never promoted. */
     INVALIDATED
   }
 
@@ -49,6 +58,11 @@ public final class BacklogLocationBuffer {
      */
     @SuppressWarnings("unused")
     private Object pinnedBinList;
+    /**
+     * Reject sink of the region that staged this entry. World bins are shared across regions,
+     * so the verifying region may not own the entry; rejections route here to teach the owner.
+     */
+    private volatile java.util.function.Consumer<BacklogEntry> ownerOnReject;
 
     BacklogEntry(RTPLocation location) {
       this.location = Objects.requireNonNull(location, "location");
@@ -94,10 +108,29 @@ public final class BacklogLocationBuffer {
     public void setValidity(Validity next) {
       this.validity = Objects.requireNonNull(next, "validity");
     }
+
+    /** Sets the owning region's reject sink; {@code null} clears it. */
+    public void setOwnerOnReject(java.util.function.Consumer<BacklogEntry> sink) {
+      this.ownerOnReject = sink;
+    }
+
+    /** @return the owning region's reject sink, or {@code null} when unset */
+    public java.util.function.Consumer<BacklogEntry> ownerOnReject() {
+      return ownerOnReject;
+    }
   }
 
   private final int capacity;
   private final AtomicReference<BacklogEntry[]> state = new AtomicReference<>(EMPTY);
+  private java.util.Random rng = null;
+
+  public void setRng(java.util.Random rng) {
+    this.rng = rng;
+  }
+
+  protected java.util.Random rng() {
+    return rng != null ? rng : java.util.concurrent.ThreadLocalRandom.current();
+  }
 
   /**
    * Constructs a new buffer with the given maximum capacity.
@@ -178,7 +211,7 @@ public final class BacklogLocationBuffer {
     if (maxN < 0) throw new IllegalArgumentException("maxN must be non-negative: " + maxN);
     if (maxN == 0) return Collections.emptyList();
 
-    java.util.concurrent.ThreadLocalRandom rng = java.util.concurrent.ThreadLocalRandom.current();
+    java.util.Random activeRng = rng();
     for (int retry = 0; retry < MAX_CAS_RETRIES; retry++) {
       BacklogEntry[] curr = state.get();
       if (curr.length == 0) return Collections.emptyList();
@@ -196,7 +229,7 @@ public final class BacklogLocationBuffer {
       int toTake = Math.min(maxN, validatedIndices.size());
       // Fisher-Yates partial shuffle of candidate indices
       for (int i = 0; i < toTake; i++) {
-        int swapIdx = i + rng.nextInt(validatedIndices.size() - i);
+        int swapIdx = i + activeRng.nextInt(validatedIndices.size() - i);
         int temp = validatedIndices.get(i);
         validatedIndices.set(i, validatedIndices.get(swapIdx));
         validatedIndices.set(swapIdx, temp);
@@ -219,7 +252,7 @@ public final class BacklogLocationBuffer {
 
   /**
    * Drains contiguous {@link Validity#VALIDATED} entries from head, dropping {@link Validity#INVALIDATED} entries.
-   * Stops at the first unverified entry or once {@code maxN} entries are drained.
+   * Stops at the first unverified or unknown entry or once {@code maxN} entries are drained.
    *
    * @param maxN maximum validated entries to return (non-negative)
    * @return validated entries in insertion order (never null)
@@ -243,7 +276,7 @@ public final class BacklogLocationBuffer {
           headIdx++;
           continue;
         }
-        if (v == Validity.UNVERIFIED) break;
+        if (v == Validity.UNVERIFIED || v == Validity.UNKNOWN) break;
         // VALIDATED
         if (out.size() >= maxN) break;
         out.add(head);
@@ -266,6 +299,30 @@ public final class BacklogLocationBuffer {
   }
 
   /**
+   * Removes and returns the oldest entry tagged {@code validity}, nulling its slot for reuse.
+   *
+   * @return the oldest matching entry, or {@code null} if none
+   */
+  public BacklogEntry pollOldest(Validity validity) {
+    for (int retry = 0; retry < MAX_CAS_RETRIES; retry++) {
+      BacklogEntry[] curr = state.get();
+      int idx = -1;
+      for (int i = 0; i < curr.length; i++) {
+        BacklogEntry e = curr[i];
+        if (e != null && e.validity() == validity) {
+          idx = i;
+          break;
+        }
+      }
+      if (idx < 0) return null;
+      BacklogEntry[] next = curr.clone();
+      next[idx] = null;
+      if (state.compareAndSet(curr, next)) return curr[idx];
+    }
+    return null;
+  }
+
+  /**
    * Returns a snapshot array of the current entries in the buffer (including nulled slots).
    *
    * @return array copy of current internal buffer state
@@ -282,9 +339,20 @@ public final class BacklogLocationBuffer {
    * @return the oldest unverified entry, or {@code null} if none
    */
   public BacklogEntry peekOldestUnverified() {
+    return peekOldestUnverified(null);
+  }
+
+  /**
+   * Oldest {@link Validity#UNVERIFIED} entry not rejected by {@code skip}; lets the batched backlog
+   * verifier pass over entries whose region-file bin is already in flight.
+   *
+   * @param skip entries to pass over, or {@code null} for none
+   * @return the oldest eligible unverified entry, or {@code null} if none
+   */
+  public BacklogEntry peekOldestUnverified(java.util.function.Predicate<BacklogEntry> skip) {
     BacklogEntry[] curr = state.get();
     for (BacklogEntry e : curr) {
-      if (e != null && e.validity() == Validity.UNVERIFIED) return e;
+      if (e != null && e.validity() == Validity.UNVERIFIED && (skip == null || !skip.test(e))) return e;
     }
     return null;
   }
@@ -313,6 +381,20 @@ public final class BacklogLocationBuffer {
     int n = 0;
     for (BacklogEntry e : curr) {
       if (e != null && e.validity() == Validity.VALIDATED) n++;
+    }
+    return n;
+  }
+
+  /**
+   * Returns the number of entries currently tagged {@link Validity#UNKNOWN}.
+   *
+   * @return number of entries waiting for the cold fill's check
+   */
+  public int unknownSize() {
+    BacklogEntry[] curr = state.get();
+    int n = 0;
+    for (BacklogEntry e : curr) {
+      if (e != null && e.validity() == Validity.UNKNOWN) n++;
     }
     return n;
   }

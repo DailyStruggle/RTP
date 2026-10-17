@@ -55,7 +55,7 @@ Concretely:
 ### Negative / Trade-offs
 
 - **Reflection.** `DistanceManager#addRegionTicket` is package-private on Mojmap, so the v-submodule uses one-shot reflection rather than a direct call. An access-widener (`accesstransformer.cfg` or Fabric `accesswidener`) is the longer-term fix, deferred until the Loom build is stable per `MULTI_PLATFORM_PLAN.md` line 60. The reflection is consistent with `FabricRTPWorld.resolveReflectionOnce`'s existing pattern.
-- **Per-version SPI work.** Each future `rtp-fabric-vXX_YY_R1` submodule must override the two new SPI methods. Default failed-future behaviour ensures unimplemented adapters fail loudly during ticket application rather than silently degrading. v1_20_R1 and v26_1_R1 currently inherit the default and will throw on `keep(true)` until ported — see "Open work" below.
+- **Per-version SPI work.** Each future `rtp-fabric-vXX_YY_R1` submodule must override the two new SPI methods. Default failed-future behaviour ensures unimplemented adapters fail loudly during ticket application rather than silently degrading. Every shipped adapter (v1_20_R1 through v26_4_R1) overrides both methods; see the 2026-10-15 amendment.
 - **Migration of pre-existing leaked entries.** Servers that ran an earlier Fabric build will still have the persistent RTP-owned entries in `level.dat`. There is no automatic migration; admins must `/forceload remove` the leaked entries (or use `/forceload remove all` if no admin entries exist). Documented in `CHANGELOG.md`.
 
 ## Alternatives considered
@@ -80,9 +80,22 @@ Ship a Fabric `accesswidener` declaring `addRegionTicket` / `removeRegionTicket`
 
 ## Open work
 
-- `V1_20_R1FabricVersionAdapter` and `V26_1_R1FabricVersionAdapter` inherit the SPI default (failed future). Port the `V1_21_R1` implementation to both before declaring those MC versions ready for `/rtp`. Tracked under `MULTI_PLATFORM_PLAN.md` Step E-tail.
 - Replace reflection with an accesswidener once Loom is green.
 - Add a JUnit test that asserts `RTP_TICKET_TYPE` is non-persistent (introspect `TicketType#PERSISTENT` set) once a Loom-aware test harness exists.
+
+## Amendment (2026-10-15)
+
+The open item "port the ticket implementation to `V1_20_R1FabricVersionAdapter` and `V26_1_R1FabricVersionAdapter`" is closed: both override `applyTicket` / `releaseTicket`. ADR-113 relies on this for the unofficial Fabric 1.20.1 (Java 17) target.
+
+The 1.20.1 and 1.21.1 adapters call the public `ServerChunkCache#addRegionTicket` / `#removeRegionTicket` directly (Loom-remapped) with ticket distance 1 per rtp-fabric-ADR-016, replacing the reflective `DistanceManager` scan in Decision item 2. That scan could not pick the right pair: `DistanceManager` declares `addTicket` / `removeTicket` (level) before `addRegionTicket` / `removeRegionTicket` (distance), all `(TicketType, ChunkPos, int, T)`. The Mojmap name match bound the level pair, and the intermediary name-sorted fallback bound `addTicket(level)` as "add" and `addRegionTicket` as "remove". Tickets were added at level 1 and never released, and on the legacy devstack the 1.20.1 server ran out of memory within a minute. `requestFullChunkAsync` brackets the load with a separate `rtp_load` ticket type, because tickets with equal type, level and position collapse into one and releasing a shared-type load ticket would drop a kept-cache ticket.
+
+Both adapters also bind the private `getChunkFutureMainThread` instead of the first same-signature method; the public `getChunkFuture` blocks the tick thread (S-005). They unwrap the chunk future with typed `Either` (1.20.1) / `ChunkResult` (1.21.1) instead of reflection, which had read every loaded chunk as missing. On the legacy devstack, Fabric 1.20.1 and 1.21.1 each hold about 1 ms MSPT with the hot and cold queues full.
+
+## Amendment (2026-10-15, 2) - 1.21.5+ and 26.x chunk futures
+
+`V1_21_R5FabricVersionAdapter` and `V1_21_R11FabricVersionAdapter` had the same order-dependent scan and reflective `left()` unwrap. `javap` on the mapped 1.21.5 and 1.21.11 jars shows the same public / private / synthetic trio, so both now bind `getChunkFutureMainThread` with the v1_21_R1 shape check and unwrap the typed `ChunkResult`. Their temporary load ticket now has its own `TicketType` instance: from 1.21.5 `TicketStorage` matches tickets by type identity and level, so a load ticket of the kept-cache type was a no-op add whose release dropped the kept ticket. On boot, 1.21.8 and 1.21.11 log `chunk-future method bound: net.minecraft.class_3215#method_14134`, the private method.
+
+The 26.x adapters need no change. 26.x runs Mojang names, so they bind `getChunkFuture` by name, call it off the tick thread (where vanilla takes its non-blocking `supplyAsync` branch), unwrap `ChunkResult#orElse` by name, and use a separate timed load-ticket type.
 
 ## References
 

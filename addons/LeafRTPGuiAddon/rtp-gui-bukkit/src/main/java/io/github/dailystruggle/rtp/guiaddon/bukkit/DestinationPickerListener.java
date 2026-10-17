@@ -47,7 +47,9 @@ public final class DestinationPickerListener implements Listener {
       return; // decoration (dashboard / filler), not a destination button
     }
 
-    player.closeInventory();
+    if (!MenuActions.isMenuNavigation(target)) {
+      player.closeInventory();
+    }
     MenuActions.submit(player.getUniqueId(), target);
   }
 

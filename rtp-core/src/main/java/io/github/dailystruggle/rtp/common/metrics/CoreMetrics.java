@@ -5,7 +5,6 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionQueueManager;
-import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -182,6 +181,19 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
         return snapshotRing;
     }
 
+    private static volatile java.util.function.IntSupplier memoryTrackerEntriesSupplier = () -> 0;
+    private static volatile java.util.function.ToIntFunction<String> memoryTrackerByLabelSupplier = label -> 0;
+
+    /**
+     * Installs suppliers for memory-tracker counts, decoupling {@link CoreMetrics} from {@code tools.MemoryTracker}.
+     */
+    public static void setMemoryTrackerSuppliers(
+            java.util.function.IntSupplier entriesSupplier,
+            java.util.function.ToIntFunction<String> byLabelSupplier) {
+        if (entriesSupplier != null) memoryTrackerEntriesSupplier = entriesSupplier;
+        if (byLabelSupplier != null) memoryTrackerByLabelSupplier = byLabelSupplier;
+    }
+
     /**
      * Samples the current runtime state and returns a snapshot.
      *
@@ -191,8 +203,8 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
     public io.github.dailystruggle.metrics.api.MetricsSnapshot snapshot() {
         io.github.dailystruggle.metrics.api.MetricsBinding b = this.binding;
         int queueDepth = computeQueueDepth();
-        int memoryTrackerEntries = MemoryTracker.trackedCount();
-        int pendingTeleports = MemoryTracker.trackedCountByLabel("TeleportPipelineTask");
+        int memoryTrackerEntries = memoryTrackerEntriesSupplier.getAsInt();
+        int pendingTeleports = memoryTrackerByLabelSupplier.applyAsInt("TeleportPipelineTask");
 
         double avgPipelineMs = pipelineHistogram.mean();
         int chunkLoadBacklog = b.chunkLoadBacklog();
@@ -222,19 +234,20 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
         // Attach RTP-specific extension carrying RTP metric values. Sibling plugins
         // consuming metrics-api read host-runtime fields directly; RTP-specific
         // counters live on this extension (see metrics-api-ADR-001).
-        snap = snap.withExtension(new RTPMetricsExtension(
-                queueDepth,
-                pendingTeleports,
-                memoryTrackerEntries,
-                chunkLoadBacklog,
-                avgPipelineMs,
-                databaseLatencyMs,
-                slowCount,
-                slowThreshold,
-                queueGrowthCount,
-                queueGrowthThreshold,
-                regionQueueStatus
-        ));
+        snap = snap.withExtension(RTPMetricsExtension.builder()
+                .queueDepth(queueDepth)
+                .pendingTeleports(pendingTeleports)
+                .memoryTrackerEntries(memoryTrackerEntries)
+                .chunkLoadBacklog(chunkLoadBacklog)
+                .avgPipelineMs(avgPipelineMs)
+                .databaseLatencyMs(databaseLatencyMs)
+                .slowPipeline(slowCount, slowThreshold)
+                .queueGrowthWarn(queueGrowthCount, queueGrowthThreshold)
+                .regionQueueStatus(regionQueueStatus)
+                .probeGovernors(io.github.dailystruggle.rtp.common.selection.region.ProbeFirstGovernor.snapshotAll())
+                .liveLoadGates(io.github.dailystruggle.rtp.common.selection.region.LiveLoadGate.snapshotAll())
+                .immediateGovernors(io.github.dailystruggle.rtp.common.selection.region.ImmediateLoadGovernor.snapshotAll())
+                .build());
         // Compose sibling-plugin extensions registered via Metrics.registerExtension(...).
         // Suppliers are evaluated in registration order; nulls are skipped; failures are swallowed.
         for (java.util.function.Supplier<? extends io.github.dailystruggle.metrics.api.MetricsExtension<?>> sup :

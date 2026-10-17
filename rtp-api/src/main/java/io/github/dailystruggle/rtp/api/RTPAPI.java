@@ -61,6 +61,31 @@ public class RTPAPI {
   /** Eager opt-in per-player dispatcher for {@link PlayerMoveEvent} notifications (ADR-075). */
   public static final PlayerMoveDispatcher playerMoveEvents = new PlayerMoveDispatcher();
 
+  /** Scripted actions service delegate populated by core during {@code onEnable} (ADR-093). */
+  public static volatile io.github.dailystruggle.rtp.api.action.ActionService actionService = null;
+
+  /** Air check predicate delegate populated by core during initialization. */
+  public static volatile Predicate<String> isAirDelegate = null;
+
+  /**
+   * Checks if the given material name represents air (either vanilla air or configured air blocks).
+   *
+   * @param materialName material or block identifier (e.g. {@code "AIR"}, {@code "minecraft:cave_air"})
+   * @return {@code true} if air, {@code false} otherwise
+   */
+  @PublicApi
+  public static boolean isAir(String materialName) {
+    if (materialName == null || materialName.isEmpty()) return false;
+    Predicate<String> delegate = isAirDelegate;
+    if (delegate != null) {
+      return delegate.test(materialName);
+    }
+    String upper = materialName.toUpperCase(java.util.Locale.ROOT);
+    int colon = upper.indexOf(':');
+    String bare = (colon >= 0) ? upper.substring(colon + 1) : upper;
+    return bare.equals("AIR") || bare.equals("CAVE_AIR") || bare.equals("VOID_AIR");
+  }
+
   /**
    * Sets the platform-specific server accessor (write-once).
    *
@@ -287,5 +312,51 @@ public class RTPAPI {
       return Collections.emptyList();
     }
     return snapshot.foliaRegions;
+  }
+
+  /**
+   * Checks whether {@code player} holds {@code permission}.
+   *
+   * @param player     player UUID
+   * @param permission permission string
+   * @return {@code true} if permitted, {@code false} otherwise
+   */
+  @PublicApi
+  public static boolean checkPermission(UUID player, String permission) {
+    if (player == null || permission == null || permission.isBlank()) return false;
+    RTPServerAccessor sa = serverAccessor;
+    if (sa == null) return false; // fail closed: no core, no permission
+    try {
+      var sender = sa.getSender(player);
+      return sender != null && sender.hasPermission(permission);
+    } catch (Throwable t) {
+      return false;
+    }
+  }
+
+  /**
+   * Returns whether the scripted actions engine is loaded and available.
+   *
+   * @return {@code true} if actions service is present
+   */
+  @PublicApi
+  public static boolean hasActions() {
+    return actionService != null;
+  }
+
+  /**
+   * Returns the platform-neutral scripted actions service (ADR-093).
+   *
+   * @return non-null action service
+   * @throws IllegalStateException if called before core is loaded (REQ-RTP-S-006)
+   */
+  @PublicApi
+  public static io.github.dailystruggle.rtp.api.action.ActionService actions() {
+    io.github.dailystruggle.rtp.api.action.ActionService s = actionService;
+    if (s == null) {
+      throw new IllegalStateException(
+          "[RTP API] Cannot access actions: Core implementation is not loaded.");
+    }
+    return s;
   }
 }

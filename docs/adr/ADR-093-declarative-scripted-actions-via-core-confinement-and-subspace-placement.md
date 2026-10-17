@@ -243,6 +243,6 @@ The following are recorded so their absence is intentional rather than accidenta
 - [ADR-026](ADR-026-external-hook-api-surface.md) - External Hook API Surface.
 - [ADR-075](ADR-075-platform-neutral-player-move-event-spi.md) - Platform-Neutral Player-Move Event SPI.
 - [ADR-076](ADR-076-config-folder-consolidation.md) - Config Folder Consolidation (`definitions/` hierarchy).
-- [`leafrtp-group-addon-ADR-001`](../../addons/LeafRTPGroupAddon/docs/adr/leafrtp-group-addon-ADR-001-subspace-group-teleport.md) - Multi-Entity Subspace Teleportation.
+- `leafrtp-group-addon-ADR-001` - Multi-Entity Subspace Teleportation (superseded by this ADR).
 - [`leafrtp-tether-addon-ADR-001`](../../addons/LeafRTPTetherAddon/docs/adr/leafrtp-tether-addon-ADR-001-cross-platform-region-confinement.md) - Cross-Platform Region Confinement.
 - [`effects-api-ADR-007`](../../api/effects-api/docs/adr/effects-api-ADR-007-command-effect-and-death-stage.md) - Command Effect and Death Stage in the Effects Engine.

@@ -20,7 +20,7 @@
 ## Checklist
 
 - [ ] All existing tests pass (`./gradlew test`)
-- [ ] Traceability check passes (`./gradlew check` or `check_traceability.sh`)
+- [ ] Traceability check passes (`./gradlew check` or `./scripts/check_traceability.sh`)
 - [ ] New or updated requirements have a row in `docs/dev/TRACEABILITY.md`
 - [ ] `CHANGELOG.md` updated under `[Unreleased]`
 - [ ] New public API changes are reflected in `rtp-api/REQUIREMENTS.md`

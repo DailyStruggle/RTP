@@ -542,6 +542,22 @@ This is the recommended dependency for out-of-repo addon authors (see
 
 ---
 
+## Release Staging & Binary Distribution (Pro vs. Lite)
+
+Per **ADR-100 section 2.3 ("Release Staging")**, binary distribution follows a staged rollout to ensure stability:
+
+1. **LeafRTP Pro (BuiltByBit / Commercial):**
+   - **Trigger:** Automated on merging a release PR into `V3`/`V2`/`V1` (or manual `workflow_dispatch`) via `.github/workflows/release-bbb.yml`.
+   - **Actions:** Tags the repository with `v<version>`, builds `LeafRTP-Pro-<version>.jar`, generates SBOM and signatures, and publishes immediately to BuiltByBit.
+   - **Settling Period:** Pro users receive early-access updates and continuous production builds. This 1-2 week window allows edge cases and regressions to be identified and resolved.
+
+2. **LeafRTP Lite (Modrinth, Hangar, GitHub Releases):**
+   - **Trigger:** Manual trigger via `.github/workflows/release.yml` (`workflow_dispatch`).
+   - **Cadence:** Initiated after the Pro release settles in production (typically 1-2 weeks post-Pro release).
+   - **Actions:** Builds `LeafRTP-<version>.jar` (lite variant), attaches signatures and SBOM, creates the public GitHub Release, and publishes to Modrinth and Hangar with Lite-filtered release notes.
+
+---
+
 ## Compatibility policy (to document with the first stable release)
 
 - Semantic versioning for `rtp-api`/`rtp-core` independent of the plugin version.

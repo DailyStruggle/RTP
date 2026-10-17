@@ -6,6 +6,9 @@ import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.proxy.messages.ChannelIdentifier;
 import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
+import io.github.dailystruggle.rtp.common.network.pluginmessage.PluginMessageEnvelope;
+import io.github.dailystruggle.rtp.common.network.pluginmessage.ThrottledWarning;
+import io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier;
 import org.slf4j.Logger;
 
 import java.io.ByteArrayInputStream;
@@ -33,9 +36,13 @@ import java.util.Objects;
  * </ul>
  *
  * <p>Wire framing mirrors {@code BukkitNetworkBridge} exactly: {@code byte verb}
- * then, for PUSH/RSP, {@code short length} + raw codec payload. S-004: every
- * handler swallows {@link Throwable} so a malformed frame cannot break
- * Velocity's event dispatcher.</p>
+ * then, for PUSH/RSP, {@code short length} + {@link PluginMessageEnvelope}
+ * payload. S-004: every handler swallows {@link Throwable} so a malformed
+ * frame cannot break Velocity's event dispatcher.</p>
+ *
+ * <p>Authentication: with an {@link HmacVerifier} (same secret as the
+ * backends) pushes must carry a valid MAC and every snapshot row is signed so
+ * backends can reject forged replies. Rejections log a throttled WARNING.</p>
  */
 @SuppressWarnings("java:S1845") // channel field alongside CHANNEL identifier constant
 public final class VelocityProxyCacheListener {
@@ -47,25 +54,55 @@ public final class VelocityProxyCacheListener {
     private static final byte PROXY_SNAPSHOT_REQ = 2;
     private static final byte PROXY_SNAPSHOT_RSP = 3;
 
+    /** Env var read by the 3-arg constructor; matches the {@code network.secretEnv} default. */
+    static final String DEFAULT_SECRET_ENV = "RTP_NET_SECRET";
+
     private final ProxyServer proxyServer;
     private final VelocityProxyAvailabilityCache cache;
     private final Logger logger;
     private final ChannelIdentifier channel;
+    private final HmacVerifier verifier;
+    private final ThrottledWarning rejectWarning;
 
+    /** Loads the verifier from {@value #DEFAULT_SECRET_ENV}; unsigned (WARNING) when absent. */
     public VelocityProxyCacheListener(ProxyServer proxyServer,
                                       VelocityProxyAvailabilityCache cache,
                                       Logger logger) {
+        this(proxyServer, cache, logger, loadDefaultVerifier(logger));
+    }
+
+    /** @param verifier shared-secret verifier; {@code null} runs unsigned */
+    public VelocityProxyCacheListener(ProxyServer proxyServer,
+                                      VelocityProxyAvailabilityCache cache,
+                                      Logger logger,
+                                      HmacVerifier verifier) {
         this.proxyServer = Objects.requireNonNull(proxyServer, "proxyServer");
         this.cache = Objects.requireNonNull(cache, "cache");
         this.logger = Objects.requireNonNull(logger, "logger");
         this.channel = MinecraftChannelIdentifier.from(CHANNEL);
+        this.verifier = verifier;
+        this.rejectWarning = new ThrottledWarning(
+                logger::warn, ThrottledWarning.DEFAULT_INTERVAL_MS, System::currentTimeMillis);
+    }
+
+    private static HmacVerifier loadDefaultVerifier(Logger logger) {
+        try {
+            // Schema version is MAC-covered; accept any >= 1 here, rows carry their own.
+            return HmacVerifier.loadFromEnv(DEFAULT_SECRET_ENV, 1, Integer.MAX_VALUE);
+        } catch (RuntimeException ex) {
+            if (logger != null) {
+                logger.warn("RTP proxy-cache: HMAC secret unavailable ({}); rtp:net heartbeats run UNSIGNED.",
+                        ex.getMessage());
+            }
+            return null;
+        }
     }
 
     /** Register the {@code rtp:net} channel so backend messages reach this companion. */
     public void register() {
         proxyServer.getChannelRegistrar().register(channel);
-        logger.info("RTP proxy-cache companion active on channel '{}'; {} declared server row(s) seeded.",
-                CHANNEL, cache.snapshot().size());
+        logger.info("RTP proxy-cache companion active on channel '{}' ({}); {} declared server row(s) seeded.",
+                CHANNEL, verifier != null ? "HMAC-signed" : "unsigned", cache.snapshot().size());
     }
 
     /** Deregister the channel on shutdown. */
@@ -92,14 +129,30 @@ public final class VelocityProxyCacheListener {
         if (data == null || data.length == 0) {
             return;
         }
+        if (data.length > PluginMessageEnvelope.MAX_FRAME_BYTES) {
+            rejectWarning.report("RTP proxy-cache: dropped oversized rtp:net frame (" + data.length
+                    + " bytes) from backend '" + backend.getServerInfo().getName() + "' (REQ-RTP-S-004).");
+            return;
+        }
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(data))) {
             byte verb = in.readByte();
             switch (verb) {
                 case PROXY_PUSH -> {
                     int len = in.readUnsignedShort();
+                    if (len == 0 || len > PluginMessageEnvelope.MAX_PAYLOAD_BYTES || len > in.available()) {
+                        rejectWarning.report("RTP proxy-cache: dropped PROXY_PUSH with invalid length " + len
+                                + " from backend '" + backend.getServerInfo().getName() + "' (REQ-RTP-S-004).");
+                        return;
+                    }
                     byte[] payload = new byte[len];
                     in.readFully(payload);
-                    cache.onPushPayload(payload);
+                    PluginMessageEnvelope.Rejection rejected = cache.onPushPayload(payload, verifier);
+                    if (rejected != null) {
+                        rejectWarning.report("RTP proxy-cache: dropped PROXY_PUSH (" + rejected + ") from backend '"
+                                + backend.getServerInfo().getName() + "'"
+                                + (verifier != null ? "; HMAC required" : "") + " (REQ-RTP-S-004).");
+                        return;
+                    }
                     logger.info("RTP proxy-cache: PROXY_PUSH ({} bytes) from backend '{}'; cache now holds {} server row(s).",
                             len, backend.getServerInfo().getName(), cache.snapshot().size());
                 }
@@ -119,7 +172,7 @@ public final class VelocityProxyCacheListener {
 
     /** Send one {@link #PROXY_SNAPSHOT_RSP} frame per known server row. */
     private void replySnapshot(ServerConnection backend) {
-        List<byte[]> rows = cache.snapshotPayloads();
+        List<byte[]> rows = cache.snapshotPayloads(verifier);
         logger.info("RTP proxy-cache: sending {} snapshot row(s) to '{}'.",
                 rows.size(), backend.getServerInfo().getName());
         for (byte[] payload : rows) {

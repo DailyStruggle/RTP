@@ -64,6 +64,10 @@ public final class CompositeRegionRenderer implements ChartRenderer<CompositeReg
         int mx = (int) ((long) cx * mw / cw);
         if (mx >= mw) mx = mw - 1;
         int mIdx = mRow + mx;
+        if (mIdx < 0 || mIdx >= insideDomain.length || mIdx >= biomeRgb.length || mIdx >= hazardMask.length) {
+          canvas.setPixelRgb(cx, cy, COLOR_OUTSIDE);
+          continue;
+        }
 
         if (!insideDomain[mIdx]) {
           canvas.setPixelRgb(cx, cy, COLOR_OUTSIDE);

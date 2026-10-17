@@ -124,6 +124,7 @@ public class MemoryShapeSelectionParityTest {
     shape.set(NormalDistributionParams.centerRadius, 0L);
     shape.set(NormalDistributionParams.mode, "ACCUMULATE");
     shape.set(NormalDistributionParams.uniquePlacements, 2);
+    shape.set(NormalDistributionParams.expand, true);
     shape.setRng(new Random(3));
 
     long location = shape.rand();
@@ -141,6 +142,27 @@ public class MemoryShapeSelectionParityTest {
     assertTrue(
         shape.getEffectiveBadCount() > 0,
         "a positive uniqueplacements radius must mark the landing area");
+  }
+
+  @Test
+  @DisplayName("uniqueplacements marks nothing while expand is off, so the region cannot run out")
+  void uniquePlacements_withoutExpand_marksNothing() {
+    Circle shape = new Circle();
+    shape.set(GenericMemoryShapeParams.radius, 64L);
+    shape.set(GenericMemoryShapeParams.centerRadius, 0L);
+    shape.set(GenericMemoryShapeParams.mode, "ACCUMULATE");
+    shape.set(GenericMemoryShapeParams.uniquePlacements, 8);
+    shape.set(GenericMemoryShapeParams.expand, false);
+    shape.setRng(new Random(3));
+
+    long range = shape.getRange();
+    for (int i = 0; i < 2_000; i++) {
+      assertNotEquals(-1L, shape.rand(), "selection must keep succeeding without expand");
+    }
+    shape.flushAndRebuild(1L);
+    assertEquals(0L, shape.getEffectiveBadCount(),
+        "without expand the range never grows back, so uniquePlacements must not consume it");
+    assertEquals(range, shape.getRange());
   }
 
   // ---------------------------------------------------------------------------

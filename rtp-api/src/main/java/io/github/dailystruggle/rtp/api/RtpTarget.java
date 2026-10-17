@@ -19,23 +19,46 @@ public final class RtpTarget {
     REGION,
     /** Resolve to the target region of a world; {@link #name()} is the world name. */
     WORLD,
+    /** Resolve to a specific biome within the default or target region; {@link #name()} is the biome name. */
+    BIOME,
     /**
      * Resolve to a region advertised by a peer backend across the network.
      * Dispatched across the cross-server wait queue.
      */
-    NETWORK
+    NETWORK,
+    /**
+     * Resolve to an exact coordinate on a local or remote server (e.g. for {@code /rtp back}).
+     */
+    COORDINATE,
+    /**
+     * UI or navigation action (e.g. sub-menu transitions, pagination).
+     * Handled by menu/UI layers rather than dispatching a teleport.
+     */
+    ACTION
   }
 
-  private static final RtpTarget DEFAULT = new RtpTarget(Kind.DEFAULT, null, null);
+  private static final RtpTarget DEFAULT = new RtpTarget(Kind.DEFAULT, null, null, null, 0, 0, 0);
 
   private final Kind kind;
   private final String name;
   private final String serverId;
+  private final String worldName;
+  private final int x;
+  private final int y;
+  private final int z;
 
   private RtpTarget(Kind kind, String name, String serverId) {
+    this(kind, name, serverId, null, 0, 0, 0);
+  }
+
+  private RtpTarget(Kind kind, String name, String serverId, String worldName, int x, int y, int z) {
     this.kind = kind;
     this.name = name;
     this.serverId = serverId;
+    this.worldName = worldName;
+    this.x = x;
+    this.y = y;
+    this.z = z;
   }
 
   /**
@@ -110,6 +133,51 @@ public final class RtpTarget {
   }
 
   /**
+   * Target a specific biome.
+   *
+   * @param biomeName the biome name; must not be {@code null} or blank
+   * @return a biome-kind target
+   * @throws IllegalArgumentException if {@code biomeName} is {@code null} or blank
+   */
+  public static RtpTarget biome(String biomeName) {
+    if (biomeName == null || biomeName.isBlank()) {
+      throw new IllegalArgumentException("biomeName must not be null or blank");
+    }
+    return new RtpTarget(Kind.BIOME, biomeName, null);
+  }
+
+  /**
+   * Target an exact coordinate on a local or remote server.
+   *
+   * @param serverId destination backend network id (nullable/empty for local)
+   * @param worldName world name; must not be null or blank
+   * @param x x coordinate
+   * @param y y coordinate
+   * @param z z coordinate
+   * @return coordinate-kind target
+   */
+  public static RtpTarget coordinate(String serverId, String worldName, int x, int y, int z) {
+    if (worldName == null || worldName.isBlank()) {
+      throw new IllegalArgumentException("worldName must not be null or blank");
+    }
+    String sId = (serverId == null || serverId.isBlank()) ? null : serverId;
+    return new RtpTarget(Kind.COORDINATE, worldName + ":" + x + "," + y + "," + z, sId, worldName, x, y, z);
+  }
+
+  /**
+   * Action target for UI navigation or custom actions.
+   *
+   * @param action the action identifier; must not be {@code null} or blank
+   * @return an action-kind target
+   */
+  public static RtpTarget action(String action) {
+    if (action == null || action.isBlank()) {
+      throw new IllegalArgumentException("action must not be null or blank");
+    }
+    return new RtpTarget(Kind.ACTION, action, null);
+  }
+
+  /**
    * Returns how this target should be resolved.
    *
    * @return the target kind; never {@code null}
@@ -128,13 +196,43 @@ public final class RtpTarget {
   }
 
   /**
-   * Returns the destination backend's network id for a {@link Kind#NETWORK}
+   * Returns the destination backend's network id for a {@link Kind#NETWORK} or remote {@link Kind#COORDINATE}
    * target.
    *
-   * @return the server id, or {@code null} for any non-network target
+   * @return the server id, or {@code null} for any non-network / local target
    */
   public String serverId() {
     return serverId;
+  }
+
+  /**
+   * Returns the destination world name for a {@link Kind#COORDINATE} target.
+   *
+   * @return world name, or {@code null} if not a coordinate target
+   */
+  public String worldName() {
+    return worldName;
+  }
+
+  /**
+   * Returns the X coordinate for a {@link Kind#COORDINATE} target.
+   */
+  public int x() {
+    return x;
+  }
+
+  /**
+   * Returns the Y coordinate for a {@link Kind#COORDINATE} target.
+   */
+  public int y() {
+    return y;
+  }
+
+  /**
+   * Returns the Z coordinate for a {@link Kind#COORDINATE} target.
+   */
+  public int z() {
+    return z;
   }
 
   @Override
@@ -143,19 +241,33 @@ public final class RtpTarget {
     if (!(o instanceof RtpTarget)) return false;
     RtpTarget that = (RtpTarget) o;
     return kind == that.kind
+        && x == that.x
+        && y == that.y
+        && z == that.z
         && Objects.equals(name, that.name)
-        && Objects.equals(serverId, that.serverId);
+        && Objects.equals(serverId, that.serverId)
+        && Objects.equals(worldName, that.worldName);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(kind, name, serverId);
+    return Objects.hash(kind, name, serverId, worldName, x, y, z);
   }
 
   @Override
   public String toString() {
-    return "RtpTarget[" + kind
-        + (serverId == null ? "" : ":" + serverId)
-        + (name == null ? "" : ":" + name) + ']';
+    StringBuilder sb = new StringBuilder("RtpTarget[").append(kind);
+    if (serverId != null) {
+      sb.append(':').append(serverId);
+    }
+    if (worldName != null) {
+      sb.append(':').append(worldName);
+    }
+    if (kind == Kind.COORDINATE) {
+      sb.append('(').append(x).append(',').append(y).append(',').append(z).append(')');
+    } else if (name != null) {
+      sb.append(':').append(name);
+    }
+    return sb.append(']').toString();
   }
 }

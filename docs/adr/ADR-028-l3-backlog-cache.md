@@ -1,6 +1,6 @@
 # ADR-028 — L3 Backlog Cache (`backlogLocations`)
 
-- **Status**: Accepted (amended 2026-05-08)
+- **Status**: Accepted (amended 2026-05-08; amended 2026-10-13: prefilter outcomes and the cold fill)
 - **Date**: 2026-05-08 (amended; accepted 2026-05-07; originally proposed 2026-05-02)
 - **Supersedes**: —
 - **Related**: ADR-006 (async queue pre-generation), ADR-015 (stale-chunk guard / count-bound pipes), ADR-016 (anvil subsystem), ADR-023 (login reserve cache), `REQ-RTP-S-005` (no chunk loading on the main thread)
@@ -162,6 +162,21 @@ is intentionally allowed to sit idle when downstream cannot drain it.
 All three steps (refill, verify-one-bin, drain-head-validated) execute
 linearly within `Region.execute()`; there is no producer/consumer split.
 
+### Amendment: Prefilter Outcomes and the Cold Fill (2026-10-13)
+
+Supersedes the "verified by default" fallback (see *Negative / Trade-offs*) and the refill pacing in *Refill loop* above. Every prefilter outcome other than `REJECT` used to mark an entry `VALIDATED`, so with no provider bound, or on ungenerated land, picks that nobody had checked drained into cold, counted as backlog stock and recorded successes.
+
+1. **The backlog reads region files only.** It never loads, generates or tickets a chunk (S-005, S-002); its only I/O is the binned region-file read (one `classifyBatch` per region file).
+2. **Four validity states.** `UNVERIFIED`: not yet prefiltered. `VALIDATED`: `ACCEPT` on disk data. `UNKNOWN`: no disk data to decide from (chunk not generated, unreadable or unsupported file, failed or timed-out batch, or no provider bound). `INVALIDATED`: `REJECT`; removed in the same pulse, recorded as a `prefilterBlock` failure and a bad chunk in the owner's shape.
+3. **Validated entries cost nothing more until promotion.** `VALIDATED` entries drain into cold up to `cacheCap` with no chunk load (contiguous head under `FLAT_STRIDE`, random under `BINNED_AMORTIZED`), recording one success each. `ACCEPT` only screens the surface blocks of every column for unsafe blocks, so it is not the full check (see item 8).
+4. **Unknown entries wait for the cold fill.** `UNKNOWN` entries stay in the backlog and block the head drain until the public cold fill (`RegionCacheTask` -> `LocationGenerator` -> `PregenTask`, single-flight per region) takes the oldest one (`pollOldest(UNKNOWN)`) in place of a shape draw. The fill checks it through the existing speculative path: region-file read, else a native load (pinned when a kept slot is free, otherwise unpinned and validated on load; ADR-110). Under heap pressure the load is refused and the entry returns to the backlog as `UNKNOWN`. Because the fill takes one candidate at a time, a region file full of ungenerated chunks never turns into a burst of generation requests.
+5. **Shape draws only without a backlog.** The fill draws from the shape when the backlog is disabled or empty. When the backlog holds entries but none is `UNKNOWN`, the run ends without a draw (`drained/backlog`, not counted as a failure). Per-player and observational fills keep drawing from the shape.
+6. **Time-bounded refill.** Unverified picks are shape math only (no chunk I/O, ~100 B each), so refill runs toward `backlogCacheCap` each pulse with no count window. It stops when elapsed time plus the EWMA cost of one pick (7/8 decay, as in `TimeBoundTaskPipe`) would pass `Region.refillDeadline`: the remaining pulse budget (`asyncAllottedTime`) less a fixed 20% headroom (`Region.BACKLOG_HEADROOM`) for later stages and other plugins. The refill hysteresis (`backlogRefillThreshold`) still applies. Splitting this budget across Folia region threads is out of scope here.
+7. **Pregenerated preference applies once.** Backlog candidates already passed `pregeneratedPreference` at refill; the fill does not draw it again.
+8. **Promotion to hot is the full check for cold entries.** Cold-to-hot promotion already loads the chunk. After the vertical adjustor finds the real Y on it, `Region.promotionChecks` runs the world border, the biome filter, the safety-radius scan (`SafetyScan`; neighbours from resident chunks or region files, native load only on a miss) and claims (`GlobalRegionVerifiers`, async). A failure drops the location, purges its database row and records the cause. Validated backlog entries and stored locations used to reach hot with the vertical adjustor as their only check (S-001, S-003). Entries from the cold fill pass these checks twice; on the already loaded chunk the repeat costs block reads and a claim lookup, not a load.
+
+Persistence is unchanged: backlog entries never reach the database.
+
 ## Alternatives Considered
 
 | Alternative | Why Rejected |
@@ -169,7 +184,11 @@ linearly within `Region.execute()`; there is no producer/consumer split.
 | Make L2 itself ~10× larger | Defeats the purpose: every L2 entry is fully verified (chunk I/O), so a larger L2 means proportionally more chunk loads, not fewer. The point of L3 is to *avoid* most of those loads via anvil pre-filtering. |
 | Re-order L3 by bin to verify bin-at-a-time without head-blocking | Violates user requirement *"without changing their order in queue"*. Order preservation is the contract that makes L3 indistinguishable from a virtual L2 from the consumer's perspective; reordering would change spatial distribution semantics established by ADR-001 / ADR-009. |
 | Verify all bins per pulse (no per-pulse cap) | Unbounded per-pulse work would violate the count-bound pipeline contract on Folia (ADR-004 / ADR-015). One bin per pulse keeps the work amortized and predictable. |
-| Use the full pipeline (chunk + vert + safety) for L3 verification | Negates the cost win — L3 then duplicates L2's work. Anvil-only verification is a cheap *rejection filter*; survivors still face the full pipeline at L2 → L1. |
+| Use the full pipeline (chunk + vert + safety) for L3 verification | Negates the cost win — L3 then duplicates L2's work. Anvil-only verification is a cheap *rejection filter*; only entries without disk data go through the cold fill's chunk-load check (2026-10-13 amendment). |
+| Let the backlog load or generate chunks it cannot read from disk | One region-file batch would issue a generation request per ungenerated chunk at once. The cold fill already takes one candidate at a time, so it owns every chunk load. |
+| Copy loaded chunks into detached snapshots for unpinned checks | Duplicates the region-file chunk view the anvil subsystem already provides; an unpinned load validated on load needs no copy (ADR-110). |
+| Pace refill by a count window of unverified entries | Throttled a near-free step: 4 picks per region pulse at the default 20-tick `period` took ~4 minutes to reach 1000, which read as hidden verification work. Time-bounded refill reaches the cap in milliseconds; the reported count is gated by validity instead. |
+| Count `UNKNOWN` entries as validated | Without a provider (or on ungenerated land) every pick reported as verified stock, so the backlog count meant nothing. |
 | Persist L3 to the database | Schema cost + tentative-row semantics outweigh the value, since shape re-selection and anvil verification are both cheap. See *Persistence* above. |
 | Bin at single-chunk granularity | Loses the amortization win — one anvil read per chunk is not appreciably cheaper than a chunk-load. The 32 × 32 region-file is the natural amortization unit because it matches the on-disk `.mca` file. |
 | Bin at world-section / 16 × 16 granularity | No on-disk grouping below the `.mca` level; anvil reads are already region-file scoped. |
@@ -203,9 +222,9 @@ linearly within `Region.execute()`; there is no producer/consumer split.
   invoking the (absent) DB callbacks.
 - Anvil pre-filter availability is platform-dependent. On Fabric (which
   remains unstable per ADR-022) and on worlds whose region files are
-  not yet flushed to disk, anvil verification falls back to "verified
-  by default" (do not block on absent anvil data). This avoids stalling
-  L3 on freshly generated worlds.
+  not yet flushed to disk, entries go `UNKNOWN` and the cold fill checks
+  them with a chunk load (2026-10-13 amendment), so L3 never stalls on
+  freshly generated worlds and never reports them as verified.
 
 ### Neutral
 
@@ -245,8 +264,8 @@ change. Anticipated touch points:
 | Cross-region bin index | New `RTPWorld.backlogBinsByRegionFile` — `Map<RegionFileCoord, WeakReference<List<BacklogEntry>>>`; populated on insert, weakly held |
 | Bin coord type | New `RegionFileCoord` value type (`(cx>>5, cz>>5)`) |
 | Refill | extension to `Region.execute()` ahead of the existing L2 deficit loop |
-| Verify | new per-pulse step: pick this region's oldest-`UNVERIFIED` entry → look up world bin → anvil pre-filter every entry in the bin list → set tri-state validity |
-| Promote | head-only contiguous-`VALIDATED` promotion to `unkeptLocations` (drop `INVALIDATED` head, stop on `UNVERIFIED`), inline within `Region.execute()` |
+| Verify | new per-pulse step: pick this region's oldest-`UNVERIFIED` entry → look up world bin → anvil pre-filter every entry in the bin list → set validity (`VALIDATED` / `UNKNOWN` / `INVALIDATED`, 2026-10-13) |
+| Promote | `Region.drainValidatedToCold` drains `VALIDATED` entries into cold; the cold fill (`RegionCacheTask` -> `PregenTask`) takes `UNKNOWN` entries through `BacklogLocationBuffer.pollOldest(UNKNOWN)`; `Region.promotionChecks` completes the check at cold-to-hot promotion (2026-10-13) |
 | Templates | `rtp-plugin/src/main/resources/regions/default.yml`, `rtp-plugin/src/main/resources/lang/regions.lang.yml` (+ de/es/fr/nl) |
 | Placeholder | `%rtp_backlogCacheCap%` (mirror of `%rtp_cacheCap%`) |
 | Memory accounting | `MemoryTracker.totalCacheCap` includes `backlogCacheCap` |

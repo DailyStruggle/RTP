@@ -5,16 +5,15 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.CircleOptimizedDualLayer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.tools.ChartOutputHelper;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 
 public class CircleComparisonBenchmarkTest {
@@ -86,30 +85,14 @@ public class CircleComparisonBenchmarkTest {
     optCircle32.set(GenericMemoryShapeParams.centerZ, 0L);
     ShapeResult resOpt32 = evaluateShape(optCircle32, mask, 32L);
 
-    // Render PNGs
-    File outDir = new File("C:\\GameServers\\Minecraft\\testServer\\RTP-Folia\\26.1\\plugins\\RTP\\database\\regionData\\debug");
-    if (!outDir.exists()) outDir.mkdirs();
-
     ShapeResult resTruth = buildTruthResult(mask);
 
-    renderPNG(resClassic, new File(outDir, "simulation_circle_classic_res3.png"), "Classic Circle (Polar Spiral, res = 3)", 3);
-    renderPNG(resOpt16, new File(outDir, "simulation_circle_optimized_res16.png"), "Optimized Circle (Dual-Layer Square, res = 16)", 16);
-    renderPNG(resOpt32, new File(outDir, "simulation_circle_optimized_res32.png"), "Optimized Circle (Dual-Layer Square, res = 32)", 32);
+    renderReportPNG(resClassic, "simulation_circle_classic_res3.png", "Classic Circle (Polar Spiral, res = 3)", 3);
+    renderReportPNG(resOpt16, "simulation_circle_optimized_res16.png", "Optimized Circle (Dual-Layer Square, res = 16)", 16);
+    renderReportPNG(resOpt32, "simulation_circle_optimized_res32.png", "Optimized Circle (Dual-Layer Square, res = 32)", 32);
 
-    renderComparisonPNG(resTruth, resClassic, resOpt16, resOpt32, new File(outDir, "simulation_circle_comparison_side_by_side.png"));
-
-    // Also write to workspace build/reports/
-    File localDir = new File("build/reports/circle_comparison");
-    localDir.mkdirs();
-    renderComparisonPNG(resTruth, resClassic, resOpt16, resOpt32, new File(localDir, "simulation_circle_comparison_side_by_side.png"));
-
-    File repoRoot = new File("../simulation_circle_comparison_side_by_side.png");
-    renderComparisonPNG(resTruth, resClassic, resOpt16, resOpt32, repoRoot);
-    File docsAsset = new File("../docs/assets/img/simulation_circle_comparison_side_by_side.png");
-    if (!docsAsset.getParentFile().exists()) docsAsset = new File("docs/assets/img/simulation_circle_comparison_side_by_side.png");
-    if (docsAsset.getParentFile().exists()) {
-      renderComparisonPNG(resTruth, resClassic, resOpt16, resOpt32, docsAsset);
-    }
+    BufferedImage compImg = renderComparisonImage(resTruth, resClassic, resOpt16, resOpt32);
+    ChartOutputHelper.writeChart(compImg, "circle_comparison", "simulation_circle_comparison_side_by_side.png");
 
     // Print Metrics
     System.out.println("\n=================================================================================================================================");
@@ -275,7 +258,7 @@ public class CircleComparisonBenchmarkTest {
     return res;
   }
 
-  private static void renderPNG(ShapeResult res, File outFile, String title, int resKnob) throws Exception {
+  private static void renderReportPNG(ShapeResult res, String fileName, String title, int resKnob) throws Exception {
     int scale = 1;
     int size = res.dim * scale;
     BufferedImage img = new BufferedImage(size, size + 60, BufferedImage.TYPE_INT_RGB);
@@ -305,8 +288,8 @@ public class CircleComparisonBenchmarkTest {
         res.coalescedRuns, res.safeChunks, res.badChunks), 15, 42);
 
     g.dispose();
-    ImageIO.write(img, "png", outFile);
-    System.out.println("[DEBUG_LOG] Saved PNG to " + outFile.getAbsolutePath());
+    ChartOutputHelper.writeReportOnly(img, "circle_comparison", fileName);
+    System.out.println("[DEBUG_LOG] Saved report PNG to " + fileName);
   }
 
   private static ShapeResult buildTruthResult(RealWorldVerdictMask mask) {
@@ -350,7 +333,7 @@ public class CircleComparisonBenchmarkTest {
     return res;
   }
 
-  private static void renderComparisonPNG(ShapeResult truth, ShapeResult c, ShapeResult opt16, ShapeResult opt32, File outFile) throws Exception {
+  private static BufferedImage renderComparisonImage(ShapeResult truth, ShapeResult c, ShapeResult opt16, ShapeResult opt32) throws Exception {
     int dim = c.dim;
     int margin = 20;
     int totalWidth = dim * 4 + margin * 5;
@@ -404,8 +387,7 @@ public class CircleComparisonBenchmarkTest {
     }
 
     g.dispose();
-    ImageIO.write(img, "png", outFile);
-    System.out.println("[DEBUG_LOG] Saved comparison PNG to " + outFile.getAbsolutePath());
+    return img;
   }
 
   private static void printAsciiMaps(ShapeResult truth, ShapeResult c, ShapeResult opt16, ShapeResult opt32) {

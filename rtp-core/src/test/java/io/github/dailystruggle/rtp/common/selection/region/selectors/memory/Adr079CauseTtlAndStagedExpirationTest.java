@@ -55,6 +55,47 @@ class Adr079CauseTtlAndStagedExpirationTest {
   }
 
   @Test
+  @DisplayName("ADR-079 / REQ-CORE-F-005: transient causes are discarded, never stored as permanent")
+  void testTransientCausesAreNotStored() {
+    Circle circle = new Circle();
+    circle.addBadLocation(5L, LocationGenerator.FailTypes.nullChunk);
+    circle.addBadLocation(7L, LocationGenerator.FailTypes.ungenerated);
+    assertEquals(0, circle.addBadChunk(9L, LocationGenerator.FailTypes.timeout));
+    circle.flushAndRebuild(1L);
+
+    assertFalse(circle.isKnownBad(5L));
+    assertFalse(circle.isKnownBad(7L));
+    assertFalse(circle.isKnownBad(9L));
+    assertEquals(0, circle.badKeysSnapshot().length, "no run may be stored for a transient cause");
+
+    // Control: a terrain cause on the same index is stored; explicit 0L stays permanent
+    circle.addBadLocation(5L, LocationGenerator.FailTypes.biome, 0L);
+    circle.flushAndRebuild(1L);
+    assertTrue(circle.isKnownBad(5L));
+    assertEquals(0L, circle.badExpiriesSnapshot()[0]);
+  }
+
+  @Test
+  @DisplayName("ADR-079 / REQ-CORE-F-005: ttl.yml cannot give a transient cause a retention")
+  void testTransientCauseOverrideIgnored() {
+    try {
+      TtlConfig.load(java.util.Map.of("timeout", "1h", "safetyExternal", "2h"), null);
+      assertTrue(TtlConfig.isTransient(LocationGenerator.FailTypes.timeout));
+      assertFalse(TtlConfig.isTransient(LocationGenerator.FailTypes.biome));
+      assertFalse(TtlConfig.isTransient(null));
+      assertEquals(0L, TtlConfig.resolveTtlSeconds(LocationGenerator.FailTypes.timeout, null));
+      assertEquals(2L * 3600L, TtlConfig.resolveTtlSeconds(LocationGenerator.FailTypes.safetyExternal, null));
+
+      Circle circle = new Circle();
+      circle.addBadLocation(12L, LocationGenerator.FailTypes.timeout);
+      circle.flushAndRebuild(1L);
+      assertFalse(circle.isKnownBad(12L));
+    } finally {
+      TtlConfig.resetDefaults();
+    }
+  }
+
+  @Test
   @DisplayName("ADR-079: Dynamic coalescing - merges with max(TTL) and first-cause-wins")
   void testDynamicRunsCoalesceWithMaxTtl() {
     Circle circle = new Circle();

@@ -192,9 +192,20 @@ public final class SqlNetworkStateSchema {
                 server_hint      VARCHAR(64),
                 enqueued_at_ms   BIGINT       NOT NULL,
                 state            VARCHAR(16)  NOT NULL DEFAULT 'READY',
-                claimed_at_ms    BIGINT
+                claimed_at_ms    BIGINT,
+                hmac             VARCHAR(128)
             )
             """;
+
+    /**
+     * HMAC envelope for wait-queue entries (rtp-proxy-ADR-010). Nullable;
+     * pre-existing READY rows carry NULL and are dropped at dequeue under
+     * signed mode (short-lived, so rejection is the migration).
+     */
+    private static final String DDL_WQ_READY_ADD_HMAC =
+            "ALTER TABLE rtp_net_wq_ready ADD COLUMN IF NOT EXISTS hmac VARCHAR(128)";
+    private static final String DDL_WQ_READY_ADD_HMAC_MYSQL =
+            "ALTER TABLE rtp_net_wq_ready ADD COLUMN hmac VARCHAR(128)";
 
     private static final String DDL_WQ_READY_IDX_ORDER =
             "CREATE INDEX IF NOT EXISTS idx_rtp_net_wq_ready_order "
@@ -214,6 +225,13 @@ public final class SqlNetworkStateSchema {
                 region_key       VARCHAR(64),
                 reason           VARCHAR(255),
                 updated_at_ms    BIGINT       NOT NULL
+            )
+            """;
+
+    private static final String DDL_LAST_TELEPORT = """
+            CREATE TABLE IF NOT EXISTS rtp_network_last_teleport (
+                player_id        VARCHAR(36)  NOT NULL PRIMARY KEY,
+                last_teleport_ms BIGINT       NOT NULL
             )
             """;
 
@@ -247,9 +265,11 @@ public final class SqlNetworkStateSchema {
         // reservation-token tables above; safe to bootstrap on every open
         // because the create statements are IF NOT EXISTS.
         execIgnoringDuplicate(conn, DDL_WQ_READY);
+        addColumnIgnoringMissing(conn, DDL_WQ_READY_ADD_HMAC, DDL_WQ_READY_ADD_HMAC_MYSQL);
         execIgnoringDuplicate(conn, DDL_WQ_READY_IDX_ORDER);
         execIgnoringDuplicate(conn, DDL_WQ_READY_IDX_PLAYER);
         execIgnoringDuplicate(conn, DDL_WQ_STATUS);
+        execIgnoringDuplicate(conn, DDL_LAST_TELEPORT);
     }
 
     /**

@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
 public class ParsePermissions {
+  private ParsePermissions() {}
   private static final Map<UUID, Map<String, Map.Entry<Long, Boolean>>> lastBool =
       new ConcurrentHashMap<>();
   private static final Map<UUID, Map<String, Map.Entry<Long, Integer>>> lastInt =
@@ -23,6 +24,7 @@ public class ParsePermissions {
 
   public static boolean hasPerm(
       RTPCommandSender sender, String permissionPrefix, String... permissions) {
+    if (sender == null || sender.uuid() == null) return false;
     long current = System.currentTimeMillis();
     Map<String, Map.Entry<Long, Boolean>> entryMap = lastBool.get(sender.uuid());
     if (entryMap != null) {
@@ -61,6 +63,7 @@ public class ParsePermissions {
   }
 
   public static int getInt(RTPCommandSender sender, String permissionPrefix) {
+    if (sender == null || sender.uuid() == null) return -1;
     long current = System.currentTimeMillis();
     Map<String, Map.Entry<Long, Integer>> entryMap = lastInt.get(sender.uuid());
     if (entryMap != null) {

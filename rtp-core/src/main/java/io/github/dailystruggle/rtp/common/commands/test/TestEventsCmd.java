@@ -6,8 +6,8 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.event.PlayerMoveEvent;
 import io.github.dailystruggle.rtp.api.event.PrefabAppliedEvent;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.commands.BaseRTPCmdImpl;
-import io.github.dailystruggle.rtp.common.commands.RTPCommandEvents;
+import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.RTPCommandEvents;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -196,10 +196,8 @@ public class TestEventsCmd extends BaseRTPCmdImpl {
   }
 
   private void report(UUID callerId, String msg, Level level, Throwable t) {
-    if (!callerId.equals(RTPAPI.serverId)) {
-      if (RTP.serverAccessor != null) {
-        RTP.serverAccessor.sendMessage(callerId, msg);
-      }
+    if (!callerId.equals(RTPAPI.serverId) && RTP.serverAccessor != null) {
+      RTP.serverAccessor.sendMessage(callerId, msg);
     }
     if (t != null) {
       RTP.log(level, msg, t);

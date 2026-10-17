@@ -98,6 +98,70 @@ class RegionFormatRegistryTest {
     }
 
     @Test
+    @DisplayName("Dynamic Linear registration matches DynamicZstdBinding availability")
+    void testLinearRegistrationState() {
+        if (DynamicZstdBinding.isAvailable()) {
+            assertTrue(RegionFormatRegistry.isRegistered(".linear"));
+            assertEquals(LinearRegionReader.INSTANCE, RegionFormatRegistry.getReader(".linear"));
+            assertTrue(RegionFormatRegistry.getRegisteredExtensions().contains(".linear"));
+
+            // Verify .linear can be unregistered
+            RegionFileReader removed = RegionFormatRegistry.unregister(".linear");
+            assertEquals(LinearRegionReader.INSTANCE, removed);
+            assertFalse(RegionFormatRegistry.isRegistered(".linear"));
+        } else {
+            assertFalse(RegionFormatRegistry.isRegistered(".linear"));
+            assertNull(RegionFormatRegistry.getReader(".linear"));
+        }
+    }
+
+    @Test
+    @DisplayName("Unregistered .linear file is ignored: resolve defaults to .mca, resolveExisting finds nothing")
+    void testUnregisteredLinearIgnored(@TempDir Path tempDir) throws IOException {
+        RegionFormatRegistry.unregister(".linear");
+        Path regionDir = tempDir.resolve("region");
+        Files.createDirectories(regionDir);
+        Files.write(regionDir.resolve("r.0.0.linear"), new byte[100]);
+        RegionFileResolver.invalidateMemo();
+
+        RegionFileResolver.ResolvedRegion res = RegionFileResolver.resolve(tempDir, "", 0, 0);
+        assertEquals(regionDir.resolve("r.0.0.mca"), res.path());
+        assertEquals(AnvilReader.INSTANCE, res.reader());
+        assertNull(RegionFileResolver.resolveExisting(tempDir, "", 0, 0));
+    }
+
+    @Test
+    @DisplayName("Addon-registered .linear reader is preferred over a stale .mca for the same region")
+    void testRegisteredLinearPreferredOverMca(@TempDir Path tempDir) throws IOException {
+        Path regionDir = tempDir.resolve("region");
+        Files.createDirectories(regionDir);
+        Path mcaFile = regionDir.resolve("r.0.0.mca");
+        Path linearFile = regionDir.resolve("r.0.0.linear");
+        Files.write(mcaFile, new byte[100]);
+
+        RegionFileReader addonReader = new RegionFileReader() {
+            @Override
+            public AnvilReader.ChunkEntry readChunk(byte[] regionBytes, int rx, int rz) {
+                return null;
+            }
+
+            @Override
+            public boolean isChunkGenerated(byte[] regionBytes, int rx, int rz) {
+                return false;
+            }
+        };
+        RegionFormatRegistry.register("linear", addonReader);
+
+        assertEquals(mcaFile, RegionFileResolver.resolve(tempDir, "", 0, 0).path());
+
+        Files.write(linearFile, new byte[100]);
+        RegionFileResolver.invalidateMemo();
+        RegionFileResolver.ResolvedRegion res = RegionFileResolver.resolve(tempDir, "", 0, 0);
+        assertEquals(linearFile, res.path());
+        assertEquals(addonReader, res.reader());
+    }
+
+    @Test
     @DisplayName("Null checks and edge cases in RegionFormatRegistry")
     void testRegistryNullChecks() {
         assertNull(RegionFormatRegistry.getReader(null));

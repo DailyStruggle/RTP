@@ -208,12 +208,11 @@ public final class DurationParser {
         logAutoInterpret(contextName, val, "ticks", val / 50.0, "ticks (from millis)", val / 50.0 * 0.05);
         return new ParsedDuration(val, TemporalUnit.MILLISECOND, false);
       }
-    } else if (expectedUnit == TemporalUnit.SECOND && parsed.unit() == TemporalUnit.SECOND) {
+    } else if (expectedUnit == TemporalUnit.SECOND && parsed.unit() == TemporalUnit.SECOND
+        && val >= 1000.0 && val % 500 == 0) {
       // If expected is SECOND, but user configured e.g. 1000 or 5000 (likely milliseconds)
-      if (val >= 1000.0 && val % 500 == 0) {
-        logAutoInterpret(contextName, val, "seconds", val / 1000.0, "seconds (from millis)", val / 1000.0);
-        return new ParsedDuration(val, TemporalUnit.MILLISECOND, false);
-      }
+      logAutoInterpret(contextName, val, "seconds", val / 1000.0, "seconds (from millis)", val / 1000.0);
+      return new ParsedDuration(val, TemporalUnit.MILLISECOND, false);
     }
 
     return parsed;

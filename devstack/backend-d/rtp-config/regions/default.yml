@@ -1,0 +1,33 @@
+# --- RTP Region Configuration (devstack demo) ---
+# backend-d (NeoForge) default region -> Overworld.
+# Demonstrates multi-platform NeoForge destination backend.
+
+displayName: "&#ffb703Neo Forge Frontier"
+world: "minecraft:overworld"
+worldBorderOverride: false
+
+shape:
+  name: "CIRCLE"
+  mode: "ACCUMULATE"
+  radius: 2000
+  centerRadius: 64
+  centerX: 0
+  centerZ: 0
+  weight: 1.0
+  uniquePlacements: false
+  expand: false
+
+vert:
+  name: "SURFACE"
+  minY: 60
+  maxY: 120
+
+requirePermission: false
+override: "default"
+cacheCap: 50
+backlogCacheCap: 1000
+activeChunkCap: 10
+price: 0.0
+spatialResolution: 3
+
+version: "1.0"

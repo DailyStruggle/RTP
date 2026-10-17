@@ -125,6 +125,15 @@ Ratified by repo owner leaf from the approved D-005 proposal `docs/dev/scratch/P
 - **Safety unchanged.** The destination always runs the normal local pipeline (spiral -> chunk -> safety), so S-001/S-004/S-005 hold; tier-1 transports *intent*, not a coordinate. Move failures are logged, never swallowed (S-004); busy/invalid messages are configurable (S-007).
 - **Contract detail:** subproject ADR [`rtp-proxy-ADR-016-plugin-message-default-transport`](../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-016-plugin-message-default-transport.md). Lite-assembly impact: [ADR-024](ADR-024-rtp-lite-assembly-variant.md). Plan amendment: `docs/dev/MULTI_SERVER_PLAN.md` *Amendment: Plugin-Message Default Tier*.
 
+## Amendment (2026-10-05): Authenticated Transports Fail Closed
+
+Security detail: [`rtp-proxy-ADR-010`](../../platforms/rtp-proxy/docs/adr/rtp-proxy-ADR-010-security-hardening.md) amendment of the same date. The ratified components are otherwise unchanged.
+
+- **Every shared-store record is signed:** reservation tokens (including `regionKey`), request-queue entries and Redis shared-waitlist entries. Plugin-message heartbeats and proxy-cache snapshots are signed too, so the tier-1 default no longer trusts unsigned gossip unless `network.allowUnsigned: true` is set.
+- **No silent downgrade:** `redis`, `sql` and `proxy-direct` shall not start without a valid `RTP_NET_SECRET`; a weak or missing secret disables network mode rather than switching to an in-memory store.
+- **Transport options:** Redis TLS and ACL users; `proxy-direct` loopback-by-default bind, client allow-list, and TLS / mTLS.
+- **Upgrade constraint:** signed formats changed, so mixed-version networks cannot share a store.
+
 ## Alternatives Considered
 
 | Alternative | Why Rejected |

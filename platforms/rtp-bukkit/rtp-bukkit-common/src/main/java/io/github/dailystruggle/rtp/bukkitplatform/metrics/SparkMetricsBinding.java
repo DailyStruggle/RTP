@@ -5,6 +5,7 @@ import io.github.dailystruggle.metrics.api.MetricsBinding;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * {@link MetricsBinding} that sources TPS / MSPT from the
@@ -45,28 +46,27 @@ import java.util.List;
  * samples are preserved.
  *
  * <p>Testable without spark on the classpath via the package-private
- * {@link #SparkMetricsBinding(MetricsBinding, SparkStats)} constructor.
+ * {@link #SparkMetricsBinding(MetricsBinding, SparkStatSource)} constructor.
  */
 public final class SparkMetricsBinding implements MetricsBinding {
 
-    /** Source of spark-derived statistic values. */
-    interface SparkStats {
-        /** {@code true} once the spark API has been linked successfully. */
-        boolean available();
+    /** Source of spark-derived statistic values; nested alias of {@link SparkStatSource}. */
+    interface SparkStats extends SparkStatSource {
+    }
 
-        /**
-         * TPS for window index {@code 0=1m, 1=5m, 2=15m}, or
-         * {@link MetricsSnapshot#UNSAMPLED} ({@code NaN}) if unavailable / not
-         * yet sampled.
-         */
-        double tps(int windowIdx);
-
-        /** Mean MSPT (last minute), or {@link MetricsSnapshot#UNSAMPLED}. */
-        double mspt();
+    /**
+     * Collects engine telemetry dataset for spark metadata serialization.
+     * Guaranteed never to throw and safely degrades if core or subcomponents
+     * are uninitialized.
+     *
+     * @return structured map of telemetry key-value pairs
+     */
+    public static java.util.Map<String, Object> collectTelemetry() {
+        return SparkTelemetry.collect();
     }
 
     private final MetricsBinding delegate;
-    private final SparkStats spark;
+    private final SparkStatSource spark;
 
     /** Production constructor: builds a reflective spark accessor. */
     public SparkMetricsBinding(MetricsBinding delegate) {
@@ -74,7 +74,7 @@ public final class SparkMetricsBinding implements MetricsBinding {
     }
 
     /** Test seam. */
-    SparkMetricsBinding(MetricsBinding delegate, SparkStats spark) {
+    SparkMetricsBinding(MetricsBinding delegate, SparkStatSource spark) {
         this.delegate = (delegate == null) ? MetricsBinding.NOOP : delegate;
         this.spark = spark;
     }
@@ -136,5 +136,56 @@ public final class SparkMetricsBinding implements MetricsBinding {
     @Override
     public List<FoliaRegionSample> foliaRegions() {
         return delegate.foliaRegions();
+    }
+
+    /** Worse of spark's server-wide TPS and the delegate's worst loop (a Folia region). */
+    @Override
+    public double worstTps1m() {
+        return worse(tps1m(), delegate.worstTps1m(), false);
+    }
+
+    /** Worse of spark's MSPT and the delegate's worst loop (a Folia region). */
+    @Override
+    public double worstMspt() {
+        return worse(mspt(), delegate.worstMspt(), true);
+    }
+
+    @Override
+    public boolean regionalTicking() {
+        return delegate.regionalTicking();
+    }
+
+    /**
+     * Regional delegate: its own region reading, as-is (spark's server-wide TPS would mark every
+     * region unhealthy). Single loop: worse of spark and the delegate.
+     */
+    @Override
+    public double regionTps1m(UUID worldId, int chunkX, int chunkZ) {
+        double region = delegate.regionTps1m(worldId, chunkX, chunkZ);
+        return delegate.regionalTicking() ? region : worse(tps1m(), region, false);
+    }
+
+    /** See {@link #regionTps1m(UUID, int, int)}. */
+    @Override
+    public double regionMspt(UUID worldId, int chunkX, int chunkZ) {
+        double region = delegate.regionMspt(worldId, chunkX, chunkZ);
+        return delegate.regionalTicking() ? region : worse(mspt(), region, true);
+    }
+
+    @Override
+    public boolean wraps(MetricsBinding other) {
+        return this == other || delegate.wraps(other);
+    }
+
+    @Override
+    public void observeRegion(Object world, int cx, int cz) {
+        delegate.observeRegion(world, cx, cz);
+    }
+
+    /** NaN-aware min (TPS) or max (MSPT); NaN only when both sides are unsampled. */
+    static double worse(double a, double b, boolean higherIsWorse) {
+        if (Double.isNaN(a)) return b;
+        if (Double.isNaN(b)) return a;
+        return higherIsWorse ? Math.max(a, b) : Math.min(a, b);
     }
 }

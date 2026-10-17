@@ -30,7 +30,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
  *     <li>{@code Server#getMaxPlayers()} / {@code Bukkit.getMaxPlayers()} -
  *         {@code *MetricsBinding}, {@code *TpsSampler}.</li>
  *     <li>{@code Server#getTPS()} - {@code *MetricsBinding} only
- *         ({@code RTPCostMetricsCharts} dropped from the list once section 1.6.4
+ *         (the Bukkit bStats chart host dropped from the list once section 1.6.4
  *         landed).</li>
  * </ul>
  *
@@ -96,7 +96,7 @@ class MetricsConsolidationArchTest {
     void server_getTPS_reflective_read_is_restricted_to_metrics_bindings() {
         // Catches both `Server#getTPS` (Paper/Spigot) and `Server#getTPS()`
         // invoked reflectively via Method#invoke - the latter is the
-        // RTPCostMetricsCharts pattern section 1.6.4 removed; the former is the
+        // Bukkit bStats chart-host pattern section 1.6.4 removed; the former is the
         // legitimate PaperMetricsBinding sampler call. Sampler classes are
         // NOT allowed here (proposal: only *MetricsBinding may call getTPS),
         // mirroring the audit decision in section 1.6.5.

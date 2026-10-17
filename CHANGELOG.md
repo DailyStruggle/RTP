@@ -1,90 +1,267 @@
+<!--
+Rules for this file. Read them before you add or edit an entry.
+
+What gets published: release.yml and release-bbb.yml copy the section whose
+heading contains [<version>], up to the next version heading, word for word into
+Modrinth, Hangar, GitHub Releases and BuiltByBit. Everything inside a section is
+public release notes. Nothing above the first version heading is published.
+Never start a line in this comment with a version heading.
+
+Voice (RULES.md D-006):
+  - Write for server owners deciding whether and how to upgrade, and for addon
+    developers. Do not write for the person who wrote the code.
+  - Say what changed, what it fixes, and what the reader has to do. Do not say
+    how it was built: no class names, internal mechanisms, batch sizes, debug or
+    test switches, or step-by-step fix history.
+  - Give exact detail only when the detail matters: commands, config keys and
+    values, permissions, CVE IDs, numbers that describe a finding (share of
+    files affected, memory per player, jar size), and anything the reader must
+    act on.
+  - Plain words, no sales language ("significantly", "blazing", "powerful").
+    ASCII punctuation only. UTF-8, no BOM, LF line endings.
+
+Compare against the last released tag (AGENTS.md "CHANGELOG Hygiene"):
+  - A section describes the release compared with the previous released tag
+    (git diff <last-tag>), not the commits made along the way.
+  - A fix to something added in the same release is not a Fixed entry. Fold
+    the final behavior into the feature's Added entry, or drop it.
+  - Changes that cancel out (added and then reverted, "again", "restored")
+    never appear.
+  - Before tagging, check every entry against the last tag: did the command,
+    setting, file or behavior it mentions exist there?
+  - Describe the released state in absolute terms. Never compare it with
+    unreleased builds.
+
+Section layout:
+  - Heading: "[X.Y.Z] - YYYY-MM-DD" at level 2; before release, "[X.Y.Z] - Unreleased".
+    Keep an empty "[Unreleased]" level-2 heading at the top for work that has
+    no version yet.
+  - Optional upgrade note, directly under the heading:
+      > **Upgrade note.** ...
+    Use it only for things that break on upgrade or rollback: changed defaults,
+    removed or renamed settings, saved-data format changes, upgrades that must
+    happen together. One paragraph. A subsection may open with its own scoped
+    note (e.g. "> **Network mode upgrade note.**").
+  - Subsections at level 3, in this order, leaving out empty ones:
+      Added, Changed, Deprecated, Removed, Fixed, Security
+    No other subsections (Highlights, Known Issues, Planned): known issues go
+    to the issue tracker or the docs.
+  - Released sections predate parts of these rules. Edit them only to fix
+    factual errors, and do not reformat them.
+
+Entry format:
+  - One bullet per change, with a blank line between bullets. Each entry is
+    one to three sentences.
+  - Each entry opens with a bold headline:
+      Added / Changed / Removed / Deprecated / Security:
+        - **Feature or outcome (`/command`, ADR-NNN).** What it does for the reader.
+      Fixed: name the symptom as players or admins saw it, in the past tense,
+        then the fix:
+        - **Teleports could stall under heavy load** because ... Now ...
+        - **Players who left stayed in memory** (about 1 MB each). Now ...
+  - Commands, config keys and values, permissions and file paths go in backticks.
+    New commands name their permission node.
+  - Put ADR / REQ IDs in parentheses in the headline. Links must be absolute
+    https://github.com/DailyStruggle/RTP/tree/V3/... URLs, because the notes are
+    pasted off-site. Never cite planning docs (*_PLAN.md, CHECKLIST-*.md) or
+    development shorthand (phase, slice, step).
+  - API and addon-facing changes go in a single "**For addon developers.**"
+    bullet at the end of Added (or Changed).
+
+Editions (retired tagging): both editions ship the same MIT-licensed code
+(ADR-100, ADR-108), so every entry applies to both, and new entries must not
+carry the `**(Pro)**` marker. Marked entries in older released sections
+describe the edition split at that release; release.yml still drops them if
+such a section is re-published. The full edition and the rtp-lite assembly
+variant (ADR-024) share this file; there is no separate lite changelog.
+-->
+
 # Changelog
 
 All notable changes to RTP are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/); versioning follows [SemVer](https://semver.org/spec/v2.0.0.html).
 
-This is the single changelog for both editions. The full (Pro) edition and the
-rtp-lite assembly variant ([ADR-024](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-024-rtp-lite-assembly-variant.md))
-share this file; there is no separate lite changelog.
-
-**Pro-exclusive tagging rule.** Any entry describing a feature that ships only
-in the full (Pro) edition and is NOT present in rtp-lite shall be prefixed with
-the literal marker `**(Pro)**` immediately after the bullet's `- `. Example:
-
-```
-- **(Pro)** Login reserve cache (ADR-023) ...
-```
-
-The marker lets the rtp-lite Modrinth release workflow
-(`.github/workflows/release.yml`) strip Pro-only bullets from the lite release
-notes automatically, so a single source of truth stays honest for both
-editions. Entries with no marker are assumed to apply to both editions.
+One changelog covers both the free and Pro jars, which ship the same code.
 
 ---
 
 ## [Unreleased]
 
----
+## [3.3.0] - Unreleased
 
-## [3.3.0] - 2026-09-23
-
-> **Upgrade note.** `rtp.servers.*` now defaults to `true` instead of `op`, so in network mode every player can reach open cross-server regions; restrict with negative permissions if you relied on the old default. Spatial-memory `.bin` files and region cache files upgrade in place on first load (format version 5 and `BIN_VERSION 3`); older builds do not know the new formats, so back up `plugins/RTP/` before upgrading if you may need to roll back.
+> **Upgrade note.** `rtp.servers.*` now defaults to `true` instead of `op`, so in network mode every player can reach open cross-server regions; restrict with negative permissions if you relied on the old default. `CIRCLE` and `SQUARE` now use new selection engines that ignore `weight`; use `CIRCLE_DEPRECATED_PURE_SPIRAL` or `SQUARE_DEPRECATED_PURE_SPIRAL` to keep the 3.2.1 behavior. In `config.yml`, `defaults.shape.uniquePlacements` now defaults to `"auto"` (a radius matching the view distance) instead of `0`, and `defaults.spatialResolution` to `"auto"` (scaled to the region's size) instead of `3`; set `0` and `3` to keep the 3.2.1 values. Both jars now load on Minecraft 1.18 or newer with Java 17 or newer; the Lite jar no longer loads on 1.13 - 1.17. Folia is supported only from 1.21.11; older Folia still loads the jar but is no longer supported. Saved memory and region cache files from 3.2.1 still load, but RTP rewrites them in a new format at the next save or shutdown, and 3.2.1 can't read that format, so back up `plugins/RTP/` if you may need to roll back.
 
 ### Added
 
-- **Spiral-addressed Hilbert key space and optimized dual-layer shapes (ADR-085).** Introduces a continuous spiral-addressed Hilbert space-filling curve mapping for learned spatial memory, expanding coarse spiral points into intra-point Hilbert traversals matched to travel orientation. Reduces run fragmentation across ring seams and significantly shrinks memory footprint at full chunk precision:
-  - *New shape engines (`CIRCLE_OPTIMIZED_DUAL_LAYER`, `SQUARE_OPTIMIZED_DUAL_LAYER`):* Shipped implementations leveraging continuous Hilbert point traversals and hardware-cache segmented secondary tables (`SegmentedKeyRunTable`), delivering up to 5x run reduction and 2x-11x faster candidate selection under `ACCUMULATE` mode.
-  - *Deprecated pure-spiral shape engines (`CIRCLE_DEPRECATED_PURE_SPIRAL`, `SQUARE_DEPRECATED_PURE_SPIRAL`):* Preserves legacy 1D Archimedean spiral mapping shapes for side-by-side benchmarking, legacy regression testing, and rollback parity.
-  - *Format Version 5 persistence:* Enhances `.bin` spatial memory serialization with format version 5, adding curve identifiers (`SPIRAL`, `SPIRAL_HILBERT`), power-of-two point edge values, and dynamic 4-byte/8-byte `keyWidth` chunk addressing saving up to 32% on-disk storage with upward ratchet migration.
-  - *Dynamic point edge derivation:* Automates selection of the Hilbert point edge based on region radius via `PointEdgeSelector`, ensuring scale invariance and safe domain expansion without precision loss.
+- **Runs on Spigot and Paper 1.18 - 1.20.6, and on Java 17 ([ADR-113](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-113-java-17-baseline-and-26x-support-boundary.md)).** The full jar now loads on Spigot and Paper 1.18 through 1.20.6, and Fabric 1.20.1 servers can run it on Java 17. These older versions are best-effort and are not covered by automated tests. NeoForge still needs 1.21.1 or newer, and Fabric 1.20.2 - 1.20.6 is not supported. Folia is supported from 1.21.11: it is experimental and only its current builds are maintained, so older Folia builds are not supported and can crash on their own. Bug reports are accepted for Minecraft 1.21.11 through the latest release; the per-version status is in the [support matrix](https://github.com/DailyStruggle/RTP/blob/V3/docs/dev/SUPPORT_MATRIX.md).
 
-- **Multi-platform command execution and player death lifecycle stage in the effects engine (effects-api-ADR-007).** The effects framework introduces `CommandEffect` (`COMMAND`), enabling arbitrary console commands (`COMMAND CONSOLE ...`) and player-executed commands (`COMMAND PLAYER ...`) across all teleport stages, permission nodes (`rtp.effect.<stage>.command...`), and declarative groups in `effects/*.yml`. Command parsing supports human-readable strings with quotes, backslash escapes, and dynamic placeholders (`[player]`, `[uuid]`, `[world]`, `[x]`, `[y]`, `[z]`). A new `death` lifecycle stage triggers effects upon player death. Supported across Bukkit/Paper/Folia (with Folia global-region and entity-scheduler thread safety), Fabric (both intermediary and unobf carriers), and NeoForge (`LivingDeathEvent` and server-thread command execution).
+- **Tag exclusions in `safety.yml` (ADR-017).** Remove entries from a block tag instead of listing every variant by hand, e.g. `#minecraft:slabs - OAK_SLAB`.
 
-- **Multi-format region file support including Linear (`.linear` / ZSTD) and pluggable region readers (ADR-077).** Generalizes the off-tick region prefilter subsystem (`anvil-api`) with a pluggable `RegionFileReader` SPI supporting both Anvil (`.mca`) and Linear (`.linear`) region storage formats via `zstd-jni` stream decoding. Enables off-tick biome and safety prefiltering on servers using the Linear region format (such as Leaves, Gale, or modded environments) without triggering live server chunk loads.
+- **Actions.** Script multi-step teleports in YAML: what happens before, during and after the teleport, what to do on failure or timeout, and conditions that must pass first (permission, balance, cooldown, world, biome, time, server load and more). Destinations can be anchored to a player, a claim, a faction or a world center, and teams can be placed together. Walk-in triggers start an action when a player enters a zone. Commands: `/rtp action` (`rtp.action`; `/rtp trigger` and `/rtp run` are other names for it), `/rtp action cancel` (`rtp.action.cancel`) and `/rtp back` (`rtp.back`). The bundled action addon ships ready-made modes such as arena, KOTH, scatter and teams.
 
-- **Cause-based TTL and staged expiration on spatial memory segments (ADR-079).** Dynamic rejection causes (`safetyExternal` from claim plugins, `uniquePlacement` player spacing) now expire automatically using configurable time-to-live durations in `advanced/ttl.yml` rather than permanently locking candidate land in `badKeysCache`. Adjacent bad-location runs coalesce only within the same volatility tier (static terrain versus dynamic claims), preventing permanent land from expiring and transient claims from becoming immortalized. A two-phase off-tick rebuild pass partitions segments into active avoidance (younger than one TTL) and probation (between one and two TTLs) buffers, allowing still-claimed land to be re-quarantined with a binary search rather than full terrain raycasts or tick spikes. Region cache files use format `BIN_VERSION 3` with expiration epochs per segment and backward compatibility for older cache files.
+- **Web config editor (`/rtp editor`).** Edit RTP's configs in a browser and apply the changes back to the server. Permission: `rtp.editor`. The region map shows the land of every loaded world, including the nether and the end, and a region's world can be picked from the worlds the server detected. Passwords, tokens and other secrets are redacted before anything leaves the server and are never overwritten by the editor. Only config files inside the plugin folder can be written, and a browser must be trusted before it can apply changes (revoke with `/rtp editor untrust`; optional expiry with `editor.trust.maxAgeDays` in `advanced/network.yml`).
 
-- **Composable cache pipeline stages and domain stage nomenclature (ADR-078).** Retires ambiguous hardware cache analogies (`L1`, `L2`, `L3`) in favor of domain-accurate terms across codebase and contracts: `Backlog` (unscreened candidates), `Cold` (pre-verified coordinates with chunk tickets released), and `Hot` (verified coordinates with active `keep(true)` reservations). Cache pipelines decompose into discrete, bounded `CacheStage<T>` buffers (`RingCacheStage`, `SimpleCacheStage`) connected by asynchronous transitions with explicit rejection outcomes and terminal disposal, protecting chunk ticket lifecycles (S-002).
+- **Import from other RTP plugins (`/rtp config import`, ADR-066).** Reads another random-teleport plugin's config folder, such as BetterRTP, JustRTP or EzRTP, by recognizing common config layouts, and moves over worlds, radius, shape, cooldowns, prices, database, effects and JustRTP zones. Permission: `rtp.config`. The old plugin doesn't need to be installed. Existing files are only replaced with `overwrite=true`, and are backed up first. `/rtp config import permissions` prints LuckPerms commands that map BetterRTP, JustRTP and EzRTP permission nodes to RTP's.
 
-- **Unified unit parsing framework for spatial, temporal, and data size expressions across configurations and commands.** Configurations and command arguments now accept human-readable expressions with explicit unit suffixes and auto-interpretation:
-  - *Spatial units (`SpatialUnit`, `DistanceParser`, `DistanceParameter`):* Shape dimensions (`radius`, `centerRadius`, `radius2`, `centerRadius2`, `width`, `length`) and center coordinates (`centerx`, `centerz`) across all memory shapes accept blocks (`b`, `blocks`, `m`), chunks (`c`, `chunks`), region files (`r`, `regions`), kilometers (`km`), miles (`mi`), and feet (`ft`), with tab-completion and auto-conversion into internal chunk units. Subspace shapes remain strictly unitless lattice coordinates.
-  - *Temporal duration units (`TemporalUnit`, `DurationParser`):* Time-based settings across `config.yml` (`teleportCooldown`, `teleportDelay`, `lockAfterResetSeconds`), background sync timers (`periodTicks`, `syncTimer`), and spatial memory retention TTLs (`advanced/ttl.yml`) accept game ticks (`t`), milliseconds (`ms`), seconds (`s`), minutes (`m`), hours (`h`), days (`d`), weeks (`w`), and composite strings (e.g. `2h30m`, `1d12h`, `2s500ms`).
-  - *Data size units (`DataSizeUnit`, `DataSizeParser`):* Memory ceilings in `MemoryTracker` (`memoryCeiling`), off-tick region I/O budgets in `AnvilIoPool` (`memoryBudget`), and region cache limits (`activeChunkCap`, `cacheCap`, `backlogCacheCap`) accept binary and decimal suffixes (`b`, `kb`/`kib`, `mb`/`mib`, `gb`/`gib`) mapped to estimated tier memory footprints (~1 MiB/active chunk ticket, ~128 B/cold coordinate or candidate).
-  - All parsers preserve full backward compatibility for plain unitless numbers with contextual auto-interpretation, and documentation across all supported locale translations has been updated.
+- **Setup wizard (`/rtp admin setup`).** A guided first-time setup in chat or the console: world, gameplay, performance, preview, confirm. Your config is backed up before anything is written. Permission: `rtp.admin.setup`.
 
-- **World border overflow audit and chunk-inscribed bounding.** RTP now performs startup and reload validation checks comparing configured region shapes against the active world border (`WorldBorderAuditor`). Regions whose outer radius extends beyond the world border log an informative warning to alert server operators. Furthermore, chunk-inscribed bounding math ensures that block-specified radii scale to whole-chunk boundaries, guaranteeing that no candidate chunk or teleport destination crosses the border.
+- **Teleport near your own claim or faction.** Actions can pick destinations around the player's land, with Towny, GriefPrevention and SaberFactions/FactionsUUID supported through the bundled claim addon. The search center stays put through small land changes, and terrain already known to be bad is reused so new searches start fast.
 
-- **Automated Maven Central publishing workflow.** A dedicated GitHub Actions workflow (`maven-central.yml`) automates publishing of signed API and platform artifacts to Maven Central.
+- **Selection heatmap and pipeline views (`/rtp visualization heatmap`, `/rtp visualization pipeline`).** See on the in-game map where destinations land and how the search moves through a region. Permission: `rtp.menu.admin`.
+
+- **More claim plugins.** The bundled claim addon also keeps players out of HuskTowns, PlotSquared, UltimateClaims and MinePlots land.
+
+- **Minecraft 26.3 on Fabric.** The Fabric jar also runs on 26.3 servers.
+
+- **Holograms.** Status and pre-teleport text can be shown as holograms, using built-in text displays on 1.19.4+ or DecentHolograms / HolographicDisplays.
+
+- **New engines for `CIRCLE` and `SQUARE` (ADR-085, ADR-088).** Picks spread evenly by area and never repeat a chunk within a pass. In `mode: REROLL` players are kept several chunks apart without using up the region, so `expand: false` regions never run out; very narrow strips of land on internal cell borders may be skipped. Bad-land memory is smaller and faster, and its saved files are up to a third smaller. `weight` no longer applies; the old shapes remain as `*_DEPRECATED_PURE_SPIRAL`.
+
+- **Commands as teleport effects, and a `death` stage (effects-api-ADR-007).** Run console or player commands at any teleport stage, with player and location placeholders. The new `death` stage runs effects when a player dies.
+
+- **Claim and spacing rejections expire (ADR-079).** Land rejected for a reason that can change, such as a claim or another player nearby, is retried after the time set in `advanced/ttl.yml` instead of being avoided forever. Bad terrain is still remembered permanently.
+
+- **Units in configs and commands.** Write `radius: 5km`, `teleportCooldown: 2h30m` or `cacheCap: 256mb`. Distance, time and size units are supported; plain numbers keep their old meaning.
+
+- **World border check.** RTP warns when a region reaches past the world border and keeps destinations inside it.
+
+- **API on Maven Central.** `rtp-api`, `rtp-core` and the API libraries they depend on, such as `commands-api` and `effects-api`, are published to Maven Central. Platform jars are not.
+
+- **For addon developers.** New `rtp-api` surfaces for actions, claim boundaries (`ClaimBoundaryProvider`), web editor extensions (`EditorExtensionRegistry`, ADR-107; tabs are built from the editor's own widgets, so no addon code runs in the browser, and no bundled addon uses them yet), and extra region-file formats (`RegionFormatRegistry`, ADR-077; RTP itself reads only Anvil `.mca` and loads other formats such as `.linear` asynchronously).
 
 ### Changed
 
-- **Off-tick Anvil and Linear region prefilter data structure reuse.** The Anvil and Linear region file prefilter (`AnvilChunkView`, `AnvilRegionByteCache`, and internal read buffers) now aggressively reuses chunk parsing data structures across off-tick scan pulses. This eliminates high-frequency byte array allocations during terrain prefiltering, significantly reducing JVM garbage collection churn on servers with large pre-generation pipelines.
+- **RTP is now MIT-licensed in full ([ADR-108](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-108-all-mit-licensing-pro-as-support.md)).** The PolyForm Noncommercial terms on non-core source (ADR-061) are withdrawn. Free and Pro jars are both MIT; Pro is a support tier and grants no extra licence. Earlier releases keep the licence they shipped with.
 
-- **Region file freshness checks no longer dominate off-tick prefilter cost.** The cached region-byte lookup used to `stat` the `.mca` / `.linear` file on every probe to detect a chunk-save, which on Windows cost about as much as the entire cached lookup it was guarding - a 1024-probe sweep over one region file paid roughly 68 ms of syscalls. The check now runs at most once per region file per second, so a warm lookup measured 153 ns instead of ~65 us on the same machine. Chunk saves are still picked up promptly, since the default autosave cadence is ~30s.
+- **Location queues renamed to hot, cold and backlog (ADR-078).** The `L1`/`L2`/`L3` names in `/rtp info` and the docs now say what each queue holds. Queues always release the chunks of locations they drop.
 
-- **Monolithic `messages.yml` removed in favor of modular category messages.** The legacy flat `messages.yml` has been removed. All user-facing strings are organized under `advanced/messages/` (`commands.yml`, `network.yml`, `placeholders.yml`, `player.yml`, `system.yml`) with co-located dotfile rename maps across all 13 supported locales, ensuring cleaner structure and faster translation audits.
+- **Background search loads far fewer chunks (ADR-110).** Filling the location queues first checks chunks that are already loaded or saved on disk. Only locations held ready for teleport get their surrounding view-distance area preloaded. Other spots load just the landing chunk and its safety neighbours, so the cache still fills on fresh, unexplored worlds. Those chunks are checked as they load and RTP doesn't keep them loaded. Fill pauses while the server is short on memory.
 
-- **Standardized configuration formatting and comment block hygiene across all modules and translations.** Sibling settings across all shipped YAML configurations (`config.yml`, `safety.yml`, `advanced/`, `definitions/`, proxy configs, and bundled add-on configs) now have blank-line separation preceding option comment blocks, guaranteeing clear visual boundaries and deterministic key association under the ADR-042 preservation engine across all 13 locales. Commented-out settings consistently use `# ` spacing to prevent indentation parse errors, and the `defaults.shape` comment in `config.yml` was shortened from 20 lines to a 4-line summary referencing `REGIONS.md` to keep in-game menu tooltips concise.
+- **The backlog queue never loads chunks and feeds the cold queue (ADR-028).** Backlog picks the region-file pre-check accepts move into the cold queue with no chunk load. Picks it cannot read from disk, such as ungenerated land, are checked one at a time by the background search instead of being passed on unchecked. Backlog picks fill within each pulse's time budget (`asyncAllottedTime`, keeping 20% spare for other work). The backlog count in `/rtp info` shows only locations the region-file pre-check accepted; rejected picks are dropped straight away.
 
-- **Unified region shape selection routine in `MemoryShape`.** Each of the seven memory shapes previously duplicated location-selection logic (bad-area accounting, `mode` handling, and `uniqueplacements` marking), which had drifted apart across implementations. That logic now lives once in `MemoryShape`, with individual shapes contributing only their specific geometry and sampling curve. Deliberate shape characteristics are preserved: `RECTANGLE` retains uniform draw over its range (without `weight` or `expand`), and `CIRCLE_NORMAL` / `SQUARE_NORMAL` share a single normal-distribution implementation.
+- **Queued locations are fully checked before a player gets one (S-001, S-003).** When a cold location is promoted to the ready queue, RTP now checks the world border, biome filter, safety radius and claim plugins on the loaded chunk, after finding the landing height. Locations from the backlog or the database used to skip these checks, so a player could land in a claim or a filtered biome.
 
-- **`ELLIPSE` now refuses `expand: true` with a console warning.** Because an ellipse is inscribed within the circle describing its internal range, expanding past known-bad land pushed selections into outer corners outside the ellipse that the shape itself then rejected. Setting `expand: true` on an ellipse is now automatically forced off with a one-time console warning, matching `POLYGON` behavior. `CIRCLE`, `SQUARE`, and normal variants remain bounded by their range and continue to honor `expand`.
+- **Region-file pre-check tunes itself (ADR-109).** RTP measures, per region, whether reading candidates straight from region files saves time and turns the pre-check on or off accordingly. Nothing to configure.
+
+- **Faster region-file access (ADR-016).** Checks against the same region file are batched so each file is opened once instead of once per chunk, read buffers are reused, and save detection no longer hits the file system on every lookup.
+
+- **Paper picks sync or async teleport per teleport (ADR-005).** Teleports to an already-loaded chunk happen immediately; all others load the chunk off the main thread first. Set `teleportPath: ASYNC` in `advanced/performance.yml` to always use async.
+
+- **Less main-thread work per teleport on Paper, Spigot and Folia.** Block-name lookups are cached and the arrival-schematic check no longer touches the disk on every teleport.
+
+- **Tidier shipped config files.** Comments are clearly attached to their settings and stay attached when RTP rewrites a file (ADR-042), and long comments that cluttered menu tooltips are shortened.
+
+- **All memory shapes share one selection routine.** Shapes had drifted apart in how they handle bad land, `mode` and `uniqueplacements` (see Fixed); they now behave consistently.
+
+- **`ELLIPSE` turns off `expand: true` with a one-time warning,** as `POLYGON` already did. Expanding pushed picks outside the ellipse, where they were rejected.
+
+- **bStats on every platform, without a bundled bStats library.** Fabric and NeoForge now report too. RTP uses its own small, dependency-free client ([bstats-api-ADR-001](https://github.com/DailyStruggle/RTP/tree/V3/api/bstats-api/docs/adr/bstats-api-ADR-001-dependency-free-client.md)), keeping the same data, opt-out and server ID on Paper, Spigot and Folia.
+
+- **RTP leaves more of each tick to the server and other plugins.** `syncAllottedTime` now defaults to 5 ms and `asyncAllottedTime` to 25 ms, and both are capped at 25 ms. Queued commands, scripted actions and promotion checks for ready-queue locations now count against `syncAllottedTime`, and RTP starts at most 8 chunk loads per region per refill. On Fabric and NeoForge, RTP's end-of-tick work stops at `syncAllottedTime` and background work uses at most half the CPU cores. `period` now means ticks between refills of the same region.
+
+- **`minTPS` now pauses background cache filling,** and the new `maxMSPT` setting (default 45 ms) pauses it when ticks run long even though TPS still reads 20. Players already waiting are still served. On Folia the server-wide pause uses the mean TPS across regions, and a slow region is handled on its own: RTP runs one background task per tick there and fills from other regions instead.
+
+- **Folia divides RTP's work across region threads instead of stacking it on one.** Under heavy `/rtp` load one region could fall to about 1.4 TPS while the mean stayed near 19 (ADR-112).
+  - Location checks, retries, claim checks and teleport setup that followed a chunk load now continue on async workers instead of the region thread that loaded the chunk.
+  - RTP's work for each region runs in order, within `syncAllottedTime` per region thread; anything left waits behind other regions until that region's next tick.
+  - Regions that are slow or backed up get one RTP task per tick, and the ready queue fills from other regions meanwhile.
+  - The limit on concurrent region tasks applies to every kind of region task, and work waiting for a slot runs in order instead of polling.
+  - Folia task queues now always run at least one task per pulse and stop inline work once their time budget is spent. Cold-cache refill per region turn is no longer limited to two tasks.
+
+- **For addon developers.** `rtp-api`, `rtp-core` and the shared API modules they pull in (`commands-api`, `effects-api`, `maps-api`, `metrics-api`, `anvil-api`, `yaml-api`, `bstats-api`) are compiled to Java 17 bytecode ([ADR-113](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-113-java-17-baseline-and-26x-support-boundary.md)), so addons that build against them can target Java 17. The bundled addons are Java 17 too.
+
+### Deprecated
+
+- **For addon developers.** `PaletteIdentifierNormalizer` in `rtp-api` is deprecated; use the one in `anvil-api`.
+
+### Removed
+
+- **Party and tether addons.** LeafRTPPartyAddon and LeafRTPTetherAddon are no longer built. For group teleports, use the action addon's `teams` and `scatter` modes.
+
+- **For addon developers.** The Bukkit-only classes in `commands-api` (`BukkitCommand`, `BukkitCommandRegistrar`, `BukkitParameter`, `StringCommandDispatcher`, `BukkitTreeCommand` and the `LocalParameters` package) and its `plugin.yml` are removed; use the platform-neutral `commandsapi.common` and `commandsapi.brigadier` packages. The Bukkit command classes and `plugin.yml` in `effects-api` are removed too. The Fabric effect classes in `io.github.dailystruggle.effectsapi.fabric` moved out of `effects-api` to `io.github.dailystruggle.rtp.fabric.effects` in the Fabric adapter, so `effects-api` no longer needs a Minecraft or Fabric classpath.
 
 ### Fixed
 
-- **MSPT readings on Fabric and NeoForge were stuck near 50 ms and never came back down.** Those two platforms were measuring the gap between server ticks rather than the time actually spent inside a tick. The vanilla server sleeps after each tick to hold 20 TPS, so that gap is always at least 50 ms: a perfectly healthy server reported ~50 ms, and once a lag spike pushed the number up it could only ever settle back to 50, never below. MSPT now comes from the server's own average tick time, so an idle server reads a few milliseconds and the value recovers after a spike like it does on Paper. This also unsticks everything downstream that divides MSPT by 50 to get tick-budget use - the adaptive tick budget and the tick-stress counter were seeing a permanently maxed-out server on Fabric and NeoForge and holding back accordingly. Expect the number in `/rtp info` to drop sharply on these platforms; the old reading was the bug, not the new one. If no tick-time source is reachable, MSPT now reports "unsampled" instead of inventing a value.
+- **RTP could freeze Fabric 1.20.1 and 1.21.1 servers and run them out of memory.** Each chunk load added a chunk ticket that kept a large area around the candidate loaded and was never released, so the server kept generating chunks, partly on the main thread. Loaded chunks were also read as missing, so no locations were found there. Tickets now cover only the area RTP needs and are released after use, and chunks load off the main thread.
 
-- **Cross-server regions were invisible to anyone who was not op.** In network mode a peer destination (`/rtp region=<server>:<region>`, and its row in the `/rtp` menu) demanded `rtp.servers.<server>` and `rtp.regions.<region>` unconditionally, while both `rtp.servers.*` and `rtp.regions.*` defaulted to op. Non-op players (e.g. on a lobby server) saw no cross-server destinations at all - even for open regions they could reach freely. `rtp.servers.*` now defaults to `true` in `plugin.yml` so cross-server teleports work for all players by default (servers can still be restricted via negative permissions or permission managers), and a peer region only costs `rtp.regions.<region>` when the owning backend actually configured `requirePermission`. Permission-gated regions stay gated.
+- **On Fabric 1.21.5 through 1.21.11, RTP read every chunk it loaded as missing and could release a cached location's chunk early.** Chunk results are now read correctly, and the temporary load ticket no longer removes the ticket that keeps a cached location loaded. Chunk loads now always use the non-blocking path, so they can't stall the main thread.
 
-- **Region shape `mode` handling and bad-location recovery fixes across shapes.**
-  - `mode` settings (`nearest`, `reroll`) in shape configurations are now case-insensitive across all shapes (lowercase values on `SQUARE` and `RECTANGLE` previously disabled snapping and rerolling silently).
-  - In `NEAREST` mode, `CIRCLE` and `ELLIPSE` shapes now fall back to rerolling when no usable neighbor is found instead of returning a known-bad location.
-  - `NEAREST` mode on `CIRCLE` and `ELLIPSE` shapes now properly honors `uniqueplacements` spreading markers instead of skipping them on repeat teleports.
+- **Arriving players could trigger a main-thread chunk load.** On servers that unload chunks immediately, the landing chunk could unload just before the player arrived. It now stays loaded briefly after a teleport.
 
-- **`uniqueplacements` radius parsing and binary-search scaling.**
-  - `SQUARE_NORMAL` regions now parse `uniqueplacements` as a chunk radius instead of a boolean, preventing configured integer radii from being misinterpreted as "off" and subsequently overwritten as `false` in config saves.
-  - Selection performance on regions with `uniqueplacements` enabled no longer degrades as bad-location memory grows: nearby marks now fold directly into existing records, sorting and collapsing run in batches rather than on every pick, and known-bad checks use a binary search instead of linear scans (reducing a 40,000-candidate fill from ~6s to ~0.2s).
+- **Background safety checks read whole region files to inspect one chunk.** They now read only that chunk, cutting CPU and memory churn on pregenerated worlds.
+
+- **Teleports could stall under heavy load** because config reads contended on a shared lock (ADR-094). Reads are now lock-free and reloads switch over in one step.
+
+- **`uniquePlacements` could use up a region with `expand: false`** within seconds of startup. It now applies only when `expand: true`.
+
+- **Reserving chunks around a destination could load them on the main thread** on Bukkit, Spigot and Paper. They are now loaded in the background first.
+
+- **Claim protection switched itself off after a single error,** so players could land in protected land until a restart. An error now rejects only that one location, and the integration stays active. WorldGuard regions also block landings when RTP's custom flag couldn't be registered.
+
+- **Cross-server `/rtp` requests could vanish with multiple proxies** sharing a Redis queue, or after a Redis hiccup. Requests are now handed to the proxy that holds the player.
+
+- **Some region-file chunks always fell back to a full chunk load.** The last chunk of a file that the server hadn't closed yet was treated as unreadable.
+
+- **MySQL and PostgreSQL storage stopped saving after a few minutes** because database connections were never returned to the pool.
+
+- **Worlds using `region-file-compression=lz4` never got the region-file safety check.**
+
+- **`/rtp scan` rejected generated land on Minecraft 26.3 and never finished half-generated chunks.** RTP now reads 26.3's block format from region files. Chunks the server saved mid-generation are loaded so the server can finish them, instead of being marked bad.
+
+- **lz4-java is no longer bundled.** LZ4 region chunks are decoded by RTP's own bounds-checked code, which closes CVE-2025-12183 and CVE-2026-59949 and makes the jar smaller.
+
+- **Corrupt or crafted region chunks could crash the safety check or force huge memory use.** Such chunks are now loaded normally instead.
+
+- **The scan land percentage was wrong during scans,** and the scan boss bar showed progress in its place. Progress is now `[scan_progress]`.
+
+- **MSPT on Fabric and NeoForge was stuck at 50 ms or higher.** It measured the time between ticks, which includes the server's idle sleep, instead of the time spent in a tick. This also made RTP throttle itself as if the server were overloaded. Expect much lower readings in `/rtp info`.
+
+- **Shape `mode` and `uniqueplacements` inconsistencies.** `mode` values are case-insensitive, `NEAREST` mode no longer returns known-bad locations or ignores `uniqueplacements` on `CIRCLE` and `ELLIPSE`, `SQUARE_NORMAL` reads `uniqueplacements` as a radius, and regions using `uniqueplacements` no longer slow down as RTP learns more bad land.
+
+- **The `JUMP` vertical adjustor discarded whole chunks** after a miss in a single column.
+
+- **Players who left stayed in memory** through their teleport history and boss bars. RTP now keeps only their ID and the data cooldowns need.
+
+- **Fabric on Minecraft 26.x left live chunk loads out of `/rtp info`, skipped the top block row, and held chunks the server had unloaded.** Live loads are now counted, the height limit includes the top block, and RTP's chunk cache is bounded instead of keeping every chunk it loaded.
+
+- **Repeated hex colors showed a stray `&`** on servers without Adventure.
+
+- **`syncAllottedTime` and `asyncAllottedTime` above 25 were silently capped,** and the `high-performance` and arena presets wrote 50. The cap is now documented, and the presets use values within it.
+
+- **`period` refilled each region one tick early** (every 19 ticks at `period: 20`).
+
+- **Background area scans could stall a tick thread** while waiting for claim plugins to answer.
+
+- **Fabric and NeoForge could start an unlimited number of background threads,** and a slow repeating task could run several copies at once.
+
+- **On Folia, delayed tasks ran immediately, cancelled tasks still ran, and one failing task skipped the rest of that tick's queue.** Chunk tickets were also changed on the wrong thread. With spark installed, RTP also lost its own TPS readings.
+
+- **`/rtp scan` progress lines showed a speed and ETA that jumped wildly between updates** (for example 150 cps, then 3,000 cps). They now show the average since the previous progress line.
+
+- **`/rtp scan` stalled for seconds at a time on large pregenerated worlds.** RTP re-checked the region file format by listing the whole region folder every 10 seconds; it now detects the format once.
+
+- **`/rtp scan` on circle regions checked chunks outside the circle, and generated them on fresh worlds.** These are the corners of the square area the scan walks. It now skips them without recording them, so they no longer count toward land % or toward the learned bad area that `expand` uses.
+
+- **On Paper and Folia 26.1 or newer, `/rtp scan` and the background search did not recognize pregenerated land** and loaded every chunk through the server, which put heavy load on the scheduler. RTP looked for region files in the old folder layout; it now also reads the new `world/dimensions/<namespace>/<name>/region/` layout.
+
+### Security
+
+> **Network mode upgrade note.** Upgrade every backend and proxy together: network messages and shared-store records now use a new signed format that older builds can't read. Tokens, queue entries and Redis waitlist entries in the old format are rejected, not migrated, so players waiting in a Redis waitlist from an older build need to run the command again. Network mode now requires a Base64 `RTP_NET_SECRET` of at least 32 bytes; `plugin-message`, `proxy-cache` and `auto` can instead run unsigned with `network.allowUnsigned: true` in `advanced/network.yml`.
+
+- **More network traffic and shared records are signed.** Proxy-cache replies, request queues and Redis waitlists are now signed with the network secret too, as Redis heartbeats and reservation tokens already were, all in a new record format, so a modded client or anyone with store access can't inject fake servers, regions or requests. Tampered entries are dropped with a warning.
+
+- **One cross-server request at a time per player.** A proxy ignores a new request from a player while their previous one is still being handled.
+
+- **Proxy-direct link hardening.** All requests are signed, the listener binds to `127.0.0.1` by default, and new settings add an IP allowlist (`allowedClients`) and TLS with optional client certificates. Connection counts are capped.
+
+- **Redis connection options.** TLS, ACL usernames (`rediss://user@host`) and passwords from environment variables (`passwordEnv`). A password left in YAML logs a warning.
+
+- **Hardened Redis replies.** Oversized or deeply nested Redis replies are rejected.
+
+- **`RTPAPI.teleport` now checks destination permissions,** so menus and addons can't send players to worlds, biomes, regions or servers they lack permission for. Returns `NO_PERMISSION`; addons that relied on bypassing this must grant the permission themselves.
+
+- **`reg:` command patterns are capped at 256 characters,** so a crafted pattern from the console or API can't stall the server.
 
 ---
 
@@ -100,7 +277,7 @@ editions. Entries with no marker are assumed to apply to both editions.
 
 - **`config.yml` is now purely teleport behavior.** The database settings moved to a new `database.yml`, and the redundant `network.redis` block was removed (use the Redis transport settings in `network.yml` instead). Values you customized in the old locations are not migrated automatically - re-set the database in `database.yml` and Redis in `network.yml`. The `config.yml` version was bumped to 3.1.
 
-- **The `plugins/RTP/` folder was reorganized into a cleaner, tiered layout.** The everyday files (`config.yml`, `economy.yml`, `language.yml`, `safety.yml`) stay at the top level. The definitions you author (regions, worlds, effects, plus the shared shape/vert catalogs) now live under a single `definitions/` folder, and the rarely-edited message files and prefab schematics moved under `advanced/`. On upgrade RTP relocates your files automatically and never overwrites a file already present at the new location. The file contents and keys are unchanged - only their location moved - so no re-tuning is required.
+- **The `plugins/RTP/` folder was reorganized into a cleaner, tiered layout, and `messages.yml` split into modular category files.** The everyday files (`config.yml`, `economy.yml`, `language.yml`, `safety.yml`) stay at the top level. The definitions you author (regions, worlds, effects, plus the shared shape/vert catalogs) now live under a single `definitions/` folder, and the rarely-edited prefab schematics moved under `advanced/`. The legacy flat `messages.yml` was removed in favor of modular category messages under `advanced/messages/` (`commands.yml`, `network.yml`, `placeholders.yml`, `player.yml`, `system.yml`) with co-located dotfile rename maps across all 13 supported locales, ensuring cleaner structure and faster translation audits. On upgrade RTP relocates your files automatically and never overwrites a file already present at the new location. The keys are unchanged - only their location moved - so no re-tuning is required.
 
 - **Biome-weighting settings moved** from `advanced/performance.yml` to `advanced/biomes.yml`, so every biome-selection option (whitelist/blacklist plus weighting) lives in one file. Behavior is unchanged. A value you customized in `performance.yml` is not migrated automatically - re-set it in `advanced/biomes.yml`.
 
@@ -680,6 +857,7 @@ Earlier versions introduced the multi-module split (`rtp-api` / `rtp-core` / pla
 
 ---
 
+[3.3.0]: https://github.com/DailyStruggle/RTP/compare/v3.2.1...HEAD
 [3.2.1]: https://github.com/DailyStruggle/RTP/compare/v3.2.0...v3.2.1
 [3.2.0]: https://github.com/DailyStruggle/RTP/compare/v3.1.3...v3.2.0
 [3.1.3]: https://github.com/DailyStruggle/RTP/compare/v3.1.2-Lite...v3.1.3

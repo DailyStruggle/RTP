@@ -279,7 +279,7 @@ class JoinTriggerSourceTest {
         t.redeemOutcome = RedeemOutcome.REDEEMED;
         JoinTriggerSource src = new JoinTriggerSource(t, SERVER_ID);
 
-        MockRTPPlayer p = onlinePlayer(id);
+        onlinePlayer(id);
         FakeLifecycleHook hook = new FakeLifecycleHook();
         src.register(hook);
 
@@ -299,7 +299,7 @@ class JoinTriggerSourceTest {
         t.reservation = Optional.of(token(tokenId, SERVER_ID, id, "backend-a:nether"));
         JoinTriggerSource src = new JoinTriggerSource(t, SERVER_ID);
 
-        MockRTPPlayer p = onlinePlayer(id);
+        onlinePlayer(id);
         FakeLifecycleHook hook = new FakeLifecycleHook();
         src.register(hook);
 
@@ -322,7 +322,7 @@ class JoinTriggerSourceTest {
         assertTrue(cache.get(id).isPresent());
 
         JoinTriggerSource src = new JoinTriggerSource(t, SERVER_ID, cache);
-        MockRTPPlayer p = onlinePlayer(id);
+        onlinePlayer(id);
         FakeLifecycleHook hook = new FakeLifecycleHook();
         src.register(hook);
 

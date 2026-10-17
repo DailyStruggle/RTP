@@ -8,23 +8,11 @@ import io.github.dailystruggle.rtp.folia.mock.MockAsyncScheduler;
 import io.github.dailystruggle.rtp.folia.mock.MockGlobalRegionScheduler;
 import io.github.dailystruggle.rtp.folia.mock.MockRegionScheduler;
 import io.github.dailystruggle.rtp.folia.world.FoliaRTPWorld;
-import io.papermc.paper.plugin.configuration.PluginMeta;
-import java.io.File;
-import java.io.InputStream;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
-import org.bukkit.Server;
 import org.bukkit.World;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.generator.BiomeProvider;
-import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.plugin.PluginDescriptionFile;
-import org.bukkit.plugin.PluginLoader;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,31 +20,15 @@ import org.mockito.Mockito;
 
 public class FoliaSchedulerGovernanceTest {
 
-  private static final Plugin STUB_PLUGIN = new Plugin() {
-    @Override public void onDisable() {}
-    @Override public void onEnable() {}
-    @Override public void onLoad() {}
-    @Override public boolean isEnabled() { return true; }
-    @Override public PluginLoader getPluginLoader() { return null; }
-    @Override public Server getServer() { return null; }
-    @Override public String getName() { return "StubPlugin"; }
-    @Override public PluginMeta getPluginMeta() { return null; }
-    @Override public PluginDescriptionFile getDescription() { return null; }
-    @Override public FileConfiguration getConfig() { return null; }
-    @Override public InputStream getResource(String filename) { return null; }
-    @Override public void saveConfig() {}
-    @Override public void saveDefaultConfig() {}
-    @Override public void saveResource(String resourcePath, boolean replace) {}
-    @Override public void reloadConfig() {}
-    @Override public File getDataFolder() { return null; }
-    @Override public Logger getLogger() { return Logger.getLogger("StubPlugin"); }
-    @Override public boolean isNaggable() { return false; }
-    @Override public void setNaggable(boolean canNag) {}
-    @Override public ChunkGenerator getDefaultWorldGenerator(String worldName, String id) { return null; }
-    @Override public BiomeProvider getDefaultBiomeProvider(String worldName, String id) { return null; }
-    @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) { return false; }
-    @Override public List<String> onTabComplete(CommandSender sender, Command command, String label, String[] args) { return List.of(); }
-  };
+  private static final Plugin STUB_PLUGIN = stubPlugin();
+
+  private static Plugin stubPlugin() {
+    Plugin plugin = Mockito.mock(Plugin.class);
+    Mockito.when(plugin.isEnabled()).thenReturn(true);
+    Mockito.when(plugin.getName()).thenReturn("StubPlugin");
+    Mockito.when(plugin.getLogger()).thenReturn(Logger.getLogger("StubPlugin"));
+    return plugin;
+  }
 
   private MockAsyncScheduler asyncScheduler;
   private MockRegionScheduler regionScheduler;
@@ -94,19 +66,23 @@ public class FoliaSchedulerGovernanceTest {
     assertEquals(0, scheduler.getInFlightRegionalTasks());
 
     // Task 1 dispatches to region
-    scheduler.runTask(mockWorld, 0, 0, () -> {});
+    scheduler.runTask(mockWorld, 0, 0, () -> {/* no-op */});
     assertEquals(1, scheduler.getInFlightRegionalTasks());
 
     // Task 2 dispatches to region
-    scheduler.runTask(mockWorld, 1, 1, () -> {});
+    scheduler.runTask(mockWorld, 64, 64, () -> {/* no-op */});
     assertEquals(2, scheduler.getInFlightRegionalTasks());
 
-    // Task 3 attempts to dispatch - should be deferred via async scheduler because inflight == 2
-    scheduler.runTask(mockWorld, 2, 2, () -> {});
+    // Task 3 attempts to dispatch - joins the FIFO deferred queue because inflight == 2
+    scheduler.runTask(mockWorld, 128, 128, () -> {/* no-op */}); // distinct cells: same-cell work coalesces
     assertEquals(2, scheduler.getInFlightRegionalTasks());
-    assertEquals(1, asyncScheduler.pendingCount());
+    assertEquals(1, scheduler.getDeferredQueueSize());
+    assertEquals(2, regionScheduler.pendingCount());
 
-    // Complete pending region tasks
+    // Completing the first two releases permits; the deferred task is dispatched on release
+    regionScheduler.executeAll();
+    assertEquals(1, scheduler.getInFlightRegionalTasks());
+    assertEquals(0, scheduler.getDeferredQueueSize());
     regionScheduler.executeAll();
     assertEquals(0, scheduler.getInFlightRegionalTasks());
   }
@@ -115,8 +91,8 @@ public class FoliaSchedulerGovernanceTest {
   @DisplayName("Interactive requests queue when saturated and pump through upon completion")
   void testInteractiveQueuePumping() {
     // Saturate permits with 2 background tasks
-    scheduler.runTask(mockWorld, 0, 0, () -> {});
-    scheduler.runTask(mockWorld, 1, 1, () -> {});
+    scheduler.runTask(mockWorld, 0, 0, () -> {/* no-op */});
+    scheduler.runTask(mockWorld, 64, 64, () -> {/* no-op */});
     assertEquals(2, scheduler.getInFlightRegionalTasks());
 
     // Interactive request submitted - enters queue
@@ -150,8 +126,8 @@ public class FoliaSchedulerGovernanceTest {
   @DisplayName("Interactive request expires cleanly on deadline timeout when permits remain unavailable")
   void testInteractiveRequestDeadlineTimeout() {
     // Saturate permits
-    scheduler.runTask(mockWorld, 0, 0, () -> {});
-    scheduler.runTask(mockWorld, 1, 1, () -> {});
+    scheduler.runTask(mockWorld, 0, 0, () -> {/* no-op */});
+    scheduler.runTask(mockWorld, 64, 64, () -> {/* no-op */});
     assertEquals(2, scheduler.getInFlightRegionalTasks());
 
     AtomicBoolean interactiveExecuted = new AtomicBoolean(false);
@@ -166,7 +142,10 @@ public class FoliaSchedulerGovernanceTest {
 
     try {
       Thread.sleep(5);
-    } catch (InterruptedException ignored) {}
+    } catch (InterruptedException ignored) {
+      // Test thread interrupted during delay
+      Thread.currentThread().interrupt();
+    }
 
     // Async timeout watchdog executes
     asyncScheduler.executeAll();

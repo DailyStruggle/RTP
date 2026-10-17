@@ -129,6 +129,8 @@ public class RegionPipelineTest {
         region.queueManager.unkeptLocations.offer(new RTPLocation(coords, 1L, null));
 
         region.execute(Long.MAX_VALUE);
+        // Tick-thread chunk callbacks queue verify on the budgeted sync pipe; drain it.
+        RTP.getInstance().miscSyncTasks.execute(Long.MAX_VALUE);
 
         assertFalse(region.queueManager.keptLocations.isEmpty(),
                 "execute() must promote the unkept location to keptLocations");
@@ -152,6 +154,7 @@ public class RegionPipelineTest {
         region.queueManager.unkeptLocations.offer(new RTPLocation(midairCoords, 1L, null));
 
         region.execute(Long.MAX_VALUE);
+        RTP.getInstance().miscSyncTasks.execute(Long.MAX_VALUE);
 
         assertFalse(region.queueManager.keptLocations.isEmpty(),
                 "promotion must succeed when ground exists in the vert window");
@@ -201,7 +204,7 @@ public class RegionPipelineTest {
         LocationGenerator.setRng(new Random(42L));
         circle.setRng(new Random(42L));
 
-        GenerationResult result = LocationGenerator.getLocation(region, (Set<String>) null);
+        GenerationResult result = LocationGenerator.getLocationFuture(region, (Set<String>) null).join();
 
         assertNotNull(result, "GenerationResult must not be null");
         assertNotNull(result.coords(),
@@ -214,7 +217,7 @@ public class RegionPipelineTest {
         LocationGenerator.setRng(new Random(42L));
         circle.setRng(new Random(42L));
 
-        GenerationResult result = LocationGenerator.getLocation(region, (Set<String>) null);
+        GenerationResult result = LocationGenerator.getLocationFuture(region, (Set<String>) null).join();
 
         assertNotNull(result);
         RTPCoords coords = result.coords();
@@ -232,7 +235,7 @@ public class RegionPipelineTest {
         LocationGenerator.setRng(new Random(42L));
         circle.setRng(new Random(42L));
 
-        GenerationResult result = LocationGenerator.getLocation(region, Set.of("PLAINS"));
+        GenerationResult result = LocationGenerator.getLocationFuture(region, Set.of("PLAINS")).join();
 
         assertNotNull(result);
         assertNotNull(result.coords(),
@@ -245,7 +248,7 @@ public class RegionPipelineTest {
         LocationGenerator.setRng(new Random(42L));
         circle.setRng(new Random(42L));
 
-        GenerationResult result = LocationGenerator.getLocation(region, Set.of("DEEP_OCEAN"));
+        GenerationResult result = LocationGenerator.getLocationFuture(region, Set.of("DEEP_OCEAN")).join();
 
         assertTrue(result == null || result.coords() == null,
                 "Impossible biome (MockRTPWorld only has PLAINS) must exhaust attempts and yield no location");
@@ -256,11 +259,11 @@ public class RegionPipelineTest {
     void same_seed_produces_identical_result() {
         LocationGenerator.setRng(new Random(99L));
         circle.setRng(new Random(99L));
-        GenerationResult first = LocationGenerator.getLocation(region, (Set<String>) null);
+        GenerationResult first = LocationGenerator.getLocationFuture(region, (Set<String>) null).join();
 
         LocationGenerator.setRng(new Random(99L));
         circle.setRng(new Random(99L));
-        GenerationResult second = LocationGenerator.getLocation(region, (Set<String>) null);
+        GenerationResult second = LocationGenerator.getLocationFuture(region, (Set<String>) null).join();
 
         assertNotNull(first);
         assertNotNull(second);
@@ -277,11 +280,11 @@ public class RegionPipelineTest {
     void different_seeds_produce_different_results() {
         LocationGenerator.setRng(new Random(1L));
         circle.setRng(new Random(1L));
-        GenerationResult r1 = LocationGenerator.getLocation(region, (Set<String>) null);
+        GenerationResult r1 = LocationGenerator.getLocationFuture(region, (Set<String>) null).join();
 
         LocationGenerator.setRng(new Random(999_999L));
         circle.setRng(new Random(999_999L));
-        GenerationResult r2 = LocationGenerator.getLocation(region, (Set<String>) null);
+        GenerationResult r2 = LocationGenerator.getLocationFuture(region, (Set<String>) null).join();
 
         assertNotNull(r1);
         assertNotNull(r2);

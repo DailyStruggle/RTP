@@ -62,7 +62,7 @@ class BacklogLocationBufferTest {
   void headBlockingOnUnverified() {
     BacklogLocationBuffer b = new BacklogLocationBuffer(4);
     BacklogEntry e0 = b.offerUnverified(loc(0));
-    BacklogEntry e1 = b.offerUnverified(loc(1));
+    b.offerUnverified(loc(1));
     BacklogEntry e2 = b.offerUnverified(loc(2));
     e0.setValidity(Validity.VALIDATED);
     // e1 stays UNVERIFIED -> blocks promotion of e2 even if e2 were VALIDATED.
@@ -92,6 +92,27 @@ class BacklogLocationBufferTest {
   }
 
   @Test
+  @DisplayName("ADR-028: pollOldest takes the oldest entry with the given tag, skipping others")
+  void pollOldestTakesOldestOfTag() {
+    BacklogLocationBuffer b = new BacklogLocationBuffer(4);
+    BacklogEntry e0 = b.offerUnverified(loc(0));
+    BacklogEntry e1 = b.offerUnverified(loc(1));
+    BacklogEntry e2 = b.offerUnverified(loc(2));
+    BacklogEntry e3 = b.offerUnverified(loc(3));
+    e0.setValidity(Validity.UNKNOWN);
+    e1.setValidity(Validity.VALIDATED);
+    e3.setValidity(Validity.VALIDATED);
+    assertEquals(1, b.unknownSize());
+
+    assertSame(e1, b.pollOldest(Validity.VALIDATED), "skips the older UNKNOWN e0");
+    assertSame(e3, b.pollOldest(Validity.VALIDATED), "skips the UNVERIFIED e2");
+    assertNull(b.pollOldest(Validity.VALIDATED));
+    assertSame(e0, b.pollOldest(Validity.UNKNOWN));
+    assertNull(b.pollOldest(Validity.UNKNOWN), "taken once");
+    assertSame(e2, b.peekOldestUnverified());
+  }
+
+  @Test
   @DisplayName("pollContiguousValidatedHead respects maxN cap")
   void respectsMaxN() {
     BacklogLocationBuffer b = new BacklogLocationBuffer(4);
@@ -115,7 +136,7 @@ class BacklogLocationBufferTest {
     BacklogLocationBuffer b = new BacklogLocationBuffer(4);
     BacklogEntry e0 = b.offerUnverified(loc(0));
     BacklogEntry e1 = b.offerUnverified(loc(1));
-    BacklogEntry e2 = b.offerUnverified(loc(2));
+    b.offerUnverified(loc(2));
     e0.setValidity(Validity.VALIDATED);
     // e1 and e2 remain UNVERIFIED.
 
@@ -140,7 +161,7 @@ class BacklogLocationBufferTest {
     BacklogLocationBuffer b = new BacklogLocationBuffer(4);
     BacklogEntry e0 = b.offerUnverified(loc(0));
     BacklogEntry e1 = b.offerUnverified(loc(1));
-    BacklogEntry e2 = b.offerUnverified(loc(2));
+    b.offerUnverified(loc(2));
     e0.setValidity(Validity.VALIDATED);
     e1.setValidity(Validity.INVALIDATED);
     // e2 stays UNVERIFIED
@@ -330,7 +351,7 @@ class BacklogLocationBufferTest {
   void cleanIfHeuristicMetNoopsBelowThreshold() {
     BacklogLocationBuffer b = new BacklogLocationBuffer(16);
     BacklogEntry e0 = b.offerUnverified(loc(0));
-    BacklogEntry e1 = b.offerUnverified(loc(1));
+    b.offerUnverified(loc(1));
     e0.setValidity(Validity.INVALIDATED);
 
     assertEquals(1, b.invalidatedSize());

@@ -1,0 +1,25 @@
+// bstats-api -- dependency-free bStats v2 client (bstats-api-ADR-001).
+//
+// Pure-Java module: no Bukkit / Fabric / Loom dependency and no RTP
+// module dependency, so any monorepo plugin can reuse it. Hosts plug in their
+// scheduler and logger through BStatsScheduler / BStatsLog. Package root is
+// neutral (io.github.dailystruggle.bstats.api.*), mirroring metrics-api.
+plugins {
+    id 'java-library'
+}
+
+dependencies {
+    // ArchUnit -- bytecode guard that the module stays free of platform and
+    // RTP imports. Same artifact + version as metrics-api.
+    testImplementation 'com.tngtech.archunit:archunit-junit5:1.3.0'
+}
+
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+
+javadoc {
+    options.encoding = 'UTF-8'
+    options.addStringOption('Xdoclint:syntax,html', '-quiet')
+}

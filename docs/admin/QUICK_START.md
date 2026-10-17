@@ -2,25 +2,56 @@
 
 **Current Plugin Version:** `@version@`
 
-Get RTP running on your server in under 5 minutes, then follow the rest of the sequence to take it to production. The numbered steps below are the **recommended end-to-end setup sequence**: prerequisites → install → worlds → regions → permissions → economy → scan → verify. Each step summarises what to do and links to the canonical doc for full detail.
+**Minimum:** drop the jar in `plugins/` (or `mods/`), restart, type `/rtp`. That works as-is. RTP learns the terrain as players teleport; the only cost of skipping the rest is that its memory of bad terrain builds up over time instead of up front.
 
-> **TL;DR sequence:** pregenerate → install → configure worlds → configure regions → set permissions → (optional) economy → `/rtp scan` to pre-warm → `/rtp info` + `/rtp test` to verify.
+**Recommended:**
+
+1. [`/rtp admin setup`](#guided-setup-rtp-admin-setup) - answer the wizard's questions.
+2. Set each region's radius for how players will use it. The wizard doesn't ask about distance, so do this yourself: `/rtp config regions default shape.radius=10km` (or the map in `/rtp editor`, or [Step 4](#step-4-adjust-the-teleport-area)).
+3. `/rtp scan start` to check the terrain ahead of time ([Step 9](#step-9-build-spatial-memory-with-rtp-scan)).
+4. A stress test if you expect heavy traffic ([Step 10](#step-10-verify-with-rtp-info-and-rtp-test)).
+
+Everything else below is optional: pregeneration, per-world files, permissions beyond the defaults, economy, extra regions. Each step links to the full doc.
+
+---
+
+## Guided setup (`/rtp admin setup`)
+
+Run `/rtp admin setup` in game (permission `rtp.admin.setup`). It walks you through:
+
+1. **Worlds:** `single` or `multi`.
+2. **Gameplay:** `survival`, `arena`, `skyblock` or `oneblock`.
+3. **Performance:** `high`, `low` or `folia`.
+4. **Extras:** claim checks, teleport effects, economy on or off.
+5. **Preview:** `/rtp admin setup preview` shows every file change before anything is written.
+6. **Confirm:** `/rtp admin setup confirm` writes the files (with backups) and reloads.
+
+`back`, `next`, `status` and `cancel` move around or abandon the wizard.
+
+**The wizard does not set the teleport distance.** Every region keeps its default (4,096 blocks, nobody within 1,024 blocks of the centre). Set it afterwards, for example:
+
+```
+/rtp config regions default shape.radius=10km --dry-run   # preview
+/rtp config regions default shape.radius=10km shape.centerRadius=1km
+```
+
+Or drag the region border on the map in `/rtp editor`, or edit the file by hand ([Step 4](#step-4-adjust-the-teleport-area)). Then run `/rtp scan start`.
 
 ---
 
 ## Step 0 — Prerequisites & Pregenerate the World
 
-Before installing RTP, get the environment ready. RTP does not ship its own pregenerator; it loads chunks asynchronously on demand (it never does synchronous chunk I/O on the main thread), so a cold world makes the first teleports slow and the first `/rtp scan` (Step 9) chunkgen-bound.
+**Optional.** Only Java 17+ is required. The rest makes the first teleports and the first `/rtp scan` faster: RTP loads chunks off the main thread on demand, so on a world that was never generated those first runs wait on chunk generation.
 
-1. **Java 21+** is required.
-2. **Pick your platform:** Paper, Spigot, Folia, Fabric, or NeoForge.
+1. **Java 17+** is required, or whatever your Minecraft version needs (Java 21 from 1.20.5, Java 25 on 26.x).
+2. **Pick your platform:** Paper or Spigot 1.18+, Folia 1.21.11+, Fabric 1.20.1 or 1.21+, or NeoForge 1.21.1+, up to 26.3. Bug reports are accepted for 1.21.11 through the latest release; older versions are best effort, except Folia, which is experimental and not supported below 1.21.11 ([support matrix](../dev/SUPPORT_MATRIX.md)).
 3. **Install Vault + an economy plugin first** if you plan to charge for `/rtp` (Step 7).
 4. **Install your claim plugin first** (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, …) if you want claim-aware teleport. RTP autodetects them at load.
-5. **Pregenerate** every world you'll add to RTP, sized to match the region you'll configure in Step 4. A region with `shape.radius: 256` (chunks) needs ~4 096 blocks pregenerated from `centerX, centerZ`, plus a small margin.
+5. **Pregenerate** (optional) each world you'll add to RTP, sized to the region from Step 4. A region with `radius: 4096b` needs 4,096 blocks pregenerated from `centerX, centerZ`, plus a small margin.
    - **Chunky** (Paper/Spigot/Folia): `/chunky world <world>`, `/chunky radius <blocks>`, `/chunky start`.
    - **WorldBorder** (legacy): `/wb <world> set <radius>`, `/wb fill`.
 
-> Pregenerating now means Step 9's `/rtp scan` only validates safety, instead of also generating chunks. Scan throughput is bound by chunk-load latency, so pregenerating first keeps it fast.
+> With the world pregenerated, Step 9's `/rtp scan` only checks safety instead of also generating chunks, so it finishes much sooner.
 
 ---
 
@@ -42,7 +73,7 @@ Run this in your server console or as an operator:
 /rtp
 ```
 
-If you land somewhere random, the plugin is working. If you see a permission error, make sure your account has `rtp.use`, noting that operators have all permissions by default.
+With the bundled GUI addon, `/rtp` opens a picker listing your regions, with links to the map visualizations and the admin panel; pick a region to teleport. Without it, `/rtp` teleports straight away. If you land somewhere random, the plugin is working. If you see a permission error, make sure your account has `rtp.use` (operators have all permissions by default).
 
 ---
 
@@ -56,8 +87,8 @@ plugins/RTP/definitions/regions/default.yml
 
 Out of the box it:
 - Targets your main world (`[0]`, which Bukkit resolves to `world`).
-- Uses a **circle** shape with a radius of **256 chunks** (~4 096 blocks).
-- Enforces a **64-chunk inner exclusion zone** (or "donut hole") so players don't land at spawn.
+- Uses a **circle** shape with a radius of **4,096 blocks** (256 chunks).
+- Keeps players at least **1,024 blocks** (64 chunks) from the centre so nobody lands at spawn.
 - Excludes ocean, nether, and end biomes.
 - Grants 5 seconds of invulnerability on landing.
 - Pre-generates a queue of safe locations in the background.
@@ -76,15 +107,16 @@ and look for the `shape:` block:
 shape:
   name: "CIRCLE"       # CIRCLE, SQUARE, or RECTANGLE
   mode: "ACCUMULATE"   # selection algorithm (see CONFIGURATION.md for options)
-  radius: 256          # maximum distance from centre in CHUNKS (256 chunks = ~4 096 blocks)
-  centerRadius: 64     # minimum distance — players won't land closer than this
+  radius: 4096b        # maximum distance from centre (4096b, 4km, 256c all work)
+  centerRadius: 1024b  # minimum distance - players won't land closer than this
   centerX: 0
   centerZ: 0
   weight: 1.0          # >1.0 = centre-weighted; <1.0 = edge-weighted; 1.0 = flat
 ```
 
-> **Tip:** `radius` is measured in **chunks**, not blocks. Multiply by 16 for the block distance.
-> A radius of 256 chunks = 4 096 blocks from centre.
+> **Tip:** write distances with a unit: `b` (blocks), `c` (chunks), `m`, `km`. A bare number means chunks, so `radius: 256` is 4,096 blocks.
+>
+> Pick the radius for how players will use it: a few km for a busy survival world where players should meet, 10km+ for resource worlds or servers where bases should stay hidden. Bigger regions take longer to scan.
 
 For the full key list (vertical clamps, biome filters, cache cap, mode options, etc.) see [REGIONS.md](configuration/REGIONS.md). For safety filters (biome blacklist, unsafe blocks, hazards) see [SAFETY.md](configuration/SAFETY.md) — and remember that any change to `safety.yml` must be followed by `/rtp scan reset` + `/rtp scan start` in Step 9 to discard memory validated under the old rules ([RUNBOOK.md](RUNBOOK.md)).
 
@@ -112,7 +144,7 @@ Full reference: [WORLDS.md](configuration/WORLDS.md).
 
 ## Step 6 — Set Up Permissions
 
-RTP uses a permission-based system. Assign these to your permission plugin (e.g., LuckPerms):
+**Optional.** Players get `rtp.use` by default. Assign the rest with your permission plugin (e.g., LuckPerms):
 
 | Permission | What it grants |
 |---|---|
@@ -167,8 +199,8 @@ To create a second region (e.g., for a nether world):
    requirePermission: false
    shape:
      name: "CIRCLE"
-     radius: 128
-     centerRadius: 16
+     radius: 2048b
+     centerRadius: 256b
      minY: 32
      maxY: 120
    ```
@@ -178,8 +210,6 @@ To create a second region (e.g., for a nether world):
 Players can now target it with `/rtp region=nether` (requires `rtp.region` + `rtp.regions.nether` permissions).
 
 ### Programmatic / In-Game Edits with `/rtp config`
-
-> ⚠️ **Hardening in `3.0.0-beta.3`.** Behavior described here is the **target**; earlier builds may still silently ignore unknown keys or skip validation. For production use on pre-beta.3 builds, prefer hand-editing the YAML files plus `/rtp reload`.
 
 Instead of editing files by hand, you can read or change any region key at runtime using the `/rtp config` command:
 
@@ -197,8 +227,8 @@ For example, to update the nether region's world after the file already exists:
 
 ```
 /rtp config regions nether world=world_nether
-/rtp config regions nether shape.radius=128 --dry-run    # preview, no change
-/rtp config regions nether shape.radius=128              # commit
+/rtp config regions nether shape.radius=2048b --dry-run  # preview, no change
+/rtp config regions nether shape.radius=2048b            # commit
 /rtp config regions nether biomeWhitelist add=FOREST add=PLAINS remove=OCEAN
 /rtp config regions nether view shape                    # show the current shape block
 ```
@@ -211,9 +241,9 @@ Each successful `/rtp config` write is **atomic** (write-to-temp → fsync → r
 
 ## Step 9 — Build Spatial Memory with `/rtp scan`
 
-> ⚠️ **Run scan only after pregeneration is complete.** `/rtp scan` (and the background scan that starts automatically when a region first loads) probes every spiral coordinate in the region; if the underlying chunks have not been pregenerated, each probe pays full chunkgen cost and competes with the server's chunk system for tick-thread I/O. On Fabric this can drag steady-state TPS noticeably; on any platform it makes scan throughput abysmal. **Always finish your Chunky / WorldBorder pregeneration pass first** (Step 0), then start the scan.
+Once regions are set up (Steps 4 and 8), scan them so RTP records bad terrain ahead of time instead of while players teleport. Scanning runs off the main thread.
 
-Once worlds are pregenerated (Step 0) and regions are configured (Steps 4 and 8), scan them to identify and persist known-bad coordinates into spatial memory. This allows background location generation and player teleports to skip invalid terrain immediately. Scanning is async on every platform and never blocks tick threads.
+> **On a world that isn't pregenerated,** scan generates chunks as it goes. That is much slower and competes with the server's own chunk loading (noticeable on Fabric). If you can, pregenerate first (Step 0); otherwise run the scan at a quiet time and pause it if TPS drops.
 
 ```
 /rtp scan start                       # caller's region (player) or all (console)
@@ -235,7 +265,9 @@ Full sub-command reference: [COMMANDS.md](COMMANDS.md) section `/rtp scan`. Oper
 
 ## Step 10 — Verify with `/rtp info` and `/rtp test`
 
-Inspect runtime state:
+### Diagnostics (`/rtp info`)
+
+Shows queue depth, latency and per-region state:
 
 ```
 /rtp info                              # all loaded worlds and permanent regions
@@ -243,7 +275,9 @@ Inspect runtime state:
 /rtp info region=default               # queue depth, in-flight calcs, shape, cacheCap
 ```
 
-Exercise the full pipeline against a real player (every safety guard remains active — cooldown, economy, claim verifiers, async chunk I/O):
+### Stress test
+
+Optional; worth doing if you expect many teleports at once. It runs real teleports on a player with every normal check on (cooldown, economy, claims):
 
 ```
 /rtp test stress player=Alice
@@ -270,7 +304,7 @@ Manual smoke checks:
 
 ## Operational Cadence (after setup)
 
-Once Steps 0–10 are green, the recurring loop is small:
+After setup, the recurring loop is small:
 
 - Every config edit → `/rtp reload` (or `/rtp reload <region>` for a single region).
 - Every `safety.yml` edit → `/rtp scan reset <region>` then `/rtp scan start <region>` ([RUNBOOK.md](RUNBOOK.md)).
@@ -284,12 +318,12 @@ Once Steps 0–10 are green, the recurring loop is small:
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `/rtp` does nothing | Plugin failed to load | Check console for errors on startup |
-| "No safe location found" | Radius too small or all biomes excluded | Increase `radius` in the region file, or relax biome filters in `safety.yml` |
+| "No safe location found" | Radius too small or all biomes excluded | Increase `radius` in the region file, or relax the biome list in `advanced/biomes.yml` |
 | Economy not working | Vault not installed | Install Vault + an economy plugin and restart |
 | Teleport is slow | Cache empty on first run | Wait a few moments for the background queue to fill, or check `cacheCap` in the region config |
-| Players land in ocean | Biome filter not active | Check `safety.yml` biome blacklist includes ocean biomes; then `/rtp scan reset` + `/rtp scan start` |
+| Players land in ocean | Biome filter not active | Check `biomes` in `advanced/biomes.yml` lists the ocean biomes (with `biomeWhitelist: false`); then `/rtp scan reset` + `/rtp scan start` |
 | Players land too close to spawn | `centerRadius` too small | Increase `centerRadius` in the region's `shape:` block |
-| `/rtp scan` very slow | World not pregenerated | Pregenerate first (Step 0), then `/rtp scan resume` |
+| `/rtp scan` very slow | World not pregenerated | Expected; let it run at a quiet time, or pregenerate (Step 0) and `/rtp scan resume` |
 
 ---
 

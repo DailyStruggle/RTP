@@ -1,0 +1,32 @@
+version: "1.0"
+
+linter: qodana-jvm-community
+
+# The import alone does not run Loom remapJar or ModDevGradle artifact tasks, so carrier jars under
+# build/libs and the generated Minecraft jars are missing and their types resolve as unknown
+# (false ClassCastException / NPE / JavadocReference findings). Build first; set -e makes a build
+# failure exit non-zero instead of scanning half-resolved modules.
+# JDK 25 is the container default; foojay (settings.gradle) provisions the JDK 21 toolchain.
+bootstrap: |
+  set -eu
+  sh ./gradlew assemble --console=plain
+
+profile:
+  name: qodana.recommended
+  inspections:
+    # Not shipped: stress/fuzz harness. Test source sets are already outside qodana.recommended.
+    - group: ALL
+      ignore:
+        - "helpers/StressTestRTP"
+    # Reflection across platform bridges and NMS accessors is audited under ADR-026.
+    - inspection: JavaReflectionMemberAccess
+      ignore:
+        - "platforms"
+    # Bukkit MapPalette/MapView calls in maps-api.
+    - inspection: Deprecation
+      ignore:
+        - "api/maps-api/src"
+    # Optional parameters in the proxy SPI. rtp-core hits remain visible.
+    - inspection: OptionalUsedAsFieldOrParameterType
+      ignore:
+        - "platforms/rtp-proxy"

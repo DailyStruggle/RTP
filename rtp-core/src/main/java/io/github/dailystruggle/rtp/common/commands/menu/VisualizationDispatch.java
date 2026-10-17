@@ -255,6 +255,56 @@ final class VisualizationDispatch {
     }
 
     /**
+     * Dispatch for {@code /rtp visualization heatmap region=<name>}:
+     * paints the candidate selection density heatmap through {@link MapDispatch}.
+     */
+    boolean paintHeatmap(UUID viewer,
+                         String regionName,
+                         @Nullable Consumer<String> messageMethod) {
+        RTP.log(Level.FINE,
+                "[viz/heatmap] dispatch entry: viewer=" + viewer
+                        + " region=" + regionName);
+        if (viewer == null) {
+            RTP.log(Level.WARNING, "visualization heatmap rejected: null viewer");
+            return false;
+        }
+        if (regionName == null || regionName.isEmpty()) {
+            reject(viewer, "visualization heatmap rejected: empty regionName",
+                    messageMethod);
+            return false;
+        }
+        if (!permissionGates.hasAdminMenu(viewer)) {
+            RTP.log(Level.WARNING,
+                    "visualization heatmap denied: " + viewer
+                            + " lacks " + MenuPermissionGates.ADMIN_MENU_PERMISSION);
+            reject(viewer, "visualization heatmap rejected: permission denied",
+                    messageMethod);
+            return false;
+        }
+        ChartSpec spec;
+        try {
+            spec = ChartSpec.of(ChartSpec.Kind.SELECTION_HEATMAP, regionName);
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "visualization heatmap rejected: invalid ChartSpec for "
+                            + viewer + ": " + e.getMessage(), e);
+            reject(viewer, "visualization heatmap rejected: invalid ChartSpec",
+                    messageMethod);
+            return false;
+        }
+        try {
+            return MapDispatch.paint(spec, viewer);
+        } catch (RuntimeException e) {
+            RTP.log(Level.WARNING,
+                    "visualization heatmap MapDispatch.paint threw for " + viewer
+                            + ": " + e.getMessage(), e);
+            reject(viewer, "visualization heatmap rejected: dispatch failure",
+                    messageMethod);
+            return false;
+        }
+    }
+
+    /**
      * S-004 reject through {@link CommandMessages#menuInvalid}. Logs WARN
      * unconditionally; the viewer-facing message goes through the supplied
      * {@code messageMethod} when present, falling back to

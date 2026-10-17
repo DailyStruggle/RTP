@@ -1,0 +1,56 @@
+# Sample guimenu.yml for devstack third-party item compatibility testing.
+menuStyle: "chest"
+menuTitle: "&1&lRandom Teleport (Compat Devstack)"
+menuRows: 6
+menuFiller: "GRAY_STAINED_GLASS_PANE"
+
+showDashboard: true
+showActions: true
+showOperatorTools: true
+groupBiomesIntoSubmenu: true
+
+# Custom item prefix routing test specifications
+iconDefault: "ia:ruby_sword"
+iconWorld: "oraxen:amethyst_pickaxe"
+iconRegion: "nexo:void_blade"
+iconOnCooldown: "hdb:12345"
+iconInCombat: "BARRIER"
+iconUnavailable: "BARRIER"
+iconDashboard: "DIAMOND_SWORD:1005"
+iconActionsSelector: "GOLDEN_HOE#42"
+iconActionDefault: "NETHERITE_SWORD"
+iconOperatorSelector: "COMMAND_BLOCK"
+
+barrierOnUnavailable: true
+
+loreReady:
+  - "&7Status: &aREADY"
+  - "&7Cost: &6{cost}"
+  - "&7Warmup: &e{delay}"
+  - ""
+  - "&aClick to teleport!"
+
+loreCooldown:
+  - "&7Status: &eON COOLDOWN"
+  - "&cCooldown remaining: &e{cooldown}"
+  - ""
+  - "&cCannot teleport right now."
+
+loreCombat:
+  - "&7Status: &cIN COMBAT"
+  - "&cCombat tag remaining: &e{cooldown}"
+  - ""
+  - "&cCannot teleport while in combat."
+
+loreNoFunds:
+  - "&7Status: &eINSUFFICIENT FUNDS"
+  - "&7Required: &6{cost}"
+  - ""
+  - "&cYou cannot afford this teleport."
+
+loreNoPermission:
+  - "&7Status: &cLOCKED"
+  - ""
+  - "&cYou lack permission for this region."
+
+version: "1.0"

@@ -1,0 +1,111 @@
+# --- actions/arena.yml ---
+# Sample scripted action (ADR-093): 1v1 Arena duel with visual world border confinement,
+# spatial proximity extraction gates, command evaluation gates, and automatic match lifecycle.
+#
+# Confinement:
+#   boundary: "SUBSPACE" or "LEASH" creates a clientbound per-player world border wall
+#   centered on the arena anchor coordinate, automatically removed upon session disarm.
+
+alias: "arena"
+permission: "rtp.action.arena"
+description: "Confined 1v1 arena duel with visual world border and extraction point."
+
+command:
+  name: "duel"
+  permission: "rtp.command.duel"
+  description: "Challenge players to an arena duel"
+  # Root command aliases (opt-in; empty by default to keep root command namespace clean)
+  aliases: []
+  # aliases:
+  #   - "fight"
+  #   - "arena"
+  subcommands:
+    leave:
+      description: "Surrender and exit the duel"
+      permission: "rtp.command.duel.leave"
+      aliases:
+        - "surrender"
+        - "forfeit"
+      run:
+        - CONSOLE: "kill [player_name]"
+
+placement:
+  region: "default"
+  anchor: "regionQueue"
+  shape:
+    name: "SQUARE"
+    radius: 4c                  # 4-chunk radius (64 blocks each direction)
+    centerRadius: 0
+  minSeparation: 32             # 32 blocks minimum between opponents
+  elevationTolerance: 256       # Maximum height delta between opponents
+
+confinement:
+  boundary: "LEASH"             # Visual world border wall rendered client-side
+  leashRadius: 48.0             # 48 block radius around anchor (96 block world border)
+  duration: "5m"                # 5-minute match countdown
+  initialSize: 128              # Initial world border width in blocks
+  shrinkTo: 32                  # Final world border width in blocks
+  shrinkOver: "4m"              # Shrink smoothly to 32 blocks over 4 minutes
+  damage: 2.0                   # 2.0 damage (1 heart) applied when outside border
+  damageBuffer: 0.0             # Damage begins immediately upon leaving border (0 blocks buffer)
+  maxDistanceOutside: 8.0       # Immediate escape limit if player exceeds 8 blocks outside boundary
+  outsideActions:               # Declarative commands/actions executed when exceeding boundary limit
+    - ACTION: PULL_BACK
+  cancellable: false
+
+gate:
+  - players: ">= 2"
+
+lifecycle:
+  onEnqueue:
+    - FOR_EACH:
+        - MESSAGE: "<yellow>Entered arena duel matchmaking queue. Waiting for an opponent (1/2)...</yellow>"
+        - MESSAGE: "<gray>Run <click:run_command:'/rtp action cancel'><hover:show_text:'<gray>Click to cancel queue</gray>'><u>/rtp action cancel</u></hover></click> if you wish to leave the queue.</gray>"
+
+  onStart:
+    - FOR_EACH:
+        - CONSOLE: "gamemode adventure [player]"
+        - CONSOLE: "give [player] iron_sword 1"
+        - CONSOLE: "title [player] title {\"text\":\"DUEL START!\",\"color\":\"red\"}"
+        - MESSAGE: "<green><bold>Match found! Arena duel started. Fight to the death!</bold></green>"
+
+  onBoundaryViolation:
+    # Gate 1: Warning and safe interior pull-back for first violation
+    - gate:
+        scoreboard:
+          objective: "rtp_violations"
+          matches: "< 2"
+      run:
+        - ACTION: PULL_BACK
+        - FOR_EACH:
+            CONSOLE: "title [violator] subtitle {\"text\":\"Stay inside the world border!\",\"color\":\"yellow\"}"
+
+    # Gate 2: Disqualification if repeatedly attempting to flee
+    - gate:
+        scoreboard:
+          objective: "rtp_violations"
+          matches: ">= 2"
+      run:
+        - CONSOLE: "tellraw @a [{\"text\":\"[violator] fled the arena and was disqualified!\",\"color\":\"red\"}]"
+        - CONSOLE: "kill [violator]"
+        - ACTION: DISARM
+
+  onExpire:
+    # Match timed out without a death: reset survival mode, announce draw, and disarm
+    - FOR_EACH:
+        - CONSOLE: "gamemode survival [player]"
+        - MESSAGE: "<yellow><bold>Match timed out! Arena duel ended in a draw.</bold></yellow>"
+    - ACTION: DISARM
+
+  onDeath:
+    - CONSOLE: "tellraw @a [{\"text\":\"[winner] \",\"color\":\"gold\"},{\"text\":\"has defeated \",\"color\":\"yellow\"},{\"text\":\"[victim] \",\"color\":\"red\"},{\"text\":\"in the arena!\",\"color\":\"yellow\"}]"
+    - CONSOLE: "give [winner] diamond 3"
+    - FOR_EACH:
+        - CONSOLE: "gamemode survival [player]"
+    - ACTION: DISARM
+
+  onCancel:
+    - FOR_EACH:
+        - MESSAGE: "<gray>You have left the arena duel queue.</gray>"
+
+version: "1.0"

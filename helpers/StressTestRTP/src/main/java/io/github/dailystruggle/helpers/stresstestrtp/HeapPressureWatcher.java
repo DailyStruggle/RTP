@@ -68,6 +68,8 @@ public final class HeapPressureWatcher {
         loadPatterns();
     }
 
+    // Admin-supplied heap-pressure-patterns, compiled once per load (not per log line).
+    @SuppressWarnings("PMD.RegexCompiledPerCall")
     private void loadPatterns() {
         patterns.clear();
         List<String> raw = config.getStringList("heap-pressure-patterns");

@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 
 /**
  * Resolves the configured target commands. Multiple co-installed RTP-style
@@ -26,14 +27,30 @@ public final class Targets {
     public static final class Entry {
         public final String label;
         public final String template;
+        /** Per-target sender override: {@code Boolean.TRUE} player,
+         *  {@code Boolean.FALSE} console, {@code null} the global
+         *  {@code dispatch-as-player} setting. A plugin whose player form
+         *  silently refuses (BetterRTP on 26.x) can then be driven by its
+         *  console form without moving every other arm off the player path. */
+        public final Boolean asPlayer;
         public Entry(String label, String template) {
+            this(label, template, null);
+        }
+        public Entry(String label, String template, Boolean asPlayer) {
             this.label = label;
             this.template = template;
+            this.asPlayer = asPlayer;
+        }
+        /** Effective sender for this target given the global default. */
+        public boolean dispatchAsPlayer(boolean globalDefault) {
+            return asPlayer == null ? globalDefault : asPlayer;
         }
         public String render(String playerName) {
             return template.replace("{player}", playerName);
         }
     }
+
+    private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
     private Targets() {}
 
@@ -63,16 +80,18 @@ public final class Targets {
                 if (o instanceof ConfigurationSection sec) {
                     String label = sec.getString("label", "target" + idx);
                     String cmd = sec.getString("command", "");
-                    if (!cmd.isEmpty()) out.add(new Entry(label, cmd));
+                    if (!cmd.isEmpty()) out.add(new Entry(label, cmd, parseSender(sec.getString("sender")).orElse(null)));
                 } else if (o instanceof java.util.Map<?, ?> m) {
                     Object lbl = m.get("label");
                     Object cmd = m.get("command");
                     if (cmd != null && !cmd.toString().isEmpty()) {
-                        out.add(new Entry(lbl == null ? "target" + idx : lbl.toString(), cmd.toString()));
+                        Object sender = m.get("sender");
+                        out.add(new Entry(lbl == null ? "target" + idx : lbl.toString(), cmd.toString(),
+                                parseSender(sender == null ? null : sender.toString()).orElse(null)));
                     }
                 } else if (o instanceof String s && !s.isEmpty()) {
                     // Bare-string entry: derive a label from the first whitespace-separated token.
-                    String label = s.split("\\s+", 2)[0];
+                    String label = WHITESPACE.split(s, 2)[0];
                     out.add(new Entry(label, s));
                 }
             }
@@ -85,12 +104,23 @@ public final class Targets {
         return Collections.unmodifiableList(out);
     }
 
+    /** {@code player} / {@code console} (case-insensitive); anything else defers to the global setting. */
+    static java.util.Optional<Boolean> parseSender(String raw) {
+        if (raw == null) return java.util.Optional.empty();
+        String s = raw.trim().toLowerCase(java.util.Locale.ROOT);
+        if (s.equals("player")) return java.util.Optional.of(Boolean.TRUE);
+        if (s.equals("console")) return java.util.Optional.of(Boolean.FALSE);
+        return java.util.Optional.empty();
+    }
+
     /** Compact human-readable description for status / summary output. */
     public static String describe(List<Entry> entries) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < entries.size(); i++) {
             if (i > 0) sb.append(", ");
-            sb.append(entries.get(i).label).append("=`").append(entries.get(i).template).append('`');
+            Entry e = entries.get(i);
+            sb.append(e.label).append("=`").append(e.template).append('`');
+            if (e.asPlayer != null) sb.append(e.asPlayer ? " (player)" : " (console)");
         }
         return sb.toString();
     }

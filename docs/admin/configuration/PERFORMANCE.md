@@ -19,12 +19,13 @@ You can update performance settings through:
 
 | Key | Type | Default | Description | Impact |
 |---|---|---|---|---|
-| `minTPS` | Double | `19.0` | Minimum server TPS required to queue new locations. Range: 0.0–20.0. | **LOW** |
+| `minTPS` | Double | `19.0` | Pause background cache filling (backlog picks, chunk loads for the ready queue, cold fill) when TPS drops below this. On Folia the server-wide pause uses the mean across regions, and each region below `minTPS` is handled on its own: RTP runs one background task per region tick there and fills from other regions instead. Players already waiting are still served. Resumes 0.5 TPS above the threshold. `0` disables. Range: 0.0–20.0. | **LOW** |
+| `maxMSPT` | Double | `45.0` | Pause background cache filling when a tick takes longer than this many ms. TPS stays at 20 until ticks pass 50 ms, so this catches a loaded server earlier. Resumes 5 ms below the threshold. On Folia only a region whose ticks overrun (over 52.5 ms apart) counts, and only for that region, because Folia exposes tick intervals rather than tick work. `0` disables. | **LOW** |
 | `maxHeapPercent` | Double | `85.0` | Pause cache filling when JVM memory use passes this percentage. `0` or `100` disables. Range: 0.0–100.0. | **LOW** |
 | `maxAttempts` | Integer | `32` | Maximum location search attempts before giving up. | **HIGH** — Higher values increase CPU per request. |
-| `period` | Integer | `20` | Ticks between background cache cycles (20 ticks = 1 second). | **MEDIUM** — Lower values refill faster but use more CPU. |
-| `syncAllottedTime` | Integer | `50` | Max milliseconds per tick spent on synchronous RTP tasks. | **MEDIUM** — Higher values allow faster processing at the risk of tick time. |
-| `asyncAllottedTime` | Integer | `50` | Max milliseconds per tick spent on asynchronous RTP tasks. | **MEDIUM** |
+| `period` | Integer | `20` | Ticks between refills of the same region (20 ticks = 1 second). Regions take turns, so each region gets one refill every `period` ticks. | **MEDIUM** — Lower values refill faster but use more CPU. |
+| `syncAllottedTime` | Integer | `5` | Max milliseconds per tick for RTP's main-thread work (queued commands, scripted actions, sync task queue). On Folia it also applies to each region thread separately: RTP adds at most this much to any region's tick, however many players' work lands there, and the rest waits behind other regions. Values above 25 are treated as 25, so at least half of each tick stays free for the server and other plugins. Range: 1–25. | **MEDIUM** — Higher values allow faster processing at the risk of tick time. |
+| `asyncAllottedTime` | Integer | `25` | Max milliseconds per pulse for RTP's background work. Values above 25 are treated as 25. Range: 1–25. | **MEDIUM** |
 
 ## World Loading & View Distance
 
@@ -34,6 +35,7 @@ You can update performance settings through:
 | `viewDistanceTeleport` | Integer | `0` | Chunk radius to pre-load around the destination before teleport. `0` = just the destination chunk. | **HIGH** |
 | `viewDistanceRestoreInterval` | Integer | `0` | Ticks to ease view distance back to normal after arrival. Set to `0` (off) to prevent client-side flashing. | **LOW** |
 | `syncLoading` | Boolean | `false` | Use synchronous chunk loading for location selection. **NOT RECOMMENDED**. | **HIGH** — Can cause server hangs. |
+| `teleportPath` | String | `AUTO` | Paper only. `AUTO` teleports in the same tick when the destination chunk is already loaded and the teleport starts on the main thread, otherwise uses `teleportAsync`. `ASYNC` always uses `teleportAsync` (up to one tick slower). Folia always uses `teleportAsync`. | **LOW** |
 
 ## Caching & Pre-fill
 

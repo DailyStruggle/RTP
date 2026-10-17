@@ -404,7 +404,56 @@ class SqlNetworkStateBindingH2Test {
         outcome = a.redeem("unknown-token", pid, "srv1").get(2, TimeUnit.SECONDS);
         assertEquals(io.github.dailystruggle.rtp.proxy.common.spi.RedeemOutcome.NOT_FOUND, outcome);
 
+        // redeem with wrong server
+        UUID pid2 = UUID.randomUUID();
+        ReservationToken tok2 = a.claim("srv1", pid2, Duration.ofSeconds(30)).get(2, TimeUnit.SECONDS);
+        outcome = a.redeem(tok2.tokenId(), pid2, "wrong-server").get(2, TimeUnit.SECONDS);
+        assertEquals(io.github.dailystruggle.rtp.proxy.common.spi.RedeemOutcome.WRONG_SERVER, outcome);
+
         assertEquals(SqlNetworkStateBinding.Dialect.H2, a.dialect());
+    }
+
+    @Test
+    @DisplayName("dialectOf detects all dialect strings")
+    void dialectDetection() throws Exception {
+        java.sql.Connection conn = org.mockito.Mockito.mock(java.sql.Connection.class);
+        java.sql.DatabaseMetaData meta = org.mockito.Mockito.mock(java.sql.DatabaseMetaData.class);
+        org.mockito.Mockito.when(conn.getMetaData()).thenReturn(meta);
+
+        org.mockito.Mockito.when(meta.getDatabaseProductName()).thenReturn(null);
+        assertEquals(SqlNetworkStateBinding.Dialect.UNKNOWN, SqlNetworkStateBinding.dialectOf(conn));
+
+        org.mockito.Mockito.when(meta.getDatabaseProductName()).thenReturn("H2");
+        assertEquals(SqlNetworkStateBinding.Dialect.H2, SqlNetworkStateBinding.dialectOf(conn));
+
+        org.mockito.Mockito.when(meta.getDatabaseProductName()).thenReturn("MySQL");
+        assertEquals(SqlNetworkStateBinding.Dialect.MYSQL, SqlNetworkStateBinding.dialectOf(conn));
+
+        org.mockito.Mockito.when(meta.getDatabaseProductName()).thenReturn("MariaDB");
+        assertEquals(SqlNetworkStateBinding.Dialect.MYSQL, SqlNetworkStateBinding.dialectOf(conn));
+
+        org.mockito.Mockito.when(meta.getDatabaseProductName()).thenReturn("PostgreSQL");
+        assertEquals(SqlNetworkStateBinding.Dialect.POSTGRES, SqlNetworkStateBinding.dialectOf(conn));
+
+        org.mockito.Mockito.when(meta.getDatabaseProductName()).thenReturn("SQLite");
+        assertEquals(SqlNetworkStateBinding.Dialect.SQLITE, SqlNetworkStateBinding.dialectOf(conn));
+
+        org.mockito.Mockito.when(meta.getDatabaseProductName()).thenReturn("Oracle");
+        assertEquals(SqlNetworkStateBinding.Dialect.UNKNOWN, SqlNetworkStateBinding.dialectOf(conn));
+    }
+
+    @Test
+    @DisplayName("setLastTeleportTime and getLastTeleportTime work across instances")
+    void lastTeleportTimeCrossInstance() throws Exception {
+        UUID pid = UUID.randomUUID();
+        assertEquals(0L, a.getLastTeleportTime(pid).get(2, TimeUnit.SECONDS));
+
+        a.setLastTeleportTime(pid, 123456789L).get(2, TimeUnit.SECONDS);
+        assertEquals(123456789L, b.getLastTeleportTime(pid).get(2, TimeUnit.SECONDS));
+
+        // Overwrite
+        b.setLastTeleportTime(pid, 987654321L).get(2, TimeUnit.SECONDS);
+        assertEquals(987654321L, a.getLastTeleportTime(pid).get(2, TimeUnit.SECONDS));
     }
 
     // --- helpers -------------------------------------------------------------

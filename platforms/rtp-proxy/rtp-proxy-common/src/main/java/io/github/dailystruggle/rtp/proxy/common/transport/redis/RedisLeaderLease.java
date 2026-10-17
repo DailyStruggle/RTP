@@ -1,10 +1,8 @@
 package io.github.dailystruggle.rtp.proxy.common.transport.redis;
 
 import io.github.dailystruggle.rtp.proxy.common.spi.WaitlistLeaderLease;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.JedisPoolConfig;
-import redis.clients.jedis.params.SetParams;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespConnection;
+import io.github.dailystruggle.rtp.proxy.common.transport.redis.resp.RespPool;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -41,7 +39,7 @@ import java.util.logging.Logger;
  * <p>{@link #release()} uses a compare-and-delete script so a proxy never
  * stomps a successor's lease that took over after its TTL expired.</p>
  *
- * <p>Mirrors the {@link JedisPool} + single-thread async executor pattern of
+ * <p>Mirrors the {@link RespPool} + single-thread async executor pattern of
  * {@link RedisNetworkRequestQueue} and {@link RedisNetworkStateBinding}. The
  * Lua atomicity of the rest of the {@code RedisNetworkWaitlist} impl
  * (drain-batch, remove-by-uuid, position, reap, refreshAllTtl) is in {@link RedisNetworkWaitlist}.</p>
@@ -70,7 +68,7 @@ public final class RedisLeaderLease implements WaitlistLeaderLease, AutoCloseabl
 
     private static final AtomicInteger THREAD_COUNTER = new AtomicInteger();
 
-    private final JedisPool pool;
+    private final RespPool pool;
     private final boolean ownsPool;
     private final ExecutorService executor;
     private final String key;
@@ -78,7 +76,7 @@ public final class RedisLeaderLease implements WaitlistLeaderLease, AutoCloseabl
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
     /**
-     * Production constructor. Opens its own {@link JedisPool} against
+     * Production constructor. Opens its own {@link RespPool} against
      * {@code host}/{@code port}, uses the default key, and generates a fresh
      * random {@code holderId}.
      *
@@ -87,7 +85,7 @@ public final class RedisLeaderLease implements WaitlistLeaderLease, AutoCloseabl
      * @param password optional Redis password ({@code null} or empty disables AUTH).
      */
     public RedisLeaderLease(String host, int port, String password) {
-        this(buildPool(host, port, password), true, DEFAULT_KEY, UUID.randomUUID().toString());
+        this(new RespPool(host, port, 2000, password, 2), true, DEFAULT_KEY, UUID.randomUUID().toString());
     }
 
     /**
@@ -95,26 +93,16 @@ public final class RedisLeaderLease implements WaitlistLeaderLease, AutoCloseabl
      * is responsible for closing it; supply a custom {@code key} when
      * multiple lease scopes coexist on one Redis (e.g., per-cluster).
      */
-    public RedisLeaderLease(JedisPool pool, String key, String holderId) {
+    public RedisLeaderLease(RespPool pool, String key, String holderId) {
         this(Objects.requireNonNull(pool, "pool"), false, key, holderId);
     }
 
-    private RedisLeaderLease(JedisPool pool, boolean ownsPool, String key, String holderId) {
+    private RedisLeaderLease(RespPool pool, boolean ownsPool, String key, String holderId) {
         this.pool = pool;
         this.ownsPool = ownsPool;
         this.key = Objects.requireNonNull(key, "key");
         this.holderId = Objects.requireNonNull(holderId, "holderId");
         this.executor = Executors.newSingleThreadExecutor(threadFactory());
-    }
-
-    private static JedisPool buildPool(String host, int port, String password) {
-        JedisPoolConfig cfg = new JedisPoolConfig();
-        cfg.setMaxTotal(2);
-        cfg.setMaxIdle(1);
-        cfg.setMinIdle(0);
-        return (password == null || password.isEmpty())
-                ? new JedisPool(cfg, host, port, 2000)
-                : new JedisPool(cfg, host, port, 2000, password);
     }
 
     private ThreadFactory threadFactory() {
@@ -149,10 +137,9 @@ public final class RedisLeaderLease implements WaitlistLeaderLease, AutoCloseabl
         }
         long pxMillis = Math.max(1L, holdFor.toMillis());
         return CompletableFuture.supplyAsync(() -> {
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 // First try SET NX PX - the common case when no leader holds it.
-                SetParams nx = SetParams.setParams().nx().px(pxMillis);
-                String r = j.set(key, holderId, nx);
+                String r = j.set(key, holderId, "NX", "PX", pxMillis);
                 if ("OK".equals(r)) {
                     return Boolean.TRUE;
                 }
@@ -161,14 +148,14 @@ public final class RedisLeaderLease implements WaitlistLeaderLease, AutoCloseabl
                 // holder per SPI contract).
                 String current = j.get(key);
                 if (holderId.equals(current)) {
-                    SetParams xx = SetParams.setParams().xx().px(pxMillis);
-                    String r2 = j.set(key, holderId, xx);
+                    String r2 = j.set(key, holderId, "XX", "PX", pxMillis);
                     return Boolean.valueOf("OK".equals(r2));
                 }
                 return Boolean.FALSE;
-            } catch (RuntimeException e) {
+            } catch (Exception e) {
                 LOG.log(Level.WARNING, "RedisLeaderLease.tryAcquire failed for key " + key, e);
-                throw e;
+                if (e instanceof RuntimeException re) throw re;
+                throw new RuntimeException(e);
             }
         }, executor);
     }
@@ -179,13 +166,14 @@ public final class RedisLeaderLease implements WaitlistLeaderLease, AutoCloseabl
             return CompletableFuture.completedFuture(null);
         }
         return CompletableFuture.runAsync(() -> {
-            try (Jedis j = pool.getResource()) {
+            try (RespConnection j = pool.getResource()) {
                 j.eval(COMPARE_AND_DELETE_LUA,
                         Collections.singletonList(key),
                         Collections.singletonList(holderId));
-            } catch (RuntimeException e) {
+            } catch (Exception e) {
                 LOG.log(Level.WARNING, "RedisLeaderLease.release failed for key " + key, e);
-                throw e;
+                if (e instanceof RuntimeException re) throw re;
+                throw new RuntimeException(e);
             }
         }, executor);
     }

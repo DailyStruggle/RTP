@@ -50,7 +50,7 @@ Change begins as user feedback, developer intent, or a bug report. Feedback is c
 
 ### 2. Planning tier
 
-Between intake and design sits a deliberately *mutable* staging layer: plan docs (`MULTI_PLATFORM_PLAN.md`, `MULTI_SERVER_PLAN.md`, `METRICS_PLAN.md`, `ROADMAP.md`) and scratch/proposal notes (`docs/dev/scratch/`, PROPOSAL drafts). These are living documents, edited in place, because the ideas in them are not yet decisions. When a plan ships or is superseded, the plan is removed and the ADR becomes the durable record - the mutability is the point of the tier, not a defect of it.
+Between intake and design sits a deliberately *mutable* staging layer: plan docs (`MULTI_PLATFORM_PLAN.md`, `MULTI_SERVER_PLAN.md`, `METRICS_PLAN.md`), the Linear `LeafRTP` backlog (forward-looking work, replacing the former `ROADMAP.md`), and scratch/proposal notes (`docs/dev/scratch/`, PROPOSAL drafts). These are living documents, edited in place, because the ideas in them are not yet decisions. When a plan ships or is superseded, the plan is removed and the ADR becomes the durable record - the mutability is the point of the tier, not a defect of it.
 
 ### 3. Default change loop: read, document, modify
 
@@ -62,7 +62,7 @@ For larger changes, the architecture and thought process are a layer above the c
 
 ### 5. Implementation and verification
 
-**Code is the functional component and has priority.** A bugfix may or may not warrant documentation, depending on the scale of its impact - though most bugfixes still warrant a `CHANGELOG.md` entry; the changelog is the exception to weight-proportional documentation. Implementation is bound back to the record layer through REQ-traceable tests and `TRACEABILITY.md` rows, and guarded mechanically by ArchUnit boundary tests and `check_traceability.sh`. Runtime-testable work ends with a full build; integration behavior is exercised against the devstack where the change warrants it.
+**Code is the functional component and has priority.** A bugfix may or may not warrant documentation, depending on the scale of its impact - though most bugfixes still warrant a `CHANGELOG.md` entry; the changelog is the exception to weight-proportional documentation. Implementation is bound back to the record layer through REQ-traceable tests and `TRACEABILITY.md` rows, and guarded mechanically by ArchUnit boundary tests and `check_traceability.sh`. Runtime-testable work ends with a full build; integration behavior is exercised against the devstack where the change warrants it. Integration of finished work into the repository follows the pull request lifecycle ([`PULL_REQUEST_PROCESS.md`](../dev/PULL_REQUEST_PROCESS.md)) under automated CI gates (`.github/workflows/gradle.yml`).
 
 ### 6. Divergence handling
 
@@ -122,6 +122,7 @@ AI tooling (agentic LLM assistants) is an *optional* executor of human-directed 
 - [`docs/dev/TRACEABILITY.md`](../dev/TRACEABILITY.md) - REQ-* to class to test matrix.
 - [`docs/dev/LESSONS_LEARNED.md`](../dev/LESSONS_LEARNED.md) - dated engineering findings.
 - [`docs/dev/AI_USAGE.md`](../dev/AI_USAGE.md) - canonical AI-tooling rationale and boundaries.
+- [`docs/dev/PULL_REQUEST_PROCESS.md`](../dev/PULL_REQUEST_PROCESS.md) - operational pull request lifecycle, local pre-PR verification gates, and CI pipeline checks.
 - [`.junie/AGENTS.md`](../../.junie/AGENTS.md) - agent-operational guide (Self-Updating Protocol, D-005 gate restatement).
 - [ADR-018](ADR-018-agents-md-public-release-structure.md) - precedent for meta-level ADRs.
 - [ADR-TEMPLATE.md](ADR-TEMPLATE.md) - the record format this workflow produces.

@@ -19,9 +19,12 @@ algorithm.
 
 ## Supported platforms
 
-Paper, Folia, Spigot, Fabric, and NeoForge (Minecraft 1.20.x / 1.21.x / 26.x). Java 21+
-is required. Legacy Forge is not native - run the Spigot/Paper jar under Arclight /
-Mohist.
+Paper and Spigot 1.18+, Folia 1.21.11+, Fabric 1.20.1 and 1.21+, and NeoForge 1.21.1+, up to
+Minecraft 26.3. Java 17+ is required (Minecraft itself needs Java 21 from 1.20.5 and Java
+25 on 26.x). Bug reports are accepted for 1.21.11 through the latest release; older
+versions are best effort, except Folia, which is experimental and not supported below
+1.21.11 ([support matrix](../dev/SUPPORT_MATRIX.md)). Legacy Forge is not
+native - run the Spigot/Paper jar under Arclight / Mohist.
 
 ## Install
 

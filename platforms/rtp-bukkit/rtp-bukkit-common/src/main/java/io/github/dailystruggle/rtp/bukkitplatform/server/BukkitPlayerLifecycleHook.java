@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.bukkitplatform.server;
 
 import io.github.dailystruggle.rtp.api.server.DispatchingPlayerLifecycleHook;
+import io.github.dailystruggle.rtp.bukkitplatform.entity.PersonalBossBars;
 import org.bukkit.Bukkit;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -46,6 +47,9 @@ public final class BukkitPlayerLifecycleHook extends DispatchingPlayerLifecycleH
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerQuit(PlayerQuitEvent event) {
-        fireQuit(event.getPlayer().getUniqueId());
+        java.util.UUID uuid = event.getPlayer().getUniqueId();
+        // A BossBar holds its viewers strongly; drop them before subscribers run.
+        PersonalBossBars.clearAll(uuid);
+        fireQuit(uuid);
     }
 }

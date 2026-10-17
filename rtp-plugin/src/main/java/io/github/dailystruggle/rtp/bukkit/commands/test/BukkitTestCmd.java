@@ -39,6 +39,7 @@ public class BukkitTestCmd extends TestCmd {
     addSubCommand(new TestEventsCmd(this));
     addSubCommand(new TestWorldOpsCmd(this));
     addSubCommand(new TestAccessorCmd(this));
+    addSubCommand(new TestHologramCmd(this));
 
     // `full` is the umbrella entry point (see RUNTIME_TEST_SUITE_PLAN.md section 3.2).
     // It is wired in last so `findChild` in TestFullCmd can resolve every

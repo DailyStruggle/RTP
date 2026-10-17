@@ -8,15 +8,14 @@ import java.util.Set;
 
 /**
  * Immutable view over the subset of chunk NBT the pre-filter consults: block
- * palette + heightmap + optional biome palette. Built by
+ * palette + optional biome palette. Built by
  * {@link AnvilReader#readChunkView(byte[], int, int)}. Sections are kept in
- * on-disk order (no sort). Extending fields is additive; removing is breaking.
+ * on-disk order (no sort).
  */
 public final class AnvilChunkView {
 
     private final int dataVersion;
     private final List<PaletteSection> sections;
-    private final long[] motionBlockingNoLeaves;
     private final List<BiomePaletteSection> biomeSections;
 
     /**
@@ -25,27 +24,50 @@ public final class AnvilChunkView {
      */
     public AnvilChunkView(int dataVersion,
                           List<PaletteSection> sections,
-                          long[] motionBlockingNoLeaves,
                           List<BiomePaletteSection> biomeSections) {
         this.dataVersion = dataVersion;
         this.sections = Objects.requireNonNull(sections, "sections");
-        this.motionBlockingNoLeaves = motionBlockingNoLeaves;
         this.biomeSections = Objects.requireNonNull(biomeSections, "biomeSections");
     }
 
     /**
-     * Back-compat constructor for call sites that predate the biome palette (ADR-016).
-     * Defaults {@code biomeSections} to an empty list.
+     * Overload for views without biome data. Defaults {@code biomeSections} to an empty list.
      */
-    public AnvilChunkView(int dataVersion, List<PaletteSection> sections, long[] motionBlockingNoLeaves) {
-        this(dataVersion, sections, motionBlockingNoLeaves, Collections.emptyList());
+    public AnvilChunkView(int dataVersion, List<PaletteSection> sections) {
+        this(dataVersion, sections, Collections.emptyList());
     }
 
-    // -------------------------------------------------- record-style accessors (kept for back-compat)
+    /**
+     * Deprecated constructor retained for backward compatibility.
+     * The {@code motionBlockingNoLeaves} heightmap array is ignored.
+     *
+     * @deprecated heightmap is no longer stored; use
+     *             {@link #AnvilChunkView(int, List, List)}.
+     */
+    @Deprecated(since = "3.3.0", forRemoval = false)
+    public AnvilChunkView(int dataVersion,
+                          List<PaletteSection> sections,
+                          long[] motionBlockingNoLeaves,
+                          List<BiomePaletteSection> biomeSections) {
+        this(dataVersion, sections, biomeSections);
+    }
+
+    /**
+     * Deprecated constructor retained for backward compatibility.
+     * The {@code motionBlockingNoLeaves} heightmap array is ignored.
+     *
+     * @deprecated heightmap is no longer stored; use
+     *             {@link #AnvilChunkView(int, List)}.
+     */
+    @Deprecated(since = "3.3.0", forRemoval = false)
+    public AnvilChunkView(int dataVersion, List<PaletteSection> sections, long[] motionBlockingNoLeaves) {
+        this(dataVersion, sections, Collections.emptyList());
+    }
+
+    // -------------------------------------------------- record-style accessors
 
     public int dataVersion() { return dataVersion; }
     public List<PaletteSection> sections() { return sections; }
-    public long[] motionBlockingNoLeaves() { return motionBlockingNoLeaves; }
     public List<BiomePaletteSection> biomeSections() { return biomeSections; }
 
     /**
@@ -71,6 +93,16 @@ public final class AnvilChunkView {
             }
         }
         return null;
+    }
+
+    /**
+     * True iff this view contains an emitted section covering section Y {@code sy}.
+     */
+    public boolean hasSection(int sy) {
+        for (PaletteSection s : sections) {
+            if (s.sectionY() == sy) return true;
+        }
+        return false;
     }
 
     // --- Typed queries (ADR-016) ---
@@ -158,29 +190,6 @@ public final class AnvilChunkView {
         if (id == null) return true;
         String reconciled = AnvilPrefilter.DEFAULT_RECONCILER.apply(id);
         return reconciled == null || !reconciledUnsafe.contains(reconciled);
-    }
-
-    /**
-     * Returns the world-Y of the highest motion-blocking, no-leaves column top at
-     * section-local {@code (x, z)}. Mirrors
-     * {@code World#getHighestBlockYAt(x, z, MOTION_BLOCKING_NO_LEAVES)} on the live
-     * chunk. Returns {@link #minHeight()} (the bottom of the lowest emitted section)
-     * when the column is empty or the heightmap is absent - conservative, keeps
-     * callers on valid Y ranges.
-     */
-    public int getSurfaceHeight(int x, int z) {
-        int floor = minHeight();
-        if (motionBlockingNoLeaves == null || motionBlockingNoLeaves.length == 0) return floor;
-        int bits = 9;
-        int entriesPerLong = 64 / bits;
-        int columnIndex = (z & 15) * 16 + (x & 15);
-        int longIdx = columnIndex / entriesPerLong;
-        if (longIdx >= motionBlockingNoLeaves.length) return floor;
-        int slot = columnIndex - longIdx * entriesPerLong;
-        long mask = (1L << bits) - 1L;
-        int raw = (int) ((motionBlockingNoLeaves[longIdx] >>> (slot * bits)) & mask);
-        if (raw <= 0) return floor;
-        return floor + raw - 1;
     }
 
     // --- Biome queries (ADR-016) ---
