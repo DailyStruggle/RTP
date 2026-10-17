@@ -7,7 +7,6 @@ import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.residency.StrideGroupResidencyManager;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.HybridHazardTable;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
-import io.github.dailystruggle.rtp.common.tools.HeapPressureMonitor;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -988,9 +987,18 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    *
    * @return {@code true} if bin swapping should be used instead of a full table
    */
+  private static volatile java.util.function.BooleanSupplier heapPressureSupplier = () -> false;
+
+  /**
+   * Installs the heap pressure supplier, decoupling {@link MemoryShape} from {@code tools.HeapPressureMonitor}.
+   */
+  public static void setHeapPressureSupplier(java.util.function.BooleanSupplier supplier) {
+    if (supplier != null) heapPressureSupplier = supplier;
+  }
+
   public boolean shouldSwapBins() {
     if (residencyManager != null) return true;
-    boolean heapOverutilized = HeapPressureMonitor.underPressure();
+    boolean heapOverutilized = heapPressureSupplier.getAsBoolean();
     StorageLatencyProbe.Device device = StorageLatencyProbe.classifyByLatency();
     boolean diskTimesGood = (device != StorageLatencyProbe.Device.HDD && device != StorageLatencyProbe.Device.SLOW);
     return heapOverutilized && diskTimesGood;

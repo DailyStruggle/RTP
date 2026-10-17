@@ -87,7 +87,7 @@ This lets the seam ship first and the two mappings activate as their targets arr
 | Alternative | Why Rejected |
 |-------------|--------------|
 | Silent auto-import on startup | Destructive and surprising; can overwrite a populated config without consent. Violates the non-destructive constraint. |
-| Live competitor API shim (read competitor files / emulate its API at runtime) | Different goal (absorbing the menu-plugin ecosystem), heavier, and a permanent runtime coupling. Tracked as its own ROADMAP item; this importer is a one-shot aid. |
+| Live competitor API shim (read competitor files / emulate its API at runtime) | Different goal (absorbing the menu-plugin ecosystem), heavier, and a permanent runtime coupling. Tracked as its own Linear issue (`RTP-52`); this importer is a one-shot aid. |
 | Importer in `rtp-plugin` / an addon | Unnecessary now that file-only reading + the in-house YAML parser prove platform-neutrality. `rtp-core` keeps a single implementation shared across every platform. |
 | BetterRTP-only, no generic seam | Operators migrate from several plugins; a per-source seam (EzRTP, JakesRTP, ...) costs little extra and avoids a rewrite for the second source. |
 | Drop unsupported keys silently | Dishonest about lossiness; operators must know what was not carried over. Hence the logged `APPROXIMATED` / `DEFERRED` / `DROPPED` classification. |
@@ -100,9 +100,9 @@ This lets the seam ship first and the two mappings activate as their targets arr
 
 ## References
 
-- ROADMAP: "BetterRTP config importer (one-shot migration aid)" and the parity items "cooldown usage cap (`LockAfter`)" and "persist RTP destination as a permanent spawn anchor (`SetAsRespawn`)" in [`docs/dev/ROADMAP.md`](../dev/ROADMAP.md).
+- Former roadmap items "BetterRTP config importer (one-shot migration aid)" and the parity items "cooldown usage cap (`LockAfter`)" and "persist RTP destination as a permanent spawn anchor (`SetAsRespawn`)": open work is tracked in the Linear `LeafRTP` team ([`docs/dev/ROADMAP.md`](../dev/ROADMAP.md) pointer).
 - In-house YAML parser: `RtpYamlConfig` / `RtpYamlSection` (`rtp-core/.../common/configuration/yaml/`); see [ADR-025](ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper.md).
 - Region shapes / Polygon: [ADR-034](ADR-034-memory-shape-catalog.md).
 - Backup + two-phase `apply`/`confirm` UX prior art: the `rtp prefab` flow and `performance.yml#prefab.bakRetention`.
-- Distinct runtime shim: the "BetterRTP API compatibility shim" ROADMAP item; external-hook policy [ADR-026](ADR-026-external-hook-api-surface.md).
+- Distinct runtime shim: the "BetterRTP API compatibility shim" Linear issue (`RTP-52`); external-hook policy [ADR-026](ADR-026-external-hook-api-surface.md).
 - Process: D-005 (Propose Before Implementation).

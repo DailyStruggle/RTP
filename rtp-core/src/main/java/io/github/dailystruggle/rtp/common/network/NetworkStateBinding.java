@@ -7,7 +7,7 @@ import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
  * Carries optional {@link #transport()} returning live {@link NetworkTransport}.
  * A null binding indicates network mode is disabled (REQ-RTP-NET-002).
  */
-public interface NetworkStateBinding {
+public interface NetworkStateBinding extends io.github.dailystruggle.rtp.common.database.options.NetworkStateBinding {
     /**
      * The live {@link NetworkTransport} this binding wraps, or {@code null}
      * if the binding does not host one. Default returns {@code null}

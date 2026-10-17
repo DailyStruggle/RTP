@@ -102,6 +102,6 @@
 ## Process
 
 - Stage 1 changed only `scripts/bench_fuzz.py`, its tests and docs.
-- Stages 2 to 5 are planned and on hold in [`ROADMAP.md`](ROADMAP.md) Tier 2 until stage 1 has been through extended real-server runs with the results recorded in [`LEAK_FUZZING.md`](../../helpers/StressTestRTP/LEAK_FUZZING.md).
+- Stages 2 to 5 are planned and on hold in Linear `RTP-55` (team `LeafRTP`) until stage 1 has been through extended real-server runs with the results recorded in [`LEAK_FUZZING.md`](../../helpers/StressTestRTP/LEAK_FUZZING.md).
 - Stages 2 to 5 touch StressTestRTP (Java), `bench-swarm.js` and the bench server's launch flags: each needs an approved proposal (Rule D-005). Their direction is fixed by [ADR-111](../adr/ADR-111-live-server-behaviour-fuzzing.md), including the coverage channel: `/rtpstress coverage <label>` reads and resets the JaCoCo agent through its runtime API in the server JVM and writes probe JSON, so the Python side stays stdlib-only.
 - Optional middle tier, not scheduled: Jazzer driving the `rtp-core` command pipeline against a fake platform (coverage-guided at thousands of runs per second; logic exceptions, not real-server races).

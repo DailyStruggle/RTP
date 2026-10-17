@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.common.metrics;
+package io.github.dailystruggle.rtp.common.selection.region;
 
 /**
  * Immutable per-region view of the cost-governed on-demand chunk reader and native admission gate (ADR-114).

@@ -50,7 +50,7 @@ Change begins as user feedback, developer intent, or a bug report. Feedback is c
 
 ### 2. Planning tier
 
-Between intake and design sits a deliberately *mutable* staging layer: plan docs (`MULTI_PLATFORM_PLAN.md`, `MULTI_SERVER_PLAN.md`, `METRICS_PLAN.md`, `ROADMAP.md`) and scratch/proposal notes (`docs/dev/scratch/`, PROPOSAL drafts). These are living documents, edited in place, because the ideas in them are not yet decisions. When a plan ships or is superseded, the plan is removed and the ADR becomes the durable record - the mutability is the point of the tier, not a defect of it.
+Between intake and design sits a deliberately *mutable* staging layer: plan docs (`MULTI_PLATFORM_PLAN.md`, `MULTI_SERVER_PLAN.md`, `METRICS_PLAN.md`), the Linear `LeafRTP` backlog (forward-looking work, replacing the former `ROADMAP.md`), and scratch/proposal notes (`docs/dev/scratch/`, PROPOSAL drafts). These are living documents, edited in place, because the ideas in them are not yet decisions. When a plan ships or is superseded, the plan is removed and the ADR becomes the durable record - the mutability is the point of the tier, not a defect of it.
 
 ### 3. Default change loop: read, document, modify
 

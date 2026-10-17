@@ -111,7 +111,7 @@ RTPAPI.hooks().anvilPrefilter().bind((world, cx, cz) -> myDecision(world, cx, cz
 |---|---|
 | **API symbol** | `io.github.dailystruggle.rtp.api.hooks.PvPCombatStateRegistry` |
 | **Provider** | `Provider#isInCombat(UUID) -> boolean`. |
-| **Behavior modified** | Replaces RTP's native PvP damage tracker as the authority for the optional `/rtp` combat gate (refuse / delay / cancel a teleport for a combat-tagged player). See [ADR-055](../adr/ADR-055-pvp-combat-gate.md) and ROADMAP Tier 2. |
+| **Behavior modified** | Replaces RTP's native PvP damage tracker as the authority for the optional `/rtp` combat gate (refuse / delay / cancel a teleport for a combat-tagged player). See [ADR-055](../adr/ADR-055-pvp-combat-gate.md). |
 | **When invoked** | `PvPGate` at the `/rtp` pre-dispatch surface (before queue enrolment) and again before the destination is applied (execution prefilter). Gate is off by default (`safety.yml#pvpCheckEnabled`). |
 | **Threading** | Called from the command thread and the teleport pipeline; implementations shall be thread-safe and non-blocking. |
 | **Failure mode** | A throwing provider is logged once at WARNING and treated as "not in combat" (REQ-RTP-S-004); a buggy integration never blocks teleports. |

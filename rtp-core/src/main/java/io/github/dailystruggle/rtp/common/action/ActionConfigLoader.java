@@ -60,7 +60,6 @@ public final class ActionConfigLoader {
         }
         ActionDefinition def = (root != null) ? parseDefinition(id, root) : parseDefinition(id, parser);
         manager.registerAction(def);
-        registerTriggers(def);
         RTP.log(Level.FINE, "[RTP Action] Loaded scripted action: " + id);
       } catch (Exception e) {
         RTP.log(Level.WARNING, "[RTP Action] Failed parsing action config: " + parser.name, e);
@@ -89,22 +88,9 @@ public final class ActionConfigLoader {
         RtpYamlConfig yaml = RtpYamlConfig.parse(reader);
         ActionDefinition def = parseDefinition(id, yaml);
         manager.registerAction(def);
-        registerTriggers(def);
         RTP.log(Level.FINE, "[RTP Action] Loaded scripted action: " + id);
       } catch (Exception e) {
         RTP.log(Level.WARNING, "[RTP Action] Failed parsing action config: " + file.getName(), e);
-      }
-    }
-  }
-
-  private static void registerTriggers(ActionDefinition def) {
-    if (def == null || def.triggers().isEmpty() || RTP.triggerManager == null) return;
-    for (io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec trigger : def.triggers()) {
-      try {
-        RTP.triggerManager.registerTrigger(trigger);
-        RTP.log(Level.FINE, "[RTP Action] Registered physical trigger: " + trigger.id() + " -> " + def.id());
-      } catch (Exception e) {
-        RTP.log(Level.WARNING, "[RTP Action] Failed registering trigger " + trigger.id() + ": " + e.getMessage());
       }
     }
   }

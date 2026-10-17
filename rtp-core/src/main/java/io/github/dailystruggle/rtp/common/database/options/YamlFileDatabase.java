@@ -86,8 +86,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
     for (File file : files) {
       if (!file.isFile()) continue;
       // Skip the locale bootstrap file - it is plugin configuration, not a database table.
-      if (io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap.FILE_NAME
-          .equalsIgnoreCase(file.getName())) continue;
+      if ("lang.yml".equalsIgnoreCase(file.getName())) continue;
 
       long lastModified = file.lastModified();
       long dt = lastModified - cachedLookupLastModified.get().getOrDefault(file.getName(), -1L);

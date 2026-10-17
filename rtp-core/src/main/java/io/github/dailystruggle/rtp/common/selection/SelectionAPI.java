@@ -205,13 +205,26 @@ public class SelectionAPI {
     }
   }
 
+  private static volatile java.util.function.LongSupplier defaultBudgetSupplier = () -> 10_000_000L;
+
+  /**
+   * Configures the supplier used by no-arg {@link #compute()} to determine available nanoseconds.
+   *
+   * @param supplier budget supplier in nanoseconds
+   */
+  public static void setDefaultBudgetSupplier(java.util.function.LongSupplier supplier) {
+    if (supplier != null) {
+      defaultBudgetSupplier = supplier;
+    }
+  }
+
   /**
    * Processes tasks from the selection pipelines, prioritizing urgent tasks.
    * This method is called on each server tick to drive the asynchronous location
    * generation process.
    */
   public void compute() {
-    compute(io.github.dailystruggle.rtp.common.tasks.tick.TickBudget.asyncNanos());
+    compute(defaultBudgetSupplier.getAsLong());
   }
 
   /**

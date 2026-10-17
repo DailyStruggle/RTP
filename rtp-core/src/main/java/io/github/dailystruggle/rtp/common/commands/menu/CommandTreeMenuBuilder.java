@@ -36,7 +36,7 @@ import java.util.regex.Pattern;
  * rendering by {@code MenuRenderer}. Resolves hover text from {@link YamlCommentLookup},
  * parameter types/bounds, or command descriptions.
  */
-public final class CommandTreeMenuBuilder {
+public final class CommandTreeMenuBuilder implements io.github.dailystruggle.rtp.common.commands.menu.multiconfig.ConfigFileMenuDelegate {
 
     private static final Pattern LINE_BREAK = Pattern.compile("\\R");
 
@@ -614,11 +614,13 @@ public final class CommandTreeMenuBuilder {
     /**
      * Cart-aware overload. Surfaces staged changes under pending section.
      */
-    public <E extends Enum<E>> MenuModel buildConfigFile(UUID callerId,
-                                                         String fileName,
-                                                         ConfigParser<E> parser,
-                                                         java.util.LinkedHashMap<String, String> cartSnapshot) {
-        return buildConfigFile(callerId, fileName, parser, cartSnapshot, "");
+    @Override
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public MenuModel buildConfigFile(UUID callerId,
+                                     String fileName,
+                                     ConfigParser<?> parser,
+                                     java.util.LinkedHashMap<String, String> cartSnapshot) {
+        return buildConfigFile(callerId, fileName, (ConfigParser) parser, cartSnapshot, "");
     }
 
     /**

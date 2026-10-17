@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory;
 
 import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.CoordinateRunEncoder;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;

@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.common.metrics;
+package io.github.dailystruggle.rtp.common.selection.region;
 
 /**
  * Immutable per-region view of the purpose gate on native chunk loads (ADR-110).

@@ -22,6 +22,47 @@ import java.util.List;
  */
 public class ActionSubCmd extends BaseRTPCmdImpl {
 
+  static {
+    ActionManager.setCommandRegistrar(new ActionManager.ActionCommandRegistrar() {
+      @Override
+      public void onActionRegistered(ActionDefinition definition) {
+        if (definition.command().isConfigured() && RTP.serverAccessor != null) {
+          try {
+            ActionCommand actionCmd = new ActionCommand(definition);
+            java.util.List<String> names = new java.util.ArrayList<>();
+            names.add(definition.command().name());
+            names.addAll(definition.command().aliases());
+            RTP.serverAccessor.registerCommands(actionCmd, names.toArray(new String[0]));
+          } catch (Exception e) {
+            RTP.log(java.util.logging.Level.WARNING, "[RTP Action] Failed registering command for action " + definition.id() + ": " + e.getMessage());
+          }
+        }
+        syncActionSubCmd();
+      }
+
+      @Override
+      public void onSync() {
+        syncActionSubCmd();
+      }
+    });
+  }
+
+  private static void syncActionSubCmd() {
+    if (RTP.baseCommand != null) {
+      CommandsAPICommand actionSub =
+          RTP.baseCommand.getCommandLookup().get("ACTION");
+      if (actionSub == null) {
+        actionSub = new ActionSubCmd(RTP.baseCommand);
+        RTP.baseCommand.addSubCommand(actionSub);
+        RTP.baseCommand.getCommandLookup().put("RUN", actionSub);
+        RTP.baseCommand.getCommandLookup().put("TRIGGER", actionSub);
+      }
+      if (actionSub instanceof ActionSubCmd subCmd) {
+        subCmd.syncActions();
+      }
+    }
+  }
+
   private final ActionCancelCmd cancelCmd;
 
   public ActionSubCmd(@Nullable CommandsAPICommand parent) {

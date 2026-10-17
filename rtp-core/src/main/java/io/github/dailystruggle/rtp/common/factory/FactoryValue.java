@@ -76,6 +76,14 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
   }
 
   /**
+   * Lifecycle callback invoked when a factory value is constructed/cloned for a specific target.
+   * Overridden by subclasses (e.g. {@code ConfigParser}) that perform self-checks or renames.
+   */
+  public void onConstruct() {
+    // Default no-op
+  }
+
+  /**
    * Returns a mutable copy of the current (immutable, published) data map.
    *
    * @return cloned copy of data

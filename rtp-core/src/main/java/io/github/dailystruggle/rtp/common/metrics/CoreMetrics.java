@@ -5,7 +5,6 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionQueueManager;
-import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -182,6 +181,19 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
         return snapshotRing;
     }
 
+    private static volatile java.util.function.IntSupplier memoryTrackerEntriesSupplier = () -> 0;
+    private static volatile java.util.function.ToIntFunction<String> memoryTrackerByLabelSupplier = label -> 0;
+
+    /**
+     * Installs suppliers for memory-tracker counts, decoupling {@link CoreMetrics} from {@code tools.MemoryTracker}.
+     */
+    public static void setMemoryTrackerSuppliers(
+            java.util.function.IntSupplier entriesSupplier,
+            java.util.function.ToIntFunction<String> byLabelSupplier) {
+        if (entriesSupplier != null) memoryTrackerEntriesSupplier = entriesSupplier;
+        if (byLabelSupplier != null) memoryTrackerByLabelSupplier = byLabelSupplier;
+    }
+
     /**
      * Samples the current runtime state and returns a snapshot.
      *
@@ -191,8 +203,8 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
     public io.github.dailystruggle.metrics.api.MetricsSnapshot snapshot() {
         io.github.dailystruggle.metrics.api.MetricsBinding b = this.binding;
         int queueDepth = computeQueueDepth();
-        int memoryTrackerEntries = MemoryTracker.trackedCount();
-        int pendingTeleports = MemoryTracker.trackedCountByLabel("TeleportPipelineTask");
+        int memoryTrackerEntries = memoryTrackerEntriesSupplier.getAsInt();
+        int pendingTeleports = memoryTrackerByLabelSupplier.applyAsInt("TeleportPipelineTask");
 
         double avgPipelineMs = pipelineHistogram.mean();
         int chunkLoadBacklog = b.chunkLoadBacklog();

@@ -7,7 +7,7 @@ import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopback
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.CoordinateRunEncoder;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.CoordinateRunEncoder;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 
 import java.io.File;

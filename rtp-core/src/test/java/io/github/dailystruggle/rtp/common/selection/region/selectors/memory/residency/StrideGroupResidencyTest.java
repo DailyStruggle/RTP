@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.res
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.DualLayerSweepCursor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import org.junit.jupiter.api.BeforeEach;

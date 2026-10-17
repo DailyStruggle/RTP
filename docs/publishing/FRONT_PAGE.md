@@ -30,6 +30,19 @@ To eliminate churn between beginner accessibility and engineering precision,
 the document is partitioned into three non-overlapping functional zones. Do not
 blur boundaries between zones when updating copy:
 
+Section order (fixed; do not reorder per target):
+  1. What it is + hero image + one-line install   (what is this, can I use it)
+  2. The short version: 1 headline + 5 outcome bullets; the rest sit in a
+     collapsed 'More highlights' block   (why this one)
+  3. Zone 2: common setups, install, features   (how do I use it)
+  4. Zone 3: performance, how it works, FAQ   (why should I believe it)
+  5. Why I made it
+Rule: a section moves up only if the section above it answers a question the
+reader asks earlier. The one-line install above the fold is the only allowed
+duplication of Install. Hero: a web editor screenshot (map, no jargon); the
+spatial-memory walk image stays in Zone 3 (it reads as noise above the fold).
+Use screenshots whose status pill reads LINK - CONNECTED.
+
 Zone 1: Verified Outcomes & Universal Guarantees (Above the Fold)
   - Audience: 100% of visitors (evaluators, beginners, power users).
   - Scope: Title, badges, 'What it is', platform compatibility, 'The short version'.
@@ -83,6 +96,12 @@ Private / Author notes:
 
 **{{name}} is a `/rtp` command.** It teleports a player to a random, safe spot in the world. Candidate checking runs off the tick thread. I've worked on it in my own time since 2021. The benchmarks and the test harness are in the repo, and every number below can be rerun from them.
 
+**Install:** drop `{{jar}}` into `plugins/` (or `mods/`), start the server, type `/rtp`. Full steps are in [Install](#install).
+
+![Web editor: a circular region with an inner exclusion zone drawn over the world map](../assets/img/web_editor_region_map.png)
+
+*Drawing where players land, in the browser editor (`/rtp editor`).*
+
 <!-- only: bbb-pro -->
 <!-- kind: promo -->
 This listing is how you pay for support. The code is the same as the [free download](https://modrinth.com/plugin/rtpv3) and all of it is MIT licensed. Paying doesn't unlock anything in the plugin; details are in [What paying gets you](#what-paying-gets-you) below.
@@ -102,17 +121,24 @@ On Paper all candidate checking runs off the tick thread. On Folia, candidates a
 
 ### The short version
 
-- [**Tick stability**](https://dailystruggle.github.io/RTP/admin/configuration/PERFORMANCE/): No ticks over 50 ms across 4,096 paced teleports in the Paper run; candidates are checked against region files off-tick before any chunk loads.
-- [**Low latency**](https://dailystruggle.github.io/RTP/site/why/#background-processing-and-memory): 6 ms median from `/rtp` to arrival on Paper, served from pre-verified candidate queues.
-- [**Throughput**](#performance): 40 TP/s on Paper and 180 TP/s on Folia under nominal ticks, scaling to 249.7 TP/s peak on Folia.
-- [**Even player spread**](https://dailystruggle.github.io/RTP/site/why/): Zero duplicate landings in each 4,096-teleport Paper 26.2 run, with no player coordinates tracked.
-- [**Spatial memory**](https://dailystruggle.github.io/RTP/admin/configuration/TTL/): Biomes and rejected chunks (with cause and TTL) remembered across restarts at chunk resolution.
-- [**Switch in one command**](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-another-rtp-plugin): `/rtp config import` reads any rtp-style config folder in `plugins/` (tested on BetterRTP, JustRTP and EzRTP), previews the result, and never overwrites without `overwrite=true`. Permission copy covers BetterRTP, JustRTP and EzRTP.
-- [**Web workspace**](https://dailystruggle.github.io/RTP/admin/WEB_EDITOR_GUIDE/): Edit region borders on a map, search configs by intent, and view live engine stats (`/rtp editor`). The hosted editor needs no inbound port.
+**No ticks over 50 ms across 4,096 paced teleports, and 6 ms median from `/rtp` to arrival (Paper).**
+
+- [**Doesn't lag the server**](https://dailystruggle.github.io/RTP/admin/configuration/PERFORMANCE/): 0 ticks over 50 ms in 4,096 paced teleports; candidates are checked off-tick before any chunk loads.
+- [**Fast**](#performance): 40 TP/s on Paper (a limit of Paper's single main thread), 180 TP/s on Folia under nominal ticks.
+- [**Even spread**](https://dailystruggle.github.io/RTP/site/why/): 0 duplicate landings in each 4,096-teleport Paper 26.2 run, with no player coordinates tracked.
+- [**Switch in one command**](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-another-rtp-plugin): `/rtp config import` reads your BetterRTP, JustRTP or EzRTP config, previews it, and never overwrites without `overwrite=true`.
+- [**Web workspace**](https://dailystruggle.github.io/RTP/admin/WEB_EDITOR_GUIDE/): draw region borders on a map in your browser (`/rtp editor`). No inbound port needed.
+
+<details>
+<summary><b>More highlights</b></summary>
+
+- [**Peak throughput**](#performance): 249.7 TP/s peak on Folia.
 - [**One jar**](https://dailystruggle.github.io/RTP/admin/QUICK_START/): Runs on Paper, Folia, Spigot, Fabric, NeoForge, and Velocity.
-- [**Action engine**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Scriptable pipeline for step-in portals, party scatter, and 1v1 arena duels.
+- [**Action engine**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Scripted teleports that start from a trigger, like stepping into a zone or queueing for a duel.
 - [**Custom terrain**](#region-file-pre-filter): Candidates are read from the region files on disk, so Iris, Terra, datapack and upgraded worlds are checked as they actually are.
-- [**Claim checks**](https://dailystruggle.github.io/RTP/admin/CLAIM_PLUGIN_COMPATIBILITY/): 16 claim plugins on Bukkit / Paper / Folia plus FTB Chunks and Open Parties and Claims on Fabric / NeoForge, checked fail-closed off the teleport tick. Optional PvP combat-tag check.
+- [**Claim checks**](https://dailystruggle.github.io/RTP/admin/CLAIM_PLUGIN_COMPATIBILITY/): 16 claim plugins on Bukkit / Paper / Folia plus FTB Chunks and Open Parties and Claims on Fabric / NeoForge, checked off the teleport tick, and the teleport is refused if a check cannot answer. Optional PvP combat-tag check.
+
+</details>
 
 Benchmark comparisons and hardware metrics are in [Performance](#performance).
 
@@ -120,7 +146,7 @@ Benchmark comparisons and hardware metrics are in [Performance](#performance).
 
 These work without extra plugins:
 
-- [**Spawn portals & launch pads**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Step-in trigger zones over portal frames or launch pads run teleports with countdown holograms, sounds, and particle trails.
+- [**Spawn portals & launch pads**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Step-in trigger zones over portal frames or launch pads run teleports, with an optional countdown hologram and effects.
 - [**Group & party scatter**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): The bundled `scatter.yml` action sends queued parties to safe spots at least `minSeparation` blocks apart.
 - [**First-join random spawn**](https://dailystruggle.github.io/RTP/admin/RECIPES/#rtp-on-first-join-random-spawn-for-new-players): Grant `rtp.onevent.firstjoin` to send new players to random spots on login; the login reserve cache keeps a destination pre-warmed so arrival is quick.
 - [**1v1 and 2v2 PvP matchmaking**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Bundled `challenge.yml`, `arena.yml`, and `teams.yml` actions queue and pair players for 1v1 duels or 2v2 squad battles into temporary bounded arenas with countdowns and border constraints, cleaned up automatically.
@@ -166,6 +192,17 @@ All configuration routes edit the same files, accept human units (`radius: 10km`
 - [**Engine Diagnostics**](https://dailystruggle.github.io/RTP/admin/QUICK_START/#diagnostics-rtp-info) (`/rtp info`): Live queue depth, latency percentiles, and per-region generation rates.
 - **11 languages** (`/rtp config language <locale>`): Config files and messages in German, Spanish, French, Italian, Japanese, Korean, Dutch, Polish, Portuguese, Russian and Chinese. Some keys are still in English; translations are welcome.
 
+![Web editor: custom polygon region with validation checks](../assets/img/web_editor_polygon_region.png)
+
+*Any boundary shape: a six-vertex polygon, with a diff of the staged change and validity checks.*
+
+![Web editor: diagnostics tab](../assets/img/web_editor_diagnostics.png)
+
+*Diagnostics tab: tick budget, queue depth per tier, and pipeline latency percentiles.*
+
+<details>
+<summary><b>More web editor screenshots</b></summary>
+
 ![Web editor: region map](../assets/img/web_editor_cartography.png)
 
 *Region editor: polygon boundaries over the terrain, with landing candidate previews.*
@@ -174,9 +211,7 @@ All configuration routes edit the same files, accept human units (`radius: 10km`
 
 *Settings editor with each setting's description alongside and a diff of staged changes.*
 
-![Web editor: diagnostics tab](../assets/img/web_editor_diagnostics.png)
-
-*Diagnostics tab: tick budget, queue depth per tier, and pipeline latency percentiles.*
+</details>
 
 <div align="center">
 
@@ -222,7 +257,7 @@ An extensible action pipeline for group events, boundary confinement, and miniga
 ### Claims and safety
 
 - **Claim plugins**: 16 on Bukkit / Paper / Folia through the bundled claim addon (GriefDefender, GriefPrevention, Lands, WorldGuard, TownyAdvanced, SaberFactions, FactionsBridge, HuskClaims, HuskTowns, PlotSquared, RedProtect, CrashClaim, KingdomsX, Residence, UltimateClaims, MinePlots), plus FTB Chunks and Open Parties and Claims on Fabric / NeoForge. Claim checks run in the async pipeline, off the teleport tick. You can add your own through `RegionVerifierRegistry` with one lambda.
-- **Claim and faction anchors**: an action can land players relative to their own town, claim or faction land (`anchor: claimboundary`, `anchor: faction`). Towny, GriefPrevention and SaberFactions / FactionsUUID boundaries are supported directly; others plug in through `ClaimBoundaryProvider`. The anchor stays put while it's inside the claim and is recomputed at most once per cooldown, which keeps destination anchors stable every time land changes hands.
+- **Claim and faction anchors**: an action can land players relative to their own town, claim or faction land (`anchor: claimboundary`, `anchor: faction`). Towny, GriefPrevention and SaberFactions / FactionsUUID boundaries are supported directly; others plug in through `ClaimBoundaryProvider`. The anchor stays put while it's inside the claim and is recomputed at most once per cooldown.
 - **Safety filter**: the block lists in `advanced/blocks.yml` (`unsafeBlocks`, `airBlocks`) take plain materials, block-state predicates (`OAK_SLAB[waterlogged=true]`), numeric ranges (`WATER[level>=5]`), vanilla and datapack block tags (`#minecraft:leaves`) and wildcards (`*[waterlogged=true]`). Grammar is in the details below.
 
 ### Networks
@@ -283,6 +318,10 @@ Full methodology, per-run analyses, and the runs not shown here (equalized-radiu
 ### Spatial memory
 
 About 35-65% of typical Minecraft terrain is ocean, lava or void. LeafRTP remembers biomes and invalid chunks (with cause and TTL) at chunk resolution across server restarts so it doesn't check the same dead ground twice. Operations like `/rtp biome=<biome>` resolve directly from memory without chunk loading. Locations are mapped in constant time, and `/rtp scan` pregenerates spatial memory off-tick. Mathematical derivations and distribution benchmarks: [Why LeafRTP exists](https://dailystruggle.github.io/RTP/site/why/).
+
+![Web editor view of the scan walk over a region, with rejected spots marked in red](../assets/img/web_editor_spatial_memory_walk.png)
+
+*The order `/rtp scan` walks a region in, with rejected spots in red; they are stored with their cause and TTL.*
 
 ### Region-file pre-filter
 
@@ -408,7 +447,7 @@ Safety-critical packages inside `rtp-core` have higher floors on top of the modu
 
 ## Why I made it
 
-I started this project for the challenge of solving a hard problem. Every time a player ran `/rtp`, the plugin took the blame for server lag. After watching 3Blue1Brown videos, I set out to prove mathematically that spatial memory could fix that, using a custom space-filling curve to spread candidates evenly without rerolling.
+I started this project for the challenge of solving a hard problem. Every time a player ran `/rtp`, people wrote "LAG" in chat. I thought "the problem is with pure rejection sampling. This seems solvable if I can figure an efficient memory system". After watching 3Blue1Brown videos, I set out to prove mathematically that spatial memory could fix that, using a custom space-filling curve to spread candidates evenly without rerolling.
 
 I built the rest in stages:
 - **v1:** Proved the math. Built the space-filling spiral to map 2D territory uniformly, so picks don't duplicate or clump and no player positions need tracking.

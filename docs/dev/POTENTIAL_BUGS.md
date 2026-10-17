@@ -110,6 +110,28 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** Many simultaneous arrivals in one region with large platforms can still extend that region's tick.
 - **Suggested next step:** Measure with the stress harness; if it shows, split block writes across ticks per chunk or cap writes per tick.
 
+### 2026-10-16 — Package tangles: RTPLocation in selection.region couples caches, claims, and storage
+
+- **Severity:** Medium
+- **Status:** Open
+- **Discovered during:** SonarQube tangle audit on branch `v3.3.0` / PR #57 (ADR-115 Phase 2)
+- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/selection/region/RTPLocation.java`
+- **Symptom / hypothesis:** `RTPLocation` is declared inside `selection.region`. Any package caching locations (`RingCacheStage`), persisting them (`DatabaseAccessor`), filtering claims (`ClaimAnchoredRegionTracker`), or monitoring memory safety (`MemoryTracker`) must import `selection.region`. In turn, `selection.region` imports those packages, producing ~6 mutual package cycles.
+- **Impact:** Violates the Tier 1-4 package DAG in ADR-115, couples location data structures to execution and persistence, and impedes isolated unit testing.
+- **Suggested next step:** Relocate `RTPLocation` to a Tier 1 data model package (e.g. `io.github.dailystruggle.rtp.common.selection.region.model` or `rtp-api`) and update all call sites across `cache`, `claim`, `database`, and `tools`.
+- **Linear:** RTP-67
+
+### 2026-10-16 — Package tangles: Configs reload orchestration couples configuration to tasks and selection
+
+- **Severity:** Medium
+- **Status:** Open
+- **Discovered during:** SonarQube tangle audit on branch `v3.3.0` / PR #57 (ADR-115 Phase 2)
+- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/configuration/Configs.java` (`reloadConfigs`, `reloadRegions`); `selection/region/Region.java`
+- **Symptom / hypothesis:** `Configs.java` acts as both a configuration store (Tier 1) and lifecycle coordinator (Tier 4), terminating tasks (`ScanTask.kill()`, `RTPTeleportCancel`), refreshing `TickBudget`, and recreating `Region` instances. Furthermore, `Region.java` directly instantiates `TeleportPipelineTask` and `ScanTask` while those tasks import `Region`. These cross-tier invocations cause ~11 package cycles between `configuration`, `tasks`, and `selection.region`.
+- **Impact:** Violates the Tier 1-4 package DAG in ADR-115, tangling configuration parsing with pipeline task dispatching and region lifecycle.
+- **Suggested next step:** Extract reload orchestration into a Tier 4 coordinator (`ConfigReloader` / `RTPConfigLifecycleCoordinator`), and invert pipeline task creation in `Region` using a task factory or dispatcher delegate.
+- **Linear:** RTP-68
+
 ### 2026-10-14 - FoliaRegionProcessor is never constructed
 
 - **Severity:** Low

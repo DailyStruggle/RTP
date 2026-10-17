@@ -333,7 +333,7 @@ Cite the verification level executed and rationale in the `submit` summary under
 
 ## Current Development Focus
 
-Active development frontiers are indexed in [`docs/dev/INDEX.md`](../docs/dev/INDEX.md) and tracked in [`docs/dev/ROADMAP.md`](../docs/dev/ROADMAP.md) and [`docs/dev/MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md) (Fabric and NeoForge platforms are complete; proxy/network mode is in progress).
+Active development frontiers are indexed in [`docs/dev/INDEX.md`](../docs/dev/INDEX.md) and tracked in the Linear `LeafRTP` team (pointer: [`docs/dev/ROADMAP.md`](../docs/dev/ROADMAP.md)) and [`docs/dev/MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md) (Fabric and NeoForge platforms are complete; proxy/network mode is in progress).
 
 ---
 
@@ -371,7 +371,7 @@ When discovering durable knowledge, record it in the canonical destination:
 | Dated engineering pitfall, reproduction note, non-obvious behavior | [`docs/dev/LESSONS_LEARNED.md`](../docs/dev/LESSONS_LEARNED.md) |
 | Overloaded or ambiguous domain term | [`docs/dev/GLOSSARY.md`](../docs/dev/GLOSSARY.md) (Multipurpose Terms table) |
 | Informal alias / nickname for an existing code symbol | this file (*Domain Analogies & Aliases* table) |
-| Roadmap phase completion / decision change (multi-platform) | *Current Development Focus* above **and** [`docs/dev/ROADMAP.md`](../docs/dev/ROADMAP.md) |
+| Roadmap phase completion / decision change (multi-platform) | *Current Development Focus* above **and** the matching Linear `LeafRTP` issue (pointer: [`docs/dev/ROADMAP.md`](../docs/dev/ROADMAP.md)) |
 | Roadmap phase completion / decision change (multi-server proxy) | [`MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md); [`docs/admin/proxies/`](../docs/admin/proxies/) |
 | Roadmap phase completion / decision change (metrics) | [`METRICS_PLAN.md`](../docs/dev/METRICS_PLAN.md) |
 | Renamed / moved class referenced by a REQ-* | [`docs/dev/TRACEABILITY.md`](../docs/dev/TRACEABILITY.md) row |

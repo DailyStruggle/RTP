@@ -200,3 +200,16 @@ package-lock.json
 /*.png
 rtp-core/*.png
 rtp-core/docs/
+# Nested module path and plugin data dir produced when a test runs with rtp-core/ as cwd
+rtp-core/rtp-core/
+rtp-core/plugins/
+
+# Stray devstack artifacts (renamed lockfile copies, jars parked by audits)
+devstack/clients/package-lock.json.*
+*.disabled-by-audit
+
+# Root scratch output (javap/compile probes, ad-hoc gradle logs)
+/temp_*.class
+/gradle-*.log
+/core_compile.log
+/gate_lines.txt

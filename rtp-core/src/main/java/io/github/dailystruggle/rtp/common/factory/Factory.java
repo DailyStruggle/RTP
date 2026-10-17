@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.factory;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import java.util.Enumeration;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -94,14 +93,7 @@ public class Factory<T extends FactoryValue<?>> {
       if (value == null) return null;
       FactoryValue<?> cloned = value.clone();
       cloned.name = (name.endsWith(".yml")) ? name : name + ".yml";
-
-      if (cloned instanceof ConfigParser) {
-        ConfigParser<?> configParser = (ConfigParser<?>) cloned;
-        // Reuse the template's rename map (e.g. a MultiConfigParser's shared
-        // folder-similar `.worlds.lang.yml`) rather than passing null, which
-        // would re-auto-resolve to a stray per-file map inside the folder.
-        configParser.check(configParser.version, configParser.pluginDirectory, configParser.langFile);
-      }
+      cloned.onConstruct();
       value = (T) cloned;
     }
     return value.clone();
@@ -129,11 +121,7 @@ public class Factory<T extends FactoryValue<?>> {
     }
     FactoryValue<?> cloned = template.clone();
     cloned.name = (name.endsWith(".yml")) ? name : name + ".yml";
-    if (cloned instanceof ConfigParser) {
-      ConfigParser<?> configParser = (ConfigParser<?>) cloned;
-      // Reuse the template's rename map (see construct(String)) instead of null.
-      configParser.check(configParser.version, configParser.pluginDirectory, configParser.langFile);
-    }
+    cloned.onConstruct();
     return cloned.clone();
   }
 

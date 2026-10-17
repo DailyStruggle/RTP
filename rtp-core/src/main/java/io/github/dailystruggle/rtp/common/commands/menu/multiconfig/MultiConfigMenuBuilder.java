@@ -5,7 +5,6 @@ import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
-import io.github.dailystruggle.rtp.common.commands.menu.CommandTreeMenuBuilder;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 
@@ -31,7 +30,7 @@ public final class MultiConfigMenuBuilder {
      * Optional delegate for flat-config editing parity (clickable keys, pagination, cart).
      * Falls back to display-only layout when unset.
      */
-    private volatile @org.jetbrains.annotations.Nullable CommandTreeMenuBuilder commandTreeMenuBuilder;
+    private volatile @org.jetbrains.annotations.Nullable ConfigFileMenuDelegate commandTreeMenuBuilder;
 
     /**
      * Constructs a menu builder emitting concrete command actions.
@@ -41,11 +40,11 @@ public final class MultiConfigMenuBuilder {
     }
 
     /**
-     * Wire (or unwire) the {@link CommandTreeMenuBuilder} used by
+     * Wire (or unwire) the {@link ConfigFileMenuDelegate} used by
      * {@link #buildEntry} to delegate per-entry rendering. Pass
      * {@code null} to disable delegation (legacy display-only layout).
      */
-    public void setCommandTreeMenuBuilder(@org.jetbrains.annotations.Nullable CommandTreeMenuBuilder builder) {
+    public void setCommandTreeMenuBuilder(@org.jetbrains.annotations.Nullable ConfigFileMenuDelegate builder) {
         this.commandTreeMenuBuilder = builder;
     }
 
@@ -175,12 +174,12 @@ public final class MultiConfigMenuBuilder {
         MultiConfigRemovalGuard guard = MultiConfigRemovalGuards.get(parserKind);
 
         // Delegation path. When the platform adapter wired a
-        // CommandTreeMenuBuilder (rtp-plugin RTPCmdBukkit), reuse the
+        // ConfigFileMenuDelegate (e.g. CommandTreeMenuBuilder), reuse the
         // flat-config page builder so every editor feature (clickable
         // keys, pagination, staging cart) applies uniformly to
         // multiconfig entries. Post-processing rewrites Back + appends
         // the Remove row.
-        CommandTreeMenuBuilder delegate = this.commandTreeMenuBuilder;
+        ConfigFileMenuDelegate delegate = this.commandTreeMenuBuilder;
         if (delegate != null && entryParser != null) {
             String syntheticFileName = parserKind + "/" + entryName;
             MenuModel inner = invokeBuildConfigFile(
@@ -282,20 +281,17 @@ public final class MultiConfigMenuBuilder {
     // ---- helpers ----------------------------------------------------------
 
     /**
-     * Reflective bridge to {@link CommandTreeMenuBuilder#buildConfigFile}.
-     * Isolates generic enum type parameters; returns null on invocation failure.
+     * Bridge to {@link ConfigFileMenuDelegate#buildConfigFile}.
+     * Returns null on invocation failure.
      */
-    @SuppressWarnings({"unchecked", "rawtypes"})
     private static @org.jetbrains.annotations.Nullable MenuModel invokeBuildConfigFile(
-            CommandTreeMenuBuilder delegate,
+            ConfigFileMenuDelegate delegate,
             UUID viewer,
             String syntheticFileName,
             ConfigParser<?> entryParser,
             java.util.LinkedHashMap<String, String> cartSnapshot) {
         try {
-            return ((CommandTreeMenuBuilder) delegate).buildConfigFile(
-                    viewer, syntheticFileName,
-                    (ConfigParser) entryParser, cartSnapshot);
+            return delegate.buildConfigFile(viewer, syntheticFileName, entryParser, cartSnapshot);
         } catch (RuntimeException ignored) {
             return null;
         }

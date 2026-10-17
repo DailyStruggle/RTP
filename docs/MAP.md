@@ -32,7 +32,7 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - [`dev/CONFIG_COMMENT_STYLE.md`](dev/CONFIG_COMMENT_STYLE.md) — configuration comment guidelines and style.
 - [`dev/MULTI_SERVER_PLAN.md`](dev/MULTI_SERVER_PLAN.md) — proxy / multi-server (Velocity, BungeeCord) roadmap; D-005 gated.
 - [`dev/METRICS_PLAN.md`](dev/METRICS_PLAN.md) — runtime metrics SPI (TPS / MSPT / heap / queue / pipeline); implementation eligible.
-- [`dev/ROADMAP.md`](dev/ROADMAP.md) — forward-looking work.
+- [`dev/ROADMAP.md`](dev/ROADMAP.md) — pointer to the Linear `LeafRTP` team, where forward-looking work is tracked.
 - [`dev/POTENTIAL_BUGS.md`](dev/POTENTIAL_BUGS.md) — triage log for potential issues found during development.
 - [`dev/PUBLISHING.md`](dev/PUBLISHING.md) — publishing `rtp-api`/`rtp-core` for out-of-repo addons (JitPack active; Maven Central how-to).
 - [`dev/PULL_REQUEST_PROCESS.md`](dev/PULL_REQUEST_PROCESS.md) — pull request lifecycle, local verification gates, and CI pipeline reference.
