@@ -164,7 +164,6 @@ All configuration routes edit the same files, accept human units (`radius: 10km`
 - [**Spatial Pregeneration**](https://dailystruggle.github.io/RTP/admin/configuration/TTL/) (`/rtp scan`): Checks region files off-tick ahead of time, recording biomes, invalidity causes, and claims at chunk resolution.
 - [**Live Visualizations**](https://dailystruggle.github.io/RTP/admin/configuration/IN_GAME_CONFIG/#c-diagnostics--monitoring) (`/rtp visualization`): Renders boundaries, biome layouts, and candidate heatmaps onto held in-game maps.
 - [**Engine Diagnostics**](https://dailystruggle.github.io/RTP/admin/QUICK_START/#diagnostics-rtp-info) (`/rtp info`): Live queue depth, latency percentiles, and per-region generation rates.
-- **Bundled docs** (`/rtp docs`): The admin docs ship inside the jar and read in game; `/rtp docs export` writes an offline HTML copy.
 - **11 languages** (`/rtp config language <locale>`): Config files and messages in German, Spanish, French, Italian, Japanese, Korean, Dutch, Polish, Portuguese, Russian and Chinese. Some keys are still in English; translations are welcome.
 
 ![Web editor: region map](../assets/img/web_editor_cartography.png)

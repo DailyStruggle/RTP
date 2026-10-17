@@ -10,7 +10,7 @@ The LeafRTP Web Workspace is a browser-based visual cartography and configuratio
 ## 1. Problem Statement: The Simultaneous View & Edit Dilemma
 
 Traditional server management confronts operators with screen conflicts and accessibility hurdles:
-- **Screen Lock:** Opening in-game books (`/rtp docs`) or inventory menus locks the Minecraft client screen. Operators cannot comfortably cross-reference documentation while tweaking complex configuration files or command arguments.
+- **Screen Lock:** Opening in-game books or inventory menus locks the Minecraft client screen. Operators cannot comfortably cross-reference documentation while tweaking complex configuration files or command arguments.
 - **Port-Forwarding & Remote Hosting Restrictions:** Running an embedded HTTP listener inside the Minecraft JVM requires inbound firewall ports, which are frequently blocked by shared hosting environments or home NATs. Embedded servers also introduce network attack surfaces (e.g. CSRF, unauthenticated sockets).
 - **Geometric Complexity:** Manually hand-typing coordinates for multi-vertex polygons (`POLYGON`) or inner exclusion rings (`centerRadius`) is error-prone and unintuitive.
 
@@ -161,7 +161,6 @@ For environments without outbound internet connectivity or where external byte s
    ```text
    /rtp editor local
    ```
-   *(or `/rtp docs export`)*
 2. The server outputs a single standalone file at:
    ```text
    plugins/RTP/editor/index.html
@@ -187,7 +186,7 @@ For environments without outbound internet connectivity or where external byte s
 
 - [`FOR_SERVER_ADMINS.md`](../FOR_SERVER_ADMINS.md) — Server administrator onboarding and reading order.
 - [`QUICK_START.md`](QUICK_START.md) — Fast 10-minute setup guide.
-- [`COMMANDS.md`](COMMANDS.md) — Full command reference for `/rtp editor`, `/rtp editor apply`, and `/rtp docs`.
+- [`COMMANDS.md`](COMMANDS.md) — Full command reference for `/rtp editor` and `/rtp editor apply`.
 - [`RUNBOOK.md`](RUNBOOK.md) — Incident response and operational troubleshooting.
 - [`CONFIGURATION.md`](configuration/CONFIGURATION.md) — Complete configuration parameter reference.
 - [`ADR-104`](../../adr/ADR-104-ephemeral-web-editor-and-packed-docs-integration.md) — Architectural design record for ephemeral web editor and in-game docs.
