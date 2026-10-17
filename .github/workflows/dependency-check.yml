@@ -1,23 +1,12 @@
 name: OWASP Dependency Check
 
+# Paused: manual dispatch only. The shipped jars contain only in-repo classes
+# (io/github/dailystruggle/**, including the bundled addon jars), so there is
+# no third-party code for this scan to match; in-repo code is covered by
+# SonarCloud and PMD. Restore the schedule / push / pull_request triggers if a
+# third-party library is ever shaded or bundled.
 on:
-  schedule:
-    # Run weekly on Monday at 04:00 UTC
-    - cron: '0 4 * * 1'
   workflow_dispatch:
-  push:
-    branches: [ V3 ]
-    paths:
-      - 'gradle/libs.versions.toml'
-      - 'build.gradle'
-      - '**/build.gradle'
-  pull_request:
-    branches: [ V3, V2, V1 ]
-    paths:
-      - 'gradle/libs.versions.toml'
-      - 'build.gradle'
-      - '**/build.gradle'
-      - 'config/dependency-check-suppressions.xml'
 
 permissions:
   contents: read

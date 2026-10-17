@@ -60,6 +60,14 @@ public final class FabricMenuRenderer implements MenuRenderer {
   /** Guards one-time registration of the lifecycle/tick capture listeners. */
   private static volatile boolean lifecycleHooked;
 
+  /** Server set by {@code RTPGuiFabricInitializer}; preferred over {@link #capturedServer}. */
+  private static volatile MinecraftServer boundServer;
+
+  /** Called by {@code RTPGuiFabricInitializer} on SERVER_STARTED ({@code server}) and SERVER_STOPPING ({@code null}). */
+  static void bindServer(MinecraftServer server) {
+    boundServer = server;
+  }
+
   public FabricMenuRenderer() {
     ensureServerCapture();
   }
@@ -141,7 +149,7 @@ public final class FabricMenuRenderer implements MenuRenderer {
    * deobfuscated MC 26.x runtime, throwing {@link NoClassDefFoundError}.
    */
   private static MinecraftServer currentServer() {
-    MinecraftServer s = RTPGuiFabricInitializer.server();
+    MinecraftServer s = boundServer;
     if (s != null) {
       return s;
     }

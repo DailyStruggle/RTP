@@ -48,7 +48,7 @@ import java.util.function.IntSupplier;
  *
  * <p>The sampler maintains:
  * <ul>
- *   <li>latest snapshot (read by {@link MetricsRecorder.Attempt} at dispatch)</li>
+ *   <li>latest snapshot (read by {@link Attempt} at dispatch)</li>
  *   <li>rolling samples for the run summary (min TPS, p95 MSPT, peak heap)</li>
  * </ul>
  */

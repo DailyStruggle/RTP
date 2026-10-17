@@ -342,7 +342,7 @@ public final class RTPBukkitLitePlugin extends JavaPlugin {
 
     if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
       RTP.log(java.util.logging.Level.FINE, "[RTP] onEnable registering PAPI_expansion");
-      new PAPI_expansion().register();
+      new PAPI_expansion(this).register();
     } else {
       RTP.log(java.util.logging.Level.FINER, "[RTP] onEnable PlaceholderAPI not present -- skipping PAPI_expansion");
     }

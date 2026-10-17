@@ -306,10 +306,10 @@ public final class Runner {
      *  to an in-flight attempt. Records the attempt as failed with the given
      *  reason and frees the slot immediately. */
     public void onConsoleFail(UUID playerId, String reason) {
-        MetricsRecorder.Attempt a = probe.forget(playerId);
+        Attempt a = probe.forget(playerId);
         if (a != null) {
             recorder.onComplete(a, false, reason == null ? "CONSOLE_FAIL" : reason, 0, 0,
-                    MetricsRecorder.AttributionSource.CONSOLE);
+                    AttributionSource.CONSOLE);
         }
         if (deadlines.remove(playerId) != null) {
             inFlight.decrementAndGet();
@@ -348,7 +348,7 @@ public final class Runner {
     /**
      * Run each configured target in turn for {@code perTargetSeconds}, with a
      * {@code gapSeconds} recovery pause between targets. Per-target results are
-     * still attributed via {@link MetricsRecorder.Attempt#targetLabel}, so
+     * still attributed via {@link Attempt#targetLabel}, so
      * {@code /rtpstress export} produces the same per-target breakdown - but
      * targets do not contend with one another within a single phase, which is
      * what the user wants when isolating each plugin's behaviour.
@@ -630,7 +630,7 @@ public final class Runner {
     /** Times out every tracked attempt; used when a bounded drain expires. */
     private void forceClearInFlight() {
         for (UUID id : new ArrayList<>(deadlines.keySet())) {
-            MetricsRecorder.Attempt a = probe.forget(id);
+            Attempt a = probe.forget(id);
             if (a != null) recorder.onTimeout(a);
             deadlines.remove(id);
         }
@@ -802,11 +802,11 @@ public final class Runner {
         int idx = rampStageIdx;
         if (idx < 0 || idx >= rampStages.length || rampTarget == null) return;
         long end = Math.max(rampStateStartMs, Math.min(rampStageEndMs, now));
-        List<MetricsRecorder.Attempt> atts =
+        List<Attempt> atts =
                 recorder.finishedDispatchedBetween(rampStateStartMs, end + 1L, rampTarget.label);
         int ok = 0, to = 0, err = 0, busy = 0;
         List<Long> lat = new ArrayList<>();
-        for (MetricsRecorder.Attempt a : atts) {
+        for (Attempt a : atts) {
             switch (RampEvaluator.classify(a.success, a.failReason, rampBusyPatterns)) {
                 case SUCCESS -> {
                     ok++;
@@ -972,7 +972,7 @@ public final class Runner {
         }
         // Time out any still-expected attempts so the CSV is closed cleanly.
         for (UUID id : new ArrayList<>(deadlines.keySet())) {
-            MetricsRecorder.Attempt a = probe.forget(id);
+            Attempt a = probe.forget(id);
             if (a != null) recorder.onTimeout(a);
             deadlines.remove(id);
         }
@@ -1044,7 +1044,7 @@ public final class Runner {
                         (now - lastProgressEpochMs), kickstartCount,
                         deadlines.size(), nextDispatchAt.size(), inFlight.get()));
                 for (UUID id : new ArrayList<>(deadlines.keySet())) {
-                    MetricsRecorder.Attempt a = probe.forget(id);
+                    Attempt a = probe.forget(id);
                     if (a != null) recorder.onTimeout(a);
                     deadlines.remove(id);
                 }
@@ -1085,7 +1085,7 @@ public final class Runner {
             for (var entry : deadlines.entrySet()) {
                 if (entry.getValue() <= now) {
                     UUID id = entry.getKey();
-                    MetricsRecorder.Attempt a = probe.forget(id);
+                    Attempt a = probe.forget(id);
                     if (a != null) recorder.onTimeout(a);
                     // Gate the decrement on the removal actually winning, exactly
                     // like onAttemptCompleted / onConsoleFail. The reaper (tick
@@ -1120,7 +1120,7 @@ public final class Runner {
                 double thr = config.getDouble("folia.poll-distance-threshold", 16.0);
                 double thr2 = thr * thr;
                 for (UUID id : probe.expectingIds()) {
-                    MetricsRecorder.Attempt a = probe.peek(id);
+                    Attempt a = probe.peek(id);
                     if (a == null) continue;
                     Player p = Bukkit.getPlayer(id);
                     if (p == null || !p.isOnline()) continue;
@@ -1179,7 +1179,7 @@ public final class Runner {
                     if (inFlight.get() > 0) {
                         if (now < warmupSliceDrainDeadline) return;
                         for (UUID id : new ArrayList<>(deadlines.keySet())) {
-                            MetricsRecorder.Attempt a = probe.forget(id);
+                            Attempt a = probe.forget(id);
                             if (a != null) recorder.onTimeout(a);
                             if (deadlines.remove(id) != null) inFlight.decrementAndGet();
                         }
@@ -1262,7 +1262,7 @@ public final class Runner {
                         // none of these lingering attempts have CSV impact;
                         // they only need their bookkeeping wiped.
                         for (UUID id : new ArrayList<>(deadlines.keySet())) {
-                            MetricsRecorder.Attempt a = probe.forget(id);
+                            Attempt a = probe.forget(id);
                             if (a != null) recorder.onTimeout(a); // no-op while !recording
                             deadlines.remove(id);
                         }
@@ -1366,7 +1366,7 @@ public final class Runner {
                             // tick task still firing at 10 Hz (observed as
                             // fans-revving freeze ~60 s after phase start).
                             for (UUID id : new ArrayList<>(deadlines.keySet())) {
-                                MetricsRecorder.Attempt a = probe.forget(id);
+                                Attempt a = probe.forget(id);
                                 if (a != null) recorder.onTimeout(a);
                                 deadlines.remove(id);
                             }
@@ -1480,7 +1480,7 @@ public final class Runner {
         // completion signal - leaving the flag on would attribute nothing and
         // produce a wall of TIMEOUTs (the ezrtp/justrtp symptom).
         probe.setDirectAuthoritative(isDirectArm(chosen));
-        MetricsRecorder.Attempt attempt = new MetricsRecorder.Attempt(
+        Attempt attempt = new Attempt(
                 UUID.randomUUID(),
                 target.getName(),
                 from.getWorld() == null ? "" : from.getWorld().getName(),
@@ -1620,7 +1620,7 @@ public final class Runner {
      * stops doing work instead of re-running the early-return path every
      * tick on a region thread.
      */
-    private void startPinnedPositionWatch(Player target, MetricsRecorder.Attempt attempt,
+    private void startPinnedPositionWatch(Player target, Attempt attempt,
                                           double fromX, double fromZ, long timeoutMs) {
         UUID tid = target.getUniqueId();
         double thr = config.getDouble("folia.poll-distance-threshold", 16.0);

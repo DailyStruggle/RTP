@@ -89,7 +89,7 @@ public class RegionCacheTask extends RTPRunnable {
      * Observational-mode factory. Constructs task running only when cache is at/above
      * cacheCap, discarding safe candidates while retaining bad-location/biome side effects.
      */
-    public static RegionCacheTask observe(Region region, long maxNanos) {
+    public static RegionCacheTask observe(Region region) {
         return new RegionCacheTask(region, true);
     }
 

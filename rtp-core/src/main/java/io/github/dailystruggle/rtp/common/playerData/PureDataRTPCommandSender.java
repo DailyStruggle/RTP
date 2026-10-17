@@ -130,7 +130,7 @@ public class PureDataRTPCommandSender implements RTPCommandSender, Cloneable {
   @Override
   public boolean equals(Object obj) {
     if (obj == this) return true;
-    if (obj == null || !(obj instanceof RTPCommandSender)) return false;
+    if (!(obj instanceof RTPCommandSender)) return false;
     RTPCommandSender that = (RTPCommandSender) obj;
     return Objects.equals(this.uuid, that.uuid());
   }

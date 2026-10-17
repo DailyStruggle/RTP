@@ -71,6 +71,9 @@ class SpatialDistributionFidelityTest {
         square.set(GenericMemoryShapeParams.mode, io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode.NONE);
         square.set(GenericMemoryShapeParams.radius, CHUNK_RADIUS);
         square.set(GenericMemoryShapeParams.centerRadius, 0L);
+        // Shape selection draws from its own RNG (ThreadLocalRandom by default); unseeded, an
+        // alpha=0.05 goodness-of-fit test fails ~1 run in 20 on a correct distribution.
+        square.setRng(new java.util.Random(20261017L));
         RegionSettings settings = new RegionSettings(
                 "spatial_region", world, square, new LinearAdjustor(new ArrayList<>()),
                 false, false, 10L, 1000L, 0L, 0, 0.0, 1L, "", false);

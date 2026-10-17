@@ -11,6 +11,8 @@ from scripts.release.build_front_pages import (
     FrontPageError,
     build_all,
     check_denylist,
+    check_short_version_labels,
+    check_zone1_jargon,
     inline_bbcode,
     main,
     render,
@@ -102,6 +104,39 @@ class DenylistTest(unittest.TestCase):
                                             "ProtocolLib, Protection, per-region pricing, pays for every candidate"))
 
 
+class Zone1JargonTest(unittest.TestCase):
+
+    def test_jargon_above_the_fold_fails(self):
+        for line in ("40 TP/s on Paper", "Checks run off the tick thread", "MSPT stays flat",
+                     "`REROLL` mode", "candidates are screened"):
+            body = f"# T\n\n## What it is\n\n{line}\n\n## Common setups\n\nok\n"
+            with self.subTest(line=line), self.assertRaises(FrontPageError):
+                _render(body, "hangar")
+
+    def test_jargon_below_the_fold_and_in_link_targets_passes(self):
+        body = ("# T\n\n## What it is\n\n[No lag spikes](#performance-tp-s)\n\n"
+                "## Performance\n\n40 TP/s at 48 ms MSPT\n")
+        self.assertIn("40 TP/s", _render(body, "hangar"))
+
+    def test_rejected_lines_above_the_fold_fail(self):
+        for line in ("They told me \"no, that's laggy\", and I took that personally.",
+                     "It passed 400,000 downloads.", "It works with no setup."):
+            body = f"# T\n\n{line}\n\n## What it is\n\n{line}\n\n## Common setups\n\nok\n"
+            with self.subTest(line=line), self.assertRaises(FrontPageError):
+                _render(body, "hangar")
+
+    def test_short_version_labels_must_be_adjectives(self):
+        ok = [(1, "### The short version"), (2, "- [**Efficient**](#p): 0 stalls."),
+              (3, "- [**Web workspace**](#w): a map."), (4, "<details>"),
+              (5, "- [**Any long label is fine here**](#x): ok")]
+        self.assertEqual([], check_short_version_labels(ok))
+        bad = [(1, "### The short version"), (2, "- [**Holds up under a crowd**](#p): ok")]
+        self.assertEqual(1, len(check_short_version_labels(bad)))
+
+    def test_pages_without_zone1_heading_are_not_checked(self):
+        self.assertEqual([], check_zone1_jargon([(1, "40 TP/s")]))
+
+
 class BBCodeTest(unittest.TestCase):
 
     def test_inline_conversion(self):
@@ -159,6 +194,34 @@ class CommittedSourceTest(unittest.TestCase):
             bad.write_text(NOTES + "Buy the support tier\n", encoding="utf-8")
             self.assertEqual(1, main(["--check", "--source", str(bad), "--out-dir", str(out)]))
             self.assertFalse(out.exists())
+
+
+class DocLinkTest(unittest.TestCase):
+
+    def test_published_doc_resolves_to_website_with_anchor(self):
+        out = _render("[c](../admin/COMMANDS.md#commands)\n", "hangar")
+        self.assertIn("(https://dailystruggle.github.io/RTP/admin/COMMANDS/#commands)", out)
+        out = _render("[w](../site/why.md)\n", "bbb-lite")
+        self.assertIn("[URL='https://dailystruggle.github.io/RTP/site/why/']w[/URL]", out)
+
+    def test_repo_root_relative_doc_resolves_to_website(self):
+        out = _render("[c](docs/admin/COMMANDS.md)\n", "modrinth")
+        self.assertIn("(https://dailystruggle.github.io/RTP/admin/COMMANDS/)", out)
+
+    def test_unpublished_paths_resolve_to_github(self):
+        out = _render("[d](../../helpers/StressTestRTP/)\n[p](FRONT_PAGE.md)\n", "hangar")
+        self.assertIn("(https://github.com/DailyStruggle/RTP/tree/V3/helpers/StressTestRTP)", out)
+        self.assertIn("(https://github.com/DailyStruggle/RTP/blob/V3/docs/publishing/FRONT_PAGE.md)", out)
+
+    def test_missing_doc_fails(self):
+        with self.assertRaises(FrontPageError) as ctx:
+            _render("[g](../admin/NO_SUCH_PAGE.md)\n", "hangar")
+        self.assertIn("does not exist on disk", str(ctx.exception))
+
+    def test_absolute_and_anchor_links_untouched(self):
+        out = _render("[a](https://example.com/x) [b](#install)\n", "hangar")
+        self.assertIn("(https://example.com/x)", out)
+        self.assertIn("(#install)", out)
 
 
 class LocalImageTest(unittest.TestCase):

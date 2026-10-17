@@ -25,9 +25,9 @@ public final class StressCommand implements CommandExecutor, TabCompleter {
             "start", "stop", "status", "burst", "sequence", "ramp", "reset-cold", "export",
             "probe-footprint", "leakcheck", "churn", "tp", "coverage");
 
-    private final StressTestRTPPlugin plugin;
+    private final StressHost plugin;
 
-    public StressCommand(StressTestRTPPlugin plugin) { this.plugin = plugin; }
+    StressCommand(StressHost plugin) { this.plugin = plugin; }
 
     @Override
     @SuppressWarnings("java:S3516") // Bukkit command execution returns true to indicate command was handled

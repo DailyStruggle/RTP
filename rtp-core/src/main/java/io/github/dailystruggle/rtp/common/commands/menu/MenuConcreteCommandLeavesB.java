@@ -61,17 +61,17 @@ final class MenuConcreteCommandLeavesB {
     // -- /rtp menu picker path=<dotted> param=<name> -----------------------
 
     static final class PickerCmd extends BaseRTPCmdImpl {
-        private final MenuRedeemSubcommand owner;
-        PickerCmd(MenuRedeemSubcommand owner) {
+        private final MenuDispatchTarget owner;
+        PickerCmd(MenuDispatchTarget owner) {
             super(owner);
             this.owner = owner;
-            addParameter(P_PATH, freeParam(MenuRedeemSubcommand.PERMISSION,
+            addParameter(P_PATH, freeParam(MenuPermissionGates.MENU_PERMISSION,
                     "dotted parent path under /rtp"));
-            addParameter(P_PARAM, freeParam(MenuRedeemSubcommand.PERMISSION,
+            addParameter(P_PARAM, freeParam(MenuPermissionGates.MENU_PERMISSION,
                     "parameter name on the target TreeCommand"));
         }
         @Override public String name() { return "picker"; }
-        @Override public String permission() { return MenuRedeemSubcommand.PERMISSION; }
+        @Override public String permission() { return MenuPermissionGates.MENU_PERMISSION; }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
                                            @Nullable CommandsAPICommand n) { return run(c, p, null); }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
@@ -97,7 +97,7 @@ final class MenuConcreteCommandLeavesB {
      * Enumerate parameter values and delegates rendering to SelectionMenuBuilder.
      */
     abstract static class SelectionLeaf extends BaseRTPCmdImpl {
-        private final MenuRedeemSubcommand owner;
+        private final MenuDispatchTarget owner;
         private final String[] parentPath;
         private final String paramName;
         private final String displayName;
@@ -105,7 +105,7 @@ final class MenuConcreteCommandLeavesB {
         private final boolean executeOnClick;
         private final @Nullable MenuAction backAction;
 
-        SelectionLeaf(MenuRedeemSubcommand owner,
+        SelectionLeaf(MenuDispatchTarget owner,
                       String[] parentPath,
                       String paramName,
                       String displayName,
@@ -115,7 +115,7 @@ final class MenuConcreteCommandLeavesB {
                     executeOnClick, null);
         }
 
-        SelectionLeaf(MenuRedeemSubcommand owner,
+        SelectionLeaf(MenuDispatchTarget owner,
                       String[] parentPath,
                       String paramName,
                       String displayName,
@@ -132,7 +132,7 @@ final class MenuConcreteCommandLeavesB {
             this.backAction = backAction;
         }
 
-        @Override public String permission() { return MenuRedeemSubcommand.PERMISSION; }
+        @Override public String permission() { return MenuPermissionGates.MENU_PERMISSION; }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
                                            @Nullable CommandsAPICommand n) { return run(c, null); }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
@@ -147,7 +147,7 @@ final class MenuConcreteCommandLeavesB {
 
     /** {@code /rtp menu world} - pick a world, tinted by its resolved region. */
     static final class WorldCmd extends SelectionLeaf {
-        WorldCmd(MenuRedeemSubcommand owner) {
+        WorldCmd(MenuDispatchTarget owner) {
             super(owner, new String[0], "world", "world",
                     MenuColor::worldRegionColorPrefix, true);
         }
@@ -156,7 +156,7 @@ final class MenuConcreteCommandLeavesB {
 
     /** {@code /rtp menu region} - pick a region, tinted by its biome mix. */
     static final class RegionCmd extends SelectionLeaf {
-        RegionCmd(MenuRedeemSubcommand owner) {
+        RegionCmd(MenuDispatchTarget owner) {
             super(owner, new String[0], "region", "region",
                     MenuColor::regionColorPrefix, true);
         }
@@ -165,7 +165,7 @@ final class MenuConcreteCommandLeavesB {
 
     /** {@code /rtp menu biome} - pick a biome, tinted by its map color. */
     static final class BiomeCmd extends SelectionLeaf {
-        BiomeCmd(MenuRedeemSubcommand owner) {
+        BiomeCmd(MenuDispatchTarget owner) {
             super(owner, new String[0], "biome", "biome",
                     MenuColor::biomeColorPrefix, true);
         }
@@ -178,7 +178,7 @@ final class MenuConcreteCommandLeavesB {
      * carry no biome/map semantics).
      */
     static final class PrefabCmd extends SelectionLeaf {
-        PrefabCmd(MenuRedeemSubcommand owner) {
+        PrefabCmd(MenuDispatchTarget owner) {
             // The prefab picker stages values onto `admin prefab apply`, but is
             // reached from the admin panel; its Back row returns there rather
             // than looping onto the (non-navigable) value-staging path.
@@ -191,15 +191,15 @@ final class MenuConcreteCommandLeavesB {
     // -- /rtp menu page n=<n> ---------------------------------------------
 
     static final class PageCmd extends BaseRTPCmdImpl {
-        private final MenuRedeemSubcommand owner;
-        PageCmd(MenuRedeemSubcommand owner) {
+        private final MenuDispatchTarget owner;
+        PageCmd(MenuDispatchTarget owner) {
             super(owner);
             this.owner = owner;
-            addParameter(P_N, posIntParam(MenuRedeemSubcommand.PERMISSION,
+            addParameter(P_N, posIntParam(MenuPermissionGates.MENU_PERMISSION,
                     "1-indexed page number"));
         }
         @Override public String name() { return "page"; }
-        @Override public String permission() { return MenuRedeemSubcommand.PERMISSION; }
+        @Override public String permission() { return MenuPermissionGates.MENU_PERMISSION; }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
                                            @Nullable CommandsAPICommand n) { return run(c, p, null); }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
@@ -220,20 +220,20 @@ final class MenuConcreteCommandLeavesB {
      * Single leaf for {@code /rtp menu config ...} handling selector, directory, file, and key paths.
      */
     static final class ConfigCmd extends BaseRTPCmdImpl {
-        private final MenuRedeemSubcommand owner;
-        ConfigCmd(MenuRedeemSubcommand owner) {
+        private final MenuDispatchTarget owner;
+        ConfigCmd(MenuDispatchTarget owner) {
             super(owner);
             this.owner = owner;
-            addParameter(P_DIR, freeParam(MenuRedeemSubcommand.PERMISSION, "config sub-directory path"));
-            addParameter(P_FILE, freeParam(MenuRedeemSubcommand.PERMISSION, "config file name"));
-            addParameter(P_KEY, freeParam(MenuRedeemSubcommand.PERMISSION, "parameter key"));
-            addParameter(P_TYPE, freeParam(MenuRedeemSubcommand.PERMISSION, "sub-parameter type"));
-            addParameter(P_QUERY, freeParam(MenuRedeemSubcommand.PERMISSION, "search query"));
-            addParameter(P_PAGE, posIntParam(MenuRedeemSubcommand.PERMISSION, "1-indexed page"));
+            addParameter(P_DIR, freeParam(MenuPermissionGates.MENU_PERMISSION, "config sub-directory path"));
+            addParameter(P_FILE, freeParam(MenuPermissionGates.MENU_PERMISSION, "config file name"));
+            addParameter(P_KEY, freeParam(MenuPermissionGates.MENU_PERMISSION, "parameter key"));
+            addParameter(P_TYPE, freeParam(MenuPermissionGates.MENU_PERMISSION, "sub-parameter type"));
+            addParameter(P_QUERY, freeParam(MenuPermissionGates.MENU_PERMISSION, "search query"));
+            addParameter(P_PAGE, posIntParam(MenuPermissionGates.MENU_PERMISSION, "1-indexed page"));
             addSubCommand(new ConfigSearchCmd(owner, this));
         }
         @Override public String name() { return "config"; }
-        @Override public String permission() { return MenuRedeemSubcommand.PERMISSION; }
+        @Override public String permission() { return MenuPermissionGates.MENU_PERMISSION; }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
                                            @Nullable CommandsAPICommand n) { return run(c, p, null); }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
@@ -272,15 +272,15 @@ final class MenuConcreteCommandLeavesB {
      * the search prompt; with a query opens the results page.
      */
     static final class ConfigSearchCmd extends BaseRTPCmdImpl {
-        private final MenuRedeemSubcommand owner;
-        ConfigSearchCmd(MenuRedeemSubcommand owner, CommandsAPICommand parent) {
+        private final MenuDispatchTarget owner;
+        ConfigSearchCmd(MenuDispatchTarget owner, CommandsAPICommand parent) {
             super(parent);
             this.owner = owner;
-            addParameter(P_QUERY, freeParam(MenuRedeemSubcommand.PERMISSION, "search query"));
-            addParameter(P_PAGE, posIntParam(MenuRedeemSubcommand.PERMISSION, "1-indexed page"));
+            addParameter(P_QUERY, freeParam(MenuPermissionGates.MENU_PERMISSION, "search query"));
+            addParameter(P_PAGE, posIntParam(MenuPermissionGates.MENU_PERMISSION, "1-indexed page"));
         }
         @Override public String name() { return "search"; }
-        @Override public String permission() { return MenuRedeemSubcommand.PERMISSION; }
+        @Override public String permission() { return MenuPermissionGates.MENU_PERMISSION; }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
                                            @Nullable CommandsAPICommand n) { return run(c, p, null); }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
@@ -303,16 +303,16 @@ final class MenuConcreteCommandLeavesB {
     // -- /rtp menu stage / unstage / apply / discard -----------------------
 
     static final class StageCmd extends BaseRTPCmdImpl {
-        private final MenuRedeemSubcommand owner;
-        StageCmd(MenuRedeemSubcommand owner) {
+        private final MenuDispatchTarget owner;
+        StageCmd(MenuDispatchTarget owner) {
             super(owner);
             this.owner = owner;
-            addParameter(P_FILE, freeParam(MenuRedeemSubcommand.PERMISSION, "config file name"));
-            addParameter(P_KEY, freeParam(MenuRedeemSubcommand.PERMISSION, "parameter key"));
-            addParameter(P_VALUE, freeParam(MenuRedeemSubcommand.PERMISSION, "value to stage"));
+            addParameter(P_FILE, freeParam(MenuPermissionGates.MENU_PERMISSION, "config file name"));
+            addParameter(P_KEY, freeParam(MenuPermissionGates.MENU_PERMISSION, "parameter key"));
+            addParameter(P_VALUE, freeParam(MenuPermissionGates.MENU_PERMISSION, "value to stage"));
         }
         @Override public String name() { return "stage"; }
-        @Override public String permission() { return MenuRedeemSubcommand.PERMISSION; }
+        @Override public String permission() { return MenuPermissionGates.MENU_PERMISSION; }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
                                            @Nullable CommandsAPICommand n) { return run(c, p, null); }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
@@ -333,15 +333,15 @@ final class MenuConcreteCommandLeavesB {
     }
 
     static final class UnstageCmd extends BaseRTPCmdImpl {
-        private final MenuRedeemSubcommand owner;
-        UnstageCmd(MenuRedeemSubcommand owner) {
+        private final MenuDispatchTarget owner;
+        UnstageCmd(MenuDispatchTarget owner) {
             super(owner);
             this.owner = owner;
-            addParameter(P_FILE, freeParam(MenuRedeemSubcommand.PERMISSION, "config file name"));
-            addParameter(P_KEY, freeParam(MenuRedeemSubcommand.PERMISSION, "parameter key"));
+            addParameter(P_FILE, freeParam(MenuPermissionGates.MENU_PERMISSION, "config file name"));
+            addParameter(P_KEY, freeParam(MenuPermissionGates.MENU_PERMISSION, "parameter key"));
         }
         @Override public String name() { return "unstage"; }
-        @Override public String permission() { return MenuRedeemSubcommand.PERMISSION; }
+        @Override public String permission() { return MenuPermissionGates.MENU_PERMISSION; }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
                                            @Nullable CommandsAPICommand n) { return run(c, p, null); }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
@@ -361,14 +361,14 @@ final class MenuConcreteCommandLeavesB {
     }
 
     static final class ApplyCmd extends BaseRTPCmdImpl {
-        private final MenuRedeemSubcommand owner;
-        ApplyCmd(MenuRedeemSubcommand owner) {
+        private final MenuDispatchTarget owner;
+        ApplyCmd(MenuDispatchTarget owner) {
             super(owner);
             this.owner = owner;
-            addParameter(P_FILE, freeParam(MenuRedeemSubcommand.PERMISSION, "config file name"));
+            addParameter(P_FILE, freeParam(MenuPermissionGates.MENU_PERMISSION, "config file name"));
         }
         @Override public String name() { return "apply"; }
-        @Override public String permission() { return MenuRedeemSubcommand.PERMISSION; }
+        @Override public String permission() { return MenuPermissionGates.MENU_PERMISSION; }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
                                            @Nullable CommandsAPICommand n) { return run(c, p, null); }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
@@ -387,14 +387,14 @@ final class MenuConcreteCommandLeavesB {
     }
 
     static final class DiscardCmd extends BaseRTPCmdImpl {
-        private final MenuRedeemSubcommand owner;
-        DiscardCmd(MenuRedeemSubcommand owner) {
+        private final MenuDispatchTarget owner;
+        DiscardCmd(MenuDispatchTarget owner) {
             super(owner);
             this.owner = owner;
-            addParameter(P_FILE, freeParam(MenuRedeemSubcommand.PERMISSION, "config file name"));
+            addParameter(P_FILE, freeParam(MenuPermissionGates.MENU_PERMISSION, "config file name"));
         }
         @Override public String name() { return "discard"; }
-        @Override public String permission() { return MenuRedeemSubcommand.PERMISSION; }
+        @Override public String permission() { return MenuPermissionGates.MENU_PERMISSION; }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
                                            @Nullable CommandsAPICommand n) { return run(c, p, null); }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
@@ -415,17 +415,17 @@ final class MenuConcreteCommandLeavesB {
     // -- /rtp menu info scope=<global|world:N|region:N> [text=true] -------
 
     static final class InfoCmd extends BaseRTPCmdImpl {
-        private final MenuRedeemSubcommand owner;
-        InfoCmd(MenuRedeemSubcommand owner) {
+        private final MenuDispatchTarget owner;
+        InfoCmd(MenuDispatchTarget owner) {
             super(owner);
             this.owner = owner;
-            addParameter(P_SCOPE, freeParam(MenuRedeemSubcommand.PERMISSION,
+            addParameter(P_SCOPE, freeParam(MenuPermissionGates.MENU_PERMISSION,
                     "info scope: global | world:<name> | region:<name>"));
-            addParameter(P_TEXT, freeParam(MenuRedeemSubcommand.PERMISSION,
+            addParameter(P_TEXT, freeParam(MenuPermissionGates.MENU_PERMISSION,
                     "if true, render chat (text) instead of book"));
         }
         @Override public String name() { return "info"; }
-        @Override public String permission() { return MenuRedeemSubcommand.PERMISSION; }
+        @Override public String permission() { return MenuPermissionGates.MENU_PERMISSION; }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
                                            @Nullable CommandsAPICommand n) { return run(c, p, null); }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
@@ -464,26 +464,26 @@ final class MenuConcreteCommandLeavesB {
 
     /**
      * ADR-050 Stage 2: concrete leaf for {@link MenuAction.PromptAnvilInput}.
-     * Routes into {@link MenuRedeemSubcommand#dispatchPromptAnvilInput}, which
+     * Routes into {@code MenuRedeemSubcommand#dispatchPromptAnvilInput}, which
      * opens the platform anvil GUI on the player. Wire grammar:
      * {@code /rtp menu anvil path=<dotted> param=<name> [prefill=<text>] [mode=run|stage]}.
      */
     static final class AnvilCmd extends BaseRTPCmdImpl {
-        private final MenuRedeemSubcommand owner;
-        AnvilCmd(MenuRedeemSubcommand owner) {
+        private final MenuDispatchTarget owner;
+        AnvilCmd(MenuDispatchTarget owner) {
             super(owner);
             this.owner = owner;
-            addParameter(P_PATH, freeParam(MenuRedeemSubcommand.PERMISSION,
+            addParameter(P_PATH, freeParam(MenuPermissionGates.MENU_PERMISSION,
                     "dotted parent path under /rtp"));
-            addParameter(P_PARAM, freeParam(MenuRedeemSubcommand.PERMISSION,
+            addParameter(P_PARAM, freeParam(MenuPermissionGates.MENU_PERMISSION,
                     "parameter name to prompt for"));
-            addParameter(P_PREFILL, freeParam(MenuRedeemSubcommand.PERMISSION,
+            addParameter(P_PREFILL, freeParam(MenuPermissionGates.MENU_PERMISSION,
                     "initial anvil text"));
-            addParameter(P_MODE, freeParam(MenuRedeemSubcommand.PERMISSION,
+            addParameter(P_MODE, freeParam(MenuPermissionGates.MENU_PERMISSION,
                     "run (execute /rtp on confirm) | stage (route into config-staging cart)"));
         }
         @Override public String name() { return "anvil"; }
-        @Override public String permission() { return MenuRedeemSubcommand.PERMISSION; }
+        @Override public String permission() { return MenuPermissionGates.MENU_PERMISSION; }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
                                            @Nullable CommandsAPICommand n) { return run(c, p, null); }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
@@ -511,19 +511,19 @@ final class MenuConcreteCommandLeavesB {
     // -- /rtp menu multi kind=<kind> [entry=<name>] [op=add|remove] -------
 
     static final class MultiCmd extends BaseRTPCmdImpl {
-        private final MenuRedeemSubcommand owner;
-        MultiCmd(MenuRedeemSubcommand owner) {
+        private final MenuDispatchTarget owner;
+        MultiCmd(MenuDispatchTarget owner) {
             super(owner);
             this.owner = owner;
-            addParameter(P_KIND, freeParam(MenuRedeemSubcommand.PERMISSION,
+            addParameter(P_KIND, freeParam(MenuPermissionGates.MENU_PERMISSION,
                     "multi-config parser kind"));
-            addParameter(P_ENTRY, freeParam(MenuRedeemSubcommand.PERMISSION,
+            addParameter(P_ENTRY, freeParam(MenuPermissionGates.MENU_PERMISSION,
                     "entry name within the kind"));
-            addParameter(P_OP, freeParam(MenuRedeemSubcommand.PERMISSION,
+            addParameter(P_OP, freeParam(MenuPermissionGates.MENU_PERMISSION,
                     "mutation op: add | remove"));
         }
         @Override public String name() { return "multi"; }
-        @Override public String permission() { return MenuRedeemSubcommand.PERMISSION; }
+        @Override public String permission() { return MenuPermissionGates.MENU_PERMISSION; }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,
                                            @Nullable CommandsAPICommand n) { return run(c, p, null); }
         @Override public boolean onCommand(UUID c, Map<String, List<String>> p,

@@ -44,119 +44,130 @@ public final class RTPMetricsExtension implements io.github.dailystruggle.metric
             int chunkLoadBacklog,
             double avgPipelineMs,
             int databaseLatencyMs) {
-        this(queueDepth, pendingTeleports, memoryTrackerEntries, chunkLoadBacklog,
-                avgPipelineMs, databaseLatencyMs, 0L, 0L, 0L, 0, Collections.emptyMap());
+        this(builder()
+                .queueDepth(queueDepth)
+                .pendingTeleports(pendingTeleports)
+                .memoryTrackerEntries(memoryTrackerEntries)
+                .chunkLoadBacklog(chunkLoadBacklog)
+                .avgPipelineMs(avgPipelineMs)
+                .databaseLatencyMs(databaseLatencyMs));
     }
 
-    public RTPMetricsExtension(
-            int queueDepth,
-            int pendingTeleports,
-            int memoryTrackerEntries,
-            int chunkLoadBacklog,
-            double avgPipelineMs,
-            int databaseLatencyMs,
-            long slowPipelineCount,
-            long slowPipelineThresholdMs,
-            long queueGrowthWarnCount,
-            int queueGrowthWarnThreshold) {
-        this(queueDepth, pendingTeleports, memoryTrackerEntries, chunkLoadBacklog,
-                avgPipelineMs, databaseLatencyMs, slowPipelineCount, slowPipelineThresholdMs,
-                queueGrowthWarnCount, queueGrowthWarnThreshold, Collections.emptyMap());
+    private RTPMetricsExtension(Builder b) {
+        this.queueDepth = b.queueDepth;
+        this.pendingTeleports = b.pendingTeleports;
+        this.memoryTrackerEntries = b.memoryTrackerEntries;
+        this.chunkLoadBacklog = b.chunkLoadBacklog;
+        this.avgPipelineMs = b.avgPipelineMs;
+        this.databaseLatencyMs = b.databaseLatencyMs;
+        this.slowPipelineCount = b.slowPipelineCount;
+        this.slowPipelineThresholdMs = b.slowPipelineThresholdMs;
+        this.queueGrowthWarnCount = b.queueGrowthWarnCount;
+        this.queueGrowthWarnThreshold = b.queueGrowthWarnThreshold;
+        this.regionQueueStatus = immutableCopy(b.regionQueueStatus);
+        this.probeGovernors = immutableCopy(b.probeGovernors);
+        this.liveLoadGates = immutableCopy(b.liveLoadGates);
+        this.immediateGovernors = immutableCopy(b.immediateGovernors);
     }
 
-    public RTPMetricsExtension(
-            int queueDepth,
-            int pendingTeleports,
-            int memoryTrackerEntries,
-            int chunkLoadBacklog,
-            double avgPipelineMs,
-            int databaseLatencyMs,
-            long slowPipelineCount,
-            long slowPipelineThresholdMs,
-            long queueGrowthWarnCount,
-            int queueGrowthWarnThreshold,
-            Map<String, RegionQueueRow> regionQueueStatus) {
-        this(queueDepth, pendingTeleports, memoryTrackerEntries, chunkLoadBacklog,
-                avgPipelineMs, databaseLatencyMs, slowPipelineCount, slowPipelineThresholdMs,
-                queueGrowthWarnCount, queueGrowthWarnThreshold, regionQueueStatus, Collections.emptyMap());
+    /** Starts an extension with every counter at zero and every table empty. */
+    public static Builder builder() {
+        return new Builder();
     }
 
-    public RTPMetricsExtension(
-            int queueDepth,
-            int pendingTeleports,
-            int memoryTrackerEntries,
-            int chunkLoadBacklog,
-            double avgPipelineMs,
-            int databaseLatencyMs,
-            long slowPipelineCount,
-            long slowPipelineThresholdMs,
-            long queueGrowthWarnCount,
-            int queueGrowthWarnThreshold,
-            Map<String, RegionQueueRow> regionQueueStatus,
-            Map<String, ProbeGovernorRow> probeGovernors) {
-        this(queueDepth, pendingTeleports, memoryTrackerEntries, chunkLoadBacklog,
-                avgPipelineMs, databaseLatencyMs, slowPipelineCount, slowPipelineThresholdMs,
-                queueGrowthWarnCount, queueGrowthWarnThreshold, regionQueueStatus, probeGovernors,
-                Collections.emptyMap());
-    }
-
-    public RTPMetricsExtension(
-            int queueDepth,
-            int pendingTeleports,
-            int memoryTrackerEntries,
-            int chunkLoadBacklog,
-            double avgPipelineMs,
-            int databaseLatencyMs,
-            long slowPipelineCount,
-            long slowPipelineThresholdMs,
-            long queueGrowthWarnCount,
-            int queueGrowthWarnThreshold,
-            Map<String, RegionQueueRow> regionQueueStatus,
-            Map<String, ProbeGovernorRow> probeGovernors,
-            Map<String, LiveLoadGateRow> liveLoadGates) {
-        this(queueDepth, pendingTeleports, memoryTrackerEntries, chunkLoadBacklog,
-                avgPipelineMs, databaseLatencyMs, slowPipelineCount, slowPipelineThresholdMs,
-                queueGrowthWarnCount, queueGrowthWarnThreshold, regionQueueStatus, probeGovernors,
-                liveLoadGates, Collections.emptyMap());
-    }
-
-    public RTPMetricsExtension(
-            int queueDepth,
-            int pendingTeleports,
-            int memoryTrackerEntries,
-            int chunkLoadBacklog,
-            double avgPipelineMs,
-            int databaseLatencyMs,
-            long slowPipelineCount,
-            long slowPipelineThresholdMs,
-            long queueGrowthWarnCount,
-            int queueGrowthWarnThreshold,
-            Map<String, RegionQueueRow> regionQueueStatus,
-            Map<String, ProbeGovernorRow> probeGovernors,
-            Map<String, LiveLoadGateRow> liveLoadGates,
-            Map<String, ImmediateGovernorRow> immediateGovernors) {
-        this.queueDepth = queueDepth;
-        this.pendingTeleports = pendingTeleports;
-        this.memoryTrackerEntries = memoryTrackerEntries;
-        this.chunkLoadBacklog = chunkLoadBacklog;
-        this.avgPipelineMs = avgPipelineMs;
-        this.databaseLatencyMs = databaseLatencyMs;
-        this.slowPipelineCount = slowPipelineCount;
-        this.slowPipelineThresholdMs = slowPipelineThresholdMs;
-        this.queueGrowthWarnCount = queueGrowthWarnCount;
-        this.queueGrowthWarnThreshold = queueGrowthWarnThreshold;
-        this.regionQueueStatus = (regionQueueStatus == null || regionQueueStatus.isEmpty())
+    private static <V> Map<String, V> immutableCopy(Map<String, V> source) {
+        return (source == null || source.isEmpty())
                 ? Collections.emptyMap()
-                : Collections.unmodifiableMap(new LinkedHashMap<>(regionQueueStatus));
-        this.probeGovernors = (probeGovernors == null || probeGovernors.isEmpty())
-                ? Collections.emptyMap()
-                : Collections.unmodifiableMap(new LinkedHashMap<>(probeGovernors));
-        this.liveLoadGates = (liveLoadGates == null || liveLoadGates.isEmpty())
-                ? Collections.emptyMap()
-                : Collections.unmodifiableMap(new LinkedHashMap<>(liveLoadGates));
-        this.immediateGovernors = (immediateGovernors == null || immediateGovernors.isEmpty())
-                ? Collections.emptyMap()
-                : Collections.unmodifiableMap(new LinkedHashMap<>(immediateGovernors));
+                : Collections.unmodifiableMap(new LinkedHashMap<>(source));
+    }
+
+    /** Mutable staging for {@link RTPMetricsExtension}; {@code null} tables read as empty. */
+    public static final class Builder {
+        private int queueDepth;
+        private int pendingTeleports;
+        private int memoryTrackerEntries;
+        private int chunkLoadBacklog;
+        private double avgPipelineMs;
+        private int databaseLatencyMs;
+        private long slowPipelineCount;
+        private long slowPipelineThresholdMs;
+        private long queueGrowthWarnCount;
+        private int queueGrowthWarnThreshold;
+        private Map<String, RegionQueueRow> regionQueueStatus;
+        private Map<String, ProbeGovernorRow> probeGovernors;
+        private Map<String, LiveLoadGateRow> liveLoadGates;
+        private Map<String, ImmediateGovernorRow> immediateGovernors;
+
+        private Builder() {
+        }
+
+        public Builder queueDepth(int v) {
+            queueDepth = v;
+            return this;
+        }
+
+        public Builder pendingTeleports(int v) {
+            pendingTeleports = v;
+            return this;
+        }
+
+        public Builder memoryTrackerEntries(int v) {
+            memoryTrackerEntries = v;
+            return this;
+        }
+
+        public Builder chunkLoadBacklog(int v) {
+            chunkLoadBacklog = v;
+            return this;
+        }
+
+        public Builder avgPipelineMs(double v) {
+            avgPipelineMs = v;
+            return this;
+        }
+
+        public Builder databaseLatencyMs(int v) {
+            databaseLatencyMs = v;
+            return this;
+        }
+
+        /** ADR-053 slow-pipeline audit: count over threshold and the threshold itself. */
+        public Builder slowPipeline(long count, long thresholdMs) {
+            slowPipelineCount = count;
+            slowPipelineThresholdMs = thresholdMs;
+            return this;
+        }
+
+        /** ADR-053 queue-growth audit: warnings emitted and the depth that triggers one. */
+        public Builder queueGrowthWarn(long count, int threshold) {
+            queueGrowthWarnCount = count;
+            queueGrowthWarnThreshold = threshold;
+            return this;
+        }
+
+        public Builder regionQueueStatus(Map<String, RegionQueueRow> v) {
+            regionQueueStatus = v;
+            return this;
+        }
+
+        public Builder probeGovernors(Map<String, ProbeGovernorRow> v) {
+            probeGovernors = v;
+            return this;
+        }
+
+        public Builder liveLoadGates(Map<String, LiveLoadGateRow> v) {
+            liveLoadGates = v;
+            return this;
+        }
+
+        public Builder immediateGovernors(Map<String, ImmediateGovernorRow> v) {
+            immediateGovernors = v;
+            return this;
+        }
+
+        public RTPMetricsExtension build() {
+            return new RTPMetricsExtension(this);
+        }
     }
 
     @Override

@@ -54,34 +54,24 @@ public class TimeBoundTaskPipe extends RTPTaskPipe {
             try {
                 if (stop) return true;
                 Runnable runnable = runnables.poll();
-                if (runnable == null) continue;
-                if (runnable instanceof RTPDelayable) {
-                    long d = ((RTPDelayable) runnable).getDelay();
-                    if (d > 0) {
-                        delayedRunnables.add((RTPDelayable) runnable);
-                        continue;
+                if (isDueNow(runnable, delayedRunnables)) {
+                    long localStart = System.nanoTime();
+                    try {
+                        if (runnable instanceof RTPRunnable)
+                            ((RTPRunnable) runnable).runWithTracking();
+                        else runnable.run();
+                    } catch (Throwable throwable) {
+                        RTP.log(Level.WARNING, throwable.getMessage(), throwable);
                     }
+                    long localStop = System.nanoTime();
+                    ranAny = true;
+
+                    long diff = localStop - localStart;
+                    pacer.recordDuration(diff);
+                    avgTime = pacer.predictedCostNanos();
+
+                    dt = localStop - start;
                 }
-
-                if (runnable instanceof RTPCancellable && ((RTPCancellable) runnable).isCancelled())
-                    continue;
-
-                long localStart = System.nanoTime();
-                try {
-                    if (runnable instanceof RTPRunnable)
-                        ((RTPRunnable) runnable).runWithTracking();
-                    else runnable.run();
-                } catch (Throwable throwable) {
-                    RTP.log(Level.WARNING, throwable.getMessage(), throwable);
-                }
-                long localStop = System.nanoTime();
-                ranAny = true;
-
-                long diff = localStop - localStart;
-                pacer.recordDuration(diff);
-                avgTime = pacer.predictedCostNanos();
-
-                dt = localStop - start;
             } catch (Throwable t) {
                 RTP.log(Level.WARNING, t.getMessage(), t);
             } finally {
@@ -96,6 +86,19 @@ public class TimeBoundTaskPipe extends RTPTaskPipe {
         runnables.addAll(delayedRunnables);
 
         return runnables.isEmpty();
+    }
+
+    /**
+     * True when {@code runnable} should run this pulse. A delayed task is parked in
+     * {@code delayed} instead; null and cancelled tasks are dropped.
+     */
+    private static boolean isDueNow(Runnable runnable, List<Runnable> delayed) {
+        if (runnable == null) return false;
+        if (runnable instanceof RTPDelayable delayable && delayable.getDelay() > 0) {
+            delayed.add(delayable);
+            return false;
+        }
+        return !(runnable instanceof RTPCancellable cancellable && cancellable.isCancelled());
     }
 
     public long getAvailableTime() {

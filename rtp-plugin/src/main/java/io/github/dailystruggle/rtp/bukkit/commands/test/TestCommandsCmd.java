@@ -147,12 +147,14 @@ public class TestCommandsCmd extends BaseRTPCmdImpl {
 
   /**
    * Recognises the one intentional alias in the tree: {@code ALL} -&gt; {@link TestFullCmd}
-   * as documented in {@link TestCmd}. If more aliases are introduced, add them here
-   * (and, preferably, promote aliases to a first-class concept in {@link TreeCommand}).
+   * under the {@code test} node, as documented in {@code TestCmd}. Matched by node name, not by
+   * type, so this audit does not depend on the parent that registers it. If more aliases are
+   * introduced, add them here (and, preferably, promote aliases to a first-class concept in
+   * {@link TreeCommand}).
    */
   private static boolean isDeclaredAlias(
       CommandsAPICommand parent, String key, CommandsAPICommand child) {
-    if (parent instanceof TestCmd
+    if ("test".equalsIgnoreCase(safeName(parent))
         && "ALL".equals(key)
         && child instanceof TestFullCmd) return true;
     return false;

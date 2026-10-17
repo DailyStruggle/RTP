@@ -223,7 +223,7 @@ public final class DirectTeleportProbe implements Listener {
         UUID id = playerOf(event);
         if (id == null) return;
         Long preTs = pendingPre.remove(id);
-        MetricsRecorder.Attempt attempt = probe.peek(id);
+        Attempt attempt = probe.peek(id);
         if (attempt != null) {
             if (preTs != null && attempt.pluginPreTeleportEpochMs < 0) {
                 attempt.pluginPreTeleportEpochMs = preTs;

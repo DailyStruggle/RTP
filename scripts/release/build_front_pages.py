@@ -25,7 +25,10 @@ pipe tables, links, images, badges, **bold**, *italic*, `code`, centred <div>,
 <details>/<summary>, ---) and rejects anything else instead of guessing. Numbered
 steps ("1. ...") pass through as plain text lines. Local image references
 (![alt](../assets/img/...)) are validated against disk and rewritten to absolute
-raw GitHub URLs during rendering for all storefront targets.
+raw GitHub URLs during rendering for all storefront targets. Relative links
+(`../admin/COMMANDS.md#anchor`) are validated against disk and rewritten: published
+docs become https://dailystruggle.github.io/RTP/... pages (same mapping as mkdocs
+directory URLs), anything else becomes a GitHub blob/tree URL.
 
 Usage:
     python scripts/release/build_front_pages.py                  # write all outputs
@@ -83,12 +86,50 @@ DENYLIST = [
     (re.compile(r"[$\u20ac\u00a3]\s?\d"), "a price"),
 ]
 
+# Zone 1 (title down to the first `## ` heading after `## What it is`) is read by
+# every visitor, most of whom don't know these words. Each term is defined in
+# Zone 3 (Performance / How it works); a Zone 1 hit fails the build so the
+# plain-language top survives later passes. Link targets are not checked.
+ZONE1_START = "## What it is"
+ZONE1_JARGON = [
+    (re.compile(r"TP/s"), "'TP/s' (say 'teleports per second')"),
+    (re.compile(r"\bMSPT\b"), "'MSPT'"),
+    (re.compile(r"\bTPS\b"), "'TPS' (say 'full speed')"),
+    (re.compile(r"(?i)tick thread|off[- ]tick|main thread|server thread|single thread"), "thread jargon"),
+    (re.compile(r"(?i)\bticks?\b"), "'tick' (say 'lag spike' or 'full speed')"),
+    (re.compile(r"(?i)\bp9[59]\b"), "percentile jargon"),
+    (re.compile(r"\b(ACCUMULATE|REROLL)\b"), "spacing mode names"),
+    (re.compile(r"(?i)\bshuffle\b"), "'shuffle'"),
+    (re.compile(r"(?i)pre-?filter"), "'pre-filter'"),
+    (re.compile(r"(?i)\bcandidates?\b"), "'candidate' (say 'spot')"),
+    (re.compile(r"\b(SPI|TTL)\b"), "engineering acronym"),
+    (re.compile(r"(?i)\b(closed|open)-loop\b"), "harness jargon"),
+]
+# Lines the author has removed and rejected; they keep reappearing in rewrites.
+ZONE1_REJECTED = [
+    (re.compile(r"(?i)took that personally|that's laggy"), "rejected subtitle"),
+    (re.compile(r"(?i)\d[\d,]*k?\s+downloads"), "download count (kept in the rename FAQ only)"),
+    (re.compile(r"(?i)(works|runs) (with no|without( any)?) setup|no setup (needed|required)"),
+     "'works with no setup'"),
+]
+_LINK_TARGET = re.compile(r"\]\([^)]*\)")
+# Short-version bullets are `[**Adjective**](link): fact.`; a label of one or two
+# words, never a sentence.
+SHORT_VERSION_START = "### The short version"
+_SHORT_BULLET = re.compile(r"^- \[\*\*[A-Z][\w-]*( [\w-]+)?\*\*\]\([^)]+\): \S")
+
 # Share of source lines that are audience-specific before the report warns that
 # the pages are drifting back toward separate copies.
 DRIFT_WARN = 0.15
 
 HEADING_COLOR = "#27AE60"
 RAW_BASE = "https://raw.githubusercontent.com/dailystruggle/RTP/V3"
+SITE_BASE = "https://dailystruggle.github.io/RTP"  # mkdocs.yml site_url
+REPO_BASE = "https://github.com/DailyStruggle/RTP"
+REPO_BRANCH = "V3"
+DOCS_DIR = ROOT / "docs"
+# Mirrors mkdocs.yml exclude_docs: these docs have no page on the website.
+SITE_EXCLUDED = ("site/README.md", "MAP.md", "publishing/")
 
 _OPEN = re.compile(r"^\s*<!--\s*(kind|only|not)\s*:\s*(.*?)\s*-->\s*$")
 _CLOSE = re.compile(r"^\s*<!--\s*/(kind|only|not)\s*-->\s*$")
@@ -227,6 +268,50 @@ def _resolve_images(line_no, line, source_dir=SOURCE.parent, raw_base=RAW_BASE):
         return f"![{alt}]({new_url})"
 
     return _IMAGE.sub(repl, line)
+
+
+def _site_url(docs_rel):
+    """Website URL (mkdocs directory URLs) for a docs-relative .md path, or None if unpublished."""
+    if any(docs_rel == x or (x.endswith("/") and docs_rel.startswith(x)) for x in SITE_EXCLUDED):
+        return None
+    parts = docs_rel[:-3].split("/")
+    if parts[-1] in ("index", "README"):
+        parts.pop()
+    return SITE_BASE + "/" + "/".join(parts) + ("/" if parts else "")
+
+
+def _resolve_doc_links(line_no, line, source_dir=SOURCE.parent):
+    """Rewrites relative links to absolute URLs, validating the target exists on disk.
+
+    Published docs/**/*.md become website URLs; every other repo path (code,
+    unpublished docs, directories) becomes a GitHub blob/tree URL on the release branch.
+    """
+    def repl(m):
+        target = m.group(1)
+        path, hash_, anchor = target.partition("#")
+        if not path:
+            return m.group(0)
+        candidate = (source_dir / path).resolve()
+        if not candidate.exists():
+            candidate = (ROOT / path.lstrip("/\\")).resolve()
+        if not candidate.exists():
+            raise FrontPageError(f"line {line_no}: relative link '{target}' does not exist on disk")
+        try:
+            rel = candidate.relative_to(ROOT).as_posix()
+        except ValueError:
+            raise FrontPageError(f"line {line_no}: relative link '{target}' resolves outside the repository")
+        url = None
+        if candidate.is_file() and candidate.suffix == ".md":
+            try:
+                url = _site_url(candidate.relative_to(DOCS_DIR).as_posix())
+            except ValueError:
+                pass
+        if url is None:
+            kind = "tree" if candidate.is_dir() else "blob"
+            url = f"{REPO_BASE}/{kind}/{REPO_BRANCH}/{rel}"
+        return f"]({url}{hash_}{anchor})"
+
+    return _RELATIVE_LINK.sub(repl, line)
 
 
 def _lint(kept):
@@ -410,13 +495,56 @@ def check_denylist(target, text):
     return problems
 
 
+def check_zone1_jargon(kept):
+    """Returns problems for jargon in Zone 1; empty when the page has no `## What it is`."""
+    if not any(line.strip() == ZONE1_START for _, line in kept):
+        return []
+    problems = []
+    seen_start = False
+    for n, line in kept:
+        stripped = line.strip()
+        if stripped == ZONE1_START:
+            seen_start = True
+        elif seen_start and stripped.startswith("## "):
+            break
+        text = _LINK_TARGET.sub("]", line)
+        for pattern, label in ZONE1_JARGON:
+            if pattern.search(text):
+                problems.append(f"line {n}: {label} above the fold; move it below or say it plainly: "
+                                f"{stripped[:120]}")
+        for pattern, label in ZONE1_REJECTED:
+            if pattern.search(text):
+                problems.append(f"line {n}: {label} was rejected by the author; remove it: {stripped[:120]}")
+    return problems
+
+
+def check_short_version_labels(kept):
+    """Returns problems for short-version bullets whose bold label is not a one- or two-word label."""
+    problems = []
+    inside = False
+    for n, line in kept:
+        stripped = line.strip()
+        if stripped == SHORT_VERSION_START:
+            inside = True
+        elif inside and (stripped.startswith("<details") or stripped.startswith("#")):
+            break
+        elif inside and stripped.startswith("- ") and not _SHORT_BULLET.match(stripped):
+            problems.append(f"line {n}: short-version bullet must be '[**Adjective**](link): fact.': "
+                            f"{stripped[:120]}")
+    return problems
+
+
 def render(source_text, target, source_path=SOURCE, raw_base=RAW_BASE):
     """Returns (output text, audience-specific line count, shared line count)."""
     source_dir = source_path.parent if isinstance(source_path, pathlib.Path) else pathlib.Path(source_path).parent
     kept, specific, shared = select_lines(source_text, target.name)
     kept = [(n, _substitute(n, line, target)) for n, line in kept]
     kept = [(n, _resolve_images(n, line, source_dir=source_dir, raw_base=raw_base)) for n, line in kept]
+    kept = [(n, _resolve_doc_links(n, line, source_dir=source_dir)) for n, line in kept]
     _lint(kept)
+    jargon = check_zone1_jargon(kept) + check_short_version_labels(kept)
+    if jargon:
+        raise FrontPageError("\n".join(jargon))
     if target.fmt == "bbcode":
         lines = to_bbcode(kept)
         text = "\n".join(lines) + "\n"

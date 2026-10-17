@@ -27,14 +27,6 @@ public final class SetupRecipe {
     }
 
     /**
-     * Resolves the ordered chain of prefabs corresponding to the given setup session.
-     * World names are inferred from the active runtime context if available.
-     */
-    public static List<Prefab> compileRecipe(SetupSession session) {
-        return compileRecipe(session, SetupHandlerSupport.collectWorldNames());
-    }
-
-    /**
      * Resolves the ordered chain of prefabs corresponding to the given setup session
      * and list of active worlds.
      * Order of precedence:

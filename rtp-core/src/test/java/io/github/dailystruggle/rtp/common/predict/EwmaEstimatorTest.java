@@ -21,7 +21,7 @@ class EwmaEstimatorTest {
         assertTrue(Double.isNaN(estimator.mean()));
         assertEquals(0L, estimator.sampleCount());
 
-        estimator.record(42.0);
+        estimator.recordSample(42.0);
         assertEquals(42.0, estimator.mean(), 1e-9);
         assertEquals(0.0, estimator.variance(), 1e-9);
         assertEquals(1L, estimator.sampleCount());
@@ -32,7 +32,7 @@ class EwmaEstimatorTest {
     void fractional_constantSeriesZeroVariance() {
         EwmaEstimator estimator = EwmaEstimator.ofWindow(32);
         for (int i = 0; i < 50; i++) {
-            estimator.record(100.0);
+            estimator.recordSample(100.0);
         }
 
         assertEquals(100.0, estimator.mean(), 1e-6);
@@ -47,7 +47,7 @@ class EwmaEstimatorTest {
         EwmaEstimator estimator = EwmaEstimator.ofWindow(64);
         // Alternating between 10 and 20 (true mean 15, expected variance ~ 25)
         for (int i = 0; i < 200; i++) {
-            estimator.record((i % 2 == 0) ? 10.0 : 20.0);
+            estimator.recordSample((i % 2 == 0) ? 10.0 : 20.0);
         }
 
         assertEquals(15.0, estimator.mean(), 0.5);
@@ -63,7 +63,7 @@ class EwmaEstimatorTest {
         assertEquals(15.0, estimator.mean(), 1e-9);
         assertEquals(0L, estimator.sampleCount());
 
-        estimator.record(25.0);
+        estimator.recordSample(25.0);
         assertEquals(1L, estimator.sampleCount());
         // alpha = 2 / (64 + 1) = 2 / 65 ~ 0.030769
         // mean = 15.0 + (2/65) * (25.0 - 15.0) = 15.0 + 0.30769 ~ 15.30769
@@ -75,10 +75,10 @@ class EwmaEstimatorTest {
     @DisplayName("Fractional: Numerical stability rejects NaN, infinite, and negative inputs")
     void fractional_numericalStability() {
         EwmaEstimator estimator = EwmaEstimator.ofWindow(16, 50.0);
-        estimator.record(Double.NaN);
-        estimator.record(Double.POSITIVE_INFINITY);
-        estimator.record(Double.NEGATIVE_INFINITY);
-        estimator.record(-100.0);
+        estimator.recordSample(Double.NaN);
+        estimator.recordSample(Double.POSITIVE_INFINITY);
+        estimator.recordSample(Double.NEGATIVE_INFINITY);
+        estimator.recordSample(-100.0);
 
         assertEquals(50.0, estimator.mean(), 1e-9);
         assertEquals(0L, estimator.sampleCount());

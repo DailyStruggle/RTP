@@ -170,12 +170,12 @@ public final class ChunkLoadCounter implements Listener {
      *  attempts are added in {@link #beginAttempt} and removed in
      *  {@link #endAttempt}. Iteration cost is bounded by the runner's
      *  concurrency cap (typically 1-4). */
-    private final Deque<MetricsRecorder.Attempt> inFlight = new ConcurrentLinkedDeque<>();
+    private final Deque<Attempt> inFlight = new ConcurrentLinkedDeque<>();
     /** Per-attempt load tally, keyed by attempt id. Removed by
      *  {@link #endAttempt}, which copies the raw count into
-     *  {@link MetricsRecorder.Attempt#attributedChunkLoads} and the
+     *  {@link Attempt#attributedChunkLoads} and the
      *  arrival-filtered count into
-     *  {@link MetricsRecorder.Attempt#selectionChunkLoads}. */
+     *  {@link Attempt#selectionChunkLoads}. */
     private final ConcurrentHashMap<java.util.UUID, Tally> attemptCounts = new ConcurrentHashMap<>();
 
     /** Per-attempt accumulator: a raw load count plus the packed chunk
@@ -307,7 +307,7 @@ public final class ChunkLoadCounter implements Listener {
 
         // Plugin-ticket attribution (Paper only).
         if (pluginTicketsSupported && chunk != null) {
-            MetricsRecorder.Attempt a = attributeByPluginTicket(chunk);
+            Attempt a = attributeByPluginTicket(chunk);
             if (a != null) {
                 bump(a, cx, cz, onTick);
                 return;
@@ -323,7 +323,7 @@ public final class ChunkLoadCounter implements Listener {
 
         // Main-thread temporal attribution.
         if (onTick) {
-            MetricsRecorder.Attempt a = inFlight.peekLast();
+            Attempt a = inFlight.peekLast();
             if (a != null) {
                 bump(a, cx, cz, onTick);
                 return;
@@ -344,7 +344,7 @@ public final class ChunkLoadCounter implements Listener {
      * label), this method returns null and step 2 takes over.
      */
     @SuppressWarnings("unchecked")
-    private MetricsRecorder.Attempt attributeByPluginTicket(Chunk chunk) {
+    private Attempt attributeByPluginTicket(Chunk chunk) {
         Method m = getPluginChunkTicketsMethod;
         if (m == null) return null;
         Collection<Plugin> tickets;
@@ -360,7 +360,7 @@ public final class ChunkLoadCounter implements Listener {
             return null;
         }
         if (tickets == null || tickets.isEmpty()) return null;
-        for (MetricsRecorder.Attempt a : inFlight) {
+        for (Attempt a : inFlight) {
             String label = a.targetLabel == null ? "" : a.targetLabel.toLowerCase(Locale.ROOT);
             if (label.isEmpty()) continue;
             for (Plugin p : tickets) {
@@ -387,7 +387,7 @@ public final class ChunkLoadCounter implements Listener {
         return best;
     }
 
-    private void bump(MetricsRecorder.Attempt a, int chunkX, int chunkZ, boolean onTick) {
+    private void bump(Attempt a, int chunkX, int chunkZ, boolean onTick) {
         Tally t = attemptCounts.get(a.attemptId);
         if (t == null) {
             // Race: attempt ended between inFlight.peekLast() and this lookup.
@@ -417,7 +417,7 @@ public final class ChunkLoadCounter implements Listener {
      * foreground work lands relative to the tick, and a total cannot
      * distinguish one 8 ms stall from sixteen 0.5 ms ones.
      */
-    private void noteOnTickBurst(MetricsRecorder.Attempt a, Tally t, long nowNs) {
+    private void noteOnTickBurst(Attempt a, Tally t, long nowNs) {
         synchronized (t.burstLock) {
             if (t.burstStartNs != 0L && nowNs - t.burstLastNs <= BURST_GAP_NS) {
                 t.burstLastNs = nowNs;
@@ -453,7 +453,7 @@ public final class ChunkLoadCounter implements Listener {
      * chunk itself. Returns the selection count (raw minus arrival). Falls back
      * to the raw count when the destination is unknown (timeouts / failures).
      */
-    private long computeSelection(MetricsRecorder.Attempt a, Tally t, long raw) {
+    private long computeSelection(Attempt a, Tally t, long raw) {
         if (!a.success) return raw;
         if (a.toX == 0.0 && a.toZ == 0.0) return raw;
         int destX = (int) Math.floor(a.toX / 16.0);
@@ -500,7 +500,7 @@ public final class ChunkLoadCounter implements Listener {
      * Only the selection subset is considered: the post-teleport arrival ring
      * is server-owned and would swamp the plugin's own read count.
      */
-    private void computeRegionAccounting(MetricsRecorder.Attempt a, Tally t) {
+    private void computeRegionAccounting(Attempt a, Tally t) {
         int destX = Integer.MIN_VALUE;
         int destZ = Integer.MIN_VALUE;
         int r = -1;
@@ -544,7 +544,7 @@ public final class ChunkLoadCounter implements Listener {
     /** Called by {@link MetricsRecorder#onDispatch} to register an attempt
      *  for chunk-load attribution. Idempotent - re-registering an already-known
      *  attempt is a no-op. */
-    public void beginAttempt(MetricsRecorder.Attempt a) {
+    public void beginAttempt(Attempt a) {
         if (a == null) return;
         // The account's next teleport closes its previous landing window.
         if (a.player != null) landings.remove(a.player);
@@ -555,9 +555,9 @@ public final class ChunkLoadCounter implements Listener {
 
     /** Called by {@link MetricsRecorder#onComplete}/{@link MetricsRecorder#onTimeout}
      *  to finalise an attempt's chunk-load tally. Writes the count into
-     *  {@link MetricsRecorder.Attempt#attributedChunkLoads} and removes the
+     *  {@link Attempt#attributedChunkLoads} and removes the
      *  per-attempt accumulator. Safe to call multiple times. */
-    public void endAttempt(MetricsRecorder.Attempt a) {
+    public void endAttempt(Attempt a) {
         if (a == null) return;
         Tally t = attemptCounts.remove(a.attemptId);
         if (t != null) {
@@ -588,7 +588,7 @@ public final class ChunkLoadCounter implements Listener {
 
     /** Opens the account's landing window for a successful attempt with a
      *  known destination; any other outcome leaves no window open. */
-    private void openLanding(MetricsRecorder.Attempt a) {
+    private void openLanding(Attempt a) {
         if (a.player == null) return;
         if (!a.success || (a.toX == 0.0 && a.toZ == 0.0)) {
             landings.remove(a.player);

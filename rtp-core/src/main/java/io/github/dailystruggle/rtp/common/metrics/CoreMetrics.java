@@ -234,22 +234,20 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
         // Attach RTP-specific extension carrying RTP metric values. Sibling plugins
         // consuming metrics-api read host-runtime fields directly; RTP-specific
         // counters live on this extension (see metrics-api-ADR-001).
-        snap = snap.withExtension(new RTPMetricsExtension(
-                queueDepth,
-                pendingTeleports,
-                memoryTrackerEntries,
-                chunkLoadBacklog,
-                avgPipelineMs,
-                databaseLatencyMs,
-                slowCount,
-                slowThreshold,
-                queueGrowthCount,
-                queueGrowthThreshold,
-                regionQueueStatus,
-                io.github.dailystruggle.rtp.common.selection.region.ProbeFirstGovernor.snapshotAll(),
-                io.github.dailystruggle.rtp.common.selection.region.LiveLoadGate.snapshotAll(),
-                io.github.dailystruggle.rtp.common.selection.region.ImmediateLoadGovernor.snapshotAll()
-        ));
+        snap = snap.withExtension(RTPMetricsExtension.builder()
+                .queueDepth(queueDepth)
+                .pendingTeleports(pendingTeleports)
+                .memoryTrackerEntries(memoryTrackerEntries)
+                .chunkLoadBacklog(chunkLoadBacklog)
+                .avgPipelineMs(avgPipelineMs)
+                .databaseLatencyMs(databaseLatencyMs)
+                .slowPipeline(slowCount, slowThreshold)
+                .queueGrowthWarn(queueGrowthCount, queueGrowthThreshold)
+                .regionQueueStatus(regionQueueStatus)
+                .probeGovernors(io.github.dailystruggle.rtp.common.selection.region.ProbeFirstGovernor.snapshotAll())
+                .liveLoadGates(io.github.dailystruggle.rtp.common.selection.region.LiveLoadGate.snapshotAll())
+                .immediateGovernors(io.github.dailystruggle.rtp.common.selection.region.ImmediateLoadGovernor.snapshotAll())
+                .build());
         // Compose sibling-plugin extensions registered via Metrics.registerExtension(...).
         // Suppliers are evaluated in registration order; nulls are skipped; failures are swallowed.
         for (java.util.function.Supplier<? extends io.github.dailystruggle.metrics.api.MetricsExtension<?>> sup :

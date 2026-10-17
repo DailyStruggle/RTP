@@ -358,15 +358,6 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
     }
 
     /**
-     * Builds standard LeafRTP region YAML configuration without custom biomes.
-     */
-    protected RtpYamlConfig createRegionYaml(String regionName, String worldName, String shape,
-                                             int minRadius, int maxRadius, int centerX, int centerZ,
-                                             double price) {
-        return createRegionYaml(regionName, worldName, shape, minRadius, maxRadius, centerX, centerZ, price, null);
-    }
-
-    /**
      * Builds standard LeafRTP world YAML configuration.
      */
     protected RtpYamlConfig createWorldYaml(String regionName) {

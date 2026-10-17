@@ -538,7 +538,7 @@ class RtpBStatsCatalogueDetectorsTest {
     // --- Bucket boundaries ---
 
     @Test
-    @DisplayName("Bucketisers emit every documented label at their boundaries")
+    @DisplayName("TPS and MSPT bucketisers emit every documented label at their boundaries")
     void bucketBoundaries() {
         assertEquals("10-15", RtpBStatsCatalogue.tpsBucket(12.0));
         assertEquals("25-50", RtpBStatsCatalogue.msptBucket(30.0));
@@ -550,7 +550,11 @@ class RtpBStatsCatalogueDetectorsTest {
         assertEquals("50-100", RtpBStatsCatalogue.msptP99Bucket(70.0));
         assertEquals("100-250", RtpBStatsCatalogue.msptP99Bucket(150.0));
         assertEquals("1000+", RtpBStatsCatalogue.msptP99Bucket(5000.0));
+    }
 
+    @Test
+    @DisplayName("Count, cost and version bucketisers emit every documented label at their boundaries")
+    void countAndCostBucketBoundaries() {
         assertEquals("10-50", RtpBStatsCatalogue.memoryTrackerBucket(20));
         assertEquals("50-200", RtpBStatsCatalogue.memoryTrackerBucket(100));
         assertEquals("1-5", RtpBStatsCatalogue.chunkBacklogBucket(3));

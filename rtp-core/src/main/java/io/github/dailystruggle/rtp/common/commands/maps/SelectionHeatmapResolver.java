@@ -28,6 +28,9 @@ public final class SelectionHeatmapResolver extends AbstractRegionGridResolver {
   private static final int GRID_W = 512;
   private static final int GRID_H = 512;
   private static final int MAX_MARKERS = 2000;
+  // Splat kernel radius (grid cells) and variance for smooth density accumulation
+  private static final int KERNEL_RADIUS = 6;
+  private static final double KERNEL_SIGMA2 = 2.0 * 2.5 * 2.5;
   private static final Set<ChartSpec.Kind> SUPPORTED_KINDS =
       Set.of(ChartSpec.Kind.SELECTION_HEATMAP);
 
@@ -49,6 +52,7 @@ public final class SelectionHeatmapResolver extends AbstractRegionGridResolver {
     int maxZ = bounds.maxZ();
     long boundW = bounds.boundW();
     long boundH = bounds.boundH();
+    GridFrame frame = new GridFrame(minX, minZ, boundW, boundH);
 
     // 2. Compute domain containment and backdrop terrain grid
     GridDomain domain = sampleDomainGrid(memoryShape, bounds, GRID_W, GRID_H, false);
@@ -60,10 +64,6 @@ public final class SelectionHeatmapResolver extends AbstractRegionGridResolver {
     List<SelectionHeatmap.SelectionPoint> points = new ArrayList<>();
     double[] density = new double[totalElements];
 
-    // Splat kernel radius for smooth density accumulation (in grid cells)
-    final int kernelRadius = 6;
-    final double sigma2 = 2.0 * 2.5 * 2.5;
-
     // A. Landings: one row per chunk, weighted by landing count. Points carry chunk coords.
     for (int[] row : LandingHeatmap.snapshot(region.name)) {
       int cx = row[0];
@@ -73,15 +73,15 @@ public final class SelectionHeatmapResolver extends AbstractRegionGridResolver {
         points.add(new SelectionHeatmap.SelectionPoint(
             cx, cz, n, SelectionHeatmap.SelectionType.ARRIVAL));
       }
-      splatDensity(density, cx, cz, n, minX, minZ, boundW, boundH, kernelRadius, sigma2);
+      splatDensity(density, cx, cz, n, frame);
     }
 
     // B. Queued selections (block coords -> chunks)
     if (region.queueManager != null) {
       addQueue(region.queueManager.keptLocations, SelectionHeatmap.SelectionType.QUEUE_L1,
-          points, density, minX, minZ, boundW, boundH, kernelRadius, sigma2);
+          points, density, frame);
       addQueue(region.queueManager.unkeptLocations, SelectionHeatmap.SelectionType.QUEUE_L2,
-          points, density, minX, minZ, boundW, boundH, kernelRadius, sigma2);
+          points, density, frame);
     }
 
     // Find max density
@@ -111,8 +111,7 @@ public final class SelectionHeatmapResolver extends AbstractRegionGridResolver {
 
   private static void addQueue(
       LockFreeLocationBuffer queue, SelectionHeatmap.SelectionType type,
-      List<SelectionHeatmap.SelectionPoint> points, double[] density,
-      int minX, int minZ, long boundW, long boundH, int kernelRadius, double sigma2
+      List<SelectionHeatmap.SelectionPoint> points, double[] density, GridFrame frame
   ) {
     if (queue == null) return;
     int size = queue.size();
@@ -124,26 +123,24 @@ public final class SelectionHeatmapResolver extends AbstractRegionGridResolver {
       if (points.size() < MAX_MARKERS) {
         points.add(new SelectionHeatmap.SelectionPoint(cx, cz, 1, type));
       }
-      splatDensity(density, cx, cz, 1.0, minX, minZ, boundW, boundH, kernelRadius, sigma2);
+      splatDensity(density, cx, cz, 1.0, frame);
     }
   }
 
   private static void splatDensity(
-      double[] density, int bx, int bz, double weight,
-      int minX, int minZ, long boundW, long boundH,
-      int kernelRadius, double sigma2
+      double[] density, int bx, int bz, double weight, GridFrame frame
   ) {
-    int gx = (int) ((bx - minX) * (GRID_W - 1) / boundW);
-    int gz = (int) ((bz - minZ) * (GRID_H - 1) / boundH);
-    if (gx < -kernelRadius || gx > GRID_W - 1 + kernelRadius
-        || gz < -kernelRadius || gz > GRID_H - 1 + kernelRadius) {
+    int gx = (int) ((bx - frame.minX()) * (GRID_W - 1) / frame.boundW());
+    int gz = (int) ((bz - frame.minZ()) * (GRID_H - 1) / frame.boundH());
+    if (gx < -KERNEL_RADIUS || gx > GRID_W - 1 + KERNEL_RADIUS
+        || gz < -KERNEL_RADIUS || gz > GRID_H - 1 + KERNEL_RADIUS) {
       return;
     }
 
-    int startX = Math.max(0, gx - kernelRadius);
-    int endX = Math.min(GRID_W - 1, gx + kernelRadius);
-    int startZ = Math.max(0, gz - kernelRadius);
-    int endZ = Math.min(GRID_H - 1, gz + kernelRadius);
+    int startX = Math.max(0, gx - KERNEL_RADIUS);
+    int endX = Math.min(GRID_W - 1, gx + KERNEL_RADIUS);
+    int startZ = Math.max(0, gz - KERNEL_RADIUS);
+    int endZ = Math.min(GRID_H - 1, gz + KERNEL_RADIUS);
 
     for (int z = startZ; z <= endZ; z++) {
       int dz = z - gz;
@@ -151,9 +148,11 @@ public final class SelectionHeatmapResolver extends AbstractRegionGridResolver {
       for (int x = startX; x <= endX; x++) {
         int dx = x - gx;
         double dist2 = (double) dx * (double) dx + (double) dz * (double) dz;
-        double g = Math.exp(-dist2 / sigma2);
+        double g = Math.exp(-dist2 / KERNEL_SIGMA2);
         density[row + x] += weight * g;
       }
     }
   }
+
+  private record GridFrame(int minX, int minZ, long boundW, long boundH) {}
 }

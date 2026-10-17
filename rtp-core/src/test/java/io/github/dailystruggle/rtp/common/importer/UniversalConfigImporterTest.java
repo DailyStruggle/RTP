@@ -269,9 +269,8 @@ class UniversalConfigImporterTest {
     assertTrue(w.contains("broken.yml") && w.contains("line 4"), w);
   }
 
-  @Test
-  @DisplayName("BetterRTP fixture from a live server imports without parse warnings and keeps source values")
-  void betterRtpFixtureImportsCleanly() throws IOException {
+  /** Imports the live-server BetterRTP fixture into {@code destDir}; fails unless the import succeeds. */
+  private ImportResult importBetterRtpFixture() throws IOException {
     for (String f : List.of("config.yml", "placeholders.yml")) {
       try (InputStream in = getClass().getResourceAsStream("/importer/betterrtp/" + f)) {
         assertNotNull(in, f);
@@ -280,6 +279,13 @@ class UniversalConfigImporterTest {
     }
     ImportResult result = new UniversalConfigImporter().importConfiguration(sourceDir, destDir, true);
     assertTrue(result.isSuccess(), String.valueOf(result.getErrors()));
+    return result;
+  }
+
+  @Test
+  @DisplayName("BetterRTP fixture from a live server imports without parse warnings and keeps source region values")
+  void betterRtpFixtureImportsCleanly() throws IOException {
+    ImportResult result = importBetterRtpFixture();
     assertTrue(result.getWarnings().stream().noneMatch(w -> w.contains("parse")),
         String.valueOf(result.getWarnings()));
 
@@ -309,6 +315,13 @@ class UniversalConfigImporterTest {
     assertEquals(123, cw2.getInt("shape.centerX"));
     assertEquals(-123, cw2.getInt("shape.centerZ"));
     assertEquals(0, cw2.getInt("vert.minY"), "custom world must inherit minY=0 from Default");
+  }
+
+  @Test
+  @DisplayName("BetterRTP fixture maps biomes, disabled cooldown/delay and reports unmapped keys")
+  void betterRtpFixtureMapsSettingsAndReportsUnmappedKeys() throws IOException {
+    ImportResult result = importBetterRtpFixture();
+    RtpYamlConfig cw2 = RtpYamlConfig.load(destDir.resolve("definitions/regions/other_custom_world_region.yml").toFile());
 
     // 3. Biome allow-list is written with blacklist: false
     assertFalse(cw2.getBoolean("biomes.blacklist"), "Biomes allow-list must be mapped with blacklist: false");
