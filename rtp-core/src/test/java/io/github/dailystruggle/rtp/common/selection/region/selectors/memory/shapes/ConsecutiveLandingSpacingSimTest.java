@@ -118,18 +118,18 @@ class ConsecutiveLandingSpacingSimTest {
       int laneSame = 0;
       for (int i = 0; i < seq.size(); i++) {
         int[] a = seq.get(i);
-        if (!used.add(((long) a[0] << 32) ^ (a[1] & 0xFFFFFFFFL))) dups++;
+        if (!used.add(((long) a[0] << 32) ^ (a[1] & 0xFFFFFFFFL))) dups += 1;
         if (i == 0) continue;
         if (keys != null && Math.floorMod(keys.get(i), stride) == Math.floorMod(keys.get(i - 1), stride)) {
           laneSame++;
         }
-        if (distSq(a, seq.get(i - 1)) < NEAR_CHUNKS_SQ) lag1++;
+        if (distSq(a, seq.get(i - 1)) < NEAR_CHUNKS_SQ) lag1 += 1;
         for (int j = Math.max(0, i - LOOKBACK); j < i; j++) {
           if (distSq(a, seq.get(j)) < NEAR_CHUNKS_SQ) {
-            near64++;
+            near64 += 1;
             if (fromCold != null) {
-              if (fromCold[i]) nearCold++;
-              else nearFast++;
+              if (fromCold[i]) nearCold += 1;
+              else nearFast += 1;
             }
             break;
           }

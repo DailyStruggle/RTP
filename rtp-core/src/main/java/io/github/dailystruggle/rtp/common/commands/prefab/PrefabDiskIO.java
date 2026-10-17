@@ -205,10 +205,8 @@ public final class PrefabDiskIO {
         if (bakPath == null) {
             // Parent directory may not exist (regions/<new>.yml).
             File parent = target.getParentFile();
-            if (parent != null && !parent.exists()) {
-                if (!parent.mkdirs() && !parent.exists()) {
-                    throw new IOException("could not create parent directory: " + parent);
-                }
+            if (parent != null && !parent.exists() && !parent.mkdirs() && !parent.exists()) {
+                throw new IOException("could not create parent directory: " + parent);
             }
         }
 

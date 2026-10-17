@@ -230,8 +230,7 @@ public class ConfigParserLanguageTest {
         Files.writeString(configFile.toPath(), "alpha: 7\nversion: 0.9\n");
         YamlFileDatabase fileDatabase = new YamlFileDatabase(tempDir.toFile());
         // Constructor calls check() which detects version mismatch and calls renameFiles()
-        ConfigParser<TestKeys> parser = new ConfigParser<>(
-                TestKeys.class, "test", "1.0", tempDir.toFile(), null, fileDatabase);
+        new ConfigParser<>(TestKeys.class, "test", "1.0", tempDir.toFile(), null, fileDatabase);
         // After rename, test.yml.old1 should exist
         File renamed = tempDir.resolve("test.yml.old1").toFile();
         assertTrue(renamed.exists(), "Version mismatch should cause old config to be renamed to .old1");

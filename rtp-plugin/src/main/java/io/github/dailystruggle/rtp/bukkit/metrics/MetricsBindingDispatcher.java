@@ -68,8 +68,6 @@ public final class MetricsBindingDispatcher {
     private static volatile boolean installed = false;
     /** Non-null only on the Spigot path; cancelled in {@link #uninstall()}. */
     private static volatile Object spigotSamplerTaskHandle = null;
-    /** Non-null only on the Spigot path; reference retained for diagnostics. */
-    private static volatile Object spigotSamplerInstance = null;
 
     private MetricsBindingDispatcher() {
         // static helper
@@ -136,7 +134,6 @@ public final class MetricsBindingDispatcher {
                     // the sampler is still driven below so its values back the
                     // merge's fallback and supply playerCount / softCap.
                     RTP.metrics.setBinding(wrapWithSparkIfPresent((MetricsBinding) sampler));
-                    spigotSamplerInstance = sampler;
                     // Drive sampler.tick() once per server tick. The sampler is
                     // documented as single-tick-thread-only, which matches
                     // RTP.scheduler.runTaskTimer (global region scheduler on Folia,
@@ -173,7 +170,6 @@ public final class MetricsBindingDispatcher {
             if (!installed) return;
             Object handle = spigotSamplerTaskHandle;
             spigotSamplerTaskHandle = null;
-            spigotSamplerInstance = null;
             if (handle != null) {
                 try {
                     // The scheduler returns Object; the underlying type exposes
@@ -196,35 +192,6 @@ public final class MetricsBindingDispatcher {
             }
             installed = false;
             RTP.log(Level.FINE, LOG_TAG + " uninstalled MetricsBinding");
-        }
-    }
-
-    /**
-     * Attempt to instantiate and install the {@link MetricsBinding} named by
-     * {@code bindingFqn}. Returns {@code true} on success. Returns
-     * {@code false} (without throwing) if the binding class is absent from the
-     * runtime classpath - this is expected on trimmed assemblies such as the
-     * rtp-lite jar, which excludes the platform metrics bindings. In that case
-     * the caller falls through to the next applicable binding (or the raw
-     * Spigot sampler), so {@code /rtp info} still reports sampled data instead
-     * of logging a WARNING + stack trace.
-     */
-    private static boolean tryInstallBinding(String bindingFqn, String description) {
-        try {
-            MetricsBinding binding = (MetricsBinding) Class.forName(bindingFqn)
-                    .getDeclaredConstructor()
-                    .newInstance();
-            RTP.metrics.setBinding(binding);
-            RTP.log(Level.FINE, LOG_TAG + " installed " + description);
-            return true;
-        } catch (ClassNotFoundException | NoClassDefFoundError e) {
-            RTP.log(Level.FINE, LOG_TAG + " binding " + bindingFqn
-                    + " not present (trimmed assembly?); falling back to next path");
-            return false;
-        } catch (Throwable t) {
-            RTP.log(Level.WARNING, LOG_TAG + " failed to install " + description
-                    + "; falling back to next path", t);
-            return false;
         }
     }
 

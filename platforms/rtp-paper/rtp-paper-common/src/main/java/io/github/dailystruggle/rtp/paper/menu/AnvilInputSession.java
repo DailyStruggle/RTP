@@ -396,8 +396,8 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
                     reopenFileArg = fileSegment;
                 }
             }
-            if (sink == null || fileSegment == null || cartFileName == null
-                    || reopenFileArg == null) {
+            // fileSegment, cartFileName and reopenFileArg are assigned together, so one check covers all three.
+            if (sink == null || fileSegment == null) {
                 RTP.log(Level.WARNING,
                         "menu anvil-input STAGE confirm dropped for " + player.getUniqueId()
                                 + " (sink=" + (sink != null ? "set" : "null")

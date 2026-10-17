@@ -187,7 +187,7 @@ class SegmentedKeyRunTableBenchmarkTest {
 
       // Segmented reconciliation: partition marks by bin, re-coalesce only touched bins
       long tReconSeg0 = System.nanoTime();
-      SegmentedKeyRunTable reconSeg = reconFlat.toSegmented(totalRange, binSize);
+      reconFlat.toSegmented(totalRange, binSize);
       long segReconNanos = System.nanoTime() - tReconSeg0;
 
       double flatNsPerMark = (double) flatReconNanos / marks.length;
@@ -222,6 +222,18 @@ class SegmentedKeyRunTableBenchmarkTest {
           "Speedup",
           "x",
           speedup,
+          SimulationReport.Provenance.MEASURED);
+      report.add(
+          "Bin Size " + binSize,
+          "Flat Recon ns/mark",
+          "ns",
+          flatNsPerMark,
+          SimulationReport.Provenance.MEASURED);
+      report.add(
+          "Bin Size " + binSize,
+          "Seg Recon ns/mark",
+          "ns",
+          segNsPerMark,
           SimulationReport.Provenance.MEASURED);
       report.add(
           "Bin Size " + binSize,

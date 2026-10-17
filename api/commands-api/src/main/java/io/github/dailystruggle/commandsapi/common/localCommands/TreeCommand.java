@@ -67,14 +67,12 @@ public interface TreeCommand extends CommandsAPICommand {
                 //check for sub-parameters
                 CommandParameter parameter = parameterLookup.get(arr[0]);
                 if(parameter == null) parameter = tempParameters.get(arr[0]);
-                if(parameter != null) {
-                    if (arr.length > 1) {
-                        String[] subParameters = arr[1].split(",");
-                        for (String subParamName : subParameters) {
-                            Map<String, CommandParameter> parameterMap = parameter.subParams(subParamName);
-                            if (parameterMap == null) continue;
-                            tempParameters.putAll(parameterMap);
-                        }
+                if(parameter != null && arr.length > 1) {
+                    String[] subParameters = arr[1].split(",");
+                    for (String subParamName : subParameters) {
+                        Map<String, CommandParameter> parameterMap = parameter.subParams(subParamName);
+                        if (parameterMap == null) continue;
+                        tempParameters.putAll(parameterMap);
                     }
                 }
             }

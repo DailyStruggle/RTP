@@ -169,6 +169,8 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
       if (!RTP.reloading.get()) reload();
     }
 
+    private ConfigCache() {}
+
     public static void reload() {
       unsafe = RTP.configs.getConfigValue(PlayerMessages.unsafe, "").toString();
       teleportMessage = RTP.configs.getConfigValue(PlayerMessages.teleportMessage, "").toString();
@@ -367,7 +369,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
       originSnapshot = origin;
     }
 
-    if (origin != null && this.destination != null) {
+    if (origin != null) {
       this.distance = Math.hypot((double) this.destination.x() - origin.x(), (double) this.destination.z() - origin.z());
     } else {
       this.distance = 0.0;

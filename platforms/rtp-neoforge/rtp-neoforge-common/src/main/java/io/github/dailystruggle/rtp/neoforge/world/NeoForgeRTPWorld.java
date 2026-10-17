@@ -3,11 +3,13 @@ package io.github.dailystruggle.rtp.neoforge.world;
 import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
+import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.world.BiomeOverride;
 import io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter;
 import io.github.dailystruggle.rtp.neoforge.version.NeoForgeVersionAdapter;
 import io.github.dailystruggle.rtp.neoforge.version.NeoForgeVersionAdapterRegistry;
@@ -185,8 +187,8 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
 
         if (shouldPrefilter(chunkX, chunkZ)) {
             ServerLevel probeLevel = world;
-            MinecraftServer probeServer = (probeLevel != null) ? probeLevel.getServer() : null;
-            if (probeLevel != null && probeServer != null) {
+            if (probeLevel != null) {
+                MinecraftServer probeServer = probeLevel.getServer();
                 java.nio.file.Path worldFolder;
                 try {
                     worldFolder = probeServer.getWorldPath(LevelResource.ROOT);
@@ -545,7 +547,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
     public java.util.Map<Long, String> sampleBiomesInRegionFile(
             int rcx, int rcz, int y, int[] localIndices) {
         ServerLevel level = world;
-        if (level == null || level.getServer() == null) return java.util.Collections.emptyMap();
+        if (level == null) return java.util.Collections.emptyMap();
         try {
             java.nio.file.Path worldFolder = level.getServer().getWorldPath(LevelResource.ROOT);
             java.nio.file.Path regionFile =
@@ -591,7 +593,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
     @Override
     public long regionFileModifiedMillis(int rcx, int rcz) {
         ServerLevel level = world;
-        if (level == null || level.getServer() == null) return -1L;
+        if (level == null) return -1L;
         try {
             java.nio.file.Path worldFolder = level.getServer().getWorldPath(LevelResource.ROOT);
             return io.github.dailystruggle.rtp.anvil.AnvilRegionSampler.lastModifiedMillis(
@@ -609,7 +611,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
     @Override
     public java.util.List<int[]> listRegionFiles() {
         ServerLevel level = world;
-        if (level == null || level.getServer() == null) return null;
+        if (level == null) return null;
         try {
             java.nio.file.Path worldFolder = level.getServer().getWorldPath(LevelResource.ROOT);
             return io.github.dailystruggle.rtp.anvil.RegionFileResolver.listAnvilRegionCoords(
@@ -903,6 +905,11 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public String getBiome(int x, int y, int z) {
+        var override = BiomeOverride.get();
+        if (override != null) {
+            String fromAddon = override.apply(new RTPLocation(this, x, y, z));
+            if (fromAddon != null) return fromAddon;
+        }
         try {
             var holder = world.getBiome(new BlockPos(x, y, z));
             return holder.unwrapKey()

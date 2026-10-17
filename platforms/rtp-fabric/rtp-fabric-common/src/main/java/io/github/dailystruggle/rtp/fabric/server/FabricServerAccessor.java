@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
+import io.github.dailystruggle.rtp.common.world.BiomeOverride;
 import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
@@ -80,13 +81,6 @@ public final class FabricServerAccessor implements RTPServerAccessor {
    */
   private Function<String, ?> shapeFunction = this::createNativeShape;
 
-  /**
-   * Per-location biome resolver. Default uses the level's dynamic biome
-   * registry via {@link ServerLevel#getBiome(net.minecraft.core.BlockPos)} on
-   * the server thread; addons override via {@link #setBiomeGetter(Function)}.
-   * Mirrors {@code AbstractServerAccessor.biomeGetter} (Bukkit parity).
-   */
-  private Function<RTPLocation, String> biomeGetter = this::defaultBiomeAt;
 
   /**
    * Per-world biome-set resolver. Default returns every biome key registered
@@ -409,11 +403,6 @@ public final class FabricServerAccessor implements RTPServerAccessor {
               + " This violates REQ-RTP-S-006 (require-by-contract API entry points).");
     }
     return new LocationGenerator();
-  }
-
-  private static UnsupportedOperationException notYet(String method) {
-    return new UnsupportedOperationException(
-        "[RTP] FabricServerAccessor." + method + " not yet implemented.");
   }
 
   @Override
@@ -2024,10 +2013,9 @@ public final class FabricServerAccessor implements RTPServerAccessor {
 
   @Override
   public void setBiomeGetter(Function<RTPLocation, String> getter) {
-    // Mirror AbstractServerAccessor.setBiomeGetter - addons can override the
-    // per-location biome resolver. Default lookup happens via the level's
-    // dynamic biome registry (see #defaultBiomeAt).
-    this.biomeGetter = getter;
+    // Mirror AbstractServerAccessor.setBiomeGetter - the resolver is forwarded
+    // to the shared holder that every Fabric world adapter reads on lookup.
+    BiomeOverride.set(getter);
   }
 
   @Override
@@ -2039,30 +2027,6 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   // Default biome resolvers (Bukkit parity)
   // ---------------------------------------------------------------------------
 
-  /**
-   * Resolve the biome at a given {@link RTPLocation} via the level's dynamic
-   * biome registry. Returns the biome's {@code namespace:path} key, or
-   * {@code null} when the world is not a {@link FabricRTPWorld} (foreign
-   * impl) or the lookup is invoked off the server thread without a bound
-   * server. Caller is expected to hop to the server thread when needed.
-   */
-  private @Nullable String defaultBiomeAt(RTPLocation location) {
-    if (location == null) return null;
-    RTPWorld<?> w = location.world();
-    if (!(w instanceof FabricRTPWorld fw)) return null;
-    ServerLevel level = fw.level();
-    net.minecraft.core.BlockPos pos =
-        new net.minecraft.core.BlockPos(location.getBlockX(), location.getBlockY(), location.getBlockZ());
-    var holder = level.getBiome(pos);
-    String raw = holder.unwrapKey().map(k -> k.location().toString()).orElse(null);
-    if (raw == null) return null;
-    // Match the form `defaultBiomesFor` and the anvil probe adapter expose,
-    // and the form Spigot's `Biome.name()` produces (upper-case path-only).
-    // Without this, live-load biome comparisons would mismatch the allow-list.
-    String n = io.github.dailystruggle.rtp.api.configuration
-        .PaletteIdentifierNormalizer.normalize(raw);
-    return (n != null && !n.isEmpty()) ? n : raw;
-  }
 
   /**
    * Typed fast-path for {@link #defaultBiomesFor}: enumerate the bound server's

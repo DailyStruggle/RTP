@@ -8,14 +8,10 @@ import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
 public class ListRemoveParameter extends CommandParameter {
   private final Supplier<Set<String>> values;
-  private final RtpYamlConfig file;
-  private final String key;
 
   public ListRemoveParameter(RtpYamlConfig file, String key) {
     super("rtp.update", "remove items from a list", (uuid, s) -> true);
     this.values = () -> new HashSet<>(file.getStringList(key));
-    this.file = file;
-    this.key = key;
   }
 
   // todo: store and update

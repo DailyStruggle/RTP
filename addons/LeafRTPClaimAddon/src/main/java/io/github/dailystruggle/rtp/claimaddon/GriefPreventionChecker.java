@@ -8,6 +8,7 @@ import org.bukkit.plugin.Plugin;
 
 /** Checker for GriefPrevention claims */
 public class GriefPreventionChecker {
+  private GriefPreventionChecker() {}
   private static boolean exists = true;
 
   private static GriefPrevention getGriefPrevention() {

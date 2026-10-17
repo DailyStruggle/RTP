@@ -31,7 +31,7 @@ class ReqRtpObs003HeapSamplerTest {
     @Test
     void heapPressureMonitor_evaluatesWithoutError() {
         // underPressure should sample and return boolean without throwing
-        boolean pressure = HeapPressureMonitor.underPressure();
+        HeapPressureMonitor.underPressure();
         double percent = HeapPressureMonitor.lastUsedPercent();
         assertTrue(percent >= 0.0, "expected non-negative used percent, got " + percent);
     }

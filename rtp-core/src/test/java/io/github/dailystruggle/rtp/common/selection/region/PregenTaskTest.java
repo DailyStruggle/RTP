@@ -206,14 +206,14 @@ class PregenTaskTest {
     @Test
     @DisplayName("Probabilistic pregenerated rejection rejects candidate chunk")
     void testPregeneratedPreferenceRejection() throws ExecutionException, InterruptedException {
-        PregenState state = createState(1L, true);
+        createState(1L, true);
         ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
         perf.set(PerformanceKeys.pregeneratedPreference, 1.0); // 100% rejection if ungenerated
 
         MockRTPWorld spyWorld = spy(world);
         doReturn(false).when(spyWorld).isChunkGenerated(anyInt(), anyInt());
         Region spyRegion = createRegionWithWorld(spyWorld, null);
-        state = PregenState.build(spyRegion, Set.of("PLAINS"));
+        PregenState state = PregenState.build(spyRegion, Set.of("PLAINS"));
         state.maxAttempts = 1L;
 
         CompletableFuture<GenerationResult> result = new CompletableFuture<>();
@@ -305,7 +305,7 @@ class PregenTaskTest {
     @Test
     @DisplayName("getOrLoadChunk failure records ticketFailed and reschedules")
     void testGetOrLoadChunkFailure() throws ExecutionException, InterruptedException {
-        PregenState state = createState(1L, true);
+        createState(1L, true);
 
         MockRTPWorld spyWorld = spy(world);
         CompletableFuture<RTPChunk<?>> failedFuture = new CompletableFuture<>();
@@ -313,7 +313,7 @@ class PregenTaskTest {
         doReturn(failedFuture).when(spyWorld).getOrLoadChunk(anyInt(), anyInt(), any());
 
         Region spyRegion = createRegionWithWorld(spyWorld, null);
-        state = PregenState.build(spyRegion, Set.of("PLAINS"));
+        PregenState state = PregenState.build(spyRegion, Set.of("PLAINS"));
         state.maxAttempts = 1L;
 
         CompletableFuture<GenerationResult> result = new CompletableFuture<>();
@@ -329,13 +329,13 @@ class PregenTaskTest {
     @Test
     @DisplayName("getOrLoadChunk returning null records asyncLoadNull")
     void testGetOrLoadChunkReturnsNull() throws ExecutionException, InterruptedException {
-        PregenState state = createState(1L, true);
+        createState(1L, true);
 
         MockRTPWorld spyWorld = spy(world);
         doReturn(CompletableFuture.completedFuture(null)).when(spyWorld).getOrLoadChunk(anyInt(), anyInt(), any());
 
         Region spyRegion = createRegionWithWorld(spyWorld, null);
-        state = PregenState.build(spyRegion, Set.of("PLAINS"));
+        PregenState state = PregenState.build(spyRegion, Set.of("PLAINS"));
         state.maxAttempts = 1L;
 
         CompletableFuture<GenerationResult> result = new CompletableFuture<>();

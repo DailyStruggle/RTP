@@ -485,7 +485,7 @@ public class CrossPluginDestinationScatterVisualizerTest {
           double dz = zs[i] - zs[j];
           double d2 = dx * dx + dz * dz;
           if (d2 < best2) best2 = d2;
-          if (j > i && d2 <= near2) pairSum++;
+          if (j > i && d2 <= near2) pairSum += 1;
         }
         nnSum += Math.sqrt(best2);
       }

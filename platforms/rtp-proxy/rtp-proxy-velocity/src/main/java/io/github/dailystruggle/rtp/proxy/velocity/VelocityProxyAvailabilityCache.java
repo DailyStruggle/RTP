@@ -134,10 +134,8 @@ public final class VelocityProxyAvailabilityCache {
                 if (delta > staleAfterMs + SKEW_TOLERANCE_MS) {
                     return PluginMessageEnvelope.Rejection.STALE;
                 }
-                if (prev != null) {
-                    if (seq <= prev.lastSeq() && sentAtMs <= prev.sentAtMs()) {
-                        return PluginMessageEnvelope.Rejection.REPLAY;
-                    }
+                if (prev != null && seq <= prev.lastSeq() && sentAtMs <= prev.sentAtMs()) {
+                    return PluginMessageEnvelope.Rejection.REPLAY;
                 }
             }
             if (prev == null && live.size() >= MAX_LIVE_SERVERS) {

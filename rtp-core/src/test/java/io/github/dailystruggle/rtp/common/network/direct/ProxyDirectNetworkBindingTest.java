@@ -314,34 +314,31 @@ class ProxyDirectNetworkBindingTest {
     @DisplayName("REQ-RTP-PROXY-007: an unsigned (legacy) proxy reply is dropped, not trusted")
     void unsignedProxyReplyDropped() throws Exception {
         // A rogue listener that answers with empty-HMAC frames.
-        ServerSocket rogue = new ServerSocket();
-        rogue.bind(new InetSocketAddress("127.0.0.1", 0));
-        Thread t = new Thread(() -> {
-            try (Socket s = rogue.accept()) {
-                DataInputStream in = new DataInputStream(s.getInputStream());
-                WireContext ctx = ProxyDirectWire.readRequestHeader(in).context();
-                ProxyDirectWire.readSignedPayload(in, ctx, Direction.REQUEST, V);
-                DataOutputStream out = new DataOutputStream(s.getOutputStream());
-                out.writeInt(1);
-                out.writeInt(1);
-                out.writeUTF("");
-                out.writeUTF(BackendHeartbeatCodec.encode(hb("evil", List.of("x"))));
-                out.flush();
-            } catch (Exception ignored) {
-                // test double
-            }
-        }, "rogue-proxy-direct");
-        t.setDaemon(true);
-        t.start();
-        try {
+        try (ServerSocket rogue = new ServerSocket()) {
+            rogue.bind(new InetSocketAddress("127.0.0.1", 0));
+            Thread t = new Thread(() -> {
+                try (Socket s = rogue.accept()) {
+                    DataInputStream in = new DataInputStream(s.getInputStream());
+                    WireContext ctx = ProxyDirectWire.readRequestHeader(in).context();
+                    ProxyDirectWire.readSignedPayload(in, ctx, Direction.REQUEST, V);
+                    DataOutputStream out = new DataOutputStream(s.getOutputStream());
+                    out.writeInt(1);
+                    out.writeInt(1);
+                    out.writeUTF("");
+                    out.writeUTF(BackendHeartbeatCodec.encode(hb("evil", List.of("x"))));
+                    out.flush();
+                } catch (Exception ignored) {
+                    // test double
+                }
+            }, "rogue-proxy-direct");
+            t.setDaemon(true);
+            t.start();
             ProxyDirectNetworkBinding binding = new ProxyDirectNetworkBinding(
                     List.of(InetSocketAddress.createUnresolved("127.0.0.1", rogue.getLocalPort())),
                     V, 1, 5000L, 1000, 2000, () -> 1000L);
             binding.publishBackendHeartbeat(hb("backend-a", List.of("default"))).get();
             assertEquals(0, binding.livePeerCount(), "unsigned row must not be ingested");
             binding.close();
-        } finally {
-            rogue.close();
         }
     }
 

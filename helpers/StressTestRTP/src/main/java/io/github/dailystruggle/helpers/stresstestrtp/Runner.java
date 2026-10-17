@@ -191,6 +191,8 @@ public final class Runner {
     private Sched.TimerStats rampTimersAtStart = new Sched.TimerStats(0L, 0L, 0L);
     private long rampLiveTimersAtStart = 0L;
     private long rampMaxLiveBetweenStages = 0L;
+    /** Jar hashes and config snapshot for this ramp ({@link RunProvenance}); written async at ramp start. */
+    private volatile String rampProvenance = "";
     private int rampRosterSize = 0;
     private boolean rampAborted = false;
     // Synchronized: an operator stop builds the partial row off the tick thread.
@@ -502,6 +504,18 @@ public final class Runner {
         this.mode = Mode.RAMP;
         this.concurrencyCap = Integer.MAX_VALUE; // one-per-player is the only bound
         this.rampTarget = target;
+        this.rampProvenance = "provenance: pending\n";
+        RunProvenance prov = RunProvenance.snapshot();
+        java.nio.file.Path provCsv = recorder.csvPath();
+        // Jar hashing and config copies are file I/O: off the tick thread, done well inside the idle window.
+        Sched.runAsync(plugin, () -> {
+            try {
+                rampProvenance = prov.write(provCsv);
+            } catch (java.io.IOException | RuntimeException e) {
+                rampProvenance = "provenance: write failed (" + e + ")\n";
+                plugin.getLogger().log(Level.WARNING, "[StressTestRTP] run provenance write failed", e);
+            }
+        });
         double[] arr = stagesOverride != null && stagesOverride.length > 0
                 ? Arrays.stream(stagesOverride).filter(d -> d > 0).toArray()
                 : config.getDoubleList("ramp.stages").stream()
@@ -903,6 +917,7 @@ public final class Runner {
         sb.append("repeating_live_at_end: ").append(pt.live()).append('\n');
         sb.append("repeating_cancel_failures: ").append(pt.cancelFailures()).append('\n');
         sb.append(line).append('\n');
+        sb.append(rampProvenance);
         try {
             rampWriter.writeSummary(sb.toString());
         } catch (java.io.IOException e) {
@@ -1131,10 +1146,8 @@ public final class Runner {
                             Location loc = p.getLocation();
                             double dx = loc.getX() - fromX;
                             double dz = loc.getZ() - fromZ;
-                            if ((dx * dx + dz * dz) >= thr2) {
-                                if (probe.attributeByPosition(id, loc)) {
-                                    lastProgressEpochMs = System.currentTimeMillis();
-                                }
+                            if ((dx * dx + dz * dz) >= thr2 && probe.attributeByPosition(id, loc)) {
+                                lastProgressEpochMs = System.currentTimeMillis();
                             }
                         } catch (Throwable ignored) {
                             // best-effort: never break the runner tick
@@ -1683,17 +1696,17 @@ public final class Runner {
     }
 
     private List<Player> roster() {
-        String mode = config.getString("roster", "all").toLowerCase(Locale.ROOT);
+        String rosterMode = config.getString("roster", "all").toLowerCase(Locale.ROOT);
         // Reuse the per-runner buffer instead of allocating a fresh list every
         // tick (10 Hz). Only ever touched from the non-overlapping tick body.
         List<Player> out = rosterBuffer;
         out.clear();
-        if (mode.startsWith("permission:")) {
-            String node = mode.substring("permission:".length()).trim();
+        if (rosterMode.startsWith("permission:")) {
+            String node = rosterMode.substring("permission:".length()).trim();
             for (Player p : Bukkit.getOnlinePlayers()) {
                 if (p.hasPermission(node)) out.add(p);
             }
-        } else if (mode.startsWith("names:")) {
+        } else if (rosterMode.startsWith("names:")) {
             // Names list comes through the YAML list, not the inline string.
             List<String> names = config.getStringList("roster-names");
             for (Player p : Bukkit.getOnlinePlayers()) {
@@ -1742,11 +1755,11 @@ public final class Runner {
      * target a comparable starting state.
      */
     private void saveWorldsBetweenPhases(String endingLabel) {
-        String mode = config.getString("save-worlds-between-phases", "auto");
-        if (mode == null) mode = "auto";
-        mode = mode.trim().toLowerCase(Locale.ROOT);
+        String saveMode = config.getString("save-worlds-between-phases", "auto");
+        if (saveMode == null) saveMode = "auto";
+        saveMode = saveMode.trim().toLowerCase(Locale.ROOT);
         boolean save;
-        switch (mode) {
+        switch (saveMode) {
             case "never":
             case "false":
             case "off":

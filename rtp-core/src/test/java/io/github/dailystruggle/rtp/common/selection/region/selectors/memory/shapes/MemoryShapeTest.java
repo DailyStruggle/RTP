@@ -571,10 +571,10 @@ public class MemoryShapeTest {
         TestShape small = buildBiomeShape(1, smallRuns);
         TestShape large = buildBiomeShape(1, largeRuns);
 
-        double smallNs = timeDensity(small, smallRuns, 20_000);
-        double largeNs = timeDensity(large, largeRuns, 20_000);
-        smallNs = timeDensity(small, smallRuns, 200_000);
-        largeNs = timeDensity(large, largeRuns, 200_000);
+        timeDensity(small, smallRuns, 20_000);
+        timeDensity(large, largeRuns, 20_000);
+        double smallNs = timeDensity(small, smallRuns, 200_000);
+        double largeNs = timeDensity(large, largeRuns, 200_000);
         double ratio = largeNs / smallNs;
 
         System.out.println(

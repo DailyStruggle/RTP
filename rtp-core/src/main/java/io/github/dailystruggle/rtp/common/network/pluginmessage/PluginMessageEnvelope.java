@@ -198,9 +198,7 @@ public final class PluginMessageEnvelope {
             if (++lines > MAX_LINES) return null;
             String line = s.substring(start, end);
             int eq = line.indexOf('=');
-            if (eq > 0) {
-                if (m.put(line.substring(0, eq), line.substring(eq + 1)) != null) return null;
-            }
+            if (eq > 0 && m.put(line.substring(0, eq), line.substring(eq + 1)) != null) return null;
             if (nl < 0) break;
             start = nl + 1;
         }

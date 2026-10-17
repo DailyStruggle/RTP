@@ -539,7 +539,6 @@ public class RegionQueueManagerTest {
     @Timeout(value = 2, unit = TimeUnit.SECONDS)
     void networkReservationLifecycle() {
         MockRTPWorld world = (MockRTPWorld) region.getWorld();
-        UUID tokenId = UUID.randomUUID();
 
         // Null token inputs fail safe
         assertNull(qm.reserveFromNetworkKept(null, "regionKey"));

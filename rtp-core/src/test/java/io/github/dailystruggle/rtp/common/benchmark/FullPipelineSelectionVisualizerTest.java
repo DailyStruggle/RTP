@@ -2,7 +2,6 @@ package io.github.dailystruggle.rtp.common.benchmark;
 
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.AnvilRegionBinHazardTable;
 import io.github.dailystruggle.rtp.common.tools.ChartOutputHelper;
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -57,8 +56,6 @@ public class FullPipelineSelectionVisualizerTest {
     square.set(GenericMemoryShapeParams.centerRadius, 0L);
     long totalRange = square.getRange();
     System.out.printf("[DEBUG_LOG] World Range: %,d chunks (%,d bins of 32x32 chunks)%n", totalRange, TOTAL_BINS);
-
-    AnvilRegionBinHazardTable binTable = new AnvilRegionBinHazardTable(totalRange);
 
     // 3. Populate initial discardable bins / terrain stats from outcome map
     int totalDiscardedBins = 0;

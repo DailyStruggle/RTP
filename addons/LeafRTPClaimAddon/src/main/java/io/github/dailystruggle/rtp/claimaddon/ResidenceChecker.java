@@ -15,6 +15,7 @@ import java.lang.reflect.Modifier;
  * the integration disables itself for the session, and the verifier becomes a no-op.
  */
 public class ResidenceChecker {
+  private ResidenceChecker() {}
   private static boolean exists = true;
 
   /**

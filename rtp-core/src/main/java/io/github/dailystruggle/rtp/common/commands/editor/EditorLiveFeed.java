@@ -580,8 +580,8 @@ public final class EditorLiveFeed {
 
     /** Deletes feed files; {@code prefixes} limits it to names starting with one of them. */
     private void deleteOwnFiles(List<String> prefixes) throws IOException {
-        try (DirectoryStream<Path> files = Files.newDirectoryStream(liveDir)) {
-            for (Path p : files) {
+        try (DirectoryStream<Path> entries = Files.newDirectoryStream(liveDir)) {
+            for (Path p : entries) {
                 String n = p.getFileName().toString();
                 if (!Files.isRegularFile(p) || !OWN_FILE.matcher(n).matches()) continue;
                 if (prefixes != null && prefixes.stream().noneMatch(n::startsWith)) continue;

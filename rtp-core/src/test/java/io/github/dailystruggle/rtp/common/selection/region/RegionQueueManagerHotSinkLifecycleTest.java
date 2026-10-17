@@ -238,7 +238,6 @@ class RegionQueueManagerHotSinkLifecycleTest {
     @DisplayName("perPlayerStage partitions and personalAggregateStage branches")
     void perPlayerStage_andPersonalAggregateStage() {
         UUID player1 = UUID.randomUUID();
-        UUID player2 = UUID.randomUUID();
 
         CacheStage<RTPLocation> p1Stage = qm.perPlayerStage.open(player1, 1);
         assertEquals("perPlayerLocationQueue:" + player1, p1Stage.name());

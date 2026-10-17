@@ -56,7 +56,7 @@ Zone 1: Verified Outcomes & Universal Guarantees (Above the Fold)
   - Audience: 100% of visitors (evaluators, beginners, power users).
   - Scope: Title, badges, 'What it is', platform compatibility, 'The short version'.
   - Rule: State empirical outcomes only (0 stalls, 0 failed teleports,
-    6 ms median /rtp-to-arrival latency on Paper, single jar). Use the same
+    5 ms median /rtp-to-arrival latency on Paper, single jar). Use the same
     measured figure everywhere it appears. Zero algorithmic exposition or
     derivations here.
   - Rule: 'What it is' defines the plugin: category (random teleport / RTP
@@ -143,9 +143,9 @@ On Folia, spots are checked against the world files on disk first, nothing waits
 
 ### The short version
 
-**No lag spikes across 4,096 paced teleports, and 6 ms median from `/rtp` to arrival (Paper).**
+**5 ms median from `/rtp` to arrival over 4,186 paced teleports (Paper).**
 
-- [**Efficient**](https://dailystruggle.github.io/RTP/admin/configuration/PERFORMANCE/): 0 lag spikes in 4,096 paced teleports.
+- [**Efficient**](https://dailystruggle.github.io/RTP/admin/configuration/PERFORMANCE/): the server stayed at full speed through all 4,186 paced teleports.
 - [**Fast**](#performance): 40 teleports per second on Paper and 180 per second on Folia, at full server speed.
 - [**Distinct**](https://dailystruggle.github.io/RTP/site/why/): 0 duplicate landings in each 4,096-teleport Paper 26.2 run.
 - [**Portable**](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-another-rtp-plugin): `/rtp config import` reads your BetterRTP, JustRTP or EzRTP config, previews it, and never overwrites without `overwrite=true`.
@@ -213,13 +213,13 @@ More: [Features](../site/features.md). Commands and permissions are in the colla
 
 ## Performance
 
-Most of an rtp plugin's work happens inside server API calls, so a profiler lists it under generic chunk functions. The public harness in [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP) attributes it back to the plugin. Rig: AMD Ryzen Threadripper 7970X (32 cores / 64 threads, 128 GB RAM, NVMe), Ubuntu 24.04 LTS, Java 25, 16 GB heap, 48 scripted bot clients (`devstack/clients/bench-swarm.js`). Each plugin ran on the latest version it supported at the time of the run, with cooldowns, delays and countdowns zeroed and its queue on at its default size where it has one. The other plugins ran at their documented defaults, because I can't tune settings their authors don't document. LeafRTP ran tuned ([config and the full list of changes](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP/bench-config/paper-26.2)): queue refill every tick (`period: 1`; the shipped default is `period: 20`) with no pause when server speed drops, a smaller ready queue (10 spots; shipped 50) and no backlog of unverified spots (shipped 1,000). Read the LeafRTP rows as a ceiling, not as what an untouched install does.
+Most of an rtp plugin's work happens inside server API calls, so a profiler lists it under generic chunk functions. The public harness in [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP) attributes it back to the plugin. Rig: AMD Ryzen Threadripper 7970X (32 cores / 64 threads, 128 GB RAM, NVMe), Ubuntu 24.04 LTS, Java 25, 16 GB heap, 48 scripted bot clients (`devstack/clients/bench-swarm.js`). Each plugin ran on the latest version it supported at the time of the run, with cooldowns, delays and countdowns zeroed and its queue on at its default size where it has one. The other plugins ran at their documented defaults, because I can't tune settings their authors don't document. LeafRTP ran tuned ([config and the full list of changes](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP/bench-config/paper-26.2)): queue refill every tick (`period: 1`; the shipped default is `period: 20`) with no pause when server speed drops, a smaller ready queue (10 spots; shipped 50) and no backlog of unverified spots (shipped 1,000). The tuning was for finding where it breaks: it lets LeafRTP spend more server time per second than the shipped settings allow, while a shipped install refills more slowly and pauses when the server lags. Read the LeafRTP rows as a throughput ceiling under worst-case load, not as what an untouched install does.
 
 <!-- only: bbb -->
 Both LeafRTP downloads are built from the same code, and the LeafRTP rows apply to either.
 <!-- /only -->
 
-Terms used below: **TP/s** is teleports per second. **TPS** is server ticks per second; 20 is full speed. **MSPT** is milliseconds per tick; above 50 ms the server falls below 20 TPS and players feel lag. A **lag spike** is a tick over 50 ms. **Safe max** is the highest rate a plugin held while the server stayed at 20 TPS.
+Terms used below: **TP/s** is teleports per second. **TPS** is server ticks per second; 20 is full speed. **MSPT** is milliseconds per tick; above 50 ms the server falls below 20 TPS and players feel lag. A **lag spike** is a tick over 50 ms. **Safe max** is the highest rate a plugin held while the server stayed at 20 TPS. **p95 / p99** is the time that 95% / 99% of teleports came in under.
 
 I compare throughput under load, latency from `/rtp` to arrival, and tick stability. On Paper, world ticking runs on a single main thread, while on Folia, world ticking is distributed across independent regional worker threads. LeafRTP checks candidates against region files (`.mca` and `.linear`) off-tick and keeps a queue of verified destinations, avoiding synchronous chunk loading and main-thread stalls.
 
@@ -237,6 +237,7 @@ These are snapshots of each plugin under one harness on my hardware. The other p
 | BetterRTP | < 5 TP/s | 9.2 TP/s | - | Did not complete on this rig |
 
 - **Paper vs. Folia:** Paper places every arriving player on one main thread, so no plugin here gets much past 40 TP/s at 20 TPS. Under 100 TP/s unthrottled load on Paper, LeafRTP completed 35,113 of 35,113 teleports while the server slowed (MSPT p95 103-122 ms; runs `20261009-044336`, `20261009-054148` and `20261009-070736`). Folia spreads that work across region threads, and LeafRTP reached 180 TP/s at 19.6 regional TPS (198 ms median latency), peaking at 249.7 TP/s.
+- **Latency at equal load:** each plugin got one `/rtp` every 200 ms in the first 60 s stage of 14 Paper ladder runs (4,186 teleports per plugin, all of them successful). LeafRTP's time from `/rtp` to arrival was p50 5 ms, p95 6 ms, p99 6 ms and max 33 ms, with MSPT p95 at 21.4-25.0 ms per run. JakesRTP was faster at this rate (p50 0 ms, p99 16 ms, max 45 ms); at 40 and 80 TP/s its MSPT reached 96 ms and 295 ms. HuskHomes, EzRTP and JustRTP had p99 of 471 ms, 904 ms and 2,425 ms. BetterRTP timed out on every command in those runs; in 11 later BetterRTP-only runs (16,789 teleports) its p99 was 805 ms ([table](https://github.com/dailystruggle/RTP/blob/V3/helpers/StressTestRTP/RESULTS.md#paper-262-linux---paced-5-tps-14-ladder-runs-per-plugin)).
 
 <details>
 <summary><b>What I changed on each plugin so they do the same job</b></summary>
@@ -276,7 +277,7 @@ Full methodology, per-run analyses, and the runs not shown here (equalized-radiu
 
 - **Spatial memory:** biomes and invalid chunks (with cause and TTL) are remembered at chunk resolution across restarts.
 - **Region-file pre-filter:** candidates are read from `.mca` and `.linear` region files and rejected off-tick.
-- **Pre-verified cache:** safe destinations wait in background queues; on Paper the median from `/rtp` to arrival was 6 ms in the paced benchmark.
+- **Pre-verified cache:** safe destinations wait in background queues; on Paper the median from `/rtp` to arrival was 5 ms in the paced benchmark.
 - **Spacing:** a keyed shuffle of the region.
 
 Details, derivations and charts: [How it works](../site/how-it-works.md). Spacing statistics: [Spacing between players](../site/how-it-works.md#spacing-between-players).
@@ -470,7 +471,7 @@ A: No, but they work well together. `/rtp scan` walks a region off-tick, verifie
 A: Yes. Region files are read directly: modded and namespaced IDs are kept, and `/rtp biome=<x>` matches what's on disk. Plugins that use the live noise-map lookup get this wrong after a version migration. Chunks that were never populated fall back to a live load.
 
 **Q: What about the Linear (.linear) region format?**
-A: Supported out of the box. LeafRTP reads both standard Anvil (`.mca`) and Linear (`.linear`, v1 and v2) region files directly. On Linear servers (such as Leaves, Gale, LinearPaper, or Fabric with the Linear Region Format mod), it dynamically binds to the host's existing Zstandard decompressor through lightweight method handles, so the jar stays zero-dependency with no shaded libraries or native binary conflicts. A startup canary test verifies decompressor health on boot, and reads enforce continuous bounds and signature tripwires. If the host environment lacks Zstandard or a file is corrupted, the pre-filter returns `UNKNOWN` and falls back cleanly to the server engine's async chunk loader.
+A: Yes, with no setup. LeafRTP reads Anvil (`.mca`) and Linear (`.linear`, v1 and v2) region files directly. On Linear servers (such as Leaves, Gale, LinearPaper, or Fabric with the Linear Region Format mod) it uses the Zstandard library the server already has, so the jar bundles no extra libraries. It checks that decompressor once at startup and checks each file's header and bounds as it reads. If Zstandard is missing or a file is damaged, that spot is checked through the server's normal async chunk load instead.
 
 **Q: I'm on NeoForge.**
 A: There's a native NeoForge adapter for 1.21.x / 26.x running the same core as every other platform. I test it less than the Bukkit family and Fabric, and broader testing on the 26.x carrier is still ongoing. If you hit something there, it goes to the front of my list.
@@ -479,10 +480,10 @@ A: There's a native NeoForge adapter for 1.21.x / 26.x running the same core as 
 A: Run Arclight or Mohist and use this jar. A native Forge adapter isn't planned.
 
 **Q: Memory and MSPT: should I worry?**
-A: MSPT, no. Locations kept in the hot queue hold chunk tickets so arrival doesn't wait on chunk loading, and `MemoryTracker` makes sure those tickets are released. Under heap pressure (old-generation use at or above `maxHeapPercent`, 85% by default; on a JVM with no separate old-generation pool and under 512 MB free, total heap use counts too) background filling pauses and the held tickets are dropped back to cold storage, which frees the pinned chunks right away.
+A: In the paced Paper benchmark (4,186 teleports at 5 per second across 14 runs), MSPT p95 was 21.4-25.0 ms per run and TPS stayed at or above 19.8. Those runs recorded no idle baseline, so this is the whole server's tick time with 48 bots online, not LeafRTP's share of it. Locations kept in the hot queue hold chunk tickets so arrival doesn't wait on chunk loading, and `MemoryTracker` makes sure those tickets are released. Under heap pressure (old-generation use at or above `maxHeapPercent`, 85% by default; on a JVM with no separate old-generation pool and under 512 MB free, total heap use counts too) background filling pauses and the held tickets are dropped back to cold storage, which frees the pinned chunks right away.
 
 **Q: Can I use ItemsAdder, Oraxen, Nexo, or CustomModelData in the GUI menu?**
-A: Yes. Icon strings in `guimenu.yml` accept prefix routing for `ia:<id>`, `oraxen:<id>`, `nexo:<id>`, `hdb:<id>`, `head:<player>`, `base64:<hash>`, and `<MATERIAL>:<cmd>`. Because commercial plugins carry closed-source licenses and commercial price tags, automated CI cannot run proprietary binaries; testing relies on mock contract stubs and open-source equivalents, so third-party proprietary compatibility is maintained on a best-effort basis. If an item plugin is absent or changes unexpectedly, LeafRTP falls back to vanilla materials. See [Custom Item & Menu Integration](https://dailystruggle.github.io/RTP/admin/CUSTOM_ITEMS/).
+A: Yes. Icons in `guimenu.yml` take `ia:<id>`, `oraxen:<id>`, `nexo:<id>`, `hdb:<id>`, `head:<player>`, `base64:<hash>` and `<MATERIAL>:<cmd>`. Most of the item plugins behind these prefixes are paid and closed source, so CI can't run them; those hooks are tested against stubs and open-source stand-ins, and support for them is best effort. If the item plugin is missing or its API changes, the icon falls back to a vanilla material. See [Custom Item & Menu Integration](https://dailystruggle.github.io/RTP/admin/CUSTOM_ITEMS/).
 
 <!-- only: bbb-pro -->
 <!-- kind: promo -->

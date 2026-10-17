@@ -15,6 +15,7 @@ import java.lang.reflect.Modifier;
  * session, and the verifier becomes a no-op.
  */
 public class KingdomsXChecker {
+  private KingdomsXChecker() {}
   private static boolean exists = true;
   private static Boolean available = null;
 

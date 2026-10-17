@@ -936,7 +936,6 @@ public class Region extends FactoryValue<RegionKeys> {
     }
 
     long start = System.nanoTime();
-    long currentAvailable = availableTime;
 
 //    System.out.println("[RTP-DEBUG] Region '" + name + "' execute() STARTED. Initial budget: " + availableTime + "ns");
 
@@ -1020,15 +1019,13 @@ public class Region extends FactoryValue<RegionKeys> {
         RTP.getInstance().invulnerablePlayers.remove(playerId);
 
         TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
-        if (data != null && !data.completed) {
-          if (data.nextTask instanceof TeleportPipelineTask task) {
-            task.setCancelled(true);
-            if (task.coords() != null) {
-              RTP.scheduler.runTask(
-                      task.region().getWorld(), task.coords().x() >> 4, task.coords().z() >> 4, task);
-            } else {
-              RTP.scheduler.runTask(task);
-            }
+        if (data != null && !data.completed && data.nextTask instanceof TeleportPipelineTask task) {
+          task.setCancelled(true);
+          if (task.coords() != null) {
+            RTP.scheduler.runTask(
+                    task.region().getWorld(), task.coords().x() >> 4, task.coords().z() >> 4, task);
+          } else {
+            RTP.scheduler.runTask(task);
           }
         }
 
@@ -1085,15 +1082,13 @@ public class Region extends FactoryValue<RegionKeys> {
         RTP.getInstance().invulnerablePlayers.remove(playerId);
 
         TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
-        if (data != null && !data.completed) {
-          if (data.nextTask instanceof TeleportPipelineTask task) {
-            task.setCancelled(true);
-            if (task.coords() != null) {
-              RTP.scheduler.runTask(
-                      task.region().getWorld(), task.coords().x() >> 4, task.coords().z() >> 4, task);
-            } else {
-              RTP.scheduler.runTask(task);
-            }
+        if (data != null && !data.completed && data.nextTask instanceof TeleportPipelineTask task) {
+          task.setCancelled(true);
+          if (task.coords() != null) {
+            RTP.scheduler.runTask(
+                    task.region().getWorld(), task.coords().x() >> 4, task.coords().z() >> 4, task);
+          } else {
+            RTP.scheduler.runTask(task);
           }
         }
 
@@ -1516,16 +1511,16 @@ public class Region extends FactoryValue<RegionKeys> {
   /** shutDown - save and clear data */
   public void shutDown() {
     binVerifier.close();
-    Shape<?> shape = getShape();
-    if (shape == null) return;
+    Shape<?> currentShape = getShape();
+    if (currentShape == null) return;
 
     RTPWorld world = getWorld();
     if (world == null) return;
 
-    if (shape instanceof MemoryShape<?>) {
-      ((MemoryShape<?>) shape).flushAndRebuild(((MemoryShape<?>) shape).spatialResolution());
-      ((MemoryShape<?>) shape).save(this.name + "_" + cacheKey() + ".bin", world.name());
-      ((MemoryShape<?>) shape).exportDebugJson(this.name, world.name());
+    if (currentShape instanceof MemoryShape<?>) {
+      ((MemoryShape<?>) currentShape).flushAndRebuild(((MemoryShape<?>) currentShape).spatialResolution());
+      ((MemoryShape<?>) currentShape).save(this.name + "_" + cacheKey() + ".bin", world.name());
+      ((MemoryShape<?>) currentShape).exportDebugJson(this.name, world.name());
     }
 
     cachePipeline.stop();
@@ -1645,17 +1640,17 @@ public class Region extends FactoryValue<RegionKeys> {
   public Shape<?> getShape() {
     boolean wbo = settings.worldBorderOverride();
     RTPWorld<?> world = getWorld();
-    Shape<?> shape = this.shape;
+    Shape<?> current = this.shape;
 
     if (wbo && world != null) {
       Shape<?> worldShape = ((WorldBorder) RTP.serverAccessor.getWorldBorder(world.name())).getShape().get();
-      if (!worldShape.equals(shape)) {
+      if (!worldShape.equals(current)) {
         this.shape = worldShape;
-        shape = worldShape;
+        current = worldShape;
         settings = new RegionSettings(
             settings.name(),
             settings.world(),
-            shape,
+            current,
             settings.vert(),
             settings.worldBorderOverride(),
             settings.requirePermission(),
@@ -1686,7 +1681,7 @@ public class Region extends FactoryValue<RegionKeys> {
         queueManager.keptLocations.clear();
       }
     }
-    return shape;
+    return current;
   }
 
   public VerticalAdjustor<?> getVert() {

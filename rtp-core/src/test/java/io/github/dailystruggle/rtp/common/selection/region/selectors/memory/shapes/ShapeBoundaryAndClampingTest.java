@@ -339,7 +339,7 @@ class ShapeBoundaryAndClampingTest {
     void saveAndLoad_roundTripBinaryFile(@TempDir Path tempDir) throws Exception {
         // Wire a dedicated test directory and database accessor
         File testDir = tempDir.toFile();
-        MockRTPServerAccessor accessor = RTPTestSetup.install(testDir);
+        RTPTestSetup.install(testDir);
 
         YamlFileDatabase db = new YamlFileDatabase(testDir);
         Field daField = RTP.class.getDeclaredField("databaseAccessor");

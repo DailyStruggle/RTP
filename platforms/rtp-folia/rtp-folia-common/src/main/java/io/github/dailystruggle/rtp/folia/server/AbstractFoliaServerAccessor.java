@@ -392,7 +392,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
           totalEmpty++;
           continue;
         }
-        if (values == null || values.isEmpty()) {
+        if (values.isEmpty()) {
           totalEmpty++;
           continue;
         }
@@ -582,7 +582,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
       Player p = Bukkit.getPlayer(player);
       if (p == null) return "en_us";
       String loc = p.getLocale();
-      return (loc == null || loc.isEmpty()) ? "en_us" : loc;
+      return loc.isEmpty() ? "en_us" : loc;
     } catch (Throwable t) {
       return "en_us";
     }
@@ -771,7 +771,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
       Player player = Bukkit.getPlayer(playerId);
       if (player == null) return Collections.emptySet();
       Set<String> tags = player.getScoreboardTags();
-      if (tags == null || tags.isEmpty()) return Collections.emptySet();
+      if (tags.isEmpty()) return Collections.emptySet();
       return Collections.unmodifiableSet(new HashSet<>(tags));
     } catch (Throwable t) {
       return Collections.emptySet();

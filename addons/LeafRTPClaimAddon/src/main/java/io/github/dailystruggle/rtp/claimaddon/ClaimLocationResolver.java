@@ -40,14 +40,12 @@ public final class ClaimLocationResolver {
 
     // 2. Fallback to Bukkit server if present and initialized
     try {
-      if (Bukkit.getServer() != null) {
-        World bw = Bukkit.getWorld(coords.worldName());
-        if (bw != null) {
-          return new Location(bw, coords.x(), coords.y(), coords.z());
-        }
+      World bw = Bukkit.getWorld(coords.worldName());
+      if (bw != null) {
+        return new Location(bw, coords.x(), coords.y(), coords.z());
       }
     } catch (Throwable ignored) {
-      // Ignored: Bukkit server may be mock or uninitialized during testing
+      // Ignored: Bukkit server may be null, mock or uninitialized during testing
     }
 
     return null;

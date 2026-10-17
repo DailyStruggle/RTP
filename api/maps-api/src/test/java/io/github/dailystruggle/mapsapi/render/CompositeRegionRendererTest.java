@@ -54,11 +54,9 @@ public class CompositeRegionRendererTest {
     // Verify desaturation: channels converge closer to luminance
     int rOrig = (forestGreen >> 16) & 0xFF;
     int gOrig = (forestGreen >> 8) & 0xFF;
-    int bOrig = forestGreen & 0xFF;
 
     int rDesat = (desaturated >> 16) & 0xFF;
     int gDesat = (desaturated >> 8) & 0xFF;
-    int bDesat = desaturated & 0xFF;
 
     int deltaOrig = Math.abs(gOrig - rOrig);
     int deltaDesat = Math.abs(gDesat - rDesat);

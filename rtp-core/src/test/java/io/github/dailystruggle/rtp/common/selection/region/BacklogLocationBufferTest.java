@@ -62,7 +62,7 @@ class BacklogLocationBufferTest {
   void headBlockingOnUnverified() {
     BacklogLocationBuffer b = new BacklogLocationBuffer(4);
     BacklogEntry e0 = b.offerUnverified(loc(0));
-    BacklogEntry e1 = b.offerUnverified(loc(1));
+    b.offerUnverified(loc(1));
     BacklogEntry e2 = b.offerUnverified(loc(2));
     e0.setValidity(Validity.VALIDATED);
     // e1 stays UNVERIFIED -> blocks promotion of e2 even if e2 were VALIDATED.
@@ -136,7 +136,7 @@ class BacklogLocationBufferTest {
     BacklogLocationBuffer b = new BacklogLocationBuffer(4);
     BacklogEntry e0 = b.offerUnverified(loc(0));
     BacklogEntry e1 = b.offerUnverified(loc(1));
-    BacklogEntry e2 = b.offerUnverified(loc(2));
+    b.offerUnverified(loc(2));
     e0.setValidity(Validity.VALIDATED);
     // e1 and e2 remain UNVERIFIED.
 
@@ -161,7 +161,7 @@ class BacklogLocationBufferTest {
     BacklogLocationBuffer b = new BacklogLocationBuffer(4);
     BacklogEntry e0 = b.offerUnverified(loc(0));
     BacklogEntry e1 = b.offerUnverified(loc(1));
-    BacklogEntry e2 = b.offerUnverified(loc(2));
+    b.offerUnverified(loc(2));
     e0.setValidity(Validity.VALIDATED);
     e1.setValidity(Validity.INVALIDATED);
     // e2 stays UNVERIFIED
@@ -351,7 +351,7 @@ class BacklogLocationBufferTest {
   void cleanIfHeuristicMetNoopsBelowThreshold() {
     BacklogLocationBuffer b = new BacklogLocationBuffer(16);
     BacklogEntry e0 = b.offerUnverified(loc(0));
-    BacklogEntry e1 = b.offerUnverified(loc(1));
+    b.offerUnverified(loc(1));
     e0.setValidity(Validity.INVALIDATED);
 
     assertEquals(1, b.invalidatedSize());

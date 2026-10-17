@@ -50,7 +50,7 @@ class GlobalRegionVerifiersTest {
         class SourceA {}
         class SourceB {}
 
-        AutoCloseable handleA1 = GlobalRegionVerifiers.addGlobalRegionVerifier(SourceA.class, coords -> coords.x() > 0);
+        GlobalRegionVerifiers.addGlobalRegionVerifier(SourceA.class, coords -> coords.x() > 0);
         GlobalRegionVerifiers.addGlobalRegionVerifier(SourceA.class, coords -> coords.x() > 5);
         GlobalRegionVerifiers.addGlobalRegionVerifierAsync(SourceA.class, coords -> CompletableFuture.completedFuture(coords.y() > 0));
 

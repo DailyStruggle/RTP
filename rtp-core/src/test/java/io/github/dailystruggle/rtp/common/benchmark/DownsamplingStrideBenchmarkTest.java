@@ -1801,7 +1801,6 @@ public class DownsamplingStrideBenchmarkTest {
   @DisplayName("Generate 4-way visual comparison graph for spacing strategies")
   public void testRenderSpacingStrategiesGraph() throws Exception {
     System.out.println("\n[DEBUG_LOG] --- Generating 4-Way Spacing Strategies Graph ---");
-    long range = 202_000L;
     long secretKey = 0x517CC1B727220A95L;
     CircleOptimizedDualLayer shape = new CircleOptimizedDualLayer("SPACING_GRAPH", POINT_EDGE_P);
     shape.set(GenericMemoryShapeParams.radius, (long) DEFAULT_R);
@@ -2098,7 +2097,6 @@ public class DownsamplingStrideBenchmarkTest {
   @DisplayName("Diagnostic: Blue-Noise Spaced-Out PRP maximizes physical distance between consecutive arrivals")
   public void testSpacedOutPRP() {
     System.out.println("\n[DEBUG_LOG] --- Statistically Spaced-Out (Blue Noise) PRP Diagnostic ---");
-    long range = 202_000L;
     long secretKey = 0x517CC1B727220A95L;
     CircleOptimizedDualLayer shape = new CircleOptimizedDualLayer("SPACED_PRP", POINT_EDGE_P);
     shape.set(GenericMemoryShapeParams.radius, (long) DEFAULT_R);

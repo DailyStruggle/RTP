@@ -8,6 +8,7 @@ import org.bukkit.plugin.Plugin;
 /** Checker for Lands claims */
 @SuppressWarnings("deprecation")
 public class LandsChecker {
+  private LandsChecker() {}
   private static LandsIntegration landsIntegration = null;
   private static boolean exists = true;
 

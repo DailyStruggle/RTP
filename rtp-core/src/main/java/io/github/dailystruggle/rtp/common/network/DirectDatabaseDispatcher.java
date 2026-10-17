@@ -50,7 +50,6 @@ public final class DirectDatabaseDispatcher {
     }
 
     private final NetworkTransport transport;
-    private final Supplier<NetworkSnapshot> snapshotSupplier;
     private final PeerRegionRegistry peerRegionRegistry;
     private final NetworkBridge bridge;
     private final String localServerId;
@@ -65,7 +64,7 @@ public final class DirectDatabaseDispatcher {
                                     Duration tokenTtl,
                                     Consumer<UUID> onTerminalFailure) {
         this.transport = Objects.requireNonNull(transport, "transport");
-        this.snapshotSupplier = Objects.requireNonNull(snapshotSupplier, "snapshotSupplier");
+        Objects.requireNonNull(snapshotSupplier, "snapshotSupplier");
         this.peerRegionRegistry = peerRegionRegistry;
         this.bridge = bridge;
         this.localServerId = Objects.requireNonNull(localServerId, "localServerId");

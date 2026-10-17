@@ -4,6 +4,9 @@ import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class BukkitServerProvider {
+    private BukkitServerProvider() {
+    }
+
     public static class ServerModel {
         public final String accessorClassName;
         public final String schedulerClassName;

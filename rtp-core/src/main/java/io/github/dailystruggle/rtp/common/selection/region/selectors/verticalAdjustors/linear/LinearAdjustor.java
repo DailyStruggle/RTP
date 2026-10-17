@@ -534,9 +534,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
     // highest non-air block on this column. Stored sky-light nibbles and
     // heightmap data are ignored - both are unreliable on unticked /
     // freshly-generated chunks. Block data is always present and deterministic.
-    if (requireSkyLight) {
-      if (y + 1 <= columnSkyFloor) return false;
-    }
+    if (requireSkyLight && y + 1 <= columnSkyFloor) return false;
     return true;
   }
 

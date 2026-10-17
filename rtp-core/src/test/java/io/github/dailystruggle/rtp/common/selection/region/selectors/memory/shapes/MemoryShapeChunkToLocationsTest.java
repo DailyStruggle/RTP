@@ -302,8 +302,6 @@ public class MemoryShapeChunkToLocationsTest {
         assertEquals(2, preimage.length, "Setup precondition: chunk has 2 preimages");
 
         long p1 = preimage[0];
-        long p2 = preimage[1];
-        long rep = shape.xzToLocation(twoChunk[0], twoChunk[1]);
 
         // Record biome only on p1 (simulating legacy ScanTask recording only for current pos)
         shape.addBiomeLocation(p1, 1L, "minecraft:plains");

@@ -116,7 +116,7 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
     if (anvilView != null) {
       return (RTP.serverAccessor != null) ? RTP.serverAccessor.getRTPWorld(anvilWorldId) : null;
     }
-    if (chunk == null || chunk.getWorld() == null) return null;
+    if (chunk == null) return null;
     return (RTP.serverAccessor != null) ? RTP.serverAccessor.getRTPWorld(chunk.getWorld().getUID()) : null;
   }
 

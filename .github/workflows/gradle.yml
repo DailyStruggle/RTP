@@ -51,6 +51,11 @@ jobs:
       - name: Assemble reduced graph
         run: ./gradlew assemble -PexcludeJdk25 -PexcludeNeoforge
 
+      # ADR-113 classfile gate. `assemble` skips `check`, so run it explicitly here. It inspects
+      # bytecode only, so the JDK 21 host is sufficient and no JDK 17 install is needed.
+      - name: Verify Java 17 bytecode (ADR-113)
+        run: ./gradlew verifyJava17Bytecode -PexcludeJdk25 -PexcludeNeoforge
+
   # Full graph: the complete unified-jar build, including the JDK-25 deobf
   # 26.x Fabric/NeoForge carriers (which pin their own Java 25 toolchain) and
   # the shaded plugin jar. Both JDK 21 and 25 are provisioned; Gradle selects

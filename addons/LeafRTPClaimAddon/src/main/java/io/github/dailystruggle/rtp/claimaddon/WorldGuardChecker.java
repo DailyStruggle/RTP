@@ -16,6 +16,7 @@ import org.bukkit.plugin.Plugin;
 
 /** Checker for WorldGuard regions (honors the {@code can-rtp-select-here} state flag). */
 public class WorldGuardChecker {
+  private WorldGuardChecker() {}
   public static StateFlag CAN_RTP_SELECT_HERE = null;
   private static WorldGuardPlugin worldGuardPlugin = null;
   private static boolean exists = true;

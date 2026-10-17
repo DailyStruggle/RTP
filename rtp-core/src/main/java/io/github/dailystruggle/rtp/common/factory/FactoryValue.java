@@ -367,9 +367,9 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     // Iterate a snapshot so a concurrent {@link #getNumber} cache-back
     // cannot fire CME on the underlying EnumMap iterator.
     for (Map.Entry<E, Object> e : getData().entrySet()) {
-      String[] desc = this.desc.get(e.getKey());
-      if (desc != null) {
-        for (String d : desc) {
+      String[] keyDesc = desc.get(e.getKey());
+      if (keyDesc != null) {
+        for (String d : keyDesc) {
           res.append(d).append("\n");
         }
       }
@@ -403,8 +403,8 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
    * @throws IOException if an I/O error occurs
    */
   public void loadLangFile(String subDir) throws IOException {
-    String name = this.name;
-    if (!name.endsWith(".yml")) name = name + ".yml";
+    String fileName = this.name;
+    if (!fileName.endsWith(".yml")) fileName = fileName + ".yml";
     File langFile;
     if (RTP.serverAccessor == null) return;
     // ADR-076: the shared catalog rename map is a co-located dotfile sibling under the
@@ -425,7 +425,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
       }
     }
 
-    String mapFileName = langDir + File.separator + "." + name.replace(".yml", ".lang.yml");
+    String mapFileName = langDir + File.separator + "." + fileName.replace(".yml", ".lang.yml");
     langFile = new File(mapFileName);
 
     RtpYamlConfig langYaml = new RtpYamlConfig(langFile);
@@ -466,10 +466,10 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     if (!(other instanceof FactoryValue)) return false;
     if (!(this.getClass().isAssignableFrom(other.getClass()))) return false;
     if (!(((FactoryValue<?>) other).myClass.equals(myClass))) return false;
-    EnumMap<E, Object> data = (EnumMap<E, Object>) ((FactoryValue<?>) other).getData();
+    EnumMap<E, Object> otherData = (EnumMap<E, Object>) ((FactoryValue<?>) other).getData();
     for (Map.Entry<? extends Enum<?>, Object> e : this.data.entrySet()) {
       Object mine = e.getValue();
-      Object theirs = data.get(e.getKey());
+      Object theirs = otherData.get(e.getKey());
       if (mine.getClass().equals(theirs.getClass())) {
         if (!mine.equals(theirs)) return false;
       } else if (!mine.toString().equalsIgnoreCase(theirs.toString())) return false;

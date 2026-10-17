@@ -87,11 +87,9 @@ public final class NetworkWaitlistGuard implements Predicate<RTPCommandSender> {
     private static String resolveTemplate() {
         try {
             if (RTP.configs != null) {
-                if (RTP.configs != null) {
-                    Object v = RTP.configs.getConfigValue(
-                            NetworkMessages.alreadyQueued, DEFAULT_ALREADY_QUEUED);
-                    if (v != null) return v.toString();
-                }
+                Object v = RTP.configs.getConfigValue(
+                        NetworkMessages.alreadyQueued, DEFAULT_ALREADY_QUEUED);
+                if (v != null) return v.toString();
             }
         } catch (Throwable ignored) {
             // fall through to default

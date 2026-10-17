@@ -85,7 +85,6 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
     private final Dialect dialect;
     private final Executor executor;
     private final ScheduledExecutorService poller;
-    private final long pollIntervalMs;
     private final ConcurrentLinkedQueue<Sub> subscribers = new ConcurrentLinkedQueue<>();
     private final AtomicBoolean open = new AtomicBoolean(true);
     private final AtomicInteger threadCounter = new AtomicInteger();
@@ -130,7 +129,6 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
         if (pollIntervalMs <= 0) {
             throw new IllegalArgumentException("pollIntervalMs must be > 0, got " + pollIntervalMs);
         }
-        this.pollIntervalMs = pollIntervalMs;
         this.verifier = verifier;
         this.schemaVersion = schemaVersion;
 
@@ -286,17 +284,16 @@ public final class SqlNetworkStateBinding implements NetworkTransport {
             // Signed mode: verify the stored token HMAC before consuming and
             // pin the verified hmac into the CAS so a row rewritten between
             // SELECT and UPDATE affects 0 rows. Fail closed on NULL hmac.
-            if (verifier != null) {
-                if (rowHmac == null || rowHmac.isEmpty()
+            if (verifier != null
+                    && (rowHmac == null || rowHmac.isEmpty()
                         || !CanonicalEnvelopes.verifyToken(verifier, schemaVersion,
                                 tokenId, rowServer, rowPlayer,
                                 Long.toString(rowExpires), Long.toString(rowCreated),
-                                rowState, rowRegion, rowHmac)) {
-                    LOG.log(Level.WARNING,
-                            "SqlNetworkStateBinding.redeem: HMAC verification failed for token "
-                                    + tokenPrefix(tokenId) + "; refusing to consume (REQ-RTP-S-004)");
-                    return RedeemOutcome.HMAC_INVALID;
-                }
+                                rowState, rowRegion, rowHmac))) {
+                LOG.log(Level.WARNING,
+                        "SqlNetworkStateBinding.redeem: HMAC verification failed for token "
+                                + tokenPrefix(tokenId) + "; refusing to consume (REQ-RTP-S-004)");
+                return RedeemOutcome.HMAC_INVALID;
             }
             // Row-count-atomic CAS: only the call that finds the row still in
             // (CLAIMED|PENDING) AND released_at_ms IS NULL transitions it; a

@@ -538,7 +538,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
           totalEmpty++;
           continue;
         }
-        if (values == null || values.isEmpty()) {
+        if (values.isEmpty()) {
           totalEmpty++;
           continue;
         }
@@ -870,7 +870,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       Player p = Bukkit.getPlayer(player);
       if (p == null) return "en_us";
       String loc = p.getLocale();
-      return (loc == null || loc.isEmpty()) ? "en_us" : loc;
+      return loc.isEmpty() ? "en_us" : loc;
     } catch (Throwable t) {
       return "en_us";
     }
@@ -893,7 +893,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   public java.util.Collection<io.github.dailystruggle.rtp.api.entity.RTPPlayer> getOnlinePlayers() {
     try {
       java.util.Collection<? extends Player> players = Bukkit.getOnlinePlayers();
-      if (players == null || players.isEmpty()) return Collections.emptyList();
+      if (players.isEmpty()) return Collections.emptyList();
       java.util.List<io.github.dailystruggle.rtp.api.entity.RTPPlayer> list = new java.util.ArrayList<>(players.size());
       for (Player p : players) {
         if (p == null) continue;
@@ -1221,7 +1221,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       Player player = Bukkit.getPlayer(playerId);
       if (player == null) return Collections.emptySet();
       Set<String> tags = player.getScoreboardTags();
-      if (tags == null || tags.isEmpty()) return Collections.emptySet();
+      if (tags.isEmpty()) return Collections.emptySet();
       return Collections.unmodifiableSet(new java.util.HashSet<>(tags));
     } catch (Throwable t) {
       return Collections.emptySet();

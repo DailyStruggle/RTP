@@ -16,6 +16,8 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 /**
  * Side-by-side empirical verification and visual image generator for:
  * 1. Current Implementation (Native Feistel PRP at S=1 resolution).
@@ -99,6 +101,9 @@ public class DownsamplingSideBySideBenchmarkTest {
     List<ChunkCoord> currentArrivals = samplePoints(legacyDefaultShape, testTeleports);
     List<ChunkCoord> arrivalsS64 = samplePoints(stride64Shape, testTeleports);
     List<ChunkCoord> arrivalsS256 = samplePoints(stride256Shape, testTeleports);
+    assertInsideSquare(currentArrivals, R);
+    assertInsideSquare(arrivalsS64, R);
+    assertInsideSquare(arrivalsS256, R);
 
     // Compute comprehensive proximity metrics
     ProximityMetrics proxCurrent = evaluateProximityMetrics(currentArrivals);
@@ -140,10 +145,17 @@ public class DownsamplingSideBySideBenchmarkTest {
 
     // Render and save to canonical doc and report destinations
     BufferedImage sideBySideImg = renderSideBySideChart(R, uniqueRadiusRu, currentArrivals, arrivalsS64, arrivalsS256, proxCurrent, proxS64, proxS256, memCurrent, memS64, memS256);
+    assertTrue(sideBySideImg.getWidth() > 0 && sideBySideImg.getHeight() > 0, "chart must have a drawable area");
     ChartOutputHelper.writeChart(sideBySideImg, "player_distribution", "side_by_side_downsampling_comparison_chart.png");
     ChartOutputHelper.writeChart(sideBySideImg, "player_distribution", "unique_placements_auto_comparison_chart.png");
 
     System.out.println("[DEBUG_LOG] Successfully rendered comparison charts to canonical destinations");
+  }
+
+  private static void assertInsideSquare(List<ChunkCoord> arrivals, int radius) {
+    for (ChunkCoord c : arrivals) {
+      assertTrue(Math.abs(c.x()) <= radius && Math.abs(c.z()) <= radius, "placement outside radius: " + c);
+    }
   }
 
   private static List<ChunkCoord> samplePoints(SquareOptimizedDualLayer shape, int count) {

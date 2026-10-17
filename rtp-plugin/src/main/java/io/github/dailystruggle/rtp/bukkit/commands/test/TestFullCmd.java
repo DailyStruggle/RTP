@@ -261,31 +261,29 @@ public class TestFullCmd extends BaseRTPCmdImpl {
 
       if (isEvents) {
         try {
-          if (Bukkit.getServer() != null && Bukkit.getPluginManager() != null) {
-            Plugin plugin = Bukkit.getPluginManager().getPlugin("RTP");
-            if (plugin == null) {
-              Plugin[] plugins = Bukkit.getPluginManager().getPlugins();
-              if (plugins != null && plugins.length > 0) {
-                plugin = plugins[0];
-              }
+          Plugin plugin = Bukkit.getPluginManager().getPlugin("RTP");
+          if (plugin == null) {
+            Plugin[] plugins = Bukkit.getPluginManager().getPlugins();
+            if (plugins.length > 0) {
+              plugin = plugins[0];
             }
-            if (plugin != null) {
-              BukkitCommandEvents.register();
-              Listener l =
-                  new Listener() {
-                    @EventHandler
-                    public void onSuccess(TeleportCommandSuccessEvent event) {
-                      successFired.set(true);
-                    }
+          }
+          if (plugin != null) {
+            BukkitCommandEvents.register();
+            Listener l =
+                new Listener() {
+                  @EventHandler
+                  public void onSuccess(TeleportCommandSuccessEvent event) {
+                    successFired.set(true);
+                  }
 
-                    @EventHandler
-                    public void onFail(TeleportCommandFailEvent event) {
-                      failFired.set(true);
-                    }
-                  };
-              tempListenerHolder[0] = l;
-              Bukkit.getPluginManager().registerEvents(l, plugin);
-            }
+                  @EventHandler
+                  public void onFail(TeleportCommandFailEvent event) {
+                    failFired.set(true);
+                  }
+                };
+            tempListenerHolder[0] = l;
+            Bukkit.getPluginManager().registerEvents(l, plugin);
           }
         } catch (Throwable t) {
           // Bukkit environment not available or mock/headless

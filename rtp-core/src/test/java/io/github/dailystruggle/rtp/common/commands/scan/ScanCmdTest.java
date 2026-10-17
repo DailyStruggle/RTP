@@ -940,7 +940,6 @@ public class ScanCmdTest {
         ScanTask task = new ScanTask(bigRegion, 0L);
         Square shape = (Square) bigRegion.getShape();
         long range = (long) shape.getRange();
-        long stride = Math.max(1L, shape.minBridgingStride());
         task.currentOffset = 0;
         // Total points across all passes = ((range + stride - 1) / stride) * stride ≈ range.
         // At 1000 cpsLocal, ewma and cumulative are uninitialized so cps = 1000.

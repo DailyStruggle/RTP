@@ -78,6 +78,15 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Suggested next step:** Keep the repeat limit documented; both obvious fixes are ruled out. Physical-order lanes need per-lane occupancy state instead of run tables (the encoding that failed earlier performance tests, and it breaks C8), and marking landings without `expand` exhausts the region. Any future fix must consume no good area and keep the run encoding. Route BINNED_AMORTIZED through the main counter and phase windows. Flip the `dups > 0` pin in `ConsecutiveLandingSpacingSimTest.terrainRejectionKeepsBackToBackSpacing` only with such a fix.
 - **Linear:** RTP-2
 
+### 2026-10-17 - Linux ladder runs re-serve the exact same landing block
+
+- **Severity:** Medium
+- **Status:** Open
+- **Discovered during:** moving the front-page paced figures to the Threadripper ladder runs
+- **Location:** queue / reservation path that hands out `to_x,to_z` (unknown); data in `/networkshare/26.2/plugins/StressTestRTP/runs/<stamp>.csv` on the bench host
+- **Symptom / hypothesis:** In the 14 Paper ladder runs `20261009-095754`..`20261010-070617` (tuned bench config), LeafRTP landed two players on the identical block 5-149 times per run (e.g. 149 of 15,896 in `20261009-225939`), mostly in the 10-160 TP/s stages; 3 in 4,186 at 5 TP/s, 20-48 s apart, served as FAST or COLD. Other plugins had 0 in the same 5 TP/s windows. Exact-block repeats at ~1% exceed the ~0.1% chunk-repeat rate modelled for RTP-2, so a verified spot may be handed out twice or returned to the queue after use.
+- **Impact:** Players can land on the same spot as someone a few seconds earlier; contradicts the "0 duplicate landings" storefront claim if those runs are used.
+- **Suggested next step:** Group repeats by `served_mode` and stage in one run's CSV; check whether a location is re-queued after teleport (cache recycle, cancelled-teleport return path) and whether the tuned config (`period: 1`, no unverified backlog) is required to reproduce.
 
 ### 2026-10-06 — Weekly Jazzer job fuzzes one Anvil target for 2 s and passes
 
@@ -252,6 +261,46 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** Every in-flight task reads the same static fields, so a `/rtp reload` mid-teleport can give one attempt messages, `viewDistanceTeleport`, lock-after and respawn settings from two different config generations.
 - **Impact:** Rare and cosmetic in practice (reload is already refused while it runs); a teleport that straddles a reload may mix old and new settings.
 - **Suggested next step:** Snapshot the values into an immutable record at task construction (or at the SETUP-to-LOAD transition) and read that record in the later phases; keep the static cache only as the source for new snapshots.
+
+### 2026-10-17 - Fabric/NeoForge `setBiomeGetter` override is stored but never read
+
+- **Severity:** Medium
+- **Status:** Open
+- **Discovered during:** SonarCloud medium-maintainability sweep (S1068 unused private field)
+- **Location:** `platforms/rtp-fabric/rtp-fabric-common/.../server/FabricServerAccessor.java` field `biomeGetter` (~line 89) and `setBiomeGetter` (~line 2022); `platforms/rtp-neoforge/rtp-neoforge-common/.../server/NeoForgeServerAccessor.java` field `biomeGetter` (~line 60) and `setBiomeGetter` (~line 692)
+- **Symptom / hypothesis:** `setBiomeGetter` assigns the field, but biome lookups never call it, so an addon-installed biome resolver is silently ignored. Bukkit and Folia forward the getter into `BukkitRTPWorld` / `FoliaRTPWorld`, where it is used.
+- **Impact:** On Fabric and NeoForge, biome filters ignore addon overrides (e.g. custom world generators) and always use the vanilla registry lookup.
+- **Suggested next step:** Route the world adapters' biome reads through `biomeGetter` (or forward it to the world class the way Bukkit/Folia do), and add a test that installs a stub getter and checks it is consulted. Then close Sonar's S1068 on these fields; it is a true positive.
+
+### 2026-10-17 - `Factory.getOrDefault` throws on an empty map despite `@NotNull` contract
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** SonarCloud medium-maintainability sweep (S2589 in `MultiConfigParser.getParser`)
+- **Location:** `rtp-core/.../common/factory/Factory.java` `getOrDefault` (~152-170); `rtp-core/.../configuration/MultiConfigParser.java` `getParser` (~283-291)
+- **Symptom / hypothesis:** `getOrDefault` throws an NPE when the factory map is empty instead of returning a default, so the `parser != null` fallback (`new ConfigParser(...)`) in `MultiConfigParser.getParser` can never run.
+- **Impact:** A multi-config file whose factory has no entries yet crashes the lookup instead of falling back to a fresh parser.
+- **Suggested next step:** Decide the contract (throw `IllegalStateException` with a message, or return a fallback), make `getOrDefault` match its Javadoc, and add an empty-factory test; then close or fix the S2589 accordingly.
+
+### 2026-10-17 - `VerticalAdjustor.equals` and `hashCode` disagree
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** SonarCloud medium-maintainability sweep (S3415 in `VerticalAdjustorBaseTest`)
+- **Location:** `rtp-core/.../selection/worldborder/verticalAdjustors/VerticalAdjustor.java` (or its package) `equals` / `hashCode`
+- **Symptom / hypothesis:** `equals` ignores `name`, but `hashCode` includes `name` and `super.hashCode()`, so two equal adjustors can hash differently.
+- **Impact:** Adjustors used as map/set keys can be duplicated or not found.
+- **Suggested next step:** Use the same fields in both methods and add an equal-implies-same-hash test.
+
+### 2026-10-17 - `Rectangle` with `rotation=90` does not round-trip location to XZ and back
+
+- **Severity:** Medium
+- **Status:** Open
+- **Discovered during:** SonarCloud medium-maintainability sweep (S1854 dead store in `DegenerateShapeAndSpiralTest` ~153)
+- **Location:** `rtp-core/.../selection/region/selectors/shapes/Rectangle.java` `locationToXZ` / `xzToLocation`
+- **Symptom / hypothesis:** For location `500` with `rotation=90`, `xzToLocation(locationToXZ(500))` returns `-9549`. The two transforms are probably rotating in opposite or inconsistent directions.
+- **Impact:** Any path that maps a placement back to its index (verification, coverage bookkeeping, backlog) mis-identifies placements on rotated rectangles.
+- **Suggested next step:** Write a round-trip property test across rotations 0/45/90/180, then fix the inverse rotation.
 
 ### 2026-10-13 - Block-list rejection log still names `safety.yml`
 

@@ -196,10 +196,8 @@ public class TestEventsCmd extends BaseRTPCmdImpl {
   }
 
   private void report(UUID callerId, String msg, Level level, Throwable t) {
-    if (!callerId.equals(RTPAPI.serverId)) {
-      if (RTP.serverAccessor != null) {
-        RTP.serverAccessor.sendMessage(callerId, msg);
-      }
+    if (!callerId.equals(RTPAPI.serverId) && RTP.serverAccessor != null) {
+      RTP.serverAccessor.sendMessage(callerId, msg);
     }
     if (t != null) {
       RTP.log(level, msg, t);

@@ -189,10 +189,10 @@ public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistr
 
           subParams.put("name", fv.name);
           for (Map.Entry<? extends Enum<?>, Object> entry : data.entrySet()) {
-            String name = entry.getKey().name();
-            List<String> strings = parameterValues.get(name.toLowerCase());
+            String paramName = entry.getKey().name();
+            List<String> strings = parameterValues.get(paramName.toLowerCase());
             if (strings != null && !strings.isEmpty()) {
-              subParams.put(name, strings.get(0));
+              subParams.put(paramName, strings.get(0));
             }
           }
           value = subParams;
@@ -519,26 +519,26 @@ public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistr
       }
       EnumMap<?, ?> data = configParser.getData();
       for (Map.Entry<? extends Enum<?>, ?> e : data.entrySet()) {
-        String name = e.getKey().name();
-        if (name.equalsIgnoreCase("version")) continue;
-        String s = name;
-        Object nameObj = configParser.language_mapping.get(name);
+        String keyName = e.getKey().name();
+        if (keyName.equalsIgnoreCase("version")) continue;
+        String s = keyName;
+        Object nameObj = configParser.language_mapping.get(keyName);
         if (nameObj != null) s = nameObj.toString();
         Object o = e.getValue();
         // Try the in-file display name first (s), then fall back to the enum
         // name - the yaml is keyed by whichever the language_mapping points to.
         String desc = descriptionFromComment(parserYaml, s);
-        if (desc.isEmpty() && !s.equals(name)) desc = descriptionFromComment(parserYaml, name);
+        if (desc.isEmpty() && !s.equals(keyName)) desc = descriptionFromComment(parserYaml, keyName);
 
-        if (name.contains("world")) {
+        if (keyName.contains("world")) {
           addParameter(s, new WorldParameter("rtp.update", desc, (uuid, s1) -> true));
-        } else if (name.contains("region")) {
+        } else if (keyName.contains("region")) {
           addParameter(s, new RegionParameter("rtp.update", desc, (uuid, s1) -> true));
-        } else if (o instanceof String && name.equalsIgnoreCase("shape")) {
+        } else if (o instanceof String && keyName.equalsIgnoreCase("shape")) {
           // Referenced shape (@config or bare name): register ShapeParameter and factory dotted leaves.
           addParameter(s, new ShapeParameter("rtp.update", desc, (uuid, s1) -> true));
           addFactoryReferenceDottedParameters(s, RTP.factoryNames.shape);
-        } else if (o instanceof String && name.equalsIgnoreCase("vert")) {
+        } else if (o instanceof String && keyName.equalsIgnoreCase("vert")) {
           // Referenced vert (@config or bare name): register VertParameter and factory dotted leaves.
           addParameter(s, new VertParameter("rtp.update", desc, (uuid, s1) -> true));
           addFactoryReferenceDottedParameters(s, RTP.factoryNames.vert);
@@ -582,9 +582,9 @@ public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistr
           }
         } else if (o instanceof List) {
           Supplier<Set<String>> values = HashSet::new;
-          if (name.contains("block")) {
+          if (keyName.contains("block")) {
             values = () -> RTP.serverAccessor.materials();
-          } else if (name.contains("biome")) {
+          } else if (keyName.contains("biome")) {
             values =
                 () -> {
                   Set<String> res = new HashSet<>();
@@ -596,7 +596,7 @@ public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistr
                 };
           }
           RtpYamlConfig RtpYamlConfig = configParser.fileDatabase.cachedLookup.get().get(configParser.name);
-          if (RtpYamlConfig != null) addSubCommand(new ListCmd(name, this, values, RtpYamlConfig, s));
+          if (RtpYamlConfig != null) addSubCommand(new ListCmd(keyName, this, values, RtpYamlConfig, s));
         }
       }
     } else if (factoryValue instanceof MultiConfigParser<?> parser) {

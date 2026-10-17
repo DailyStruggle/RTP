@@ -6,8 +6,8 @@ group = 'io.github.dailystruggle'
 // version: it ships and updates on its own cadence (mirroring LeafRTPGuiAddon).
 version = '1.0.0'
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 // The installable artifact carries the addon's brand name (not the internal

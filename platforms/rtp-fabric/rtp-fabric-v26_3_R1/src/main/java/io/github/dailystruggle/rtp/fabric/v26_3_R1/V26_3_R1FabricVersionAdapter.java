@@ -527,7 +527,7 @@ public final class V26_3_R1FabricVersionAdapter implements FabricVersionAdapter 
         for (int packed = 0; packed < 256; packed++) {
             net.minecraft.world.level.material.MapColor color =
                     net.minecraft.world.level.material.MapColor.byId(packed >> 2);
-            if (color == null || color.id == 0) continue;
+            if (color.id == 0) continue;
             int rgb = net.minecraft.world.level.material.MapColor.getColorFromPackedId(packed);
             int rr = (rgb >> 16) & 0xFF;
             int gg = (rgb >> 8) & 0xFF;

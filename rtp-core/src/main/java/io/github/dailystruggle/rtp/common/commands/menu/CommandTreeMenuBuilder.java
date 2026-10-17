@@ -364,27 +364,8 @@ public final class CommandTreeMenuBuilder implements io.github.dailystruggle.rtp
             }
         }
 
-        // "Type a value..." fallback - chat-prefill, lets the player enter
-        // free-form values (numeric ranges, custom strings) without leaving
-        // the menu flow.
-        Deque<String> chatPath = new ArrayDeque<>();
-        // suggestPrefix expects the path *including* an implicit leading
-        // command label; mirror what build() does (root.name() at the head).
-        chatPath.addLast(parent.name() == null ? "" : parent.name());
-        // The actual node's name is already the last segment of parentPath,
-        // so suggestPrefix will produce "/rtp <parentPath...> <paramName>=".
-        String typePrefix = profile.suggestPrefix(chatPath, paramName);
-        // Compose with the upstream args so the prefill includes the assembled
-        // command, not just the leaf node. profile.suggestPrefix is expected
-        // to emit the full "/rtp ... <paramName>=" form when given the full
-        // chat path; if our parent context drops upstream segments we have to
-        // splice them in. We delegate to the profile but augment when needed.
-        if (!assembledStr.isEmpty() && !typePrefix.contains(assembledStr)) {
-            // Fallback composition: parentPath is the full path from /rtp; the
-            // profile didn't carry it. Build the canonical prefill ourselves.
-            // '=' separator matches commands-api parameter parsing.
-            typePrefix = "/rtp " + assembledStr + " " + paramName + "=";
-        }
+        // "Type a value..." fallback - lets the player enter free-form values
+        // (numeric ranges, custom strings) without leaving the menu flow.
         String typeLabel = lookupMsg(CommandMessages.menuTypeValue,
                 "✎ type a custom value...");
         // ADR-045 - on renderers that support it (Paper/Folia BookMenuRenderer),
@@ -392,7 +373,7 @@ public final class CommandTreeMenuBuilder implements io.github.dailystruggle.rtp
         // sibling subcommand which opens the anvil server-side and submits
         // `/rtp <parentPath...> <paramName>=<typed>` on confirm. Renderers
         // that don't support anvil input fall back to chat-prefill semantics
-        // by re-rendering this action as a `SuggestInput(typePrefix)` click.
+        // by re-rendering this action as a `SuggestInput` click.
         String[] parentPathArr = parentPath.toArray(new String[0]);
         // When the picker is rendered from a /rtp config <file> context, mint
         // the anvil prompt in STAGE mode so anvil-confirm pushes (file, key,
@@ -1114,13 +1095,10 @@ public final class CommandTreeMenuBuilder implements io.github.dailystruggle.rtp
         java.util.LinkedHashMap<String, Object> out = new java.util.LinkedHashMap<>();
         // Discriminator first so the type row sits at the top of the flattened view.
         out.put("name", fv.name);
-        java.util.EnumMap<?, Object> data = fv.getData();
-        if (data != null) {
-            for (Map.Entry<?, Object> e : data.entrySet()) {
-                Object k = e.getKey();
-                if (k == null) continue;
-                out.put(String.valueOf(k), e.getValue());
-            }
+        for (Map.Entry<?, Object> e : fv.getData().entrySet()) {
+            Object k = e.getKey();
+            if (k == null) continue;
+            out.put(String.valueOf(k), e.getValue());
         }
         return out;
     }

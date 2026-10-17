@@ -1365,17 +1365,13 @@ public final class EditorSessionManager {
         for (String key : yaml.getKeys(true)) {
             if (key.endsWith(".radius") || key.equals("radius")) {
                 Object r = yaml.get(key);
-                if (r instanceof Number num) {
-                    if (num.doubleValue() < 0) {
-                        throw new IllegalArgumentException("Geometry error in '" + fileName + "': radius cannot be negative (" + num + ")");
-                    }
+                if (r instanceof Number num && num.doubleValue() < 0) {
+                    throw new IllegalArgumentException("Geometry error in '" + fileName + "': radius cannot be negative (" + num + ")");
                 }
             } else if (key.endsWith(".centerRadius") || key.equals("centerRadius")) {
                 Object cr = yaml.get(key);
-                if (cr instanceof Number num) {
-                    if (num.doubleValue() < 0) {
-                        throw new IllegalArgumentException("Geometry error in '" + fileName + "': centerRadius cannot be negative (" + num + ")");
-                    }
+                if (cr instanceof Number num && num.doubleValue() < 0) {
+                    throw new IllegalArgumentException("Geometry error in '" + fileName + "': centerRadius cannot be negative (" + num + ")");
                 }
             }
         }

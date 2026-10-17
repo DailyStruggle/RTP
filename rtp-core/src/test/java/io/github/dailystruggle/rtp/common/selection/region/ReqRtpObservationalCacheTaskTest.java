@@ -143,14 +143,13 @@ public class ReqRtpObservationalCacheTaskTest {
     @Timeout(value = 10, unit = TimeUnit.SECONDS)
     void execute_withObservationalEnabled_reachesFullCacheCapPlusActiveCap() {
         long totalCap = region.getSettings().cacheCap() + region.getSettings().activeChunkCap();
-        long previous = -1L;
         long current = region.getPublicQueueLength();
         // Bounded retry: each pulse should add at least one location until
         // saturation. 64 pulses comfortably covers the 8-slot total even
         // with cache-pipeline yielding.
         for (int i = 0; i < 64 && current < totalCap; i++) {
             pulse();
-            previous = current;
+            long previous = current;
             current = region.getPublicQueueLength();
             if (current == previous && current >= totalCap - 1) {
                 // Saturation candidate: one more pulse to confirm we're not

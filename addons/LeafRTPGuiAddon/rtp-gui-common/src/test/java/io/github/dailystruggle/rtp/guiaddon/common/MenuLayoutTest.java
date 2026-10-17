@@ -45,7 +45,6 @@ public class MenuLayoutTest {
 
     @Test
     void compute_separatesDestinationsAndSubmenusOntoDistinctRows() {
-        GuiMenuConfig config = new GuiMenuConfig();
         List<MenuEntry> entries = new ArrayList<>();
 
         // Add 1 region destination

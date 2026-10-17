@@ -116,7 +116,6 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
 
     private final RespPool pool;
     private final boolean ownsPool;
-    private final long heartbeatIntervalMs;
     private final int ttlSeconds;
     private final ConcurrentLinkedQueue<Sub> subscribers = new ConcurrentLinkedQueue<>();
     private final AtomicBoolean open = new AtomicBoolean(true);
@@ -184,7 +183,6 @@ public final class RedisNetworkStateBinding implements NetworkTransport {
         if (heartbeatIntervalMs <= 0) {
             throw new IllegalArgumentException("heartbeatIntervalMs must be > 0");
         }
-        this.heartbeatIntervalMs = heartbeatIntervalMs;
         // 3x interval keeps a row alive across one missed publish; matches the
         // backend-side "staleAfterMs default 5000" rounding bias.
         this.ttlSeconds = (int) Math.max(2L, (heartbeatIntervalMs * 3L) / 1000L);

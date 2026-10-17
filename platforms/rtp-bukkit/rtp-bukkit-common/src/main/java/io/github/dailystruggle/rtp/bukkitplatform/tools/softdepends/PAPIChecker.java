@@ -11,6 +11,8 @@ public class PAPIChecker {
   // stored object reference to skip plugin getting sometimes
   private static PlaceholderAPIPlugin placeholderAPIPlugin = null;
 
+  private PAPIChecker() {}
+
   /** getPAPI - function to if PAPI exists and scan the above object reference accordingly */
   private static void getPAPI() {
     Plugin plugin = Bukkit.getServer().getPluginManager().getPlugin("PlaceholderAPI");

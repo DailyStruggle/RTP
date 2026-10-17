@@ -13,7 +13,7 @@ Operational guide for AI agents and human contributors working in the RTP reposi
 3. Never silently swallow a teleport failure (S-004).
 4. Run Gradle via the wrapper (`.\gradlew.bat` on Windows, `./gradlew` on POSIX); one command per line. Serialization locking is built transparently into both wrapper scripts to prevent concurrent lock collisions.
 5. Use the `search_project` tool - not `grep`/`find` - to search the codebase.
-6. Java 21+ is required (REQ-RTP-SYS-001).
+6. Java 17+ is required, plus whatever the host Minecraft version needs (REQ-RTP-SYS-001, ADR-113).
 7. Before modifying an uncommitted **code** file, create a `.bak` copy beside it. Skip for git-clean files and docs/markdown.
 8. **Stay on task.** Record unrelated potential bugs in [`docs/dev/POTENTIAL_BUGS.md`](../docs/dev/POTENTIAL_BUGS.md) and keep going. Promote to the Linear tracker only per *Issue Tracking (Linear)*.
 9. **Maintain a task checklist** for any multi-step task to preserve state across interruptions (see *Checklist-Based State Tracking*).
@@ -318,7 +318,7 @@ User strings live in `rtp-plugin/src/main/resources/<file>.yml` (English baselin
 - **IDE command bridge:** Commands are dispatched by name. `help` and `--help` are not commands; an unknown name returns the list of available tool names. Other names available in the session include `build_project`, `get_file_problems`, `lint_files`, `reformat_file`, `get_symbol_info`, `get_project_modules`, `get_run_configurations`, `execute_run_configuration` and `git_status`.
 - **Directory listing caution:** Treat empty listings as "unknown"; verify file existence with `git status` or `search_project` before overwriting.
 - **Python scripts:** Stdlib-only scripts live in `scripts/`. On Windows, execute via configured Python 3.12+ interpreter alias. Place temporary or ad-hoc analysis scripts in gitignored `scripts/tmp/`.
-- **Runtime:** Java 21+ required (REQ-RTP-SYS-001).
+- **Runtime:** Java 17+ required, plus whatever the host Minecraft version needs (REQ-RTP-SYS-001, ADR-113). Shared modules, pre-1.20.5 carriers and `rtp-plugin` compile to Java 17 bytecode; the toolchain is Java 21 (25 for 26.x carriers).
 
 ---
 

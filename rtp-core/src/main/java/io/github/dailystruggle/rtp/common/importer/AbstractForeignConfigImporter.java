@@ -29,7 +29,6 @@ import java.util.regex.Pattern;
  */
 public abstract class AbstractForeignConfigImporter implements ForeignConfigImporter {
 
-    private static final Pattern NON_ALPHANUMERIC = Pattern.compile("[^a-zA-Z0-9]");
     private static final Pattern POTION_SEPARATORS = Pattern.compile("[:\\s]+");
 
     /**

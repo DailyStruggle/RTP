@@ -28,6 +28,8 @@ public class RegionConfigLoader {
     private static final Pattern ZERO_DURATION = Pattern.compile("^0[a-zA-Z]*$");
     private static final Pattern DIGITS_ONLY = Pattern.compile("^\\d+$");
 
+    private RegionConfigLoader() {}
+
     @SuppressWarnings("unchecked") // raw config values are instanceof-checked to Map before the String-keyed cast
     public static RegionSettings load(ConfigParser<RegionKeys> regionParser) {
         String name = regionParser.name.replace(".yml", "");

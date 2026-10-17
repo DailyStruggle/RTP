@@ -78,11 +78,6 @@ public class Square_Normal extends NormalMemoryShape {
     return io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.util.SquareGeometry.perimeterStep(x, z, radius);
   }
 
-  private static int[] squareOct2Coords(long radius, double perimeterStep) {
-    MutableRTPCoords output = new MutableRTPCoords(0, 0);
-    squareOct2Coords(radius, perimeterStep, output);
-    return new int[] {output.x, output.z};
-  }
 
   private static long ringStart(long r, long cr) {
     return io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.util.SquareGeometry.ringStart(r, cr);

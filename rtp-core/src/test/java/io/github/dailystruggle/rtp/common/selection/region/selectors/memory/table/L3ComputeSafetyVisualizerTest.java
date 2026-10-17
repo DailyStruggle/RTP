@@ -53,12 +53,11 @@ public class L3ComputeSafetyVisualizerTest {
       RTPCoords coords = new RTPCoords("world", cycle * 16, 64, (cycle % 100) * 16);
       RTPLocation loc = new RTPLocation(coords, 0L);
 
-      int sizeBefore = buffer.size();
       BacklogEntry entry = buffer.offerUnverified(loc);
 
       if (entry == null) {
         // Buffer reached capacity, validate existing entries and randomly poll to simulate L3 -> L2 drain
-        List<BacklogEntry> toValidate = buffer.pollRandomValidated(0); // non-destructive probe
+        buffer.pollRandomValidated(0); // non-destructive probe
         // Mark everything currently in buffer as validated to simulate background Anvil prefilter
         BacklogEntry[] rawState = buffer.snapshot();
         for (BacklogEntry e : rawState) {

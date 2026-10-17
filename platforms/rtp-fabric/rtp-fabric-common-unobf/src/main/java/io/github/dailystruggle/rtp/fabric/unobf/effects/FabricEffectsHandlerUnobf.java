@@ -168,13 +168,6 @@ public final class FabricEffectsHandlerUnobf {
     private static void dispatch(String prefix, RTPPlayer player, FabricEffectRuntimeUnobf runtime,
                                  net.minecraft.world.phys.Vec3 explicitLocation,
                                  net.minecraft.world.phys.Vec3 destinationLocation,
-                                 String destWorldName) {
-        dispatch(prefix, player, runtime, explicitLocation, destinationLocation, destWorldName, null);
-    }
-
-    private static void dispatch(String prefix, RTPPlayer player, FabricEffectRuntimeUnobf runtime,
-                                 net.minecraft.world.phys.Vec3 explicitLocation,
-                                 net.minecraft.world.phys.Vec3 destinationLocation,
                                  String destWorldName,
                                  TeleportPipelineTask pipelineTask) {
         try {

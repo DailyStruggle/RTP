@@ -420,9 +420,7 @@ public class JumpAdjustor extends AbstractVerticalAdjustor<JumpAdjustorKeys> {
     // ignores stored sky-light nibbles and heightmap data - both are unreliable
     // on unticked / freshly-generated chunks. Block data is always present and
     // deterministic.
-    if (requireSkyLight) {
-      if (y + 1 <= columnSkyFloor) return false;
-    }
+    if (requireSkyLight && y + 1 <= columnSkyFloor) return false;
     return true;
   }
 

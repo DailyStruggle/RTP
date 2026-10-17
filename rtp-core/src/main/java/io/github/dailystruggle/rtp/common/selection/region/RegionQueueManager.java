@@ -890,8 +890,8 @@ public class RegionQueueManager {
         }
 
         // Clean per-player queues
-        for (ConcurrentLinkedQueue<RTPLocation> playerQueue : perPlayerLocationQueue.values()) {
-            java.util.Iterator<RTPLocation> it = playerQueue.iterator();
+        for (ConcurrentLinkedQueue<RTPLocation> personalQueue : perPlayerLocationQueue.values()) {
+            java.util.Iterator<RTPLocation> it = personalQueue.iterator();
             while (it.hasNext()) {
                 RTPLocation loc = it.next();
                 if (!isLocationInBounds(loc)) {

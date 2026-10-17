@@ -101,8 +101,8 @@ public class BukkitRTPCommandSender implements RTPCommandSender {
     this.sender = null;
   }
 
-  public void rebind(CommandSender sender) {
-    this.sender = sender;
+  public void rebind(CommandSender liveSender) {
+    this.sender = liveSender;
   }
 
   @Override

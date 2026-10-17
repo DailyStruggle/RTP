@@ -35,9 +35,6 @@ public final class FabricLegacyText {
     private static final char SECTION = '\u00A7';
     // Matches "&#RRGGBB" or "#RRGGBB"
     private static final Pattern HEX_PATTERN = Pattern.compile("&?#([0-9a-fA-F]{6})");
-    // Bukkit-style "section xsection rsection rsection gsection gsection bsection b" hex run
-    private static final Pattern BUKKIT_HEX_PATTERN =
-            Pattern.compile(SECTION + "[xX](?:" + SECTION + "[0-9a-fA-F]){6}");
 
     private FabricLegacyText() {}
 

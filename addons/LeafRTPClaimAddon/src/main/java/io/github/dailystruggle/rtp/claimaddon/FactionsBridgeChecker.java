@@ -13,6 +13,7 @@ import java.lang.reflect.Method;
  * session, and the verifier becomes a no-op.
  */
 public class FactionsBridgeChecker {
+  private FactionsBridgeChecker() {}
   private static boolean exists = true;
 
   /**

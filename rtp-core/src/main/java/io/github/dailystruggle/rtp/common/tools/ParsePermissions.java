@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
 public class ParsePermissions {
+  private ParsePermissions() {}
   private static final Map<UUID, Map<String, Map.Entry<Long, Boolean>>> lastBool =
       new ConcurrentHashMap<>();
   private static final Map<UUID, Map<String, Map.Entry<Long, Integer>>> lastInt =

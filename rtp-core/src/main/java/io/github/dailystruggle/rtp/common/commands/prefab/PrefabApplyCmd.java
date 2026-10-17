@@ -137,7 +137,7 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
         MultiWorldExpander.RegionOverlayAmender vertAmender = buildDimensionVertAmender(prefab);
         PrefabApplier.Result result = PrefabApplier.apply(baseline, prefab, worldNames, vertAmender);
         Map<String, List<PrefabApplier.Change>> diff = result.perFileDiff();
-        PrefabNonceStore.Entry entry = nonceStore.mint(callerId, prefab.id(), diff, result.newTrees());
+        nonceStore.mint(callerId, prefab.id(), diff, result.newTrees());
 
         int changeCount = 0;
         for (List<PrefabApplier.Change> changes : diff.values()) {

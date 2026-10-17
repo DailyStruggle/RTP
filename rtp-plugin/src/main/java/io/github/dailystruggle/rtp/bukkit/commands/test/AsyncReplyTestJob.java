@@ -252,7 +252,7 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
     final String platform = safePlatform(realAccessor);
     final boolean isPrimary = safeIsPrimary(realAccessor, deliveryThread);
     final String threadName = deliveryThread.getName();
-    final boolean folia = platform != null && platform.toLowerCase(Locale.ROOT).contains("folia");
+    final boolean folia = platform.toLowerCase(Locale.ROOT).contains("folia");
 
     // Permitted categories:
     //   - Paper/Spigot: main server thread is the canonical safe thread;

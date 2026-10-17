@@ -317,7 +317,7 @@ public class CircleOptimizedDualLayer extends AbstractDualLayerShape {
       long totalGood = range - table.totalCovered();
       if (totalGood <= 0) return -1L;
 
-      int stride = SquareOptimizedDualLayer.deriveAdaptiveStride(totalGood);
+      int stride = AbstractDualLayerShape.deriveAdaptiveStride(totalGood);
       int bits = Integer.numberOfTrailingZeros(stride);
 
       for (int attempts = 0; attempts < 5; attempts++) {
@@ -350,7 +350,7 @@ public class CircleOptimizedDualLayer extends AbstractDualLayerShape {
     }
 
     // Standard / Default mode for backlog: Dyadic stride binning
-    int stride = SquareOptimizedDualLayer.deriveAdaptiveStride(range);
+    int stride = AbstractDualLayerShape.deriveAdaptiveStride(range);
     int bits = Integer.numberOfTrailingZeros(stride);
 
     for (int attempts = 0; attempts < 10; attempts++) {

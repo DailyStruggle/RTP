@@ -370,7 +370,10 @@ class ProxyDirectListenerTest {
         ProxyDirectListener listener = discoveryListener("127.0.0.1", V, null, null);
         listener.start();
         List<Socket> held = new ArrayList<>();
-        try {
+        AutoCloseable closeHeld = () -> {
+            for (Socket s : held) s.close();
+        };
+        try (closeHeld) {
             for (int i = 0; i < ProxyDirectListener.MAX_CONNECTIONS_PER_ADDRESS; i++) {
                 Socket s = new Socket();
                 s.connect(new InetSocketAddress("127.0.0.1", listener.boundPort()), 1000);
@@ -392,8 +395,6 @@ class ProxyDirectListenerTest {
                 }
                 assertEquals(-1, read, "over-cap connection must be closed");
             }
-        } finally {
-            for (Socket s : held) s.close();
         }
         try {
             long deadline = System.currentTimeMillis() + 5_000L;
@@ -455,11 +456,11 @@ class ProxyDirectListenerTest {
             }
 
             // Hostname verification: the cert does not cover this name.
-            Socket plain2 = new Socket();
-            plain2.connect(new InetSocketAddress("127.0.0.1", listener.boundPort()), 1000);
-            plain2.setSoTimeout(5000);
-            assertThrows(IOException.class, () -> clientTls.wrapClient(plain2, "not-the-proxy.example", 1));
-            plain2.close();
+            try (Socket plain2 = new Socket()) {
+                plain2.connect(new InetSocketAddress("127.0.0.1", listener.boundPort()), 1000);
+                plain2.setSoTimeout(5000);
+                assertThrows(IOException.class, () -> clientTls.wrapClient(plain2, "not-the-proxy.example", 1));
+            }
 
             // Plain client against the TLS listener gets no usable reply.
             try (Socket raw = new Socket()) {

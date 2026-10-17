@@ -509,7 +509,6 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
      */
     private static volatile java.lang.reflect.Method LEVEL_ACCESSOR;
     private static volatile java.lang.reflect.Field LEVEL_FIELD;
-    private static volatile boolean LEVEL_RESOLVED;
 
     @Nullable
     public static ServerLevel resolveServerLevel(ServerPlayer p) {
@@ -557,7 +556,6 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
                 Object r = m.invoke(p);
                 if (r instanceof ServerLevel sl) {
                     LEVEL_ACCESSOR = m;
-                    LEVEL_RESOLVED = true;
                     return sl;
                 }
             } catch (Throwable ignored) { /* try next */ }
@@ -572,7 +570,6 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
                     Object r = m.invoke(p);
                     if (r instanceof ServerLevel sl) {
                         LEVEL_ACCESSOR = m;
-                        LEVEL_RESOLVED = true;
                         return sl;
                     }
                 } catch (Throwable ignored) { /* try next */ }
@@ -587,7 +584,6 @@ public final class NeoForgeRTPPlayer implements RTPPlayer, NeoForgeBookOpener, N
                     Object r = f.get(p);
                     if (r instanceof ServerLevel sl) {
                         LEVEL_FIELD = f;
-                        LEVEL_RESOLVED = true;
                         return sl;
                     }
                 } catch (Throwable ignored) { /* try next */ }

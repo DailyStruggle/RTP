@@ -116,14 +116,14 @@ public final class NetworkModeBootstrap {
             return; // REQ-RTP-NET-002: parity-by-construction.
         }
 
-        String serverId = network.getString("serverId", "");
-        if (serverId == null || serverId.isEmpty()) {
+        String localServerId = network.getString("serverId", "");
+        if (localServerId == null || localServerId.isEmpty()) {
             RTP.log(Level.WARNING,
                     "[RTP] network.enabled=true but network.serverId is empty; "
                             + "refusing to enable network mode (REQ-RTP-NET-002).");
             return;
         }
-        this.serverId = serverId;
+        this.serverId = localServerId;
 
         RtpYamlSection transportSec = cfg.getConfigurationSection("transport");
         String transportType = transportSec == null ? "in-memory"
@@ -244,11 +244,11 @@ public final class NetworkModeBootstrap {
             RTP.log(Level.WARNING,
                     "[RTP] no BackendStateSampler factory installed by the platform"
                             + " adapter; network mode requires one - aborting network boot"
-                            + " for this lifecycle (serverId='" + serverId + "').");
+                            + " for this lifecycle (serverId='" + localServerId + "').");
             return;
         }
         BackendStateSampler sampler = samplerFactory.apply(lobbyMode);
-        BackendStatePublisher pub = new BackendStatePublisher(selected, sampler, serverId, intervalMs);
+        BackendStatePublisher pub = new BackendStatePublisher(selected, sampler, localServerId, intervalMs);
         pub.start();
 
         // Refresh cached snapshot periodically via async scheduler.
@@ -278,15 +278,14 @@ public final class NetworkModeBootstrap {
         if (detector != null) {
             Runnable pump = () -> {
                 try {
+                    // Only spend a handshake when a carrier player can
+                    // actually carry the plugin message.
                     if (detector.state()
                             != io.github.dailystruggle.rtp.common.network.pluginmessage
-                                    .ProxyAutoDetector.State.ENABLED) {
-                        // Only spend a handshake when a carrier player can
-                        // actually carry the plugin message.
-                        if (probeBridge == null
-                                || probeBridge.anyOnlinePlayer().isPresent()) {
-                            detector.onCarrierAvailable();
-                        }
+                                    .ProxyAutoDetector.State.ENABLED
+                            && (probeBridge == null
+                                || probeBridge.anyOnlinePlayer().isPresent())) {
+                        detector.onCarrierAvailable();
                     }
                     detector.tick();
                 } catch (Throwable ignored) {
@@ -313,7 +312,7 @@ public final class NetworkModeBootstrap {
         // proxy-direct is a remote view of the proxy store: the standard
         // JoinTriggerSource reads the reservation via findReservation/redeem
         // RPC, so no dedicated proxy-direct arrival listener is needed.
-        this.joinTriggerSource = new JoinTriggerSource(selected, serverId);
+        this.joinTriggerSource = new JoinTriggerSource(selected, localServerId);
 
         // Wire router + enrolment buffer + status cache.
         // Until then the buffer's flushSink is a no-op and the cache's
@@ -460,7 +459,7 @@ public final class NetworkModeBootstrap {
                 this.joinTriggerSource.setStatusCache(this.statusCache);
             }
             this.router = new NetworkRouter(
-                    serverId,
+                    localServerId,
                     routerMode,
                     () -> this.cachedSnapshot,
                     NetworkModeBootstrap::sumLocalKeptCount,
@@ -539,7 +538,7 @@ public final class NetworkModeBootstrap {
             }
             this.peerRegionRegistry = new PeerRegionRegistry(
                     () -> this.cachedSnapshot,
-                    serverId,
+                    localServerId,
                     loadBalancerConfig);
             // Topology supplier: seed discovered peer servers.
             this.peerRegionRegistry.setTopologyPeerSupplier(() -> {
@@ -568,7 +567,7 @@ public final class NetworkModeBootstrap {
                         () -> this.cachedSnapshot,
                         this.peerRegionRegistry,
                         bridge,
-                        serverId,
+                        localServerId,
                         Duration.ofMillis(reservationTtlMs),
                         uuid -> {
                             try { RTP.getInstance().processingPlayers.remove(uuid); } catch (Throwable ignored) {}
@@ -588,7 +587,7 @@ public final class NetworkModeBootstrap {
                 NetworkSnapshot bootSnap = selected.readSnapshot()
                         .get(2000L, java.util.concurrent.TimeUnit.MILLISECONDS);
                 NetworkRegionCollisionWarner.auditAndWarn(
-                        bootSnap, serverId, NetworkRegionCollisionWarner.Policy.WARN);
+                        bootSnap, localServerId, NetworkRegionCollisionWarner.Policy.WARN);
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
                 RTP.log(Level.FINE,
@@ -619,7 +618,7 @@ public final class NetworkModeBootstrap {
 
         // Reconcile active network reservations on boot.
         try {
-            reconcileNetworkReservations(selected, serverId);
+            reconcileNetworkReservations(selected, localServerId);
         } catch (Throwable reconcileFail) {
             RTP.log(Level.WARNING,
                     "[RTP] boot-time reservation reconcile failed: "
@@ -629,7 +628,7 @@ public final class NetworkModeBootstrap {
         }
 
         RTP.log(Level.INFO,
-                "[RTP] Backend network mode enabled: serverId='" + serverId
+                "[RTP] Backend network mode enabled: serverId='" + localServerId
                         + "' transport=" + transportType + " intervalMs=" + intervalMs
                         + " reapIntervalMs=" + reapMs
                         + " router=" + (router == null ? "disabled" : router.mode()));

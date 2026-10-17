@@ -557,11 +557,11 @@ public final class RtpVelocityPlugin {
      */
     @SuppressWarnings("unchecked")
     private void startProxyDirectListener(Map<String, Object> raw, VelocityProxyAvailabilityCache cache) {
-        Map<String, Object> transport = raw.get("transport") instanceof Map<?, ?> m
+        Map<String, Object> transportSection = raw.get("transport") instanceof Map<?, ?> m
                 ? (Map<String, Object>) m : java.util.Map.of();
-        String type = String.valueOf(transport.getOrDefault("type", ""))
+        String type = String.valueOf(transportSection.getOrDefault("type", ""))
                 .toLowerCase(java.util.Locale.ROOT);
-        Map<String, Object> direct = transport.get("direct") instanceof Map<?, ?> d
+        Map<String, Object> direct = transportSection.get("direct") instanceof Map<?, ?> d
                 ? (Map<String, Object>) d : java.util.Map.of();
         boolean enabled = type.equals("proxy-direct") || type.equals("proxydirect")
                 || Boolean.parseBoolean(String.valueOf(direct.getOrDefault("enabled", "false")));
@@ -617,8 +617,6 @@ public final class RtpVelocityPlugin {
                     // proxy-direct = remote view of the proxy store: dispatch
                     // NetworkTransport + NetworkRequestQueue RPCs onto the
                     // proxy's own instances.
-                    // NB: the local `transport` here is the YAML section, so we
-                    // pass the plugin fields explicitly.
                     this.transport,
                     this.requestQueue,
                     tls,
@@ -899,10 +897,9 @@ public final class RtpVelocityPlugin {
                 }
             }
             step = 7;
-            if (transport != null) {
-                if (!closeTransportBounded(transport, SHUTDOWN_TRANSPORT_CLOSE_TIMEOUT_MS)) {
-                    cleanShutdown = false;
-                }
+            if (transport != null
+                    && !closeTransportBounded(transport, SHUTDOWN_TRANSPORT_CLOSE_TIMEOUT_MS)) {
+                cleanShutdown = false;
             }
         } finally {
             try { RtpProxy.clearProxyAccessor(); } catch (RuntimeException ignored) { }
