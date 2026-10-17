@@ -5,6 +5,22 @@ linter: qodana-jvm-community
 profile:
   name: qodana.recommended
   inspections:
+    # Not shipped: stress/fuzz harness. Test source sets are already outside qodana.recommended.
+    # Version carriers: Qodana imports without building, so the rtp-fabric-common /
+    # rtp-neoforge-common jars they consume are unresolved and their findings are unreliable.
+    - group: ALL
+      ignore:
+        - "helpers/StressTestRTP"
+        - "platforms/rtp-fabric/rtp-fabric-v1_20_R1"
+        - "platforms/rtp-fabric/rtp-fabric-v1_21_R1"
+        - "platforms/rtp-fabric/rtp-fabric-v1_21_R5"
+        - "platforms/rtp-fabric/rtp-fabric-v1_21_R11"
+        - "platforms/rtp-fabric/rtp-fabric-v26_1_R1"
+        - "platforms/rtp-fabric/rtp-fabric-v26_2_R1"
+        - "platforms/rtp-fabric/rtp-fabric-v26_3_R1"
+        - "platforms/rtp-fabric/rtp-fabric-v26_4_R1"
+        - "platforms/rtp-neoforge/rtp-neoforge-v1_21_R1"
+        - "platforms/rtp-neoforge/rtp-neoforge-v26_1_R1"
     # Reflection across platform bridges and NMS accessors is audited under ADR-026.
     - inspection: JavaReflectionMemberAccess
       ignore:
@@ -17,7 +33,3 @@ profile:
     - inspection: OptionalUsedAsFieldOrParameterType
       ignore:
         - "platforms/rtp-proxy"
-    # StressTestRTP harness classes.
-    - inspection: ClassEscapesItsScope
-      ignore:
-        - "helpers/StressTestRTP"
