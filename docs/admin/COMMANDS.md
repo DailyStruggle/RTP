@@ -341,6 +341,33 @@ Actions with a configured `command:` block are also automatically registered as 
 
 ---
 
+## `/rtp editor` — Web Workspace & Configuration Editor
+
+Generates an outbound ephemeral web editor session or offline standalone bundle to inspect diagnostics, adjust region boundary geometry, and configure plugin YAML with live documentation hints on a secondary display without port forwarding.
+
+**Syntax**
+```
+/rtp editor
+/rtp editor local
+/rtp editor apply token=<token>
+/rtp editor trust <code>
+/rtp editor untrust key=<prefix|all>
+```
+
+**Required permission:** `rtp.editor`
+
+| Form | Description |
+|---|---|
+| `/rtp editor` | Gathers active configuration models, schemas, and region geometries, uploads an ephemeral session to the byte store, and emits a clickable browser link. |
+| `/rtp editor local` | Generates a self-contained offline HTML editor bundle at `plugins/RTP/editor/index.html`. |
+| `/rtp editor apply token=<token>` | Fetches and applies staged configuration changes from the byte store session. |
+| `/rtp editor trust <code>` | Grants trust to a new browser session using the 6-character code shown in the web editor. |
+| `/rtp editor untrust key=<prefix\|all>` | Revokes trust for a browser fingerprint prefix, or `all` to revoke all trusted browsers. |
+
+See the [Web Workspace & Visual Editor Guide](WEB_EDITOR_GUIDE.md) for full operational and workflow documentation.
+
+---
+
 ## `/rtp help` — Help
 
 Displays a clickable, permission-filtered list of all available `/rtp` sub-commands. Only sub-commands for which the sender holds the required permission **and** which have a matching `MessagesKeys` entry are shown.
@@ -439,6 +466,7 @@ When PlaceholderAPI is installed, the following `%rtp_<key>%` placeholders are a
 | `rtp.config.set` | op | Use `/rtp config <file> …` to write any config file (umbrella). |
 | `rtp.config.set.<section>` | op | Write only the named section (e.g. `rtp.config.set.regions`, `rtp.config.set.performance`). `set` implies `view` for the same section. |
 | `rtp.update` | op | Write individual config keys or list items (legacy node; subsumed by `rtp.config.set`). |
+| `rtp.editor` | op | Use `/rtp editor` and its subcommands (local, apply, trust, untrust). |
 | `rtp.info` | op | Use `/rtp info` |
 | `rtp.admin` | op | See DRM info in `/rtp info`; elevated admin access |
 | `rtp.support` | op | See DRM info in `/rtp info` |
