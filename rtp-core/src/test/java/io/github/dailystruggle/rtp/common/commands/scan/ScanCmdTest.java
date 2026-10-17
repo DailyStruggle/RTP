@@ -23,8 +23,11 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import io.github.dailystruggle.rtp.common.mock.MockRTPScheduler;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -629,6 +632,39 @@ public class ScanCmdTest {
         List<Region> regions = scanResetCmd.getRegions(senderId, Collections.singletonList("default"));
         assertFalse(regions.isEmpty());
         assertEquals("default", regions.get(0).name);
+    }
+
+    @Test
+    void scanResetCmd_whenTeardownPending_refusesResetAndAnnouncesRunning() {
+        CompletableFuture<Void> gate = new CompletableFuture<>();
+        ScanTask.setPendingTeardownForTesting("default", gate);
+        try {
+            boolean result = scanResetCmd.onCommand(senderId, params(), null);
+            assertTrue(result);
+            assertTrue(accessor.announcedMessages.stream()
+                    .anyMatch(msg -> msg.contains("scanRunning")));
+        } finally {
+            ScanTask.setPendingTeardownForTesting("default", null);
+        }
+    }
+
+    @Test
+    void scanResetCmd_withRunningTaskAndAsyncTeardown_resetsAfterTeardownCompletes() throws Exception {
+        MockRTPScheduler scheduler = ((MockRTPScheduler) RTP.scheduler).enableServerThreads();
+        try {
+            ScanTask task = makeFakeTask();
+            RTP.getInstance().scanTasks.put("default", task);
+
+            boolean result = scanResetCmd.onCommand(senderId, params(), null);
+            assertTrue(result);
+            assertNull(RTP.getInstance().scanTasks.get("default"), "task removed from map immediately");
+            assertTrue(task.isCancelled(), "task should be cancelled");
+
+            task.teardownFuture().get(5, TimeUnit.SECONDS);
+            assertFalse(ScanTask.isTeardownPending("default"));
+        } finally {
+            scheduler.shutdown();
+        }
     }
 
     // -------------------------------------------------------------------------

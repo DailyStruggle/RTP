@@ -51,15 +51,37 @@ allprojects {
     repositories {
         mavenLocal()
         mavenCentral()
-        maven { url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+        maven {
+            url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/'
+            mavenContent {
+                snapshotsOnly()
+            }
+        }
         maven { url = 'https://repo.papermc.io/repository/maven-public/' }
-        maven { url = 'https://repo.papermc.io/repository/maven-snapshots/' }
-        maven { url = 'https://repo.extendedclip.com/content/repositories/placeholderapi/' }
-        maven { url = 'https://nexus.sirblobman.xyz/public/' }
+        maven {
+            url = 'https://repo.papermc.io/repository/maven-snapshots/'
+            mavenContent {
+                snapshotsOnly()
+            }
+        }
+        maven {
+            url = 'https://repo.extendedclip.com/content/repositories/placeholderapi/'
+            content {
+                includeGroupByRegex 'me\\.clip.*'
+            }
+        }
+        maven {
+            url = 'https://nexus.sirblobman.xyz/public/'
+            content {
+                includeGroupByRegex 'com\\.github\\.sirblobman.*'
+                includeGroupByRegex 'com\\.sirblobman.*'
+            }
+        }
         maven {
             url = 'https://jitpack.io'
             content {
                 excludeGroupByRegex 'com\\.github\\.sirblobman.*'
+                excludeGroupByRegex 'com\\.sirblobman.*'
             }
         }
         maven { url = 'https://repo.codemc.io/repository/maven-public/' }

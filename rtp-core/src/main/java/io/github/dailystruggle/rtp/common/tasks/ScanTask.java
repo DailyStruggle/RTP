@@ -219,8 +219,16 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
 
   // Status-window origin for the reported cps/ETA: wall time and spiral position. A single
   // batch is ~1 region file, so its rate swings 20x between a cold and a warm .mca read.
-  private long statusWindowStartMs = -1L;
-  private long statusWindowStartPos = 0L;
+  private volatile long statusWindowStartMs = -1L;
+  private volatile long statusWindowStartPos = 0L;
+
+  public long getStatusWindowStartMs() {
+    return statusWindowStartMs;
+  }
+
+  public void resetStatusWindow() {
+    statusWindowStartMs = -1L;
+  }
 
   private BigInteger cps_all = BigInteger.ZERO;
   private BigInteger cps_divisor = BigInteger.ZERO;
@@ -1876,6 +1884,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
     RTP.log(Level.FINE, "[ScanTask] pause requested region=" + region.name
             + " inFlight=" + inFlight.get());
     pause.set(true);
+    statusWindowStartMs = -1L;
     cancelInFlightChunkFutures();
     teardownAsync("pause", true, onDone);
   }
@@ -1974,5 +1983,13 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
   public static boolean isTeardownPending(String regionName) {
     CompletableFuture<Void> pending = PENDING_TEARDOWNS.get(regionName);
     return pending != null && !pending.isDone();
+  }
+
+  public static void setPendingTeardownForTesting(String regionName, CompletableFuture<Void> gate) {
+    if (gate == null) {
+      PENDING_TEARDOWNS.remove(regionName);
+    } else {
+      PENDING_TEARDOWNS.put(regionName, gate);
+    }
   }
 }
