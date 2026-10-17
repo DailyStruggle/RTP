@@ -260,7 +260,7 @@ final class MenuWiringSupportInstallerTest {
                         "messages.yml", "testKey", false, "testVal", java.util.List.of(new int[]{0, 4}));
 
         // invoke resolveHitHover
-        Object hover = mHover.invoke(null, profile, hit);
+        mHover.invoke(null, profile, hit);
 
         // invoke resolveYamlRoot
         Method mYaml = MenuWiringSupportInstaller.class.getDeclaredMethod("resolveYamlRoot", String.class);

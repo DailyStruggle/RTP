@@ -89,7 +89,7 @@ class QueueTaskTest {
         QueueTask task = new QueueTask(region, player, player, customBiomes, result);
         task.start();
 
-        GenerationResult gen = result.get(10, TimeUnit.SECONDS);
+        result.get(10, TimeUnit.SECONDS);
         // Result completes (either null or with result depending on biome availability)
         assertTrue(result.isDone());
     }
@@ -547,7 +547,7 @@ class QueueTaskTest {
         Region testRegion = new Region("neighbourMissingRegion", settings);
 
         // Position at chunk edge so neighbour chunks are needed
-        RTPChunk<?> centerChunk = spyWorld.getChunkAt(1, 1).thenApply(spyWorld::getCachedChunk).join();
+        spyWorld.getChunkAt(1, 1).thenApply(spyWorld::getCachedChunk).join();
         long chunkKey = (1L & 0xffffffffL) | (1L << 32);
         ChunkSet chunkSet = new ChunkSet(spyWorld, 1, 1, Collections.singletonList(CompletableFuture.completedFuture(chunkKey)), new CompletableFuture<>());
         ChunkReservation reservation = new ChunkReservation(chunkSet, spyWorld);

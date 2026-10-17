@@ -102,12 +102,12 @@ public class FoliaRTPCommandSender implements RTPCommandSender {
   @Override
   @RegionThread
   public void performCommand(@Nullable RTPPlayer player, String command) {
-    CommandSender sender = this.sender;
+    CommandSender dispatcher = this.sender;
     OfflinePlayer bukkitPlayer = (player != null) ? Bukkit.getOfflinePlayer(player.uuid()) : null;
     command = SendMessage.formatNoColor(bukkitPlayer, command);
     final String finalCommand = command;
     io.github.dailystruggle.rtp.common.RTP.serverAccessor.getScheduler()
-        .runTask(() -> Bukkit.dispatchCommand(sender, finalCommand));
+        .runTask(() -> Bukkit.dispatchCommand(dispatcher, finalCommand));
   }
 
   @Override

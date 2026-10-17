@@ -67,10 +67,8 @@ public class UniquePlacementsAndExpandVisualizerTest {
     List<ChunkPoint> snapshot20k = new ArrayList<>();
 
     int targetTotal = 5_000;
-    int maxSearchAttempts = 100;
 
     System.out.println("[DEBUG_LOG] Starting unique placements & expansion simulation loop...");
-    long startSimNs = System.nanoTime();
 
     for (int count = 1; count <= targetTotal; count++) {
       long loc = shape.rand();

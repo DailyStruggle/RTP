@@ -133,18 +133,18 @@ public final class AsyncTaskProcessing extends RTPRunnable {
 
     // One region turn every `interval` pulses, so each region refills once per `period` ticks.
     long interval = Math.max(period / size, 1L);
-    long betweenStep;
-    long step;
+    long turn;
+    long regionIndex;
     try {
       stepSemaphore.acquire();
       // Post-increment: the first pulse takes a turn, then one turn every `interval` pulses.
-      betweenStep = AsyncTaskProcessing.betweenStep.get() % interval;
-      AsyncTaskProcessing.betweenStep.set((betweenStep + 1) % interval);
+      turn = betweenStep.get() % interval;
+      betweenStep.set((turn + 1) % interval);
 
-      step = AsyncTaskProcessing.step.get();
-      if (betweenStep == 0) step = (step + 1) % size;
+      regionIndex = step.get();
+      if (turn == 0) regionIndex = (regionIndex + 1) % size;
 
-      AsyncTaskProcessing.step.set(step);
+      step.set(regionIndex);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       RTP.log(Level.WARNING, e.getMessage(), e);
@@ -154,14 +154,14 @@ public final class AsyncTaskProcessing extends RTPRunnable {
     }
 
     // step computation according to period
-    if (betweenStep == 0) {
+    if (turn == 0) {
       if (isCancelled()) return;
-      if (step >= size) return;
+      if (regionIndex >= size) return;
 
       Region region = null;
       long idx = 0;
       for (Region r : RTP.selectionAPI.permRegionLookup.values()) {
-        if (idx++ == step) {
+        if (idx++ == regionIndex) {
           region = r;
           break;
         }

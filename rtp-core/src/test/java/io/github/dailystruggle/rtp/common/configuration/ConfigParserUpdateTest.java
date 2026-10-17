@@ -133,7 +133,7 @@ class ConfigParserUpdateTest {
         );
 
         // 2. Initialize ConfigParser with version 2.0
-        ConfigParser<TestKeys> parser = new ConfigParser<TestKeys>(
+        new ConfigParser<TestKeys>(
                 TestKeys.class,
                 "config",
                 "2.0",
@@ -181,7 +181,7 @@ class ConfigParserUpdateTest {
         );
 
         // 2. Initialize ConfigParser with version 2.0
-        ConfigParser<TestKeys> parser = new ConfigParser<TestKeys>(
+        new ConfigParser<TestKeys>(
                 TestKeys.class,
                 "config",
                 "2.0",
@@ -220,7 +220,7 @@ class ConfigParserUpdateTest {
         );
 
         // 2. Initialize ConfigParser with version 2.0
-        ConfigParser<TestKeys> parser = new ConfigParser<TestKeys>(
+        new ConfigParser<TestKeys>(
                 TestKeys.class,
                 "config",
                 "2.0",
@@ -264,7 +264,7 @@ class ConfigParserUpdateTest {
                 "teleportDelay: 42\n"
         );
 
-        ConfigParser<TestKeys> parser = new ConfigParser<TestKeys>(
+        new ConfigParser<TestKeys>(
                 TestKeys.class,
                 "config",
                 "2.0",
@@ -297,7 +297,7 @@ class ConfigParserUpdateTest {
             File file = new File(pluginDir, fileName);
             Files.writeString(file.toPath(), "version: \"1.0\"\nuserValue: \"custom\"\n");
 
-            ConfigParser<TestKeys> parser = new ConfigParser<TestKeys>(
+            new ConfigParser<TestKeys>(
                     TestKeys.class,
                     baseName,
                     "2.0",

@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
@@ -100,7 +99,7 @@ public class ReqRtpS005StaleChunkGuardTest {
         // a successful ChunkSet a moment earlier.
         world.isChunkLoadedPredicate = key -> false;
 
-        GenerationResult result = LocationGenerator.getLocation(region, (Set<String>) null);
+        LocationGenerator.getLocationFuture(region, (Set<String>) null).join();
 
         // Guard must entirely bypass MockRTPChunk.isSafe - if even one call leaked
         // through, we would have been vulnerable to the synchronous-load crash on
@@ -134,7 +133,7 @@ public class ReqRtpS005StaleChunkGuardTest {
         // and therefore MockRTPChunk.isSafe must be called at least once.
         world.isChunkLoadedPredicate = key -> true;
 
-        LocationGenerator.getLocation(region, (Set<String>) null);
+        LocationGenerator.getLocationFuture(region, (Set<String>) null).join();
 
         assertTrue(world.isSafeCallCount.get() > 0,
                 "Baseline: with a loaded chunk, MockRTPChunk.isSafe must be invoked by "

@@ -109,12 +109,12 @@ public class VerticalAdjustorBaseTest {
         def.put(DummyKeys.maxY, 200L);
         def.put(DummyKeys.customObj, new ArrayList<>());
 
-        DummyAdjustor adjustor = new DummyAdjustor(uniqueName, def, null);
+        new DummyAdjustor(uniqueName, def, null);
         assertTrue(factory.contains(uniqueName));
         assertNotNull(factory.get(uniqueName));
 
         // Creating another with same name should not fail
-        DummyAdjustor adjustor2 = new DummyAdjustor(uniqueName, def, null);
+        new DummyAdjustor(uniqueName, def, null);
         assertTrue(factory.contains(uniqueName));
     }
 
@@ -203,7 +203,6 @@ public class VerticalAdjustorBaseTest {
 
         // hashCode contract
         int h1 = adj1.hashCode();
-        int h2 = adj2.hashCode();
         assertTrue(h1 != 0);
 
         // AdjustResult static constants and methods

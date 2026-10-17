@@ -212,8 +212,6 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
   // sweep (PRESCAN) is the active phase, and mistake long initial runtimes for
   // a stalled fullscan. Logged once per run() entry when phase==PRESCAN.
   private final AtomicBoolean prescanAnnounced = new AtomicBoolean(false);
-  private final AtomicBoolean fullscanAnnounced = new AtomicBoolean(false);
-  private final AtomicBoolean genscanAnnounced = new AtomicBoolean(false);
 
   private long lastSaveTime = 0;
 
@@ -269,10 +267,9 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
     // When resuming mid-FULLSCAN with scanIter persisted as 0 (fresh Pass 2),
     // the Pass 1 bad-location bitmap must be preserved so Pass 2 can skip
     // positions already marked bad.
-    if(start == 0 && (scanPhase.get() == PHASE_PRESCAN || scanPhase.get() == PHASE_GENSCAN)) {
-      if (region.shape instanceof MemoryShape<?> memoryShape) {
-        memoryShape.clear();
-      }
+    if (start == 0 && (scanPhase.get() == PHASE_PRESCAN || scanPhase.get() == PHASE_GENSCAN)
+        && region.shape instanceof MemoryShape<?> memoryShape) {
+      memoryShape.clear();
     }
   }
 

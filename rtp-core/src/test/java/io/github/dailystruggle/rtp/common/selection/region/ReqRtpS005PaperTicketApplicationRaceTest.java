@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
@@ -136,7 +135,7 @@ public class ReqRtpS005PaperTicketApplicationRaceTest {
     void await_ready_bridges_deferred_ticket_application() {
         LocationGenerator.setRng(new Random(42L));
 
-        GenerationResult result = LocationGenerator.getLocation(region, (Set<String>) null);
+        LocationGenerator.getLocationFuture(region, (Set<String>) null).join();
 
         // With reservation.awaitReady(2s) bracketing the stale guard (ADR-015
         // Paper follow-up), the location generator thread waits for the
@@ -175,7 +174,7 @@ public class ReqRtpS005PaperTicketApplicationRaceTest {
         }
         assertEquals(0, world.getActiveTicketCount(),
                 "REQ-RTP-S-002: every ChunkReservation opened by "
-                        + "LocationGenerator.getLocation(Region, Set<String>) must be "
+                        + "LocationGenerator.getLocationFuture(Region, Set<String>) must be "
                         + "released before the method returns (the release side also "
                         + "routes through the deferred-apply queue on this mock).");
     }

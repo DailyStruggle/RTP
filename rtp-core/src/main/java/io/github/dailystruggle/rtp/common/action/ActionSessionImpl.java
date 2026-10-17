@@ -803,13 +803,6 @@ public final class ActionSessionImpl implements ActionSession {
   private void executeLifecycleStepsWithTokens(
       List<ActionDefinition.LifecycleStep> steps,
       ActionGateContext gateCtx,
-      Map<String, Object> additionalTokens) {
-    executeLifecycleStepsWithTokens(steps, gateCtx, additionalTokens, false);
-  }
-
-  private void executeLifecycleStepsWithTokens(
-      List<ActionDefinition.LifecycleStep> steps,
-      ActionGateContext gateCtx,
       Map<String, Object> additionalTokens,
       boolean terminal) {
 

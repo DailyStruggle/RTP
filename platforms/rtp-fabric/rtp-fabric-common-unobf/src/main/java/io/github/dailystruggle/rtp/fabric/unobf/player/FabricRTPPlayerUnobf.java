@@ -211,14 +211,12 @@ public final class FabricRTPPlayerUnobf implements RTPPlayer {
         try {
             if (p.level() instanceof ServerLevel lvl) {
                 net.minecraft.server.MinecraftServer srv = lvl.getServer();
-                if (srv != null) {
-                    java.io.File opsFile = srv.getPlayerList().getOps().getFile();
-                    if (opsFile != null && opsFile.isFile()) {
-                        String body = new String(java.nio.file.Files.readAllBytes(opsFile.toPath()),
-                                java.nio.charset.StandardCharsets.UTF_8);
-                        if (body.contains("\"" + uuid.toString() + "\"")) {
-                            opFallback = true;
-                        }
+                java.io.File opsFile = srv.getPlayerList().getOps().getFile();
+                if (opsFile != null && opsFile.isFile()) {
+                    String body = new String(java.nio.file.Files.readAllBytes(opsFile.toPath()),
+                            java.nio.charset.StandardCharsets.UTF_8);
+                    if (body.contains("\"" + uuid.toString() + "\"")) {
+                        opFallback = true;
                     }
                 }
             }

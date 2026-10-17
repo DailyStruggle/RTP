@@ -147,10 +147,9 @@ public class DegenerateShapeAndSpiralTest {
         assertTrue(rect.contains(50, -50 + 50));
         assertTrue(rect.contains(50 + 100, -50));
 
-        // locationToXZ and xzToLocation consistency
+        // locationToXZ consistency
         MutableRTPCoords out = new MutableRTPCoords(0, 0);
         rect.locationToXZ(500L, out);
-        long backLoc = rect.xzToLocation(out.x, out.z);
         // decoded should match within bounding box
         assertTrue(rect.contains(out.x, out.z));
     }

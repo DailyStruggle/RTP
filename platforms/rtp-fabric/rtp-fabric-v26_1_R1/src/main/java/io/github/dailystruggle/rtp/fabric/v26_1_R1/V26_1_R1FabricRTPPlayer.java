@@ -172,13 +172,11 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
         try {
             if (p.level() instanceof ServerLevel lvl) {
                 MinecraftServer srv = lvl.getServer();
-                if (srv != null) {
-                    java.io.File opsFile = srv.getPlayerList().getOps().getFile();
-                    if (opsFile != null && opsFile.isFile()) {
-                        String body = new String(java.nio.file.Files.readAllBytes(opsFile.toPath()),
-                                java.nio.charset.StandardCharsets.UTF_8);
-                        if (body.contains("\"" + uuid.toString() + "\"")) return true;
-                    }
+                java.io.File opsFile = srv.getPlayerList().getOps().getFile();
+                if (opsFile != null && opsFile.isFile()) {
+                    String body = new String(java.nio.file.Files.readAllBytes(opsFile.toPath()),
+                            java.nio.charset.StandardCharsets.UTF_8);
+                    if (body.contains("\"" + uuid.toString() + "\"")) return true;
                 }
             }
         } catch (Throwable t) {
@@ -576,7 +574,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
 
     private static boolean isLoaded(ServerLevel level, int cx, int cz) {
         try {
-            return level.getChunkSource() != null && level.getChunkSource().hasChunk(cx, cz);
+            return level.getChunkSource().hasChunk(cx, cz);
         } catch (Throwable ignored) {
             return false;
         }

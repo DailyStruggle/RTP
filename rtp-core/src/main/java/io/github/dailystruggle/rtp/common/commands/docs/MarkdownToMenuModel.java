@@ -288,11 +288,10 @@ public final class MarkdownToMenuModel {
         StringBuilder current = new StringBuilder();
 
         for (String word : words) {
-            if (current.length() + word.length() + (current.isEmpty() ? 0 : 1) > maxLine) {
-                if (!current.isEmpty()) {
-                    result.add(current.toString());
-                    current.setLength(0);
-                }
+            if (current.length() + word.length() + (current.isEmpty() ? 0 : 1) > maxLine
+                    && !current.isEmpty()) {
+                result.add(current.toString());
+                current.setLength(0);
             }
             if (!current.isEmpty()) {
                 current.append(' ');

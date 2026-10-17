@@ -74,10 +74,9 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
   @Override
   @NotNull
   public Map<String, RtpYamlConfig> connect() {
-    if (!directory.exists()) {
-      if (!directory.mkdirs())
-        throw new IllegalStateException(
-            "unable to create directory " + directory.getAbsolutePath());
+    if (!directory.exists() && !directory.mkdirs()) {
+      throw new IllegalStateException(
+          "unable to create directory " + directory.getAbsolutePath());
     }
 
     File[] files = directory.listFiles();

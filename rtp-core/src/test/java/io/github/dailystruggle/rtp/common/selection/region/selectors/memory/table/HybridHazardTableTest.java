@@ -275,9 +275,6 @@ public class HybridHazardTableTest {
     }
     // Directly replace container 2 with a RunContainer or run compact with gap that keeps runs
     table.container(2);
-    // Let's create RunContainer explicitly or via compaction:
-    char[] starts = new char[]{0, 200};
-    char[] lengths = new char[]{100, 100};
     // Since compact(1L, 10L) on container 2 will convert its ArrayContainer (200 bad chunks)
     // to RunContainer or stays ArrayContainer? Wait! compact on ArrayContainer returns this!
     // So to make container 2 a RunContainer, we can put a RunContainer or build a BitmaskContainer with > 4096 elements and compact to RunContainer.

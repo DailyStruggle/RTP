@@ -250,12 +250,11 @@ public final class NetworkConfig {
         b.waitlistReapMaxAgeMs = reapMaxMs > 0 ? reapMaxMs : 60_000L;
 
         // Fail-fast: redis transport requires a host.
-        if (b.enabled && "redis".equalsIgnoreCase(b.transportType)) {
-            if (b.redisHost == null || b.redisHost.isEmpty()) {
-                throw new NetworkConfigException(
-                        "transport.type=redis requires transport.redis.host to be set; "
-                                + "refusing to enable network mode.");
-            }
+        if (b.enabled && "redis".equalsIgnoreCase(b.transportType)
+                && (b.redisHost == null || b.redisHost.isEmpty())) {
+            throw new NetworkConfigException(
+                    "transport.type=redis requires transport.redis.host to be set; "
+                            + "refusing to enable network mode.");
         }
 
         // proxyId is optional: when role resolves to a proxy and no proxyId is
@@ -263,10 +262,9 @@ public final class NetworkConfig {
         // has no intrinsic self-name, so an operator running a single proxy need
         // not invent one; multi-proxy deployments should still set proxyId
         // explicitly so each proxy has a stable, human-readable identity.
-        if (declared == Role.PROXY_VELOCITY || declared == Role.PROXY_BUNGEE) {
-            if (b.proxyId == null || b.proxyId.isEmpty()) {
-                b.proxyId = defaultProxyId();
-            }
+        if ((declared == Role.PROXY_VELOCITY || declared == Role.PROXY_BUNGEE)
+                && (b.proxyId == null || b.proxyId.isEmpty())) {
+            b.proxyId = defaultProxyId();
         }
 
         // secretEnv check only when enabled. Signing transports get the full

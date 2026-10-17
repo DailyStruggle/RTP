@@ -3,7 +3,6 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.anvil.AnvilRegionByteCache;
-import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.selection.region.BacklogLocationBuffer;
 import io.github.dailystruggle.rtp.common.selection.region.RegionFileCoord;
 import io.github.dailystruggle.rtp.common.selection.region.WorldBacklogBinIndex;
@@ -88,7 +87,6 @@ public class FlatVsBinnedPrpEfficiencyTest {
     int flatTotalAttempts = 0;
     int flatChunkLoads = 0;
     int flatSuccessfulTeleports = 0;
-    MutableRTPCoords coords = new MutableRTPCoords(0, 0);
 
     for (int tp = 0; tp < SUCCESSFUL_TELEPORTS; tp++) {
       boolean placed = false;
@@ -158,7 +156,7 @@ public class FlatVsBinnedPrpEfficiencyTest {
 
       // Off-tick region file read (1 file read covers all candidates in that bin!)
       Path regionFile = regionDir.resolve("r." + binKey.rx() + "." + binKey.rz() + ".mca");
-      byte[] fileBytes = AnvilRegionByteCache.get(regionFile);
+      AnvilRegionByteCache.get(regionFile);
 
       for (BacklogLocationBuffer.BacklogEntry e : snapshot) {
         if (e.validity() != BacklogLocationBuffer.Validity.UNVERIFIED) continue;
@@ -186,7 +184,6 @@ public class FlatVsBinnedPrpEfficiencyTest {
     // 0 retries! Exactly 1 chunk load to finalize placement
     int binnedSuccessfulTeleports = 0;
     for (int tp = 0; tp < SUCCESSFUL_TELEPORTS && tp < validatedPool.size(); tp++) {
-      BacklogLocationBuffer.BacklogEntry ready = validatedPool.get(tp);
       // Only the target chunk is loaded for actual arrival placement
       binnedChunkLoads += 1;
       binnedSuccessfulTeleports++;

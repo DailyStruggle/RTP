@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.world.BiomeOverride;
 import io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -633,6 +634,11 @@ public final class V26_4_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public String getBiome(int x, int y, int z) {
+        var override = BiomeOverride.get();
+        if (override != null) {
+            String fromAddon = override.apply(new RTPLocation(this, x, y, z));
+            if (fromAddon != null) return fromAddon;
+        }
         ServerLevel level = world;
         if (level == null) return "";
         try {

@@ -116,7 +116,7 @@ public class ReqRtpS004NullChunkAttributionTest {
         world.nullChunkKeyPredicate = key -> true;
         accessor.logMessages.clear();
 
-        GenerationResult result = LocationGenerator.getLocation(region, (Set<String>) null);
+        GenerationResult result = LocationGenerator.getLocationFuture(region, (Set<String>) null).join();
 
         // No location can be found if every candidate is null-chunked.
         assertNotNull(result, "Generator must return a GenerationResult envelope even on total failure.");
@@ -155,7 +155,7 @@ public class ReqRtpS004NullChunkAttributionTest {
         world.nullChunkKeyPredicate = key -> false;
         accessor.logMessages.clear();
 
-        LocationGenerator.getLocation(region, (Set<String>) null);
+        LocationGenerator.getLocationFuture(region, (Set<String>) null).join();
 
         List<String> logs;
         synchronized (accessor.logMessages) {

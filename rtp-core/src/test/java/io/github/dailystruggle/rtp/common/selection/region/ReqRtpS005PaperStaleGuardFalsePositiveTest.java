@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
@@ -97,7 +96,7 @@ public class ReqRtpS005PaperStaleGuardFalsePositiveTest {
     void reservation_pins_chunk_across_stale_guard() {
         LocationGenerator.setRng(new Random(42L));
 
-        GenerationResult result = LocationGenerator.getLocation(region, (Set<String>) null);
+        LocationGenerator.getLocationFuture(region, (Set<String>) null).join();
 
         // With the ChunkReservation in place (ADR-015 Paper follow-up), the
         // stale-chunk guard tests RTP-owned liveness, not server-default TTL:
@@ -116,7 +115,7 @@ public class ReqRtpS005PaperStaleGuardFalsePositiveTest {
         // continue, or exception). The counter must return to zero.
         assertEquals(0, world.getActiveTicketCount(),
                 "REQ-RTP-S-002: every ChunkReservation opened by "
-                        + "LocationGenerator.getLocation(Region, Set<String>) must be "
+                        + "LocationGenerator.getLocationFuture(Region, Set<String>) must be "
                         + "released before the method returns. Non-zero residual "
                         + "indicates a leak via an exit path that bypasses the finally.");
     }

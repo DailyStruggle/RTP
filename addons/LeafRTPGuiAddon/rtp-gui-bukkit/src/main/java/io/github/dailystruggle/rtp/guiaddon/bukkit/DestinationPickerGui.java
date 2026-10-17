@@ -40,7 +40,6 @@ public final class DestinationPickerGui implements InventoryHolder {
   private static final int COLUMNS = MenuLayout.COLUMNS;
 
   private final Inventory inventory;
-  private final int dashboardSlot;
   private final Map<Integer, RtpTarget> slotTargets = new HashMap<>();
 
   private static final Pattern HEX_PATTERN_1 = Pattern.compile("&#([0-9a-fA-F]{6})");
@@ -48,10 +47,9 @@ public final class DestinationPickerGui implements InventoryHolder {
   private static final Pattern COLOR_PREFIX_PATTERN =
       Pattern.compile("^(?:[&\u00a7][0-9a-fk-orA-FK-OR]|(?:&?#[0-9a-fA-F]{6})|<[^>]+>)");
 
-  private DestinationPickerGui(MenuModel model, int rows, int dashboardSlot) {
+  private DestinationPickerGui(MenuModel model, int rows) {
     this.inventory =
         Bukkit.createInventory(this, rows * COLUMNS, colorize(model.title()));
-    this.dashboardSlot = dashboardSlot;
   }
 
   /**
@@ -67,7 +65,7 @@ public final class DestinationPickerGui implements InventoryHolder {
    */
   public static DestinationPickerGui from(MenuModel model) {
     MenuLayout layout = MenuLayout.compute(model);
-    DestinationPickerGui gui = new DestinationPickerGui(model, layout.rows(), layout.dashboardSlot());
+    DestinationPickerGui gui = new DestinationPickerGui(model, layout.rows());
 
     for (Map.Entry<Integer, MenuEntry> placed : layout.slotEntries().entrySet()) {
       int slot = placed.getKey();

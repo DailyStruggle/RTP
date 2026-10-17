@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.world.BiomeOverride;
 import io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.storage.LevelResource;
@@ -1131,77 +1132,6 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
     // ---------------------------------------------------------------------------
 
     /**
-     * Reflective handles into Mojang internals for the non-blocking
-     * &quot;does an .mca entry exist for this chunk?&quot; question. Lazily
-     * resolved on first use; cached for the JVM lifetime. Reflection is used
-     * (rather than an AccessWidener / accessor mixin) to keep this change
-     * self-contained - {@code rtp-fabric-common} has no AW/mixin config today.
-     *
-     * <p>Resolution chain: {@code ServerChunkCache#chunkMap} field →
-     * {@code ChunkMap#read(ChunkPos)} method returning
-     * {@code CompletableFuture<Optional<CompoundTag>>}. The future is fed by
-     * the {@code IOWorker} async region-file reader; it does NOT touch the
-     * chunk system and does NOT trigger generation, so it satisfies the
-     * S-005 non-blocking pre-check contract.</p>
-     */
-    private static volatile java.lang.reflect.Field CHUNK_MAP_FIELD;
-    private static volatile java.lang.reflect.Method CHUNK_MAP_READ_METHOD;
-    private static volatile boolean REFLECTION_RESOLVED = false;
-    private static volatile boolean REFLECTION_AVAILABLE = false;
-
-    private static void resolveReflectionOnce(@NotNull ServerChunkCache sample) {
-        if (REFLECTION_RESOLVED) return;
-        synchronized (FabricRTPWorldUnobf.class) {
-            if (REFLECTION_RESOLVED) return;
-            try {
-                // ServerChunkCache#chunkMap - package-private final field; mappings
-                // stable since 1.18 under the deobf name "chunkMap".
-                java.lang.reflect.Field f = null;
-                for (java.lang.reflect.Field cand : sample.getClass().getDeclaredFields()) {
-                    if ("chunkMap".equals(cand.getName())
-                        || net.minecraft.server.level.ChunkMap.class.isAssignableFrom(cand.getType())) {
-                        f = cand;
-                        break;
-                    }
-                }
-                if (f == null) {
-                    REFLECTION_RESOLVED = true;
-                    return;
-                }
-                f.setAccessible(true);
-                CHUNK_MAP_FIELD = f;
-
-                // ChunkMap#read(ChunkPos) - protected method; returns
-                // CompletableFuture<Optional<CompoundTag>>.
-                Class<?> chunkMapClass = f.getType();
-                java.lang.reflect.Method read = null;
-                Class<?> chunkPosClass = net.minecraft.world.level.ChunkPos.class;
-                for (java.lang.reflect.Method m : chunkMapClass.getDeclaredMethods()) {
-                    if (!m.getName().equals("read")) continue;
-                    Class<?>[] params = m.getParameterTypes();
-                    if (params.length == 1 && params[0] == chunkPosClass) {
-                        read = m;
-                        break;
-                    }
-                }
-                if (read == null) {
-                    REFLECTION_RESOLVED = true;
-                    return;
-                }
-                read.setAccessible(true);
-                CHUNK_MAP_READ_METHOD = read;
-                REFLECTION_AVAILABLE = true;
-            } catch (Throwable t) {
-                RTP.log(java.util.logging.Level.WARNING,
-                    "[RTP] FabricRTPWorldUnobf.isChunkGenerated reflection setup failed: "
-                        + t.getClass().getSimpleName() + ": " + t.getMessage());
-            } finally {
-                REFLECTION_RESOLVED = true;
-            }
-        }
-    }
-
-    /**
      * Non-blocking check for whether the chunk has been generated and persisted
      * to disk. Implements the {@link RTPWorld#isChunkGenerated(int, int)}
      * contract using region-file probes - same primitive Bukkit's
@@ -1479,6 +1409,11 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
      */
     @Override
     public String getBiome(int x, int y, int z) {
+        var override = BiomeOverride.get();
+        if (override != null) {
+            String fromAddon = override.apply(new RTPLocation(this, x, y, z));
+            if (fromAddon != null) return fromAddon;
+        }
         if (world == null) return "";
         try {
             net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> holder =
@@ -1498,10 +1433,10 @@ public final class FabricRTPWorldUnobf extends RTPWorld<ServerLevel> {
                     .orElseGet(() -> {
                         // Fallback: registry reverse lookup.
                         try {
-                            Identifier id = world.registryAccess()
+                            Identifier biomeId = world.registryAccess()
                                     .lookupOrThrow(net.minecraft.core.registries.Registries.BIOME)
                                     .getKey(holder.value());
-                            return (id == null) ? "" : id.toString();
+                            return (biomeId == null) ? "" : biomeId.toString();
                         } catch (Throwable t) {
                             return "";
                         }

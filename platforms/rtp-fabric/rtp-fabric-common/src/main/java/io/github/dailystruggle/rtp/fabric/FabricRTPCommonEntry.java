@@ -15,6 +15,8 @@ import java.util.logging.Level;
  */
 public class FabricRTPCommonEntry {
 
+    private FabricRTPCommonEntry() {}
+
     /**
      * Registers the {@code ServerLifecycleEvents.SERVER_STARTED} listener to populate
      * {@link RTP#testUmbrellaContext}.

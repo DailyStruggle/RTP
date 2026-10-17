@@ -98,13 +98,6 @@ public final class RTPNeoForgeMod {
   private volatile boolean corePrepared = false;
 
   /**
-   * Game-bus bridge for player join/quit and world load/unload events.
-   * Constructed and registered in {@link #bootCore(MinecraftServer)} once the
-   * accessor exists; {@code null} until then.
-   */
-  private NeoForgeEventBridge eventBridge;
-
-  /**
    * ADR-075 tick-sampled player-move producer. Driven from {@link #onServerTick};
    * cost is bounded to the watched set (a single has-watchers check per tick when
    * nothing is watched).
@@ -346,7 +339,6 @@ public final class RTPNeoForgeMod {
     // load/unload). Created here (not in the constructor) because it needs the
     // accessor, which only exists once the server has started.
     NeoForgeEventBridge bridge = new NeoForgeEventBridge(acc);
-    this.eventBridge = bridge;
     bridge.register();
 
     // Register every already-loaded ServerLevel - overworld + nether + end (and
@@ -655,10 +647,8 @@ public final class RTPNeoForgeMod {
     CommandsAPICommand testCmd = NeoForgeCommandRegistrar.resolveTestCmd(RTP.baseCommand);
     if (testCmd != null) {
       TreeCommand treeCmd = RTP.baseCommand;
-      if (treeCmd != null) {
-        if (!treeCmd.getCommandLookup().containsKey(testCmd.name().toUpperCase())) {
-          treeCmd.addSubCommand(testCmd);
-        }
+      if (treeCmd != null && !treeCmd.getCommandLookup().containsKey(testCmd.name().toUpperCase())) {
+        treeCmd.addSubCommand(testCmd);
       }
       NeoForgeCommandRegistrar.registerTestCmd(event.getDispatcher(), testCmd);
     }

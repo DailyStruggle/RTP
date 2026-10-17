@@ -71,7 +71,7 @@ class PluginMessageAndDirectEdgeCaseTest {
 
         // Throwing subscriber isolation
         List<String> received = new ArrayList<>();
-        Subscription subFail = binding.subscribeBackendHeartbeats(hb -> {
+        binding.subscribeBackendHeartbeats(hb -> {
             throw new RuntimeException("subscriber failure");
         });
         Subscription subOk = binding.subscribeBackendHeartbeats(hb -> received.add(hb.serverId()));
@@ -117,7 +117,7 @@ class PluginMessageAndDirectEdgeCaseTest {
 
         // Throwing subscriber isolation
         List<String> received = new ArrayList<>();
-        Subscription subFail = binding.subscribeBackendHeartbeats(hb -> {
+        binding.subscribeBackendHeartbeats(hb -> {
             throw new RuntimeException("subscriber failure");
         });
         Subscription subOk = binding.subscribeBackendHeartbeats(hb -> received.add(hb.serverId()));

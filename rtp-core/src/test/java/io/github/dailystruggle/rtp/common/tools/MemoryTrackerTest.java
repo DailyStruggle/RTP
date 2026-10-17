@@ -289,7 +289,7 @@ public class MemoryTrackerTest {
         RTP.getInstance().processingPlayers.add(playerId);
         RTP.getInstance().latestTeleportData.put(playerId, td);
 
-        UUID trackId = MemoryTracker.track(td, "TeleportData-" + playerId, 0L);
+        MemoryTracker.track(td, "TeleportData-" + playerId, 0L);
         Thread.sleep(5L);
 
         MemoryTracker.runDiagnostics();

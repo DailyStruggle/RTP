@@ -104,9 +104,9 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
   @Override
   public void startup() {
     DriverManager.setLoginTimeout(30);
-    Connection connection;
+    Connection conn;
     try {
-      connection = getConnection();
+      conn = getConnection();
     } catch (SQLException e) {
       RTP.log(Level.WARNING, e.getMessage(), e);
       return;
@@ -114,7 +114,7 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
 
     @NotNull
     Optional<Map<String, Object>> read =
-        read(connection, "referenceData", new AbstractMap.SimpleEntry<>("UUID", new UUID(0, 0)));
+        read(conn, "referenceData", new AbstractMap.SimpleEntry<>("UUID", new UUID(0, 0)));
     if (!read.isPresent()) {
       return;
     }
@@ -123,7 +123,7 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
     String sql = "SELECT senderId, time, selectedWorldName, selectedX, selectedY, selectedZ, "
         + "originalWorldName, originalX, originalY, originalZ, cost FROM rtp_teleport_data";
 
-    try (PreparedStatement statement = connection.prepareStatement(sql);
+    try (PreparedStatement statement = conn.prepareStatement(sql);
         ResultSet resultSet = statement.executeQuery()) {
       if (resultSet == null) {
         return;

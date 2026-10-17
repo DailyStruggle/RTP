@@ -5,6 +5,7 @@ import org.bukkit.Location;
 
 /** Checker for RedProtect regions */
 public class RedProtectChecker {
+  private RedProtectChecker() {}
   private static boolean exists = true;
 
   public static boolean isInClaim(io.github.dailystruggle.rtp.api.world.RTPCoords location) {

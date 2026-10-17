@@ -76,6 +76,8 @@ public class SendMessage {
   private static final List<BiConsumer<Level, String>> leveledInterceptors =
       new CopyOnWriteArrayList<>();
 
+  private SendMessage() {}
+
   public static void addInterceptor(Consumer<String> interceptor) {
     interceptors.add(interceptor);
   }

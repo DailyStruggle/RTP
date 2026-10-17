@@ -116,7 +116,7 @@ public final class BukkitNetworkBridge implements NetworkBridge {
         this.listener = new Listener();
         boolean ok = false;
         try {
-            if (plugin != null && plugin.getServer() != null && plugin.getServer().getMessenger() != null) {
+            if (plugin != null) {
                 plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, CHANNEL);
                 plugin.getServer().getMessenger()
                         .registerIncomingPluginChannel(plugin, CHANNEL, listener);

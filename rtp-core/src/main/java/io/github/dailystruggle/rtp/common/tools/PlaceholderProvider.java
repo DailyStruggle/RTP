@@ -27,6 +27,7 @@ import java.util.function.Function;
 import java.util.function.IntFunction;
 
 public class PlaceholderProvider {
+    private PlaceholderProvider() {}
     public static final Map<String, Function<UUID, String>> placeholders = new ConcurrentHashMap<>();
 
     /**

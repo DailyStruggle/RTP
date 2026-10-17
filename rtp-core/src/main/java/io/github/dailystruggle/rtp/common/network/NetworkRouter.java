@@ -42,7 +42,6 @@ public final class NetworkRouter {
     private final IntSupplier queueDepthSupplier;
     private final int queueMaxDepth;
     private final TokenBucket tokenBucket;
-    private final LongSupplier nowMs;
 
     public NetworkRouter(String localServerId,
                          Mode mode,
@@ -68,7 +67,6 @@ public final class NetworkRouter {
                 Math.max(1, requestsBurst),
                 Math.max(1, requestsPerSecond),
                 nowMs);
-        this.nowMs = nowMs;
     }
 
     /**
@@ -153,10 +151,9 @@ public final class NetworkRouter {
         // Gate 3 (D6 A: implicit local-first). When mode == AUTO and the local
         // backend can satisfy this request, do not cross the network.
         // Skipped under hard-pin: a named server hint MUST be honoured exactly.
-        if (mode == Mode.AUTO && hint == null) {
-            if (localCanServe(snap, regionKey) && localKeptCountSupplier.getAsInt() > 0) {
-                return RoutingDecision.Local.INSTANCE;
-            }
+        if (mode == Mode.AUTO && hint == null
+                && localCanServe(snap, regionKey) && localKeptCountSupplier.getAsInt() > 0) {
+            return RoutingDecision.Local.INSTANCE;
         }
 
         // Hard-pin gate (H2, before generic peer-liveness check): if the

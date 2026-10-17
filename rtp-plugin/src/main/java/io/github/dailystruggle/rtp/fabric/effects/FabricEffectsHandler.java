@@ -193,13 +193,6 @@ public final class FabricEffectsHandler {
     private static void dispatch(String prefix, RTPPlayer player, FabricEffectRuntime runtime,
                                  net.minecraft.world.phys.Vec3 explicitLocation,
                                  net.minecraft.world.phys.Vec3 destinationLocation,
-                                 String destWorldName) {
-        dispatch(prefix, player, runtime, explicitLocation, destinationLocation, destWorldName, null);
-    }
-
-    private static void dispatch(String prefix, RTPPlayer player, FabricEffectRuntime runtime,
-                                 net.minecraft.world.phys.Vec3 explicitLocation,
-                                 net.minecraft.world.phys.Vec3 destinationLocation,
                                  String destWorldName,
                                  TeleportPipelineTask pipelineTask) {
         try {

@@ -14,6 +14,7 @@ import java.lang.reflect.Method;
  * once, the integration disables itself for the session, and the verifier becomes a no-op.
  */
 public class SaberFactionsChecker {
+  private SaberFactionsChecker() {}
   private static boolean exists = true;
 
   /**

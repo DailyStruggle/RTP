@@ -452,7 +452,7 @@ public final class BukkitHandles implements HandleProvider {
             } catch (Throwable t) {
                 // S-004: don't swallow silently; surface via plugin logger.
                 org.bukkit.plugin.Plugin caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();
-                if (caller != null) caller.getLogger().warning(
+                caller.getLogger().warning(
                         "GlideEffect failed to start glide for " + player.getName() + ": " + t.getMessage());
                 return;
             }
@@ -469,20 +469,18 @@ public final class BukkitHandles implements HandleProvider {
             // schedule entirely to avoid a long-lived task that will never fire.
             if (landingTimeoutTicks > 0 && landingTimeoutTicks < Integer.MAX_VALUE) {
                 org.bukkit.plugin.Plugin caller = io.github.dailystruggle.effectsapi.EffectsAPI.getInstance();
-                if (caller != null) {
-                    try {
-                        Runnable timeoutTask = () -> {
-                            Player p = org.bukkit.Bukkit.getPlayer(state.playerId);
-                            if (p != null && io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.GlideSafetyListener.isGliding(state.playerId)) {
-                                io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.GlideSafetyListener.endGlide(
-                                        p, io.github.dailystruggle.effectsapi.bukkit.events.PlayerLandEvent.Reason.TIMEOUT);
-                            }
-                        };
-                        state.watchdogCanceller = scheduleDelayed(caller, player, landingTimeoutTicks, timeoutTask);
-                    } catch (Throwable t) {
-                        caller.getLogger().warning(
-                                "GlideEffect could not schedule timeout watchdog: " + t.getMessage());
-                    }
+                try {
+                    Runnable timeoutTask = () -> {
+                        Player p = org.bukkit.Bukkit.getPlayer(state.playerId);
+                        if (p != null && io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.GlideSafetyListener.isGliding(state.playerId)) {
+                            io.github.dailystruggle.effectsapi.bukkit.BukkitListeners.GlideSafetyListener.endGlide(
+                                    p, io.github.dailystruggle.effectsapi.bukkit.events.PlayerLandEvent.Reason.TIMEOUT);
+                        }
+                    };
+                    state.watchdogCanceller = scheduleDelayed(caller, player, landingTimeoutTicks, timeoutTask);
+                } catch (Throwable t) {
+                    caller.getLogger().warning(
+                            "GlideEffect could not schedule timeout watchdog: " + t.getMessage());
                 }
             }
         }

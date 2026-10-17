@@ -50,13 +50,11 @@ public final class RTPTeleportCancel extends RTPRunnable {
     if (repData != null) RTP.getInstance().latestTeleportData.put(playerId, repData);
     else RTP.getInstance().latestTeleportData.remove(playerId);
 
-    if (RTP.economy != null && data.cost != 0.0) {
-      if (refund && data.sender instanceof RTPPlayer) {
-        final double refundAmount = data.cost;
-        final UUID refundTarget = data.sender.uuid();
-        io.github.dailystruggle.rtp.common.economy.EconomyHop.run(
-            () -> RTP.economy.give(refundTarget, refundAmount));
-      }
+    if (RTP.economy != null && data.cost != 0.0 && refund && data.sender instanceof RTPPlayer) {
+      final double refundAmount = data.cost;
+      final UUID refundTarget = data.sender.uuid();
+      io.github.dailystruggle.rtp.common.economy.EconomyHop.run(
+          () -> RTP.economy.give(refundTarget, refundAmount));
     }
 
     RTP.getInstance().processingPlayers.remove(playerId);

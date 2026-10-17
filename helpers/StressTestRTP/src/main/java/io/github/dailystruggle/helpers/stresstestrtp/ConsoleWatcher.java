@@ -168,7 +168,7 @@ public final class ConsoleWatcher {
         Player victim = null;
         for (Player p : Bukkit.getOnlinePlayers()) {
             String n = p.getName();
-            if (n != null && !n.isEmpty() && lower.contains(n.toLowerCase(Locale.ROOT))) {
+            if (!n.isEmpty() && lower.contains(n.toLowerCase(Locale.ROOT))) {
                 victim = p;
                 break;
             }

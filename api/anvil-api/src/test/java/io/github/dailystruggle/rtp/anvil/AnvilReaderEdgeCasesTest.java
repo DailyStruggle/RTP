@@ -142,7 +142,6 @@ class AnvilReaderEdgeCasesTest {
   void testColumnProbeHeightmapBranches() {
     // Heightmap array present but length 0
     long[] emptyHm = new long[0];
-    PaletteSection sec = new PaletteSection(0, List.of("minecraft:stone"), new long[4]);
     // Call computeHeightmapTop via synthetic chunk root
     LinkedHashMap<String, Object> root = new LinkedHashMap<>();
     root.put("DataVersion", 2975);

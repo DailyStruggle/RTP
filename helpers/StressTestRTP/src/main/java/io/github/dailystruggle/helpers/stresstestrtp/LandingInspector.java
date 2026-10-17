@@ -106,8 +106,9 @@ public final class LandingInspector {
                             boolean feetPassable, boolean headPassable) {
         if (isLava(floor) || isLava(feet) || isLava(head)) return Verdict.LAVA;
         boolean feetThin = isThin(feet);
-        if ((!feetPassable && !feetThin) || !headPassable) {
-            if (!isWater(feet) && !isWater(head)) return Verdict.SUFFOCATING;
+        if (((!feetPassable && !feetThin) || !headPassable)
+                && !isWater(feet) && !isWater(head)) {
+            return Verdict.SUFFOCATING;
         }
         if (isWater(feet) || isWater(head)) return Verdict.WATER;
         if (isHazard(floor) || isHazard(feet) || isHazard(head)) return Verdict.HAZARD;

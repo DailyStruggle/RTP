@@ -514,11 +514,9 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         break;
       }
     }
-    if (!anyRename) {
-      // No key renames for this locale: either no localized JAR resource exists (identity map),
-      // or translations are value-only (messages). Value-only files migrate on locale switch.
-      if (!valueOnlyLocaleMigrationNeeded(f)) return preserved;
-    }
+    // No key renames for this locale: either no localized JAR resource exists (identity map),
+    // or translations are value-only (messages). Value-only files migrate on locale switch.
+    if (!anyRename && !valueOnlyLocaleMigrationNeeded(f)) return preserved;
 
     RtpYamlConfig oldYaml = new RtpYamlConfig(f.getPath());
     try {
@@ -1106,8 +1104,6 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       } catch (Exception e) {
         RTP.log(Level.WARNING, e.getMessage(), e);
       }
-      f = new File(pluginDirectory, this.name);
-      //            loadResource( f );
     }
 
     // Build off-side and publish once: lock-free readers must never see the

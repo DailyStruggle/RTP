@@ -100,7 +100,6 @@ public class CompositeRegionModelBuilderTest {
 
     // Build rich realistic terrain mask:
     // Oceans, River channels, Plains, Forests, Snowy peaks, Deserts
-    java.util.Random rand = new java.util.Random(42L);
     for (int y = 0; y < h; y++) {
       for (int x = 0; x < w; x++) {
         int idx = y * w + x;

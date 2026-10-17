@@ -19,7 +19,6 @@ public final class SegmentedKeyRunTable {
 
   public static final class Bin {
     private final int binIndex;
-    private final long binStartKey;
     private final long binSize;
     private final int[] starts;
     private final int[] lengths;
@@ -30,7 +29,6 @@ public final class SegmentedKeyRunTable {
 
     public Bin(int binIndex, long binStartKey, long binSize, int[] starts, int[] lengths, int count) {
       this.binIndex = binIndex;
-      this.binStartKey = binStartKey;
       this.binSize = binSize;
       this.starts = starts;
       this.lengths = lengths;

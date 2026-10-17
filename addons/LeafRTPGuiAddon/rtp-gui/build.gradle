@@ -42,8 +42,8 @@ base {
 // The MC 26.x carriers are compiled to Java 25 bytecode. To consume (shade) them
 // the assembly's runtime classpath must advertise the same JVM target, so when a
 // carrier is on the build graph this module pins a Java 25 toolchain. When the
-// carriers are excluded (-PexcludeJdk25), it stays on Java 21 so a JDK-21-only host
-// can still assemble the Bukkit jar.
+// carriers are excluded (-PexcludeJdk25), it targets Java 17 bytecode to match the
+// Bukkit renderer modules it bundles.
 def hasJdk25Carriers = findProject(':addons:LeafRTPGuiAddon:rtp-gui-fabric') != null ||
         findProject(':addons:LeafRTPGuiAddon:rtp-gui-neoforge') != null
 
@@ -53,8 +53,8 @@ java {
             languageVersion = JavaLanguageVersion.of(25)
         }
     } else {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 

@@ -38,7 +38,6 @@ public class PathProgressionVisualizerTest {
       circle.set(GenericMemoryShapeParams.centerRadius, 0L);
 
       int pSquare = square.getPointEdgeChunks();
-      int pCircle = circle.getPointEdgeChunks();
       long rangeSquare = square.getRange();
       long rangeCircle = circle.getRange();
 

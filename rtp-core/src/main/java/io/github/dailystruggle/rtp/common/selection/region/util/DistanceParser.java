@@ -112,12 +112,11 @@ public final class DistanceParser {
           return new ParsedDistance(val, SpatialUnit.CHUNK, false);
         }
       }
-    } else if (parsed.unit() == SpatialUnit.CHUNK) {
+    } else if (parsed.unit() == SpatialUnit.CHUNK
+        && worldBorderRadius > 0 && val > 512.0 && val * 16.0 > worldBorderRadius && val <= worldBorderRadius) {
       // If default was CHUNK, but value is e.g. 5000 (which would be 80,000 blocks) and exceeds world border
-      if (worldBorderRadius > 0 && val > 512.0 && val * 16.0 > worldBorderRadius && val <= worldBorderRadius) {
-        logAutoInterpret(contextName, val, "chunks", val / 16.0, "blocks", val);
-        return new ParsedDistance(val, SpatialUnit.BLOCK, false);
-      }
+      logAutoInterpret(contextName, val, "chunks", val / 16.0, "blocks", val);
+      return new ParsedDistance(val, SpatialUnit.BLOCK, false);
     }
 
     return parsed;

@@ -149,11 +149,11 @@ public class DualLayerDownsamplingResolutionTest {
     assertEquals(0, initialEpoch);
 
     // Initial adjustRange call sets lastAdjustedRange
-    double r1 = square.adjustRange(1000.0, 0L, MemoryShape.MODE_ACCUMULATE);
+    square.adjustRange(1000.0, 0L, MemoryShape.MODE_ACCUMULATE);
     assertEquals(0, square.getExpansionEpoch());
 
     // Expand: badSum increases -> adjustedRange increases -> expansionEpoch increments!
-    double r2 = square.adjustRange(1000.0, 500L, "NORMAL");
+    square.adjustRange(1000.0, 500L, "NORMAL");
     assertEquals(1, square.getExpansionEpoch());
 
     // Within an epoch with S=1, Feistel permutation guarantees zero duplicates

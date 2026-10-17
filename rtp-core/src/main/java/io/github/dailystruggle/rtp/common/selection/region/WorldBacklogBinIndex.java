@@ -138,9 +138,7 @@ public final class WorldBacklogBinIndex {
     int reaped = 0;
     for (Map.Entry<RegionFileCoord, WeakReference<List<BacklogLocationBuffer.BacklogEntry>>> e :
         bins.entrySet()) {
-      if (e.getValue().get() == null) {
-        if (bins.remove(e.getKey(), e.getValue())) reaped++;
-      }
+      if (e.getValue().get() == null && bins.remove(e.getKey(), e.getValue())) reaped++;
     }
     return reaped;
   }

@@ -44,8 +44,6 @@ public class SelectionAPI {
   /** A lookup map for all permanently configured regions, keyed by name. */
   public final ConcurrentHashMap<String, Region> permRegionLookup = new ConcurrentHashMap<>();
 
-  /** A factory for creating {@link Region} instances. */
-  private final Factory<Region> regionFactory = new Factory<>();
 
   /** A factory for creating {@link Shape} instances. */
   public Factory<Shape<?>> shapeFactory;

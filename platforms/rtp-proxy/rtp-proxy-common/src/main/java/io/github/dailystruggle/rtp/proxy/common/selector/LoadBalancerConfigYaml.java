@@ -95,16 +95,14 @@ public final class LoadBalancerConfigYaml {
                     || map instanceof TreeMap) ? (Map<String, Object>) map : new LinkedHashMap<>((Map<String, Object>) map);
             List<ScoringTerm> out = new ArrayList<>(ordered.size());
             for (Map.Entry<String, Object> e : ordered.entrySet()) {
-                ScoringTerm t = readOneTerm(e.getKey(), e.getValue());
-                if (t != null) out.add(t);
+                out.add(readOneTerm(e.getKey(), e.getValue()));
             }
             return out;
         }
         if (node instanceof List<?> list) {
             List<ScoringTerm> out = new ArrayList<>(list.size());
             for (Object o : list) {
-                ScoringTerm t = readOneTerm(null, o);
-                if (t != null) out.add(t);
+                out.add(readOneTerm(null, o));
             }
             return out;
         }

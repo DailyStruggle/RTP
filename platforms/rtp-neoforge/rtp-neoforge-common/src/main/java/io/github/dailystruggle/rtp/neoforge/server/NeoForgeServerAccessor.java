@@ -11,6 +11,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
+import io.github.dailystruggle.rtp.common.world.BiomeOverride;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
@@ -57,7 +58,6 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
     private final Map<String, WorldBorder> nativeWorldBorderCache = new ConcurrentHashMap<>();
     private Function<String, ?> worldBorderFunction = this::createNativeWorldBorder;
     private Function<String, ?> shapeFunction = this::createNativeShape;
-    private Function<RTPLocation, String> biomeGetter = this::defaultBiomeAt;
     private Function<RTPWorld<?>, Set<String>> biomesGetter = this::defaultBiomesFor;
 
     private final Map<UUID, RTPPlayer> playersById = new ConcurrentHashMap<>();
@@ -690,7 +690,7 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
 
     @Override
     public void setBiomeGetter(Function<RTPLocation, String> getter) {
-        this.biomeGetter = getter;
+        BiomeOverride.set(getter);
     }
 
     @Override
@@ -698,22 +698,6 @@ public final class NeoForgeServerAccessor implements RTPServerAccessor {
         this.biomesGetter = getter;
     }
 
-    private @Nullable String defaultBiomeAt(RTPLocation location) {
-        if (location == null) return null;
-        RTPWorld<?> w = location.world();
-        if (!(w instanceof NeoForgeRTPWorld nw)) return null;
-        ServerLevel level = nw.level();
-        net.minecraft.core.BlockPos pos =
-                new net.minecraft.core.BlockPos(location.getBlockX(), location.getBlockY(), location.getBlockZ());
-        var holder = level.getBiome(pos);
-        String raw = holder.unwrapKey()
-                .map(k -> io.github.dailystruggle.rtp.neoforge.tools.NeoForgeResourceIds.locationString(k))
-                .orElse(null);
-        if (raw == null) return null;
-        String n = io.github.dailystruggle.rtp.api.configuration
-                .PaletteIdentifierNormalizer.normalize(raw);
-        return (n != null && !n.isEmpty()) ? n : raw;
-    }
 
     private Set<String> defaultBiomesFor(@Nullable RTPWorld<?> rtpWorld) {
         MinecraftServer s = server;

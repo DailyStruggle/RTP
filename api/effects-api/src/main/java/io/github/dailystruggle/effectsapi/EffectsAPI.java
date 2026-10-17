@@ -175,7 +175,7 @@ public final class EffectsAPI {
                     .orElse(null));
             if (caller == null) return null;
             Plugin providing = JavaPlugin.getProvidingPlugin(caller);
-            if (providing != null && STATES.containsKey(providing)) return providing;
+            if (STATES.containsKey(providing)) return providing;
         } catch (Throwable ignored) {
             // getProvidingPlugin throws for classes not loaded by a plugin
             // classloader (core server / test classes); treat as unresolved.

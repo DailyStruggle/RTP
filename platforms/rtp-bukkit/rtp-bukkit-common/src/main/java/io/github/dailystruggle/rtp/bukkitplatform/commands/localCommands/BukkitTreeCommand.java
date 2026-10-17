@@ -96,7 +96,7 @@ public abstract class BukkitTreeCommand extends BukkitCommand implements TreeCom
         }
         try {
             CommandSender console = Bukkit.getConsoleSender();
-            if (console != null && sender.getName().equals(console.getName())) {
+            if (sender.getName().equals(console.getName())) {
                 return CommandsAPI.serverId;
             }
         } catch (Exception ignored) {

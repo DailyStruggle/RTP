@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.DownloadInfo;
 import io.github.dailystruggle.rtp.common.RTP;
 
 public class SupportInfo {
+    private SupportInfo() {}
     public static String getSig() {
         DownloadInfo.Source source = DownloadInfo.source();
         if (source == DownloadInfo.Source.DEV) {

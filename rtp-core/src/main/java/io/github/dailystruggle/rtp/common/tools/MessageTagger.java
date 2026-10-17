@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import org.jetbrains.annotations.Nullable;
 
 public class MessageTagger {
+    private MessageTagger() {}
     public static String tagMessage(String message, @Nullable String tag) {
         if (message == null || message.isEmpty()) return message;
 

@@ -52,6 +52,23 @@ Test B (`20261008-024412`) holds every plugin to the same offered rate (one `/rt
 
 ---
 
+## Paper 26.2 Linux - paced 5 TP/s, 14 ladder runs per plugin
+
+> Threadripper 7970X rig (Ubuntu 24.04, OpenJDK 25, `-Xmx16G`, 48 non-op Mineflayer bots, server view distance 4, harness caps each bot to 2), same rig as the open-loop ramps in [`PRE_WRITEUP.md`](./PRE_WRITEUP.md) section 5.10. Each row pools the first stage (5 TP/s offered, 60 s, 299 attempts) of the 14 ramp runs per plugin from `20261009-092205` to `20261010-070617` in which that plugin was the one loaded; the two earlier rounds measured a server without the plugin and are excluded (section 5.10 validity note). LeafRTP ran the tuned bench config. Latency is dispatch to arrival over every attempt dispatched inside the stage window; MSPT p95 and min TPS are the per-run stage values. No idle baseline was recorded, so MSPT is gross.
+
+| Plugin | Runs | Success / Attempts | Latency (p50 / p95 / p99 / max) | MSPT p95 (per run) | Min TPS | Exact duplicate landings (summed per run) |
+|---|---:|---|---|---|---:|---:|
+| **LeafRTP** | 14 | **4,186 / 4,186** | 5 / **6** / **6** / **33 ms** | 21.4-25.0 ms | 19.82 | 3 |
+| **JakesRTP** | 14 | 4,186 / 4,186 | **0** / 8 / 16 / 45 ms | 22.4-24.9 ms | 19.67 | 0 |
+| **HuskHomes** | 14 | 4,186 / 4,186 | 220 / 369 / 471 / 617 ms | 20.2-22.8 ms | **19.98** | 0 |
+| **EzRTP** | 14 | 4,186 / 4,186 | 154 / 511 / 904 / 2,403 ms | 21.0-23.7 ms | 19.64 | 0 |
+| **JustRTP** | 14 | 4,186 / 4,186 | 368 / 1,619 / 2,425 / 4,668 ms | 20.0-22.9 ms | 19.82 | 0 |
+| **BetterRTP** | 11 | 16,789 / 16,789 | 197 / 510 / 805 / 1,706 ms | 22.6-33.6 ms | 18.76 | 1 |
+
+BetterRTP timed out on every attempt in the ladder runs (dispatch issue), so its row comes from 11 later BetterRTP-only paced runs (`20261010-180827` to `20261011-014150`: six 60 s stages and five 600 s stages at 5 TP/s) and is not pooled the same way as the others. JakesRTP had the lowest latency at this rate; at 40 and 80 TP/s in the same ladders its MSPT reached 96 ms and 295 ms ([`BENCHMARK_ANALYSIS.md`](../../docs/dev/BENCHMARK_ANALYSIS.md)). The three LeafRTP repeats came 20-48 s after the first landing on the same block (runs `20261009-131313`, `20261010-021445`, `20261010-070617`); the higher-rate stages of the same runs repeated more often and are not in this table.
+
+---
+
 ## Paper 26.2 - paced dispatch at 5 TP/s (Test B: `20261008-024412`, 4,096 teleports per plugin, 16k radius)
 
 > Same server, world, radius, clients and plugin configs as Test A. One `/rtp` dispatched every 200 ms (`immediate-redispatch: false`, `dispatch-interval-ms: 200`, `per-player-gap-ticks: 4`), 180 s settle gap, spark on for every phase. Every plugin is asked for the same rate, so the MSPT and CPU columns compare cost at equal work. Achieved rate is attempts / phase wall time: five plugins held 4.50-4.63 TP/s; JustRTP fell behind at 3.84 TP/s.

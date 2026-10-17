@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.world.BiomeOverride;
 import io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -403,7 +404,7 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
     public boolean isChunkLoaded(int cx, int cz) {
         try {
             ServerChunkCache cache = world.getChunkSource();
-            return cache != null && cache.hasChunk(cx, cz);
+            return cache.hasChunk(cx, cz);
         } catch (Throwable ignored) {
             return false;
         }
@@ -830,6 +831,11 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public String getBiome(int x, int y, int z) {
+        var override = BiomeOverride.get();
+        if (override != null) {
+            String fromAddon = override.apply(new RTPLocation(this, x, y, z));
+            if (fromAddon != null) return fromAddon;
+        }
         ServerLevel level = world;
         if (level == null) return "";
         try {
@@ -848,10 +854,10 @@ public final class V26_2_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
                     .orElseGet(() -> {
                         // Fallback: registry reverse lookup via BuiltInRegistries.
                         try {
-                            Identifier id = level.registryAccess()
+                            Identifier biomeId = level.registryAccess()
                                     .lookupOrThrow(net.minecraft.core.registries.Registries.BIOME)
                                     .getKey(holder.value());
-                            return (id == null) ? "" : id.toString();
+                            return (biomeId == null) ? "" : biomeId.toString();
                         } catch (Throwable t) {
                             return "";
                         }

@@ -14,6 +14,7 @@ import java.lang.reflect.Method;
  * disables itself for the session, and the verifier becomes a no-op.
  */
 public class HuskClaimsChecker {
+  private HuskClaimsChecker() {}
   private static boolean exists = true;
   private static Boolean available = null;
 

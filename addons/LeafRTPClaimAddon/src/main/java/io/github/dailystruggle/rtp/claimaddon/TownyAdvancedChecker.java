@@ -5,6 +5,7 @@ import org.bukkit.Location;
 
 /** Checker for TownyAdvanced towns */
 public class TownyAdvancedChecker {
+  private TownyAdvancedChecker() {}
   private static boolean exists = true;
 
   public static boolean isInClaim(io.github.dailystruggle.rtp.api.world.RTPCoords location) {

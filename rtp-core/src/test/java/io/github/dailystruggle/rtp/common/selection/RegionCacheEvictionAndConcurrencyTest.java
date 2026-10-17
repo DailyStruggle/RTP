@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.selection.region.BacklogLocationBuffer;
 import io.github.dailystruggle.rtp.common.selection.region.BacklogLocationBuffer.BacklogEntry;
 import io.github.dailystruggle.rtp.common.selection.region.BacklogLocationBuffer.Validity;
@@ -24,7 +23,6 @@ import static org.mockito.Mockito.when;
 public class RegionCacheEvictionAndConcurrencyTest {
 
     private RTPLocation createMockLocation(int x, int z) {
-        RTPWorld world = Mockito.mock(RTPWorld.class);
         RTPCoords coords = Mockito.mock(RTPCoords.class);
         return new RTPLocation(coords, 1L, null);
     }

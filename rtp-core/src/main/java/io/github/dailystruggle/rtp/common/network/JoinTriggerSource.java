@@ -296,7 +296,7 @@ public final class JoinTriggerSource {
                 "[RTP][trace] JoinTriggerSource.onRedeemed: networkTokenId=" + networkTokenId
                         + " redeemedCoord=" + (redeemed != null ? "present" : "null")
                         + " for " + id);
-        if (redeemed != null && networkTokenId != null) {
+        if (redeemed != null) {
             // Record the binding before pinning so a racing quit observed
             // between accept and dispatch still triggers the release path.
             activeReservations.put(id, networkTokenId);

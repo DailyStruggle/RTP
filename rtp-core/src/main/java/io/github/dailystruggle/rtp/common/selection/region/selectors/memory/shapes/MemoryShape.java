@@ -1190,9 +1190,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     if (rebuilding != null && rebuilding.containsKey(location)) return true;
 
     StrideGroupResidencyManager residency = residencyManager;
-    if (residency != null) {
-      if (residency.isKnownBad(location)) return true;
-    }
+    if (residency != null && residency.isKnownBad(location)) return true;
 
     HybridHazardTable mirror = (shouldSwapBins()) ? null : ensureHazardMirror();
     if (mirror != null) {
@@ -2962,9 +2960,6 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     private long[] unionKeys = new long[0];
     private long[] unionLengths = new long[0];
     private short[] unionIds = new short[0];
-    private long[] stageKeys = new long[0];
-    private long[] stageLengths = new long[0];
-    private short[] stageIds = new short[0];
     private long[] existingKeys = new long[0];
     private long[] existingLengths = new long[0];
     private byte[] existingCauses = new byte[0];
@@ -3041,7 +3036,6 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     if (!badLocationsDirty && !biomeLocationsDirty) return;
     if (isRebuilding.compareAndSet(false, true)) {
       try {
-        long currentBadSum = 0L;
         long currentBiomeSum = 0L;
         ConcurrentHashMap<Long, Long> localPendingBad =
             pendingBadLocations.getAndSet(new ConcurrentHashMap<>());
@@ -3628,7 +3622,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
           }
         }
 
-        currentBadSum = runningSum;
+        long currentBadSum = runningSum;
 
         publishBadLocations(newKeys, newSums, newCauses, newExpiries);
         publishProbationLocations(newProbKeys, newProbSums, newProbCauses, newProbExpiries);

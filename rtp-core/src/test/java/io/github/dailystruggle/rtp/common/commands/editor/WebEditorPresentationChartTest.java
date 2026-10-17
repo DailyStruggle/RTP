@@ -15,6 +15,8 @@ import java.awt.geom.Path2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+
 @DisplayName("Visual render test producing Web Editor presentation assets for FRONT_PAGE.md")
 public class WebEditorPresentationChartTest {
 
@@ -257,6 +259,7 @@ public class WebEditorPresentationChartTest {
         g.drawString("Token: /rtp editor apply token=8f3c4e19 (or click Hot-Apply)", sideX + 32, valY + 142);
 
         g.dispose();
+        assertNotEquals(0, img.getRGB(width / 2, height / 2) >>> 24, "canvas centre must be painted");
 
         // Write directly to canonical docs and reports
         ChartOutputHelper.writeChart(img, "web_editor", "web_editor_region_staging_preview.png");

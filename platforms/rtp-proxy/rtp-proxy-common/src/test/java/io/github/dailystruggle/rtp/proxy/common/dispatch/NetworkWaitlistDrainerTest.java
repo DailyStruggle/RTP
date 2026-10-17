@@ -230,13 +230,12 @@ class NetworkWaitlistDrainerTest {
                 waitlist, transport, dispatcher, new AlwaysLeaderLease(),
                 Duration.ofSeconds(2), Duration.ofMillis(500));
 
-        long before = System.currentTimeMillis();
         assertEquals(NetworkWaitlistDrainer.PulseResult.TOTAL_FAILURE, drainer.runPulse().get());
         // The drained envelope was consumed by drainBatch; only `parked`
         // remains. Its enrolledAtMs must have been refreshed.
         assertEquals(1, waitlist.sizeNow());
         // The reap-with-very-short-maxAge proves the entry is no longer stale:
-        // if refreshAllTtl ran, enrolledAtMs >= before; reap(maxAge=10s) keeps it.
+        // if refreshAllTtl ran, enrolledAtMs is ~now; reap(maxAge=10s) keeps it.
         int reaped = waitlist.reap(Duration.ofSeconds(10)).get();
         assertEquals(0, reaped, "Parked entry must have been TTL-refreshed past the reap cutoff");
     }

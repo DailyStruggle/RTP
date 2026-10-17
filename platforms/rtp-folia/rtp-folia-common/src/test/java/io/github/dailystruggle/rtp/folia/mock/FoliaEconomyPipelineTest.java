@@ -2,22 +2,11 @@ package io.github.dailystruggle.rtp.folia.mock;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.folia.scheduling.FoliaSchedulerImpl;
-import io.papermc.paper.plugin.configuration.PluginMeta;
-import org.bukkit.Server;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.generator.BiomeProvider;
-import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.plugin.PluginDescriptionFile;
-import org.bukkit.plugin.PluginLoader;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
-import java.io.File;
-import java.io.InputStream;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
@@ -50,32 +39,15 @@ class FoliaEconomyPipelineTest {
     // -----------------------------------------------------------------------
     // Minimal no-op Plugin stub - only getLogger() is used by the mocks.
     // -----------------------------------------------------------------------
-    @SuppressWarnings("removal")
-    private static final Plugin STUB_PLUGIN = new Plugin() {
-        @Override public void onDisable() {}
-        @Override public void onEnable() {}
-        @Override public void onLoad() {}
-        @Override public boolean isEnabled() { return true; }
-        @Override public PluginLoader getPluginLoader() { return null; }
-        @Override public Server getServer() { return null; }
-        @Override public String getName() { return "StubPlugin"; }
-        @Override public PluginMeta getPluginMeta() { return null; }
-        @Override public PluginDescriptionFile getDescription() { return null; }
-        @Override public FileConfiguration getConfig() { return null; }
-        @Override public InputStream getResource(String filename) { return null; }
-        @Override public void saveConfig() {}
-        @Override public void saveDefaultConfig() {}
-        @Override public void saveResource(String resourcePath, boolean replace) {}
-        @Override public void reloadConfig() {}
-        @Override public File getDataFolder() { return null; }
-        @Override public Logger getLogger() { return Logger.getLogger("StubPlugin"); }
-        @Override public boolean isNaggable() { return false; }
-        @Override public void setNaggable(boolean canNag) {}
-        @Override public ChunkGenerator getDefaultWorldGenerator(String worldName, String id) { return null; }
-        @Override public BiomeProvider getDefaultBiomeProvider(String worldName, String id) { return null; }
-        @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] args) { return false; }
-        @Override public List<String> onTabComplete(CommandSender sender, Command command, String label, String[] args) { return List.of(); }
-    };
+    private static final Plugin STUB_PLUGIN = stubPlugin();
+
+    private static Plugin stubPlugin() {
+        Plugin plugin = Mockito.mock(Plugin.class);
+        Mockito.when(plugin.isEnabled()).thenReturn(true);
+        Mockito.when(plugin.getName()).thenReturn("StubPlugin");
+        Mockito.when(plugin.getLogger()).thenReturn(Logger.getLogger("StubPlugin"));
+        return plugin;
+    }
 
     private MockAsyncScheduler asyncScheduler;
     private MockRegionScheduler regionScheduler;

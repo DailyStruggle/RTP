@@ -526,7 +526,6 @@ public interface RTPCmd extends BaseRTPCmd {
     List<String> shapeNames = rtpArgs.get("shape");
     List<String> vertNames = rtpArgs.get("vert");
     double price = 0.0;
-    double floor = 0.0;
     RTPEconomy economy = RTP.economy;
     if (economy != null) {
       if (!senderId.equals(CommandsAPI.serverId) && !sender.hasPermission("rtp.free")) {
@@ -541,7 +540,7 @@ public interface RTPCmd extends BaseRTPCmd {
         }
       }
       double bal = economy.bal(senderId);
-      floor = eco.getNumber(EconomyKeys.balanceFloor, 0.0d).doubleValue();
+      double floor = eco.getNumber(EconomyKeys.balanceFloor, 0.0d).doubleValue();
       if ((bal - price) < floor) {
         String s = RTP.configs.getConfigValue(PlayerMessages.notEnoughMoney, "").toString();
         s = s.replace("[money]", String.valueOf(price));

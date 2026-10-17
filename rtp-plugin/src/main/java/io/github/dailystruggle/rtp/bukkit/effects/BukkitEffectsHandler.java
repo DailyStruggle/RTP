@@ -31,6 +31,9 @@ import java.util.UUID;
 import java.util.logging.Level;
 
 public class BukkitEffectsHandler {
+    private BukkitEffectsHandler() {
+    }
+
     /**
      * Resolve a Bukkit {@link Player} from a UUID and emit an observable FINE-level
      * log entry when the lookup returns {@code null}. Silently-skipped effects for
@@ -71,15 +74,6 @@ public class BukkitEffectsHandler {
      */
     private static void dispatchEffects(JavaPlugin plugin, String prefix, Player player) {
         dispatchEffects(plugin, prefix, player, null, null, null);
-    }
-
-    private static void dispatchEffects(JavaPlugin plugin, String prefix, Player player, org.bukkit.Location explicitLocation) {
-        dispatchEffects(plugin, prefix, player, explicitLocation, null, null);
-    }
-
-    private static void dispatchEffects(JavaPlugin plugin, String prefix, Player player,
-                                        org.bukkit.Location explicitLocation, org.bukkit.Location destinationLocation) {
-        dispatchEffects(plugin, prefix, player, explicitLocation, destinationLocation, null);
     }
 
     private static void dispatchEffects(JavaPlugin plugin, String prefix, Player player,

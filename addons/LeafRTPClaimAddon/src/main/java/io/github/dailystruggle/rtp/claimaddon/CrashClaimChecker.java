@@ -11,6 +11,7 @@ package io.github.dailystruggle.rtp.claimaddon;
  * integration disables itself for the session, and the verifier becomes a no-op.
  */
 public class CrashClaimChecker {
+  private CrashClaimChecker() {}
   private static boolean exists = true;
   private static Boolean available = null;
 

@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.bukkit.configuration;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -35,7 +34,7 @@ public class DatabaseYmlDuplicationTest {
     @Test
     void databaseYmlDoesNotDuplicateAcrossReboots() throws Exception {
         File dir = tempDir.toFile();
-        MockRTPServerAccessor accessor = RTPTestSetup.install(dir);
+        RTPTestSetup.install(dir);
         System.out.println("[DEBUG_LOG] after first boot: " + databaseSiblings(dir));
 
         for (int i = 0; i < 3; i++) {

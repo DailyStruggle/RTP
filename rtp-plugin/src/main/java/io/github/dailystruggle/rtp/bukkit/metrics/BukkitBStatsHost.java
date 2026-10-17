@@ -104,7 +104,7 @@ public final class BukkitBStatsHost implements RtpBStatsCatalogue.Host {
       org.bukkit.plugin.Plugin rtp = Bukkit.getPluginManager().getPlugin("RTP");
       if (rtp == null) return "unknown";
       String version = rtp.getDescription().getVersion();
-      return (version == null || version.isBlank()) ? "unknown" : version;
+      return version.isBlank() ? "unknown" : version;
     } catch (Throwable t) {
       return "unknown";
     }
@@ -116,12 +116,12 @@ public final class BukkitBStatsHost implements RtpBStatsCatalogue.Host {
       String name = s.getName();
       String version = s.getVersion();
       // Version-string probe: no Folia/Paper import in rtp-plugin.
-      if (version != null && version.toLowerCase().contains("folia")) return "folia";
+      if (version.toLowerCase().contains("folia")) return "folia";
       if ("Paper".equalsIgnoreCase(name)) return "paper";
       if ("Spigot".equalsIgnoreCase(name)) return "spigot";
       // Forks (Purpur, Pufferfish, ...) collapse to their upstream family.
-      if (version != null && version.toLowerCase().contains("paper")) return "paper-fork";
-      return (name == null || name.isBlank()) ? "unknown" : name.toLowerCase();
+      if (version.toLowerCase().contains("paper")) return "paper-fork";
+      return name.isBlank() ? "unknown" : name.toLowerCase();
     } catch (Throwable t) {
       return "unknown";
     }

@@ -5,6 +5,7 @@ import com.griefdefender.api.claim.Claim;
 
 /** Checker for GriefDefender claims */
 public class GriefDefenderChecker {
+  private GriefDefenderChecker() {}
   private static boolean exists = true;
 
   public static Boolean isInClaim(io.github.dailystruggle.rtp.api.world.RTPCoords location) {

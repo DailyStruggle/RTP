@@ -147,8 +147,8 @@ public class ConfigsTest {
 
     @Test
     void testGetWorldParserForRegisteredWorld() throws IOException {
-        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
         // "world" is registered by default in MockRTPServerAccessor
+        assertInstanceOf(MockRTPServerAccessor.class, RTP.serverAccessor);
 
         Configs configs = new Configs(tempDir.toFile());
         RTP.configs = configs;

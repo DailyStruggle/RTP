@@ -43,6 +43,7 @@ public final class DocsRegistry {
     private volatile boolean initialized = false;
 
     public DocsRegistry() {
+        // Caches start empty; rebuildFromDataFolder populates them off the main thread.
     }
 
     public static DocsRegistry getInstance() {
@@ -154,10 +155,9 @@ public final class DocsRegistry {
                     String relpath = normalizeRelpath(rel.toString());
 
                     // Filter developer docs if disabled
-                    if (!options.exposeDeveloperDocs()) {
-                        if (relpath.startsWith("dev/") || relpath.startsWith("adr/") || relpath.startsWith("architecture/")) {
-                            return FileVisitResult.CONTINUE;
-                        }
+                    if (!options.exposeDeveloperDocs()
+                            && (relpath.startsWith("dev/") || relpath.startsWith("adr/") || relpath.startsWith("architecture/"))) {
+                        return FileVisitResult.CONTINUE;
                     }
 
                     if (attrs.size() > options.maxFileBytes()) {

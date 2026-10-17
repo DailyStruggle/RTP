@@ -101,7 +101,7 @@ public final class PaperMetricsBinding implements MetricsBinding {
         try {
             Server s = Bukkit.getServer();
             double[] tps = s.getTPS();
-            if (tps == null || idx >= tps.length) return MetricsSnapshot.UNSAMPLED;
+            if (idx >= tps.length) return MetricsSnapshot.UNSAMPLED;
             return tps[idx];
         } catch (Throwable ignored) {
             return MetricsSnapshot.UNSAMPLED;

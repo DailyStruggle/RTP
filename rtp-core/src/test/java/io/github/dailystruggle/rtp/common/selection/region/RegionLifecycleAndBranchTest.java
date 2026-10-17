@@ -823,7 +823,7 @@ public class RegionLifecycleAndBranchTest {
         Region region = new Region("val_reg", createValidSettings("val_reg", new Circle()));
         CandidateValidator validator = region.candidateValidator();
 
-        RTPLocation result = validator.validate(0, 0);
+        validator.validate(0, 0);
         // On mock world, either returns resolved location or null if mock chunk safe check fails
         // In either case, validator invocation succeeds without exception
         assertNotNull(validator);
