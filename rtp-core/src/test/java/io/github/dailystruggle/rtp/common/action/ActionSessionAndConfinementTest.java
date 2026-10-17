@@ -7,6 +7,8 @@ import io.github.dailystruggle.rtp.api.action.ConfinementBoundary;
 import io.github.dailystruggle.rtp.api.event.PlayerMoveEvent;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,6 +31,12 @@ class ActionSessionAndConfinementTest {
     serverAccessor = new MockRTPServerAccessor(new java.io.File("."));
     RTP.serverAccessor = serverAccessor;
     RTP.scheduler = serverAccessor.getMockScheduler();
+    MemoryTracker.reset();
+  }
+
+  @AfterEach
+  void tearDown() {
+    MemoryTracker.reset();
   }
 
   @Test
@@ -1538,21 +1546,28 @@ class ActionSessionAndConfinementTest {
         "world", 0, 0, null, null, null
     );
 
-    // Track session directly with a 0ms budget so it is considered stalled once the clock advances
-    long trackedAtMs = System.currentTimeMillis();
-    io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(session, "ActionSession-" + session.sessionId(), 0L);
     session.arm();
     assertTrue(session.isActive());
 
+    // Replace default lifespan from arm() with 0ms budget so session is considered stalled
+    MemoryTracker.untrack(session);
+    MemoryTracker.track(session, "ActionSession-" + session.sessionId(), 0L);
+
     // TrackedObject.isLeaking() is strict (age > budget, ms resolution): a sweep within the
     // tracking millisecond sees age 0 and skips the entry. Wait out that millisecond.
+    long trackedAtMs = System.currentTimeMillis();
     long deadlineNs = System.nanoTime() + 1_000_000_000L;
     while (System.currentTimeMillis() <= trackedAtMs && System.nanoTime() < deadlineNs) {
-      Thread.onSpinWait();
+      try {
+        Thread.sleep(5);
+      } catch (InterruptedException ignored) {
+        Thread.currentThread().interrupt();
+        break;
+      }
     }
 
     // Run active GC sweep via runDiagnostics
-    io.github.dailystruggle.rtp.common.tools.MemoryTracker.runDiagnostics();
+    MemoryTracker.runDiagnostics();
 
     // Verify session was force-disarmed
     assertFalse(session.isActive(), "Stalled ActionSession must be force-disarmed by MemoryTracker GC sweep");

@@ -192,7 +192,7 @@ task on production sources.
 2. **SonarCloud surface.** SonarCloud cannot load custom Java rule plugins, so
    project-specific PMD rules reach it as external issues through
    `sonar.java.pmd.reportPaths` (set per subproject when either flag is present);
-   `.github/workflows/sonar.yml` passes `-PregexAnalysis`. Built-in Sonar rules
+   `.github/workflows/gradle.yml` passes `-Pcoverage -PstaticAnalysis`. Built-in Sonar rules
    `java:S4248` and `java:S5361` cover the same ground natively.
 3. **IDE surface.** `.sonarlint/connectedMode.json` shares the SonarQube for IDE
    binding, so the bound quality profile (including built-in quick fixes) applies
