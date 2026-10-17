@@ -348,8 +348,10 @@ public final class SparkHook {
             Sched.runAsync(owner, () -> awaitAndSummarise(label, stopEpochMs, delayMs, timeoutMs));
         } catch (Throwable t) {
             // Shutdown path: polling inline would block the caller thread.
-            if (log != null) log.fine("[StressTestRTP] spark auto-summary: scheduler unavailable, skipping (label="
-                    + label + ").");
+            if (log != null) {
+                log.log(Level.FINE, () -> "[StressTestRTP] spark auto-summary: scheduler unavailable, skipping (label="
+                        + label + ").");
+            }
         }
     }
 

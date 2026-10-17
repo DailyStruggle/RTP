@@ -142,11 +142,32 @@ class MarkdownToMenuModelEdgeCaseTest {
 
         MenuAction.RunRtpCommand docs = assertInstanceOf(MenuAction.RunRtpCommand.class, frags.get(0).action());
         assertEquals("docs", docs.args()[0]);
-        assertEquals("guide.md", docs.args()[1]);
+        assertEquals("topic=guide.md", docs.args()[1]);
 
         assertEquals("&0 then ", frags.get(1).text());
 
         assertEquals("&1Image", frags.get(2).text());
         assertNull(frags.get(2).action());
+    }
+
+    @Test
+    @DisplayName("Doc link targets resolve against the linking document's directory")
+    void resolveDocLink() {
+        String doc = "admin/configuration/MESSAGES.md";
+        assertEquals("admin/configuration/IN_GAME_CONFIG.md", MarkdownToMenuModel.resolveDocLink(doc, "IN_GAME_CONFIG.md"));
+        assertEquals("admin/configuration/X.md", MarkdownToMenuModel.resolveDocLink(doc, "./X.md#a"));
+        assertEquals("admin/QUICK_START.md", MarkdownToMenuModel.resolveDocLink(doc, "../QUICK_START.md"));
+        assertEquals("FOR_SERVER_ADMINS.md", MarkdownToMenuModel.resolveDocLink(doc, "../../FOR_SERVER_ADMINS.md"));
+        assertEquals("FOR_SERVER_ADMINS.md", MarkdownToMenuModel.resolveDocLink(doc, "/FOR_SERVER_ADMINS.md"));
+        assertEquals("my notes.md", MarkdownToMenuModel.resolveDocLink("index.md", "my%20notes.md"));
+        assertEquals("a+b.md", MarkdownToMenuModel.resolveDocLink(null, "a+b.md"));
+        assertNull(MarkdownToMenuModel.resolveDocLink(doc, "../../../dev/RULES.md"));
+
+        MenuModel model = MarkdownToMenuModel.lower("M", "[Up](../QUICK_START.md) [Out](../../../x.md)",
+                DocsLoweringOptions.defaults(), doc);
+        List<MenuFragment> frags = model.pages().get(0).lines().get(0).fragments();
+        MenuAction.RunRtpCommand up = assertInstanceOf(MenuAction.RunRtpCommand.class, frags.get(0).action());
+        assertEquals("topic=admin/QUICK_START.md", up.args()[1]);
+        assertNull(frags.get(2).action(), "links above the docs root carry no action");
     }
 }

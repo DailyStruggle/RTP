@@ -112,6 +112,7 @@ public class ActionCancelCmd extends BaseRTPCmdImpl {
       try {
         targetSessionId = UUID.fromString(sessionArgs.get(0).trim());
       } catch (IllegalArgumentException ignored) {
+        // Not a valid UUID; fall through to action/player parameter resolution
       }
     }
     if (targetSessionId == null && this.fixedActionId == null) {
@@ -120,6 +121,7 @@ public class ActionCancelCmd extends BaseRTPCmdImpl {
         try {
           targetSessionId = UUID.fromString(actionArgs.get(0).trim());
         } catch (IllegalArgumentException ignored) {
+          // Not a valid UUID; fall through to action/player parameter resolution
         }
       }
     }

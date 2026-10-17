@@ -92,7 +92,7 @@ class MarkdownToMenuModelTest {
                 foundExternal = true;
             } else if (frag.action() instanceof MenuAction.RunRtpCommand cmd) {
                 assertEquals("docs", cmd.args()[0]);
-                assertEquals("admin/QUICK_START.md", cmd.args()[1]);
+                assertEquals("topic=admin/QUICK_START.md", cmd.args()[1]);
                 foundDoc = true;
             }
         }

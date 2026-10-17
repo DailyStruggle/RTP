@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.FileTime;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,11 +41,16 @@ public final class RegionFormatDetector implements BuiltInTestable {
     public record WorldFormatProfile(PrimaryFormat primaryFormat, boolean hasMixedFormats) {}
 
     private static final int PROFILE_CACHE_CAPACITY = 128;
-    private static final long CACHE_TTL_NANOS = 10_000_000_000L; // 10 seconds
+    // Only EMPTY profiles expire (a fresh world gains files); a detected format stays until
+    // invalidateCache() (format registry changes). Re-surveying on a TTL or directory mtime
+    // listed a 4.5k-file directory every 10 s and stalled scans on Folia 26.2.
+    private static final long EMPTY_TTL_NANOS = 10_000_000_000L; // 10 seconds
 
-    private record CachedProfile(WorldFormatProfile profile, long createdNanos, FileTime lastModified) {}
+    private record CachedProfile(WorldFormatProfile profile, long createdNanos) {}
 
     private final Map<Path, CachedProfile> profileCache = new ConcurrentHashMap<>(PROFILE_CACHE_CAPACITY);
+    // One survey per directory at a time, so concurrent IO-pool misses wait instead of re-listing.
+    private final Map<Path, Object> surveyLocks = new ConcurrentHashMap<>();
 
     private RegionFormatDetector() {}
 
@@ -61,33 +65,35 @@ public final class RegionFormatDetector implements BuiltInTestable {
             return new WorldFormatProfile(PrimaryFormat.EMPTY, false);
         }
 
-        long now = System.nanoTime();
         long window = AnvilRegionByteCache.revalidateIntervalNanos();
-        if (window > 0L) {
-            CachedProfile cached = profileCache.get(regionDir);
-            if (cached != null && (now - cached.createdNanos()) < CACHE_TTL_NANOS) {
-                try {
-                    FileTime mtime = Files.getLastModifiedTime(regionDir);
-                    if (mtime.equals(cached.lastModified())) {
-                        return cached.profile();
-                    }
-                } catch (IOException ignored) {
-                    return cached.profile();
-                }
-            }
+        if (window <= 0L) {
+            return survey(regionDir, System.nanoTime());
         }
-
-        FileTime mtime = null;
-        try {
-            if (Files.isDirectory(regionDir)) {
-                mtime = Files.getLastModifiedTime(regionDir);
-            }
-        } catch (IOException ignored) {
-            // best-effort: a null mtime only forces a re-survey on the next lookup
+        WorldFormatProfile hit = freshCached(regionDir);
+        if (hit != null) {
+            return hit;
         }
+        synchronized (surveyLocks.computeIfAbsent(regionDir, k -> new Object())) {
+            hit = freshCached(regionDir);
+            return hit != null ? hit : survey(regionDir, System.nanoTime());
+        }
+    }
 
+    private WorldFormatProfile freshCached(Path regionDir) {
+        CachedProfile cached = profileCache.get(regionDir);
+        if (cached == null) {
+            return null;
+        }
+        if (cached.profile().primaryFormat() == PrimaryFormat.EMPTY
+                && (System.nanoTime() - cached.createdNanos()) >= EMPTY_TTL_NANOS) {
+            return null;
+        }
+        return cached.profile();
+    }
+
+    private WorldFormatProfile survey(Path regionDir, long now) {
         WorldFormatProfile profile = surveyDirectory(regionDir);
-        profileCache.put(regionDir, new CachedProfile(profile, now, mtime));
+        profileCache.put(regionDir, new CachedProfile(profile, now));
         return profile;
     }
 
@@ -96,6 +102,7 @@ public final class RegionFormatDetector implements BuiltInTestable {
      */
     public void invalidateCache() {
         profileCache.clear();
+        surveyLocks.clear();
     }
 
     private WorldFormatProfile surveyDirectory(Path regionDir) {
@@ -112,7 +119,8 @@ public final class RegionFormatDetector implements BuiltInTestable {
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(regionDir)) {
             for (Path entry : stream) {
                 String name = entry.getFileName().toString();
-                if (name.startsWith("r.") && Files.isRegularFile(entry)) {
+                // Name only: a per-entry stat cost ~4.5k syscalls per survey on a pregenerated world.
+                if (name.startsWith("r.")) {
                     if (name.endsWith(".linear")) {
                         linearCount++;
                     } else if (name.endsWith(".mca")) {

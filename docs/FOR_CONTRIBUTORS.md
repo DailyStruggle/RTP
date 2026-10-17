@@ -43,9 +43,13 @@ Definitions for every domain term. Use these exact terms in code, comments, and 
 Architecture Decision Records — the *why* behind key design choices and the alternatives that were rejected.
 Read the relevant ADRs before changing anything the decisions describe.
 
+### 10. [PULL_REQUEST_PROCESS.md](dev/PULL_REQUEST_PROCESS.md)
+The end-to-end pull request lifecycle: branching conventions, local pre-PR verification gates, CI pipeline anatomy, and definition of ready to merge.
+
 ---
 
 ## Reference Material
 
+- [PULL_REQUEST_PROCESS.md](dev/PULL_REQUEST_PROCESS.md) — pull request lifecycle, pre-PR verification checklist, and CI pipeline reference.
 - [HAZARDS.md](dev/HAZARDS.md) — hazard register (also the per-component failure catalog); consult when a change touches chunk loading, scheduling, or memory management, or when writing or reviewing error-handling code.
 - [CHANGELOG.md](https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md) — release history; follow the existing format when adding an Unreleased entry.

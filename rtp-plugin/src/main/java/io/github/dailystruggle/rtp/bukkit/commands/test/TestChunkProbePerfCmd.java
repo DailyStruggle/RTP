@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.bukkitplatform.world.BukkitRegionPaths;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.parameters.IntegerParameter;
@@ -333,11 +334,10 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
   }
 
   /**
-   * Resolve the {@code region/} folder on disk for the RTP world. Uses
-   * {@link Bukkit#getWorld(String)} then
-   * {@link World#getWorldFolder()} plus the vanilla dimension subpath
-   * ({@code DIM-1} / {@code DIM1} / none). Returns {@code null} if the
-   * underlying Bukkit world is not loaded or the region directory is absent.
+   * Resolve the {@code region/} folder on disk for the RTP world: {@link World#getWorldFolder()}
+   * plus the dimension subpath from {@link BukkitRegionPaths} (legacy {@code DIM-1}/{@code DIM1}
+   * or the 26.1+ {@code dimensions/<ns>/<key>}). Returns {@code null} if the underlying Bukkit
+   * world is not loaded or the region directory is absent.
    */
   @Nullable
   private static File resolveRegionFolder(RTPWorld<?> rtpWorld) {
@@ -349,22 +349,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
     }
     if (bukkit == null) return null;
     File worldFolder = bukkit.getWorldFolder();
-    String dim;
-    try {
-      switch (bukkit.getEnvironment()) {
-        case NETHER:
-          dim = "DIM-1";
-          break;
-        case THE_END:
-          dim = "DIM1";
-          break;
-        case NORMAL:
-        default:
-          dim = "";
-      }
-    } catch (Throwable ignored) {
-      dim = "";
-    }
+    String dim = BukkitRegionPaths.dimensionRegionSubpath(bukkit);
     File base = dim.isEmpty() ? worldFolder : new File(worldFolder, dim);
     File region = new File(base, "region");
     return region.isDirectory() ? region : null;

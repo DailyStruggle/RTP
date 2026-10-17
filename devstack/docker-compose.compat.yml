@@ -18,6 +18,9 @@ services:
       SKIP_CHOWN: "TRUE"
       RUN_AS_UID: "0"
       RUN_AS_GID: "0"
+      # Vanilla 1.21.2+ stops ticking after 60 s with no players, which parks
+      # RTP's tick-thread probes (`rtp test ...`) and the background cache fill.
+      PAUSE_WHEN_EMPTY_SECONDS: "-1"
     ports:
       - "127.0.0.1:25565:25565"
     volumes:

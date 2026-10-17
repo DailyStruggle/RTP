@@ -83,6 +83,8 @@ Every file touched or written is reported in the console and command sender chat
 
 **Source Location:** `plugins/BetterRTP/config.yml`
 
+![BetterRTP Migration Preview & Execution](../assets/img/config_import_betterrtp.png)
+
 - **World & Region Mapping:**
   - `Default` configuration maps to region defaults.
   - `CustomWorlds` entries generate per-world region files (`regions/<world>.yml`).
@@ -105,6 +107,8 @@ Every file touched or written is reported in the console and command sender chat
 #### 2. JustRTP Migration Guide
 
 **Source Locations:** `plugins/justRTP/config.yml`, `custom_locations.yml`, and `rtp_zones.yml`
+
+![JustRTP Migration Preview & Execution](../assets/img/config_import_justrtp.png)
 
 - **World & Location Mapping:**
   - `worlds` sections map to `regions/<world>.yml`.
@@ -293,15 +297,11 @@ permissions:
    - Existing files are upgraded in place on first load.
    - *Rollback note:* 3.1.x and earlier cannot read the upgraded files. Always make a backup of `plugins/RTP/` before upgrading in case you need to roll back.
 
-3. **In-Game Packed Documentation & Offline HTML Export (`/rtp docs`):**
-   - Introduces `/rtp docs [topic]`, `/rtp docs list`, and `/rtp docs export` under permission `rtp.admin.docs`.
-   - Operators can browse version-matched manuals in-game or export self-contained offline documentation bundles (`docs-bundle.html`).
-
-4. **Tag-Group Set Subtraction in `safety.yml`:**
+3. **Tag-Group Set Subtraction in `safety.yml`:**
    - Block safety lists support subtraction expressions (e.g. `#minecraft:slabs - OAK_SLAB`, `#minecraft:leaves - AZALEA_LEAVES`).
    - Existing syntax and unmodified lists remain fully backward-compatible.
 
-5. **Unified Unit Parsing:**
+4. **Unified Unit Parsing:**
    - Configuration files and command parameters accept explicit units for lengths/distances (`b`/`blocks`, `c`/`chunks`, `r`/`regions`), durations (`t`, `ms`, `s`, `m`, `h`, `d`, composite `2h30m`), and memory sizes (`kib`, `mib`, `gib`). Plain unitless numbers remain backward-compatible and auto-interpreted in context.
 
 ---

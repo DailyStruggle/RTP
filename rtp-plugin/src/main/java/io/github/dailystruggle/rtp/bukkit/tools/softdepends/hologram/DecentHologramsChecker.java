@@ -66,7 +66,7 @@ public final class DecentHologramsChecker implements HologramProvider {
         Location loc = new Location(world, position.x(), position.y(), position.z());
 
         try {
-            Object hologramObj = CREATE_HOLOGRAM_METHOD.invoke(null, id, loc, lines);
+            Object hologramObj = CREATE_HOLOGRAM_METHOD.invoke(null, id, loc, HologramText.render(lines));
             return new DecentHologramHandle(id, worldName, position, lines, hologramObj);
         } catch (Throwable t) {
             RTP.log(Level.WARNING, "[RTP] Failed to spawn DecentHolograms hologram '" + id + "': " + t.getMessage(), t);
@@ -113,7 +113,7 @@ public final class DecentHologramsChecker implements HologramProvider {
         public void updateLines(List<String> newLines) {
             this.lines = List.copyOf(newLines);
             try {
-                SET_LINES_METHOD.invoke(null, hologramObj, newLines);
+                SET_LINES_METHOD.invoke(null, hologramObj, HologramText.render(newLines));
             } catch (Throwable t) {
                 RTP.log(Level.FINE, "[RTP] DecentHolograms updateLines failed for " + id + ": " + t.getMessage());
             }

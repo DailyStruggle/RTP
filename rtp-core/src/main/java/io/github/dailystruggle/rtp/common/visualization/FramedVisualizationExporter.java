@@ -177,7 +177,7 @@ public final class FramedVisualizationExporter {
       currY = renderSparklineLegend(g, textX, currY);
     } else if (kind == ChartSpec.Kind.REGION_WALK_PATH) {
       currY = renderWalkPathLegend(g, region, textX, currY);
-    } else if (kind == ChartSpec.Kind.SELECTION_HEATMAP || kind == ChartSpec.Kind.BAD_POINTS_HEATMAP) {
+    } else if (kind == ChartSpec.Kind.SELECTION_HEATMAP) {
       currY = renderSelectionHeatmapLegend(g, region, textX, currY);
     } else {
       currY = renderGenericLegend(g, textX, currY);
@@ -360,10 +360,6 @@ public final class FramedVisualizationExporter {
     drawLegendEntry(g, x, y, new Color(0x29, 0xB6, 0xF6), "Sky Blue: L2 Pre-verified");
     y += 20;
     drawLegendEntry(g, x, y, new Color(0xFF, 0xD6, 0x00), "Gold: Verified Landings");
-    y += 20;
-    drawLegendEntry(g, x, y, new Color(0x00, 0xE5, 0xFF), "Cyan: Candidate Selections");
-    y += 20;
-    drawLegendEntry(g, x, y, new Color(0xFF, 0x17, 0x44), "Crimson: Hazard Discard");
     y += 26;
 
     g.setFont(new Font(Font.SANS_SERIF, Font.BOLD, 14));
@@ -372,11 +368,11 @@ public final class FramedVisualizationExporter {
     y += 20;
     g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
     g.setColor(TEXT_MUTED);
-    g.drawString("Kernel density estimation (KDE)", x, y);
+    g.drawString("Landings weighted per chunk (since restart)", x, y);
+    y += 18;
+    g.drawString("Plus queued selections", x, y);
     y += 18;
     g.drawString("Dark outline shows domain contour", x, y);
-    y += 18;
-    g.drawString("Identifies spatial collision hotspots", x, y);
     y += 22;
     return y;
   }

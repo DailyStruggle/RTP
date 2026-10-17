@@ -35,6 +35,7 @@ Flat one-line catalog of every normative doc. Cheapest first-fetch for an agent 
 - [`dev/ROADMAP.md`](dev/ROADMAP.md) — forward-looking work.
 - [`dev/POTENTIAL_BUGS.md`](dev/POTENTIAL_BUGS.md) — triage log for potential issues found during development.
 - [`dev/PUBLISHING.md`](dev/PUBLISHING.md) — publishing `rtp-api`/`rtp-core` for out-of-repo addons (JitPack active; Maven Central how-to).
+- [`dev/PULL_REQUEST_PROCESS.md`](dev/PULL_REQUEST_PROCESS.md) — pull request lifecycle, local verification gates, and CI pipeline reference.
 - [`dev/SEMVER.md`](dev/SEMVER.md) — semantic versioning policy and guarantees.
 - [`dev/STAKEHOLDERS.md`](dev/STAKEHOLDERS.md) — roles.
 - [`dev/TESTING_GUIDE.md`](dev/TESTING_GUIDE.md) — test suites, test tiers, and verification guide.

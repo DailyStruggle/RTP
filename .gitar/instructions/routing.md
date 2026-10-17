@@ -43,7 +43,15 @@ When identifying an issue or requesting justification, always cite the governing
   - Route to: `docs/adr/ADR-111-live-server-behaviour-fuzzing.md`
   - Execution procedure: `helpers/StressTestRTP/LEAK_FUZZING.md`
 
-### 5. Operator Documentation & Requirements Parity
+### 5. Audit Procedure & Feature Evidence
+- **Verdicts, blocker classes B1-B7, large-PR triage:**
+  - Route to: `docs/dev/PR_AUDIT_PROTOCOL.md` and `.gitar/instructions/verdict.md`
+- **Comment tone, stable blocker ledger, newcomer handling:**
+  - Route to: `docs/dev/CONTRIBUTOR_REVIEW_EXPERIENCE.md`
+- **Verification gates and feature evidence table:**
+  - Route to: `docs/dev/VERIFICATION_GATES.md`
+
+### 6. Operator Documentation & Requirements Parity
 - **Traceability Matrix (Rule D-001):**
   - Route to: `docs/dev/TRACEABILITY.md`
 - **Subsystem Scope Definition (Rule D-007):**

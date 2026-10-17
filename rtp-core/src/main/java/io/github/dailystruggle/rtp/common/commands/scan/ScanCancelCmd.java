@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.common.tasks.ScanTask;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.logging.Level;
 import org.jetbrains.annotations.Nullable;
 
 public class ScanCancelCmd extends ScanSubCmd {
@@ -45,17 +46,21 @@ public class ScanCancelCmd extends ScanSubCmd {
         continue;
       }
 
-      scanTask.setCancelled(true);
-      scanTask.pause();
-      ScanTask.delete(region.name);
-      RTP.getInstance().scanTasks.remove(region.name);
-      if (RTP.configs == null) continue;
-      String msg = String.valueOf(RTP.configs.getConfigValue(CommandMessages.scanCancel, ""));
-      if (msg == null || msg.isEmpty()) continue;
-      msg = msg.replace("[scan_regions]", region.name);
-      msg = msg.replace("[scan_region]", region.name);
-      msg = msg.replace("[region]", region.name);
-      RTP.serverAccessor.announce(msg, "rtp.scan", "SCAN");
+      String regionName = region.name;
+      scanTask.setCancelled(true, failure -> {
+        if (failure != null) {
+          RTP.log(Level.WARNING, "[ScanCancelCmd] cancel teardown failed region=" + regionName, failure);
+          RTP.serverAccessor.announce("Scan cancel failed for region " + regionName + ": " + failure.getMessage(), "rtp.scan", "SCAN");
+          return;
+        }
+        if (RTP.configs == null) return;
+        String msg = String.valueOf(RTP.configs.getConfigValue(CommandMessages.scanCancel, ""));
+        if (msg == null || msg.isEmpty()) return;
+        msg = msg.replace("[scan_regions]", regionName);
+        msg = msg.replace("[scan_region]", regionName);
+        msg = msg.replace("[region]", regionName);
+        RTP.serverAccessor.announce(msg, "rtp.scan", "SCAN");
+      });
     }
 
     return true;

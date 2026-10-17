@@ -3,7 +3,8 @@ package io.github.dailystruggle.rtp.common.commands.maps;
 import io.github.dailystruggle.mapsapi.model.SelectionHeatmap;
 import io.github.dailystruggle.mapsapi.render.SelectionHeatmapRenderer;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
-import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
+import io.github.dailystruggle.rtp.common.metrics.LandingHeatmap;
+import io.github.dailystruggle.rtp.common.selection.region.LockFreeLocationBuffer;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
@@ -14,8 +15,11 @@ import java.util.Set;
 
 /**
  * Resolver for {@link ChartSpec.Kind#SELECTION_HEATMAP} (ADR-089, ADR-039).
- * Builds a {@link SelectionHeatmap} capturing candidate visits, queue states,
- * hazard discards, and continuous density across the region domain.
+ * Builds a {@link SelectionHeatmap} of selections: recorded landings ({@link LandingHeatmap})
+ * and queued selections, not bad locations (those are {@code REGION_BAD_LOCATIONS_SHAPE}).
+ *
+ * <p>Grid and bounds are in chunk units (shape space); queue locations are blocks and are
+ * shifted to chunks. Landings are lost on restart, so a fresh server shows queues only.</p>
  *
  * <p>Operates 100% off-tick with zero main-thread chunk I/O (Rule S-005).</p>
  */
@@ -23,8 +27,9 @@ public final class SelectionHeatmapResolver extends AbstractRegionGridResolver {
 
   private static final int GRID_W = 512;
   private static final int GRID_H = 512;
+  private static final int MAX_MARKERS = 2000;
   private static final Set<ChartSpec.Kind> SUPPORTED_KINDS =
-      Set.of(ChartSpec.Kind.SELECTION_HEATMAP, ChartSpec.Kind.BAD_POINTS_HEATMAP);
+      Set.of(ChartSpec.Kind.SELECTION_HEATMAP);
 
   public SelectionHeatmapResolver() {
     // Explicit public constructor
@@ -35,7 +40,6 @@ public final class SelectionHeatmapResolver extends AbstractRegionGridResolver {
     validateSpec(spec, SUPPORTED_KINDS);
     Region region = resolveRegion(spec);
     MemoryShape<?> memoryShape = resolveMemoryShape(region);
-    long range = memoryShape.getRange();
 
     // 1. Discover Bounding Box matching ComprehensiveRegionImageExporter
     RegionBounds bounds = discoverBounds(memoryShape, 4096, 16, 20);
@@ -60,67 +64,24 @@ public final class SelectionHeatmapResolver extends AbstractRegionGridResolver {
     final int kernelRadius = 6;
     final double sigma2 = 2.0 * 2.5 * 2.5;
 
-    // A. L1 Hot Queue Locations
-    if (region.queueManager != null && region.queueManager.keptLocations != null) {
-      int l1Size = region.queueManager.keptLocations.size();
-      for (int i = 0; i < l1Size; i++) {
-        RTPLocation loc = region.queueManager.keptLocations.get(i);
-        if (loc != null && loc.coords() != null) {
-          int bx = loc.coords().x();
-          int bz = loc.coords().z();
-          points.add(new SelectionHeatmap.SelectionPoint(
-              bx, bz, 1, SelectionHeatmap.SelectionType.QUEUE_L1));
-          splatDensity(density, bx, bz, 2.5, minX, minZ, boundW, boundH, kernelRadius, sigma2);
-        }
-      }
-    }
-
-    // B. L2 Cold Queue Locations
-    if (region.queueManager != null && region.queueManager.unkeptLocations != null) {
-      int l2Size = region.queueManager.unkeptLocations.size();
-      for (int i = 0; i < l2Size; i++) {
-        RTPLocation loc = region.queueManager.unkeptLocations.get(i);
-        if (loc != null && loc.coords() != null) {
-          int bx = loc.coords().x();
-          int bz = loc.coords().z();
-          points.add(new SelectionHeatmap.SelectionPoint(
-              bx, bz, 1, SelectionHeatmap.SelectionType.QUEUE_L2));
-          splatDensity(density, bx, bz, 1.8, minX, minZ, boundW, boundH, kernelRadius, sigma2);
-        }
-      }
-    }
-
-    // C. Discarded Hazard Points
-    long[] badKeys = memoryShape.badKeysSnapshot();
-    if (badKeys != null && badKeys.length > 0) {
-      int limit = Math.min(badKeys.length, 500);
-      for (int i = 0; i < limit; i++) {
-        int[] xz = memoryShape.locationToXZ(badKeys[i]);
-        if (xz != null && xz.length >= 2) {
-          int bx = xz[0];
-          int bz = xz[1];
-          points.add(new SelectionHeatmap.SelectionPoint(
-              bx, bz, 1, SelectionHeatmap.SelectionType.HAZARD_DISCARD));
-          splatDensity(density, bx, bz, 2.0, minX, minZ, boundW, boundH, kernelRadius, sigma2);
-        }
-      }
-    }
-
-    // D. Candidate Samples across the selection algorithm
-    // Sample candidates from the shape to reveal spatial selection distribution
-    int candidateSampleSize = Math.min(600, (int) Math.min(range, 2000L));
-    long stride = Math.max(1L, range / candidateSampleSize);
-    MutableRTPCoords coords = new MutableRTPCoords(0, 0);
-
-    for (long idx = 0L; idx < range && points.size() < 1200; idx += stride) {
-      memoryShape.locationToXZ(idx, coords);
-      int bx = coords.x;
-      int bz = coords.z;
-      if (memoryShape.contains(bx, bz)) {
+    // A. Landings: one row per chunk, weighted by landing count. Points carry chunk coords.
+    for (int[] row : LandingHeatmap.snapshot(region.name)) {
+      int cx = row[0];
+      int cz = row[1];
+      int n = row[2];
+      if (points.size() < MAX_MARKERS) {
         points.add(new SelectionHeatmap.SelectionPoint(
-            bx, bz, 1, SelectionHeatmap.SelectionType.CANDIDATE));
-        splatDensity(density, bx, bz, 1.0, minX, minZ, boundW, boundH, kernelRadius, sigma2);
+            cx, cz, n, SelectionHeatmap.SelectionType.ARRIVAL));
       }
+      splatDensity(density, cx, cz, n, minX, minZ, boundW, boundH, kernelRadius, sigma2);
+    }
+
+    // B. Queued selections (block coords -> chunks)
+    if (region.queueManager != null) {
+      addQueue(region.queueManager.keptLocations, SelectionHeatmap.SelectionType.QUEUE_L1,
+          points, density, minX, minZ, boundW, boundH, kernelRadius, sigma2);
+      addQueue(region.queueManager.unkeptLocations, SelectionHeatmap.SelectionType.QUEUE_L2,
+          points, density, minX, minZ, boundW, boundH, kernelRadius, sigma2);
     }
 
     // Find max density
@@ -148,6 +109,25 @@ public final class SelectionHeatmapResolver extends AbstractRegionGridResolver {
     return Resolution.of(SelectionHeatmapRenderer.INSTANCE, model);
   }
 
+  private static void addQueue(
+      LockFreeLocationBuffer queue, SelectionHeatmap.SelectionType type,
+      List<SelectionHeatmap.SelectionPoint> points, double[] density,
+      int minX, int minZ, long boundW, long boundH, int kernelRadius, double sigma2
+  ) {
+    if (queue == null) return;
+    int size = queue.size();
+    for (int i = 0; i < size; i++) {
+      RTPLocation loc = queue.get(i);
+      if (loc == null || loc.coords() == null) continue;
+      int cx = loc.coords().x() >> 4;
+      int cz = loc.coords().z() >> 4;
+      if (points.size() < MAX_MARKERS) {
+        points.add(new SelectionHeatmap.SelectionPoint(cx, cz, 1, type));
+      }
+      splatDensity(density, cx, cz, 1.0, minX, minZ, boundW, boundH, kernelRadius, sigma2);
+    }
+  }
+
   private static void splatDensity(
       double[] density, int bx, int bz, double weight,
       int minX, int minZ, long boundW, long boundH,
@@ -155,6 +135,10 @@ public final class SelectionHeatmapResolver extends AbstractRegionGridResolver {
   ) {
     int gx = (int) ((bx - minX) * (GRID_W - 1) / boundW);
     int gz = (int) ((bz - minZ) * (GRID_H - 1) / boundH);
+    if (gx < -kernelRadius || gx > GRID_W - 1 + kernelRadius
+        || gz < -kernelRadius || gz > GRID_H - 1 + kernelRadius) {
+      return;
+    }
 
     int startX = Math.max(0, gx - kernelRadius);
     int endX = Math.min(GRID_W - 1, gx + kernelRadius);

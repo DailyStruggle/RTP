@@ -64,4 +64,15 @@ class MiniMessageRendererLegacyTest {
             || component.color() != null,
         "gradient should produce colored output, got: " + component);
   }
+
+  @Test
+  @DisplayName("rainbow tag renders without literal tags surviving in legacy text")
+  void rainbowTagRendersCleanly() {
+    net.md_5.bungee.api.chat.BaseComponent[] components =
+        MiniMessageRenderer.render("<rainbow>[RTP]</rainbow> invalid command - import");
+    String legacy = net.md_5.bungee.api.chat.BaseComponent.toLegacyText(components);
+    assertTrue(!legacy.contains("<rainbow>"), "literal tag should not survive: " + legacy);
+    assertTrue(!legacy.contains("</rainbow>"), "literal closing tag should not survive: " + legacy);
+    assertTrue(net.md_5.bungee.api.ChatColor.stripColor(legacy).contains("[RTP]"), "content should survive: " + legacy);
+  }
 }

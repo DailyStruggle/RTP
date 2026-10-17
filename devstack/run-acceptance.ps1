@@ -285,7 +285,7 @@ function Show-LogWindows {
   # server in real time without juggling `docker compose logs` tabs by hand.
   # Idempotent: each window is tagged with a unique title; re-running this
   # function spawns fresh windows (old ones can be closed by the operator).
-  $services = @('redis', 'proxy-a', 'proxy-b', 'lobby-a', 'lobby-b', 'backend-a', 'backend-b', 'backend-c')
+  $services = @('redis', 'proxy-a', 'proxy-b', 'lobby-a', 'lobby-b', 'backend-a', 'backend-b', 'backend-c', 'backend-d')
   Write-Host "[logs] opening per-service log windows ($($services -join ', '))..." -ForegroundColor Cyan
   Write-Host "[logs] also tee'ing per-service streams to $RunLogDir\<service>.log" -ForegroundColor DarkGray
   foreach ($svc in $services) {
@@ -698,7 +698,7 @@ function Test-Boot {
   Write-Host '[boot] checking docker compose ps (typical: <2s)...' -ForegroundColor Cyan
   $ps = Invoke-Native { docker compose ps --format json }
   Write-Evidence 'boot' $ps
-  $expected = @('rtp-devstack-redis', 'proxy-a', 'proxy-b', 'lobby-a', 'lobby-b', 'backend-a', 'backend-b', 'backend-c')
+  $expected = @('rtp-devstack-redis', 'proxy-a', 'proxy-b', 'lobby-a', 'lobby-b', 'backend-a', 'backend-b', 'backend-c', 'backend-d')
   $missing = @()
   foreach ($name in $expected) {
     if ($ps -notmatch [Regex]::Escape($name)) { $missing += $name }
@@ -733,7 +733,7 @@ function Show-FullServiceLogs {
   param([int]$Lines = 200)
   Write-Host ''
   Write-Host "[heartbeat] ==== FULL LOG DUMP (last $Lines lines per service) ====" -ForegroundColor Magenta
-  foreach ($svc in @('redis','backend-a','backend-b','backend-c','lobby-a','lobby-b','proxy-a','proxy-b')) {
+  foreach ($svc in @('redis','backend-a','backend-b','backend-c','backend-d','lobby-a','lobby-b','proxy-a','proxy-b')) {
     $body = Invoke-Native { docker compose logs --tail=$Lines --no-log-prefix $svc }
     if (-not $body) { $body = '(no logs)' }
     Write-Host ''
@@ -758,7 +758,7 @@ function Show-HeartbeatDiagnostics {
   Write-Host "[heartbeat] ---- diagnostic snapshot at ${ElapsedSec}s ----" -ForegroundColor Yellow
   Write-Host '[heartbeat] container states:' -ForegroundColor Yellow
   Write-Host ("  " + (Get-ContainerLiveness)) -ForegroundColor Gray
-  foreach ($svc in @('backend-a','backend-b','backend-c','lobby-a','lobby-b','proxy-a','proxy-b')) {
+  foreach ($svc in @('backend-a','backend-b','backend-c','backend-d','lobby-a','lobby-b','proxy-a','proxy-b')) {
     Write-Host "[heartbeat] last log lines for ${svc}:" -ForegroundColor Yellow
     Write-Host ("    " + (Get-RecentLogTail -Service $svc -Lines 4)) -ForegroundColor Gray
   }

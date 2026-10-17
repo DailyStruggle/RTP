@@ -110,6 +110,20 @@ public final class FabricServerAccessor implements RTPServerAccessor {
   private final Map<UUID, io.github.dailystruggle.rtp.api.world.RTPWorld<?>> worldsById = new ConcurrentHashMap<>();
   private volatile @Nullable MinecraftServer server;
 
+  // ---------------------------------------------------------------------------
+  // Memoized reflective player lookup handles for Fabric lazy resolution
+  // (Path 3: multi-candidate Mojang + Intermediary lookup).
+  // Prevents repeated NoSuchMethodException overhead and log noise on
+  // intermediary runtimes (1.20 - 1.21.11) while remaining forward-compatible
+  // with deobfuscated runtimes (MC 26.1+).
+  // ---------------------------------------------------------------------------
+  private volatile @Nullable Class<?> cachedServerClass = null;
+  private volatile @Nullable java.lang.reflect.Method cachedGetPlayerListMethod = null;
+  private volatile @Nullable java.lang.reflect.Method cachedGetPlayerByUuidMethod = null;
+  private volatile @Nullable java.lang.reflect.Method cachedGetPlayerByNameMethod = null;
+  private volatile boolean lazyPlayerMethodsInitialized = false;
+  private volatile boolean playerListInstanceMethodsProbed = false;
+
   /** Called by {@code FabricEventBridge} on SERVER_STARTED. */
   public void bindServer(MinecraftServer server) {
     this.server = server;
@@ -150,6 +164,12 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     this.playersByName.clear();
     this.worldsByName.clear();
     this.worldsById.clear();
+    this.lazyPlayerMethodsInitialized = false;
+    this.cachedServerClass = null;
+    this.cachedGetPlayerListMethod = null;
+    this.cachedGetPlayerByUuidMethod = null;
+    this.cachedGetPlayerByNameMethod = null;
+    this.playerListInstanceMethodsProbed = false;
   }
 
   /** Called by {@code FabricEventBridge} on world load. */
@@ -537,19 +557,87 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     return registerPlayerObject(sp);
   }
 
-  private Object lookupOnlineServerPlayerByName(String name) {
-    MinecraftServer s = this.server;
-    if (s == null) return null;
+  synchronized void initLazyPlayerMethods(Class<?> serverClass) {
+    if (this.lazyPlayerMethodsInitialized && this.cachedServerClass == serverClass) {
+      return;
+    }
+    this.cachedServerClass = serverClass;
+    this.cachedGetPlayerListMethod = null;
+    this.cachedGetPlayerByUuidMethod = null;
+    this.cachedGetPlayerByNameMethod = null;
+    this.playerListInstanceMethodsProbed = false;
+
     try {
-      Object playerList = s.getClass().getMethod("getPlayerList").invoke(s);
-      if (playerList == null) return null;
-      for (String candidate : new String[]{"getPlayerByName", "getPlayer"}) {
+      // 1. Probe getPlayerList on MinecraftServer (Mojang name first, then Intermediary)
+      for (String mName : new String[]{"getPlayerList", "method_3760"}) {
         try {
-          java.lang.reflect.Method m = playerList.getClass().getMethod(candidate, String.class);
-          Object res = m.invoke(playerList, name);
-          if (res != null) return res;
+          java.lang.reflect.Method m = serverClass.getMethod(mName);
+          try { m.setAccessible(true); } catch (Throwable ignored) {}
+          this.cachedGetPlayerListMethod = m;
+          break;
         } catch (NoSuchMethodException ignored) {}
       }
+
+      if (this.cachedGetPlayerListMethod != null) {
+        Class<?> retType = this.cachedGetPlayerListMethod.getReturnType();
+        if (retType != null && retType != void.class && retType != Object.class) {
+          initPlayerListMethods(retType);
+        }
+      }
+    } catch (Throwable t) {
+      RTP.log(Level.FINE,
+          "[RTP][Fabric] Failed to discover player lookup methods: " + t.getMessage());
+    } finally {
+      this.lazyPlayerMethodsInitialized = true;
+    }
+  }
+
+  private void initPlayerListMethods(Class<?> playerListClass) {
+    if (this.cachedGetPlayerByUuidMethod == null) {
+      for (String mName : new String[]{"getPlayer", "method_14602", "method_14574"}) {
+        try {
+          java.lang.reflect.Method m = playerListClass.getMethod(mName, UUID.class);
+          try { m.setAccessible(true); } catch (Throwable ignored) {}
+          this.cachedGetPlayerByUuidMethod = m;
+          break;
+        } catch (NoSuchMethodException ignored) {}
+      }
+    }
+    if (this.cachedGetPlayerByNameMethod == null) {
+      for (String mName : new String[]{"getPlayerByName", "getPlayer", "method_14566", "method_74003", "method_14582", "method_14581"}) {
+        try {
+          java.lang.reflect.Method m = playerListClass.getMethod(mName, String.class);
+          try { m.setAccessible(true); } catch (Throwable ignored) {}
+          this.cachedGetPlayerByNameMethod = m;
+          break;
+        } catch (NoSuchMethodException ignored) {}
+      }
+    }
+  }
+
+  Object lookupOnlineServerPlayerByName(String name) {
+    return lookupOnlineServerPlayerByName(this.server, name);
+  }
+
+  Object lookupOnlineServerPlayerByName(@Nullable Object s, @Nullable String name) {
+    if (s == null || name == null) return null;
+    initLazyPlayerMethods(s.getClass());
+    java.lang.reflect.Method listGetter = this.cachedGetPlayerListMethod;
+    if (listGetter == null) return null;
+    try {
+      Object playerList = listGetter.invoke(s);
+      if (playerList == null) return null;
+      if (this.cachedGetPlayerByNameMethod == null && !this.playerListInstanceMethodsProbed) {
+        synchronized (this) {
+          if (!this.playerListInstanceMethodsProbed) {
+            initPlayerListMethods(playerList.getClass());
+            this.playerListInstanceMethodsProbed = true;
+          }
+        }
+      }
+      java.lang.reflect.Method lookupMethod = this.cachedGetPlayerByNameMethod;
+      if (lookupMethod == null) return null;
+      return lookupMethod.invoke(playerList, name);
     } catch (Throwable t) {
       RTP.log(Level.FINE,
           "[RTP][Fabric] lazyResolveByName failed: " + t.getClass().getSimpleName()
@@ -558,23 +646,47 @@ public final class FabricServerAccessor implements RTPServerAccessor {
     return null;
   }
 
-  private Object lookupOnlineServerPlayerByUuid(UUID uuid) {
-    MinecraftServer s = this.server;
-    if (s == null) return null;
+  Object lookupOnlineServerPlayerByUuid(UUID uuid) {
+    return lookupOnlineServerPlayerByUuid(this.server, uuid);
+  }
+
+  Object lookupOnlineServerPlayerByUuid(@Nullable Object s, @Nullable UUID uuid) {
+    if (s == null || uuid == null) return null;
+    initLazyPlayerMethods(s.getClass());
+    java.lang.reflect.Method listGetter = this.cachedGetPlayerListMethod;
+    if (listGetter == null) return null;
     try {
-      Object playerList = s.getClass().getMethod("getPlayerList").invoke(s);
+      Object playerList = listGetter.invoke(s);
       if (playerList == null) return null;
-      try {
-        java.lang.reflect.Method m = playerList.getClass().getMethod("getPlayer", UUID.class);
-        Object res = m.invoke(playerList, uuid);
-        if (res != null) return res;
-      } catch (NoSuchMethodException ignored) {}
+      if (this.cachedGetPlayerByUuidMethod == null && !this.playerListInstanceMethodsProbed) {
+        synchronized (this) {
+          if (!this.playerListInstanceMethodsProbed) {
+            initPlayerListMethods(playerList.getClass());
+            this.playerListInstanceMethodsProbed = true;
+          }
+        }
+      }
+      java.lang.reflect.Method lookupMethod = this.cachedGetPlayerByUuidMethod;
+      if (lookupMethod == null) return null;
+      return lookupMethod.invoke(playerList, uuid);
     } catch (Throwable t) {
       RTP.log(Level.FINE,
           "[RTP][Fabric] lazyResolveByUuid failed: " + t.getClass().getSimpleName()
               + ": " + t.getMessage());
     }
     return null;
+  }
+
+  @Nullable java.lang.reflect.Method getCachedGetPlayerListMethod() {
+    return this.cachedGetPlayerListMethod;
+  }
+
+  @Nullable java.lang.reflect.Method getCachedGetPlayerByUuidMethod() {
+    return this.cachedGetPlayerByUuidMethod;
+  }
+
+  @Nullable java.lang.reflect.Method getCachedGetPlayerByNameMethod() {
+    return this.cachedGetPlayerByNameMethod;
   }
 
   /**

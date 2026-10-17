@@ -305,11 +305,11 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
     }
 
     /**
-     * Builds standard LeafRTP region YAML configuration.
+     * Builds standard LeafRTP region YAML configuration with custom biome polarity.
      */
     protected RtpYamlConfig createRegionYaml(String regionName, String worldName, String shape,
                                              int minRadius, int maxRadius, int centerX, int centerZ,
-                                             double price, List<String> biomes) {
+                                             double price, List<String> biomes, boolean biomesIsBlacklist) {
         RtpYamlConfig regionConfig = new RtpYamlConfig();
         regionConfig.set("displayName", "&a" + regionName);
         regionConfig.set("world", worldName);
@@ -338,7 +338,7 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
 
         if (biomes != null && !biomes.isEmpty()) {
             RtpYamlSection biomeSec = regionConfig.createSection("biomes");
-            biomeSec.set("blacklist", true);
+            biomeSec.set("blacklist", biomesIsBlacklist);
             biomeSec.set("list", biomes);
         }
 
@@ -346,6 +346,15 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
         regionConfig.set("requirePermission", false);
         regionConfig.set("version", "1.0");
         return regionConfig;
+    }
+
+    /**
+     * Builds standard LeafRTP region YAML configuration.
+     */
+    protected RtpYamlConfig createRegionYaml(String regionName, String worldName, String shape,
+                                             int minRadius, int maxRadius, int centerX, int centerZ,
+                                             double price, List<String> biomes) {
+        return createRegionYaml(regionName, worldName, shape, minRadius, maxRadius, centerX, centerZ, price, biomes, false);
     }
 
     /**
@@ -628,22 +637,27 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
             double price,
             int cacheCap,
             List<String> biomes,
+            boolean biomesIsBlacklist,
             List<String> additionalWorlds
     ) {
         public DiscoveredWorldRegion(String name, String world, String shape, int minRadius, int maxRadius, int centerX, int centerZ, double price) {
-            this(name, world, shape, minRadius, maxRadius, centerX, centerZ, 64, 320, price, -1, null, null);
+            this(name, world, shape, minRadius, maxRadius, centerX, centerZ, 64, 320, price, -1, null, false, null);
         }
 
         public DiscoveredWorldRegion(String name, String world, String shape, int minRadius, int maxRadius, int centerX, int centerZ, double price, List<String> biomes) {
-            this(name, world, shape, minRadius, maxRadius, centerX, centerZ, 64, 320, price, -1, biomes, null);
+            this(name, world, shape, minRadius, maxRadius, centerX, centerZ, 64, 320, price, -1, biomes, false, null);
         }
 
         public DiscoveredWorldRegion(String name, String world, String shape, int minRadius, int maxRadius, int centerX, int centerZ, int minY, int maxY, double price, List<String> biomes) {
-            this(name, world, shape, minRadius, maxRadius, centerX, centerZ, minY, maxY, price, -1, biomes, null);
+            this(name, world, shape, minRadius, maxRadius, centerX, centerZ, minY, maxY, price, -1, biomes, false, null);
         }
 
         public DiscoveredWorldRegion(String name, String world, String shape, int minRadius, int maxRadius, int centerX, int centerZ, int minY, int maxY, double price, int cacheCap, List<String> biomes) {
-            this(name, world, shape, minRadius, maxRadius, centerX, centerZ, minY, maxY, price, cacheCap, biomes, null);
+            this(name, world, shape, minRadius, maxRadius, centerX, centerZ, minY, maxY, price, cacheCap, biomes, false, null);
+        }
+
+        public DiscoveredWorldRegion(String name, String world, String shape, int minRadius, int maxRadius, int centerX, int centerZ, int minY, int maxY, double price, int cacheCap, List<String> biomes, List<String> additionalWorlds) {
+            this(name, world, shape, minRadius, maxRadius, centerX, centerZ, minY, maxY, price, cacheCap, biomes, false, additionalWorlds);
         }
     }
 
@@ -907,12 +921,43 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
 
         int cacheCap = getIntCaseInsensitive(section, defaults != null ? defaults.cacheCap() : -1, "cache_size", "cache-size", "cacheCap", "cache-cap", "queueTargetSize");
 
-        List<String> biomes = getStringListCaseInsensitive(section, "biomes", "blacklisted-biomes", "blacklisted_biomes", "biomes.blacklist", "disabled-biomes");
-        if (biomes.isEmpty() && defaults != null && defaults.biomes() != null) {
-            biomes = defaults.biomes();
+        List<String> biomes = new ArrayList<>();
+        boolean biomesIsBlacklist = defaults != null && defaults.biomesIsBlacklist();
+
+        RtpYamlSection biomeSec = getSectionCaseInsensitive(section, "biomes");
+        if (biomeSec != null) {
+            boolean isBl = getBooleanCaseInsensitive(biomeSec, true, "blacklist");
+            if (containsCaseInsensitive(biomeSec, "whitelist")) {
+                isBl = !getBooleanCaseInsensitive(biomeSec, false, "whitelist");
+            }
+            List<String> list = getStringListCaseInsensitive(biomeSec, "list", "biomes");
+            if (!list.isEmpty()) {
+                biomes = list;
+                biomesIsBlacklist = isBl;
+            }
+        }
+        if (biomes.isEmpty()) {
+            List<String> blList = getStringListCaseInsensitive(section,
+                    "blacklisted-biomes", "blacklisted_biomes", "biomes.blacklist", "disabled-biomes", "disabled_biomes", "banned-biomes", "banned_biomes");
+            if (!blList.isEmpty()) {
+                biomes = blList;
+                biomesIsBlacklist = true;
+            } else {
+                List<String> alList = getStringListCaseInsensitive(section,
+                        "biomes", "allowed-biomes", "allowed_biomes", "whitelist-biomes", "whitelisted-biomes", "whitelisted_biomes");
+                if (!alList.isEmpty()) {
+                    biomes = alList;
+                    biomesIsBlacklist = false;
+                }
+            }
         }
 
-        return new DiscoveredWorldRegion(targetName, worldName, shape, minRadius, maxRadius, centerX, centerZ, minY, maxY, price, cacheCap, biomes);
+        if (biomes.isEmpty() && defaults != null && defaults.biomes() != null) {
+            biomes = defaults.biomes();
+            biomesIsBlacklist = defaults.biomesIsBlacklist();
+        }
+
+        return new DiscoveredWorldRegion(targetName, worldName, shape, minRadius, maxRadius, centerX, centerZ, minY, maxY, price, cacheCap, biomes, biomesIsBlacklist, defaults != null ? defaults.additionalWorlds() : null);
     }
 
     /**
@@ -948,8 +993,9 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
                                         List<Path> written,
                                         List<String> mapped,
                                         List<String> errors) {
-        Path regionsDir = destinationDir.resolve("regions");
-        Path worldsDir = destinationDir.resolve("worlds");
+        Path definitionsDir = destinationDir.resolve("definitions");
+        Path regionsDir = definitionsDir.resolve("regions");
+        Path worldsDir = definitionsDir.resolve("worlds");
 
         try {
             Files.createDirectories(regionsDir);
@@ -986,7 +1032,7 @@ public abstract class AbstractForeignConfigImporter implements ForeignConfigImpo
             }
 
             RtpYamlConfig regionConfig = createRegionYaml(regionName, r.world(), r.shape(),
-                    r.minRadius(), r.maxRadius(), r.centerX(), r.centerZ(), r.price(), r.biomes());
+                    r.minRadius(), r.maxRadius(), r.centerX(), r.centerZ(), r.price(), r.biomes(), r.biomesIsBlacklist());
             if (r.minY() != 64 || r.maxY() != 320) {
                 RtpYamlSection vertSec = regionConfig.getConfigurationSection("vert");
                 if (vertSec != null) {

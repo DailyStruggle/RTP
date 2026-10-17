@@ -592,25 +592,12 @@ public final class FoliaRTPWorld extends RTPWorld<World> {
   }
 
   /**
-   * Vanilla region-folder subpath for the Folia environment. Folia preserves
-   * the vanilla layout: overworld in {@code region/}, nether in
-   * {@code DIM-1/region/}, end in {@code DIM1/region/}.
+   * Region-folder subpath: {@code dimensions/<ns>/<key>} on Folia 26.1+, the legacy
+   * {@code ""}/{@code DIM-1}/{@code DIM1} before. A legacy-only mapping finds no region file on
+   * 26.1+, so every pregenerated chunk would read as ungenerated and take a native load.
    */
   private static String dimensionRegionSubpath(World world) {
-    if (world == null) return "";
-    try {
-      switch (world.getEnvironment()) {
-        case NETHER:
-          return "DIM-1";
-        case THE_END:
-          return "DIM1";
-        case NORMAL:
-        default:
-          return "";
-      }
-    } catch (Throwable ignored) {
-      return "";
-    }
+    return io.github.dailystruggle.rtp.bukkitplatform.world.BukkitRegionPaths.dimensionRegionSubpath(world);
   }
 
   /** Snapshot the current {@code BlocksKeys.unsafeBlocks} list. */

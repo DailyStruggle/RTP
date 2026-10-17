@@ -48,7 +48,7 @@ An ADR captures a significant architectural decision: the context that forced it
 | [ADR-042](ADR-042-yaml-comment-preservation-block-only.md) | YAML Comment Preservation (Block-Only) | Proposed |
 | [ADR-043](ADR-043-personal-queue-permission-semantics.md) | `rtp.personalqueue` Permission Semantics: Bucket-Only Opt-In (supersedes operational details of ADR-007) | Accepted |
 | [ADR-044](ADR-044-command-tree-menu-reflector.md) | `menu-api` Module for Generalized Interactive Menus | Proposed |
-| [ADR-045](ADR-045-rtp-docs-menu-consumer.md) | `/rtp docs` Menu Consumer (Markdown -> `MenuModel`, converted at config load) | Proposed |
+| [ADR-045](ADR-045-rtp-docs-menu-consumer.md) | `/rtp docs` Menu Consumer (Markdown -> `MenuModel`, converted at config load) | Withdrawn (superseded by [ADR-104](ADR-104-ephemeral-web-editor-and-packed-docs-integration.md)) |
 | [ADR-046](ADR-046-maps-api-module.md) | `maps-api` Module for Runtime Cartography Chart Generation | Accepted (amended 2026-06-04) |
 | [ADR-047](ADR-047-declarative-chart-composition-bridge.md) | Declarative Chart Composition Bridge (`ChartSpec` + `ChartSpecResolver` + `MapDispatch`) | Accepted |
 | [ADR-048](ADR-048-menu-builders-behind-server-accessor.md) | Move menu page builders into `rtp-api` behind `RTPServerAccessor` (four default methods + `MenuPlatformView` snapshot record; no new Gradle module) | Proposed |

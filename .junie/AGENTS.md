@@ -77,6 +77,23 @@ Before generating code or terminal commands, explicitly state and verify:
 
 ---
 
+## Verifiable Correctness Gates (correctness over speed)
+
+Applies to every change, human or LLM authored. Gates 1-4 are never skipped for code changes, even when verification scope shrinks. Rationale and citations: [`docs/dev/VERIFICATION_GATES.md`](../docs/dev/VERIFICATION_GATES.md).
+
+1. **Reproduce before fixing** - failing test first; record before/after in `### Verification`.
+2. **Mechanical checks over prose** - prefer a build-failing check (warnings, static analysis, architecture tests for S-00x) to a new rule.
+3. **Handle errors** - check return values; never catch-and-swallow.
+4. **Independent review** - a human reads the diff, not the summary.
+5. **Test quality over coverage** - would a wrong version of the changed line fail a test?
+6. **Small changes** - one behavior change per commit; refactors separate.
+7. **Contracts at boundaries** - state preconditions and the preserved invariant on public/cross-module methods.
+8. **No unverified claims** - cite command and result; state what was not verified.
+9. **Regression memory** - keep each fixed defect's reproducing test, named with REQ-*/issue ID.
+10. **Feature evidence** - new features and mechanism replacements attach evidence for their claim (differential benchmark, screenshots, real command output); table in `VERIFICATION_GATES.md`.
+
+---
+
 ## Checklist-Based State Tracking
 
 Maintain an explicit markdown checklist (`- [ ]` / `- [x]`) for any multi-step task (~3+ steps, `[CODE]` / `[SETUP]` / `[NICHE]`).
@@ -125,6 +142,9 @@ Read only what the task requires. Do not read everything.
 | Multi-server / proxy (Velocity, BungeeCord) work | [`docs/dev/MULTI_SERVER_PLAN.md`](../docs/dev/MULTI_SERVER_PLAN.md) (ADR-036) |
 | Runtime metrics SPI (`metrics-api`) | [`metrics-api/README.md`](../metrics-api/README.md), [`docs/dev/METRICS_PLAN.md`](../docs/dev/METRICS_PLAN.md) |
 | Database / command / shutdown work | [`docs/dev/LESSONS_LEARNED.md`](../docs/dev/LESSONS_LEARNED.md) |
+| Verification gate rationale / research citations | [`docs/dev/VERIFICATION_GATES.md`](../docs/dev/VERIFICATION_GATES.md) |
+| Auditing or reviewing a PR (Gitar, agentic or human; large diffs) | [`docs/dev/PR_AUDIT_PROTOCOL.md`](../docs/dev/PR_AUDIT_PROTOCOL.md) (block only on evidenced B1-B7; no "% done") |
+| Writing review feedback to a PR author (tone, stable blockers, newcomers) | [`docs/dev/CONTRIBUTOR_REVIEW_EXPERIENCE.md`](../docs/dev/CONTRIBUTOR_REVIEW_EXPERIENCE.md) |
 | Verifying requirement traceability | [`docs/dev/TRACEABILITY.md`](../docs/dev/TRACEABILITY.md) (REQ-* -> class -> test) |
 | External hooks & reflection audit | [`docs/dev/EXTERNAL_HOOKS.md`](../docs/dev/EXTERNAL_HOOKS.md) (ADR-026) |
 | Authoring commands or parameters | [`commands-api/docs/README.md`](../commands-api/docs/README.md) (commands-api-ADR-001) |

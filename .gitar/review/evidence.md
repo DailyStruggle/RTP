@@ -25,7 +25,7 @@ Pull requests touching `MemoryTracker`, chunk ticket retention, or player sessio
 1. **Retained Session Verification:**
    - Execute a minimum 24-episode fuzzing sweep using `scripts/bench_fuzz.py`:
      ```powershell
-     python scripts/bench_fuzz.py --episodes 24 --scenario disconnect_mid_teleport
+     python scripts/bench_fuzz.py --mode leak --episodes 24 --reps 3
      ```
    - Must prove **`retained+0`** player session objects post-GC across all disconnected client runs.
 2. **Heap Residency Trajectory:**

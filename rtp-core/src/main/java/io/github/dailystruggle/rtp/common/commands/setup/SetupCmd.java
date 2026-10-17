@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.commands.setup;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.base.MenuRendererDiscovery;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -25,7 +26,7 @@ public class SetupCmd extends BaseRTPCmdImpl {
     private final @Nullable MenuRenderer menuRenderer;
 
     public SetupCmd(@Nullable CommandsAPICommand parent) {
-        this(parent, new SetupSessionRegistry(), new SetupBookMenuBuilder(), null);
+        this(parent, new SetupSessionRegistry(), new SetupBookMenuBuilder(), MenuRendererDiscovery.discoverRenderer());
     }
 
     public SetupCmd(
@@ -36,7 +37,7 @@ public class SetupCmd extends BaseRTPCmdImpl {
         super(parent);
         this.sessionRegistry = Objects.requireNonNull(sessionRegistry, "sessionRegistry");
         this.bookBuilder = Objects.requireNonNull(bookBuilder, "bookBuilder");
-        this.menuRenderer = menuRenderer;
+        this.menuRenderer = (menuRenderer != null) ? menuRenderer : MenuRendererDiscovery.discoverRenderer();
 
         addSubCommand(new SetupWorldCmd(this, this.sessionRegistry, this.bookBuilder, this.menuRenderer));
         addSubCommand(new SetupGameplayCmd(this, this.sessionRegistry, this.bookBuilder, this.menuRenderer));
@@ -52,6 +53,10 @@ public class SetupCmd extends BaseRTPCmdImpl {
 
     public SetupSessionRegistry sessionRegistry() {
         return sessionRegistry;
+    }
+
+    public @Nullable MenuRenderer menuRenderer() {
+        return menuRenderer;
     }
 
     @Override
@@ -77,6 +82,7 @@ public class SetupCmd extends BaseRTPCmdImpl {
 
         SetupSession session = SetupHandlerSupport.resolveSession(callerId, sessionRegistry);
 
-        return SetupHandlerSupport.renderCurrentStage(callerId, session, bookBuilder, menuRenderer);
+        MenuRenderer renderer = (this.menuRenderer != null) ? this.menuRenderer : MenuRendererDiscovery.discoverRenderer();
+        return SetupHandlerSupport.renderCurrentStage(callerId, session, bookBuilder, renderer);
     }
 }

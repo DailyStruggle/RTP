@@ -187,10 +187,8 @@ public abstract class AbstractPluginMessageNetworkBinding implements NetworkTran
                 if (delta > staleTimeoutMillis + SKEW_TOLERANCE_MS) {
                     return PluginMessageEnvelope.Rejection.STALE;
                 }
-                if (prev != null) {
-                    if (seq <= prev.lastSeq() && sentAtMs <= prev.sentAtMs()) {
-                        return PluginMessageEnvelope.Rejection.REPLAY;
-                    }
+                if (prev != null && seq <= prev.lastSeq() && sentAtMs <= prev.sentAtMs()) {
+                    return PluginMessageEnvelope.Rejection.REPLAY;
                 }
             }
             if (prev == null && lastSeen.size() >= MAX_TRACKED_SERVERS) {
@@ -202,10 +200,6 @@ public abstract class AbstractPluginMessageNetworkBinding implements NetworkTran
             lastSeen.put(id, new Entry(hb, now, sentAtMs, seq));
             return null;
         }
-    }
-
-    private boolean admit(BackendHeartbeat hb, long now) {
-        return admitDetailed(hb, 0L, 0L, now) == null;
     }
 
     /** Visible for tests: total tracked ids (live + not-yet-evicted stale). */

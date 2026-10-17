@@ -181,56 +181,56 @@ public final class MenuActions {
           message(playerId, config.textUnavailable());
           return;
         }
-        dispatchCommand(playerId, "rtp admin setup");
+        dispatchCommand(playerId, "rtp:rtp admin setup");
       }
       case "action:operator:import" -> {
         if (!hasPerm(playerId, "rtp.config")) {
           message(playerId, config.textUnavailable());
           return;
         }
-        dispatchCommand(playerId, "rtp config import");
+        dispatchCommand(playerId, "rtp:rtp config import");
       }
       case "action:operator:config" -> {
         if (!hasPerm(playerId, "rtp.config")) {
           message(playerId, config.textUnavailable());
           return;
         }
-        dispatchCommand(playerId, "rtp menu config");
+        dispatchCommand(playerId, "rtp:rtp menu config");
       }
       case "action:operator:visualizations" -> {
         if (!hasPerm(playerId, "rtp.see")) {
           message(playerId, config.textUnavailable());
           return;
         }
-        dispatchCommand(playerId, "rtp visualization");
+        dispatchCommand(playerId, "rtp:rtp visualization");
       }
       case "action:operator:editor" -> {
         if (!hasPerm(playerId, "rtp.editor")) {
           message(playerId, config.textUnavailable());
           return;
         }
-        dispatchCommand(playerId, "rtp editor");
+        dispatchCommand(playerId, "rtp:rtp editor");
       }
       case "action:operator:status" -> {
         if (!hasPerm(playerId, "rtp.info")) {
           message(playerId, config.textUnavailable());
           return;
         }
-        dispatchCommand(playerId, "rtp menu info");
+        dispatchCommand(playerId, "rtp:rtp menu info");
       }
       case "action:operator:adminbook" -> {
         if (!hasPerm(playerId, "rtp.menu.admin")) {
           message(playerId, config.textUnavailable());
           return;
         }
-        dispatchCommand(playerId, "rtp menu admin");
+        dispatchCommand(playerId, "rtp:rtp menu admin");
       }
       case "action:operator:reload" -> {
         if (!hasPerm(playerId, "rtp.reload")) {
           message(playerId, config.textUnavailable());
           return;
         }
-        dispatchCommand(playerId, "rtp reload");
+        dispatchCommand(playerId, "rtp:rtp reload");
         renderer.open(playerId, MenuModel.buildOperatorMenu(playerId, config));
       }
       default -> message(playerId, config.textUnavailable());
@@ -246,9 +246,18 @@ public final class MenuActions {
     if (RTP.serverAccessor == null || RTP.serverAccessor.getPlayer(playerId) == null) {
       return;
     }
+    String normalized = commandLine;
+    if (normalized != null) {
+      if (normalized.equals("rtp")) {
+        normalized = "rtp:rtp";
+      } else if (normalized.startsWith("rtp ")) {
+        normalized = "rtp:rtp " + normalized.substring(4);
+      }
+    }
+    final String finalCommand = normalized;
     RTP.scheduler.runTask(() -> {
       if (RTP.serverAccessor != null && RTP.serverAccessor.getPlayer(playerId) != null) {
-        RTP.serverAccessor.executeCommand(playerId, commandLine);
+        RTP.serverAccessor.executeCommand(playerId, finalCommand);
       }
     });
   }

@@ -298,7 +298,7 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         try {
             r.close();
         } catch (Throwable t) {
-            getLogger().log(Level.WARNING, "Error closing run CSV " + r.csvPath(), t);
+            getLogger().log(Level.WARNING, t, () -> "Error closing run CSV " + r.csvPath());
         }
     }
 
@@ -327,7 +327,7 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         if (jfrProfiler != null) {
             recorder.setJfrAllocationProfiler(jfrProfiler);
             if (jfrProfiler.available()) {
-                getLogger().info("StressTestRTP: per-plugin allocation sidecar \u2192 "
+                getLogger().info(() -> "StressTestRTP: per-plugin allocation sidecar \u2192 "
                         + recorder.jfrAllocPath());
             }
         }
@@ -340,7 +340,7 @@ public final class StressTestRTPPlugin extends JavaPlugin {
             Path triggerCsv = dir.resolve(stamp + "-heap-triggers.csv");
             try {
                 heapPressureWatcher.startSidecar(triggerCsv);
-                getLogger().info("StressTestRTP: rolled new heap-trigger sidecar \u2192 " + triggerCsv);
+                getLogger().info(() -> "StressTestRTP: rolled new heap-trigger sidecar \u2192 " + triggerCsv);
             } catch (IOException e) {
                 getLogger().log(Level.WARNING,
                         "StressTestRTP: could not open heap-trigger sidecar; "
@@ -356,7 +356,7 @@ public final class StressTestRTPPlugin extends JavaPlugin {
             if (!worlds.isEmpty()) {
                 Path worldDir = worlds.get(0).getWorldFolder().toPath();
                 recorder.setStorageProfiler(new StorageProfiler(this, worldDir));
-                getLogger().info("StressTestRTP: storage profile sidecar \u2192 "
+                getLogger().info(() -> "StressTestRTP: storage profile sidecar \u2192 "
                         + recorder.storageProfilePath());
             } else {
                 getLogger().warning("StressTestRTP: no world loaded; storage columns stay -1.");
@@ -375,7 +375,7 @@ public final class StressTestRTPPlugin extends JavaPlugin {
                 MetricsRecorder r = recorder();
                 return r != null ? r.totalAttempts() : 0;
             });
-            getLogger().info("StressTestRTP: rolled new heap series CSV \u2192 " + heapCsv);
+            getLogger().info(() -> "StressTestRTP: rolled new heap series CSV \u2192 " + heapCsv);
         }
         // Per-chunk-load CPU cost calibration. When > 0, MetricsRecorder
         // amends process_cpu_ms with (chunks_loaded * chunkLoadCostNs) so
@@ -387,13 +387,13 @@ public final class StressTestRTPPlugin extends JavaPlugin {
         String chunkCostKey = chunkLoadCostKey(Runner.isFoliaFamily(), Runner.isPaperFamily());
         double chunkCostUs = getConfig().getDouble(chunkCostKey, 0.0);
         if (chunkCostUs <= 0.0) {
-            getLogger().info("StressTestRTP: " + chunkCostKey + " is 0; chunk_load_cost_ms and "
+            getLogger().info(() -> "StressTestRTP: " + chunkCostKey + " is 0; chunk_load_cost_ms and "
                     + "cpu_ms_with_chunks stay empty (chunk-system CPU is in cpu_chunk_system_ms).");
         }
         if (chunkCostUs > 0.0) {
             long ns = Math.round(chunkCostUs * 1_000.0);
             recorder.setChunkLoadCostNs(ns);
-            getLogger().info(String.format(java.util.Locale.ROOT,
+            getLogger().info(() -> String.format(java.util.Locale.ROOT,
                     "StressTestRTP: chunk-load-cost-us=%.2f \u2192 amending phase CPU "
                             + "with %d ns/chunk-load (chunk_load_cost_ms, cpu_ms_with_chunks).",
                     chunkCostUs, ns));

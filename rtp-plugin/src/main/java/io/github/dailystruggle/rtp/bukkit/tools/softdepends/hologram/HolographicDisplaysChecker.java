@@ -76,10 +76,8 @@ public final class HolographicDisplaysChecker implements HologramProvider {
 
         try {
             Object hologramObj = CREATE_HOLOGRAM_METHOD.invoke(null, plugin, loc);
-            if (lines != null) {
-                for (String line : lines) {
-                    APPEND_TEXT_LINE_METHOD.invoke(hologramObj, line);
-                }
+            for (String line : HologramText.render(lines)) {
+                APPEND_TEXT_LINE_METHOD.invoke(hologramObj, line);
             }
             return new HolographicDisplaysHandle(id, worldName, position, lines, hologramObj);
         } catch (Throwable t) {
@@ -128,7 +126,7 @@ public final class HolographicDisplaysChecker implements HologramProvider {
             this.lines = List.copyOf(newLines);
             try {
                 CLEAR_LINES_METHOD.invoke(hologramObj);
-                for (String line : newLines) {
+                for (String line : HologramText.render(newLines)) {
                     APPEND_TEXT_LINE_METHOD.invoke(hologramObj, line);
                 }
             } catch (Throwable t) {

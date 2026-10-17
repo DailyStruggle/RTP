@@ -105,6 +105,10 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
   // without mutating shape state), so proceeding after the timeout is safe.
   private static final long DRAIN_TIMEOUT_MS = 5_000L;
 
+  // Region name -> latest async cancel/pause teardown; read by ScanStartCmd to refuse a restart mid-teardown.
+  private static final java.util.concurrent.ConcurrentHashMap<String, CompletableFuture<Void>> PENDING_TEARDOWNS =
+          new java.util.concurrent.ConcurrentHashMap<>();
+
   // In-flight chunk-load futures dispatched by runFullLoadPath. Tracked so a
   // cancel/pause can actively cancel them instead of waiting out the per-future
   // 30s orTimeout one by one - cancelling completes our future chain promptly,
@@ -212,6 +216,11 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
   private final AtomicBoolean genscanAnnounced = new AtomicBoolean(false);
 
   private long lastSaveTime = 0;
+
+  // Status-window origin for the reported cps/ETA: wall time and spiral position. A single
+  // batch is ~1 region file, so its rate swings 20x between a cold and a warm .mca read.
+  private long statusWindowStartMs = -1L;
+  private long statusWindowStartPos = 0L;
 
   private BigInteger cps_all = BigInteger.ZERO;
   private BigInteger cps_divisor = BigInteger.ZERO;
@@ -435,6 +444,13 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
         continue;
       }
       shape.locationToXZ(pos, cursor);
+      // Circumscribing key spaces (dual-layer circle: square rings) hold keys outside the shape.
+      // Skip them unrecorded: marking them bad would feed expand's learned bad area and grow the
+      // effective radius for land that was never selectable.
+      if (!shape.contains(cursor.x, cursor.z)) {
+        pos++;
+        continue;
+      }
       long key = (((long) (cursor.x >> 5)) << 32) | ((cursor.z >> 5) & 0xFFFFFFFFL);
       long[] header = binHeaders.get(key);
       long[] positions;
@@ -582,7 +598,14 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
       cps_divisor = cps_divisor.add(increment_big);
       cps.set((cps.get() * 7 / 8) + cps_local / 8);
 
-      long etaSeconds = getEtaSeconds(range, finalPos1, shape, cps_local);
+      if (statusWindowStartMs < 0 || finalPos1 < statusWindowStartPos) {
+        statusWindowStartMs = timingStart;
+        statusWindowStartPos = scanIter.get();
+      }
+      long windowMs = Math.max(1L, System.currentTimeMillis() - statusWindowStartMs);
+      long windowCps = Math.max(0L, finalPos1 - statusWindowStartPos) * 1000L / windowMs;
+
+      long etaSeconds = getEtaSeconds(range, finalPos1, shape, windowCps);
 
       // --- LAND PERCENTAGE CALCULATION ---
       // Derived from scanGoodCount / (scanGoodCount + scanBadCount) accumulated
@@ -599,7 +622,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
 
       this.latestAbsolutePos = finalPos1;
       this.latestAbsoluteTotal = range;
-      this.latestCps = cps_local;
+      this.latestCps = windowCps;
       this.latestEtaSeconds = etaSeconds;
 
       long now = System.currentTimeMillis();
@@ -617,6 +640,8 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                 + " cps=" + cps_local + " etaSec=" + etaSeconds
                 + " land%=" + String.format("%.2f", landPercentage));
         lastSaveTime = now;
+        statusWindowStartMs = now;
+        statusWindowStartPos = finalPos1;
 
         // Concurrency gauge: observed peak in-flight probes this window vs the
         // MAX_PENDING_CHUNKS cap. peak well below cap => driver-loop serialization (root-cause fix is driver
@@ -642,7 +667,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
           msg = msg.replace("[region]", region.name);
           msg = msg.replace("[scan_chunks]", String.valueOf(this.latestAbsolutePos));
           msg = msg.replace("[scan_totalChunks]", String.valueOf(this.latestAbsoluteTotal));
-          msg = msg.replace("[scan_cps]", String.valueOf(cps_local));
+          msg = msg.replace("[scan_cps]", String.valueOf(windowCps));
           msg = msg.replace("[scan_landPercentage]", String.format(java.util.Locale.ROOT, "%.2f", landPercentage));
           msg = msg.replace("[scan_eta]", io.github.dailystruggle.rtp.common.tools.PlaceholderProvider.formatEta(etaSeconds));
           RTP.serverAccessor.announce(msg, "rtp.scan", "");
@@ -1833,21 +1858,44 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
     }
   }
 
+  /**
+   * Pauses the scan. The flag is set and in-flight loads are cancelled on the caller;
+   * the drain, shape rebuild and saves run on the async lane via {@link #teardownAsync}.
+   */
   @SuppressWarnings("java:S1845") // Method pause() operates on AtomicBoolean pause flag
   public void pause() {
+    pause(null);
+  }
+
+  /**
+   * Pause variant that reports the teardown outcome to {@code onDone} on the main lane.
+   *
+   * @param onDone receives null on success, or the teardown failure (S-004); may be null
+   */
+  public void pause(java.util.function.Consumer<Throwable> onDone) {
     RTP.log(Level.FINE, "[ScanTask] pause requested region=" + region.name
             + " inFlight=" + inFlight.get());
     pause.set(true);
-    // Drain in-flight chunk futures before saving to prevent ghost callbacks.
-    drainInFlight("pause", DRAIN_TIMEOUT_MS);
-    MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
-    shape.flushAndRebuild(shape.spatialResolution());
-    save();
-    shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
+    cancelInFlightChunkFutures();
+    teardownAsync("pause", true, onDone);
   }
 
+  /**
+   * Cancels the scan. The flag is set and in-flight loads are cancelled on the caller;
+   * the drain, shape rebuild and saves run on the async lane via {@link #teardownAsync}.
+   */
   @Override
   public void setCancelled(boolean cancelled) {
+    setCancelled(cancelled, null);
+  }
+
+  /**
+   * Cancel variant that reports the teardown outcome to {@code onDone} on the main lane.
+   *
+   * @param cancelled the cancel flag
+   * @param onDone receives null on success, or the teardown failure (S-004); may be null
+   */
+  public void setCancelled(boolean cancelled, java.util.function.Consumer<Throwable> onDone) {
     if (cancelled) {
       RTP.log(Level.FINE, "[ScanTask] cancellation requested region=" + region.name
               + " inFlight=" + inFlight.get());
@@ -1856,16 +1904,75 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
       try {
         done.cancel(true);
       } catch (CancellationException | CompletionException ignored) { }
-      // Drain in-flight chunk futures before saving to prevent ghost callbacks.
-      drainInFlight("cancel", DRAIN_TIMEOUT_MS);
-      MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
-      if (shape != null) {
-        shape.flushAndRebuild(shape.spatialResolution());
-        shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
-      }
-      save();
-      RTP.getInstance().scanTasks.remove(region.name, this);
+      cancelInFlightChunkFutures();
+      teardownAsync("cancel", false, onDone);
+      return;
     }
-    super.setCancelled(cancelled);
+    super.setCancelled(false);
+  }
+
+  private void cancelInFlightChunkFutures() {
+    for (CompletableFuture<?> f : inFlightChunkFutures) {
+      try {
+        f.cancel(true);
+      } catch (Throwable ignored) { }
+    }
+  }
+
+  /**
+   * Off-caller teardown: bounded drain, shape rebuild, saves, scan-map removal.
+   * Completion or failure is reported to {@code onDone} on the main lane (S-004).
+   * A later start waits on {@link #teardownDone} so it never rebuilds over a stale frontier.
+   */
+  private void teardownAsync(String reason, boolean pauseSave, java.util.function.Consumer<Throwable> onDone) {
+    CompletableFuture<Void> gate = new CompletableFuture<>();
+    teardownDone = gate;
+    PENDING_TEARDOWNS.put(region.name, gate);
+    RTP.scheduler.runTaskAsynchronously(() -> {
+      try {
+        drainInFlight(reason, DRAIN_TIMEOUT_MS);
+        MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
+        if (shape != null) {
+          shape.flushAndRebuild(shape.spatialResolution());
+          if (pauseSave) {
+            shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
+          } else {
+            shape.save(region.name + "_" + region.cacheKey(), region.getWorld().name());
+          }
+        }
+        save();
+        if (!pauseSave) {
+          delete(region.name);
+          RTP.getInstance().scanTasks.remove(region.name, this);
+        }
+        gate.complete(null);
+        reportTeardown(onDone, null);
+      } catch (Throwable t) {
+        RTP.log(Level.WARNING, "[ScanTask] " + reason + " teardown failed region=" + region.name, t);
+        gate.completeExceptionally(t);
+        reportTeardown(onDone, t);
+      } finally {
+        PENDING_TEARDOWNS.remove(region.name, gate);
+      }
+    });
+  }
+
+  private static void reportTeardown(java.util.function.Consumer<Throwable> onDone, Throwable failure) {
+    if (onDone == null) return;
+    RTP.scheduler.runTask(() -> onDone.accept(failure));
+  }
+
+  /** Completes when the most recent teardown has finished; used to order a restart after it. */
+  private volatile CompletableFuture<Void> teardownDone = CompletableFuture.completedFuture(null);
+
+  /** @return future that completes after the last cancel/pause teardown has run. */
+  public CompletableFuture<Void> teardownFuture() {
+    return teardownDone;
+  }
+
+  /** @return true while a cancel/pause teardown for {@code regionName} has not finished. */
+  public static boolean isTeardownPending(String regionName) {
+    CompletableFuture<Void> pending = PENDING_TEARDOWNS.get(regionName);
+    return pending != null && !pending.isDone();
   }
 }

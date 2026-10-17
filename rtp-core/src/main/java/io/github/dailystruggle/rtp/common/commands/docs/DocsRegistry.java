@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.common.commands.docs;
 
-import io.github.dailystruggle.rtp.api.menu.MenuAction;
 import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
@@ -173,7 +172,7 @@ public final class DocsRegistry {
 
                     String raw = Files.readString(file, StandardCharsets.UTF_8);
                     nextRawSources.put(relpath, raw);
-                    MenuModel model = MarkdownToMenuModel.lower(fileName, raw, options);
+                    MenuModel model = MarkdownToMenuModel.lower(fileName, raw, options, relpath);
                     nextModels.put(relpath, model);
                     return FileVisitResult.CONTINUE;
                 }
@@ -283,7 +282,7 @@ public final class DocsRegistry {
             if ("index".equals(key)) continue;
             lines.add(new MenuLine(List.of(
                     new MenuFragment("&0\u2022 ", null, null),
-                    new MenuFragment("&1" + key, "Open " + key, new MenuAction.RunRtpCommand(new String[]{"docs", key}))
+                    new MenuFragment("&1" + key, "Open " + key, MarkdownToMenuModel.docsCommand(key))
             )));
         }
 
