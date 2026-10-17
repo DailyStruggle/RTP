@@ -24,7 +24,13 @@ repositories {
     // error rather than "not found", so it aborts resolution instead of falling
     // through to the Nexus. Ordering the Nexus first makes these resolve from the
     // canonical publisher and avoids the 401 entirely.
-    maven { url = 'https://nexus.sirblobman.xyz/public/' }
+    maven {
+        url = 'https://nexus.sirblobman.xyz/public/'
+        content {
+            includeGroupByRegex 'com\\.github\\.sirblobman.*'
+            includeGroupByRegex 'com\\.sirblobman.*'
+        }
+    }
     // jitpack hosts several soft-dep APIs RTP compiles against (VaultAPI, MockBukkit).
     // The claim-plugin integrations and their dedicated soft-dep repos moved out to
     // the LeafRTPClaimAddon module (superseding ADR-019).
@@ -32,6 +38,7 @@ repositories {
         url = 'https://jitpack.io'
         content {
             excludeGroupByRegex 'com\\.github\\.sirblobman.*'
+            excludeGroupByRegex 'com\\.sirblobman.*'
         }
     }
     // PvPManager API (CodeMC); bundled PvP / combat-tag integrations (ADR-055).

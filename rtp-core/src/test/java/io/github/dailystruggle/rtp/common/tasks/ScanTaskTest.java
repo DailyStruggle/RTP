@@ -204,6 +204,42 @@ class ScanTaskTest {
         }
     }
 
+    @Test
+    void pause_resetsStatusWindowStartMs() {
+        ScanTask task = new ScanTask(region, 0L);
+        task.scanIncrement.set(10L);
+        task.run();
+        assertTrue(task.getStatusWindowStartMs() > 0, "statusWindowStartMs should be positive after run()");
+
+        task.pause();
+        assertEquals(-1L, task.getStatusWindowStartMs(), "pause must reset statusWindowStartMs to -1");
+    }
+
+    @Test
+    void resetStatusWindow_invalidatesWindow() {
+        ScanTask task = new ScanTask(region, 0L);
+        task.scanIncrement.set(10L);
+        task.run();
+        assertTrue(task.getStatusWindowStartMs() > 0);
+
+        task.resetStatusWindow();
+        assertEquals(-1L, task.getStatusWindowStartMs());
+    }
+
+    @Test
+    void isTeardownPending_detectsPendingTeardown() {
+        assertFalse(ScanTask.isTeardownPending(region.name));
+        CompletableFuture<Void> gate = new CompletableFuture<>();
+        ScanTask.setPendingTeardownForTesting(region.name, gate);
+        try {
+            assertTrue(ScanTask.isTeardownPending(region.name));
+            gate.complete(null);
+            assertFalse(ScanTask.isTeardownPending(region.name));
+        } finally {
+            ScanTask.setPendingTeardownForTesting(region.name, null);
+        }
+    }
+
     private static void awaitRecord(RecordingSquare recorder) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         while (recorder.rebuildThreads.isEmpty() && System.nanoTime() < deadline) {
