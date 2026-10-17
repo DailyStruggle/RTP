@@ -155,6 +155,7 @@ class RegionFormatRegistryTest {
         assertEquals(mcaFile, RegionFileResolver.resolve(tempDir, "", 0, 0).path());
 
         Files.write(linearFile, new byte[100]);
+        RegionFileResolver.invalidateMemo();
         RegionFileResolver.ResolvedRegion res = RegionFileResolver.resolve(tempDir, "", 0, 0);
         assertEquals(linearFile, res.path());
         assertEquals(addonReader, res.reader());
