@@ -143,11 +143,11 @@ On Folia, spots are checked against the world files on disk first, nothing waits
 
 ### The short version
 
-**5 ms median from `/rtp` to arrival over 4,186 paced teleports (Paper).**
+**5 ms median from `/rtp` to arrival over 4,194 paced teleports (Paper).**
 
-- [**Efficient**](https://dailystruggle.github.io/RTP/admin/configuration/PERFORMANCE/): the server stayed at full speed through all 4,186 paced teleports.
+- [**Efficient**](https://dailystruggle.github.io/RTP/admin/configuration/PERFORMANCE/): the server stayed at full speed through all 4,194 paced teleports, at up to 20 a second.
 - [**Fast**](#performance): 40 teleports per second on Paper and 180 per second on Folia, at full server speed.
-- [**Distinct**](https://dailystruggle.github.io/RTP/site/why/): 0 duplicate landings in each 4,096-teleport Paper 26.2 run.
+- [**Distinct**](https://dailystruggle.github.io/RTP/site/why/): no two players sent to the same block in two Paper 26.2 stress runs of 15,420 and 15,494 teleports.
 - [**Portable**](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-another-rtp-plugin): `/rtp config import` reads your BetterRTP, JustRTP or EzRTP config, previews it, and never overwrites without `overwrite=true`.
 - [**One jar**](https://dailystruggle.github.io/RTP/admin/QUICK_START/): the same core on Paper, Spigot, Folia, Fabric and NeoForge, and on Velocity for `/rtp` across a network.
 
@@ -213,13 +213,13 @@ More: [Features](../site/features.md). Commands and permissions are in the colla
 
 ## Performance
 
-Most of an rtp plugin's work happens inside server API calls, so a profiler lists it under generic chunk functions. The public harness in [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP) attributes it back to the plugin. Rig: AMD Ryzen Threadripper 7970X (32 cores / 64 threads, 128 GB RAM, NVMe), Ubuntu 24.04 LTS, Java 25, 16 GB heap, 48 scripted bot clients (`devstack/clients/bench-swarm.js`). Each plugin ran on the latest version it supported at the time of the run, with cooldowns, delays and countdowns zeroed and its queue on at its default size where it has one. The other plugins ran at their documented defaults, because I can't tune settings their authors don't document. LeafRTP ran tuned ([config and the full list of changes](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP/bench-config/paper-26.2)): queue refill every tick (`period: 1`; the shipped default is `period: 20`) with no pause when server speed drops, a smaller ready queue (10 spots; shipped 50) and no backlog of unverified spots (shipped 1,000). The tuning was for finding where it breaks: it lets LeafRTP spend more server time per second than the shipped settings allow, while a shipped install refills more slowly and pauses when the server lags. Read the LeafRTP rows as a throughput ceiling under worst-case load, not as what an untouched install does.
+Most of an rtp plugin's work happens inside server API calls, so a profiler lists it under generic chunk functions. The public harness in [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP) attributes it back to the plugin. Rig: AMD Ryzen Threadripper 7970X (32 cores / 64 threads, 128 GB RAM, NVMe), Ubuntu 24.04 LTS, Java 25, 16 GB heap, 48 scripted bot clients (`devstack/clients/bench-swarm.js`). On Paper, the server ran under realtime scheduling (`SCHED_FIFO`, priority 10) with only the plugin under test loaded, and restarted before every run. Each run steps through 60 s stages at 5, 10, 20, 40, 80, 160 and 320 teleports per second and stops after two failed stages in a row. The other plugins' Paper rows pool 4 runs each from 2026-10-17; LeafRTP's pool 2 runs of the current 3.3.0 build from 2026-10-18 (`20261018-022257`, `20261018-023204`). The Folia columns come from earlier Folia runs and haven't been rerun on this build. Each plugin ran on the latest version it supported at the time of the run, with cooldowns, delays and countdowns zeroed and its queue on at its default size where it has one. The other plugins ran at their documented defaults, because I can't tune settings their authors don't document. LeafRTP ran tuned ([config and the full list of changes](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP/bench-config/paper-26.2)): queue refill every tick (`period: 1`; the shipped default is `period: 20`) with no pause when server speed drops, a smaller ready queue (10 spots; shipped 50) and no backlog of unverified spots (shipped 1,000). The tuning was for finding where it breaks: it lets LeafRTP spend more server time per second than the shipped settings allow, while a shipped install refills more slowly and pauses when the server lags. Read the LeafRTP rows as a throughput ceiling under worst-case load, not as what an untouched install does.
 
 <!-- only: bbb -->
 Both LeafRTP downloads are built from the same code, and the LeafRTP rows apply to either.
 <!-- /only -->
 
-Terms used below: **TP/s** is teleports per second. **TPS** is server ticks per second; 20 is full speed. **MSPT** is milliseconds per tick; above 50 ms the server falls below 20 TPS and players feel lag. A **lag spike** is a tick over 50 ms. **Safe max** is the highest rate a plugin held while the server stayed at 20 TPS. **p95 / p99** is the time that 95% / 99% of teleports came in under.
+Terms used below: **TP/s** is teleports per second. **TPS** is server ticks per second; 20 is full speed. **MSPT** is milliseconds per tick; above 50 ms the server falls below 20 TPS and players feel lag. A **lag spike** is a tick over 50 ms. **Safe max** is the highest stage a plugin passed in every run: it delivered at least 95% of the requested rate, MSPT p95 stayed at or under 50 ms, and at most 1% of teleports failed. **p95 / p99** is the time that 95% / 99% of teleports came in under.
 
 I compare throughput under load, latency from `/rtp` to arrival, and tick stability. On Paper, world ticking runs on a single main thread, while on Folia, world ticking is distributed across independent regional worker threads. LeafRTP checks candidates against region files (`.mca` and `.linear`) off-tick and keeps a queue of verified destinations, avoiding synchronous chunk loading and main-thread stalls.
 
@@ -227,17 +227,19 @@ I compare throughput under load, latency from `/rtp` to arrival, and tick stabil
 
 These are snapshots of each plugin under one harness on my hardware. The other plugins make different trade-offs, and most don't aim for 100+ TP/s.
 
-| Plugin | Paper safe max (20 TPS) | Paper peak | Folia safe max (20 TPS) | Folia peak |
+| Plugin | Paper safe max | Paper peak | Folia safe max (20 TPS) | Folia peak |
 |---|---|---|---|---|
-| **LeafRTP** | **40 TP/s** (MSPT 48 ms) | **107.4 TP/s** | **180 TP/s** (MSPT < 50 ms) | **249.7 TP/s** (19.0 avg TPS) |
-| HuskHomes | 40 TP/s (MSPT 42 ms) | 44.9 TP/s | 60 TP/s | 60.0 TP/s |
-| JustRTP | 20 TP/s (MSPT 35 ms) | 25.6 TP/s | 10 TP/s | 18.7 TP/s |
-| JakesRTP | 20 TP/s (MSPT 41 ms) | 74.5 TP/s (TPS < 5) | - | Not loaded (no Folia support declared) |
-| EzRTP | 5 TP/s (MSPT 22 ms) | 8.4 TP/s | < 20 TP/s | 19.7 TP/s |
-| BetterRTP | < 5 TP/s | 9.2 TP/s | - | Did not complete on this rig |
+| **LeafRTP** | **40 TP/s** (MSPT 45 ms, min TPS 19.2) | **103.3 TP/s** | **180 TP/s** (MSPT < 50 ms) | **249.7 TP/s** (19.0 avg TPS) |
+| HuskHomes | 40 TP/s (MSPT 46 ms, min TPS 16.4) | 46.0 TP/s | 60 TP/s | 60.0 TP/s |
+| JakesRTP | 20 TP/s (MSPT 44 ms, min TPS 18.4) | 86.6 TP/s (TPS < 5) | - | Not loaded (no Folia support declared) |
+| BetterRTP | 20 TP/s (MSPT 43 ms, min TPS 16.2) | 39.5 TP/s (2% failed) | - | Did not complete on this rig |
+| JustRTP | 20 TP/s (MSPT 40 ms, min TPS 19.5) | 25.7 TP/s | 10 TP/s | 18.7 TP/s |
+| EzRTP | 5 TP/s (MSPT 24 ms, min TPS 20.0) | 8.5 TP/s | < 20 TP/s | 19.7 TP/s |
 
-- **Paper vs. Folia:** Paper places every arriving player on one main thread, so no plugin here gets much past 40 TP/s at 20 TPS. Under 100 TP/s unthrottled load on Paper, LeafRTP completed 35,113 of 35,113 teleports while the server slowed (MSPT p95 103-122 ms; runs `20261009-044336`, `20261009-054148` and `20261009-070736`). Folia spreads that work across region threads, and LeafRTP reached 180 TP/s at 19.6 regional TPS (198 ms median latency), peaking at 249.7 TP/s.
-- **Latency at equal load:** each plugin got one `/rtp` every 200 ms in the first 60 s stage of 14 Paper ladder runs (4,186 teleports per plugin, all of them successful). LeafRTP's time from `/rtp` to arrival was p50 5 ms, p95 6 ms, p99 6 ms and max 33 ms, with MSPT p95 at 21.4-25.0 ms per run. JakesRTP was faster at this rate (p50 0 ms, p99 16 ms, max 45 ms); at 40 and 80 TP/s its MSPT reached 96 ms and 295 ms. HuskHomes, EzRTP and JustRTP had p99 of 471 ms, 904 ms and 2,425 ms. BetterRTP timed out on every command in those runs; in 11 later BetterRTP-only runs (16,789 teleports) its p99 was 805 ms ([table](https://github.com/dailystruggle/RTP/blob/V3/helpers/StressTestRTP/RESULTS.md#paper-262-linux---paced-5-tps-14-ladder-runs-per-plugin)).
+In the Paper columns, MSPT is the highest per-run p95 at the safe-max stage, and min TPS is the lowest 10 s average in any of those runs.
+
+- **Paper vs. Folia:** Paper places every arriving player on one main thread, so no plugin here gets much past 40 TP/s at 20 TPS. Above its safe max on Paper, LeafRTP still completed every teleport: 21,924 of 21,924 in the 80 and 160 TP/s stages, delivering up to 103.3 TP/s while the server slowed to about 9-10 TPS (MSPT p95 88-105 ms). Folia spreads that work across region threads, and LeafRTP reached 180 TP/s at 19.6 regional TPS (198 ms median latency), peaking at 249.7 TP/s.
+- **Latency at equal load:** time from `/rtp` to arrival, pooled over each plugin's Paper runs ([table](https://github.com/dailystruggle/RTP/blob/V3/helpers/StressTestRTP/RESULTS.md#paper-262-linux-realtime---latency-at-5-to-40-tps)). At 5, 10 and 20 TP/s, LeafRTP's p50 was 5 ms at every rate and its p99 was 6, 6 and 7 ms (max 58 ms over 4,194 teleports, MSPT p95 21-37 ms per run). JakesRTP had the lowest median (0, 3 and 4 ms) with p99 of 13, 26 and 23 ms, but its MSPT p95 reached 77-118 ms at 40 TP/s. Over the same three rates, HuskHomes' p99 was 426-517 ms, BetterRTP's 709-815 ms and JustRTP's 2,471-2,480 ms. EzRTP's was 905 ms at 5 TP/s, and it failed the 10 TP/s stage on timeouts. At 40 TP/s the ready queue runs out in this config and LeafRTP's p50 rises to 158 ms (p99 285 ms); HuskHomes' was 568 ms (p99 1,574 ms).
 
 <details>
 <summary><b>What I changed on each plugin so they do the same job</b></summary>
@@ -480,7 +482,7 @@ A: There's a native NeoForge adapter for 1.21.x / 26.x running the same core as 
 A: Run Arclight or Mohist and use this jar. A native Forge adapter isn't planned.
 
 **Q: Memory and MSPT: should I worry?**
-A: In the paced Paper benchmark (4,186 teleports at 5 per second across 14 runs), MSPT p95 was 21.4-25.0 ms per run and TPS stayed at or above 19.8. Those runs recorded no idle baseline, so this is the whole server's tick time with 48 bots online, not LeafRTP's share of it. Locations kept in the hot queue hold chunk tickets so arrival doesn't wait on chunk loading, and `MemoryTracker` makes sure those tickets are released. Under heap pressure (old-generation use at or above `maxHeapPercent`, 85% by default; on a JVM with no separate old-generation pool and under 512 MB free, total heap use counts too) background filling pauses and the held tickets are dropped back to cold storage, which frees the pinned chunks right away.
+A: In the paced Paper benchmark (598 teleports at 5 per second across 2 runs), MSPT p95 was 21.2-21.3 ms per run and TPS stayed at or above 19.98. At 40 per second it was 42.6-45.2 ms, with TPS at or above 19.19. Those runs recorded no idle baseline, so this is the whole server's tick time with 48 bots online, not LeafRTP's share of it. Locations kept in the hot queue hold chunk tickets so arrival doesn't wait on chunk loading, and `MemoryTracker` makes sure those tickets are released. Under heap pressure (old-generation use at or above `maxHeapPercent`, 85% by default; on a JVM with no separate old-generation pool and under 512 MB free, total heap use counts too) background filling pauses and the held tickets are dropped back to cold storage, which frees the pinned chunks right away.
 
 **Q: Can I use ItemsAdder, Oraxen, Nexo, or CustomModelData in the GUI menu?**
 A: Yes. Icons in `guimenu.yml` take `ia:<id>`, `oraxen:<id>`, `nexo:<id>`, `hdb:<id>`, `head:<player>`, `base64:<hash>` and `<MATERIAL>:<cmd>`. Most of the item plugins behind these prefixes are paid and closed source, so CI can't run them; those hooks are tested against stubs and open-source stand-ins, and support for them is best effort. If the item plugin is missing or its API changes, the icon falls back to a vanilla material. See [Custom Item & Menu Integration](https://dailystruggle.github.io/RTP/admin/CUSTOM_ITEMS/).

@@ -8,6 +8,8 @@ import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.common.predict.BudgetPacer;
+import io.github.dailystruggle.rtp.common.tasks.CompletionPaced;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tools.CfDiag;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
@@ -24,7 +26,7 @@ import java.util.logging.Level;
  * Asynchronously generates and caches safe teleport locations for a region.
  * Pre-warms landing chunks on private queues to prevent main-thread chunk I/O (ADR-016).
  */
-public class RegionCacheTask extends RTPRunnable {
+public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
     private final Region region;
     private final UUID playerId;
     private final long selectRadius;
@@ -38,6 +40,10 @@ public class RegionCacheTask extends RTPRunnable {
      * Idempotency latch for {@link #releaseInFlight()} across multiple terminal branches.
      */
     private final AtomicBoolean released = new AtomicBoolean(false);
+
+    /** Owning pipe's pacer; charged dispatch-to-release wall time once per fill. */
+    private volatile BudgetPacer pacer;
+    private long dispatchNanos;
 
     private static long resolveSelectRadius() {
         if (RTP.configs == null) return 0L;
@@ -97,6 +103,11 @@ public class RegionCacheTask extends RTPRunnable {
     @Override
     protected String sparkFrameName() { return "rtp_cache_generator"; }
 
+    @Override
+    public void bindPacer(BudgetPacer pacer) {
+        this.pacer = pacer;
+    }
+
     /**
      * Executes the location generation and caching logic.
      */
@@ -122,15 +133,11 @@ public class RegionCacheTask extends RTPRunnable {
                 MemoryTracker.untrack(this);
                 return;
             }
-
-            // Throttle: single-flight in-flight public-cache generation per region.
-            // Collapses concurrent retry fan-out into one active train.
-            // Per-player tasks (playerId != null) bypass this gate and are rate-limited upstream.
-            if (!region.inFlightCacheFill.compareAndSet(false, true)) {
-                MemoryTracker.untrack(this);
-                return;
-            }
+            // Concurrency is bounded by the Region.execute deficit; the start rate by the pipe
+            // pacer, which this fill charges its full wall time on release.
         }
+
+        dispatchNanos = System.nanoTime();
 
         // Diagnostic counter: bumped only on the actual issuance path (after
         // throttle / cache-full short-circuits). The CFDIAG dump pairs this
@@ -245,10 +252,16 @@ public class RegionCacheTask extends RTPRunnable {
                     // Capture wall-clock start for the chunk-load wait; used below as a rough
                     // proxy for chunk-loading cost since actual I/O time is server-internal.
                     final long chunkLoadStart = System.nanoTime();
-                    chunkSet.complete().thenAccept(success -> {
+                    // whenComplete: a failed set must still release the slot.
+                    chunkSet.complete().whenComplete((success, ex) -> {
                         // Use elapsed wall-clock time as a rough estimate of chunk loading cost.
                         long elapsed = System.nanoTime() - chunkLoadStart;
                         try {
+                            if (ex != null) {
+                                RTP.log(Level.WARNING, "Chunk preload failed for player " + playerId, ex);
+                                if (res.reservation() != null) res.reservation().close();
+                                return;
+                            }
                             RTPLocation finalPair = new RTPLocation(coords, res.attempts(), res.reservation());
                             region.queueManager.enqueuePlayerLocation(playerId, finalPair);
                         } finally {
@@ -296,16 +309,15 @@ public class RegionCacheTask extends RTPRunnable {
     }
 
     /**
-     * Decrements {@code region.inFlightCalculations}, resets {@code region.inFlightCacheFill}
-     * for public tasks, and untracks this task in {@link MemoryTracker} exactly once across all
-     * terminal branches via CAS.
+     * Decrements {@code region.inFlightCalculations}, charges the fill's wall time to the bound
+     * pacer, and untracks this task in {@link MemoryTracker} exactly once across all terminal
+     * branches via CAS.
      */
     private void releaseInFlight() {
         if (released.compareAndSet(false, true)) {
             region.inFlightCalculations.decrementAndGet();
-            if (playerId == null) {
-                region.inFlightCacheFill.set(false);
-            }
+            BudgetPacer p = pacer;
+            if (p != null) p.recordDuration(System.nanoTime() - dispatchNanos);
             // ADR-043: clear the per-uuid push-on-open guard on the personal
             // fill path so a future openPersonalQueue(uuid) is allowed to
             // schedule another fill once the previous one terminates

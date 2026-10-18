@@ -55,6 +55,8 @@ public class TimeBoundTaskPipe extends RTPTaskPipe {
                 if (stop) return true;
                 Runnable runnable = runnables.poll();
                 if (isDueNow(runnable, delayedRunnables)) {
+                    boolean selfTimed = runnable instanceof CompletionPaced;
+                    if (selfTimed) ((CompletionPaced) runnable).bindPacer(pacer);
                     long localStart = System.nanoTime();
                     try {
                         if (runnable instanceof RTPRunnable)
@@ -66,8 +68,7 @@ public class TimeBoundTaskPipe extends RTPTaskPipe {
                     long localStop = System.nanoTime();
                     ranAny = true;
 
-                    long diff = localStop - localStart;
-                    pacer.recordDuration(diff);
+                    if (!selfTimed) pacer.recordDuration(localStop - localStart);
                     avgTime = pacer.predictedCostNanos();
 
                     dt = localStop - start;

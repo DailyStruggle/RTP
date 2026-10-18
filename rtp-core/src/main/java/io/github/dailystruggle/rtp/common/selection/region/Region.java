@@ -51,16 +51,9 @@ public class Region extends FactoryValue<RegionKeys> {
       new AtomicInteger(0);
   /**
    * Cold->hot promotions holding a ticket while waiting for the chunk to become resident. Counts
-   * toward kept/total capacity but not {@link #inFlightCalculations}, so the wait does not stall
-   * {@link RegionCacheTask}'s single-flight fill gate.
+   * toward kept/total capacity but not {@link #inFlightCalculations}.
    */
   public final AtomicInteger pendingKeptPromotions = new AtomicInteger(0);
-  /**
-   * Dedicated single-flight gate for public cache fill ({@link RegionCacheTask}). Ensures only one
-   * speculative fill train runs per region, decoupled from {@link #inFlightCalculations} so concurrent
-   * player teleports and promotions do not starve background cache refill.
-   */
-  public final AtomicBoolean inFlightCacheFill = new AtomicBoolean(false);
 
   public RTPTaskPipe cachePipeline;
   public RTPTaskPipe miscPipeline;
