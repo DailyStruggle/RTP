@@ -220,13 +220,33 @@ jobs:
 
           echo "Uploading ${PRO_JAR} as version ${VERSION} to BuiltByBit resource ${RESOURCE_ID}..."
 
-          # BuiltByBit API version upload endpoint:
-          HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.builtbybit.com/v1/resources/${RESOURCE_ID}/versions" \
+          # V2 "Post a resource update" (POST /v2/resources/creator/update) is the
+          # only version-upload endpoint. It accepts JSON only (multipart is
+          # rejected with HeaderMalformedError); the file travels base64-encoded
+          # in the body, capped at 100MB total (~67MB raw). BBB prepends 'v' to
+          # version_name. Payload is built on disk to stay under ARG_MAX.
+          PAYLOAD_DIR=$(mktemp -d)
+          base64 -w 0 "${PRO_JAR}" > "${PAYLOAD_DIR}/file.b64"
+          jq -n \
+            --argjson resource_id "${RESOURCE_ID}" \
+            --arg version_name "${VERSION}" \
+            --arg file_name "$(basename "${PRO_JAR}")" \
+            --rawfile file_data "${PAYLOAD_DIR}/file.b64" \
+            --arg title "${TITLE}" \
+            --arg message "${MESSAGE}" \
+            '{
+              resource_id: $resource_id,
+              version_name: $version_name,
+              file: { name: $file_name, data: $file_data },
+              update: { post: true, title: $title, message: $message }
+            }' > "${PAYLOAD_DIR}/payload.json"
+
+          HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.builtbybit.com/v2/resources/creator/update" \
             -H "${AUTH_HEADER}" \
-            -F "file=@${PRO_JAR}" \
-            -F "version_name=${VERSION}" \
-            -F "title=${TITLE}" \
-            -F "message=${MESSAGE}")
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            --data-binary "@${PAYLOAD_DIR}/payload.json")
+          rm -rf "${PAYLOAD_DIR}"
 
           HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '$d')
           HTTP_STATUS=$(echo "$HTTP_RESPONSE" | tail -n 1)
@@ -236,6 +256,11 @@ jobs:
 
           if [ "$HTTP_STATUS" -ne 200 ] && [ "$HTTP_STATUS" -ne 201 ]; then
             echo "::error::BuiltByBit release upload failed with HTTP status ${HTTP_STATUS}: ${HTTP_BODY}"
+            exit 1
+          fi
+
+          if [ "$(echo "$HTTP_BODY" | jq -r '.result // empty' 2>/dev/null)" != "success" ]; then
+            echo "::error::BuiltByBit release upload did not report success: ${HTTP_BODY}"
             exit 1
           fi
 
