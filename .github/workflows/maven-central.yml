@@ -5,8 +5,13 @@ name: Publish API artifacts to Maven Central
 # Portal.
 #
 # WHEN THIS RUNS
-#   Only on a push to the primary branch (`V3`). A manual `workflow_dispatch`
-#   is also allowed for re-runs. Never on an ad-hoc feature or development branch.
+#   Only on a push to the primary branch (`V3`) that touches the published
+#   closure's main sources or the shared build files (`paths` below). Pushes that
+#   change only workflows, docs, tests, or unpublished modules produce byte-equal
+#   artifacts and are skipped. A manual `workflow_dispatch` is also allowed for
+#   re-runs. Never on an ad-hoc feature or development branch. Either trigger is
+#   a no-op when the version in gradle.properties is already published (Central
+#   versions are immutable).
 #
 # WHY FIRST-PARTY ONLY
 #   The build uses only Gradle's built-in `maven-publish` + `signing` plugins
@@ -37,6 +42,27 @@ on:
   push:
     branches:
       - V3
+    # Keep in sync with publishedModulePaths in the root build.gradle and the
+    # task list in the "Sign + stage" step.
+    paths:
+      - 'rtp-api/**'
+      - 'rtp-core/**'
+      - 'api/commands-api/**'
+      - 'api/effects-api/**'
+      - 'api/yaml-api/**'
+      - 'api/metrics-api/**'
+      - 'api/bstats-api/**'
+      - 'api/maps-api/**'
+      - 'platforms/rtp-proxy/rtp-proxy-common/**'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle.properties'
+      - 'gradle/**'
+      - '!api/effects-api/effects-api-fabric-unobf/**'
+      - '!**/src/test/**'
+      - '!**/src/testFixtures/**'
+      - '!**/docs/**'
+      - '!**/*.md'
   workflow_dispatch:
 
 jobs:
@@ -51,12 +77,37 @@ jobs:
         with:
           fetch-depth: 1
 
+      # Skip when this version is already released: a re-upload would only create
+      # a duplicate deployment that Central rejects on publish. Queries the Portal
+      # (authoritative, no repo1 CDN lag). A failed query does not skip.
+      - name: Skip if version already published
+        id: published
+        env:
+          CENTRAL_TOKEN_USER: ${{ secrets.CENTRAL_TOKEN_USER }}
+          CENTRAL_TOKEN_PASS: ${{ secrets.CENTRAL_TOKEN_PASS }}
+        run: |
+          VERSION=$(grep -E '^version=' gradle.properties | cut -d '=' -f 2 | tr -d '[:space:]')
+          AUTH=$(printf '%s:%s' "${CENTRAL_TOKEN_USER}" "${CENTRAL_TOKEN_PASS}" | base64 -w0)
+          HTTP_CODE=$(curl --silent --show-error --write-out '%{http_code}' --output published.json \
+            -H "Authorization: Bearer ${AUTH}" \
+            "https://central.sonatype.com/api/v1/publisher/published?namespace=io.github.dailystruggle&name=rtp-api&version=${VERSION}" || true)
+          if [ "${HTTP_CODE}" = "200" ] && jq -e '.published == true' published.json >/dev/null; then
+            echo "::notice::io.github.dailystruggle:rtp-api:${VERSION} is already published; nothing to upload."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            if [ "${HTTP_CODE}" != "200" ]; then
+              echo "::warning::Central published-check returned HTTP ${HTTP_CODE}; continuing with the upload."
+            fi
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       # The published closure (rtp-api / rtp-core + deps) is JDK-21 code, but a
       # release must NOT pass -PexcludeJdk25 (see PUBLISHING.md): the JDK-25
       # Fabric/Loom modules stay in the build graph, so their Java 25 toolchain
       # must be resolvable. Install both JDKs; setup-java registers each for
       # Gradle's toolchain auto-detection. JDK 25 is last, so it is JAVA_HOME.
       - name: Set up JDKs (21 + 25)
+        if: steps.published.outputs.skip != 'true'
         uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
         with:
           distribution: 'temurin'
@@ -66,11 +117,13 @@ jobs:
           cache: gradle
 
       - name: Grant execute permission for gradlew
+        if: steps.published.outputs.skip != 'true'
         run: chmod +x gradlew
 
       # Sign + stage the whole published closure into build/central-staging/.
       # With SIGNING_KEY present, each publish task also runs its sign... task.
       - name: Sign + stage to Central staging
+        if: steps.published.outputs.skip != 'true'
         run: >-
           ./gradlew --no-daemon
           :commands-api:publishMavenJavaPublicationToCentralStagingRepository
@@ -90,6 +143,7 @@ jobs:
       # without .asc signatures is rejected by Central, and a silent skip would
       # contradict S-004 (no silently swallowed failures).
       - name: Verify signatures were produced
+        if: steps.published.outputs.skip != 'true'
         run: |
           ASC_COUNT=$(find build/central-staging -name '*.asc' | wc -l)
           echo "Found ${ASC_COUNT} .asc signature files."
@@ -101,6 +155,7 @@ jobs:
       # The Portal expects a zip whose internal layout IS the Maven repository
       # layout (i.e. the contents of build/central-staging).
       - name: Bundle the staging tree
+        if: steps.published.outputs.skip != 'true'
         run: |
           cd build/central-staging
           zip -r ../central-bundle.zip .
@@ -108,6 +163,7 @@ jobs:
           ls -l build/central-bundle.zip
 
       - name: Upload bundle to the Central Portal
+        if: steps.published.outputs.skip != 'true'
         env:
           CENTRAL_TOKEN_USER: ${{ secrets.CENTRAL_TOKEN_USER }}
           CENTRAL_TOKEN_PASS: ${{ secrets.CENTRAL_TOKEN_PASS }}

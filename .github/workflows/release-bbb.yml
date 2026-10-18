@@ -256,14 +256,14 @@ jobs:
             git push origin "$TAG"
           fi
 
-      # The `v<version>` tag, Modrinth publish, and the public GitHub Release are
-      # intentionally NOT handled here: they are Git / markdown-listing concerns
-      # owned by release.yml, which triggers on the same PR-merge event. Keeping
-      # them out of this workflow is what keeps each site's publish in exactly
-      # one place (no Modrinth version collision, no duplicate GitHub Release).
+      # Modrinth, Hangar, and the public GitHub Release are intentionally NOT
+      # handled here: release.yml owns them and is dispatched manually once Pro
+      # settles (ADR-100 section 2.3). Keeping them out of this workflow keeps
+      # each site's publish in exactly one place (no Modrinth version collision,
+      # no duplicate GitHub Release).
 
       - name: Generate SLSA Build Provenance (Pro jar)
-        uses: actions/attest-build-provenance@c074443f1a5cf70e7c5b0c9146f82725e2e8f5fb # v2.2.3
+        uses: actions/attest-build-provenance@c074443f1aee8d4aeeae555aebba3282517141b2 # v2.2.3
         with:
           # Only the Pro jar is published from this workflow (to BuiltByBit).
           # The Lite jar is attested by release.yml where it is published.

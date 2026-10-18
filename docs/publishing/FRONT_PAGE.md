@@ -144,7 +144,7 @@ One jar for Paper and Spigot (1.18+), Folia (1.21.11+), Fabric (1.20.1 and 1.21+
 
 <!-- only: bbb-pro -->
 <!-- kind: promo -->
-This listing is how you pay for support. The code is the same as the [free download](https://modrinth.com/plugin/rtpv3) and all of it is MIT licensed. Paying doesn't unlock anything in the plugin; details are in [What paying gets you](#what-paying-gets-you) below.
+This listing is how you pay for support. The code is the same as the [free download](https://modrinth.com/plugin/leafrtp) and all of it is MIT licensed. Paying doesn't unlock anything in the plugin; details are in [What paying gets you](#what-paying-gets-you) below.
 <!-- /kind -->
 <!-- /only -->
 <!-- only: bbb-lite -->
@@ -580,5 +580,5 @@ Support comes from me, the person who wrote the code.
 - [**Changelog**](https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md)
 - [**Source on GitHub**](https://github.com/dailystruggle/RTP): issues, contributions, the benchmark harness
 <!-- only: bbb-pro -->
-- [**Free download**](https://modrinth.com/plugin/rtpv3)
+- [**Free download**](https://modrinth.com/plugin/leafrtp)
 <!-- /only -->
