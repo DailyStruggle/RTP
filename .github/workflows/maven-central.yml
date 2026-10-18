@@ -47,6 +47,7 @@ on:
     paths:
       - 'rtp-api/**'
       - 'rtp-core/**'
+      - 'api/anvil-api/**'
       - 'api/commands-api/**'
       - 'api/effects-api/**'
       - 'api/yaml-api/**'
@@ -126,6 +127,7 @@ jobs:
         if: steps.published.outputs.skip != 'true'
         run: >-
           ./gradlew --no-daemon
+          :anvil-api:publishMavenJavaPublicationToCentralStagingRepository
           :commands-api:publishMavenJavaPublicationToCentralStagingRepository
           :yaml-api:publishMavenJavaPublicationToCentralStagingRepository
           :metrics-api:publishMavenJavaPublicationToCentralStagingRepository

@@ -522,8 +522,8 @@ subprojects {
 //
 // Closure rationale (transitive `api`/`implementation` project edges):
 //   rtp-api  -> commands-api, yaml-api, metrics-api
-//   rtp-core -> rtp-api, commands-api, yaml-api, effects-api, metrics-api,
-//               bstats-api, maps-api, rtp-proxy:rtp-proxy-common
+//   rtp-core -> rtp-api, anvil-api, commands-api, yaml-api, effects-api,
+//               metrics-api, bstats-api, maps-api, rtp-proxy:rtp-proxy-common
 //   rtp-proxy-common   -> rtp-api
 // Every coordinate that can appear in a generated POM must itself be published,
 // otherwise a consumer's transitive resolution fails. commands-api and
@@ -532,6 +532,7 @@ subprojects {
 def publishedModulePaths = [
         ':rtp-api',
         ':rtp-core',
+        ':anvil-api',
         ':commands-api',
         ':effects-api',
         ':yaml-api',
