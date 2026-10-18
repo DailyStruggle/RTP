@@ -3,7 +3,9 @@
 import pathlib
 import tempfile
 import unittest
+from unittest import mock
 
+import scripts.release.build_front_pages as bfp
 from scripts.release.build_front_pages import (
     RAW_BASE,
     SOURCE,
@@ -20,6 +22,19 @@ from scripts.release.build_front_pages import (
 )
 
 NOTES = "<!--\nauthor notes, never emitted\n-->\n"
+
+# Badge widths are fetched over the network; keep the suite offline and deterministic.
+_BADGE_WIDTHS = {"https://i/x.svg": 68}
+_real_badge_width = bfp.badge_width.__wrapped__  # uncached
+_badge_patch = mock.patch.object(bfp, "badge_width", side_effect=_BADGE_WIDTHS.get)
+
+
+def setUpModule():
+    _badge_patch.start()
+
+
+def tearDownModule():
+    _badge_patch.stop()
 
 
 def _render(body, target):
@@ -142,10 +157,26 @@ class BBCodeTest(unittest.TestCase):
     def test_inline_conversion(self):
         self.assertEqual("[B]bold[/B] [I]code *[x=1][/I] [URL='https://a.b/']text[/URL]",
                          inline_bbcode("**bold** `code *[x=1]` [text](https://a.b/)"))
-        self.assertEqual("[URL='https://l/'][IMG]https://i/x.svg[/IMG][/URL]",
+        self.assertEqual("[URL='https://l/'][IMG width=\"68px\"]https://i/x.svg[/IMG][/URL]",
                          inline_bbcode("[![badge](https://i/x.svg)](https://l/)"))
         self.assertEqual("see below", inline_bbcode("[see below](#section)"))
         self.assertEqual("[I]italic[/I] and 3 * 4", inline_bbcode("*italic* and 3 * 4"))
+
+    def test_badge_without_known_width_falls_back_to_plain_img(self):
+        self.assertEqual("[URL='https://l/'][IMG]https://i/unknown.svg[/IMG][/URL]",
+                         inline_bbcode("[![badge](https://i/unknown.svg)](https://l/)"))
+
+    def test_raster_images_skip_width_lookup(self):
+        bfp.badge_width.reset_mock()
+        self.assertEqual("[IMG]https://i/shot.png[/IMG]", inline_bbcode("![shot](https://i/shot.png)"))
+        bfp.badge_width.assert_not_called()
+
+    def test_svg_width_is_parsed_from_root_element(self):
+        body = b'<svg xmlns="http://www.w3.org/2000/svg" width="186" height="20"><rect stroke-width="3"/>'
+        resp = mock.MagicMock()
+        resp.__enter__.return_value.read.return_value = body
+        with mock.patch.object(bfp.urllib.request, "urlopen", return_value=resp):
+            self.assertEqual(186, _real_badge_width("https://i/y.svg"))
 
     def test_block_conversion(self):
         body = ('<div align="center">\n\n# Title\n\n</div>\n\n## Section\n\n### Sub\n\n'

@@ -294,7 +294,7 @@ The confinement engine restricts participants to an active spatial boundary:
 * `SUBSPACE`: Restricts players to the generated subspace footprint centered on the anchor.
 * `REGION`: Restricts players to the parent region's shape. If the region has `expand: true`, the boundary grows with it and never shrinks.
 * `LEASH`: Circle around the anchor, radius in blocks (`leashRadius: 48.0`).
-* `SHAPE`: Custom shape boundary (`shape: { name: CIRCLE, radius: 5c }`, i.e. 80 blocks).
+* `SHAPE`: Custom shape boundary (a nested `shape:` block with `name: CIRCLE` and `radius: 5c`, i.e. 80 blocks).
 
 ### Clientbound Visual World Borders
 
@@ -322,11 +322,19 @@ triggers:
   - id: "spawn_portal"
     type: "PORTAL"               # PORTAL | PRESSURE_PLATE | STEP_IN
     world: "world"
-    pos1: { x: -10, y: 64, z: -10 }
-    pos2: { x: -8, y: 68, z: -8 }
+    pos1:
+      x: -10
+      y: 64
+      z: -10
+    pos2:
+      x: -8
+      y: 68
+      z: -8
     cooldown: 5s
     batchInterval: 15s           # Spatial lobby timer (0s for instant teleport)
 ```
+
+RTP's YAML reader does not accept inline `{ ... }` maps; a file that uses them is quarantined as unparseable. Write `pos1` / `pos2` as nested blocks, as above.
 
 ### Wave Accumulator Spatial Lobbies (`batchInterval > 0`)
 

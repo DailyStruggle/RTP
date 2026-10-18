@@ -1326,6 +1326,34 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   }
 
   /**
+   * Parses a seconds-denominated setting ({@code teleportDelay}, {@code teleportCooldown}) into
+   * milliseconds. A bare number, numeric or quoted, is seconds; a suffixed token ({@code 500ms},
+   * {@code 2m}, {@code 20t}) keeps its own unit. Not {@link #parseDurationMillis}, which reads a
+   * bare number as milliseconds.
+   *
+   * @param input config value
+   * @param defMillis fallback when {@code input} is missing or unparseable
+   * @return milliseconds, {@code 0} for zero, negative or infinite values, else {@code defMillis}
+   */
+  public static long parseSecondsDurationMillis(Object input, long defMillis) {
+    if (input == null) return defMillis;
+    if (input instanceof Number num) {
+      double sec = num.doubleValue();
+      return sec > 0 ? Math.round(sec * 1000.0) : 0L;
+    }
+    String s = input.toString().trim();
+    if (s.isEmpty()) return defMillis;
+    // Not Double.parseDouble alone: it accepts "3d" / "3f" as Java literals, and "3d" is 3 days.
+    if (s.matches("-?\\d+(\\.\\d+)?")) {
+      double sec = Double.parseDouble(s);
+      return sec > 0 ? Math.round(sec * 1000.0) : 0L;
+    }
+    long ms = parseDurationMillis(s, Long.MIN_VALUE);
+    if (ms == Long.MIN_VALUE) return defMillis;
+    return Math.max(ms, 0L);
+  }
+
+  /**
    * Parses duration string or number into seconds with -1L (infinite) fallback.
    *
    * @param input string or object representation of duration

@@ -2,7 +2,8 @@
 
 A tiny reference addon that demonstrates **effect registration**: how to add your own
 teleport effect to LeafRTP so it sits alongside the built-ins (FIREWORK, PARTICLE, SOUND,
-POTION, NOTE, GLIDE, TITLE) and is usable by name in config and permissions.
+POTION, NOTE, GLIDE, COMMAND, and TITLE on Fabric / NeoForge) and is usable by name in config
+and permissions.
 
 The effect it ships is the **"Virtual Rift" world-deconstruction** animation from the
 roadmap: while a player stands through the teleport warmup, the terrain around them tears open

@@ -3,6 +3,7 @@
 - **Status:** Accepted (2026-05-06; revised after user feedback the same day; amended 2026-10-15 - `effectsapi/fabric` moved to the Fabric platform carrier, see *Amendment 2026-10-15*)
 - **Supersedes:** —
 - **Superseded by:** —
+- **Amendment proposed:** [ADR-116](../../../../docs/adr/ADR-116-effects-through-neutral-server-accessor.md) (effects through a neutral server accessor; the `EffectRuntime` chokepoint below was never built, and per-platform registration lists have drifted - RTP-70)
 - **Related:**
   - `.junie/AGENTS.md` *Architecture Boundaries* (no platform imports in `rtp-api` / `rtp-core`; analogous principle applied to `effectsapi/common`).
   - `commands-api-ADR-001-brigadier-bridge.md` — **direct precedent**: `commands-api` keeps `common/`, `bukkit/`, `brigadier/` as **subpackages of one module** with `compileOnly` Spigot + `compileOnly` Brigadier; we mirror that exact shape here.

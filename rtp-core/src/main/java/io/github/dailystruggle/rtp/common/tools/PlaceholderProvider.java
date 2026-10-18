@@ -150,7 +150,8 @@ public class PlaceholderProvider {
                     if (RTP.getInstance() == null) return "0";
                     if (RTP.serverAccessor == null) return "0";
                     RTPCommandSender commandSender = RTP.serverAccessor.getSender(uuid);
-                    Number n = RTP.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.teleportDelay, 0);
+                    Number n = ConfigParser.parseSecondsDurationMillis(
+                            RTP.configs.getConfigValue(ConfigKeys.teleportDelay, 0), 0L) / 1000L;
                     int n2 = ParsePermissions.getInt(commandSender, "rtp.delay.");
                     if (n2 >= 0) n = n2;
                     if (n.longValue() == 0) return "0";
@@ -180,8 +181,8 @@ public class PlaceholderProvider {
                     if (RTP.getInstance() == null) return "A";
                     if (RTP.serverAccessor == null) return "B";
                     RTPCommandSender commandSender = RTP.serverAccessor.getSender(uuid);
-                    Number n =
-                            RTP.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.teleportCooldown, 0);
+                    Number n = ConfigParser.parseSecondsDurationMillis(
+                            RTP.configs.getConfigValue(ConfigKeys.teleportCooldown, 0), 0L) / 1000L;
                     int n2 = ParsePermissions.getInt(commandSender, "rtp.cooldown.");
                     if (n2 >= 0) n = n2;
 

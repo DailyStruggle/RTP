@@ -45,6 +45,11 @@ public class PhysicalTriggerManager implements AutoCloseable {
     }
   }
 
+  /** True once the once-per-second wave accumulator is scheduled; without it batch triggers never fire. */
+  public boolean isWaveTimerScheduled() {
+    return accumulatorTaskHandle != null;
+  }
+
   public void registerTrigger(PhysicalTriggerSpec trigger) {
     Objects.requireNonNull(trigger, "trigger must not be null");
     String key = trigger.id().toLowerCase();

@@ -37,9 +37,11 @@ Usage:
 """
 
 import argparse
+import functools
 import pathlib
 import re
 import sys
+import urllib.request
 from dataclasses import dataclass, field
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -351,6 +353,39 @@ def _plain(text):
     return re.sub(r"[*`]", "", re.sub(r"</?b>", "", text)).replace('"', "'")
 
 
+_SVG_WIDTH = re.compile(rb"<svg\b[^>]*?\swidth=\"(\d+(?:\.\d+)?)\"")
+
+
+def _is_svg_badge(url):
+    return url.startswith("https://img.shields.io/") or url.split("?", 1)[0].endswith(".svg")
+
+
+@functools.lru_cache(maxsize=None)
+def badge_width(url):
+    """Intrinsic px width of an SVG badge, or None if it can't be fetched.
+
+    BuiltByBit stretches an SVG without an explicit width to the full post width,
+    so badges need `[IMG width=...]`. A failed fetch degrades to a plain [IMG]
+    with a warning rather than failing the build.
+    """
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "build_front_pages"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            m = _SVG_WIDTH.search(resp.read(4096))
+    except (OSError, ValueError) as e:
+        print(f"warning: badge width lookup failed for {url}: {e}", file=sys.stderr)
+        return None
+    if not m:
+        print(f"warning: no width attribute in badge {url}", file=sys.stderr)
+        return None
+    return round(float(m.group(1)))
+
+
+def _bb_img(url):
+    width = badge_width(url) if _is_svg_badge(url) else None
+    return f'[IMG width="{width}px"]{url}[/IMG]' if width else f"[IMG]{url}[/IMG]"
+
+
 def inline_bbcode(text, line_no=0):
     codes = []
 
@@ -360,8 +395,8 @@ def inline_bbcode(text, line_no=0):
 
     s = re.sub(r"`([^`]+)`", stash, text)
     s = re.sub(r"\[!\[[^\]]*\]\(([^)\s]+)\)\]\(([^)\s]+)\)",
-               lambda m: f"[URL='{m.group(2)}'][IMG]{m.group(1)}[/IMG][/URL]", s)
-    s = re.sub(r"!\[[^\]]*\]\(([^)\s]+)\)", lambda m: f"[IMG]{m.group(1)}[/IMG]", s)
+               lambda m: f"[URL='{m.group(2)}']{_bb_img(m.group(1))}[/URL]", s)
+    s = re.sub(r"!\[[^\]]*\]\(([^)\s]+)\)", lambda m: _bb_img(m.group(1)), s)
 
     def link(m):
         label, url = m.group(1), m.group(2)

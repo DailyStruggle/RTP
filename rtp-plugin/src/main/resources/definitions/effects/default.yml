@@ -76,9 +76,14 @@ effects:
   #- FIREWORK.BURST.2.1.ORANGE.YELLOW.true.true.true.0.0.0
   #- FIREWORK.CREEPER.1.1.GREEN.BLACK.false.false.true.0.0.0
 
-  # --- GLIDE (built-in, Bukkit 1.9+) ---
-  # ELYTRA = a short elytra glide when you land. No addon needed.
-  #- GLIDE.ELYTRA
+  # --- GLIDE catalog (PLATFORM.RELATIVE.MAX.TIMEOUT.FIREWORKS.PLACE.WORLD) ---
+  # Lifts you RELATIVE blocks (capped at Y=MAX) and starts an elytra glide down.
+  # No elytra or addon needed; the glide holds until you are just above ground.
+  # All args optional.
+  # PLATFORM = block for an emergency landing pad if the server stops mid-glide.
+  # TIMEOUT in ticks forces a landing. Leave out SLOW_FALLING when gliding.
+  #- GLIDE.STONE.60.320
+  #- GLIDE.STONE.100.320.400
 
 # DO NOT TOUCH VERSION NUMBER
 version: "1.0"

@@ -1630,6 +1630,10 @@ public class RTP {
     long asyncTime = TimeUnit.MILLISECONDS.toNanos(io.github.dailystruggle.rtp.common.tasks.tick.TickBudget.DEFAULT_ASYNC_MS);
     trackedTasks.add(scheduler.runTaskTimerAsynchronously(new io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing(asyncTime), 1, 1));
 
+    // The static initializer ran before the platform set the scheduler, so the wave
+    // accumulator for batchInterval triggers (ADR-093) can only be scheduled here.
+    triggerManager.start();
+
     // Discover and load platform-agnostic addons once core init has settled. Deferred via a
     // startup task so RTPAPI delegates installed by the platform adapter after construction are
     // visible to RTPAddon#onLoad (the load is idempotent; late programmatic registrations are
@@ -1686,7 +1690,7 @@ public class RTP {
       ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) configs.getParser(ConfigKeys.class);
       if (configParser != null) {
         Object val = configParser.getConfigValue(ConfigKeys.teleportCooldown, 0);
-        long parsed = ConfigParser.parseDurationMillis(val, 0L);
+        long parsed = ConfigParser.parseSecondsDurationMillis(val, 0L);
         if (parsed > 0) cdMillis = parsed;
       }
     }
@@ -2101,6 +2105,8 @@ public class RTP {
       scheduler.cancelTask(task);
     }
     trackedTasks.clear();
+    // Cancels the wave timer and drops triggers so the next enable schedules afresh.
+    triggerManager.close();
 
     // Delayed arrival releases never run once the plugin is disabled (S-002).
     int arrivalHolds =

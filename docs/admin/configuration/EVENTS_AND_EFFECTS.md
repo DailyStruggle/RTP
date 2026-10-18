@@ -87,7 +87,7 @@ rtp.effect.<stage>.<TYPE>[.<arg1>[.<arg2>[...]]]
 
 ### Built-in effect types
 
-Registered in `effects-api/.../EffectFactory.java`. Available on every supported server version (MC ≥ 1.20.1):
+Registered in `effects-api/.../EffectFactory.java` by each platform's effects initializer. Not every type is registered on every platform yet; see *Platform availability* below the table. A type that is not registered on your platform is skipped without an error.
 
 | `<TYPE>` | Class | Safety / extras |
 |----------|-------|-----------------|
@@ -96,10 +96,24 @@ Registered in `effects-api/.../EffectFactory.java`. Available on every supported
 | `PARTICLE` | `ParticleEffect` | Spawns particles at the player. |
 | `POTION` | `PotionEffect` | Applied to the teleporting player. |
 | `SOUND` | `SoundEffect` | Played at the player's location. |
+| `GLIDE` | `GlideEffect` | Lifts the player and starts an elytra glide down (no elytra item needed). `GlideSafetyListener` keeps the glide going until the player is just above ground and handles players still gliding at shutdown. |
+| `TITLE` | `TitleEffect` | Shows a title and subtitle to the player. |
 | `COMMAND` | `CommandEffect` | Executes a console or player command at the configured trigger stage (effects-api-ADR-007). |
 | `DROP_INVENTORY` | `DropInventoryEffect` | Drops inventory at origin location before teleporting without going through death screen. |
 | `DROP_EXP` | `DropExpEffect` | Drops experience according to vanilla death formula (`min(level * 7, 100)`) and resets exp. |
 | `DEATH` | `DeathEffect` | Kills the player, triggering vanilla death event and death screen. |
+
+#### Platform availability
+
+| `<TYPE>` | Bukkit / Paper / Spigot / Folia | Fabric (MC 1.20.1 - 1.21.x) | Fabric (MC 26.x) | NeoForge |
+|----------|------|------|------|------|
+| `SOUND`, `PARTICLE`, `POTION`, `COMMAND`, `DEATH` / `KILL` | yes | yes | yes | yes |
+| `FIREWORK`, `NOTE` | yes | no | no | no |
+| `GLIDE` | yes | yes | no | no |
+| `TITLE` | no | yes | yes | yes |
+| `DROP_INVENTORY`, `DROP_EXP` / `DROP_EXPERIENCE` | yes | yes | yes | no |
+
+Where `TITLE` is missing, use `COMMAND CONSOLE title [player] title ...` instead. Making every type available on every platform is tracked in [ADR-116](../../adr/ADR-116-effects-through-neutral-server-accessor.md).
 
 #### Positional arguments per type
 
@@ -158,6 +172,22 @@ Since 3.0.0-beta.2, the firework parser walks the canonical key order with a non
 | 4 | `DX` | x-offset from player |
 | 5 | `DY` | y-offset |
 | 6 | `DZ` | z-offset |
+
+**`GLIDE`** — `GlideEffect` (effects-api-ADR-001)
+
+All arguments are optional; missing trailing ones keep their defaults. Give them in the order below.
+
+| Pos | Variable | Default | Meaning |
+|-----|----------|---------|---------|
+| 1 | `SHUTDOWNPLATFORMMATERIAL` | `STONE` | Block for an emergency 3x3 landing pad if the server stops while the player is still gliding and nothing safe is below. |
+| 2 | `RELATIVE` | `75` | Blocks above the destination to lift the player before the glide starts. |
+| 3 | `MAX` | `320` | Highest Y the lift may reach. |
+| 4 | `LANDINGTIMEOUT` | none | Ticks before a landing is forced. |
+| 5 | `ALLOWFIREWORKS` | `false` | `false` blocks firework-rocket boosts during the glide. |
+| 6 | `PLACEONSHUTDOWN` | `true` | On shutdown, place still-gliding players on the highest safe block below them. |
+| 7 | `WORLD` | `*` | Accepted for compatibility; the effect does not filter by world. |
+
+Example, at `postteleport`: `GLIDE.STONE.60.320`. Do not combine it with `POTION.SLOW_FALLING`, which works against the glide.
 
 **`COMMAND`** — `CommandEffect` (effects-api-ADR-007)
 

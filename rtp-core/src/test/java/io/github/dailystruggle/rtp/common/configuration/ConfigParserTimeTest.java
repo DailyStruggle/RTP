@@ -63,6 +63,28 @@ class ConfigParserTimeTest {
   }
 
   @Test
+  @DisplayName("ConfigParser: parseSecondsDurationMillis reads bare numbers as seconds (teleportDelay / teleportCooldown)")
+  void testParseSecondsDurationMillis() {
+    // Bare numbers are seconds, as config.yml documents (@unit: seconds).
+    assertEquals(3000L, ConfigParser.parseSecondsDurationMillis(3, 0L));
+    assertEquals(300_000L, ConfigParser.parseSecondsDurationMillis(300, 0L));
+    assertEquals(1500L, ConfigParser.parseSecondsDurationMillis(1.5, 0L));
+    assertEquals(3000L, ConfigParser.parseSecondsDurationMillis("3", 0L));
+    // Unit suffixes keep their own unit.
+    assertEquals(3000L, ConfigParser.parseSecondsDurationMillis("3s", 0L));
+    assertEquals(500L, ConfigParser.parseSecondsDurationMillis("500ms", 0L));
+    assertEquals(5L * 60_000L, ConfigParser.parseSecondsDurationMillis("5m", 0L));
+    assertEquals(100L, ConfigParser.parseSecondsDurationMillis("2t", 0L));
+    assertEquals(86_400_000L, ConfigParser.parseSecondsDurationMillis("1d", 0L));
+    // Zero and negatives mean no wait; missing or unparseable falls back.
+    assertEquals(0L, ConfigParser.parseSecondsDurationMillis(0, 7L));
+    assertEquals(0L, ConfigParser.parseSecondsDurationMillis(-5, 7L));
+    assertEquals(7L, ConfigParser.parseSecondsDurationMillis(null, 7L));
+    assertEquals(7L, ConfigParser.parseSecondsDurationMillis("", 7L));
+    assertEquals(7L, ConfigParser.parseSecondsDurationMillis("garbage", 7L));
+  }
+
+  @Test
   @DisplayName("ConfigParser: getTime reads duration values with fallback support")
   void testGetTime() {
     File tempDir = new File("target/test-data/config-parser-time");

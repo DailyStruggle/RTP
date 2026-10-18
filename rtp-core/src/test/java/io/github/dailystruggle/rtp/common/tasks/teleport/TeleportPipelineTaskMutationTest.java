@@ -1919,6 +1919,27 @@ public class TeleportPipelineTaskMutationTest {
         assertEquals(TeleportPipelineTask.Phase.CLEANUP, task.getPhase());
     }
 
+    @Test
+    @DisplayName("runSetup records the origin on TeleportData pre-created by /rtp (cancelDistance needs it)")
+    void runSetup_fills_origin_on_command_created_data() {
+        Region reg = createTestRegion("setup_origin_reg");
+        SettablePlayer player = createPlayer("SetupOriginP");
+        accessor.setLocationGenerator(new CustomLocationGenerator((r, c) -> new CompletableFuture<>()));
+
+        // RTPCmd stores a TeleportData carrying only the sender before submitting the pipeline.
+        TeleportData data = new TeleportData();
+        data.sender = player;
+        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+
+        new TeleportPipelineTask(new GenerationContext(player, player, null), reg).run();
+
+        assertNotNull(data.originalCoords, "OnPlayerMove skips the cancel check without originalCoords");
+        assertEquals(player.getLocation().world().name(), data.originalCoords.worldName());
+        assertEquals(player.getLocation().x(), data.originalCoords.x());
+        assertEquals(player.getLocation().z(), data.originalCoords.z());
+        assertEquals(player.getLocation().world().name(), data.originWorldName);
+    }
+
     // -------------------------------------------------------------------------
     // 18. Pre and post action hook executions
     // -------------------------------------------------------------------------
@@ -3219,6 +3240,53 @@ public class TeleportPipelineTaskMutationTest {
         task.run();
 
         assertTrue(scheduledTicks.get() <= 0, "Negative remaining time must clamp toTicks to 0");
+    }
+
+    @Test
+    @DisplayName("runLoad without a chunkSet (cached location) still waits out teleportDelay")
+    void runLoad_without_chunkSet_honors_delay() throws Exception {
+        SettablePlayer player = createPlayer("NoChunkSetDelayP");
+        player.setDelay(3000L);
+        GenerationContext ctx = new GenerationContext(player, player, null);
+        Region reg = createTestRegion("no_chunkset_delay_reg");
+        RTPCoords coords = new RTPCoords(world.name(), 0, 64, 0);
+        TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg, coords);
+
+        TeleportData data = new TeleportData();
+        data.sender = player;
+        data.nextTask = task;
+        data.time = System.currentTimeMillis();
+        RTP.getInstance().latestTeleportData.put(player.uuid(), data);
+        Field tpDataField = TeleportPipelineTask.class.getDeclaredField("teleportData");
+        tpDataField.setAccessible(true);
+        tpDataField.set(task, data);
+
+        final java.util.concurrent.atomic.AtomicLong scheduledTicks = new java.util.concurrent.atomic.AtomicLong(-1);
+        final AtomicBoolean ranImmediately = new AtomicBoolean(false);
+        io.github.dailystruggle.rtp.api.scheduling.RTPScheduler original = RTP.scheduler;
+        try {
+            RTP.scheduler = new io.github.dailystruggle.rtp.common.mock.MockRTPScheduler() {
+                @Override
+                public void runTaskForPlayer(io.github.dailystruggle.rtp.api.entity.RTPPlayer p, RTPRunnable runnable, long delayTicks) {
+                    if (runnable == task) scheduledTicks.set(delayTicks);
+                }
+
+                @Override
+                public void runTask(Runnable runnable) {
+                    if (runnable == task) ranImmediately.set(true);
+                }
+            };
+
+            task.setPhase(TeleportPipelineTask.Phase.LOAD);
+            task.run();
+        } finally {
+            RTP.scheduler = original;
+        }
+
+        assertFalse(ranImmediately.get(), "A 3 s delay must not dispatch the teleport at once");
+        assertTrue(scheduledTicks.get() >= 58L && scheduledTicks.get() <= 60L,
+                "3000 ms remaining should schedule ~60 ticks, got " + scheduledTicks.get());
+        assertEquals(TeleportPipelineTask.Phase.TELEPORT, task.getPhase());
     }
 
     @Test

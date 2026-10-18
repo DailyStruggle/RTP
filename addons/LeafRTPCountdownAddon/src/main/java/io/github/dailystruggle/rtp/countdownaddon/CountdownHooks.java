@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import java.util.Map;
 import java.util.UUID;
@@ -49,6 +50,10 @@ import java.util.function.Consumer;
  * {@link RTPPlayer#showProgressBar(String, String, double)} / {@link RTPPlayer#clearProgressBar(String)}
  * rather than chat spam, so the per-second updates replace one on-screen bar in place instead of
  * flooding the chat log.
+ *
+ * <p><b>Cancellation:</b> both bars belong to the teleport. {@link RTPTeleportCancel#postActions}
+ * stops and clears them as soon as the teleport is cancelled (movement, damage, {@code /rtp cancel});
+ * the delay timer also stops on its next tick if its pipeline task was cancelled by any other path.
  */
 public final class CountdownHooks {
 
@@ -69,9 +74,12 @@ public final class CountdownHooks {
 
   private final BiConsumer<Region, UUID> popHook = this::onQueuePop;
 
-  /** Registers the pipeline pre-action and the core queue hooks. */
+  private final Consumer<RTPTeleportCancel> cancelHook = this::onCancel;
+
+  /** Registers the pipeline pre-action, the cancel post-action and the core queue hooks. */
   public void register() {
     TeleportPipelineTask.setupPreActions.add(setupHook);
+    RTPTeleportCancel.postActions.add(cancelHook);
     Region.onPlayerQueuePush.add(pushHook);
     Region.onPlayerQueuePop.add(popHook);
   }
@@ -79,6 +87,7 @@ public final class CountdownHooks {
   /** Cancels in-flight countdowns and detaches the static core hooks. */
   public void unregister() {
     TeleportPipelineTask.setupPreActions.remove(setupHook);
+    RTPTeleportCancel.postActions.remove(cancelHook);
     Region.onPlayerQueuePush.remove(pushHook);
     Region.onPlayerQueuePop.remove(popHook);
     delayTasks.values().forEach(RTP.scheduler::cancelTask);
@@ -111,10 +120,31 @@ public final class CountdownHooks {
     int seconds = (int) (delayMillis / 1000L);
     if (seconds <= 0) return;
 
-    RTP.scheduler.runTask(() -> startDelayCountdown(id, seconds));
+    RTP.scheduler.runTask(() -> startDelayCountdown(id, seconds, task));
   }
 
-  private void startDelayCountdown(UUID id, int seconds) {
+  /** The teleport was cancelled: drop both bars now instead of letting them count down. */
+  private void onCancel(RTPTeleportCancel cancel) {
+    if (cancel == null || cancel.getPlayerId() == null) return;
+    UUID id = cancel.getPlayerId();
+    RTP.scheduler.runTask(
+        () -> {
+          stop(delayTasks, id, DELAY_BAR);
+          stop(queueTasks, id, QUEUE_BAR);
+        });
+  }
+
+  private void stop(Map<UUID, Object> tasks, UUID id, String barId) {
+    Object task = tasks.remove(id);
+    if (task == null) return;
+    RTP.scheduler.cancelTask(task);
+    RTPPlayer p = RTP.serverAccessor.getPlayer(id);
+    if (p != null) p.clearProgressBar(barId);
+  }
+
+  private void startDelayCountdown(UUID id, int seconds, TeleportPipelineTask pipeline) {
+    // Cancelled between the setup hook and this scheduled start.
+    if (pipeline.isCancelled()) return;
     if (RTP.serverAccessor.getPlayer(id) == null) return;
 
     // Replace any stale countdown for this player.
@@ -127,7 +157,7 @@ public final class CountdownHooks {
         RTP.scheduler.runTaskTimer(
             () -> {
               RTPPlayer p = RTP.serverAccessor.getPlayer(id);
-              if (p == null || remaining[0] <= 0) {
+              if (p == null || remaining[0] <= 0 || pipeline.isCancelled()) {
                 if (p != null) p.clearProgressBar(DELAY_BAR);
                 Object self = delayTasks.remove(id);
                 if (self != null) RTP.scheduler.cancelTask(self);
