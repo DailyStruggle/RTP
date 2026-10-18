@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
@@ -40,6 +39,9 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
      * Idempotency latch for {@link #releaseInFlight()} across multiple terminal branches.
      */
     private final AtomicBoolean released = new AtomicBoolean(false);
+
+    /** Fill deadline in ticks (30 s); matches the per-player chunk-set failsafe. */
+    static final long FILL_DEADLINE_TICKS = 600L;
 
     /** Owning pipe's pacer; charged dispatch-to-release wall time once per fill. */
     private volatile BudgetPacer pacer;
@@ -133,10 +135,13 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
                 MemoryTracker.untrack(this);
                 return;
             }
-            // Concurrency is bounded by the Region.execute deficit; the start rate by the pipe
-            // pacer, which this fill charges its full wall time on release.
         }
 
+        // Fills in flight are capped by the Region.execute deficit; the start rate by the pipe
+        // pacer, charged the wall time from here to releaseInFlight(). Not every chunk is
+        // loadable and not every adapter bounds its load, so a fill that has not finished by
+        // FILL_DEADLINE_TICKS releases its slot and charges the deadline to the pacer; a result
+        // arriving later is dropped (see processResult).
         dispatchNanos = System.nanoTime();
 
         // Diagnostic counter: bumped only on the actual issuance path (after
@@ -177,6 +182,7 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
             if (locationFuture.isDone()) {
                 processResult(locationFuture.join());
             } else {
+                scheduleDeadline();
                 locationFuture.thenAccept(res -> {
                     long asyncStart = System.nanoTime();
                     try {
@@ -192,7 +198,26 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
         }
     }
 
+    private void scheduleDeadline() {
+        if (RTP.scheduler == null) return;
+        RTP.scheduler.runTaskLater(() -> {
+            if (released.get()) return;
+            RTP.log(playerId != null ? Level.WARNING : Level.FINE,
+                    "[Region:" + region.name + "] cache fill"
+                            + (playerId != null ? " for player " + playerId : "")
+                            + " did not finish within " + FILL_DEADLINE_TICKS + " ticks; slot released");
+            // Charge at least the nominal deadline: tick length varies, the cost to refill does not.
+            releaseInFlight(FILL_DEADLINE_TICKS * 50_000_000L);
+        }, FILL_DEADLINE_TICKS);
+    }
+
     private void processResult(GenerationResult res) {
+        if (released.get()) {
+            // Past the fill deadline: the slot is gone, so drop the result and free its pin
+            // (REQ-RTP-S-002) rather than overshoot the cache deficit.
+            if (res != null && res.reservation() != null) res.reservation().close();
+            return;
+        }
         if (res == null) {
             // Normal-null completion paths: malformed region, pregen dispatch
             // failure (LocationGenerator.getLocationFuture lines 105/181/188),
@@ -274,18 +299,19 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
                 }
             } else {
                 if (res.coords() != null) {
-                    if (res.reservation() != null && !observationalOnly) {
-                        // ADR-110 pinned fill: the reservation moves into the kept (pinned) queue.
-                        ChunkReservation pin = res.reservation();
-                        boolean kept = region.queueManager.keptLocations.offer(
-                                new RTPLocation(res.coords(), res.attempts(), pin));
-                        LiveLoadGate.of(region.name).onPinnedHandoff(kept);
-                        if (kept) {
-                            releaseInFlight();
-                            return;
+                    if (res.reservation() != null) {
+                        if (!observationalOnly) {
+                            // ADR-110 pinned fill: ownership of the reservation moves into the
+                            // kept (pinned) queue; this task no longer closes it.
+                            boolean kept = region.queueManager.keptLocations.offer(
+                                    new RTPLocation(res.coords(), res.attempts(), res.reservation()));
+                            LiveLoadGate.of(region.name).onPinnedHandoff(kept);
+                            if (kept) {
+                                releaseInFlight();
+                                return;
+                            }
                         }
-                        pin.close();
-                    } else if (res.reservation() != null) {
+                        // Not handed off: released here (REQ-RTP-S-002).
                         res.reservation().close();
                     }
                     // Observational mode: drop the safe candidate instead of
@@ -314,10 +340,14 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
      * branches via CAS.
      */
     private void releaseInFlight() {
+        releaseInFlight(0L);
+    }
+
+    private void releaseInFlight(long minChargeNanos) {
         if (released.compareAndSet(false, true)) {
             region.inFlightCalculations.decrementAndGet();
             BudgetPacer p = pacer;
-            if (p != null) p.recordDuration(System.nanoTime() - dispatchNanos);
+            if (p != null) p.recordDuration(Math.max(minChargeNanos, System.nanoTime() - dispatchNanos));
             // ADR-043: clear the per-uuid push-on-open guard on the personal
             // fill path so a future openPersonalQueue(uuid) is allowed to
             // schedule another fill once the previous one terminates
