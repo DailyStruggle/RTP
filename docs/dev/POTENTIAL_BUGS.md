@@ -396,28 +396,3 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Suggested next step:** Derive the suggestion set from the jar's `lang/` entries (or one shared constant checked by `LocaleParityTest`) and use it for the fallback comment.
 
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->
-ypothesis:** "Delayed terminal lifecycle step aborts if player went offline" throws `ClassCastException: ProfilingRTPScheduler cannot be cast to MockRTPScheduler` in a shared JVM and passes alone. An earlier test leaves the profiling wrapper installed on the static scheduler.
-- **Impact:** Test-order flake only; no runtime effect.
-- **Suggested next step:** Install a fresh `MockRTPScheduler` in the test's own setup (or unwrap `ProfilingRTPScheduler`) instead of casting the shared static.
-
-### 2026-10-13 - Block-list rejection log still names `safety.yml`
-
-- **Severity:** Cosmetic
-- **Status:** Open
-- **Discovered during:** v3.3.0 pre-release front-page audit (block-list grammar section)
-- **Location:** `PregenState` / `QueueTask` warnings `[safety.yml] rejected unsafe-blocks token ...`
-- **Symptom / hypothesis:** `unsafeBlocks` / `airBlocks` live in `advanced/blocks.yml` (lists in an old `safety.yml` are migrated there, ADR-071), but the warning prefix still names `safety.yml`.
-- **Impact:** Operators look in the wrong file for the rejected token. FRONT_PAGE.md quotes the current text and explains the mismatch, so it needs updating with the fix.
-- **Suggested next step:** Change the prefix to `[advanced/blocks.yml]` (message text is a log string, not a `messages.yml` key) and update the quoted line in `docs/publishing/FRONT_PAGE.md`.
-
-### 2026-10-13 - `/rtp config language` suggests 5 of the 11 bundled locales
-
-- **Severity:** Cosmetic
-- **Status:** Open
-- **Discovered during:** front-page underselling pass (11-languages bullet)
-- **Location:** `rtp-core/.../commands/config/LanguageCmd.java` `BUNDLED_LOCALES` (en, de, es, fr, nl); `LanguageBootstrap.writeDefault` fallback comment ("Bundled locales: en, de, es, fr")
-- **Symptom / hypothesis:** `rtp-plugin/src/main/resources/lang/` ships de, es, fr, it, ja, ko, nl, pl, pt, ru, zh (plus the `cat` novelty locale). `sanitize` accepts all of them, but tab completion and the fallback `language.yml` comment list fewer.
-- **Impact:** Operators may not know it, ja, ko, pl, pt, ru or zh exist unless they read the docs; typing them works.
-- **Suggested next step:** Derive the suggestion set from the jar's `lang/` entries (or one shared constant checked by `LocaleParityTest`) and use it for the fallback comment.
-
-<!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->
