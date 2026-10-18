@@ -4017,6 +4017,27 @@
   
   
     <li class="md-nav__item">
+      <a href="ADR-116-effects-through-neutral-server-accessor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-116 - Effects Through a Neutral Server Accessor, Not Per-Platform Initializers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4671,6 +4692,11 @@
 <td><a href="ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/">ADR-115</a></td>
 <td>Package DAG Disentanglement and Finite Decision-Preservation Hypergraph (resolves SonarQube package tangles in <code>rtp-core</code> via 4-tier DAG; decouples four primary cyclic seams; models code as a finite decision hypergraph with in-code invariant tags to eliminate reinvention and prevent optimizing away ADR decisions)</td>
 <td>Accepted</td>
+</tr>
+<tr>
+<td><a href="ADR-116-effects-through-neutral-server-accessor/">ADR-116</a></td>
+<td>Effects Through a Neutral Server Accessor, Not Per-Platform Initializers (accessor contract moves from <code>rtp-api</code> to a module with no RTP dependency that <code>rtp-api</code> re-exports; effects-api depends only on it; platforms implement effect primitives on the accessor; <code>HandleRegistry</code> and the four hand-copied <code>*EffectsInitializer</code> registration lists removed; one built-in registration with explicit unsupported-primitive reporting; <code>effectsapi/bukkit</code> moves to the Bukkit carrier; parity and no-platform-import tests; amends effects-api-ADR-003/006; RTP-70)</td>
+<td>Proposed (after 3.3.0)</td>
 </tr>
 </tbody>
 </table>

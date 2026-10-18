@@ -1211,6 +1211,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#platform-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      Platform availability
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#positional-arguments-per-type" class="md-nav__link">
     <span class="md-ellipsis">
       Positional arguments per type
@@ -4185,6 +4194,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../adr/ADR-116-effects-through-neutral-server-accessor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-116 - Effects Through a Neutral Server Accessor, Not Per-Platform Initializers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4296,6 +4326,15 @@
   
     <nav class="md-nav" aria-label="Built-in effect types">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#platform-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      Platform availability
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#positional-arguments-per-type" class="md-nav__link">
@@ -4553,7 +4592,7 @@ See also: <a href="../../COMMANDS/"><code>COMMANDS.md</code></a> for permission 
 <li><code>&lt;arg1&gt;</code>, <code>&lt;arg2&gt;</code>, … are <strong>positional</strong> values, filled into the effect's parameter enum <strong>in declaration order</strong>. Missing arguments fall back to the effect's defaults.</li>
 </ul>
 <h3 id="built-in-effect-types">Built-in effect types<a class="headerlink" href="#built-in-effect-types" title="Permanent link">&para;</a></h3>
-<p>Registered in <code>effects-api/.../EffectFactory.java</code>. Available on every supported server version (MC ≥ 1.20.1):</p>
+<p>Registered in <code>effects-api/.../EffectFactory.java</code> by each platform's effects initializer. Not every type is registered on every platform yet; see <em>Platform availability</em> below the table. A type that is not registered on your platform is skipped without an error.</p>
 <table>
 <thead>
 <tr>
@@ -4589,6 +4628,16 @@ See also: <a href="../../COMMANDS/"><code>COMMANDS.md</code></a> for permission 
 <td>Played at the player's location.</td>
 </tr>
 <tr>
+<td><code>GLIDE</code></td>
+<td><code>GlideEffect</code></td>
+<td>Lifts the player and starts an elytra glide down (no elytra item needed). <code>GlideSafetyListener</code> keeps the glide going until the player is just above ground and handles players still gliding at shutdown.</td>
+</tr>
+<tr>
+<td><code>TITLE</code></td>
+<td><code>TitleEffect</code></td>
+<td>Shows a title and subtitle to the player.</td>
+</tr>
+<tr>
 <td><code>COMMAND</code></td>
 <td><code>CommandEffect</code></td>
 <td>Executes a console or player command at the configured trigger stage (effects-api-ADR-007).</td>
@@ -4610,6 +4659,56 @@ See also: <a href="../../COMMANDS/"><code>COMMANDS.md</code></a> for permission 
 </tr>
 </tbody>
 </table>
+<h4 id="platform-availability">Platform availability<a class="headerlink" href="#platform-availability" title="Permanent link">&para;</a></h4>
+<table>
+<thead>
+<tr>
+<th><code>&lt;TYPE&gt;</code></th>
+<th>Bukkit / Paper / Spigot / Folia</th>
+<th>Fabric (MC 1.20.1 - 1.21.x)</th>
+<th>Fabric (MC 26.x)</th>
+<th>NeoForge</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SOUND</code>, <code>PARTICLE</code>, <code>POTION</code>, <code>COMMAND</code>, <code>DEATH</code> / <code>KILL</code></td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>FIREWORK</code>, <code>NOTE</code></td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>GLIDE</code></td>
+<td>yes</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>TITLE</code></td>
+<td>no</td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>DROP_INVENTORY</code>, <code>DROP_EXP</code> / <code>DROP_EXPERIENCE</code></td>
+<td>yes</td>
+<td>yes</td>
+<td>yes</td>
+<td>no</td>
+</tr>
+</tbody>
+</table>
+<p>Where <code>TITLE</code> is missing, use <code>COMMAND CONSOLE title [player] title ...</code> instead. Making every type available on every platform is tracked in <a href="../../../adr/ADR-116-effects-through-neutral-server-accessor/">ADR-116</a>.</p>
 <h4 id="positional-arguments-per-type">Positional arguments per type<a class="headerlink" href="#positional-arguments-per-type" title="Permanent link">&para;</a></h4>
 <p>Order and names come directly from the matching <code>*TypeNames</code> enum in <code>effects-api/.../LocalEffects/enums/</code>.</p>
 <p><strong><code>FIREWORK</code></strong> — <code>FireworkTypeNames</code></p>
@@ -4808,6 +4907,63 @@ See also: <a href="../../COMMANDS/"><code>COMMANDS.md</code></a> for permission 
 </tr>
 </tbody>
 </table>
+<p><strong><code>GLIDE</code></strong> — <code>GlideEffect</code> (effects-api-ADR-001)</p>
+<p>All arguments are optional; missing trailing ones keep their defaults. Give them in the order below.</p>
+<table>
+<thead>
+<tr>
+<th>Pos</th>
+<th>Variable</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>SHUTDOWNPLATFORMMATERIAL</code></td>
+<td><code>STONE</code></td>
+<td>Block for an emergency 3x3 landing pad if the server stops while the player is still gliding and nothing safe is below.</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>RELATIVE</code></td>
+<td><code>75</code></td>
+<td>Blocks above the destination to lift the player before the glide starts.</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>MAX</code></td>
+<td><code>320</code></td>
+<td>Highest Y the lift may reach.</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>LANDINGTIMEOUT</code></td>
+<td>none</td>
+<td>Ticks before a landing is forced.</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>ALLOWFIREWORKS</code></td>
+<td><code>false</code></td>
+<td><code>false</code> blocks firework-rocket boosts during the glide.</td>
+</tr>
+<tr>
+<td>6</td>
+<td><code>PLACEONSHUTDOWN</code></td>
+<td><code>true</code></td>
+<td>On shutdown, place still-gliding players on the highest safe block below them.</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>WORLD</code></td>
+<td><code>*</code></td>
+<td>Accepted for compatibility; the effect does not filter by world.</td>
+</tr>
+</tbody>
+</table>
+<p>Example, at <code>postteleport</code>: <code>GLIDE.STONE.60.320</code>. Do not combine it with <code>POTION.SLOW_FALLING</code>, which works against the glide.</p>
 <p><strong><code>COMMAND</code></strong> — <code>CommandEffect</code> (effects-api-ADR-007)</p>
 <p>Executes arbitrary commands at any trigger stage (<code>presetup</code>, <code>postteleport</code>, <code>cancel</code>, <code>death</code>, etc.):</p>
 <ul>

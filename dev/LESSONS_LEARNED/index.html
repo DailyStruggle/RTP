@@ -3939,6 +3939,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-116-effects-through-neutral-server-accessor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-116 - Effects Through a Neutral Server Accessor, Not Per-Platform Initializers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4575,6 +4596,15 @@
   <a href="#2026-10-12-folia-benchmark-chunk-systemio-threads-1-is-one-io-thread" class="md-nav__link">
     <span class="md-ellipsis">
       2026-10-12 - Folia benchmark: chunk-system.io-threads: -1 is one IO thread
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2026-10-18-paper-262-spam-threshold-seconds-of-0-or-1-kicks-on-the-first-message" class="md-nav__link">
+    <span class="md-ellipsis">
+      2026-10-18 - Paper 26.2: *-spam-threshold-seconds of 0 or -1 kicks on the first message
     </span>
   </a>
   
@@ -5784,6 +5814,8 @@ tp-core first (specifically the RTP constructor and     asks.tick package) befor
 <hr />
 <h2 id="2026-10-12-folia-benchmark-chunk-systemio-threads-1-is-one-io-thread">2026-10-12 - Folia benchmark: <code>chunk-system.io-threads: -1</code> is one IO thread<a class="headerlink" href="#2026-10-12-folia-benchmark-chunk-systemio-threads-1-is-one-io-thread" title="Permanent link">&para;</a></h2>
 <p>Paper/Folia <code>paper-global.yml</code> <code>chunk-system.io-threads: -1</code> runs a single chunk IO thread (any value below zero). At 200+ TP/s every arrival queues ~25 chunk reads, and a villager in the fresh destination region blocks its region thread in <code>AcquirePoi</code> -&gt; <code>PoiManager.getOrLoad</code> -&gt; <code>ChunkHolderManager.loadPoiChunk</code> (<code>LockSupport.park</code>) until that one IO thread reaches it; the Folia watchdog logged 6-16 s stalls and 44 s slow teleports. Parked time reads as idle in spark, so region threads looked 83% idle. Set <code>io-threads</code> explicitly (16 on a 32-core host) for high-rate Folia benchmarks. <code>worker-threads: -1</code> already scales (half the physical cores).</p>
+<h2 id="2026-10-18-paper-262-spam-threshold-seconds-of-0-or-1-kicks-on-the-first-message">2026-10-18 - Paper 26.2: <code>*-spam-threshold-seconds</code> of <code>0</code> or <code>-1</code> kicks on the first message<a class="headerlink" href="#2026-10-18-paper-262-spam-threshold-seconds-of-0-or-1-kicks-on-the-first-message" title="Permanent link">&para;</a></h2>
+<p>Minecraft 26.2 added <code>chat-spam-threshold-seconds</code> and <code>command-spam-threshold-seconds</code> to <code>server.properties</code>; the vanilla docs say <code>0</code> disables the kick. On Paper 26.2 both <code>-1</code> and <code>0</code> kicked every non-op player with "Kicked for spamming" on their first command (reproduced with a mineflayer bot on the GIF demo server; ops are exempt, so it only shows after <code>/deop</code>). To effectively disable it on a demo or bench server, set a large value such as <code>3600</code>: 15 commands in 3 s then pass.</p>
 <h2 id="git-workspace-safety">Git &amp; Workspace Safety<a class="headerlink" href="#git-workspace-safety" title="Permanent link">&para;</a></h2>
 <h3 id="working-tree-protection-and-destructive-git-operations-2026-06-14">Working tree protection and destructive git operations (2026-06-14)<a class="headerlink" href="#working-tree-protection-and-destructive-git-operations-2026-06-14" title="Permanent link">&para;</a></h3>
 <p>The user's working tree often contains uncommitted in-progress work across multiple modules. An agent must never run destructive git operations (<code>git stash</code>, <code>git reset --hard</code>, <code>git restore</code>, <code>git checkout --</code>, <code>git clean -fd</code>, <code>git push --force</code>) without explicit written approval in the current session.</p>

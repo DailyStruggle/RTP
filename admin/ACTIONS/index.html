@@ -4212,6 +4212,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-116-effects-through-neutral-server-accessor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-116 - Effects Through a Neutral Server Accessor, Not Per-Platform Initializers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4815,7 +4836,7 @@
 <li><code>SUBSPACE</code>: Restricts players to the generated subspace footprint centered on the anchor.</li>
 <li><code>REGION</code>: Restricts players to the parent region's shape. If the region has <code>expand: true</code>, the boundary grows with it and never shrinks.</li>
 <li><code>LEASH</code>: Circle around the anchor, radius in blocks (<code>leashRadius: 48.0</code>).</li>
-<li><code>SHAPE</code>: Custom shape boundary (<code>shape: { name: CIRCLE, radius: 5c }</code>, i.e. 80 blocks).</li>
+<li><code>SHAPE</code>: Custom shape boundary (a nested <code>shape:</code> block with <code>name: CIRCLE</code> and <code>radius: 5c</code>, i.e. 80 blocks).</li>
 </ul>
 <h3 id="clientbound-visual-world-borders">Clientbound Visual World Borders<a class="headerlink" href="#clientbound-visual-world-borders" title="Permanent link">&para;</a></h3>
 <p>When <code>boundary</code> is set to <code>LEASH</code> or <code>SUBSPACE</code>, participants see a world border centered on the anchor. Only session participants see it, and it is removed when the session ends.</p>
@@ -4835,11 +4856,18 @@
 <span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;spawn_portal&quot;</span>
 <span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;PORTAL&quot;</span><span class="w">               </span><span class="c1"># PORTAL | PRESSURE_PLATE | STEP_IN</span>
 <span class="w">    </span><span class="nt">world</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;world&quot;</span>
-<span class="w">    </span><span class="nt">pos1</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> x</span><span class="p">:</span><span class="w"> </span><span class="nv">-10</span><span class="p p-Indicator">,</span><span class="nt"> y</span><span class="p">:</span><span class="w"> </span><span class="nv">64</span><span class="p p-Indicator">,</span><span class="nt"> z</span><span class="p">:</span><span class="w"> </span><span class="nv">-10</span><span class="w"> </span><span class="p p-Indicator">}</span>
-<span class="w">    </span><span class="nt">pos2</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="nt"> x</span><span class="p">:</span><span class="w"> </span><span class="nv">-8</span><span class="p p-Indicator">,</span><span class="nt"> y</span><span class="p">:</span><span class="w"> </span><span class="nv">68</span><span class="p p-Indicator">,</span><span class="nt"> z</span><span class="p">:</span><span class="w"> </span><span class="nv">-8</span><span class="w"> </span><span class="p p-Indicator">}</span>
+<span class="w">    </span><span class="nt">pos1</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">x</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-10</span>
+<span class="w">      </span><span class="nt">y</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">64</span>
+<span class="w">      </span><span class="nt">z</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-10</span>
+<span class="w">    </span><span class="nt">pos2</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">x</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-8</span>
+<span class="w">      </span><span class="nt">y</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">68</span>
+<span class="w">      </span><span class="nt">z</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">-8</span>
 <span class="w">    </span><span class="nt">cooldown</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5s</span>
 <span class="w">    </span><span class="nt">batchInterval</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">15s</span><span class="w">           </span><span class="c1"># Spatial lobby timer (0s for instant teleport)</span>
 </code></pre></div>
+<p>RTP's YAML reader does not accept inline <code>{ ... }</code> maps; a file that uses them is quarantined as unparseable. Write <code>pos1</code> / <code>pos2</code> as nested blocks, as above.</p>
 <h3 id="wave-accumulator-spatial-lobbies-batchinterval-0">Wave Accumulator Spatial Lobbies (<code>batchInterval &gt; 0</code>)<a class="headerlink" href="#wave-accumulator-spatial-lobbies-batchinterval-0" title="Permanent link">&para;</a></h3>
 <p>When <code>batchInterval</code> is set to a non-zero duration (e.g. <code>15s</code>), the trigger functions as a <strong>Wave Accumulator Spatial Lobby</strong>:
 1. Stepping into the trigger volume registers the player as an active lobby occupant without immediately teleporting.
