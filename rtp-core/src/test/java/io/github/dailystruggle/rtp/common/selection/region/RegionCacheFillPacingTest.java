@@ -140,6 +140,38 @@ class RegionCacheFillPacingTest {
                 "after slow completions the pacer admits one fill per pulse (forward progress only)");
     }
 
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    @DisplayName("A fill that never completes releases its slot at the fill deadline and charges the pacer")
+    void neverCompletingFillReleasesAtDeadline() {
+        TimeBoundTaskPipe pipe = new TimeBoundTaskPipe();
+        long initial = pipe.pacer().predictedCostNanos();
+        CompletableFuture<GenerationResult> never = new CompletableFuture<>();
+        nextResult = () -> never;
+        assertEquals(1, pulse(pipe, 1));
+        accessor.getMockScheduler().tick(RegionCacheTask.FILL_DEADLINE_TICKS - 1);
+        assertEquals(1, region.inFlightCalculations.get(), "slot held until the deadline");
+        accessor.getMockScheduler().tick(1);
+        assertEquals(0, region.inFlightCalculations.get(), "deadline must release the slot");
+        assertTrue(pipe.pacer().predictedCostNanos() > initial,
+                "the timed-out fill must be charged to the pacer");
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.SECONDS)
+    @DisplayName("A result arriving after the fill deadline is dropped, not queued")
+    void lateResultAfterDeadlineIsDropped() {
+        CompletableFuture<GenerationResult> late = new CompletableFuture<>();
+        nextResult = () -> late;
+        new RegionCacheTask(region, PULSE_BUDGET).run();
+        accessor.getMockScheduler().tick(RegionCacheTask.FILL_DEADLINE_TICKS);
+        long coldBefore = region.queueManager.unkeptLocations.size();
+        late.complete(new GenerationResult(new RTPCoords("fill_pacing_world", 48, 64, 48), 1, null));
+        assertEquals(coldBefore, (long) region.queueManager.unkeptLocations.size(),
+                "late result must not enter cold after its slot was released");
+        assertEquals(0, region.inFlightCalculations.get(), "no double release");
+    }
+
     private final class SuppliedGenerator implements ILocationGenerator {
         @Override
         public CompletableFuture<GenerationResult> getLocation(Object region, GenerationContext context) {
