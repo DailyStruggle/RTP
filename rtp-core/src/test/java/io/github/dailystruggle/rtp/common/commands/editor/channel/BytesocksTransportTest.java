@@ -146,10 +146,10 @@ class BytesocksTransportTest {
     @Test
     @DisplayName("first join failure: start completes exceptionally without blocking, the session goes on snapshot-only")
     void firstJoinFailureThrows() throws Exception {
-        int port = relay.port();
-        relay.close();
-        BytesocksTransport t = new BytesocksTransport(http, "http://127.0.0.1:" + port, KEY,
-                BytesocksTransport.DEFAULT_TTL_MILLIS, now::get, timer);
+        // The relay stays bound and refuses the upgrade: a closed port can be rebound by a parallel
+        // test fork before the join, which then succeeds against the wrong server.
+        relay.refuseJoin = true;
+        BytesocksTransport t = transport();
         var started = t.start(new Recorder());
         ExecutionException e = assertThrows(ExecutionException.class, () -> started.get(15, TimeUnit.SECONDS));
         assertInstanceOf(IOException.class, e.getCause());
@@ -225,13 +225,15 @@ class BytesocksTransportTest {
 
     /**
      * Minimal bytesocks stand-in on 127.0.0.1: {@code GET /create} answers 201 with {@code Location},
-     * any other path upgrades to a WebSocket (RFC 6455 text, close and ping frames only).
+     * any other path upgrades to a WebSocket (RFC 6455 text, close and ping frames only), or answers
+     * 503 while {@code refuseJoin} is set.
      */
     private static final class StubRelay implements AutoCloseable {
         final List<String> httpRequests = new CopyOnWriteArrayList<>();
         final List<String> received = new CopyOnWriteArrayList<>();
         final List<Socket> sockets = new CopyOnWriteArrayList<>();
         volatile boolean failCreate;
+        volatile boolean refuseJoin;
         private final ServerSocket server;
 
         StubRelay() throws IOException {
@@ -280,6 +282,12 @@ class BytesocksTransportTest {
                             ? "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
                             : "HTTP/1.1 201 Created\r\nLocation: /" + KEY + "\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
                     out.write(res.getBytes(StandardCharsets.US_ASCII));
+                    out.flush();
+                    return;
+                }
+                if (refuseJoin) {
+                    out.write("HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                            .getBytes(StandardCharsets.US_ASCII));
                     out.flush();
                     return;
                 }
