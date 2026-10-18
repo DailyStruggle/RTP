@@ -88,7 +88,7 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 ## [Unreleased]
 
-## [3.3.0] - Unreleased
+## [3.3.0] - 2026-10-18
 
 > **Upgrade note.** `rtp.servers.*` now defaults to `true` instead of `op`, so in network mode every player can reach open cross-server regions; restrict with negative permissions if you relied on the old default. `CIRCLE` and `SQUARE` now use new selection engines that ignore `weight`; use `CIRCLE_DEPRECATED_PURE_SPIRAL` or `SQUARE_DEPRECATED_PURE_SPIRAL` to keep the 3.2.1 behavior. Region shapes now default to `mode: REROLL` instead of `ACCUMULATE`; files that set `mode` keep their value. In `config.yml`, `defaults.shape.uniquePlacements` now defaults to `"auto"` (a radius matching the view distance) instead of `0`, and `defaults.spatialResolution` to `"auto"` (scaled to the region's size) instead of `3`; set `0` and `3` to keep the 3.2.1 values. Both jars now load on Minecraft 1.18 or newer with Java 17 or newer; the Lite jar no longer loads on 1.13 - 1.17. Folia is supported only from 1.21.11; older Folia still loads the jar but is no longer supported. Saved memory and region cache files from 3.2.1 still load, but RTP rewrites them in a new format at the next save or shutdown, and 3.2.1 can't read that format, so back up `plugins/RTP/` if you may need to roll back.
 
