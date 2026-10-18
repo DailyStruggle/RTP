@@ -300,17 +300,32 @@ class EditorTransportAndApplyTest {
             Files.deleteIfExists(expectedHtml);
         } catch (IOException ignored) {}
 
+        io.github.dailystruggle.rtp.common.mock.MockRTPCommandSender sender =
+                (io.github.dailystruggle.rtp.common.mock.MockRTPCommandSender) RTP.serverAccessor.getSender(caller);
+        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+
         boolean result = editorCmd.onCommand(caller, Map.of(), null);
         assertTrue(result);
 
-        // Wait briefly for async fallback export
-        long deadline = System.currentTimeMillis() + 5000;
-        while (System.currentTimeMillis() < deadline && (!Files.exists(expectedHtml) || getFileSize(expectedHtml) == 0)) {
-            try { Thread.sleep(50); } catch (InterruptedException ignored) {}
+        // index.html lands before the feed prepares live/ beside it: wait for the whole export to
+        // finish, or tempDir cleanup races the export thread's directory writes
+        long deadline = System.currentTimeMillis() + 15_000L;
+        while (System.currentTimeMillis() < deadline
+                && sender.sentMessages.stream().noneMatch(m -> m.contains("Generated offline local editor bundle"))
+                && accessor.logMessages.stream().noneMatch(m -> m.contains("Failed to generate fallback local editor"))) {
+            try {
+                Thread.sleep(25L);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            }
         }
-
-        assertTrue(Files.exists(expectedHtml));
         EditorLiveFeed.stopActive("test end");
+
+        assertTrue(sender.sentMessages.stream().anyMatch(m -> m.contains("Generated offline local editor bundle")),
+                "fallback export must complete: " + accessor.logMessages);
+        assertTrue(Files.exists(expectedHtml));
+        assertTrue(getFileSize(expectedHtml) > 0);
     }
 
     @Test
