@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
@@ -216,10 +217,14 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
     }
 
     private void processResult(GenerationResult res) {
+        // Ownership of the pin moves to a queue (or the chunk-set callback) on success, so it
+        // cannot be scoped by try-with-resources; every non-handoff exit closes it (REQ-RTP-S-002).
+        //noinspection resource
+        final ChunkReservation reservation = res != null ? res.reservation() : null;
         if (released.get()) {
             // Past the fill deadline: the slot is gone, so drop the result and free its pin
             // (REQ-RTP-S-002) rather than overshoot the cache deficit.
-            if (res != null && res.reservation() != null) res.reservation().close();
+            if (reservation != null) reservation.close();
             return;
         }
         if (res == null) {
@@ -232,16 +237,18 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
             releaseInFlight();
             return;
         }
+        // True once the reservation is handed off or already closed on this path.
+        boolean pinSettled = false;
         try {
             if (playerId != null) {
                 if (res.coords() != null) {
                     RTPCoords coords = res.coords();
                     ChunkSet chunkSet = res.verifiedChunks();
-                    if (res.reservation() != null) {
+                    if (reservation != null) {
                         LiveLoadGate.of(region.name).onPinnedHandoff(true);
                     }
 
-                    if (chunkSet == null && res.reservation() == null) {
+                    if (chunkSet == null && reservation == null) {
                         // ADR-110: unpinned result - no ring preload (it would unload before use).
                         try {
                             region.queueManager.enqueuePlayerLocation(playerId,
@@ -288,27 +295,30 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
                         try {
                             if (ex != null) {
                                 RTP.log(Level.WARNING, "Chunk preload failed for player " + playerId, ex);
-                                if (res.reservation() != null) res.reservation().close();
+                                if (reservation != null) reservation.close();
                                 return;
                             }
-                            RTPLocation finalPair = new RTPLocation(coords, res.attempts(), res.reservation());
+                            RTPLocation finalPair = new RTPLocation(coords, res.attempts(), reservation);
                             region.queueManager.enqueuePlayerLocation(playerId, finalPair);
                         } finally {
                             PerformanceTracker.totalNanosecondsConsumed.add(elapsed);
                             releaseInFlight();
                         }
                     });
+                    // Callback registered: it now owns the reservation.
+                    pinSettled = true;
                 } else {
                     releaseInFlight();
                 }
             } else {
                 if (res.coords() != null) {
-                    if (res.reservation() != null) {
+                    if (reservation != null) {
                         if (!observationalOnly) {
                             // ADR-110 pinned fill: ownership of the reservation moves into the
                             // kept (pinned) queue; this task no longer closes it.
                             boolean kept = region.queueManager.keptLocations.offer(
-                                    new RTPLocation(res.coords(), res.attempts(), res.reservation()));
+                                    new RTPLocation(res.coords(), res.attempts(), reservation));
+                            pinSettled = kept;
                             LiveLoadGate.of(region.name).onPinnedHandoff(kept);
                             if (kept) {
                                 releaseInFlight();
@@ -316,7 +326,8 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
                             }
                         }
                         // Not handed off: released here (REQ-RTP-S-002).
-                        res.reservation().close();
+                        reservation.close();
+                        pinSettled = true;
                     }
                     // Observational mode: drop the safe candidate instead of
                     // enqueuing it. All biome / bad-location side effects already
@@ -335,6 +346,15 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
             // release the in-flight slot, otherwise a single buggy reservation
             // close or buffer offer can permanently freeze the cache deficit.
             releaseInFlight();
+        } finally {
+            // Coordinate-less results and exceptional exits before handoff must not strand the pin.
+            if (!pinSettled && reservation != null) {
+                try {
+                    reservation.close();
+                } catch (RuntimeException e) {
+                    RTP.log(Level.SEVERE, "Failed to release chunk reservation in processResult", e);
+                }
+            }
         }
     }
 

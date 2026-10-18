@@ -21,7 +21,7 @@ public class Rectangle extends MemoryShape<RectangleParams> {
       new EnumMap<>(RectangleParams.class);
 
   static {
-    defaults.put(RectangleParams.mode, Mode.ACCUMULATE);
+    defaults.put(RectangleParams.mode, Mode.REROLL);
     defaults.put(RectangleParams.width, 256);
     defaults.put(RectangleParams.height, 256);
     defaults.put(RectangleParams.centerX, 0);

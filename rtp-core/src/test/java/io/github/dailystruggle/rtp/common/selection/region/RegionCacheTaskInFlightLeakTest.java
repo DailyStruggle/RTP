@@ -5,6 +5,8 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
+import io.github.dailystruggle.rtp.api.world.ChunkReservation;
+import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
@@ -18,13 +20,16 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Regression guard for {@code inFlightCalculations} accounting in {@link RegionCacheTask}.
@@ -35,13 +40,14 @@ public class RegionCacheTaskInFlightLeakTest {
     Path tempDir;
 
     private MockRTPServerAccessor accessor;
+    private MockRTPWorld world;
     private Region region;
 
     @BeforeEach
     void setUp() {
         accessor = RTPTestSetup.install(tempDir.toFile());
 
-        MockRTPWorld world = new MockRTPWorld("inflight_leak_world");
+        world = new MockRTPWorld("inflight_leak_world");
         accessor.addWorld(world);
 
         Circle circle = new Circle();
@@ -256,6 +262,125 @@ public class RegionCacheTaskInFlightLeakTest {
 
         assertEquals(0, region.inFlightCalculations.get(),
                 "inFlightCalculations must be decremented on async completion");
+    }
+
+    /**
+     * REQ-RTP-S-002: a public-fill result carrying a reservation but no coordinates must release
+     * the pin. Prior to the fix the reservation fell through to {@code releaseInFlight()} unclosed.
+     */
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.SECONDS)
+    void reqRtpS002_publicFill_coordlessPinnedResult_closesReservation() {
+        TrackingReservation reservation = newReservation();
+        accessor.setLocationGenerator(new FixedLocationGenerator(
+                new GenerationResult(null, 1, null, reservation)));
+
+        new RegionCacheTask(region, 50_000_000L).run();
+
+        assertEquals(1, reservation.closes.get(), "coord-less pinned result must close its reservation");
+        assertTrue(reservation.wasReleased(), "force-load ticket must be dropped");
+        assertEquals(0, region.inFlightCalculations.get());
+    }
+
+    /**
+     * REQ-RTP-S-002: same invariant on the per-player fill path.
+     */
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.SECONDS)
+    void reqRtpS002_playerFill_coordlessPinnedResult_closesReservation() {
+        UUID playerId = UUID.randomUUID();
+        region.openPersonalQueue(playerId);
+        TrackingReservation reservation = newReservation();
+        accessor.setLocationGenerator(new FixedLocationGenerator(
+                new GenerationResult(null, 1, null, reservation)));
+
+        new RegionCacheTask(region, playerId, 50_000_000L).run();
+
+        assertEquals(1, reservation.closes.get(), "coord-less pinned result must close its reservation");
+        assertTrue(reservation.wasReleased(), "force-load ticket must be dropped");
+        assertEquals(0, region.inFlightCalculations.get());
+    }
+
+    /**
+     * A pinned public fill handed off to the kept queue must stay open (ownership transferred).
+     */
+    @Test
+    @Timeout(value = 2, unit = TimeUnit.SECONDS)
+    void publicFill_pinnedResultHandedOff_doesNotCloseReservation() {
+        TrackingReservation reservation = newReservation();
+        RTPCoords coords = new RTPCoords("inflight_leak_world", 500, 64, 500);
+        accessor.setLocationGenerator(new FixedLocationGenerator(
+                new GenerationResult(coords, 1, null, reservation)));
+
+        new RegionCacheTask(region, 50_000_000L).run();
+
+        if (region.queueManager.keptLocations.size() > 0) {
+            assertEquals(0, reservation.closes.get(), "handed-off reservation must not be closed");
+        } else {
+            assertEquals(1, reservation.closes.get(), "rejected reservation must be closed once");
+        }
+        assertEquals(0, region.inFlightCalculations.get());
+    }
+
+    private TrackingReservation newReservation() {
+        ChunkSet set = new ChunkSet(world, 1, 1,
+                List.of(CompletableFuture.completedFuture(0L)), new CompletableFuture<>());
+        return new TrackingReservation(set, world);
+    }
+
+    /** Counts {@link #close()} calls and whether the ticket was actually released. */
+    private static final class TrackingReservation extends ChunkReservation {
+        final AtomicInteger closes = new AtomicInteger();
+        private boolean releasedTicket;
+
+        TrackingReservation(ChunkSet set, MockRTPWorld world) {
+            super(set, world);
+        }
+
+        @Override
+        public void keep(boolean keep) {
+            if (!keep) releasedTicket = true;
+            super.keep(keep);
+        }
+
+        @Override
+        public void close() {
+            closes.incrementAndGet();
+            super.close();
+        }
+
+        boolean wasReleased() {
+            return releasedTicket;
+        }
+    }
+
+    private static final class FixedLocationGenerator implements ILocationGenerator {
+        private final GenerationResult result;
+
+        FixedLocationGenerator(GenerationResult result) {
+            this.result = result;
+        }
+
+        @Override
+        public CompletableFuture<GenerationResult> getLocation(Object region, GenerationContext context) {
+            return CompletableFuture.completedFuture(result);
+        }
+
+        @Override
+        public CompletableFuture<GenerationResult> generateLocation(Object region, GenerationContext context) {
+            return CompletableFuture.completedFuture(result);
+        }
+
+        @Override
+        public CompletableFuture<GenerationResult> getLocation(
+                Object region, RTPCommandSender sender, RTPPlayer player, Set<String> biomeNames) {
+            return CompletableFuture.completedFuture(result);
+        }
+
+        @Override
+        public CompletableFuture<GenerationResult> getLocation(Object region, Set<String> biomeNames) {
+            return CompletableFuture.completedFuture(result);
+        }
     }
 
     /**

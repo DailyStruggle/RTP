@@ -53,18 +53,20 @@ public class ChunkyRTPShape extends Rectangle {
     builder.shape(chunkyShapeName.replace("chunky_", ""));
     Shape shape = ShapeFactory.getShape(builder.build());
 
+    // REROLL and NEAREST return -1 for a known-bad draw: that is a reroll request, not a
+    // location, so it is redrawn without decoding or marking it.
     long res = super.rand();
-    int[] xz = locationToXZ(res);
 
     int i = 0;
-    while (!shape.isBounding(xz[0], xz[1])) {
+    while (res < 0 || !isBounding(shape, res)) {
       // addBadChunk: chunk-uniform - Chunky's isBounding predicate is evaluated at the
       // chunk-unit coords from locationToXZ; membership in the Chunky-defined boundary is
       // a per-chunk property, so the twin spiral index decoding to the same chunk is
       // guaranteed to also be out-of-bounds.
-      addBadChunk(res);
+      if (res >= 0) {
+        addBadChunk(res);
+      }
       res = super.rand();
-      xz = locationToXZ(res);
       i++;
       if (i > 10000) {
         if (badPrefixSumsCache.length > 0) {
@@ -74,5 +76,10 @@ public class ChunkyRTPShape extends Rectangle {
       }
     }
     return res;
+  }
+
+  private boolean isBounding(Shape shape, long location) {
+    int[] xz = locationToXZ(location);
+    return shape.isBounding(xz[0], xz[1]);
   }
 }

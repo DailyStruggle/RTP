@@ -90,7 +90,7 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 ## [3.3.0] - Unreleased
 
-> **Upgrade note.** `rtp.servers.*` now defaults to `true` instead of `op`, so in network mode every player can reach open cross-server regions; restrict with negative permissions if you relied on the old default. `CIRCLE` and `SQUARE` now use new selection engines that ignore `weight`; use `CIRCLE_DEPRECATED_PURE_SPIRAL` or `SQUARE_DEPRECATED_PURE_SPIRAL` to keep the 3.2.1 behavior. In `config.yml`, `defaults.shape.uniquePlacements` now defaults to `"auto"` (a radius matching the view distance) instead of `0`, and `defaults.spatialResolution` to `"auto"` (scaled to the region's size) instead of `3`; set `0` and `3` to keep the 3.2.1 values. Both jars now load on Minecraft 1.18 or newer with Java 17 or newer; the Lite jar no longer loads on 1.13 - 1.17. Folia is supported only from 1.21.11; older Folia still loads the jar but is no longer supported. Saved memory and region cache files from 3.2.1 still load, but RTP rewrites them in a new format at the next save or shutdown, and 3.2.1 can't read that format, so back up `plugins/RTP/` if you may need to roll back.
+> **Upgrade note.** `rtp.servers.*` now defaults to `true` instead of `op`, so in network mode every player can reach open cross-server regions; restrict with negative permissions if you relied on the old default. `CIRCLE` and `SQUARE` now use new selection engines that ignore `weight`; use `CIRCLE_DEPRECATED_PURE_SPIRAL` or `SQUARE_DEPRECATED_PURE_SPIRAL` to keep the 3.2.1 behavior. Region shapes now default to `mode: REROLL` instead of `ACCUMULATE`; files that set `mode` keep their value. In `config.yml`, `defaults.shape.uniquePlacements` now defaults to `"auto"` (a radius matching the view distance) instead of `0`, and `defaults.spatialResolution` to `"auto"` (scaled to the region's size) instead of `3`; set `0` and `3` to keep the 3.2.1 values. Both jars now load on Minecraft 1.18 or newer with Java 17 or newer; the Lite jar no longer loads on 1.13 - 1.17. Folia is supported only from 1.21.11; older Folia still loads the jar but is no longer supported. Saved memory and region cache files from 3.2.1 still load, but RTP rewrites them in a new format at the next save or shutdown, and 3.2.1 can't read that format, so back up `plugins/RTP/` if you may need to roll back.
 
 ### Added
 
@@ -151,6 +151,8 @@ One changelog covers both the free and Pro jars, which ship the same code.
 - **Less main-thread work per teleport on Paper, Spigot and Folia.** Block-name lookups are cached and the arrival-schematic check no longer touches the disk on every teleport.
 
 - **Tidier shipped config files.** Comments are clearly attached to their settings and stay attached when RTP rewrites a file (ADR-042), and long comments that cluttered menu tooltips are shortened.
+
+- **`REROLL` is the default selection mode.** `CIRCLE`, `SQUARE`, `ELLIPSE` and `RECTANGLE`, and the shipped `config.yml` in every language, now use `mode: REROLL`: no spot repeats until the shuffle has cycled and back-to-back spacing stays exact, at the cost of one in-memory check per known-bad chunk. `ACCUMULATE` stays available for regions that need every draw to be a guaranteed O(1). Regions that set `mode` keep their value.
 
 - **All memory shapes share one selection routine.** Shapes had drifted apart in how they handle bad land, `mode` and `uniqueplacements` (see Fixed); they now behave consistently.
 
@@ -244,6 +246,8 @@ One changelog covers both the free and Pro jars, which ship the same code.
 - **`/rtp scan` on circle regions checked chunks outside the circle, and generated them on fresh worlds.** These are the corners of the square area the scan walks. It now skips them without recording them, so they no longer count toward land % or toward the learned bad area that `expand` uses.
 
 - **On Paper and Folia 26.1 or newer, `/rtp scan` and the background search did not recognize pregenerated land** and loaded every chunk through the server, which put heavy load on the scheduler. RTP looked for region files in the old folder layout; it now also reads the new `world/dimensions/<namespace>/<name>/region/` layout.
+
+- **The free jar declares the same permissions as the Pro jar.** Its `plugin.yml` lacked `rtp.version`, `rtp.biome`, `rtp.menu.admin`, `rtp.personalqueue` and the `rtp.onevent.*` nodes, so `/rtp version` was op-only and no auto-RTP event permission was declared.
 
 ### Security
 

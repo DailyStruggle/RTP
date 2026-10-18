@@ -32,7 +32,7 @@ public class Circle extends MemoryShape<GenericMemoryShapeParams> {
 
   static {
     try {
-      defaults.put(GenericMemoryShapeParams.mode, Mode.ACCUMULATE);
+      defaults.put(GenericMemoryShapeParams.mode, Mode.REROLL);
       defaults.put(GenericMemoryShapeParams.radius, 256);
       defaults.put(GenericMemoryShapeParams.centerRadius, 64);
       defaults.put(GenericMemoryShapeParams.centerX, 0);
