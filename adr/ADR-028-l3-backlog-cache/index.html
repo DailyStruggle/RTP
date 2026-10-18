@@ -644,6 +644,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1404,6 +1425,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -4026,6 +4089,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4435,7 +4582,7 @@ linearly within <code>Region.execute()</code>; there is no producer/consumer spl
 <li><strong>The backlog reads region files only.</strong> It never loads, generates or tickets a chunk (S-005, S-002); its only I/O is the binned region-file read (one <code>classifyBatch</code> per region file).</li>
 <li><strong>Four validity states.</strong> <code>UNVERIFIED</code>: not yet prefiltered. <code>VALIDATED</code>: <code>ACCEPT</code> on disk data. <code>UNKNOWN</code>: no disk data to decide from (chunk not generated, unreadable or unsupported file, failed or timed-out batch, or no provider bound). <code>INVALIDATED</code>: <code>REJECT</code>; removed in the same pulse, recorded as a <code>prefilterBlock</code> failure and a bad chunk in the owner's shape.</li>
 <li><strong>Validated entries cost nothing more until promotion.</strong> <code>VALIDATED</code> entries drain into cold up to <code>cacheCap</code> with no chunk load (contiguous head under <code>FLAT_STRIDE</code>, random under <code>BINNED_AMORTIZED</code>), recording one success each. <code>ACCEPT</code> only screens the surface blocks of every column for unsafe blocks, so it is not the full check (see item 8).</li>
-<li><strong>Unknown entries wait for the cold fill.</strong> <code>UNKNOWN</code> entries stay in the backlog and block the head drain until the public cold fill (<code>RegionCacheTask</code> -&gt; <code>LocationGenerator</code> -&gt; <code>PregenTask</code>, single-flight per region) takes the oldest one (<code>pollOldest(UNKNOWN)</code>) in place of a shape draw. The fill checks it through the existing speculative path: region-file read, else a native load (pinned when a kept slot is free, otherwise unpinned and validated on load; ADR-110). Under heap pressure the load is refused and the entry returns to the backlog as <code>UNKNOWN</code>. Because the fill takes one candidate at a time, a region file full of ungenerated chunks never turns into a burst of generation requests.</li>
+<li><strong>Unknown entries wait for the cold fill.</strong> <code>UNKNOWN</code> entries stay in the backlog and block the head drain until the public cold fill (<code>RegionCacheTask</code> -&gt; <code>LocationGenerator</code> -&gt; <code>PregenTask</code>) takes the oldest one (<code>pollOldest(UNKNOWN)</code>) in place of a shape draw. The fill checks it through the existing speculative path: region-file read, else a native load (pinned when a kept slot is free, otherwise unpinned and validated on load; ADR-110). Under heap pressure the load is refused and the entry returns to the backlog as <code>UNKNOWN</code>. Each fill takes one candidate. Fills in flight are bounded by the cache deficit, and new fills start at the rate the cache pipe's pacer allows: each fill charges it its wall time from dispatch to release, so slow loads or generation (a region file full of ungenerated chunks) cut the start rate to one fill per pulse instead of a burst of generation requests.</li>
 <li><strong>Shape draws only without a backlog.</strong> The fill draws from the shape when the backlog is disabled or empty. When the backlog holds entries but none is <code>UNKNOWN</code>, the run ends without a draw (<code>drained/backlog</code>, not counted as a failure). Per-player and observational fills keep drawing from the shape.</li>
 <li><strong>Time-bounded refill.</strong> Unverified picks are shape math only (no chunk I/O, ~100 B each), so refill runs toward <code>backlogCacheCap</code> each pulse with no count window. It stops when elapsed time plus the EWMA cost of one pick (7/8 decay, as in <code>TimeBoundTaskPipe</code>) would pass <code>Region.refillDeadline</code>: the remaining pulse budget (<code>asyncAllottedTime</code>) less a fixed 20% headroom (<code>Region.BACKLOG_HEADROOM</code>) for later stages and other plugins. The refill hysteresis (<code>backlogRefillThreshold</code>) still applies. Splitting this budget across Folia region threads is out of scope here.</li>
 <li><strong>Pregenerated preference applies once.</strong> Backlog candidates already passed <code>pregeneratedPreference</code> at refill; the fill does not draw it again.</li>

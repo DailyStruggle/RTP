@@ -644,6 +644,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1404,6 +1425,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3999,6 +4062,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4259,13 +4406,13 @@
 <h3 id="1-intake">1. Intake<a class="headerlink" href="#1-intake" title="Permanent link">&para;</a></h3>
 <p>Change begins as user feedback, developer intent, or a bug report. Feedback is collected, abstracted, and only then specified. Occasionally that specification crystallizes into a <strong>requirement</strong> - and requirements record only the absolutes: core invariants and needs (regional threading on Folia, "<code>/rtp</code> shall teleport the caller"), stated in <code>shall</code> terms, implementation-free, identified as <code>REQ-&lt;module&gt;-&lt;family&gt;-NNN</code>. A whole plugin evolves from a handful of core requirements; they are not per-change forcing functions, and most changes never touch them.</p>
 <h3 id="2-planning-tier">2. Planning tier<a class="headerlink" href="#2-planning-tier" title="Permanent link">&para;</a></h3>
-<p>Between intake and design sits a deliberately <em>mutable</em> staging layer: plan docs (<code>MULTI_PLATFORM_PLAN.md</code>, <code>MULTI_SERVER_PLAN.md</code>, <code>METRICS_PLAN.md</code>, <code>ROADMAP.md</code>) and scratch/proposal notes (<code>docs/dev/scratch/</code>, PROPOSAL drafts). These are living documents, edited in place, because the ideas in them are not yet decisions. When a plan ships or is superseded, the plan is removed and the ADR becomes the durable record - the mutability is the point of the tier, not a defect of it.</p>
+<p>Between intake and design sits a deliberately <em>mutable</em> staging layer: plan docs (<code>MULTI_PLATFORM_PLAN.md</code>, <code>MULTI_SERVER_PLAN.md</code>, <code>METRICS_PLAN.md</code>), the Linear <code>LeafRTP</code> backlog (forward-looking work, replacing the former <code>ROADMAP.md</code>), and scratch/proposal notes (<code>docs/dev/scratch/</code>, PROPOSAL drafts). These are living documents, edited in place, because the ideas in them are not yet decisions. When a plan ships or is superseded, the plan is removed and the ADR becomes the durable record - the mutability is the point of the tier, not a defect of it.</p>
 <h3 id="3-default-change-loop-read-document-modify">3. Default change loop: read, document, modify<a class="headerlink" href="#3-default-change-loop-read-document-modify" title="Permanent link">&para;</a></h3>
 <p>The default loop for any change is: read the relevant code and records, document intent at a weight proportional to the change (nothing beyond a changelog entry for a small fix, a scratch note or proposal for medium work, an ADR for architectural work), then modify. Most third-party contributions - a bugfix - require neither a requirement nor an ADR. Rule D-005 is a guard rail on the large end of that spectrum, aimed primarily at low-skill contributors and AI agents whose compulsions or tooling can cause major breakage; it is not a universal forward gate - it binds only changes that reach its multi-class / cross-module trigger, where it is mandatory for every contributor.</p>
 <h3 id="4-design-records">4. Design records<a class="headerlink" href="#4-design-records" title="Permanent link">&para;</a></h3>
 <p>For larger changes, the architecture and thought process are a layer above the coding (and often emerge <em>during</em> coding); that layer is what gets recorded. <strong>ADRs co-exist with code and document the work itself</strong>, so that anyone - including the author years later - asking "why doesn't this work like X model?" has an answer. Answerability is the point: its absence causes quality drift and gives "slop" PRs a foothold. ADRs are also provenance - every architectural decision has an explicit human owner, whether or not execution was AI-assisted. Records are superseded or amended, never retconned. Supporting design surfaces: <code>DESIGN.md</code> for the <em>how</em> of cross-cutting mechanisms, <code>GLOSSARY.md</code> for term definitions, subproject ADR sequences for decisions confined to one module.</p>
 <h3 id="5-implementation-and-verification">5. Implementation and verification<a class="headerlink" href="#5-implementation-and-verification" title="Permanent link">&para;</a></h3>
-<p><strong>Code is the functional component and has priority.</strong> A bugfix may or may not warrant documentation, depending on the scale of its impact - though most bugfixes still warrant a <code>CHANGELOG.md</code> entry; the changelog is the exception to weight-proportional documentation. Implementation is bound back to the record layer through REQ-traceable tests and <code>TRACEABILITY.md</code> rows, and guarded mechanically by ArchUnit boundary tests and <code>check_traceability.sh</code>. Runtime-testable work ends with a full build; integration behavior is exercised against the devstack where the change warrants it.</p>
+<p><strong>Code is the functional component and has priority.</strong> A bugfix may or may not warrant documentation, depending on the scale of its impact - though most bugfixes still warrant a <code>CHANGELOG.md</code> entry; the changelog is the exception to weight-proportional documentation. Implementation is bound back to the record layer through REQ-traceable tests and <code>TRACEABILITY.md</code> rows, and guarded mechanically by ArchUnit boundary tests and <code>check_traceability.sh</code>. Runtime-testable work ends with a full build; integration behavior is exercised against the devstack where the change warrants it. Integration of finished work into the repository follows the pull request lifecycle (<a href="../../dev/PULL_REQUEST_PROCESS/"><code>PULL_REQUEST_PROCESS.md</code></a>) under automated CI gates (<code>.github/workflows/gradle.yml</code>).</p>
 <h3 id="6-divergence-handling">6. Divergence handling<a class="headerlink" href="#6-divergence-handling" title="Permanent link">&para;</a></h3>
 <p>When code and an ADR are found to disagree, priority is chosen case by case: the divergence reveals information about both, and examining it may show the code needs updated architecture rather than the ADR being right by default. That in-the-moment decision process has produced more value than predetermined architecture. Findings worth keeping flow to a superseding/amending ADR, a requirement refinement, or a dated <code>LESSONS_LEARNED.md</code> entry, at the maintainer's judgment. Incidental discoveries made mid-change are recorded rather than chased (<code>POTENTIAL_BUGS.md</code>), keeping each change traceable to a single driving need. Drift is also caught mechanically: <code>TRACEABILITY.md</code> updates on symbol renames and the automated backstops above.</p>
 <h3 id="7-communication-surfaces">7. Communication surfaces<a class="headerlink" href="#7-communication-surfaces" title="Permanent link">&para;</a></h3>
@@ -4275,7 +4422,7 @@
 <h3 id="constraints-applied-to-the-workflow">Constraints applied to the workflow<a class="headerlink" href="#constraints-applied-to-the-workflow" title="Permanent link">&para;</a></h3>
 <p>The lifecycle operates under the following constraints (canonical definitions live in <a href="../../dev/RULES/"><code>RULES.md</code></a>; summarized here because they shape the workflow itself):</p>
 <ul>
-<li><strong>Rule D-005 - Propose Architecture Before Implementation.</strong> For any change that touches more than one class, crosses a module boundary, or introduces a new command architecture, a written proposal (affected modules, before/after structure, relevant REQ-<em>/ADRs, risks and trade-offs) shall be presented and explicitly approved </em>before* any code is written. D-005 is the guard rail on the large end of the documentation-weight spectrum: it forces big design onto paper, where a bad idea is cheap, and constrains contributors (human or agent) whose tooling or habits could otherwise cause major breakage. A change that contradicts an existing ADR shall say so and propose a superseding ADR.</li>
+<li><strong>Rule D-005 - Propose Architecture Before Implementation.</strong> For any change that touches more than one class, crosses a module boundary, or introduces a new command architecture, a written proposal (affected modules, before/after structure, relevant REQ-*/ADRs, risks and trade-offs) shall be presented and explicitly approved <em>before</em> any code is written. D-005 is the guard rail on the large end of the documentation-weight spectrum: it forces big design onto paper, where a bad idea is cheap, and constrains contributors (human or agent) whose tooling or habits could otherwise cause major breakage. A change that contradicts an existing ADR shall say so and propose a superseding ADR.</li>
 <li><strong>Rule D-001 - Traceability.</strong> Every requirement, decision, and rule links to a source; code changes trace back to a requirement or decision.</li>
 <li><strong>Rule D-002 - Unambiguity.</strong> Requirements use <code>shall</code>/<code>shall not</code>; new or overloaded terms are defined in <code>GLOSSARY.md</code>.</li>
 <li><strong>Rule D-003 - Single Source of Truth.</strong> Each piece of information has exactly one authoritative home; other documents reference it rather than duplicating it. This ADR obeys D-003 by recording rationale and lifecycle topology only - the operational rules remain in <code>RULES.md</code> and <code>.junie/AGENTS.md</code>.</li>
@@ -4339,6 +4486,7 @@
 <li><a href="../../dev/TRACEABILITY/"><code>docs/dev/TRACEABILITY.md</code></a> - REQ-* to class to test matrix.</li>
 <li><a href="../../dev/LESSONS_LEARNED/"><code>docs/dev/LESSONS_LEARNED.md</code></a> - dated engineering findings.</li>
 <li><a href="../../dev/AI_USAGE/"><code>docs/dev/AI_USAGE.md</code></a> - canonical AI-tooling rationale and boundaries.</li>
+<li><a href="../../dev/PULL_REQUEST_PROCESS/"><code>docs/dev/PULL_REQUEST_PROCESS.md</code></a> - operational pull request lifecycle, local pre-PR verification gates, and CI pipeline checks.</li>
 <li><a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> - agent-operational guide (Self-Updating Protocol, D-005 gate restatement).</li>
 <li><a href="../ADR-018-agents-md-public-release-structure/">ADR-018</a> - precedent for meta-level ADRs.</li>
 <li><a href="../ADR-TEMPLATE/">ADR-TEMPLATE.md</a> - the record format this workflow produces.</li>

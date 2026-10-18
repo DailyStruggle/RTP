@@ -644,6 +644,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1404,6 +1425,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3870,6 +3933,90 @@
   
   
     <li class="md-nav__item">
+      <a href="ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3998,7 +4145,7 @@
 <tr>
 <td><a href="ADR-004-countbound-taskpipe-on-folia/">ADR-004</a></td>
 <td>CountBoundTaskPipe Instead of TimeBoundTaskPipe on Folia Regional Threads</td>
-<td>Accepted</td>
+<td>Accepted (amended by ADR-112)</td>
 </tr>
 <tr>
 <td><a href="ADR-005-paperlib-removal/">ADR-005</a></td>
@@ -4078,7 +4225,7 @@
 <tr>
 <td><a href="ADR-021-legacy-mc-and-java-support-scope/">ADR-021</a></td>
 <td>Legacy Minecraft and Java Support Are Out of Scope</td>
-<td>Accepted</td>
+<td>Accepted (amended by ADR-113)</td>
 </tr>
 <tr>
 <td><a href="ADR-022-shape-cache-key-seed-plus-config-hash/">ADR-022</a></td>
@@ -4178,7 +4325,7 @@
 <tr>
 <td><a href="ADR-045-rtp-docs-menu-consumer/">ADR-045</a></td>
 <td><code>/rtp docs</code> Menu Consumer (Markdown -&gt; <code>MenuModel</code>, converted at config load)</td>
-<td>Proposed</td>
+<td>Withdrawn (superseded by <a href="ADR-104-ephemeral-web-editor-and-packed-docs-integration/">ADR-104</a>)</td>
 </tr>
 <tr>
 <td><a href="ADR-046-maps-api-module/">ADR-046</a></td>
@@ -4505,6 +4652,26 @@
 <td>Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback (<code>scripts/bench_fuzz.py</code> as the live-server tier beside ADR-102's in-process Jazzer tier; per-target input limited to the command and package prefixes; same-run <code>direct</code> control; finding oracles with stable signatures attributed by stack-frame packages, never by fallback to the target; keep -&gt; control subtraction -&gt; replay k of n -&gt; ddmin -&gt; verdict, no ladder for faults; FAIL on a confirmed leak or a reproduced target finding, PASS never proof of absence; JaCoCo coverage via <code>/rtpstress coverage</code> writing JSON, a fast fault mode, S-001/S-002/S-004 oracles and a larger action vocabulary as accepted direction behind D-005; opt-in and local, never CI)</td>
 <td>Accepted (2026-10-13)</td>
 </tr>
+<tr>
+<td><a href="ADR-112-per-region-work-division-on-folia/">ADR-112</a></td>
+<td>Per-Region Work Division on Folia (chunk-future continuations complete off the region thread; one-shot regional tasks join per-cell FIFOs drained by one slice per cell within a per-region-thread <code>syncAllottedTime</code> token bucket, leftovers re-queued behind other regions; inline only within budget and FIFO; regional circuit breaker paces slow or late regions to one task per slice and steers cold-to-hot promotion elsewhere via <code>RTPScheduler.isRegionSaturated</code>; server-wide gate reads the mean on Folia; count-bound pipes also time-bound with a one-task progress floor; implements ADR-087 sections 3.4 and 3.6, amends ADR-004)</td>
+<td>Accepted (2026-10-14)</td>
+</tr>
+<tr>
+<td><a href="ADR-113-java-17-baseline-and-26x-support-boundary/">ADR-113</a></td>
+<td>Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility (lowers core/api/shared module target to Java 17 bytecode while carrier adapters target modern runtimes; sets official support, CI gates, and SLA boundary strictly to MC 26.x+ deobfuscated era; unofficial runtime compatibility for Java 17+ / MC 1.18+ including 1.20.1 modded; leverages ADR-102 fuzzing for resilient region format discovery; toolchain implementation staged for developer transition to Linux environment; amends ADR-021)</td>
+<td>Accepted (2026-10-14)</td>
+</tr>
+<tr>
+<td><a href="ADR-114-cost-governed-on-demand-chunk-reads/">ADR-114</a></td>
+<td>Cost-Governed On-Demand Chunk Reads and Native Fallback Admission (guides the trade-off between off-thread region-file reads and native chunk loads for on-demand/immediate tasks; preserves 2D spatial distribution via independent resampling and macro-bin stratified sampling; bounds in-flight native generation under tick/heap pressure while eliminating deadweight generation; extends ADR-001, ADR-009, ADR-016, ADR-028, ADR-109, ADR-110, ADR-112)</td>
+<td>Proposed</td>
+</tr>
+<tr>
+<td><a href="ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/">ADR-115</a></td>
+<td>Package DAG Disentanglement and Finite Decision-Preservation Hypergraph (resolves SonarQube package tangles in <code>rtp-core</code> via 4-tier DAG; decouples four primary cyclic seams; models code as a finite decision hypergraph with in-code invariant tags to eliminate reinvention and prevent optimizing away ADR decisions)</td>
+<td>Accepted</td>
+</tr>
 </tbody>
 </table>
 <p><strong>Spatial-memory lineage (production).</strong> Two designs ship: the original Archimedean spiral (<a href="ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>, kept as the <code>*_DEPRECATED_PURE_SPIRAL</code> shapes for benchmarking and rollback) and the dual-layer model - spiral-addressed Hilbert key space (<a href="ADR-085-spiral-addressed-hilbert-key-space/">ADR-085</a>) with the dyadic stride filter (<a href="ADR-088-configurable-downsampling-stride-filter/">ADR-088</a>) and the hybrid hazard table (<a href="ADR-092-hybrid-bit-packed-and-16-bit-run-container-hazard-table/">ADR-092</a>), over the blocked run table (<a href="ADR-081-unified-blocked-biome-run-table/">ADR-081</a>). ADR-082, ADR-083 and ADR-084 are research records kept as alternatives considered; new spatial-memory work shall extend this lineage or supersede it by ADR, not open a parallel design.</p>
@@ -4543,7 +4710,7 @@
 <tr>
 <td><code>rtp-fabric</code></td>
 <td><a href="https://github.com/DailyStruggle/RTP/tree/V3/platforms/rtp-fabric/docs/adr"><code>platforms/rtp-fabric/docs/adr/</code></a></td>
-<td><a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-001-multiversion-submodule-layout.md">rtp-fabric-ADR-001</a> Fabric Multiversion Submodule Layout (Accepted); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a> Fabric Platform Is In Scope (Accepted; renumbered from ADR-022 on 2026-05-05 to resolve a numbering collision); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-003-non-persistent-chunk-tickets.md">rtp-fabric-ADR-003</a> Non-persistent chunk tickets via <code>DistanceManager.addRegionTicket</code> (Accepted); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-004-distance-manager-api-split.md">rtp-fabric-ADR-004</a> DistanceManager API split at MC 1.21.5 (Accepted); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-005-anvil-prefilter-parity.md">rtp-fabric-ADR-005</a> Fabric anvil pre-filter parity (Accepted); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-006-ticket-radius-and-non-expiring-type.md">rtp-fabric-ADR-006</a> Chunk-ticket radius is <code>3</code>, not <code>31</code> (Accepted); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-007-mojmap-name-decoupling.md">rtp-fabric-ADR-007</a> Decouple <code>FabricVersionAdapter</code> from Mojmap type names (Accepted); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-008-non-blocking-chunk-generation.md">rtp-fabric-ADR-008</a> Non-blocking chunk generation via <code>ServerChunkCache#getChunkFuture</code> (Accepted); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md">rtp-fabric-ADR-009</a> Obf/unobf common module split (Accepted); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-010-typed-block-tag-snapshot.md">rtp-fabric-ADR-010</a> Typed block-tag snapshot via per-version SPI; reflection demoted to fallback (Accepted); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md">rtp-fabric-ADR-011</a> Effective-permission enumeration on Fabric (LuckPerms-Fabric primary, registry-probe fallback; covers <code>rtp.effect.*</code> + <code>rtp.onevent.*</code> + numeric tails) (Accepted 2026-05-22); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md">rtp-fabric-ADR-012</a> Menu renderer parity on Fabric (chat-first via obf/unobf carrier split; book renderer deferred; PromptAnvilInput substituted by chat-prompt callback) (Proposed 2026-05-22); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-013-network-mode-bootstrap-parity.md">rtp-fabric-ADR-013</a> Network-mode backend parity on Fabric (reimplementation as FabricNetworkModeBootstrap + FabricJoinTriggerSource; pulls pure-I/O helpers up to a shared utility; reuses ADR-011 resolver for reservation-token auth) (Proposed 2026-05-22); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-014-mc-26-2-prerelease-early-adapter.md">rtp-fabric-ADR-014</a> Early/experimental MC 26.2 pre-release adapter (<code>rtp-fabric-v26_2_R1</code>, cloned from v26_1_R1; deobf/JDK-25; <code>startsWith("26.2")</code> dispatch) (Accepted 2026-05-31); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-015-maps-binding-parity.md">rtp-fabric-ADR-015</a> Maps API parity (vanilla filled-map path; <code>FabricMapBinding</code> + <code>FabricVersionAdapter.renderMapChart</code> seam, 26.2_R1 carrier) (Accepted 2026-05-31); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-016-kept-cache-non-entity-ticking.md">rtp-fabric-ADR-016</a> Kept-cache chunks pin at non-entity-ticking level (32), not ENTITY_TICKING (30) (Accepted 2026-06-02)</td>
+<td><a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-001-multiversion-submodule-layout.md">rtp-fabric-ADR-001</a> Fabric Multiversion Submodule Layout (Accepted); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md">rtp-fabric-ADR-002</a> Fabric Platform Is In Scope (Accepted; renumbered from ADR-022 on 2026-05-05 to resolve a numbering collision); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-003-non-persistent-chunk-tickets.md">rtp-fabric-ADR-003</a> Non-persistent chunk tickets via <code>DistanceManager.addRegionTicket</code> (Accepted); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-004-distance-manager-api-split.md">rtp-fabric-ADR-004</a> DistanceManager API split at MC 1.21.5 (Accepted); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-005-anvil-prefilter-parity.md">rtp-fabric-ADR-005</a> Fabric anvil pre-filter parity (Accepted); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-006-ticket-radius-and-non-expiring-type.md">rtp-fabric-ADR-006</a> Chunk-ticket radius is <code>3</code>, not <code>31</code> (Accepted); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-007-mojmap-name-decoupling.md">rtp-fabric-ADR-007</a> Decouple <code>FabricVersionAdapter</code> from Mojmap type names (Accepted); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-008-non-blocking-chunk-generation.md">rtp-fabric-ADR-008</a> Non-blocking chunk generation via <code>ServerChunkCache#getChunkFuture</code> (Accepted); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-009-obf-unobf-common-split.md">rtp-fabric-ADR-009</a> Obf/unobf common module split (Accepted); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-010-typed-block-tag-snapshot.md">rtp-fabric-ADR-010</a> Typed block-tag snapshot via per-version SPI; reflection demoted to fallback (Accepted); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-011-effective-permissions-enumeration.md">rtp-fabric-ADR-011</a> Effective-permission enumeration on Fabric (LuckPerms-Fabric primary, registry-probe fallback; covers <code>rtp.effect.*</code> + <code>rtp.onevent.*</code> + numeric tails) (Accepted 2026-05-22); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-012-menu-renderer-parity.md">rtp-fabric-ADR-012</a> Menu renderer parity on Fabric (chat-first via obf/unobf carrier split; book renderer deferred; PromptAnvilInput substituted by chat-prompt callback) (Proposed 2026-05-22); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-013-network-mode-bootstrap-parity.md">rtp-fabric-ADR-013</a> Network-mode backend parity on Fabric (reimplementation as FabricNetworkModeBootstrap + FabricJoinTriggerSource; pulls pure-I/O helpers up to a shared utility; reuses ADR-011 resolver for reservation-token auth) (Proposed 2026-05-22); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-014-mc-26-2-prerelease-early-adapter.md">rtp-fabric-ADR-014</a> Early/experimental MC 26.2 pre-release adapter (<code>rtp-fabric-v26_2_R1</code>, cloned from v26_1_R1; deobf/JDK-25; <code>startsWith("26.2")</code> dispatch) (Accepted 2026-05-31); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-015-maps-binding-parity.md">rtp-fabric-ADR-015</a> Maps API parity (vanilla filled-map path; <code>FabricMapBinding</code> + <code>FabricVersionAdapter.renderMapChart</code> seam, 26.2_R1 carrier) (Accepted 2026-05-31); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-015-mc-26-3-fabric-adapter.md">rtp-fabric-ADR-015 (MC 26.3)</a> MC 26.3 Fabric adapter (Accepted 2026-09-24); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-016-kept-cache-non-entity-ticking.md">rtp-fabric-ADR-016</a> Kept-cache chunks pin at non-entity-ticking level (32), not ENTITY_TICKING (30) (Accepted 2026-06-02); <a href="https://github.com/DailyStruggle/RTP/blob/V3/platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-017-mc-26-4-fabric-adapter.md">rtp-fabric-ADR-017</a> MC 26.4 Fabric adapter (Accepted 2026-10-14)</td>
 </tr>
 <tr>
 <td><code>maps-api</code></td>

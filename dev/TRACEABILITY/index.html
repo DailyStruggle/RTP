@@ -638,6 +638,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1398,6 +1419,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3792,6 +3855,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4126,10 +4273,10 @@
 </tr>
 <tr>
 <td>REQ-RTP-SYS-001</td>
-<td>Java 21+</td>
-<td>build.gradle</td>
-<td>—</td>
-<td><code>BukkitServerProviderVersionResolutionTest</code></td>
+<td>Java 17+ (ADR-113)</td>
+<td>build.gradle (<code>java17Modules</code>)</td>
+<td><code>plugin.yml</code> <code>api-version</code>, <code>fabric.mod.json</code> <code>java</code>; <code>V1_20_R1FabricVersionAdapter</code> / <code>V1_21_R1FabricVersionAdapter</code> / <code>V1_21_R5FabricVersionAdapter</code> / <code>V1_21_R11FabricVersionAdapter</code> chunk-future binding and result unwrap (S-004, S-005)</td>
+<td><code>BukkitServerProviderVersionResolutionTest</code>, <code>AnvilLegacyChunkLayoutTest</code>, <code>V1_20_R1ChunkFutureMethodSelectionTest</code>, <code>V1_21_R1ChunkFutureMethodSelectionTest</code>, <code>V1_21_R5ChunkFutureMethodSelectionTest</code>, <code>V1_21_R11ChunkFutureMethodSelectionTest</code></td>
 </tr>
 <tr>
 <td>REQ-RTP-SYS-002</td>
@@ -4149,8 +4296,8 @@
 <td>REQ-RTP-S-002</td>
 <td>No chunk leaks</td>
 <td>DESIGN.md section 6</td>
-<td><code>ChunkReservation</code>, <code>MemoryTracker</code>; <code>RegionQueueManager#demoteToUnkept</code> (sole hot-to-cold disposal path: closes the reservation before offering the bare coordinate, shared by <code>releaseToNetworkKept</code>, <code>disableLoginCache</code>, <code>closePersonalQueue</code>); <code>CacheStage</code>, <code>SimpleCacheStage</code>, <code>RingCacheStage</code>, <code>KeyedCacheStage</code>, <code>HotSink</code>, <code>HotBudgetAllocator</code> (<a href="../../adr/ADR-078-composable-cache-pipeline-stages/">ADR-078</a> phase 1 &amp; 3: disposal is the single terminal release path, so overflow, down-size, and teardown all release through one handler; budget allocator moves hot entries with zero ticket leaks); <code>GroupSubspaceHotSink</code>, <code>GroupColdToHotTransition</code> (ADR-078 phase 6: multi-chunk footprint reservations closed on overflow/failure); <code>TeleportPipelineTask#holdArrivalReservation</code> / <code>#flushArrivalReservations</code> (post-arrival hold of the landing ticket for <code>ARRIVAL_HOLD_TICKS</code> so the arrived player never sync-loads it, REQ-RTP-S-005; released once by the delayed task or <code>RTP.stop</code>, immediately on a failed teleport; <code>MemoryTracker</code> counts and keeps held chunks); <code>Region#promotionChecks</code> (a cold-to-hot promotion that fails border, biome, safety or claims closes its reservation before dropping the location)</td>
-<td><code>ChunkTicketLifecycleTest</code>, <code>ReqRtpS002PipelineLeakAssertionTest</code> (full pipeline run, cancellation, failure, and GC sweep leak assertions), <code>ReqRtpS005ArrivalChunkHoldTest</code> (hold window, failed-teleport release, shutdown flush without double release, overlapping holders, no-scheduler fallback), <code>RegionQueueManagerNetworkReservedLifecycleTest</code> (5 demotion/hand-back ticket-hygiene cases), <code>CacheStageContractTest</code>, <code>KeyedCacheStageTest</code>, <code>HotSinkTransferEligibilityTest</code>, <code>HotBudgetAllocatorTest</code>, <code>GroupSubspaceCacheTest</code>, <code>RTPArchitectureTest</code> (<code>only_ChunkReservation_and_RTPWorld_may_call_setForceLoaded</code>, <code>only_RTPWorld_may_call_setForceLoadedImpl</code>)</td>
+<td><code>ChunkReservation</code>, <code>MemoryTracker</code>; <code>RegionQueueManager#demoteToUnkept</code> (sole hot-to-cold disposal path: closes the reservation before offering the bare coordinate, shared by <code>releaseToNetworkKept</code>, <code>disableLoginCache</code>, <code>closePersonalQueue</code>); <code>CacheStage</code>, <code>SimpleCacheStage</code>, <code>RingCacheStage</code>, <code>KeyedCacheStage</code>, <code>HotSink</code>, <code>HotBudgetAllocator</code> (<a href="../../adr/ADR-078-composable-cache-pipeline-stages/">ADR-078</a> phase 1 &amp; 3: disposal is the single terminal release path, so overflow, down-size, and teardown all release through one handler; budget allocator moves hot entries with zero ticket leaks); <code>GroupSubspaceHotSink</code>, <code>GroupColdToHotTransition</code> (ADR-078 phase 6: multi-chunk footprint reservations closed on overflow/failure); <code>TeleportPipelineTask#holdArrivalReservation</code> / <code>#flushArrivalReservations</code> (post-arrival hold of the landing ticket for <code>ARRIVAL_HOLD_TICKS</code> so the arrived player never sync-loads it, REQ-RTP-S-005; released once by the delayed task or <code>RTP.stop</code>, immediately on a failed teleport; <code>MemoryTracker</code> counts and keeps held chunks); <code>Region#promotionChecks</code> (a cold-to-hot promotion that fails border, biome, safety or claims closes its reservation before dropping the location); <code>RegionCacheTask#processResult</code> (a fill result not handed off to a queue or the preload callback, including one without coordinates or one that throws before handoff, closes its reservation)</td>
+<td><code>ChunkTicketLifecycleTest</code>, <code>RegionCacheTaskInFlightLeakTest</code> (<code>reqRtpS002_publicFill_coordlessPinnedResult_closesReservation</code>, <code>reqRtpS002_playerFill_coordlessPinnedResult_closesReservation</code>), <code>ReqRtpS002PipelineLeakAssertionTest</code> (full pipeline run, cancellation, failure, and GC sweep leak assertions), <code>ReqRtpS005ArrivalChunkHoldTest</code> (hold window, failed-teleport release, shutdown flush without double release, overlapping holders, no-scheduler fallback), <code>RegionQueueManagerNetworkReservedLifecycleTest</code> (5 demotion/hand-back ticket-hygiene cases), <code>CacheStageContractTest</code>, <code>KeyedCacheStageTest</code>, <code>HotSinkTransferEligibilityTest</code>, <code>HotBudgetAllocatorTest</code>, <code>GroupSubspaceCacheTest</code>, <code>RTPArchitectureTest</code> (<code>only_ChunkReservation_and_RTPWorld_may_call_setForceLoaded</code>, <code>only_RTPWorld_may_call_setForceLoadedImpl</code>)</td>
 </tr>
 <tr>
 <td>REQ-RTP-S-003</td>
@@ -4170,8 +4317,8 @@
 <td>REQ-RTP-S-005</td>
 <td>No sync chunk I/O</td>
 <td>ADR-015/016, <a href="../../adr/ADR-077-multi-format-region-support/">ADR-077</a></td>
-<td>RTPTaskPipe, adapters, <code>RegionFileReader</code>, <code>AnvilReader</code>, <code>Lz4BlockDecoder</code> (ADR-016 section 15: in-house mode-4 decode, size cap checked before allocation, malformed input fails closed to <code>CorruptRegionEntryException</code>), <code>Nbt</code> (512-level depth limit; array/list counts checked against remaining input before allocation; malformed NBT fails closed to <code>IOException</code>), <code>RegionFormatRegistry</code> (only <code>.mca</code> built in; files in an unregistered format such as <code>.linear</code> are never decoded and their chunks fall back to the live async load), <code>RegionFileResolver</code> (<code>resolveExisting</code>: window-bounded existence memo), <code>AnvilRegionScanner</code>, <code>PregenBiomeExtractor</code> (read only <code>.mca</code> and registered extensions); <code>AnvilSectorReader</code>, <code>AnvilRegionHeaderCache</code>, <code>AnvilRegionChannelCache</code> (probes share one ref-counted read handle per region file; mtime-keyed reopen, idle close, released by <code>RTP.stop</code> and world unload), <code>AnvilPrefilter#probeColumn</code> (single-chunk <code>.mca</code> probes on every adapter read only the location table and the chunk's own sectors, off-tick; a stale table is detected by chunk position and re-read, corrupt runs fail closed per REQ-RTP-S-004); <code>AnvilRegionByteCache.Lease</code> (whole-file reads reuse pooled buffers with an explicit file length); <code>HotSink#accepts</code> / <code>HotSink#transferEligible</code>, <code>HotBudgetAllocator#rebalance</code> (<a href="../../adr/ADR-078-composable-cache-pipeline-stages/">ADR-078</a> phase 1 &amp; 3: transfer eligibility and rebalancing operate as pure in-memory rechecks against the entry's already-resident chunk, moving entries between sinks with zero chunk load/unload I/O); <code>GroupBacklogToColdTransition</code>, <code>GroupColdToHotTransition</code> (ADR-078 phase 6: off-tick candidate screening and async chunk loading)</td>
-<td>AnvilPrefilterTest (<code>prefilterReadsOnlyChunkSectors</code>), <code>AnvilSectorReaderTest</code> (<code>clusteredProbes_reuseOneFileHandle</code>), <code>AnvilRegionChannelCacheTest</code>, <code>AnvilRegionByteCacheTest</code> (lease pinning, oversized-buffer reuse), <code>RegionFormatRegistryTest</code> (<code>testLinearNotBuiltIn</code>, <code>testUnregisteredLinearIgnored</code>, <code>testRegisteredLinearPreferredOverMca</code>), <code>AnvilRegionScannerTest</code> (<code>unregisteredFormatIsSkipped</code>, <code>registeredFormatIsScanned</code>), <code>PregenBiomeExtractorTest</code> (<code>unregisteredFormatIgnored</code>, <code>registeredFormatPreferred</code>), AnvilCorruptedRegionHardeningTest (incl. <code>testUnregisteredFormatFailsClosed</code>), <code>Lz4BlockDecoderTest</code> (differential vs lz4-java, truncation/forged-header/checksum rejection), <code>AnvilLz4CompressionTest</code>, <code>AnvilRegionFuzzTest#fuzzLz4BlockDecoder</code>, <code>NbtUntrustedInputTest</code> (depth boundary 512/513, 16M declared counts rejected with bounded allocation), <code>AnvilRegionFuzzTest#fuzzNbtReaders</code>, <code>RTPArchitectureTest</code> (<code>no_blocking_future_calls_in_core_or_api</code>, <code>no_thread_instantiation_or_executors_outside_carveouts</code>, <code>no_synchronous_chunk_io_on_platform_world</code>), <code>ReqRtpMap002NoChunkIoTest</code>, <code>HotSinkTransferEligibilityTest</code>, <code>HotBudgetAllocatorTest</code>, <code>GroupSubspaceCacheTest</code></td>
+<td>RTPTaskPipe, adapters, <code>RegionFileReader</code>, <code>AnvilReader</code>, <code>LinearRegionReader</code> (ADR-077: canonical Linear v1/v2 reader, raw NBT slicing, 64-bit bounds), <code>DynamicZstdBinding</code> (PBIT micro-canary startup verification, host MethodHandles binding with zero shaded jars), <code>RegionFormatDetector</code> (lazy survey with mtime-aware profile cache), <code>Lz4BlockDecoder</code> (ADR-016 section 15: in-house mode-4 decode, size cap checked before allocation, malformed input fails closed to <code>CorruptRegionEntryException</code>), <code>Nbt</code> (512-level depth limit; array/list counts checked against remaining input before allocation; malformed NBT fails closed to <code>IOException</code>), <code>RegionFormatRegistry</code> (<code>.mca</code> built in, <code>.linear</code> registered dynamically when host Zstd available), <code>RegionFileResolver</code> (<code>resolveExisting</code>: window-bounded existence memo; direct fast-path routing to active format), <code>AnvilRegionScanner</code>, <code>PregenBiomeExtractor</code> (read only <code>.mca</code> and registered extensions); <code>AnvilSectorReader</code>, <code>AnvilRegionHeaderCache</code>, <code>AnvilRegionChannelCache</code> (probes share one ref-counted read handle per region file; mtime-keyed reopen, idle close, released by <code>RTP.stop</code> and world unload), <code>AnvilPrefilter#probeColumn</code> (single-chunk <code>.mca</code> probes on every adapter read only the location table and the chunk's own sectors, off-tick; a stale table is detected by chunk position and re-read, corrupt runs fail closed per REQ-RTP-S-004); <code>AnvilRegionByteCache.Lease</code> (whole-file reads reuse pooled buffers with an explicit file length); <code>HotSink#accepts</code> / <code>HotSink#transferEligible</code>, <code>HotBudgetAllocator#rebalance</code> (<a href="../../adr/ADR-078-composable-cache-pipeline-stages/">ADR-078</a> phase 1 &amp; 3: transfer eligibility and rebalancing operate as pure in-memory rechecks against the entry's already-resident chunk, moving entries between sinks with zero chunk load/unload I/O); <code>GroupBacklogToColdTransition</code>, <code>GroupColdToHotTransition</code> (ADR-078 phase 6: off-tick candidate screening and async chunk loading)</td>
+<td>AnvilPrefilterTest (<code>prefilterReadsOnlyChunkSectors</code>), <code>AnvilSectorReaderTest</code> (<code>clusteredProbes_reuseOneFileHandle</code>), <code>AnvilRegionChannelCacheTest</code>, <code>AnvilRegionByteCacheTest</code> (lease pinning, oversized-buffer reuse), <code>RegionFormatRegistryTest</code> (<code>testLinearRegistrationState</code>, <code>testUnregisteredLinearIgnored</code>, <code>testRegisteredLinearPreferredOverMca</code>), <code>LinearRealDataParityTest</code> (ground-truth differential parity across real fixtures), <code>LinearDynamicRegistrationTest</code>, <code>LinearRegionReaderTest</code>, <code>DynamicZstdBindingTest</code>, <code>RegionFormatDetectorTest</code>, <code>RegionFileResolverTest</code> (<code>listRegionCoordsAcrossFormats</code>, <code>resolveDefaultsToLinearInLinearWorld</code>, <code>fastPathPureMcaDirectory</code>), <code>AnvilRegionScannerTest</code> (<code>unregisteredFormatIsSkipped</code>, <code>registeredFormatIsScanned</code>), <code>PregenBiomeExtractorTest</code> (<code>unregisteredFormatIgnored</code>, <code>registeredFormatPreferred</code>), AnvilCorruptedRegionHardeningTest (incl. <code>testUnregisteredFormatFailsClosed</code>), <code>Lz4BlockDecoderTest</code> (differential vs lz4-java, truncation/forged-header/checksum rejection), <code>AnvilLz4CompressionTest</code>, <code>AnvilRegionFuzzTest#fuzzLz4BlockDecoder</code>, <code>NbtUntrustedInputTest</code> (depth boundary 512/513, 16M declared counts rejected with bounded allocation), <code>AnvilRegionFuzzTest#fuzzNbtReaders</code>, <code>RTPArchitectureTest</code> (<code>no_blocking_future_calls_in_core_or_api</code>, <code>no_thread_instantiation_or_executors_outside_carveouts</code>, <code>no_synchronous_chunk_io_on_platform_world</code>), <code>ReqRtpMap002NoChunkIoTest</code>, <code>HotSinkTransferEligibilityTest</code>, <code>HotBudgetAllocatorTest</code>, <code>GroupSubspaceCacheTest</code></td>
 </tr>
 <tr>
 <td>REQ-RTP-S-006</td>
@@ -4471,10 +4618,10 @@
 </tr>
 <tr>
 <td>REQ-CORE-F-009</td>
-<td>Backlog cache (order-preserving FIFO; head-blocking promotion on <code>UNVERIFIED</code> and <code>UNKNOWN</code>; head-drop on <code>INVALIDATED</code>; region-file bins pre-filtered off the pulse thread with no chunk load; <code>VALIDATED</code> entries drain into cold with no load; <code>UNKNOWN</code> entries are taken one at a time by the cold fill; refill bounded by the pulse budget less 20% headroom; cold-to-hot promotion runs border, biome, safety and claims after the vertical adjustor). Named <code>L3</code> by ADR-028; the vocabulary is retired to hot/cold/backlog by <a href="../../adr/ADR-078-composable-cache-pipeline-stages/">ADR-078</a> phase 2</td>
-<td>DESIGN.md section 1.1, <a href="../../adr/ADR-028-l3-backlog-cache/">ADR-028</a> (amendment 2026-10-13)</td>
-<td><code>BacklogLocationBuffer</code> (<code>#pollOldest</code>), <code>BacklogBinVerifier</code>, <code>WorldBacklogBinIndex</code>, <code>RegionFileCoord</code>, <code>RegionQueueManager.backlogLocations</code>, <code>Region.processBacklog</code> / <code>#drainValidatedToCold</code> / <code>#refillDeadline</code> / <code>#promotionChecks</code>, <code>RegionCacheTask</code>, <code>PregenTask</code> (<code>PregenState.backlog</code>)</td>
-<td><code>BacklogLocationBufferTest</code>, <code>WorldBacklogBinIndexTest</code>, <code>RegionFileCoordTest</code>, <code>BacklogBinVerifierTest</code>, <code>RegionLifecycleAndBranchTest</code> (pre-filter outcomes route entries; the backlog never loads or tickets a chunk; time-bounded refill), <code>PregenTaskLoadPurposeTest</code> (cold fill checks <code>UNKNOWN</code> entries), <code>RegionPromotionChecksTest</code>, <code>RegionBacklogOutcomeStatsTest</code>, <code>CacheNomenclatureGuardTest</code> (ADR-078 phase 2: production sources and the shipped <code>rtp-plugin</code> yml config/locale tree carry no <code>L1</code>/<code>L2</code>/<code>L3</code> tier vocabulary)</td>
+<td>Backlog cache (order-preserving FIFO; head-blocking promotion on <code>UNVERIFIED</code> and <code>UNKNOWN</code>; head-drop on <code>INVALIDATED</code>; region-file bins pre-filtered off the pulse thread with no chunk load; <code>VALIDATED</code> entries drain into cold with no load; <code>UNKNOWN</code> entries are taken one at a time by the cold fill; refill bounded by the pulse budget less 20% headroom; cold fills in flight capped by the cache deficit and paced by each fill's wall time from dispatch to slot release, with no single-flight gate; a fill unfinished after 600 ticks releases its slot and charges at least that deadline to the pacer, and a later result is dropped with its reservation closed; a failed per-player fill releases its slot; cold-to-hot promotion runs border, biome, safety and claims after the vertical adjustor). Named <code>L3</code> by ADR-028; the vocabulary is retired to hot/cold/backlog by <a href="../../adr/ADR-078-composable-cache-pipeline-stages/">ADR-078</a> phase 2</td>
+<td>DESIGN.md section 1.1, <a href="../../adr/ADR-028-l3-backlog-cache/">ADR-028</a> (amendment 2026-10-13), <a href="../../adr/ADR-110-purpose-gated-live-loads/">ADR-110</a></td>
+<td><code>BacklogLocationBuffer</code> (<code>#pollOldest</code>), <code>BacklogBinVerifier</code>, <code>WorldBacklogBinIndex</code>, <code>RegionFileCoord</code>, <code>RegionQueueManager.backlogLocations</code>, <code>Region.processBacklog</code> / <code>#drainValidatedToCold</code> / <code>#refillDeadline</code> / <code>#promotionChecks</code> / <code>#execute</code> (cache deficit), <code>RegionCacheTask</code> (implements <code>CompletionPaced</code>; <code>FILL_DEADLINE_TICKS</code>), <code>CompletionPaced</code>, <code>PregenTask</code> (<code>PregenState.backlog</code>)</td>
+<td><code>BacklogLocationBufferTest</code>, <code>RegionCacheFillPacingTest</code> (<code>pendingFillDoesNotSerialiseRegion</code>, <code>completionWallTimeFeedsPacer</code>, <code>slowFillsSlowNewStarts</code>, <code>neverCompletingFillReleasesAtDeadline</code>, <code>lateResultAfterDeadlineIsDropped</code>), <code>WorldBacklogBinIndexTest</code>, <code>RegionFileCoordTest</code>, <code>BacklogBinVerifierTest</code>, <code>RegionLifecycleAndBranchTest</code> (pre-filter outcomes route entries; the backlog never loads or tickets a chunk; time-bounded refill), <code>PregenTaskLoadPurposeTest</code> (cold fill checks <code>UNKNOWN</code> entries), <code>RegionPromotionChecksTest</code>, <code>RegionBacklogOutcomeStatsTest</code>, <code>CacheNomenclatureGuardTest</code> (ADR-078 phase 2: production sources and the shipped <code>rtp-plugin</code> yml config/locale tree carry no <code>L1</code>/<code>L2</code>/<code>L3</code> tier vocabulary)</td>
 </tr>
 <tr>
 <td>REQ-CORE-F-010</td>
@@ -4482,6 +4629,48 @@
 <td><a href="../../adr/ADR-060-emergency-platform-block-restoration-timeout/">ADR-060</a></td>
 <td><code>PlatformRestoreManager</code>, <code>PlatformRestoreSqlStore</code> (<code>rtp-core</code>); <code>BlockDelta</code>, <code>PendingPlatformRestore</code>, <code>RTPWorld.restoreBlocks</code> (<code>rtp-api</code>); <code>BukkitRTPWorld.platform</code>/<code>restoreBlocks</code>, <code>FoliaRTPWorld.platform</code>/<code>restoreBlocks</code>; <code>SafetyKeys.platformRestoreSeconds</code></td>
 <td><code>ReqRtpAdr060PlatformRestoreTest</code> (7 cases)</td>
+</tr>
+<tr>
+<td>REQ-CORE-F-011</td>
+<td>Cost-governed on-demand chunk reads &amp; thread-weighted deduplication (three-tier resolution, zero-decode MCA occupancy check, empirical deduplication threshold bypassing Anvil when acceptance is high, hazard shedding off-thread when unsafe; native-load cost recorded on failure and ticket-apply timeout as well as success)</td>
+<td><a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/">ADR-114</a></td>
+<td><code>ImmediateLoadGovernor</code>, <code>ImmediateGovernorRow</code>, <code>PregenTask</code> (<code>#requestChunkImmediate</code>, <code>#loadChunk</code>), <code>CoreMetrics</code>, <code>RTPMetricsExtension</code></td>
+<td><code>ImmediateLoadGovernorTest</code>, <code>OnDemandChunkReadBenchmarkTest</code>, <code>ImmediatePermitScopeTest</code>, <code>SpatialDistributionFidelityTest</code></td>
+</tr>
+<tr>
+<td>REQ-PRED-F-001</td>
+<td>Unified EWMA Estimator (dual fractional alpha and 7/8 integer decay with bitwise parity and Welford variance)</td>
+<td>unified-predictive-cost-modeling</td>
+<td><code>EwmaEstimator</code></td>
+<td><code>EwmaEstimatorTest</code>, <code>TimeBoundTaskPipeCharacterizationTest</code></td>
+</tr>
+<tr>
+<td>REQ-PRED-F-002</td>
+<td>Bernoulli Outcome Estimator (binary success/rejection/failure probability tracking with bounded smoothing)</td>
+<td>unified-predictive-cost-modeling</td>
+<td><code>BernoulliEstimator</code></td>
+<td><code>BernoulliEstimatorTest</code></td>
+</tr>
+<tr>
+<td>REQ-PRED-F-003</td>
+<td>Predictive Budget Pacer (forward progress guarantee on positive budget, overrun halting on zero/negative budget)</td>
+<td>unified-predictive-cost-modeling</td>
+<td><code>BudgetPacer</code></td>
+<td><code>BudgetPacerTest</code>, <code>TimeBoundTaskPipeCharacterizationTest</code>, <code>TimeBoundTaskPipeTest</code></td>
+</tr>
+<tr>
+<td>REQ-PRED-F-004</td>
+<td>Comparative Cost Governor (domain-agnostic branch selection and threshold evaluation)</td>
+<td>unified-predictive-cost-modeling</td>
+<td><code>ComparativeCostGovernor</code>, <code>CostContext</code></td>
+<td><code>ComparativeCostGovernorTest</code>, <code>ImmediateLoadGovernorTest</code></td>
+</tr>
+<tr>
+<td>REQ-PRED-F-005</td>
+<td>Characterization-Backed Refactoring (TimeBoundTaskPipe, DatabaseAccessor, Region backlog, ImmediateLoadGovernor)</td>
+<td>unified-predictive-cost-modeling</td>
+<td><code>TimeBoundTaskPipe</code>, <code>CompletionPaced</code>, <code>DatabaseAccessor</code>, <code>Region</code>, <code>ImmediateLoadGovernor</code></td>
+<td><code>TimeBoundTaskPipeCharacterizationTest</code>, <code>ImmediateLoadGovernorTest</code>, <code>RegionTickBudgetTest</code>, <code>RegionCacheFillPacingTest</code></td>
 </tr>
 <tr>
 <td>REQ-CORE-ARCH-001</td>
@@ -4514,16 +4703,16 @@
 <tr>
 <td>REQ-CORE-ARCH-005</td>
 <td>Pulse maintenance</td>
-<td>DESIGN.md section 1</td>
-<td>AsyncTaskProcessing (one region turn per <code>period</code> ticks), <code>TickBudget</code>, <code>ServerHealthGate</code> (<code>minTPS</code> / <code>maxMSPT</code> pause of background refill, worst loop via <code>MetricsBinding#worstTps1m</code>/<code>#worstMspt</code>), <code>Region#execute</code> (<code>MAX_PROMOTIONS_PER_PULSE</code>)</td>
-<td>AsyncTaskProcessingTest, TickBudgetTest, ServerHealthGateTest, RegionTickBudgetTest, SparkMetricsBindingTest</td>
+<td>DESIGN.md section 1, <a href="../../adr/ADR-112-per-region-work-division-on-folia/">ADR-112</a></td>
+<td>AsyncTaskProcessing (one region turn per <code>period</code> ticks; sole <code>cancelTasks</code> drainer), <code>TickBudget</code>, <code>ServerHealthGate</code> (<code>minTPS</code> / <code>maxMSPT</code> pause of background refill; mean across regions when <code>MetricsBinding#regionalTicking</code>; <code>#regionUnhealthy</code> per region via <code>MetricsBinding#regionTps1m</code>/<code>#regionMspt</code>), <code>Region#execute</code> (<code>MAX_PROMOTIONS_PER_PULSE</code>; candidates in regions reported by <code>RTPScheduler#isRegionSaturated</code> stay cold)</td>
+<td>AsyncTaskProcessingTest, TickBudgetTest, ServerHealthGateTest, RegionTickBudgetTest (<code>saturatedRegionCandidatesStayCold</code>), SparkMetricsBindingTest</td>
 </tr>
 <tr>
 <td>REQ-CORE-ARCH-006</td>
 <td>Time-bounded tasks</td>
 <td>DESIGN.md section 1</td>
-<td>TimeBoundTaskPipe (zero budget runs nothing; positive budget runs at least one), SyncTaskProcessing (cancels, commands, actions charged before the misc pipe), <code>SelectionAPI#compute(long)</code></td>
-<td>SyncTaskProcessingTest, TimeBoundTaskPipeTest, RegionTickBudgetTest</td>
+<td>TimeBoundTaskPipe (zero budget runs nothing; positive budget runs at least one; a <code>CompletionPaced</code> task is bound to the pipe's pacer and reports its own completion cost instead of its <code>run()</code> time), <code>CompletionPaced</code>, SyncTaskProcessing (commands and actions charged before the misc pipe), <code>SelectionAPI#compute(long)</code></td>
+<td>SyncTaskProcessingTest, TimeBoundTaskPipeTest, RegionTickBudgetTest, <code>RegionCacheFillPacingTest</code> (<code>completionWallTimeFeedsPacer</code>, <code>slowFillsSlowNewStarts</code>)</td>
 </tr>
 <tr>
 <td>REQ-CORE-ARCH-007</td>
@@ -4552,6 +4741,13 @@
 <td>ARCH.md</td>
 <td>rtp-core package</td>
 <td>RTPArchitectureTest</td>
+</tr>
+<tr>
+<td>REQ-CORE-ARCH-011</td>
+<td>In-flight native generation admission bounds &amp; tick damping (regional semaphore max 1, global semaphore max 2 damped to 1 when MSPT &gt; 35ms, bounded FIFO queue with 1200ms timeout failing to msgBusy per S-004/S-007; applies to ungenerated chunks only, loads of chunks already on disk take no permit)</td>
+<td><a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/">ADR-114</a>, <a href="../../adr/ADR-110-purpose-gated-live-loads/">ADR-110</a></td>
+<td><code>ImmediateLoadGovernor</code>, <code>PregenTask#admitNativeLoadWithPermit</code></td>
+<td><code>ImmediateLoadGovernorTest</code>, <code>OnDemandChunkReadBenchmarkTest</code> (concurrent generations stay under the permit limit), <code>ImmediatePermitScopeTest</code> (<code>generatedChunkLoadDoesNotWaitForPermit</code>, <code>ungeneratedChunkLoadWaitsForPermit</code>)</td>
 </tr>
 <tr>
 <td>REQ-CORE-NF-001</td>
@@ -4789,10 +4985,10 @@
 </tr>
 <tr>
 <td>REQ-FOLIA-ARCH-004</td>
-<td>No <code>System.nanoTime()</code> in regional threads</td>
-<td>DESIGN.md section 2 — rtp-folia</td>
-<td><code>rtp-folia</code> (uses <code>CountBoundTaskPipe</code>)</td>
-<td>—</td>
+<td>Per-region-thread budget (<code>syncAllottedTime</code> per region tick, no accumulation)</td>
+<td>DESIGN.md section 2 — rtp-folia, <a href="../../adr/ADR-112-per-region-work-division-on-folia/">ADR-112</a></td>
+<td><code>RegionThreadBudget</code>, <code>FoliaSchedulerImpl</code> slices</td>
+<td><code>RegionThreadBudgetTest</code>, <code>FoliaSchedulerRegionSliceTest</code></td>
 </tr>
 <tr>
 <td>REQ-FOLIA-ARCH-005</td>
@@ -4804,9 +5000,23 @@
 <tr>
 <td>REQ-FOLIA-ARCH-006</td>
 <td>Count-based task slicing</td>
-<td>DESIGN.md section 2 — rtp-folia</td>
-<td><code>rtp-folia</code> <code>CountBoundTaskPipe</code> binding (regional dispatches count toward the slice); <code>FoliaSchedulerImpl</code> regional limiter (atomic permits, FIFO deferred queue, ADR-087)</td>
+<td>DESIGN.md section 2 — rtp-folia, <a href="../../adr/ADR-112-per-region-work-division-on-folia/">ADR-112</a></td>
+<td><code>rtp-folia</code> <code>CountBoundTaskPipe</code> binding (regional dispatches count toward the slice; also time-bound with a one-task floor); <code>FoliaSchedulerImpl</code> regional limiter (atomic permits, FIFO deferred queue, ADR-087)</td>
 <td><code>CountBoundTaskPipeTest</code>, <code>FoliaSchedulerLimiterTest</code>, <code>FoliaSchedulerGovernanceTest</code></td>
+</tr>
+<tr>
+<td>REQ-FOLIA-ARCH-013</td>
+<td>Per-region work division: one budgeted FIFO slice per region cell, leftovers re-queued behind other regions, inline only within budget, slow or late regions paced to one task per slice</td>
+<td><a href="../../adr/ADR-112-per-region-work-division-on-folia/">ADR-112</a>, ADR-087 sections 3.4 and 3.6</td>
+<td><code>FoliaSchedulerImpl</code> (cells, slices, <code>#isRegionSaturated</code>), <code>RegionThreadBudget</code> (<code>syncAllottedTime</code> per region thread)</td>
+<td><code>FoliaSchedulerRegionSliceTest</code>, <code>RegionThreadBudgetTest</code></td>
+</tr>
+<tr>
+<td>REQ-FOLIA-ARCH-014</td>
+<td>Chunk-future continuations leave the region thread</td>
+<td><a href="../../adr/ADR-112-per-region-work-division-on-folia/">ADR-112</a></td>
+<td><code>FoliaRTPWorld#OFF_REGION</code> (<code>loadLiveChunk</code>, <code>getChunkAtAsync</code>); <code>PregenTask</code> live safety scan dispatched to the centre region; <code>TeleportPipelineTask#continueOffRegion</code></td>
+<td><code>FoliaRTPWorldChunkTicketTest</code> (<code>chunkFutureContinuationsLeaveTheRegionThread</code>, <code>chunkFutureCompletesInlineWithoutPlugin</code>)</td>
 </tr>
 <tr>
 <td>REQ-FOLIA-ARCH-007</td>
@@ -4839,8 +5049,8 @@
 <tr>
 <td>REQ-FOLIA-ARCH-012</td>
 <td>Per-region tick health for load shedding</td>
-<td>ADR-087, REQ-CORE-ARCH-005</td>
-<td><code>FoliaMetricsBinding#observeRegion</code>, <code>#worstTps1m</code>, <code>#worstMspt</code></td>
+<td>ADR-087, ADR-112, REQ-CORE-ARCH-005</td>
+<td><code>FoliaMetricsBinding#observeRegion</code>, <code>#worstTps1m</code>, <code>#worstMspt</code>, <code>#regionTps1m</code>, <code>#regionMspt</code>, <code>#regionalTicking</code></td>
 <td><code>FoliaMetricsBindingTest</code></td>
 </tr>
 <tr>
@@ -4848,7 +5058,7 @@
 <td>Native Folia async chunk APIs</td>
 <td>DESIGN.md section 2 — rtp-folia</td>
 <td><code>rtp-folia</code> chunk impl; <code>FoliaRTPWorld#setForceLoadedImpl</code> (async preload, ticket applied on the owning region, release cancels a pending add, REQ-RTP-S-002/S-005); <code>FoliaRTPWorld#keepChunkAt</code> (async load only)</td>
-<td><code>FoliaRTPWorldChunkTicketTest</code> (7 tests)</td>
+<td><code>FoliaRTPWorldChunkTicketTest</code> (9 tests)</td>
 </tr>
 </tbody>
 </table>

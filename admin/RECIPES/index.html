@@ -18,7 +18,7 @@
         <link rel="prev" href="../FAQ/">
       
       
-        <link rel="next" href="../MIGRATION/">
+        <link rel="next" href="../../site/features/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -782,6 +782,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#curated-biome-lists-per-world-or-region" class="md-nav__link">
+    <span class="md-ellipsis">
+      Curated biome lists per world or region
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#at-a-glance" class="md-nav__link">
     <span class="md-ellipsis">
       At a glance
@@ -803,6 +812,27 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
     </li>
   
 
@@ -1575,6 +1605,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3969,6 +4041,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4119,6 +4275,15 @@
   <a href="#symmetrical-1v1-duels-arena-battles-subspace-placement" class="md-nav__link">
     <span class="md-ellipsis">
       Symmetrical 1v1 duels &amp; arena battles (subspace placement)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#curated-biome-lists-per-world-or-region" class="md-nav__link">
+    <span class="md-ellipsis">
+      Curated biome lists per world or region
     </span>
   </a>
   
@@ -4369,6 +4534,26 @@
 <p><strong>The LeafRTP way:</strong> enable <code>challenge.yml</code> from <code>definitions/actions/challenge.yml</code>. LeafRTP automatically registers <code>/challenge &lt;player&gt;</code> with clickable chat acceptance, pairs mutual challengers off-tick, enforces minimum spacing (<code>minSeparation: 24</code>), and confines players to the arena boundary (<code>confinement.boundary: SUBSPACE</code>) with automatic pull-backs on boundary breaches.</p>
 <p>See <a href="../ACTIONS/">Declarative Action Engine</a> for full configuration.</p>
 <hr />
+<h2 id="curated-biome-lists-per-world-or-region">Curated biome lists per world or region<a class="headerlink" href="#curated-biome-lists-per-world-or-region" title="Permanent link">&para;</a></h2>
+<p><strong>What you want:</strong> let players pick from a fixed set of biomes (for example <code>MEADOW</code>, <code>PLAINS</code>, <code>FOREST</code>), with a different set per world or region, without handing out <code>rtp.biome.*</code>.</p>
+<p><strong>The LeafRTP way:</strong> run the teleport at console privilege on the player's behalf. The console passes every <code>rtp.biome.&lt;biome&gt;</code> check, so players only need permission for whatever runs the command (an action, an NPC, a sign, or a menu entry).</p>
+<div class="highlight"><pre><span></span><code>rtp player=&lt;name&gt; region=default biome=MEADOW,PLAINS,FOREST
+</code></pre></div>
+<ul>
+<li><code>biome=</code> takes a comma-separated list. The destination may be any of the listed biomes.</li>
+<li>Add <code>toggletargetperms=true</code> to charge the target player's own cooldown, delay, and price instead of the console's.</li>
+<li>Use one command per world or region, each with its own biome list. Put any extra conditions in the runner (for example action <code>gate:</code> checks).</li>
+<li>Leave <code>rtp.biome.*</code> at its <code>default: op</code>, so players can't skip the list by typing <code>/rtp biome=&lt;x&gt;</code> themselves.</li>
+</ul>
+<p>In an action, the command is a <code>CONSOLE:</code> script entry, the same form the bundled <code>arena.yml</code> uses for <code>/duel leave</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="nt">run</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">CONSOLE</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;rtp</span><span class="nv"> </span><span class="s">player=[player_name]</span><span class="nv"> </span><span class="s">region=default</span><span class="nv"> </span><span class="s">biome=MEADOW,PLAINS,FOREST&quot;</span>
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Always pass <code>region=</code></p>
+<p>Without <code>region=</code>, the region comes from the target player's current world. If that region has no record yet of the <strong>first</strong> biome in the list, LeafRTP may switch to another region that has seen it, and that region can be in a different world. When the command runs from the console, that fallback skips every region with <code>requirePermission: true</code>, even when the target player holds <code>rtp.regions.&lt;name&gt;</code>. Passing <code>region=</code> pins the destination and avoids both effects.</p>
+</div>
+<hr />
 <h2 id="at-a-glance">At a glance<a class="headerlink" href="#at-a-glance" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -4413,6 +4598,10 @@
 <tr>
 <td>Teleport near another player</td>
 <td>Action Engine (<code>nearplayer.yml</code>, <code>anchor: entity</code>)</td>
+</tr>
+<tr>
+<td>Offer a curated biome list per world or region</td>
+<td>Console-run <code>rtp player=&lt;name&gt; region=&lt;r&gt; biome=&lt;a&gt;,&lt;b&gt;</code></td>
 </tr>
 <tr>
 <td>Symmetrical duels &amp; squad matchmaking</td>

@@ -12,24 +12,24 @@
         <meta name="author" content="DailyStruggle">
       
       
-        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/scratch/LINUX_RERUN_ADR109_110/">
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/VERIFICATION_GATES/">
       
       
       
       
-      <link rel="icon" href="../../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
     
     
       
-        <title>Linux rerun plan: kept-queue refill under load (ADR-109 / ADR-110 acceptance) - LeafRTP</title>
+        <title>Verification Gates and Evidence - LeafRTP</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.8c3ca2c6.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -48,7 +48,7 @@
       
     
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -74,7 +74,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#linux-rerun-plan-kept-queue-refill-under-load-adr-109-adr-110-acceptance" class="md-skip">
+        <a href="#verification-gates-and-evidence" class="md-skip">
           Skip to content
         </a>
       
@@ -88,7 +88,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -108,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Linux rerun plan: kept-queue refill under load (ADR-109 / ADR-110 acceptance)
+              Verification Gates and Evidence
             
           </span>
         </div>
@@ -217,7 +217,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../.." class="md-tabs__link">
+      <a href="../.." class="md-tabs__link">
         
   
     
@@ -236,7 +236,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
           
   
   Getting started
@@ -254,7 +254,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../admin/RUNBOOK/" class="md-tabs__link">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
           
   
   Operations
@@ -272,7 +272,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
           
   
   Configuration
@@ -290,7 +290,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../admin/proxies/INDEX/" class="md-tabs__link">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
           
   
   Proxy mode
@@ -308,7 +308,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../site/why/" class="md-tabs__link">
+        <a href="../../site/why/" class="md-tabs__link">
           
   
   Developers
@@ -326,7 +326,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../adr/" class="md-tabs__link">
+        <a href="../../adr/" class="md-tabs__link">
           
   
   Architecture decisions
@@ -359,7 +359,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -389,7 +389,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../.." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -449,7 +449,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../FOR_SERVER_ADMINS/" class="md-nav__link">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -470,7 +470,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/QUICK_START/" class="md-nav__link">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -491,7 +491,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../site/intended-usage/" class="md-nav__link">
+      <a href="../../site/intended-usage/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -512,7 +512,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../site/what-not-to-do/" class="md-nav__link">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -533,7 +533,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/PREFABS/" class="md-nav__link">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -554,7 +554,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/COMMANDS/" class="md-nav__link">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -575,7 +575,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/ACTIONS/" class="md-nav__link">
+      <a href="../../admin/ACTIONS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -596,7 +596,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/FAQ/" class="md-nav__link">
+      <a href="../../admin/FAQ/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -617,7 +617,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/RECIPES/" class="md-nav__link">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -638,7 +638,28 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/MIGRATION/" class="md-nav__link">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -706,7 +727,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/RUNBOOK/" class="md-nav__link">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -727,7 +748,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/WEB_EDITOR_GUIDE/" class="md-nav__link">
+      <a href="../../admin/WEB_EDITOR_GUIDE/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -748,7 +769,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../HAZARDS/" class="md-nav__link">
+      <a href="../HAZARDS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -769,7 +790,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/ADDONS/" class="md-nav__link">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -790,7 +811,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -811,7 +832,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -879,7 +900,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -900,7 +921,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -921,7 +942,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -942,7 +963,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/REGIONS/" class="md-nav__link">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -963,7 +984,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/WORLDS/" class="md-nav__link">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -984,7 +1005,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1005,7 +1026,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/SAFETY/" class="md-nav__link">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1026,7 +1047,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1047,7 +1068,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/ECONOMY/" class="md-nav__link">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1068,7 +1089,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1089,7 +1110,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1110,7 +1131,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/MESSAGES/" class="md-nav__link">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1131,7 +1152,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/LANGUAGE/" class="md-nav__link">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1152,7 +1173,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/LOGGING/" class="md-nav__link">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1173,7 +1194,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/METRICS/" class="md-nav__link">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1194,7 +1215,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/TTL/" class="md-nav__link">
+      <a href="../../admin/configuration/TTL/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1262,7 +1283,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/proxies/INDEX/" class="md-nav__link">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1283,7 +1304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1304,7 +1325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1325,7 +1346,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1393,7 +1414,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../site/why/" class="md-nav__link">
+      <a href="../../site/why/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1414,7 +1435,49 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../site/shape-algorithms/" class="md-nav__link">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/shape-algorithms/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1435,7 +1498,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1456,7 +1519,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../ADDON_QUICKSTART/" class="md-nav__link">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1477,7 +1540,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../FOR_CONTRIBUTORS/" class="md-nav__link">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1545,7 +1608,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/" class="md-nav__link">
+      <a href="../../adr/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1566,7 +1629,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-000-development-workflow/" class="md-nav__link">
+      <a href="../../adr/ADR-000-development-workflow/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1587,7 +1650,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-001-archimedean-spiral-1d-mapping/" class="md-nav__link">
+      <a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1608,7 +1671,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-002-h2-sqlite-over-flat-file-cache/" class="md-nav__link">
+      <a href="../../adr/ADR-002-h2-sqlite-over-flat-file-cache/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1629,7 +1692,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-003-rtp-plugin-bridge-module/" class="md-nav__link">
+      <a href="../../adr/ADR-003-rtp-plugin-bridge-module/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1650,7 +1713,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-004-countbound-taskpipe-on-folia/" class="md-nav__link">
+      <a href="../../adr/ADR-004-countbound-taskpipe-on-folia/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1671,7 +1734,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-005-paperlib-removal/" class="md-nav__link">
+      <a href="../../adr/ADR-005-paperlib-removal/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1692,7 +1755,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-006-async-queue-pre-generation/" class="md-nav__link">
+      <a href="../../adr/ADR-006-async-queue-pre-generation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1713,7 +1776,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-007-per-user-isolated-queues/" class="md-nav__link">
+      <a href="../../adr/ADR-007-per-user-isolated-queues/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1734,7 +1797,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-008-memory-tracker-active-gc/" class="md-nav__link">
+      <a href="../../adr/ADR-008-memory-tracker-active-gc/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1755,7 +1818,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-009-configurable-spatial-distributions/" class="md-nav__link">
+      <a href="../../adr/ADR-009-configurable-spatial-distributions/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1776,7 +1839,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-010-versioned-platform-adapter-submodules/" class="md-nav__link">
+      <a href="../../adr/ADR-010-versioned-platform-adapter-submodules/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1797,7 +1860,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-011-rtp-api-separate-module/" class="md-nav__link">
+      <a href="../../adr/ADR-011-rtp-api-separate-module/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1818,7 +1881,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-012-chunk-reservation-abstraction/" class="md-nav__link">
+      <a href="../../adr/ADR-012-chunk-reservation-abstraction/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1839,7 +1902,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-013-addons-as-external-gradle-projects/" class="md-nav__link">
+      <a href="../../adr/ADR-013-addons-as-external-gradle-projects/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1860,7 +1923,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-015-stale-chunk-guard-countbound-pipes/" class="md-nav__link">
+      <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1881,7 +1944,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-016-anvil-subsystem/" class="md-nav__link">
+      <a href="../../adr/ADR-016-anvil-subsystem/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1902,7 +1965,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists/" class="md-nav__link">
+      <a href="../../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1923,7 +1986,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-018-agents-md-public-release-structure/" class="md-nav__link">
+      <a href="../../adr/ADR-018-agents-md-public-release-structure/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1944,7 +2007,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-019-claim-plugin-integrations-folded-into-plugin/" class="md-nav__link">
+      <a href="../../adr/ADR-019-claim-plugin-integrations-folded-into-plugin/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1965,7 +2028,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-020-language-bootstrap-and-locale-aware-configparser/" class="md-nav__link">
+      <a href="../../adr/ADR-020-language-bootstrap-and-locale-aware-configparser/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1986,7 +2049,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-021-legacy-mc-and-java-support-scope/" class="md-nav__link">
+      <a href="../../adr/ADR-021-legacy-mc-and-java-support-scope/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2007,7 +2070,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-022-shape-cache-key-seed-plus-config-hash/" class="md-nav__link">
+      <a href="../../adr/ADR-022-shape-cache-key-seed-plus-config-hash/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2028,7 +2091,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-023-login-reserve-cache/" class="md-nav__link">
+      <a href="../../adr/ADR-023-login-reserve-cache/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2049,7 +2112,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-024-rtp-lite-assembly-variant/" class="md-nav__link">
+      <a href="../../adr/ADR-024-rtp-lite-assembly-variant/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2070,7 +2133,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/" class="md-nav__link">
+      <a href="../../adr/ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2091,7 +2154,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-026-external-hook-api-surface/" class="md-nav__link">
+      <a href="../../adr/ADR-026-external-hook-api-surface/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2112,7 +2175,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-028-l3-backlog-cache/" class="md-nav__link">
+      <a href="../../adr/ADR-028-l3-backlog-cache/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2133,7 +2196,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-032-teleport-pipeline-latency-histogram/" class="md-nav__link">
+      <a href="../../adr/ADR-032-teleport-pipeline-latency-histogram/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2154,7 +2217,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-033-neoforge-platform-in-scope/" class="md-nav__link">
+      <a href="../../adr/ADR-033-neoforge-platform-in-scope/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2175,7 +2238,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-034-memory-shape-catalog/" class="md-nav__link">
+      <a href="../../adr/ADR-034-memory-shape-catalog/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2196,7 +2259,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-035-interactive-menus-book-first/" class="md-nav__link">
+      <a href="../../adr/ADR-035-interactive-menus-book-first/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2217,7 +2280,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-036-network-mode-multi-server-multi-proxy/" class="md-nav__link">
+      <a href="../../adr/ADR-036-network-mode-multi-server-multi-proxy/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2238,7 +2301,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-037-harden-rtp-config-commands/" class="md-nav__link">
+      <a href="../../adr/ADR-037-harden-rtp-config-commands/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2259,7 +2322,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-038-rtpadmin-setup-wizards/" class="md-nav__link">
+      <a href="../../adr/ADR-038-rtpadmin-setup-wizards/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2280,7 +2343,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-039-rtpadmin-diagnostic-surfaces/" class="md-nav__link">
+      <a href="../../adr/ADR-039-rtpadmin-diagnostic-surfaces/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2301,7 +2364,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-040-cross-backend-metric-time-series-publication/" class="md-nav__link">
+      <a href="../../adr/ADR-040-cross-backend-metric-time-series-publication/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2322,7 +2385,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-041-config-command-and-save-implementation/" class="md-nav__link">
+      <a href="../../adr/ADR-041-config-command-and-save-implementation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2343,7 +2406,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-042-yaml-comment-preservation-block-only/" class="md-nav__link">
+      <a href="../../adr/ADR-042-yaml-comment-preservation-block-only/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2364,7 +2427,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-043-personal-queue-permission-semantics/" class="md-nav__link">
+      <a href="../../adr/ADR-043-personal-queue-permission-semantics/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2385,7 +2448,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-044-command-tree-menu-reflector/" class="md-nav__link">
+      <a href="../../adr/ADR-044-command-tree-menu-reflector/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2406,7 +2469,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-045-rtp-docs-menu-consumer/" class="md-nav__link">
+      <a href="../../adr/ADR-045-rtp-docs-menu-consumer/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2427,7 +2490,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-046-maps-api-module/" class="md-nav__link">
+      <a href="../../adr/ADR-046-maps-api-module/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2448,7 +2511,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-047-declarative-chart-composition-bridge/" class="md-nav__link">
+      <a href="../../adr/ADR-047-declarative-chart-composition-bridge/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2469,7 +2532,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-048-menu-builders-behind-server-accessor/" class="md-nav__link">
+      <a href="../../adr/ADR-048-menu-builders-behind-server-accessor/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2490,7 +2553,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-049-network-mode-platform-neutral-lift/" class="md-nav__link">
+      <a href="../../adr/ADR-049-network-mode-platform-neutral-lift/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2511,7 +2574,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-050-concrete-menu-commands-supersede-tokens/" class="md-nav__link">
+      <a href="../../adr/ADR-050-concrete-menu-commands-supersede-tokens/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2532,7 +2595,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-051-two-tier-api-extension-model/" class="md-nav__link">
+      <a href="../../adr/ADR-051-two-tier-api-extension-model/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2553,7 +2616,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-052-outcome-metrics-and-cause-tagged-bad-locations/" class="md-nav__link">
+      <a href="../../adr/ADR-052-outcome-metrics-and-cause-tagged-bad-locations/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2574,7 +2637,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/" class="md-nav__link">
+      <a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2595,7 +2658,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-054-rtprunnable-self-scheduling-thread-routing/" class="md-nav__link">
+      <a href="../../adr/ADR-054-rtprunnable-self-scheduling-thread-routing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2616,7 +2679,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-055-pvp-combat-gate/" class="md-nav__link">
+      <a href="../../adr/ADR-055-pvp-combat-gate/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2637,7 +2700,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-056-bare-rtp-root-action/" class="md-nav__link">
+      <a href="../../adr/ADR-056-bare-rtp-root-action/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2658,7 +2721,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-057-platform-agnostic-addon-spi/" class="md-nav__link">
+      <a href="../../adr/ADR-057-platform-agnostic-addon-spi/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2679,7 +2742,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-058-region-specific-schematic-paste/" class="md-nav__link">
+      <a href="../../adr/ADR-058-region-specific-schematic-paste/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2700,7 +2763,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-059-relative-ground-distance-safety-predicate/" class="md-nav__link">
+      <a href="../../adr/ADR-059-relative-ground-distance-safety-predicate/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2721,7 +2784,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-060-emergency-platform-block-restoration-timeout/" class="md-nav__link">
+      <a href="../../adr/ADR-060-emergency-platform-block-restoration-timeout/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2742,7 +2805,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-061-open-core-dual-licensing/" class="md-nav__link">
+      <a href="../../adr/ADR-061-open-core-dual-licensing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2763,7 +2826,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-062-biome-probability-weighting/" class="md-nav__link">
+      <a href="../../adr/ADR-062-biome-probability-weighting/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2784,7 +2847,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-063-biome-first-menu-and-auto-region-by-biome/" class="md-nav__link">
+      <a href="../../adr/ADR-063-biome-first-menu-and-auto-region-by-biome/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2805,7 +2868,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-064-config-comment-format-summary-line-as-menu-hover/" class="md-nav__link">
+      <a href="../../adr/ADR-064-config-comment-format-summary-line-as-menu-hover/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2826,7 +2889,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-065-world-override-region-and-world-menu/" class="md-nav__link">
+      <a href="../../adr/ADR-065-world-override-region-and-world-menu/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2847,7 +2910,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-066-foreign-config-importer/" class="md-nav__link">
+      <a href="../../adr/ADR-066-foreign-config-importer/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2868,7 +2931,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-067-adaptive-scan-rate-and-mca-header-generation-check/" class="md-nav__link">
+      <a href="../../adr/ADR-067-adaptive-scan-rate-and-mca-header-generation-check/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2889,7 +2952,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-068-cross-server-persisted-teleport-limits/" class="md-nav__link">
+      <a href="../../adr/ADR-068-cross-server-persisted-teleport-limits/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2910,7 +2973,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-069-claim-integrations-extracted-to-bundled-addon/" class="md-nav__link">
+      <a href="../../adr/ADR-069-claim-integrations-extracted-to-bundled-addon/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2931,7 +2994,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-070-platform-neutral-rtp-command-root/" class="md-nav__link">
+      <a href="../../adr/ADR-070-platform-neutral-rtp-command-root/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2952,7 +3015,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-071-config-organization-and-discoverability/" class="md-nav__link">
+      <a href="../../adr/ADR-071-config-organization-and-discoverability/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2973,7 +3036,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-072-teleport-view-distance-clamp-and-restore/" class="md-nav__link">
+      <a href="../../adr/ADR-072-teleport-view-distance-clamp-and-restore/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2994,7 +3057,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-073-config-default-inheritance-references/" class="md-nav__link">
+      <a href="../../adr/ADR-073-config-default-inheritance-references/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3015,7 +3078,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-074-operator-facing-throughput-and-cost-metrics/" class="md-nav__link">
+      <a href="../../adr/ADR-074-operator-facing-throughput-and-cost-metrics/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3036,7 +3099,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-075-platform-neutral-player-move-event-spi/" class="md-nav__link">
+      <a href="../../adr/ADR-075-platform-neutral-player-move-event-spi/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3057,7 +3120,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-076-config-folder-consolidation/" class="md-nav__link">
+      <a href="../../adr/ADR-076-config-folder-consolidation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3078,7 +3141,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-077-multi-format-region-support/" class="md-nav__link">
+      <a href="../../adr/ADR-077-multi-format-region-support/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3099,7 +3162,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-078-composable-cache-pipeline-stages/" class="md-nav__link">
+      <a href="../../adr/ADR-078-composable-cache-pipeline-stages/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3120,7 +3183,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-079-cause-based-ttl-and-staged-expiration/" class="md-nav__link">
+      <a href="../../adr/ADR-079-cause-based-ttl-and-staged-expiration/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3141,7 +3204,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-080-opt-in-simulation-benchmark-tier/" class="md-nav__link">
+      <a href="../../adr/ADR-080-opt-in-simulation-benchmark-tier/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3162,7 +3225,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-081-unified-blocked-biome-run-table/" class="md-nav__link">
+      <a href="../../adr/ADR-081-unified-blocked-biome-run-table/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3183,7 +3246,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-082-cache-conscious-b-plus-tree-primitive-arrays/" class="md-nav__link">
+      <a href="../../adr/ADR-082-cache-conscious-b-plus-tree-primitive-arrays/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3204,7 +3267,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-083-two-tier-probabilistic-region-routing/" class="md-nav__link">
+      <a href="../../adr/ADR-083-two-tier-probabilistic-region-routing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3225,7 +3288,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-084-layered-spiral-hilbert-rle-index/" class="md-nav__link">
+      <a href="../../adr/ADR-084-layered-spiral-hilbert-rle-index/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3246,7 +3309,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-085-spiral-addressed-hilbert-key-space/" class="md-nav__link">
+      <a href="../../adr/ADR-085-spiral-addressed-hilbert-key-space/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3267,7 +3330,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-086-external-web-map-integration/" class="md-nav__link">
+      <a href="../../adr/ADR-086-external-web-map-integration/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3288,7 +3351,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/" class="md-nav__link">
+      <a href="../../adr/ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3309,7 +3372,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-088-configurable-downsampling-stride-filter/" class="md-nav__link">
+      <a href="../../adr/ADR-088-configurable-downsampling-stride-filter/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3330,7 +3393,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-089-universal-mapcanvas-bridge-biome-hazard-overlays-and-pipeline-gauges/" class="md-nav__link">
+      <a href="../../adr/ADR-089-universal-mapcanvas-bridge-biome-hazard-overlays-and-pipeline-gauges/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3351,7 +3414,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-090-test-driver-and-synthetic-mca-architecture/" class="md-nav__link">
+      <a href="../../adr/ADR-090-test-driver-and-synthetic-mca-architecture/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3372,7 +3435,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-091-headless-player-protocol-driver-for-devstack/" class="md-nav__link">
+      <a href="../../adr/ADR-091-headless-player-protocol-driver-for-devstack/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3393,7 +3456,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-092-hybrid-bit-packed-and-16-bit-run-container-hazard-table/" class="md-nav__link">
+      <a href="../../adr/ADR-092-hybrid-bit-packed-and-16-bit-run-container-hazard-table/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3414,7 +3477,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/" class="md-nav__link">
+      <a href="../../adr/ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3435,7 +3498,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-094-quality-engineering-gates/" class="md-nav__link">
+      <a href="../../adr/ADR-094-quality-engineering-gates/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3456,7 +3519,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+      <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3477,7 +3540,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
+      <a href="../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3498,7 +3561,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-098-declarative-command-parameters-permissions-and-defaults/" class="md-nav__link">
+      <a href="../../adr/ADR-098-declarative-command-parameters-permissions-and-defaults/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3519,7 +3582,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-099-visual-region-creation-and-interactive-cartography-bridges/" class="md-nav__link">
+      <a href="../../adr/ADR-099-visual-region-creation-and-interactive-cartography-bridges/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3540,7 +3603,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-100-superseding-adr-024-sla-and-support-tier/" class="md-nav__link">
+      <a href="../../adr/ADR-100-superseding-adr-024-sla-and-support-tier/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3561,7 +3624,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-101-in-house-sql-connection-pool-and-hikaricp-retirement/" class="md-nav__link">
+      <a href="../../adr/ADR-101-in-house-sql-connection-pool-and-hikaricp-retirement/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3582,7 +3645,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-102-coverage-guided-fuzz-testing-and-parser-input-hardening/" class="md-nav__link">
+      <a href="../../adr/ADR-102-coverage-guided-fuzz-testing-and-parser-input-hardening/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3603,7 +3666,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-103-multi-version-platform-adapter-deduplication/" class="md-nav__link">
+      <a href="../../adr/ADR-103-multi-version-platform-adapter-deduplication/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3624,7 +3687,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-104-ephemeral-web-editor-and-packed-docs-integration/" class="md-nav__link">
+      <a href="../../adr/ADR-104-ephemeral-web-editor-and-packed-docs-integration/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3645,7 +3708,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-105-intent-based-documentation-architecture-and-operator-routing/" class="md-nav__link">
+      <a href="../../adr/ADR-105-intent-based-documentation-architecture-and-operator-routing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3666,7 +3729,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-106-shape-curve-helpers-and-signed-editor-channel/" class="md-nav__link">
+      <a href="../../adr/ADR-106-shape-curve-helpers-and-signed-editor-channel/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3687,7 +3750,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+      <a href="../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3708,7 +3771,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+      <a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3729,7 +3792,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3750,7 +3813,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3771,7 +3834,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3792,7 +3855,91 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-TEMPLATE/" class="md-nav__link">
+      <a href="../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3840,72 +3987,33 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#why-the-last-ab-could-not-decide-anything" class="md-nav__link">
+  <a href="#gates" class="md-nav__link">
     <span class="md-ellipsis">
-      Why the last A/B could not decide anything
+      Gates
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Gates">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#feature-evidence-by-change-type" class="md-nav__link">
+    <span class="md-ellipsis">
+      Feature evidence by change type
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#arms" class="md-nav__link">
-    <span class="md-ellipsis">
-      Arms
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#one-time-setup" class="md-nav__link">
+  <a href="#evidence-references" class="md-nav__link">
     <span class="md-ellipsis">
-      One-time setup
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#per-run-procedure-one-run-one-arm-one-variant" class="md-nav__link">
-    <span class="md-ellipsis">
-      Per-run procedure (one run = one arm, one variant)
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#what-to-read" class="md-nav__link">
-    <span class="md-ellipsis">
-      What to read
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#pass-criteria" class="md-nav__link">
-    <span class="md-ellipsis">
-      Pass criteria
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#ramp-procedure-stress-point-per-plugin" class="md-nav__link">
-    <span class="md-ellipsis">
-      Ramp procedure (stress point per plugin)
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#caveats-to-state-with-the-results" class="md-nav__link">
-    <span class="md-ellipsis">
-      Caveats to state with the results
+      Evidence &amp; References
     </span>
   </a>
   
@@ -3929,98 +4037,74 @@
   
 
 
-<h1 id="linux-rerun-plan-kept-queue-refill-under-load-adr-109-adr-110-acceptance">Linux rerun plan: kept-queue refill under load (ADR-109 / ADR-110 acceptance)<a class="headerlink" href="#linux-rerun-plan-kept-queue-refill-under-load-adr-109-adr-110-acceptance" title="Permanent link">&para;</a></h1>
-<p>Gitignored (<code>docs/dev/scratch/</code>). Companion to <code>BENCH_STATE.md</code>. Nothing here is committed.</p>
-<h2 id="why-the-last-ab-could-not-decide-anything">Why the last A/B could not decide anything<a class="headerlink" href="#why-the-last-ab-could-not-decide-anything" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Runs <code>20261009-005522</code> (before) and <code>20261009-010359</code> (after) on the Threadripper box: both 0 kept locations unloaded at use, same latency and CPU. Warm page cache and cheap file opens meant the kept queue never ran dry and never had to refill under load.</li>
-<li>Background fill barely ran (<code>read=39</code>, <code>pinned=0</code>). The single-flight fix (<code>Region.inFlightCacheFill</code>, <code>RegionCacheTask</code>) and the separate <code>pendingKeptPromotions</code> counter are in the working tree but were <strong>not</strong> in either A/B jar.</li>
-<li>So the rerun has to (1) use a jar built from the current tree, (2) start the measured phase with empty RTP queues, (3) optionally make region-file reads cold, and (4) run without spark.</li>
-</ul>
-<h2 id="arms">Arms<a class="headerlink" href="#arms" title="Permanent link">&para;</a></h2>
+<h1 id="verification-gates-and-evidence">Verification Gates and Evidence<a class="headerlink" href="#verification-gates-and-evidence" title="Permanent link">&para;</a></h1>
+<p>Canonical detail for the <em>Verifiable Correctness Gates</em> summarized in <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a>. Applies to every change, human or LLM authored, and targets regression risk from less-experienced contributors. Correctness takes priority over speed.</p>
+<p>Gates 1-4 are never skipped for code changes. They bound the proportional-verification rule in <a href="../TESTING_GUIDE/"><code>TESTING_GUIDE.md</code></a>: scope may shrink, these gates do not. Items without a reference are project practice, not research findings.</p>
+<h2 id="gates">Gates<a class="headerlink" href="#gates" title="Permanent link">&para;</a></h2>
+<ol>
+<li><strong>Reproduce before fixing.</strong> A bug fix starts with a test that fails on the old code and passes on the new code. Record both results in <code>### Verification</code>. (Project practice.)</li>
+<li><strong>Mechanical checks over discipline.</strong> Rules that matter shall fail the build: compiler warnings as errors where enabled, static analysis in CI, architecture tests for S-00x and module boundaries (e.g., no <code>org.bukkit.*</code> in <code>rtp-core</code>/<code>rtp-api</code>, no sync <code>getChunkAt</code> on main-thread paths). Prefer adding such a check over adding a prose rule. [R3][R4]</li>
+<li><strong>Errors are handled, not ignored.</strong> Check return values; never catch-and-swallow; each error path has a test or an explicit reason it cannot. [R5]</li>
+<li><strong>Independent review before merge.</strong> Every change gets a reviewer who did not write it (for LLM output: a human who reads the diff, not the summary). Reviewers check tests and error paths, not only the happy path. [R1]</li>
+<li><strong>Assess test quality, not only coverage.</strong> Coverage is a smell detector, never a target. For changed lines ask "would a wrong version of this line fail a test?" (mutation-style check; run a mutation tool on the diff for safety-critical classes when available). [R2][R6]</li>
+<li><strong>Small, decomposed changes.</strong> One behavioral change per commit/PR; refactors separate from behavior changes. (Project practice; no cited threshold.)</li>
+<li><strong>Contracts at boundaries.</strong> Public and cross-module methods state preconditions (<code>Objects.requireNonNull</code>, argument checks) and the invariant they preserve in a one-line comment. Assertions are encouraged; no per-function quota. [R7]</li>
+<li><strong>No unverified claims.</strong> Do not report "fixed", "passes", or "no regression" without the command and result that shows it. State what was <em>not</em> verified.</li>
+<li>
+<p><strong>Regression memory.</strong> Each fixed defect keeps its reproducing test permanently, named with the REQ-* or issue ID. Never delete or weaken a failing test to pass a gate.</p>
+</li>
+<li>
+<p><strong>Feature evidence.</strong> A new feature, or a replacement of an existing mechanism, ships with evidence of the claim that justifies it, committed or linked from the PR. Passing unit tests show correctness, not that the feature is worth its cost. (Project practice; see the table below.)</p>
+</li>
+</ol>
+<h3 id="feature-evidence-by-change-type">Feature evidence by change type<a class="headerlink" href="#feature-evidence-by-change-type" title="Permanent link">&para;</a></h3>
+<p>The PR states the claim (e.g., "faster", "fewer retries", "clearer menu") and attaches the matching artifact. Where the artifact cannot be produced, the PR says why under <code>not verified</code> (gate 8).</p>
 <table>
 <thead>
 <tr>
-<th>Arm</th>
-<th>Jar</th>
-<th>Source</th>
+<th>Change type</th>
+<th>Required evidence</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>A (before)</td>
-<td><code>ab-jars\before</code></td>
-<td>unchanged from the last A/B</td>
+<td>Algorithm or shape replacing another (e.g., dual-layer shapes replacing the Archimedean spiral)</td>
+<td>Differential benchmark against the old implementation on the same seeds/worlds: metric (e.g., chunk reads, attempts to a valid location, latency), sample size, spread (not only a mean), command and environment. Distribution-quality check if placement uniformity is a requirement. The old path stays runnable until the comparison is recorded.</td>
 </tr>
 <tr>
-<td>C (current)</td>
-<td>new <code>ab-jars\current</code></td>
-<td>rebuilt from the working tree (single-flight flag + pending counter + eviction fix)</td>
+<td>Performance claim</td>
+<td>Before/after numbers from the same harness and machine, with run-to-run variance. A claim without variance is advisory only.</td>
+</tr>
+<tr>
+<td>UX change (menus, books, chat messages, GUI)</td>
+<td>Before/after screenshots or recorded output, including the narrow-contrast cases for books (see <code>ADDON_MENUS.md</code>).</td>
+</tr>
+<tr>
+<td>New command or config key</td>
+<td>Example invocation with real output, plus <code>messages.yml</code>/locale parity result.</td>
+</tr>
+<tr>
+<td>Platform adapter or proxy behavior</td>
+<td>Devstack acceptance run output per <code>TESTING_GUIDE.md</code>.</td>
+</tr>
+<tr>
+<td>Safety-relevant change (S-001..S-007)</td>
+<td>Test that fails if the safeguard is removed.</td>
 </tr>
 </tbody>
 </table>
-<p><code>ab-jars\after</code> is superseded by C; keep it only if a three-way comparison is wanted. The <code>before</code> jar may not have <code>LiveLoadGate.flushSummaries</code>; <code>LoadGateFlush</code> then logs nothing and its phase rows stay empty (no failure).</p>
-<h2 id="one-time-setup">One-time setup<a class="headerlink" href="#one-time-setup" title="Permanent link">&para;</a></h2>
+<h2 id="evidence-references">Evidence &amp; References<a class="headerlink" href="#evidence-references" title="Permanent link">&para;</a></h2>
+<p>Verified from search results in the authoring session; observational studies show association, not causation.</p>
 <ul>
-<li>[ ] Build the LeafRTP plugin jar from the current tree (same task as earlier bench builds) and copy it to <code>\\100.111.32.47\UbuntuShare\26.2\ab-jars\current\</code>.</li>
-<li>[ ] Rebuild and deploy the StressTestRTP jar so <code>LoadGateFlush</code> (phase <code>:start</code> / <code>:end</code> load-gate lines) is included.</li>
-<li>[ ] <code>plugins/StressTestRTP/config.yml</code>:</li>
-<li><code>spark.enabled: false</code></li>
-<li><code>cache-reset-commands: ["rtp clear cache"]</code> (console has <code>rtp.admin</code>; this empties the kept, unkept and backlog queues of every region, releases their tickets and purges the persisted rows)</li>
-<li>Workload identical across arms: same roster, <code>concurrency</code>, phase length. Measured phase at least 180 s so at least two rate-limited <code>[RTP][load-gate]</code> / <code>[RTP][probe-gov]</code> summaries also land inside it.</li>
-<li>Fixed-rate variant (recommended, since ~76 TP/s is harness-bound): <code>immediate-redispatch: false</code>, <code>dispatch-interval-ms</code> set to a rate both arms sustain (start at 20 ms ~ 50 TP/s), so MSPT and CPU are compared at equal throughput.</li>
-<li>[ ] Confirm <code>sudo</code> works for <code>drop_caches</code> on the Ubuntu host (only needed for variant 2).</li>
+<li><strong>[R1]</strong> McIntosh, Kamei, Adams, Hassan. "The Impact of Code Review Coverage and Code Review Participation on Software Quality." MSR 2014, pp. 192-201, doi:10.1145/2597073.2597076. Low review coverage and participation associated with more post-release defects (Qt, VTK, ITK). Observational.</li>
+<li><strong>[R2]</strong> Petrovic, Ivankovic. "State of Mutation Testing at Google." ICSE-SEIP 2018. Mutants surfaced in code review on changed lines only; selective, diff-based surfacing was needed to keep it actionable.</li>
+<li><strong>[R3]</strong> Sadowski et al. "Tricorder: Building a Program Analysis Ecosystem." ICSE 2015; and "Lessons from Building Static Analysis Tools at Google." CACM 61(4), 2018. Industrial experience; analyses must be low in false positives and integrated into the workflow to be acted on.</li>
+<li><strong>[R4]</strong> Same sources as R3. Industrial experience, not a controlled experiment.</li>
+<li><strong>[R5]</strong> Yuan et al. "Simple Testing Can Prevent Most Critical Failures." OSDI 2014. 92% of catastrophic failures in the studied distributed systems came from incorrect handling of non-fatal errors. Observational, distributed data systems only.</li>
+<li><strong>[R6]</strong> Inozemtseva, Holmes. "Coverage Is Not Strongly Correlated with Test Suite Effectiveness." ICSE 2014. Correlation drops when suite size is controlled; do not use coverage as a target. (Contested: Gopinath, Jensen, Groce, ICSE 2014, report a stronger relationship.)</li>
+<li><strong>[R7]</strong> Casalnuovo et al. "Assert Use in GitHub Projects." ICSE 2015, and the authors' replication, whose results largely reversed the original defect finding. Assertion density as a defect predictor is unsettled.</li>
 </ul>
-<h2 id="per-run-procedure-one-run-one-arm-one-variant">Per-run procedure (one run = one arm, one variant)<a class="headerlink" href="#per-run-procedure-one-run-one-arm-one-variant" title="Permanent link">&para;</a></h2>
-<p>Restarting alone does not empty the kept queue: the DB-cache hydrate refills it at boot. The reset must happen after warm-up and right before the measured phase.</p>
-<ol>
-<li>Stop the server; put the arm's jar in <code>plugins/</code> (remove the other one).</li>
-<li>Start the server; wait for <code>ScanTask</code> completion and queues to settle.</li>
-<li>Warm-up phase (JIT, throwaway): <code>/rtpstress start</code> for the LeafRTP target, about 60 s, then <code>/rtpstress stop</code>.</li>
-<li><code>/rtpstress reset-cold</code> and check the log for <code>[RTP] clearcache: cleared hot/cold/backlog caches for N region(s)</code>.</li>
-<li>Variant 2 only, on the host: <code>sync; echo 3 | sudo tee /proc/sys/vm/drop_caches</code> (works with the server running; it evicts region files from the page cache).</li>
-<li>Start the measured phase immediately (<code>/rtpstress start</code>, same target, at least 180 s). Do not let the queues refill between steps 4 and 6.</li>
-<li><code>/rtpstress export</code>; note the run stamp.</li>
-</ol>
-<p>Variants:
-- <strong>1 - empty queues, warm page cache:</strong> tests refill under load (single-flight flag, pending counter, pinned handoff). Primary evidence for ADR-110.
-- <strong>2 - empty queues, cold page cache:</strong> adds real file-open and read cost; primary evidence for whether the ADR-109 governor converges where probing should matter.</p>
-<p>Order: A C C A per variant (ABBA) to cancel thermal and cache drift; three repeats per arm per variant if time allows (median-of-medians).</p>
-<h2 id="what-to-read">What to read<a class="headerlink" href="#what-to-read" title="Permanent link">&para;</a></h2>
-<ul>
-<li><code>[RTP][load-gate] region=&lt;r&gt; tag=&lt;phase&gt;:start</code> and <code>...:end</code>: subtract start from end for the phase delta of <code>read</code>, <code>deferCenter</code>, <code>deferNeighbour</code>, <code>pinned</code>, <code>kept</code>, <code>overflow</code>, <code>used(resident/evicted)</code>, <code>usedPinned(resident/evicted)</code>.</li>
-<li><code>[RTP][probe-gov] &lt;region&gt;/&lt;path&gt; flip ...</code> and <code>summary ...</code>: mode per path, <code>p</code>, <code>Tp</code>, <code>Tf|probe</code>, <code>Tf|direct</code>, flips.</li>
-<li>Harness CSVs: latency p50/p95, MSPT p50/p95, CPU per teleport, heap peak, chunk loads per teleport.</li>
-</ul>
-<h2 id="pass-criteria">Pass criteria<a class="headerlink" href="#pass-criteria" title="Permanent link">&para;</a></h2>
-<p>ADR-110 (purpose-gated live loads), arm C, both variants:
-- [ ] Background fill runs: phase-delta <code>read</code> well above the previous 39 and <code>pinned</code> &gt; 0, <code>kept</code> &gt; 0.
-- [ ] Pinned results survive until use: <code>usedPinned</code> evicted = 0 with resident &gt; 0.
-- [ ] Unpinned evicted-at-use share not higher than arm A.
-- [ ] No teleport-latency regression: C p50 and p95 within noise of A (about +/-10% across repeats).
-- [ ] Lower or equal MSPT p95 and heap peak from fill than A (ADR-110 Consequences wording).</p>
-<p>ADR-109 (probe-first governor), arm C:
-- [ ] Each <code>region/path</code> settles on one mode; no more than 2 flips in a measured phase after warm-up; same mode across repeats of a variant.
-- [ ] MSPT and throughput (or CPU per teleport at fixed rate) not worse than A.
-- [ ] Record which mode the fill path picks in variant 1 and variant 2 (skip is expected on warm Linux; probe may win cold).</p>
-<p>If all boxes are ticked: move ADR-109 and ADR-110 from Proposed to Accepted (README index too) and lower the temporary INFO summaries to FINE as ADR-110 decision 7 allows.</p>
-<h2 id="ramp-procedure-stress-point-per-plugin">Ramp procedure (stress point per plugin)<a class="headerlink" href="#ramp-procedure-stress-point-per-plugin" title="Permanent link">&para;</a></h2>
-<p>Separate from the A/B above. Finds each contender's stress point open-loop, so the ~76 TP/s harness bound no longer applies. Definition: <code>helpers/StressTestRTP/PRE_WRITEUP.md</code> section 8.1; usage: <code>helpers/StressTestRTP/README.md</code> "Ramp mode".</p>
-<ul>
-<li>[ ] Server: <code>online-mode=false</code> (already), <code>bukkit.yml</code> <code>settings.connection-throttle: -1</code>, <code>allow-flight=true</code> (bots run without physics), contenders' cooldowns 0, bots allowed the <code>/rtp</code> permission of every target.</li>
-<li>[ ] StressTestRTP <code>config.yml</code>: <code>roster: "all"</code>, <code>attempt-timeout-ms: 5000</code>, defaults under <code>ramp:</code> (stages 5..320, 60 s, warm-up 30 s). Spark off, or accept one profile spanning the whole ramp.</li>
-<li>[ ] Swarm from a separate box (keeps bot CPU off the server): <code>node devstack/clients/bench-swarm.js --host &lt;bench-ip&gt; --count 64 --join-delay-ms 250</code>. Wait for <code>online=64/64</code>.</li>
-<li>[ ] Per target, with a server restart between targets: <code>/rtpstress ramp &lt;label&gt;</code> from the console; when it ends, keep <code>&lt;stamp&gt;-ramp.csv</code> and <code>&lt;stamp&gt;-ramp-summary.txt</code> and note the swarm's <code>busy_chat</code> count.</li>
-<li>[ ] If the stage after the stress point failed with <code>HARNESS_SATURATED</code>, re-run that target with more bots (<code>--count 128</code>, second swarm with <code>--start-index 64</code>).</li>
-<li>[ ] Record per target: stress point TP/s, first failing stage, and its <code>fail_criteria</code>.</li>
-</ul>
-<h2 id="caveats-to-state-with-the-results">Caveats to state with the results<a class="headerlink" href="#caveats-to-state-with-the-results" title="Permanent link">&para;</a></h2>
-<ul>
-<li><code>Tp</code> still includes coalescer queue wait (POTENTIAL_BUGS, Medium). A SKIP decision in variant 2 may be biased against probing. Decide whether ADR-109 acceptance waits for that measurement fix or is accepted on convergence plus no regression, with the fix as follow-up.</li>
-<li><code>SyncLoadAttributor</code> self-test fix (listener-prefix-only skip) is in the working tree; the rebuilt StressTestRTP jar should log <code>sync-load attribution self-test PASS</code> at startup. If it still logs a failure, <code>chunks_sync_*</code> stay <code>-1</code> and the verdict text says why.</li>
-<li>Landing-safety column has a few false <code>NO_FLOOR</code> / <code>SUFFOCATING</code> (lily pads, carpets) until the <code>LandingInspector</code> fix lands.</li>
-<li>Heap-guard pause on uncollected garbage (logged earlier) can throttle fill at 16 GB; check for heap-pressure lines before blaming fill.</li>
-</ul>
+<p>Not adopted because no supporting evidence was found: a fixed function-length cap, and the NASA/JPL "Power of Ten" rules as a package (Holzmann, IEEE Computer 39(6), 2006, is experience-based).</p>
 
 
 
@@ -4079,10 +4163,10 @@
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.525ec568.min.js"></script>
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
       
     
   </body>

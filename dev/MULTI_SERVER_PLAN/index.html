@@ -638,6 +638,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1398,6 +1419,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3792,6 +3855,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -5234,7 +5381,7 @@
 <li>[x] <code>NetworkTransport</code> interface + <code>InMemoryNetworkStateBinding</code> reference impl. <em>(<code>rtp-proxy-common/.../spi/NetworkTransport.java</code> + <code>transport/memory/InMemoryNetworkStateBinding.java</code> per rtp-proxy-ADR-001/-003.)</em></li>
 <li>[x] Network-state member adjacent to <code>AbstractSQLDatabaseAccessor</code> per D3. <em>(<code>AbstractSQLDatabaseAccessor.networkStateBinding</code> field + <code>getNetworkStateBinding()</code> / <code>setNetworkStateBinding(...)</code>; opaque marker <code>io.github.dailystruggle.rtp.common.network.NetworkStateBinding</code> in <code>rtp-core</code> keeps the accessor proxy-agnostic. Default is <code>null</code> (network disabled).)</em></li>
 <li>[x] Single-JVM tests with two simulated backends. <em>(<code>InMemoryNetworkStateBindingTest</code> and <code>WeightedAverageBackendSelectorTest</code> exercise multi-backend snapshots, heartbeat fan-out, selector choice, and concurrent claim idempotency in-JVM.)</em></li>
-<li>[x] No-op test proving <code>network.enabled: false</code> is byte-identical. <em>(<code>ReqRtpNet002NetworkDisabledNoOpTest</code> in <code>rtp-core/src/test/.../common/network/</code> (REQ-RTP-NET-002 </em>Behavioural Parity When Disabled<em>): asserts the default binding is <code>null</code>, construction spawns no <code>network</code>/<code>redis</code>/<code>lettuce</code>-named threads, and the setter is plumbing-only.)</em></li>
+<li>[x] No-op test proving <code>network.enabled: false</code> is byte-identical. <em>(<code>ReqRtpNet002NetworkDisabledNoOpTest</code> in <code>rtp-core/src/test/.../common/network/</code> (REQ-RTP-NET-002 <em>Behavioural Parity When Disabled</em>): asserts the default binding is <code>null</code>, construction spawns no <code>network</code>/<code>redis</code>/<code>lettuce</code>-named threads, and the setter is plumbing-only.)</em></li>
 </ul>
 <h3 id="phase-2-velocity-adapter-redis-transport-incl-dragonflydb-validation">Phase 2 — Velocity adapter + Redis transport (incl. DragonflyDB validation)<a class="headerlink" href="#phase-2-velocity-adapter-redis-transport-incl-dragonflydb-validation" title="Permanent link">&para;</a></h3>
 <blockquote>

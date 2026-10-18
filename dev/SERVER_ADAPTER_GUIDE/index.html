@@ -1,0 +1,5513 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Fast, safe, bounded random teleportation for Bukkit, Paper, Folia, Fabric, and NeoForge - with a Velocity proxy transport.">
+      
+      
+        <meta name="author" content="DailyStruggle">
+      
+      
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/SERVER_ADAPTER_GUIDE/">
+      
+      
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
+    
+    
+      
+        <title>Server Adapter Requirements & Implementation Guide - LeafRTP</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#server-adapter-requirements-implementation-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            LeafRTP
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Server Adapter Requirements &amp; Implementation Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="green" data-md-color-accent="green"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
+          
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+          
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
+          
+  
+  Proxy mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../site/why/" class="md-tabs__link">
+          
+  
+  Developers
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../adr/" class="md-tabs__link">
+          
+  
+  Architecture decisions
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    LeafRTP
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/DailyStruggle/RTP" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.6.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    DailyStruggle/RTP
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Getting started
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            Getting started
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Server administrators
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Quick start
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/intended-usage/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Intended usage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What NOT to do
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prefabs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ACTIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Actions & arenas
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/FAQ/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    FAQ
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Migration guide
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Operations
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            Operations
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/WEB_EDITOR_GUIDE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Web Workspace & Editor
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../HAZARDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Hazard register
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addons
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Custom items & menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Claim compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Configuration
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            Configuration
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Config lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Core (config.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Regions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Worlds
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Schematics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Safety
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Performance
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Economy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Events & effects
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Integrations
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Messages
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Language
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Logging
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/configuration/TTL/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Spatial memory TTL
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Proxy mode
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Proxy mode
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Configuration (network.yml)
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Single-backend verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Cross-server verification
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Developers
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            Developers
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/why/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/shape-algorithms/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Shape algorithm testing & charts
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon developers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Addon quickstart
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Contributors
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    Architecture decisions
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            Architecture decisions
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-000-development-workflow/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-000 - Development Workflow
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-001 — Archimedean Spiral 1D Mapping for Location Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-002-h2-sqlite-over-flat-file-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-002 — H2/SQLite for Spatial Memory Persistence Over Flat-File Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-003-rtp-plugin-bridge-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-003 — rtp-plugin as a Separate Bridge Module from rtp-core
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-004-countbound-taskpipe-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-004 — CountBoundTaskPipe Instead of TimeBoundTaskPipe on Folia Regional Threads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-005-paperlib-removal/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-005 — Removal of PaperLib in Favour of Native Paper APIs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-006-async-queue-pre-generation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-006 — Async Queue Pre-Generation Over On-Demand Async Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-007-per-user-isolated-queues/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-007 — Per-User Isolated Queues Alongside the Global Queue
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-008-memory-tracker-active-gc/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-008 — MemoryTracker as Active Task GC with WeakReference Deallocation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-009-configurable-spatial-distributions/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-009 — Configurable Spatial Distributions: Flat, Normal, Exponential
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-010-versioned-platform-adapter-submodules/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-010 — Versioned Platform Adapter Submodules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-011-rtp-api-separate-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-011 — `rtp-api` as a Separately Published Addon Interface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-012-chunk-reservation-abstraction/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-012 — `ChunkReservation` as an Internal Chunk Ticket Abstraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-013-addons-as-external-gradle-projects/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-013 — Addons as External Gradle Projects Rather Than Built-In Optional Modules
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-015 — Stale-Chunk Guard for Count-Bound Pipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-016-anvil-subsystem/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-016 — Anvil Read-Only Subsystem
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-017 — Block Tags and Block-State Predicates in Safety Lists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-018-agents-md-public-release-structure/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-018 — `AGENTS.md` Public Release Structure: Thin Router + Canonical Sources
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-019-claim-plugin-integrations-folded-into-plugin/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-019 — Claim-Plugin Integrations Folded Into `rtp-plugin`; Example Addon Retained
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-020-language-bootstrap-and-locale-aware-configparser/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-020 — Language Bootstrap and Locale-Aware ConfigParser
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-021-legacy-mc-and-java-support-scope/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-021 — Legacy Minecraft and Java Support Are Out of Scope
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-022-shape-cache-key-seed-plus-config-hash/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-022 — Region Shape Cache Key: Seed + Canonical Config Hash
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-023-login-reserve-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-023 — Login Reserve Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-024-rtp-lite-assembly-variant/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-024 — RTP-lite Assembly Variant
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-025 — Replace SimpleYaml with an Internal Comment-Preserving YAML Library
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-026-external-hook-api-surface/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-026 — Unified External-Hook API Surface
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-028-l3-backlog-cache/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-028 — L3 Backlog Cache
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-032-teleport-pipeline-latency-histogram/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-032 — Teleport Pipeline Latency Histogram: 256-Sample Wait-Free Ring, Never Reset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-033-neoforge-platform-in-scope/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-033 — NeoForge Platform In-Scope
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-034-memory-shape-catalog/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-034 — Memory Shape Catalog and Polygon Shape
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-035-interactive-menus-book-first/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-035 — Interactive Menus via Written Book
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-036-network-mode-multi-server-multi-proxy/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-036 — Network Mode: Multi-Server, Multi-Proxy RTP
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-037-harden-rtp-config-commands/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-037 — Harden RTP Config Commands
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-038-rtpadmin-setup-wizards/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-038 — `/rtp admin setup` & Setup Wizards
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-039-rtpadmin-diagnostic-surfaces/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-039 — `/rtpadmin` Diagnostic Surfaces
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-040-cross-backend-metric-time-series-publication/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-040 — Cross-Backend Metric Time-Series Publication via `MemoryTracker` Tier Promotion
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-041-config-command-and-save-implementation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-041 — `/rtp config` Command and Save Mechanics: Implementation Strategy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-042-yaml-comment-preservation-block-only/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-042 — YAML Comment Preservation: Block-Only, Surgical Text-Edit Substrate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-043-personal-queue-permission-semantics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-043 — `rtp.personalqueue` Permission Semantics: Bucket-Only Opt-In
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-044-command-tree-menu-reflector/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-044 — `menu-api` Module for Generalized Interactive Menus
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-045-rtp-docs-menu-consumer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-045 — `/rtp docs` Menu Consumer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-046-maps-api-module/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-046 — `maps-api` Module for Runtime Cartography Chart Generation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-047-declarative-chart-composition-bridge/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-047 - Declarative Chart Composition Bridge
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-048-menu-builders-behind-server-accessor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-048 - Move menu page builders into `rtp-api` behind `RTPServerAccessor`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-049-network-mode-platform-neutral-lift/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-049 - Network-mode plumbing in `rtp-core`, platform-specific via `PlayerLifecycleHook` SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-050-concrete-menu-commands-supersede-tokens/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-050 - Concrete Menu Commands Supersede Token Registries
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-051-two-tier-api-extension-model/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-051 - Two-Tier API Model: Thin `rtp-api` Contract + `rtp-core` Extension API
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-052-outcome-metrics-and-cause-tagged-bad-locations/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-052 — Always-on generation outcome metrics and cause-tagged bad-location persistence
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-053 — Pipeline Latency Percentiles and Slow-Teleport Audit
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-054-rtprunnable-self-scheduling-thread-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-054 — RTPRunnable Self-Scheduling Thread Routing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-055-pvp-combat-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-055 - Optional PvP / combat-tag pre-flight gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-056-bare-rtp-root-action/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-056 - Pluggable bare-`/rtp` root action
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-057-platform-agnostic-addon-spi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-057 — Platform-agnostic addon SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-058-region-specific-schematic-paste/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-058 — Region-Specific Schematic
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-059-relative-ground-distance-safety-predicate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-059 — Relative Ground-Distance Safety Predicate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-060-emergency-platform-block-restoration-timeout/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-060 — Emergency-Platform Block-Restoration Timeout
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-061-open-core-dual-licensing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-061 — Open-Core Dual Licensing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-062-biome-probability-weighting/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-062 — Biome-probability weighting for location selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-063-biome-first-menu-and-auto-region-by-biome/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-063 — Biome-First Menu with Auto-Region Selection by Biome Availability
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-064-config-comment-format-summary-line-as-menu-hover/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-064 — Config-Comment Format: Summary Line as Menu Hover Text
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-065-world-override-region-and-world-menu/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-065 — World-Override Regions and the `/rtp` World Menu
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-066-foreign-config-importer/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-066 - Foreign Config Importer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-067-adaptive-scan-rate-and-mca-header-generation-check/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-067 — Automatic PRESCAN, Adaptive Scan Rate Control, and `.mca`-Header Generation Check
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-068-cross-server-persisted-teleport-limits/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-068 - Cross-Server Persisted Teleport Limits
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-069-claim-integrations-extracted-to-bundled-addon/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-069 - Claim-Plugin Integrations Extracted to the Bundled `LeafRTPClaimAddon`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-070-platform-neutral-rtp-command-root/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-070 - Platform-neutral `/rtp` command root
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-071-config-organization-and-discoverability/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-071 - Config Organization and Discoverability
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-072-teleport-view-distance-clamp-and-restore/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-072: Teleport View-Distance Clamp and Steady Restore
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-073-config-default-inheritance-references/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-073 - Config Default Inheritance via `@<file>` References
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-074-operator-facing-throughput-and-cost-metrics/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-074 - Operator-Facing RTP Throughput and Cost Metrics
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-075-platform-neutral-player-move-event-spi/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-075 - Platform-Neutral Player-Move Event SPI
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-076-config-folder-consolidation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-076 - Config Folder Consolidation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-077-multi-format-region-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-077 - Multi-Format Region Support: Pluggable Region Readers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-078-composable-cache-pipeline-stages/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-078 - Composable Cache Pipeline Stages, Domain Stage Nomenclature, and Dynamic Hot Quota Allocation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-079-cause-based-ttl-and-staged-expiration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-079 — Cause-Based TTL and Staged Expiration on Spatial Memory Segments
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-080-opt-in-simulation-benchmark-tier/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-080 — Opt-In Simulation Benchmark Tier
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-081-unified-blocked-biome-run-table/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-081 — Unified Blocked Biome Run Table in `MemoryShape`
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-082-cache-conscious-b-plus-tree-primitive-arrays/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-082 — Cache-Conscious B+ Tree of Primitive Array Pages for Spatial Run Memory
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-083-two-tier-probabilistic-region-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-083 - Two-Tier Hierarchical Cell Routing: Probabilistic Macro-Cell Selection to Intra-Macro-Cell Manifold
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-084-layered-spiral-hilbert-rle-index/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-084 - Layered Learned-State Index: Coarse Spiral Directory over Per-Cell Hilbert RLE Blobs
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-085-spiral-addressed-hilbert-key-space/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-085 - Spiral-Addressed Hilbert Key Space for Learned State
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-086-external-web-map-integration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-086 - External Web Map Integration via `anvil-api`, `maps-api`, and Spatial Memory
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-087 — Adaptive Tick-Budget, Memory Backpressure, and Dynamic Workload Regulation for Folia Execution
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-088-configurable-downsampling-stride-filter/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-088 - Configurable Downsampling Stride Filter for Spatial Candidate Selection
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-089-universal-mapcanvas-bridge-biome-hazard-overlays-and-pipeline-gauges/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-089 — Universal MapCanvas Bridge, Biome-Hazard Composite Overlays, and Visual Pipeline Gauges
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-090-test-driver-and-synthetic-mca-architecture/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-090 — Test-Driver, Synthetic MCA Generator, and Dimension Benchmark Dataset
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-091-headless-player-protocol-driver-for-devstack/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-091 — Automated Headless Client for Devstack via Mineflayer
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-092-hybrid-bit-packed-and-16-bit-run-container-hazard-table/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-092 — Hybrid Bit-Packed and 16-Bit Run Container Hazard Table
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-093 - Declarative Scripted Actions via Core Confinement, Subspace Placement, and Minecraft Command Lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-094-quality-engineering-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-094 — Quality-Engineering Gates: Tiered Logic Tests, Local Static Analysis, and Changed-Line Coverage
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-095 - Subspace Anchor Providers, Near-Teleport Primitives, and External Verifier Perimeter Extraction
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-097 — Per-Action Pre-Validated Caches, Anvil Region Pre-Screening, and Bounded Subspace Placement Retries
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-098-declarative-command-parameters-permissions-and-defaults/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-098 - Declarative Command Parameters, Per-Parameter Permissions, and Authoritative Defaults
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-099-visual-region-creation-and-interactive-cartography-bridges/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-099 — Zero-Overhead Visual Region Creation via Ecosystem Selection Bridges and Cartography Models
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-100-superseding-adr-024-sla-and-support-tier/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-100 — Superseding ADR-024: Technical Parity and Pro as SLA & Support Tier
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-101-in-house-sql-connection-pool-and-hikaricp-retirement/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-101 — In-House SQL Connection Pool and Retirement of HikariCP
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-102-coverage-guided-fuzz-testing-and-parser-input-hardening/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-102 — Coverage-Guided Fuzz Testing and Parser Input Hardening
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-103-multi-version-platform-adapter-deduplication/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-103 — Multi-Version Platform Adapter Deduplication and Runtime Coverage Normalization
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-104-ephemeral-web-editor-and-packed-docs-integration/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-104 — Ephemeral Web Editor and In-Game Packed Docs Integration
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-105-intent-based-documentation-architecture-and-operator-routing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-105 — Intent-Based Documentation Architecture, Operator-Centric Routing, and Documentation Lifecycle Refinement
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-106-shape-curve-helpers-and-signed-editor-channel/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-106 — Shape Curve Helpers, Curve-Space Run Layers, and the Signed Two-Way Editor Channel
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-107 - Addon Editor Extensions: Shared Data, Addon Tabs and Protocol Negotiation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-108 - All-MIT Licensing; Pro as Support, Not Source
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-109 - Measured-Cost Probe-First Gate
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-110 - Purpose-Gated Live Loads
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-111 — Live-Server Behaviour Fuzzing: Plugin-Agnostic Oracles, Reproduced Findings and Coverage Feedback
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-NNN — Title
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-architectural-role-boundary-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Architectural Role &amp; Boundary Rules
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Architectural Role & Boundary Rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-the-engine-vs-platform-seam" class="md-nav__link">
+    <span class="md-ellipsis">
+      1.1 The Engine vs. Platform Seam
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-multi-version-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      1.2 Multi-Version Strategy
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-non-negotiable-safety-prohibitions-s-001-s-007" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Non-Negotiable Safety Prohibitions (S-001 .. S-007)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-core-spi-interface-contracts-function-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Core SPI Interface Contracts &amp; Function Reference
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Core SPI Interface Contracts & Function Reference">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-rtpserveraccessor" class="md-nav__link">
+    <span class="md-ellipsis">
+      3.1 RTPServerAccessor
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3.1 RTPServerAccessor">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#lifecycle-subsystems" class="md-nav__link">
+    <span class="md-ellipsis">
+      Lifecycle &amp; Subsystems
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#platform-identity-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      Platform Identity &amp; Compatibility
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#world-player-registry" class="md-nav__link">
+    <span class="md-ellipsis">
+      World &amp; Player Registry
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#server-state-communication" class="md-nav__link">
+    <span class="md-ellipsis">
+      Server State &amp; Communication
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dynamic-customization-hooks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dynamic Customization Hooks
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-rtpscheduler" class="md-nav__link">
+    <span class="md-ellipsis">
+      3.2 RTPScheduler
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3.2 RTPScheduler">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#standard-scheduling-single-threaded-worker-platforms" class="md-nav__link">
+    <span class="md-ellipsis">
+      Standard Scheduling (Single-Threaded / Worker Platforms)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#regional-multithreading-folia-thread-partitioned-platforms" class="md-nav__link">
+    <span class="md-ellipsis">
+      Regional Multithreading (Folia / Thread-Partitioned Platforms)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-management-budgeting" class="md-nav__link">
+    <span class="md-ellipsis">
+      Task Management &amp; Budgeting
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-rtpworldt" class="md-nav__link">
+    <span class="md-ellipsis">
+      3.3 RTPWorld&lt;T&gt;
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3.3 RTPWorld<T>">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#identity-boundaries" class="md-nav__link">
+    <span class="md-ellipsis">
+      Identity &amp; Boundaries
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chunk-io-lifecycle-s-005-s-002" class="md-nav__link">
+    <span class="md-ellipsis">
+      Chunk I/O &amp; Lifecycle (S-005, S-002)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#off-tick-anvil-mca-file-access-adr-016" class="md-nav__link">
+    <span class="md-ellipsis">
+      Off-Tick Anvil / MCA File Access (ADR-016)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safety-terrain-manipulation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Safety &amp; Terrain Manipulation
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#34-rtpchunkt" class="md-nav__link">
+    <span class="md-ellipsis">
+      3.4 RTPChunk&lt;T&gt;
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3.4 RTPChunk<T>">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#coordinates-identity" class="md-nav__link">
+    <span class="md-ellipsis">
+      Coordinates &amp; Identity
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#block-state-safety-queries-s-001" class="md-nav__link">
+    <span class="md-ellipsis">
+      Block State &amp; Safety Queries (S-001)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chunk-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      Chunk State
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#35-rtpplayer" class="md-nav__link">
+    <span class="md-ellipsis">
+      3.5 RTPPlayer
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3.5 RTPPlayer">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#teleportation-positional-state" class="md-nav__link">
+    <span class="md-ellipsis">
+      Teleportation &amp; Positional State
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#client-visuals-hud-optional-enhanced-capabilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      Client Visuals &amp; HUD (Optional / Enhanced Capabilities)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#36-rtpcommandsender" class="md-nav__link">
+    <span class="md-ellipsis">
+      3.6 RTPCommandSender
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#37-playerlifecyclehook-event-bridge" class="md-nav__link">
+    <span class="md-ellipsis">
+      3.7 PlayerLifecycleHook &amp; Event Bridge
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-concurrency-threading-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Concurrency &amp; Threading Architecture
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Concurrency & Threading Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-standard-single-thread-tick-spigot-fabric-neoforge" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.1 Standard Single-Thread Tick (Spigot, Fabric, NeoForge)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-asynchronous-chunk-engines-paper" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.2 Asynchronous Chunk Engines (Paper)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-regional-multithreading-folia" class="md-nav__link">
+    <span class="md-ellipsis">
+      4.3 Regional Multithreading (Folia)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-chunk-ticket-lifecycle-leak-prevention-memorytracker" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Chunk Ticket Lifecycle &amp; Leak Prevention (MemoryTracker)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-command-registration-feedback-auditing" class="md-nav__link">
+    <span class="md-ellipsis">
+      6. Command Registration &amp; Feedback Auditing
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-secondary-optional-spi-frameworks" class="md-nav__link">
+    <span class="md-ellipsis">
+      7. Secondary / Optional SPI Frameworks
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-implementation-checklist-for-a-new-server-adapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      8. Implementation Checklist for a New Server Adapter
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-in-tree-platform-adapter-repository-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      9. In-Tree Platform Adapter Repository Changes
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. In-Tree Platform Adapter Repository Changes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-directory-layout-naming-conventions" class="md-nav__link">
+    <span class="md-ellipsis">
+      9.1 Directory Layout &amp; Naming Conventions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-settingsgradle-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      9.2 settings.gradle Configuration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93-rtp-api-platformfamily-registration" class="md-nav__link">
+    <span class="md-ellipsis">
+      9.3 rtp-api PlatformFamily Registration
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#94-subproject-buildgradle-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      9.4 Subproject build.gradle Structure
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#95-distribution-packaging-unified-jar-vs-standalone-artifact" class="md-nav__link">
+    <span class="md-ellipsis">
+      9.5 Distribution &amp; Packaging: Unified JAR vs. Standalone Artifact
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#96-complete-bootstrap-sequence-ordering-invariants" class="md-nav__link">
+    <span class="md-ellipsis">
+      9.6 Complete Bootstrap Sequence &amp; Ordering Invariants
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-out-of-tree-standalone-server-adapter-embedded-rtp-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. Out-of-Tree Standalone Server Adapter (Embedded RTP Engine)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Out-of-Tree Standalone Server Adapter (Embedded RTP Engine)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#101-maven-gradle-coordinates" class="md-nav__link">
+    <span class="md-ellipsis">
+      10.1 Maven / Gradle Coordinates
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#102-minimal-standalone-bootstrap-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      10.2 Minimal Standalone Bootstrap Example
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-addon-based-server-adapter-subsystem-integration-rtpaddon" class="md-nav__link">
+    <span class="md-ellipsis">
+      11. Addon-Based Server Adapter &amp; Subsystem Integration (RTPAddon)
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. Addon-Based Server Adapter & Subsystem Integration (RTPAddon)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#111-the-host-adapter-vs-addon-architectural-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      11.1 The Host Adapter vs. Addon Architectural Boundary
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#112-what-an-rtpaddon-can-adapt" class="md-nav__link">
+    <span class="md-ellipsis">
+      11.2 What an RTPAddon Can Adapt
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#113-authoring-an-rtpaddon" class="md-nav__link">
+    <span class="md-ellipsis">
+      11.3 Authoring an RTPAddon
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-architectural-decision-matrix" class="md-nav__link">
+    <span class="md-ellipsis">
+      12. Architectural Decision Matrix
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="server-adapter-requirements-implementation-guide">Server Adapter Requirements &amp; Implementation Guide<a class="headerlink" href="#server-adapter-requirements-implementation-guide" title="Permanent link">&para;</a></h1>
+<p>This document is the authoritative specification and developer guide for implementing a new platform server adapter for LeafRTP. It outlines the architectural boundaries, mandatory safety prohibitions, SPI interface contracts, and the exact function-by-function requirements needed to bridge the platform-neutral RTP engine to any Minecraft server platform (such as Bukkit, Paper, Folia, Fabric, NeoForge, Minestom, Sponge, or future server runtimes).</p>
+<hr />
+<h2 id="1-architectural-role-boundary-rules">1. Architectural Role &amp; Boundary Rules<a class="headerlink" href="#1-architectural-role-boundary-rules" title="Permanent link">&para;</a></h2>
+<h3 id="11-the-engine-vs-platform-seam">1.1 The Engine vs. Platform Seam<a class="headerlink" href="#11-the-engine-vs-platform-seam" title="Permanent link">&para;</a></h3>
+<p>LeafRTP is structured to maintain strict architectural boundaries (governed by <a href="../ARCHITECTURE/">ARCHITECTURE.md</a> and enforced by ArchUnit tests):</p>
+<div class="highlight"><pre><span></span><code>┌─────────────────────────────────────────────────────────────────┐
+│                      rtp-api &amp; SPIs                             │
+│   (Public interfaces, shared models, commands-api, anvil-api)   │
+└───────────────────────────────▲─────────────────────────────────┘
+                                │
+┌───────────────────────────────┴─────────────────────────────────┐
+│                          rtp-core                               │
+│  (Region queues, spiral math, MemoryTracker, safety pipeline)   │
+│                 ZERO PLATFORM / NMS IMPORTS                     │
+└───────────────────────────────▲─────────────────────────────────┘
+                                │
+                 Adapter Bridge via RTPServerAccessor
+                                │
+┌───────────────────────────────┴─────────────────────────────────┐
+│                     Platform Adapter                            │
+│  (rtp-bukkit, rtp-paper, rtp-folia, rtp-fabric, rtp-neoforge)  │
+│  Translates platform events, levels, chunks, players, scheduler │
+└─────────────────────────────────────────────────────────────────┘
+</code></pre></div>
+<ol>
+<li><strong>Zero Platform Imports in Core:</strong> Neither <code>rtp-core</code> nor <code>rtp-api</code> may import platform-specific packages (<code>org.bukkit.*</code>, <code>net.minecraft.*</code>, <code>net.fabricmc.*</code>, <code>net.neoforged.*</code>, etc.).</li>
+<li><strong>Platform Access via SPI:</strong> <code>rtp-core</code> interacts with the host server exclusively through <code>io.github.dailystruggle.rtp.api.server.RTPServerAccessor</code> and its associated interfaces (<code>RTPScheduler</code>, <code>RTPWorld</code>, <code>RTPChunk</code>, <code>RTPPlayer</code>, <code>RTPCommandSender</code>).</li>
+<li><strong>Fail-Closed Contract (S-006):</strong> Public <code>rtp-api</code> delegates throw <code>IllegalStateException</code> if invoked before <code>rtp-core</code> and the server accessor have completed initialization.</li>
+</ol>
+<h3 id="12-multi-version-strategy">1.2 Multi-Version Strategy<a class="headerlink" href="#12-multi-version-strategy" title="Permanent link">&para;</a></h3>
+<ul>
+<li>If targeting multiple incompatible native NMS versions (e.g. Spigot/Paper versions), follow <strong>ADR-010</strong> by splitting into compile-time versioned submodules (<code>&lt;platform&gt;-common</code>, <code>&lt;platform&gt;-v1_20_R1</code>, <code>&lt;platform&gt;-v1_21_R1</code>, etc.) with a single runtime selector at bootstrap.</li>
+<li>If targeting unified or runtime-deobfuscated platforms (e.g. modern Fabric deobfuscated or NeoForge Mojmap at runtime per <strong>ADR-033</strong>), a single adapter module can compile directly against platform APIs, using version carriers only when bytecode compatibility breaks across major releases.</li>
+</ul>
+<hr />
+<h2 id="2-non-negotiable-safety-prohibitions-s-001-s-007">2. Non-Negotiable Safety Prohibitions (S-001 .. S-007)<a class="headerlink" href="#2-non-negotiable-safety-prohibitions-s-001-s-007" title="Permanent link">&para;</a></h2>
+<p>Every platform adapter must strictly satisfy the core safety rules defined in <a href="../REQUIREMENTS/#3-prohibition-requirements">REQUIREMENTS.md</a>:</p>
+<table>
+<thead>
+<tr>
+<th>Rule</th>
+<th>Requirement</th>
+<th>Adapter Implementation Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>S-001</strong></td>
+<td><strong>No unsafe-block teleport destinations</strong></td>
+<td><code>RTPChunk#isSafe()</code> and <code>materialNameAt()</code> must fail closed on null, unknown, or unresolvable block IDs rather than passing the safety check. Never bypass core block-safety evaluation.</td>
+</tr>
+<tr>
+<td><strong>S-002</strong></td>
+<td><strong>No permanently force-loaded chunks</strong></td>
+<td><code>RTPWorld#keepChunkAt()</code> must use transient plugin chunk tickets (e.g. <code>addPluginChunkTicket</code>), NEVER persistent force-loading (like Bukkit <code>Chunk#setForceLoaded(true)</code> or native forge persistent tickets). All tickets must release on <code>reservation.close()</code>, <code>forgetChunkAt()</code>, and <code>forgetChunks()</code>.</td>
+</tr>
+<tr>
+<td><strong>S-003</strong></td>
+<td><strong>No teleport into claim-protected land</strong></td>
+<td>Platform adapters must expose or register external claim hooks (GriefPrevention, Towny, WorldGuard, FTB Chunks, etc.) through <code>RTPServerAccessor#registerClaimHandler()</code> or core <code>ClaimCheckProvider</code>.</td>
+</tr>
+<tr>
+<td><strong>S-004</strong></td>
+<td><strong>No silently discarded teleport failures</strong></td>
+<td><code>RTPPlayer#setLocation()</code> must return a <code>CompletableFuture&lt;Boolean&gt;</code> that ALWAYS completes. Catch-and-swallow blocks are prohibited. Command overrides must log <code>msgInvalidCommand</code> and <code>msgBadParameter</code> at <code>WARNING</code> level (<code>REQ-RTP-S-004</code>).</td>
+</tr>
+<tr>
+<td><strong>S-005</strong></td>
+<td><strong>Zero synchronous chunk loads on tick threads</strong></td>
+<td><code>RTPWorld#getChunkAtAsync()</code> must NEVER call synchronous <code>world.getChunkAt()</code> or blocking <code>.get()</code> on the main/tick thread. Off-tick Anvil reading (<a href="ADR-016-anvil-subsystem.md">ADR-016</a>) must be utilized for ungenerated or unloaded pre-filtering.</td>
+</tr>
+<tr>
+<td><strong>S-006</strong></td>
+<td><strong>No NPE when addons call API before core loads</strong></td>
+<td>Methods must fail closed with <code>IllegalStateException</code> if accessed pre-init, rather than returning <code>null</code> or silently no-oping.</td>
+</tr>
+<tr>
+<td><strong>S-007</strong></td>
+<td><strong>Configurable messages</strong></td>
+<td>User-facing messages must never be hardcoded; all responses route through <code>messages.yml</code> keys.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-core-spi-interface-contracts-function-reference">3. Core SPI Interface Contracts &amp; Function Reference<a class="headerlink" href="#3-core-spi-interface-contracts-function-reference" title="Permanent link">&para;</a></h2>
+<p>A server adapter must implement six primary SPI interfaces from <code>rtp-api</code>:
+1. <code>RTPServerAccessor</code>
+2. <code>RTPScheduler</code>
+3. <code>RTPWorld&lt;T&gt;</code>
+4. <code>RTPChunk&lt;T&gt;</code>
+5. <code>RTPPlayer</code>
+6. <code>RTPCommandSender</code>
+along with the event bridge and lifecycle hook (<code>PlayerLifecycleHook</code>).</p>
+<hr />
+<h3 id="31-rtpserveraccessor">3.1 <code>RTPServerAccessor</code><a class="headerlink" href="#31-rtpserveraccessor" title="Permanent link">&para;</a></h3>
+<p><code>io.github.dailystruggle.rtp.api.server.RTPServerAccessor</code> is the central service locator and lifecycle gateway instantiated and bound by the platform adapter on startup.</p>
+<h4 id="lifecycle-subsystems">Lifecycle &amp; Subsystems<a class="headerlink" href="#lifecycle-subsystems" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>void start()</code> / <code>void start(Object pluginHandle)</code></li>
+<li><strong>Purpose:</strong> Initializes the adapter, captures the host plugin or mod container, configures data folders, registers event bridges, and installs backend factories (e.g. <code>backendStateSamplerFactory</code>, <code>networkBridgeFactory</code>).</li>
+<li><strong>Thread Context:</strong> Main server bootstrap thread.</li>
+<li><code>void stop()</code></li>
+<li><strong>Purpose:</strong> Gracefully tears down the adapter during server shutdown or mod reload. Must call <code>rtpWorld.forgetChunks()</code> on all loaded worlds to release chunk tickets and flush database writes.</li>
+<li><strong>Thread Context:</strong> Server shutdown/stopping thread.</li>
+<li><code>RTPScheduler getScheduler()</code></li>
+<li><strong>Purpose:</strong> Returns the platform's <code>RTPScheduler</code> implementation.</li>
+<li><strong>Usage:</strong> Core uses this for all task scheduling (sync, async, and regional).</li>
+<li><code>RTPTaskPipe createTaskPipe()</code> / <code>Object createCachePipe()</code></li>
+<li><strong>Purpose:</strong> Instantiates task-draining pipes (e.g. <code>TimeBoundTaskPipe</code> on Bukkit/Fabric/NeoForge; <code>CountBoundTaskPipe</code> on Folia) used to pace calculation pulses within tick budgets.</li>
+<li><code>ILocationGenerator getLocationGenerator()</code></li>
+<li><strong>Purpose:</strong> Returns the location generator instance (standard <code>LocationGenerator</code>).</li>
+<li><code>PlayerLifecycleHook getPlayerLifecycleHook()</code></li>
+<li><strong>Purpose:</strong> Returns the platform-agnostic lifecycle hook that dispatches player join, quit, and teleportation events.</li>
+</ul>
+<h4 id="platform-identity-compatibility">Platform Identity &amp; Compatibility<a class="headerlink" href="#platform-identity-compatibility" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>String getServerVersion()</code></li>
+<li><strong>Purpose:</strong> Returns human-readable platform string (e.g. <code>"Paper 1.21.4"</code>, <code>"Fabric 1.21.1"</code>).</li>
+<li><code>int getServerIntVersion()</code></li>
+<li><strong>Purpose:</strong> Normalized integer version (e.g. <code>20</code> for 1.20.x, <code>21</code> for 1.21.x) for quick version gating.</li>
+<li><code>PlatformFamily getPlatformFamily()</code></li>
+<li><strong>Purpose:</strong> Returns enum: <code>BUKKIT</code>, <code>PAPER</code>, <code>FOLIA</code>, <code>FABRIC</code>, <code>NEOFORGE</code>, <code>VELOCITY</code>, or <code>BUNGEECORD</code>.</li>
+<li><strong>Usage:</strong> Used by addons and core for platform-aware capability gating.</li>
+<li><code>boolean isCompatible(PlatformFamily family, int minVersion, int maxVersion)</code></li>
+<li><strong>Purpose:</strong> Compatibility check for addons to verify if the server platform satisfies their requirements.</li>
+<li><code>File getPluginDirectory()</code></li>
+<li><strong>Purpose:</strong> Returns the base directory where <code>config.yml</code>, <code>regions.yml</code>, and <code>messages.yml</code> reside.</li>
+<li><code>Object getPlugin()</code></li>
+<li><strong>Purpose:</strong> Returns the underlying platform container handle (e.g. <code>JavaPlugin</code>, <code>ModContainer</code>).</li>
+</ul>
+<h4 id="world-player-registry">World &amp; Player Registry<a class="headerlink" href="#world-player-registry" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>RTPWorld&lt;?&gt; getRTPWorld(String name)</code> / <code>RTPWorld&lt;?&gt; getRTPWorld(UUID uuid)</code></li>
+<li><strong>Purpose:</strong> Retrieves or wraps the specified world into an <code>RTPWorld</code>. Must cache wrappers to ensure object identity across queries.</li>
+<li><code>List&lt;RTPWorld&lt;?&gt;&gt; getRTPWorlds()</code></li>
+<li><strong>Purpose:</strong> Returns all currently loaded server dimensions/levels.</li>
+<li><code>RTPPlayer getPlayer(UUID uuid)</code> / <code>RTPPlayer getPlayer(String name)</code></li>
+<li><strong>Purpose:</strong> Retrieves or wraps an online player into an <code>RTPPlayer</code>. Must return <code>null</code> if the player is offline.</li>
+<li><code>Collection&lt;RTPPlayer&gt; getOnlinePlayers()</code></li>
+<li><strong>Purpose:</strong> Returns wrappers for all currently connected players.</li>
+<li><code>RTPCommandSender getSender(UUID uuid)</code></li>
+<li><strong>Purpose:</strong> Resolves a command sender: returns the matching <code>RTPPlayer</code> if online, or console sender if UUID represents the console (or zeroes).</li>
+<li><code>void registerWorld(Object level)</code> / <code>void unregisterWorld(Object level)</code></li>
+<li><strong>Purpose:</strong> Dynamically registers or drops dimension wrappers upon world load/unload events to prevent memory leaks.</li>
+<li><code>void registerPlayer(Object player)</code> / <code>void unregisterPlayer(Object player)</code></li>
+<li><strong>Purpose:</strong> Dynamically binds/unbinds native player handles on join/quit (REQ-RTP-S-004 memory hygiene).</li>
+</ul>
+<h4 id="server-state-communication">Server State &amp; Communication<a class="headerlink" href="#server-state-communication" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>double getTPS(int ticks)</code></li>
+<li><strong>Purpose:</strong> Returns the rolling ticks-per-second average over the requested sample window (100, 600, etc.). Integrates with the metrics subsystem.</li>
+<li><code>void announce(String message, String permission)</code></li>
+<li><strong>Purpose:</strong> Broadcasts a formatted message to all online players holding the given permission (or all players if permission is null/empty).</li>
+<li><code>boolean hasEconomy()</code> / <code>Object getEconomyProvider()</code></li>
+<li><strong>Purpose:</strong> Exposes currency / Vault integration if available on the platform.</li>
+</ul>
+<h4 id="dynamic-customization-hooks">Dynamic Customization Hooks<a class="headerlink" href="#dynamic-customization-hooks" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>void setWorldBorderFunction(Function&lt;String, ?&gt; function)</code></li>
+<li><strong>Purpose:</strong> Overrides default world border calculations with platform native borders.</li>
+<li><code>void setShapeFunction(Function&lt;String, ?&gt; shapeFunction)</code></li>
+<li><strong>Purpose:</strong> Provides custom region boundary shape factories.</li>
+<li><code>void setBiomeGetter(Function&lt;RTPLocation, String&gt; getter)</code></li>
+<li><strong>Purpose:</strong> Overrides live biome resolution logic.</li>
+<li><code>void registerClaimHandler(Function&lt;RTPLocation, Boolean&gt; handler)</code></li>
+<li><strong>Purpose:</strong> Injects a platform-specific land protection check (returns <code>true</code> if location is claimed/protected).</li>
+</ul>
+<hr />
+<h3 id="32-rtpscheduler">3.2 <code>RTPScheduler</code><a class="headerlink" href="#32-rtpscheduler" title="Permanent link">&para;</a></h3>
+<p><code>io.github.dailystruggle.rtp.api.scheduling.RTPScheduler</code> abstracts task execution and timer scheduling across different concurrency architectures.</p>
+<h4 id="standard-scheduling-single-threaded-worker-platforms">Standard Scheduling (Single-Threaded / Worker Platforms)<a class="headerlink" href="#standard-scheduling-single-threaded-worker-platforms" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>RTPTask runTask(Runnable runnable)</code></li>
+<li><strong>Purpose:</strong> Schedules a task to execute on the main server/tick thread on the next tick.</li>
+<li><code>RTPTask runTaskLater(Runnable runnable, long delayTicks)</code></li>
+<li><strong>Purpose:</strong> Schedules a task to execute on the main thread after <code>delayTicks</code>.</li>
+<li><code>RTPTask runTaskTimer(Runnable runnable, long delayTicks, long periodTicks)</code></li>
+<li><strong>Purpose:</strong> Schedules a repeating task on the main thread.</li>
+<li><code>RTPTask runTaskAsynchronously(Runnable runnable)</code></li>
+<li><strong>Purpose:</strong> Dispatches work immediately onto an asynchronous thread pool.</li>
+<li><code>RTPTask runTaskLaterAsynchronously(Runnable runnable, long delayTicks)</code></li>
+<li><strong>Purpose:</strong> Delays work for <code>delayTicks</code>, then executes asynchronously.</li>
+<li><code>RTPTask runTaskTimerAsynchronously(Runnable runnable, long delayTicks, long periodTicks)</code></li>
+<li><strong>Purpose:</strong> Periodically executes work on an asynchronous thread pool.</li>
+</ul>
+<h4 id="regional-multithreading-folia-thread-partitioned-platforms">Regional Multithreading (Folia / Thread-Partitioned Platforms)<a class="headerlink" href="#regional-multithreading-folia-thread-partitioned-platforms" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>RTPTask runAtLocation(RTPLocation location, Runnable runnable)</code></li>
+<li><strong>Purpose:</strong> Dispatches the runnable on the regional thread that owns the specified <code>(x, y, z)</code> block coordinate.</li>
+<li><strong>Folia:</strong> Delegates to <code>RegionScheduler.run(plugin, world, chunkX, chunkZ, task)</code>.</li>
+<li><strong>Non-Folia:</strong> Delegates directly to <code>runTask(runnable)</code>.</li>
+<li><code>RTPTask runAtEntity(RTPPlayer player, Runnable runnable)</code></li>
+<li><strong>Purpose:</strong> Dispatches the runnable on the regional thread currently owning the player entity.</li>
+<li><strong>Folia:</strong> Delegates to <code>EntityScheduler.run(plugin, task, null)</code>.</li>
+<li><strong>Non-Folia:</strong> Delegates directly to <code>runTask(runnable)</code>.</li>
+<li><code>boolean isOwnedByCurrentRegion(RTPLocation location)</code> / <code>boolean isOwnedByCurrentRegion(RTPPlayer player)</code></li>
+<li><strong>Purpose:</strong> Verifies whether the calling thread is the authority thread owning that coordinate or entity.</li>
+<li><strong>Folia:</strong> Calls <code>Bukkit.isOwnedByCurrentRegion(location)</code>.</li>
+<li><strong>Non-Folia:</strong> Checks <code>server.isSameThread()</code> or returns <code>true</code> when on the main thread.</li>
+</ul>
+<h4 id="task-management-budgeting">Task Management &amp; Budgeting<a class="headerlink" href="#task-management-budgeting" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>void cancelTasks()</code></li>
+<li><strong>Purpose:</strong> Cancels all active scheduled tasks on shutdown or reload.</li>
+<li><code>Map&lt;Integer, RTPTask&gt; activeTasks()</code></li>
+<li><strong>Purpose:</strong> Returns a map of currently tracked tasks for leak diagnostic audits in <code>MemoryTracker</code>.</li>
+<li><strong>Tick Budgeting:</strong> For platforms driving a custom tick loop (e.g. Fabric/NeoForge), delayed and repeating tasks must be executed under a bounded tick budget (such as <code>TickBudget.syncNanos()</code>) to prevent RTP maintenance tasks from stalling the server tick.</li>
+</ul>
+<hr />
+<h3 id="33-rtpworldt">3.3 <code>RTPWorld&lt;T&gt;</code><a class="headerlink" href="#33-rtpworldt" title="Permanent link">&para;</a></h3>
+<p><code>io.github.dailystruggle.rtp.api.world.RTPWorld&lt;T&gt;</code> represents a specific dimension or world level, wrapping the underlying native level object <code>T</code> (e.g. <code>org.bukkit.World</code>, <code>net.minecraft.server.level.ServerLevel</code>).</p>
+<h4 id="identity-boundaries">Identity &amp; Boundaries<a class="headerlink" href="#identity-boundaries" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>String name()</code></li>
+<li><strong>Purpose:</strong> Canonical world name (e.g. <code>"world"</code>, <code>"minecraft:overworld"</code>).</li>
+<li><code>UUID id()</code> / <code>UUID getUID()</code></li>
+<li><strong>Purpose:</strong> Unique world identifier.</li>
+<li><code>T world()</code></li>
+<li><strong>Purpose:</strong> Returns the underlying platform world object.</li>
+<li><code>int getMinHeight()</code> / <code>int getMaxHeight()</code></li>
+<li><strong>Purpose:</strong> Returns world vertical bounds (e.g. <code>-64</code> and <code>320</code> for modern overworld). Used by vertical adjusters.</li>
+<li><code>long getSeed()</code></li>
+<li><strong>Purpose:</strong> World seed, used by spiral selection math and biome synthesis.</li>
+<li><code>String environment()</code></li>
+<li><strong>Purpose:</strong> Dimension type hint (<code>"NORMAL"</code>, <code>"NETHER"</code>, <code>"THE_END"</code>).</li>
+<li><code>boolean isVanilla()</code></li>
+<li><strong>Purpose:</strong> Returns <code>true</code> if the generator is vanilla (ADR-016), enabling seed-synthesised biome pre-checking before chunk loading. Custom modded generators return <code>false</code>.</li>
+</ul>
+<h4 id="chunk-io-lifecycle-s-005-s-002">Chunk I/O &amp; Lifecycle (S-005, S-002)<a class="headerlink" href="#chunk-io-lifecycle-s-005-s-002" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>CompletableFuture&lt;Set&lt;Long&gt;&gt; getChunkAtAsync(int cx, int cz)</code></li>
+<li><strong>Purpose:</strong> Asynchronously requests chunk generation and loading.</li>
+<li><strong>Requirement:</strong> Must return a <code>CompletableFuture</code> that completes with the chunk position key when loaded. MUST NEVER BLOCK the calling thread.</li>
+<li><code>CompletableFuture&lt;Long&gt; getChunkAt(int cx, int cz)</code></li>
+<li><strong>Purpose:</strong> Probe-first off-tick resolution. Resolves cached chunk or loads chunk without blocking.</li>
+<li><code>boolean isChunkLoaded(int cx, int cz)</code></li>
+<li><strong>Purpose:</strong> Non-blocking query to determine if the chunk is resident in memory.</li>
+<li><code>boolean isChunkGenerated(int cx, int cz)</code></li>
+<li><strong>Purpose:</strong> Non-blocking query to determine if the chunk already exists on disk (e.g. <code>World#isChunkGenerated</code>).</li>
+<li><code>void keepChunkAt(int cx, int cz)</code> / <code>void forgetChunkAt(int cx, int cz)</code></li>
+<li><strong>Purpose:</strong> Acquires or releases a transient plugin chunk ticket for <code>(cx, cz)</code>.</li>
+<li><strong>Rule S-002:</strong> Must use plugin tickets (<code>addPluginChunkTicket</code>), NEVER permanent force-loading.</li>
+<li><code>void forgetChunks()</code></li>
+<li><strong>Purpose:</strong> Releases all chunk tickets held by RTP in this world (called on shutdown/reload).</li>
+<li><code>void releaseOrphanedTickets(Set&lt;Long&gt; keepAliveKeys)</code></li>
+<li><strong>Purpose:</strong> Memory hygiene garbage collection hook called by <code>MemoryTracker</code>. Any ticket key not present in <code>keepAliveKeys</code> must be freed.</li>
+</ul>
+<h4 id="off-tick-anvil-mca-file-access-adr-016">Off-Tick Anvil / MCA File Access (<a href="ADR-016-anvil-subsystem.md">ADR-016</a>)<a class="headerlink" href="#off-tick-anvil-mca-file-access-adr-016" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>Path anvilWorldFolder()</code></li>
+<li><strong>Purpose:</strong> Path to the world save folder containing the <code>region/</code> directory. Enables off-tick Anvil prefiltering without live chunk loads.</li>
+<li><code>String anvilDimensionSubpath()</code></li>
+<li><strong>Purpose:</strong> Subdirectory for the dimension (e.g. <code>""</code> for overworld, <code>"DIM-1"</code> for Nether, <code>"DIM1"</code> for The End).</li>
+<li><code>CompletableFuture&lt;ChunkColumnProbe&gt; probeChunkColumn(int cx, int cz, int minY, int maxY)</code></li>
+<li><strong>Purpose:</strong> Fast off-tick column probe for pregeneration tasks.</li>
+<li><code>Map&lt;Long, String&gt; readBiomesInRegionFile(int rcx, int rcz, int y)</code></li>
+<li><strong>Purpose:</strong> Bulk off-tick biome reads directly from region files (<code>r.&lt;rcx&gt;.&lt;rcz&gt;.mca</code>) for fast survey caching.</li>
+</ul>
+<h4 id="safety-terrain-manipulation">Safety &amp; Terrain Manipulation<a class="headerlink" href="#safety-terrain-manipulation" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>void platform(RTPLocation location)</code></li>
+<li><strong>Purpose:</strong> Places an emergency landing platform if the landing site is over water or in the air.</li>
+<li><code>boolean restoreBlocks(List&lt;BlockDelta&gt; blocks)</code></li>
+<li><strong>Purpose:</strong> Restores original terrain after emergency platform timeout (<a href="ADR-060-emergency-platform-block-restoration-timeout.md">ADR-060</a>).</li>
+<li><code>int setBlocks(List&lt;BlockDelta&gt; blocks)</code> / <code>restoreBlockEntities(List&lt;PlacedBlockEntity&gt; entities)</code></li>
+<li><strong>Purpose:</strong> Bulk block and block-entity writes for schematic pasting (<a href="ADR-058-schematic-paster-spi.md">ADR-058</a>).</li>
+</ul>
+<hr />
+<h3 id="34-rtpchunkt">3.4 <code>RTPChunk&lt;T&gt;</code><a class="headerlink" href="#34-rtpchunkt" title="Permanent link">&para;</a></h3>
+<p><code>io.github.dailystruggle.rtp.api.world.RTPChunk&lt;T&gt;</code> wraps a chunk object <code>T</code> (or preformed data view) to answer safety and block queries.</p>
+<h4 id="coordinates-identity">Coordinates &amp; Identity<a class="headerlink" href="#coordinates-identity" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>int x()</code> / <code>int z()</code></li>
+<li><strong>Purpose:</strong> Chunk coordinate pair.</li>
+<li><code>RTPWorld&lt;?&gt; getWorld()</code></li>
+<li><strong>Purpose:</strong> The parent <code>RTPWorld</code>.</li>
+<li><code>T chunk()</code></li>
+<li><strong>Purpose:</strong> Returns the underlying platform chunk handle.</li>
+</ul>
+<h4 id="block-state-safety-queries-s-001">Block State &amp; Safety Queries (S-001)<a class="headerlink" href="#block-state-safety-queries-s-001" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>String materialNameAt(int localX, int worldY, int localZ)</code></li>
+<li><strong>Purpose:</strong> Returns upper-case namespaced block identifier (e.g. <code>"MINECRAFT:STONE"</code>, <code>"MINECRAFT:LAVA"</code>, <code>"MINECRAFT:AIR"</code>).</li>
+<li><strong>Rule:</strong> Must return empty string <code>""</code> on invalid coordinates or missing data.</li>
+<li><code>boolean isAir(int localX, int worldY, int localZ)</code></li>
+<li><strong>Purpose:</strong> Returns whether block is passable air.</li>
+<li><code>int getSkyLight(int localX, int worldY, int localZ)</code></li>
+<li><strong>Purpose:</strong> Returns sky light level (0–15) to detect caves or covered roofs.</li>
+<li><code>boolean isSafe(int localX, int worldY, int localZ, Set&lt;String&gt; unsafeBlocks)</code></li>
+<li><strong>Purpose:</strong> Evaluates destination safety.</li>
+<li><strong>Rule S-001:</strong> If the block material name is null, empty, or unresolvable, it MUST return <code>false</code> (fail-closed).</li>
+<li><code>boolean isSafe(int localX, int worldY, int localZ, CompiledUnsafeSet unsafeBlocks)</code></li>
+<li><strong>Purpose:</strong> Optimized compiled check (<a href="ADR-017-block-tags-and-state-predicates-in-safety-lists.md">ADR-017</a>) supporting block tags and block-state properties.</li>
+<li><code>boolean isSelfContained()</code></li>
+<li><strong>Purpose:</strong> Returns <code>true</code> if the chunk is backed by off-tick preformed data (e.g. <code>AnvilChunkView</code>) and requires zero live chunk I/O.</li>
+</ul>
+<h4 id="chunk-state">Chunk State<a class="headerlink" href="#chunk-state" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>boolean isLoaded()</code></li>
+<li><strong>Purpose:</strong> Returns whether the chunk is currently loaded into memory.</li>
+<li><code>boolean isGenerated()</code></li>
+<li><strong>Purpose:</strong> Returns whether the chunk has been generated on disk.</li>
+<li><code>void keep(boolean keep)</code> / <code>void unload()</code></li>
+<li><strong>Purpose:</strong> Retains or unloads the chunk via the parent world's ticket system.</li>
+</ul>
+<hr />
+<h3 id="35-rtpplayer">3.5 <code>RTPPlayer</code><a class="headerlink" href="#35-rtpplayer" title="Permanent link">&para;</a></h3>
+<p><code>io.github.dailystruggle.rtp.api.entity.RTPPlayer</code> extends <code>RTPCommandSender</code>, providing an abstraction over native connected player entities.</p>
+<h4 id="teleportation-positional-state">Teleportation &amp; Positional State<a class="headerlink" href="#teleportation-positional-state" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>CompletableFuture&lt;Boolean&gt; setLocation(RTPLocation to)</code></li>
+<li><strong>Purpose:</strong> Dispatches the player teleport to <code>to</code>.</li>
+<li><strong>Requirement (S-004):</strong> Must return a <code>CompletableFuture&lt;Boolean&gt;</code> that completes with <code>true</code> on successful teleport, or <code>false</code> on cancellation/disconnect.</li>
+<li><strong>Threading:</strong> Must dispatch on the destination owning thread (main thread or Folia region thread). Must never execute blocking chunk I/O on that thread.</li>
+<li><code>RTPLocation getLocation()</code></li>
+<li><strong>Purpose:</strong> Returns the player's current location.</li>
+<li><strong>Thread Context:</strong> Calling thread must be the player's owning thread.</li>
+<li><code>boolean isOnline()</code></li>
+<li><strong>Purpose:</strong> Returns whether the player is currently connected. Safe to call from any thread.</li>
+<li><code>void setRespawnLocation(RTPLocation location)</code></li>
+<li><strong>Purpose:</strong> Sets the player's respawn anchor / bed location (<a href="ADR-023-login-reserve-cache.md">ADR-023</a>).</li>
+</ul>
+<h4 id="client-visuals-hud-optional-enhanced-capabilities">Client Visuals &amp; HUD (Optional / Enhanced Capabilities)<a class="headerlink" href="#client-visuals-hud-optional-enhanced-capabilities" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>void sendClientBlockChange(RTPLocation location, String blockData)</code> / <code>sendClientBlockChanges(Map&lt;RTPLocation, String&gt; changes)</code></li>
+<li><strong>Purpose:</strong> Sends fake visual block packets to the client (e.g. previewing destinations or particle bounds) without altering world blocks or triggering chunk loads (REQ-RTP-S-005).</li>
+<li><code>String getClientBlock(RTPLocation location)</code></li>
+<li><strong>Purpose:</strong> Reads the block state currently displayed to the player.</li>
+<li><code>void showProgressBar(String id, String title, double progress)</code> / <code>clearProgressBar(String id)</code></li>
+<li><strong>Purpose:</strong> Displays a native boss-bar or progress bar during teleport warmups or queue generation.</li>
+<li><code>int getViewDistance()</code> / <code>void setViewDistance(int distance)</code></li>
+<li><strong>Purpose:</strong> Gets or tunes the player's server tracking chunk radius (<a href="ADR-072-teleport-pre-load-view-distance.md">ADR-072</a>).</li>
+<li><code>int getSendViewDistance()</code> / <code>void setSendViewDistance(int distance)</code></li>
+<li><strong>Purpose:</strong> Gets or tunes client render chunk distance independently of server tracking.</li>
+</ul>
+<hr />
+<h3 id="36-rtpcommandsender">3.6 <code>RTPCommandSender</code><a class="headerlink" href="#36-rtpcommandsender" title="Permanent link">&para;</a></h3>
+<p><code>io.github.dailystruggle.rtp.api.entity.RTPCommandSender</code> represents any command initiator (player, console, command block).</p>
+<ul>
+<li><code>UUID uuid()</code></li>
+<li><strong>Purpose:</strong> Unique sender identifier (console uses constant zeroed UUID).</li>
+<li><code>String name()</code></li>
+<li><strong>Purpose:</strong> Display name of the sender.</li>
+<li><code>boolean hasPermission(String permission)</code></li>
+<li><strong>Purpose:</strong> Evaluates permission nodes. Must integrate with platform permission systems (LuckPerms, Bukkit permissions, Fabric Permissions API).</li>
+<li><code>boolean isRtpAdmin()</code></li>
+<li><strong>Purpose:</strong> Returns <code>true</code> if sender has wildcard <code>rtp.*</code> or operator status.</li>
+<li><code>void sendMessage(String message)</code></li>
+<li><strong>Purpose:</strong> Sends formatted chat feedback to the sender.</li>
+<li><code>long cooldown()</code> / <code>long delay()</code></li>
+<li><strong>Purpose:</strong> Sender-specific cooldown and warmup delay overrides (e.g. resolved from permission nodes).</li>
+<li><code>Set&lt;String&gt; getEffectivePermissions()</code></li>
+<li><strong>Purpose:</strong> Returns all active permissions assigned to the sender.</li>
+<li><code>void performCommand(@Nullable RTPPlayer player, String command)</code></li>
+<li><strong>Purpose:</strong> Executes a server command on behalf of this sender.</li>
+<li><code>RTPCommandSender clone()</code></li>
+<li><strong>Purpose:</strong> Clones sender context for async safety.</li>
+</ul>
+<hr />
+<h3 id="37-playerlifecyclehook-event-bridge">3.7 <code>PlayerLifecycleHook</code> &amp; Event Bridge<a class="headerlink" href="#37-playerlifecyclehook-event-bridge" title="Permanent link">&para;</a></h3>
+<p>The adapter must listen to native server events and translate them into RTP callbacks via <code>PlayerLifecycleHook</code>:</p>
+<ol>
+<li><strong>Player Join:</strong></li>
+<li>Call <code>accessor.registerPlayer(nativePlayer)</code>.</li>
+<li>Call <code>playerLifecycleHook.fireJoinFromPlayer(nativePlayer)</code>.</li>
+<li>On default world, check for Login Reserve Cache refill (<a href="ADR-023-login-reserve-cache.md">ADR-023</a>).</li>
+<li><strong>Player Quit:</strong></li>
+<li>Call <code>playerLifecycleHook.fireQuitFromPlayer(nativePlayer)</code>.</li>
+<li>Cancel any pending <code>TeleportPipelineTask</code> for that player via <code>MemoryTracker</code>.</li>
+<li>Call <code>accessor.unregisterPlayer(nativePlayer)</code> to prevent reference leaks.</li>
+<li><strong>Player Move (ADR-075):</strong></li>
+<li>When a player with a pending warmup moves beyond the cancel threshold, cancel the teleport task and notify the player.</li>
+<li><strong>Player Damage / Combat (ADR-055):</strong></li>
+<li>Intercept damage events to tag players in combat or cancel warmups if configured.</li>
+<li><strong>World Load / Unload:</strong></li>
+<li>Bind newly loaded levels via <code>accessor.registerWorld(level)</code> and unregister unloaded levels.</li>
+</ol>
+<hr />
+<h2 id="4-concurrency-threading-architecture">4. Concurrency &amp; Threading Architecture<a class="headerlink" href="#4-concurrency-threading-architecture" title="Permanent link">&para;</a></h2>
+<p>Different platforms employ distinct concurrency constraints that the adapter must handle correctly:</p>
+<h3 id="41-standard-single-thread-tick-spigot-fabric-neoforge">4.1 Standard Single-Thread Tick (Spigot, Fabric, NeoForge)<a class="headerlink" href="#41-standard-single-thread-tick-spigot-fabric-neoforge" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Model:</strong> One main server thread ticks all entities and worlds.</li>
+<li><strong>Rules:</strong></li>
+<li>Chunk I/O must never occur synchronously on the tick thread.</li>
+<li>Use asynchronous chunk loading APIs (<code>getChunkAtAsync</code>, <code>ServerLevel.loadChunks</code>) or off-tick Anvil reading.</li>
+<li>Work scheduled via <code>RTPScheduler#runTask</code> runs on the main server thread.</li>
+</ul>
+<h3 id="42-asynchronous-chunk-engines-paper">4.2 Asynchronous Chunk Engines (Paper)<a class="headerlink" href="#42-asynchronous-chunk-engines-paper" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Model:</strong> Main thread handles logic, while chunk generation/loading runs on internal worker pools.</li>
+<li><strong>Rules:</strong></li>
+<li>Wrap Paper's native <code>World#getChunkAtAsync</code> which returns <code>CompletableFuture&lt;Chunk&gt;</code>.</li>
+<li>Continuations must run on worker threads or async pools; do not call <code>.join()</code> or <code>.get()</code> on the main thread.</li>
+</ul>
+<h3 id="43-regional-multithreading-folia">4.3 Regional Multithreading (Folia)<a class="headerlink" href="#43-regional-multithreading-folia" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Model:</strong> No single main thread; the world is divided into 8x8 chunk regions, each ticked independently by regional worker threads.</li>
+<li><strong>Rules:</strong></li>
+<li>Always check <code>RTPScheduler#isOwnedByCurrentRegion</code> before touching world blocks or entity state.</li>
+<li>Coordinate transitions using <code>runAtLocation</code> and <code>runAtEntity</code>.</li>
+<li>Vault and global economy calls must be offloaded to <code>GlobalRegionScheduler</code> or async pools.</li>
+<li>Use <code>CountBoundTaskPipe</code> (<a href="ADR-015-stale-chunk-guard-countbound-pipes.md">ADR-015</a>) to bound per-pulse slice work on region threads.</li>
+</ul>
+<hr />
+<h2 id="5-chunk-ticket-lifecycle-leak-prevention-memorytracker">5. Chunk Ticket Lifecycle &amp; Leak Prevention (MemoryTracker)<a class="headerlink" href="#5-chunk-ticket-lifecycle-leak-prevention-memorytracker" title="Permanent link">&para;</a></h2>
+<p>To satisfy <strong>S-002</strong> and avoid memory leaks:
+1. <strong>Ticket Acquisition:</strong>
+   - When pre-generating or warming up a location, acquire a chunk ticket via <code>keepChunkAt(cx, cz)</code>.
+   - Register the ticket with <code>MemoryTracker.registerChunkReservation(reservation)</code>.
+2. <strong>Ticket Release:</strong>
+   - When a location is consumed, invalidated, or cancelled, call <code>forgetChunkAt(cx, cz)</code>.
+   - Never rely on server restart to clear tickets.
+3. <strong>Garbage Collection Sweep:</strong>
+   - Periodically, <code>MemoryTracker</code> runs a diagnostic pass and invokes <code>RTPWorld#releaseOrphanedTickets(Set&lt;Long&gt; keepAliveKeys)</code>.
+   - The adapter must iterate its internal ticket map and release all tickets whose chunk key is not present in <code>keepAliveKeys</code>.</p>
+<hr />
+<h2 id="6-command-registration-feedback-auditing">6. Command Registration &amp; Feedback Auditing<a class="headerlink" href="#6-command-registration-feedback-auditing" title="Permanent link">&para;</a></h2>
+<p>Server adapters integrate with the unified command framework (<code>commands-api</code>):
+- <strong>Bukkit / Paper / Folia:</strong> Register <code>BukkitBaseRTPCmd</code> into the server's <code>CommandMap</code>.
+- <strong>Fabric / NeoForge:</strong> Register the root <code>/rtp</code> command and Brigadier syntax tree via <code>FabricCommandRegistrar</code> or NeoForge's <code>RegisterCommandsEvent</code>.
+- <strong>Command Feedback Invariant (REQ-RTP-S-004):</strong> Any syntax error, bad parameter, or invalid command execution MUST call <code>RTP.log(Level.WARNING, ...)</code> in addition to sending user feedback, ensuring operator transparency.</p>
+<hr />
+<h2 id="7-secondary-optional-spi-frameworks">7. Secondary / Optional SPI Frameworks<a class="headerlink" href="#7-secondary-optional-spi-frameworks" title="Permanent link">&para;</a></h2>
+<p>Adapters can enhance functionality by implementing optional SPI interfaces:</p>
+<table>
+<thead>
+<tr>
+<th>SPI Framework</th>
+<th>Module</th>
+<th>Purpose</th>
+<th>Adapter Implementation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>metrics-api</code></strong></td>
+<td><code>api/metrics-api</code></td>
+<td>Runtime telemetry (TPS, MSPT, queue depth, memory)</td>
+<td>Implement <code>MetricsBinding</code> to sample platform-specific tick timing and heap.</td>
+</tr>
+<tr>
+<td><strong><code>effects-api</code></strong></td>
+<td><code>api/effects-api</code></td>
+<td>Particles, sounds, and visual effects</td>
+<td>Implement <code>EffectsHandler</code> to spawn platform-native particle packets and play sounds.</td>
+</tr>
+<tr>
+<td><strong><code>maps-api</code></strong></td>
+<td><code>api/maps-api</code></td>
+<td>In-game minimap / filled map rendering</td>
+<td>Implement <code>MapBinding</code> to render RTP region bounds and biomes onto platform map canvases.</td>
+</tr>
+<tr>
+<td><strong><code>anvil-api</code></strong></td>
+<td><code>api/anvil-api</code></td>
+<td>Off-tick region file decoding</td>
+<td>Supply <code>anvilWorldFolder()</code> on <code>RTPWorld</code> so core can parse <code>.mca</code> / <code>.linear</code> files off-thread.</td>
+</tr>
+<tr>
+<td><strong><code>Network Mode</code></strong></td>
+<td><code>rtp-core</code></td>
+<td>Multi-server proxy transport (Velocity/Redis)</td>
+<td>Bind <code>backendStateSamplerFactory</code> and <code>networkBridgeFactory</code> to support cross-server RTP.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="8-implementation-checklist-for-a-new-server-adapter">8. Implementation Checklist for a New Server Adapter<a class="headerlink" href="#8-implementation-checklist-for-a-new-server-adapter" title="Permanent link">&para;</a></h2>
+<p>Use this step-by-step checklist when building a new platform adapter from scratch:</p>
+<ul>
+<li>[ ] <strong>1. Module &amp; Repo Setup:</strong></li>
+<li>Create <code>platforms/rtp-&lt;platform&gt;</code> directory.</li>
+<li>Add <code>include 'rtp-&lt;platform&gt;'</code> (or version submodules) to <code>settings.gradle</code> and assign <code>project(':rtp-&lt;platform&gt;').projectDir = file('platforms/rtp-&lt;platform&gt;')</code>.</li>
+<li>Add new platform identifier to <code>io.github.dailystruggle.rtp.api.server.PlatformFamily</code> enum in <code>rtp-api</code>.</li>
+<li>Configure <code>build.gradle</code> targeting Java 21+ with <code>api project(':rtp-api')</code>, <code>implementation project(':rtp-core')</code>, and <code>compileOnly project(':commands-api')</code>. Ensure zero platform imports leak into <code>rtp-core</code>.</li>
+<li>[ ] <strong>2. Scheduler Implementation:</strong></li>
+<li>Implement <code>RTPScheduler</code> (synchronous tick dispatch, asynchronous thread pool, delayed/repeating tasks).</li>
+<li>Implement regional scheduling if platform is partitioned (e.g. Folia <code>RegionScheduler</code>/<code>EntityScheduler</code>), otherwise delegate to sync tick thread.</li>
+<li>Bound repeating maintenance tasks under a tick budget (<code>TickBudget.syncNanos()</code>).</li>
+<li>[ ] <strong>3. World &amp; Chunk Adapters:</strong></li>
+<li>Subclass <code>RTPWorld&lt;NativeLevel&gt;</code>:<ul>
+<li>Implement non-blocking <code>isChunkLoaded</code> and <code>isChunkGenerated</code>.</li>
+<li>Implement non-blocking, asynchronous <code>getChunkAtAsync</code> (S-005).</li>
+<li>Implement chunk ticket retention in <code>keepChunkAt</code> and <code>forgetChunkAt</code> using transient tickets (S-002).</li>
+<li>Implement <code>releaseOrphanedTickets</code> for periodic GC sweeps.</li>
+<li>Wire <code>anvilWorldFolder</code> and <code>anvilDimensionSubpath</code> for off-tick Anvil pre-filtering.</li>
+</ul>
+</li>
+<li>Subclass <code>RTPChunk&lt;NativeChunk&gt;</code>:<ul>
+<li>Implement <code>materialNameAt(x, y, z)</code> returning namespaced uppercase IDs (e.g. <code>"MINECRAFT:STONE"</code>).</li>
+<li>Implement fail-closed <code>isSafe</code> and <code>CompiledUnsafeSet</code> checks (S-001).</li>
+</ul>
+</li>
+<li>[ ] <strong>4. Player &amp; Sender Wrappers:</strong></li>
+<li>Implement <code>RTPPlayer</code> wrapping native player:<ul>
+<li>Implement <code>setLocation(RTPLocation)</code> returning a <code>CompletableFuture&lt;Boolean&gt;</code> (S-004).</li>
+<li>Implement <code>isOnline()</code>, <code>getLocation()</code>, <code>hasPermission()</code>, <code>sendMessage()</code>.</li>
+</ul>
+</li>
+<li>Implement console / sender wrapper (<code>RTPCommandSender</code>).</li>
+<li>[ ] <strong>5. Server Accessor &amp; Event Bridge:</strong></li>
+<li>Subclass <code>RTPServerAccessor</code>:<ul>
+<li>Wire <code>getRTPWorld</code>, <code>getPlayer</code>, <code>getScheduler</code>, <code>createTaskPipe</code>.</li>
+<li>Cache wrappers and support dynamic registration/unregistration.</li>
+</ul>
+</li>
+<li>Create platform event bridge translating native events to <code>PlayerLifecycleHook</code> (join, quit, move, combat, world load/unload).</li>
+<li>Unregister players on disconnect to prevent memory leaks (REQ-RTP-S-004).</li>
+<li>[ ] <strong>6. Invariant-Safe Bootstrapping &amp; Lifecycle:</strong></li>
+<li>In plugin/mod startup lifecycle (<code>onEnable</code>, <code>onInitialize</code>, <code>@Mod</code>, or server application <code>main</code>):<ul>
+<li>Instantiate the accessor and scheduler.</li>
+<li>Set <code>RTP.serverAccessor = accessor;</code> and <code>RTP.scheduler = scheduler;</code> <strong>before</strong> constructing <code>RTP</code>.</li>
+<li>Call <code>accessor.start(pluginHandle);</code>.</li>
+<li>Construct <code>new RTP();</code> (or retrieve <code>RTP.getInstance()</code>).</li>
+<li>Schedule <code>ChunkUnloadProcessor</code> timer on non-Folia platforms: <code>RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1);</code> (S-002).</li>
+<li>Drain <code>RTP.getInstance().startupTasks</code> synchronously and schedule a deferred drain at <code>tick + 1</code>.</li>
+<li>Register <code>/rtp</code> and <code>/wild</code> commands in the platform's command dispatcher.</li>
+<li>Wire telemetry bindings (<code>RTP.metrics.setBinding(...)</code>) and network sampler factories if supported.</li>
+</ul>
+</li>
+<li>In shutdown lifecycle:<ul>
+<li>Cancel tasks via <code>RTPScheduler#cancelTasks()</code>.</li>
+<li>Call <code>accessor.stop()</code> and <code>RTP.stop()</code>.</li>
+</ul>
+</li>
+<li>[ ] <strong>7. Verification:</strong></li>
+<li>Verify zero synchronous chunk loads occur on main/tick threads (S-005).</li>
+<li>Verify chunk tickets release after teleport completion or player quit (S-002).</li>
+<li>Verify invalid destination blocks fail closed (S-001).</li>
+<li>Run unit and integration tests against adapter methods.</li>
+</ul>
+<hr />
+<h2 id="9-in-tree-platform-adapter-repository-changes">9. In-Tree Platform Adapter Repository Changes<a class="headerlink" href="#9-in-tree-platform-adapter-repository-changes" title="Permanent link">&para;</a></h2>
+<p>When adding a new platform adapter directly into the LeafRTP monorepo (<code>platforms/rtp-&lt;platform&gt;</code>), follow this exact repository change specification.</p>
+<h3 id="91-directory-layout-naming-conventions">9.1 Directory Layout &amp; Naming Conventions<a class="headerlink" href="#91-directory-layout-naming-conventions" title="Permanent link">&para;</a></h3>
+<p>All server platform adapters are placed under the <code>platforms/</code> directory:</p>
+<div class="highlight"><pre><span></span><code>platforms/
+├── rtp-bukkit/           # Bukkit / Spigot platform adapter
+├── rtp-paper/            # Paper async chunk adapter
+├── rtp-folia/            # Folia regional multithreading adapter
+├── rtp-fabric/           # Fabric loader adapter
+├── rtp-neoforge/         # NeoForge mod adapter
+├── rtp-proxy/            # Velocity / BungeeCord network proxy adapter
+└── rtp-&lt;platform&gt;/       # NEW platform adapter (e.g. rtp-minestom, rtp-sponge)
+    ├── build.gradle
+    └── src/
+        ├── main/
+        │   ├── java/
+        │   │   └── io/github/dailystruggle/rtp/&lt;platform&gt;/
+        │   │       ├── &lt;Platform&gt;RTPBootstrap.java
+        │   │       ├── server/&lt;Platform&gt;ServerAccessor.java
+        │   │       ├── scheduling/&lt;Platform&gt;Scheduler.java
+        │   │       ├── world/&lt;Platform&gt;RTPWorld.java
+        │   │       ├── world/&lt;Platform&gt;RTPChunk.java
+        │   │       ├── entity/&lt;Platform&gt;RTPPlayer.java
+        │   │       └── events/&lt;Platform&gt;EventBridge.java
+        │   └── resources/
+        └── test/
+</code></pre></div>
+<ul>
+<li><strong>Single Module vs. Versioned Submodules:</strong></li>
+<li><strong>Single Module:</strong> Use when the platform API is unified, backwards-compatible, or runtime-deobfuscated (e.g. Minestom, Sponge, modern unified Fabric/NeoForge).</li>
+<li><strong>Versioned Submodules (ADR-010 / ADR-103):</strong> If compiling against multiple incompatible NMS / platform bytecode revisions, split into <code>&lt;platform&gt;-common</code> (version-neutral logic) and <code>&lt;platform&gt;-vXX_YY_R1</code> (version-specific carriers resolved at runtime via <code>Class.forName</code>).</li>
+</ul>
+<h3 id="92-settingsgradle-configuration">9.2 <code>settings.gradle</code> Configuration<a class="headerlink" href="#92-settingsgradle-configuration" title="Permanent link">&para;</a></h3>
+<p>LeafRTP keeps Gradle project paths flat while grouping physical directories under <code>platforms/</code>. To register the new adapter in <code>settings.gradle</code>:</p>
+<ol>
+<li>
+<p><strong>Include and Relocate:</strong>
+<div class="highlight"><pre><span></span><code><span class="n">include</span><span class="w"> </span><span class="s1">&#39;rtp-&lt;platform&gt;&#39;</span>
+<span class="n">project</span><span class="o">(</span><span class="s1">&#39;:rtp-&lt;platform&gt;&#39;</span><span class="o">).</span><span class="na">projectDir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">file</span><span class="o">(</span><span class="s1">&#39;platforms/rtp-&lt;platform&gt;&#39;</span><span class="o">)</span>
+</code></pre></div>
+<em>(If using versioned submodules, include each submodule and assign its respective <code>projectDir</code>).</em></p>
+</li>
+<li>
+<p><strong>Conditional Toolchain Gating (Optional):</strong>
+If the new platform relies on specialized build plugins (e.g. Loom, ModDevGradle) or network-only maven repositories that cannot be resolved in offline sandboxes or lightweight CI, gate the inclusion with a project property:
+<div class="highlight"><pre><span></span><code><span class="kt">def</span><span class="w"> </span><span class="n">exclude</span><span class="o">&lt;</span><span class="n">Platform</span><span class="o">&gt;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">startParameter</span><span class="o">.</span><span class="na">projectProperties</span><span class="o">.</span><span class="na">containsKey</span><span class="o">(</span><span class="s1">&#39;exclude&lt;Platform&gt;&#39;</span><span class="o">)</span><span class="w"> </span><span class="o">||</span>
+<span class="w">        </span><span class="n">System</span><span class="o">.</span><span class="na">getenv</span><span class="o">(</span><span class="s1">&#39;EXCLUDE_&lt;PLATFORM&gt;&#39;</span><span class="o">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">null</span>
+<span class="k">if</span><span class="w"> </span><span class="o">(!</span><span class="n">exclude</span><span class="o">&lt;</span><span class="n">Platform</span><span class="o">&gt;)</span><span class="w"> </span><span class="o">{</span>
+<span class="w">    </span><span class="n">include</span><span class="w"> </span><span class="s1">&#39;rtp-&lt;platform&gt;&#39;</span>
+<span class="w">    </span><span class="n">project</span><span class="o">(</span><span class="s1">&#39;:rtp-&lt;platform&gt;&#39;</span><span class="o">).</span><span class="na">projectDir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">file</span><span class="o">(</span><span class="s1">&#39;platforms/rtp-&lt;platform&gt;&#39;</span><span class="o">)</span>
+<span class="o">}</span>
+</code></pre></div></p>
+</li>
+</ol>
+<h3 id="93-rtp-api-platformfamily-registration">9.3 <code>rtp-api</code> PlatformFamily Registration<a class="headerlink" href="#93-rtp-api-platformfamily-registration" title="Permanent link">&para;</a></h3>
+<p>Every platform adapter must have a recognized entry in <code>io.github.dailystruggle.rtp.api.server.PlatformFamily</code>:</p>
+<p><div class="highlight"><pre><span></span><code><span class="kd">public</span><span class="w"> </span><span class="kd">enum</span><span class="w"> </span><span class="n">PlatformFamily</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">BUKKIT</span><span class="p">,</span>
+<span class="w">    </span><span class="n">PAPER</span><span class="p">,</span>
+<span class="w">    </span><span class="n">FOLIA</span><span class="p">,</span>
+<span class="w">    </span><span class="n">FABRIC</span><span class="p">,</span>
+<span class="w">    </span><span class="n">NEOFORGE</span><span class="p">,</span>
+<span class="w">    </span><span class="n">VELOCITY</span><span class="p">,</span>
+<span class="w">    </span><span class="n">BUNGEECORD</span><span class="p">,</span>
+<span class="w">    </span><span class="n">MINESTOM</span><span class="p">;</span><span class="w"> </span><span class="c1">// New platform constant</span>
+<span class="p">}</span>
+</code></pre></div>
+Ensure your <code>RTPServerAccessor#getPlatformFamily()</code> returns this constant. This allows core and addons to execute platform-specific capability checks (<code>accessor.isCompatible(PlatformFamily.MINESTOM, min, max)</code>).</p>
+<h3 id="94-subproject-buildgradle-structure">9.4 Subproject <code>build.gradle</code> Structure<a class="headerlink" href="#94-subproject-buildgradle-structure" title="Permanent link">&para;</a></h3>
+<p>The new platform module must depend on <code>rtp-api</code> and <code>rtp-core</code> while keeping platform types strictly isolated:</p>
+<div class="highlight"><pre><span></span><code><span class="n">plugins</span><span class="w"> </span><span class="o">{</span>
+<span class="w">    </span><span class="n">id</span><span class="w"> </span><span class="s1">&#39;java-library&#39;</span>
+<span class="w">    </span><span class="n">id</span><span class="w"> </span><span class="s1">&#39;maven-publish&#39;</span>
+<span class="o">}</span>
+
+<span class="n">java</span><span class="w"> </span><span class="o">{</span>
+<span class="w">    </span><span class="n">toolchain</span><span class="w"> </span><span class="o">{</span>
+<span class="w">        </span><span class="n">languageVersion</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">JavaLanguageVersion</span><span class="o">.</span><span class="na">of</span><span class="o">(</span><span class="mi">21</span><span class="o">)</span>
+<span class="w">    </span><span class="o">}</span>
+<span class="o">}</span>
+
+<span class="n">dependencies</span><span class="w"> </span><span class="o">{</span>
+<span class="w">    </span><span class="c1">// Core engine and API dependencies</span>
+<span class="w">    </span><span class="n">api</span><span class="w"> </span><span class="n">project</span><span class="o">(</span><span class="s1">&#39;:rtp-api&#39;</span><span class="o">)</span>
+<span class="w">    </span><span class="n">implementation</span><span class="w"> </span><span class="n">project</span><span class="o">(</span><span class="s1">&#39;:rtp-core&#39;</span><span class="o">)</span>
+
+<span class="w">    </span><span class="c1">// Unified command framework</span>
+<span class="w">    </span><span class="n">compileOnly</span><span class="w"> </span><span class="n">project</span><span class="o">(</span><span class="s1">&#39;:commands-api&#39;</span><span class="o">)</span>
+
+<span class="w">    </span><span class="c1">// Optional SPI frameworks</span>
+<span class="w">    </span><span class="n">compileOnly</span><span class="w"> </span><span class="n">project</span><span class="o">(</span><span class="s1">&#39;:effects-api&#39;</span><span class="o">)</span>
+<span class="w">    </span><span class="n">compileOnly</span><span class="w"> </span><span class="n">project</span><span class="o">(</span><span class="s1">&#39;:metrics-api&#39;</span><span class="o">)</span>
+<span class="w">    </span><span class="n">compileOnly</span><span class="w"> </span><span class="n">project</span><span class="o">(</span><span class="s1">&#39;:anvil-api&#39;</span><span class="o">)</span>
+
+<span class="w">    </span><span class="c1">// Target Platform API / Modloader dependencies (compileOnly or modCompileOnly)</span>
+<span class="w">    </span><span class="n">compileOnly</span><span class="w"> </span><span class="s1">&#39;net.minestom:minestom-snapshots:1.21.1-SNAPSHOT&#39;</span>
+
+<span class="w">    </span><span class="c1">// Testing</span>
+<span class="w">    </span><span class="n">testImplementation</span><span class="w"> </span><span class="n">testFixtures</span><span class="o">(</span><span class="n">project</span><span class="o">(</span><span class="s1">&#39;:rtp-core&#39;</span><span class="o">))</span>
+<span class="w">    </span><span class="n">testImplementation</span><span class="w"> </span><span class="s1">&#39;org.junit.jupiter:junit-jupiter:5.10.2&#39;</span>
+<span class="o">}</span>
+</code></pre></div>
+<h3 id="95-distribution-packaging-unified-jar-vs-standalone-artifact">9.5 Distribution &amp; Packaging: Unified JAR vs. Standalone Artifact<a class="headerlink" href="#95-distribution-packaging-unified-jar-vs-standalone-artifact" title="Permanent link">&para;</a></h3>
+<p>LeafRTP supports two distribution paradigms for platform adapters:</p>
+<ol>
+<li><strong>Unified Multi-Loader JAR (<code>rtp-plugin</code>):</strong></li>
+<li>For server modloaders where operators expect a single release jar that boots across loaders (Bukkit, Paper, Folia, Fabric, NeoForge, Velocity per <strong>ADR-022</strong> and <strong>ADR-036</strong>).</li>
+<li>In <code>rtp-plugin/build.gradle</code>, add <code>implementation project(':rtp-&lt;platform&gt;')</code> (or merge post-remap bytecode).</li>
+<li>Include the loader descriptor file (<code>plugin.yml</code>, <code>fabric.mod.json</code>, <code>neoforge.mods.toml</code>, <code>velocity-plugin.json</code>) in <code>rtp-plugin/src/main/resources/</code>.</li>
+<li><strong>Standalone Platform Artifact / Library:</strong></li>
+<li>For embedded or standalone server frameworks (such as Minestom standalone servers or Sponge plugins), where bundling into a monolithic multi-loader jar creates unnecessary classloader overhead.</li>
+<li>Configure a standalone shaded jar task (<code>shadowJar</code>) directly within <code>platforms/rtp-&lt;platform&gt;/build.gradle</code> or publish as a standalone Maven dependency.</li>
+</ol>
+<h3 id="96-complete-bootstrap-sequence-ordering-invariants">9.6 Complete Bootstrap Sequence &amp; Ordering Invariants<a class="headerlink" href="#96-complete-bootstrap-sequence-ordering-invariants" title="Permanent link">&para;</a></h3>
+<p>Platform adapters must adhere to the following sequence during startup. Deviating from this order causes <code>NullPointerException</code>s or leaks chunk tickets:</p>
+<div class="highlight"><pre><span></span><code><span class="kd">public</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">onServerBootstrap</span><span class="p">(</span><span class="n">Object</span><span class="w"> </span><span class="n">hostContext</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// 1. Instantiate Accessor and Scheduler</span>
+<span class="w">    </span><span class="n">MyPlatformServerAccessor</span><span class="w"> </span><span class="n">accessor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">MyPlatformServerAccessor</span><span class="p">();</span>
+<span class="w">    </span><span class="n">RTPScheduler</span><span class="w"> </span><span class="n">scheduler</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">accessor</span><span class="p">.</span><span class="na">getScheduler</span><span class="p">();</span>
+
+<span class="w">    </span><span class="c1">// 2. Assign static references BEFORE constructing RTP</span>
+<span class="w">    </span><span class="c1">// CRITICAL: RTP constructor immediately schedules background timers on RTP.scheduler!</span>
+<span class="w">    </span><span class="n">RTP</span><span class="p">.</span><span class="na">serverAccessor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">accessor</span><span class="p">;</span>
+<span class="w">    </span><span class="n">RTP</span><span class="p">.</span><span class="na">scheduler</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scheduler</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// 3. Start the accessor (binds data folders, factories, and native server handles)</span>
+<span class="w">    </span><span class="n">accessor</span><span class="p">.</span><span class="na">start</span><span class="p">(</span><span class="n">hostContext</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// 4. Instantiate the core engine</span>
+<span class="w">    </span><span class="n">RTP</span><span class="w"> </span><span class="n">rtp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTP</span><span class="p">.</span><span class="na">getInstance</span><span class="p">();</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rtp</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">rtp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">RTP</span><span class="p">();</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="c1">// 5. Start ChunkUnloadProcessor (CRITICAL for S-002 on non-Folia platforms)</span>
+<span class="w">    </span><span class="c1">// Teleport pipeline locations reserved with keep(true) are enqueued to chunksToUnload.</span>
+<span class="w">    </span><span class="c1">// Without this timer, reserved chunks remain locked in memory!</span>
+<span class="w">    </span><span class="n">scheduler</span><span class="p">.</span><span class="na">runTaskTimer</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">ChunkUnloadProcessor</span><span class="p">(),</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// 6. Drain startupTasks synchronously and schedule deferred drain</span>
+<span class="w">    </span><span class="c1">// The RTP() constructor queues region setup and database hydration onto startupTasks.</span>
+<span class="w">    </span><span class="n">rtp</span><span class="p">.</span><span class="na">startupTasks</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="n">Long</span><span class="p">.</span><span class="na">MAX_VALUE</span><span class="p">);</span>
+<span class="w">    </span><span class="n">scheduler</span><span class="p">.</span><span class="na">runTaskLater</span><span class="p">(()</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">rtp</span><span class="p">.</span><span class="na">startupTasks</span><span class="p">.</span><span class="na">size</span><span class="p">()</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">rtp</span><span class="p">.</span><span class="na">startupTasks</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="n">Long</span><span class="p">.</span><span class="na">MAX_VALUE</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">},</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// 7. Register commands with platform command manager</span>
+<span class="w">    </span><span class="n">registerCommands</span><span class="p">(</span><span class="n">accessor</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// 8. Register platform event listeners to drive PlayerLifecycleHook</span>
+<span class="w">    </span><span class="n">registerEvents</span><span class="p">(</span><span class="n">accessor</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// 9. Install telemetry bindings (optional)</span>
+<span class="w">    </span><span class="n">installMetricsBinding</span><span class="p">(</span><span class="n">accessor</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<h2 id="10-out-of-tree-standalone-server-adapter-embedded-rtp-engine">10. Out-of-Tree Standalone Server Adapter (Embedded RTP Engine)<a class="headerlink" href="#10-out-of-tree-standalone-server-adapter-embedded-rtp-engine" title="Permanent link">&para;</a></h2>
+<p>Developers who maintain private server runtimes, custom game engines, or standalone Minestom applications can build a server adapter <strong>without modifying the LeafRTP repository</strong>.</p>
+<h3 id="101-maven-gradle-coordinates">10.1 Maven / Gradle Coordinates<a class="headerlink" href="#101-maven-gradle-coordinates" title="Permanent link">&para;</a></h3>
+<p>LeafRTP publishes its platform-agnostic core and SPI modules to Maven repositories and JitPack:</p>
+<div class="highlight"><pre><span></span><code><span class="n">repositories</span><span class="w"> </span><span class="o">{</span>
+<span class="w">    </span><span class="n">mavenCentral</span><span class="o">()</span>
+<span class="w">    </span><span class="n">maven</span><span class="w"> </span><span class="o">{</span><span class="w"> </span><span class="n">url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s1">&#39;https://jitpack.io&#39;</span><span class="w"> </span><span class="o">}</span>
+<span class="o">}</span>
+
+<span class="n">dependencies</span><span class="w"> </span><span class="o">{</span>
+<span class="w">    </span><span class="c1">// Core engine and API</span>
+<span class="w">    </span><span class="n">implementation</span><span class="w"> </span><span class="s1">&#39;com.github.DailyStruggle.RTP:rtp-api:v3.2.0&#39;</span>
+<span class="w">    </span><span class="n">implementation</span><span class="w"> </span><span class="s1">&#39;com.github.DailyStruggle.RTP:rtp-core:v3.2.0&#39;</span>
+
+<span class="w">    </span><span class="c1">// SPI frameworks (as needed)</span>
+<span class="w">    </span><span class="n">compileOnly</span><span class="w"> </span><span class="s1">&#39;com.github.DailyStruggle.RTP:commands-api:v3.2.0&#39;</span>
+<span class="w">    </span><span class="n">compileOnly</span><span class="w"> </span><span class="s1">&#39;com.github.DailyStruggle.RTP:yaml-api:v3.2.0&#39;</span>
+<span class="w">    </span><span class="n">compileOnly</span><span class="w"> </span><span class="s1">&#39;com.github.DailyStruggle.RTP:metrics-api:v3.2.0&#39;</span>
+<span class="o">}</span>
+</code></pre></div>
+<h3 id="102-minimal-standalone-bootstrap-example">10.2 Minimal Standalone Bootstrap Example<a class="headerlink" href="#102-minimal-standalone-bootstrap-example" title="Permanent link">&para;</a></h3>
+<p>In a standalone server application (e.g. Minestom <code>main</code> entry point):</p>
+<div class="highlight"><pre><span></span><code><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">MyServerApp</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kd">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">String</span><span class="o">[]</span><span class="w"> </span><span class="n">args</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="n">MinecraftServer</span><span class="w"> </span><span class="n">server</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MinecraftServer</span><span class="p">.</span><span class="na">init</span><span class="p">();</span>
+
+<span class="w">        </span><span class="c1">// Configure RTP data directory (&lt;appDir&gt;/config/rtp/)</span>
+<span class="w">        </span><span class="n">File</span><span class="w"> </span><span class="n">configDir</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">File</span><span class="p">(</span><span class="s">&quot;config/rtp&quot;</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// Instantiate and wire adapter</span>
+<span class="w">        </span><span class="n">StandaloneServerAccessor</span><span class="w"> </span><span class="n">accessor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">new</span><span class="w"> </span><span class="n">StandaloneServerAccessor</span><span class="p">(</span><span class="n">server</span><span class="p">,</span><span class="w"> </span><span class="n">configDir</span><span class="p">);</span>
+<span class="w">        </span><span class="n">RTP</span><span class="p">.</span><span class="na">serverAccessor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">accessor</span><span class="p">;</span>
+<span class="w">        </span><span class="n">RTP</span><span class="p">.</span><span class="na">scheduler</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">accessor</span><span class="p">.</span><span class="na">getScheduler</span><span class="p">();</span>
+<span class="w">        </span><span class="n">accessor</span><span class="p">.</span><span class="na">start</span><span class="p">(</span><span class="n">server</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// Boot core RTP engine</span>
+<span class="w">        </span><span class="k">new</span><span class="w"> </span><span class="n">RTP</span><span class="p">();</span>
+
+<span class="w">        </span><span class="c1">// Schedule chunk ticket release processor</span>
+<span class="w">        </span><span class="n">RTP</span><span class="p">.</span><span class="na">scheduler</span><span class="p">.</span><span class="na">runTaskTimer</span><span class="p">(</span><span class="k">new</span><span class="w"> </span><span class="n">ChunkUnloadProcessor</span><span class="p">(),</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// Drain initial startup tasks</span>
+<span class="w">        </span><span class="n">RTP</span><span class="p">.</span><span class="na">getInstance</span><span class="p">().</span><span class="na">startupTasks</span><span class="p">.</span><span class="na">execute</span><span class="p">(</span><span class="n">Long</span><span class="p">.</span><span class="na">MAX_VALUE</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// Start server</span>
+<span class="w">        </span><span class="n">server</span><span class="p">.</span><span class="na">start</span><span class="p">(</span><span class="s">&quot;0.0.0.0&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">25565</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<h2 id="11-addon-based-server-adapter-subsystem-integration-rtpaddon">11. Addon-Based Server Adapter &amp; Subsystem Integration (<code>RTPAddon</code>)<a class="headerlink" href="#11-addon-based-server-adapter-subsystem-integration-rtpaddon" title="Permanent link">&para;</a></h2>
+<p>A frequent developer question is: <em>"Can I create an <code>RTPAddon</code> that contains a server adapter?"</em>
+Understanding the architectural boundary between the <strong>Platform Host Adapter</strong> and an <strong><code>RTPAddon</code></strong> is essential.</p>
+<h3 id="111-the-host-adapter-vs-addon-architectural-boundary">11.1 The Host Adapter vs. Addon Architectural Boundary<a class="headerlink" href="#111-the-host-adapter-vs-addon-architectural-boundary" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Platform Host Adapter (<code>RTPServerAccessor</code> / <code>RTPScheduler</code>):</strong></li>
+<li><strong>Role:</strong> Bridges the core engine to the host server environment (thread scheduling, chunk loading, world registration).</li>
+<li><strong>Lifecycle Timing:</strong> Must run <strong>before</strong> <code>new RTP()</code>. Without it, <code>RTP</code> cannot construct and throws <code>IllegalStateException</code>.</li>
+<li><strong>Discovery:</strong> Explicitly instantiated by the server mod/plugin bootstrap.</li>
+<li><strong><code>RTPAddon</code> (<code>io.github.dailystruggle.rtp.api.addon.RTPAddon</code>):</strong></li>
+<li><strong>Role:</strong> Extends functionality on an already booted RTP engine (per <strong>ADR-057</strong>).</li>
+<li><strong>Lifecycle Timing:</strong> Discovered and loaded by <code>AddonRegistry</code> <strong>after</strong> <code>rtp-core</code> has already initialized.</li>
+<li><strong>Discovery:</strong> Automatic via <code>java.util.ServiceLoader</code> from the host classpath or jar files placed in <code>&lt;pluginDir&gt;/addons/</code>.</li>
+</ul>
+<p><strong>Key Architectural Conclusion:</strong> An <code>RTPAddon</code> cannot act as the primary host server adapter for an un-adapted server platform because the engine cannot start without an accessor. However, an <code>RTPAddon</code> is the primary and recommended mechanism to adapt <strong>server subsystems</strong> (protection plugins, custom region formats, custom effects, custom shapes) on top of an existing server adapter.</p>
+<h3 id="112-what-an-rtpaddon-can-adapt">11.2 What an <code>RTPAddon</code> Can Adapt<a class="headerlink" href="#112-what-an-rtpaddon-can-adapt" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Subsystem</th>
+<th>Integration Point</th>
+<th>Example Use Case</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Claim / Territory Protection</strong></td>
+<td><code>RTPAPI.hooks().verifiers().register(...)</code></td>
+<td>Integrating GriefPrevention, Towny, WorldGuard, FTB Chunks, or custom instance tags without editing core.</td>
+</tr>
+<tr>
+<td><strong>Region File Formats</strong></td>
+<td><code>RegionFormatRegistry.register(...)</code></td>
+<td>Adding support for <code>.linear</code> region files (<a href="ADR-077-multi-format-region-support.md">ADR-077</a>) or custom compressed world formats.</td>
+</tr>
+<tr>
+<td><strong>Visual &amp; Particle Effects</strong></td>
+<td><code>EffectFactory.addEffect(name, effect)</code></td>
+<td>Registering custom warmup/teleport animations (e.g. <code>LeafRTPRiftAddon</code>).</td>
+</tr>
+<tr>
+<td><strong>GUI &amp; Menus</strong></td>
+<td><code>RTPAPI.selectionAPI</code></td>
+<td>Providing platform-specific inventory menus (e.g. <code>LeafRTPGuiAddon</code>).</td>
+</tr>
+<tr>
+<td><strong>Custom Region Shapes</strong></td>
+<td><code>RTP.serverAccessor.setShapeFunction(...)</code></td>
+<td>Adding non-standard region shapes (hexagons, polygons, spline curves).</td>
+</tr>
+<tr>
+<td><strong>Custom Biome Resolvers</strong></td>
+<td><code>RTP.serverAccessor.setBiomeGetter(...)</code></td>
+<td>Overriding biome detection for custom terraforming engines.</td>
+</tr>
+<tr>
+<td><strong>Declarative Actions</strong></td>
+<td><code>ActionManager.registerAction(...)</code></td>
+<td>Custom scripted actions on pre/post teleport (<a href="ADR-093-declarative-scripted-actions.md">ADR-093</a>).</td>
+</tr>
+</tbody>
+</table>
+<h3 id="113-authoring-an-rtpaddon">11.3 Authoring an <code>RTPAddon</code><a class="headerlink" href="#113-authoring-an-rtpaddon" title="Permanent link">&para;</a></h3>
+<p>To author a subsystem adapter addon:</p>
+<ol>
+<li>
+<p><strong>Implement <code>RTPAddon</code>:</strong>
+<div class="highlight"><pre><span></span><code><span class="kn">package</span><span class="w"> </span><span class="nn">com.example.myaddon</span><span class="p">;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.rtp.api.addon.RTPAddon</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.rtp.api.RTPAPI</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io.github.dailystruggle.rtp.common.RTP</span><span class="p">;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">java.util.logging.Level</span><span class="p">;</span>
+
+<span class="kd">public</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="kd">class</span> <span class="nc">MySubsystemAddon</span><span class="w"> </span><span class="kd">implements</span><span class="w"> </span><span class="n">RTPAddon</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nd">@Override</span>
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="n">String</span><span class="w"> </span><span class="nf">name</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="s">&quot;MySubsystemAddon&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="nd">@Override</span>
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">onLoad</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Register claim verifier</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">RTPAPI</span><span class="p">.</span><span class="na">hooks</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">RTPAPI</span><span class="p">.</span><span class="na">hooks</span><span class="p">.</span><span class="na">verifiers</span><span class="p">().</span><span class="na">register</span><span class="p">(</span><span class="s">&quot;my_claim_system&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">location</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">                </span><span class="c1">// Return false if location is protected/claimed (vetoes destination)</span>
+<span class="w">                </span><span class="k">return</span><span class="w"> </span><span class="o">!</span><span class="n">MyClaimAPI</span><span class="p">.</span><span class="na">isClaimed</span><span class="p">(</span><span class="n">location</span><span class="p">.</span><span class="na">world</span><span class="p">().</span><span class="na">name</span><span class="p">(),</span><span class="w"> </span><span class="n">location</span><span class="p">.</span><span class="na">x</span><span class="p">(),</span><span class="w"> </span><span class="n">location</span><span class="p">.</span><span class="na">z</span><span class="p">());</span>
+<span class="w">            </span><span class="p">});</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">        </span><span class="n">RTP</span><span class="p">.</span><span class="na">log</span><span class="p">(</span><span class="n">Level</span><span class="p">.</span><span class="na">INFO</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;[MySubsystemAddon] Registered custom protection hook.&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="w">    </span><span class="nd">@Override</span>
+<span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">onUnload</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">RTPAPI</span><span class="p">.</span><span class="na">hooks</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">            </span><span class="n">RTPAPI</span><span class="p">.</span><span class="na">hooks</span><span class="p">.</span><span class="na">verifiers</span><span class="p">().</span><span class="na">unregister</span><span class="p">(</span><span class="s">&quot;my_claim_system&quot;</span><span class="p">);</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Register Service Provider Descriptor:</strong>
+Create <code>src/main/resources/META-INF/services/io.github.dailystruggle.rtp.api.addon.RTPAddon</code> containing:
+<div class="highlight"><pre><span></span><code>com.example.myaddon.MySubsystemAddon
+</code></pre></div></p>
+</li>
+<li>
+<p><strong>Packaging and Deployment:</strong></p>
+</li>
+<li>Compile into a jar and drop into the <code>&lt;pluginDir&gt;/addons/</code> folder.</li>
+<li><code>rtp-core</code> automatically extracts bundled addons, scans the directory with <code>URLClassLoader</code>, and executes <code>onLoad()</code> on startup.</li>
+</ol>
+<hr />
+<h2 id="12-architectural-decision-matrix">12. Architectural Decision Matrix<a class="headerlink" href="#12-architectural-decision-matrix" title="Permanent link">&para;</a></h2>
+<p>Use this matrix to determine the correct implementation route for your project:</p>
+<table>
+<thead>
+<tr>
+<th>Criterion</th>
+<th>In-Tree Platform Adapter</th>
+<th>Out-of-Tree Standalone Adapter</th>
+<th>RTPAddon Subsystem Adapter</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Location</strong></td>
+<td><code>platforms/rtp-&lt;platform&gt;</code> in RTP repo</td>
+<td>Independent external repository</td>
+<td><code>addons/</code> folder or separate jar</td>
+</tr>
+<tr>
+<td><strong>Scope</strong></td>
+<td>Complete host server bridge (scheduler, chunks, players)</td>
+<td>Complete host server bridge (scheduler, chunks, players)</td>
+<td>Subsystem extension (claims, effects, GUI, formats)</td>
+</tr>
+<tr>
+<td><strong>Engine Lifecycle</strong></td>
+<td>Executes <em>before</em> <code>new RTP()</code></td>
+<td>Executes <em>before</em> <code>new RTP()</code></td>
+<td>Executes <em>after</em> <code>new RTP()</code></td>
+</tr>
+<tr>
+<td><strong>Discovery</strong></td>
+<td>Platform entry point (<code>rtp-plugin</code> / mod)</td>
+<td>Platform entry point (<code>main()</code> / mod)</td>
+<td><code>ServiceLoader</code> via <code>AddonRegistry</code></td>
+</tr>
+<tr>
+<td><strong>Target Audience</strong></td>
+<td>Mainstream server platforms (Minestom, Sponge)</td>
+<td>Private server forks, custom game engines</td>
+<td>Server admins, plugin developers, 3rd party tools</td>
+</tr>
+<tr>
+<td><strong>Repo Maintenance</strong></td>
+<td>Maintained in LeafRTP release cycle</td>
+<td>Maintained independently by author</td>
+<td>Maintained independently by author</td>
+</tr>
+</tbody>
+</table>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      LeafRTP v3.3.0
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
+      
+    
+  </body>
+</html>

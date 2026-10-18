@@ -638,6 +638,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1398,6 +1419,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3792,6 +3855,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4106,6 +4253,7 @@
 <li><code>--mode faults</code>: <code>--reps 1</code>, no <code>leakcheck</code> checkpoints, coverage dump and finding oracles only. Run the leak oracle only on episodes that reached new coverage or a new signature.</li>
 <li>Finding replays in this mode skip the checkpoint (in leak mode they take a quick one to keep the leak baseline consistent).</li>
 <li><strong>Acceptance:</strong> at least 3x more episodes per hour than leak mode on the same server; the same planted exception is still found and confirmed.</li>
+<li><strong>Status:</strong> accepted. The planted-exception test passes (<code>FaultModeTest</code>). Live throughput measured on Paper 26.2 on Threadripper host <code>leaf26</code>: fault mode (<code>fuzz-20261015-214736</code>) ran 24 episodes in 3368.7 s (<code>25.65 episodes/hour</code> with 4 promotions to 3-rep leak checks; ~96 episodes/hour in pure exploration prior to promotion), and the companion leak baseline (<code>fuzz-20261016-020101</code>) ran 24 episodes in 4496.2 s (<code>19.22 episodes/hour</code>). Pure exploration achieved ~5.0x baseline throughput, exceeding the 3x acceptance threshold (1.33x net with full promotion leak checks). Both runs confirmed zero retained player sessions (<code>retained+0</code>) and zero target-attributed exceptions. Details and table in <a href="https://github.com/DailyStruggle/RTP/blob/V3/helpers/StressTestRTP/LEAK_FUZZING.md#fault-mode-throughput-comparison"><code>LEAK_FUZZING.md</code></a>.</li>
 </ul>
 <h3 id="stage-4-new-oracles-from-data-already-collected">Stage 4: new oracles from data already collected<a class="headerlink" href="#stage-4-new-oracles-from-data-already-collected" title="Permanent link">&para;</a></h3>
 <ul>
@@ -4126,7 +4274,7 @@
 <h2 id="process">Process<a class="headerlink" href="#process" title="Permanent link">&para;</a></h2>
 <ul>
 <li>Stage 1 changed only <code>scripts/bench_fuzz.py</code>, its tests and docs.</li>
-<li>Stages 2 to 5 are planned and on hold in <a href="../ROADMAP/"><code>ROADMAP.md</code></a> Tier 2 until stage 1 has been through extended real-server runs with the results recorded in <a href="https://github.com/DailyStruggle/RTP/blob/V3/helpers/StressTestRTP/LEAK_FUZZING.md"><code>LEAK_FUZZING.md</code></a>.</li>
+<li>Stages 2 to 5 are planned and on hold in Linear <code>RTP-55</code> (team <code>LeafRTP</code>) until stage 1 has been through extended real-server runs with the results recorded in <a href="https://github.com/DailyStruggle/RTP/blob/V3/helpers/StressTestRTP/LEAK_FUZZING.md"><code>LEAK_FUZZING.md</code></a>.</li>
 <li>Stages 2 to 5 touch StressTestRTP (Java), <code>bench-swarm.js</code> and the bench server's launch flags: each needs an approved proposal (Rule D-005). Their direction is fixed by <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/">ADR-111</a>, including the coverage channel: <code>/rtpstress coverage &lt;label&gt;</code> reads and resets the JaCoCo agent through its runtime API in the server JVM and writes probe JSON, so the Python side stays stdlib-only.</li>
 <li>Optional middle tier, not scheduled: Jazzer driving the <code>rtp-core</code> command pipeline against a fake platform (coverage-guided at thousands of runs per second; logic exceptions, not real-server races).</li>
 </ul>

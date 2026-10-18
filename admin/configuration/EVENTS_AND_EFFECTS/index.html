@@ -644,6 +644,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../MIGRATION/" class="md-nav__link">
         
   
@@ -1644,6 +1665,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -4038,6 +4101,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4665,13 +4812,13 @@ See also: <a href="../../COMMANDS/"><code>COMMANDS.md</code></a> for permission 
 <p>Executes arbitrary commands at any trigger stage (<code>presetup</code>, <code>postteleport</code>, <code>cancel</code>, <code>death</code>, etc.):</p>
 <ul>
 <li><strong>Format in <code>definitions/effects/*.yml</code>:</strong></li>
-<li><code>COMMAND CONSOLE &lt;command&gt;</code>: Executes the command with server console privileges.</li>
-<li><code>COMMAND PLAYER &lt;command&gt;</code>: Executes the command as the player.</li>
+<li><code>COMMAND CONSOLE &lt;command&gt;</code>: Executes the command with server console privileges (dotted form <code>COMMAND.CONSOLE.&lt;command&gt;</code> also supported).</li>
+<li><code>COMMAND PLAYER &lt;command&gt;</code>: Executes the command as the player (dotted form <code>COMMAND.PLAYER.&lt;command&gt;</code> also supported).</li>
 <li>Supports quotes and backslash escapes for arguments.</li>
 <li><strong>Format in permissions:</strong></li>
 <li><code>rtp.effect.&lt;stage&gt;.command.console.&lt;command&gt;</code></li>
 <li><code>rtp.effect.&lt;stage&gt;.command.player.&lt;command&gt;</code></li>
-<li>Whitespace and special characters in permissions can be escaped with backslashes (e.g. <code>rtp.effect.death.command.console.broadcast\ [player]\ died</code>).</li>
+<li>Whitespace and special characters in permissions can be escaped with backslashes (e.g. <code>rtp.effect.death.command.console.broadcast\ [player]\ died</code>). Escaped dots (<code>\.</code>) in commands are preserved.</li>
 <li><strong>Dynamic placeholders:</strong></li>
 <li><code>[player]</code> or <code>{player}</code>: Target player's username.</li>
 <li><code>[uuid]</code> or <code>{uuid}</code>: Target player's UUID.</li>

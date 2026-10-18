@@ -644,6 +644,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1404,6 +1425,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3879,6 +3942,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3995,7 +4142,7 @@
 <li><strong>Non-loading read SPI.</strong> <code>RTPWorld.getChunkIfReadable(cx, cz)</code> resolves from a resident chunk or the region file and completes with <code>null</code> where only a native load could answer; <code>getOrReadChunk</code> composes it with the cache. Bukkit/Paper, Folia, NeoForge and Fabric common / common-unobf override it with their region-file path. The default serves resident chunks only (used by the v26 Fabric adapters, which have no region-file path).</li>
 <li><strong>Speculative fill reads first and prefers a pin for native loads.</strong> Center chunk and safety neighbours resolve through the read SPI. On a miss the attempt either:</li>
 <li><strong>pins</strong>: claims a slot from <code>LiveLoadGate</code> (per region, <code>keptLocations.size() + pinsInFlight &lt; activeChunkCap</code>), then proceeds with native loads and returns its result with a <code>ChunkReservation</code>, which <code>RegionCacheTask</code> hands to the kept (pinned) queue; if the kept queue refuses, the reservation is closed and the location is stored unpinned;</li>
-<li><strong>loads unpinned</strong>: no slot free, so center and safety neighbours load natively without a pin and are validated on load, and the result goes to <code>unkeptLocations</code> without a success ring (item 4). Public fill stays single-flight per region, so this is at most one candidate's loads in flight per region; or</li>
+<li><strong>loads unpinned</strong>: no slot free, so center and safety neighbours load natively without a pin and are validated on load, and the result goes to <code>unkeptLocations</code> without a success ring (item 4). Public fills in flight are bounded by the cache deficit; the cache pipe's pacer, charged each fill's wall time to completion, sets how many start per pulse; or</li>
 <li><strong>defers</strong>: no slot free and the heap is under pressure (<code>HeapPressureMonitor</code>, <code>maxHeapPercent</code>), so the candidate is skipped (<code>deferred/...</code> outcome) without touching the bad-chunk tables and the fill run ends without the exhaustion dump; a backlog candidate returns to the backlog as <code>UNKNOWN</code> (ADR-028); the next fill pulse retries.
    A slot is released on every attempt exit (reschedule, success, exhaustion, deferral).</li>
 <li><strong>No unpinned ring.</strong> A speculative result that never pinned completes without the success ring; the teleport-time preload (<code>viewDistanceTeleport</code>, ADR-072) loads it when a player is waiting. The per-player fill path likewise enqueues without building a ring.</li>

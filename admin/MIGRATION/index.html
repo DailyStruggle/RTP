@@ -15,7 +15,7 @@
         <link rel="canonical" href="https://dailystruggle.github.io/RTP/admin/MIGRATION/">
       
       
-        <link rel="prev" href="../RECIPES/">
+        <link rel="prev" href="../../site/features/">
       
       
         <link rel="next" href="../RUNBOOK/">
@@ -633,6 +633,27 @@
   
   <span class="md-ellipsis">
     Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
   </span>
   
 
@@ -1725,6 +1746,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -4119,6 +4182,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4555,6 +4702,7 @@ Every file touched or written is reported in the console and command sender chat
 <h3 id="migration-reference-by-plugin">Migration Reference by Plugin<a class="headerlink" href="#migration-reference-by-plugin" title="Permanent link">&para;</a></h3>
 <h4 id="1-betterrtp-migration-guide">1. BetterRTP Migration Guide<a class="headerlink" href="#1-betterrtp-migration-guide" title="Permanent link">&para;</a></h4>
 <p><strong>Source Location:</strong> <code>plugins/BetterRTP/config.yml</code></p>
+<p><img alt="BetterRTP Migration Preview &amp; Execution" src="../../assets/img/config_import_betterrtp.png" /></p>
 <ul>
 <li><strong>World &amp; Region Mapping:</strong></li>
 <li><code>Default</code> configuration maps to region defaults.</li>
@@ -4577,6 +4725,7 @@ Every file touched or written is reported in the console and command sender chat
 </ul>
 <h4 id="2-justrtp-migration-guide">2. JustRTP Migration Guide<a class="headerlink" href="#2-justrtp-migration-guide" title="Permanent link">&para;</a></h4>
 <p><strong>Source Locations:</strong> <code>plugins/justRTP/config.yml</code>, <code>custom_locations.yml</code>, and <code>rtp_zones.yml</code></p>
+<p><img alt="JustRTP Migration Preview &amp; Execution" src="../../assets/img/config_import_justrtp.png" /></p>
 <ul>
 <li><strong>World &amp; Location Mapping:</strong></li>
 <li><code>worlds</code> sections map to <code>regions/&lt;world&gt;.yml</code>.</li>
@@ -4851,13 +5000,6 @@ Every file touched or written is reported in the console and command sender chat
 <li>Existing files are upgraded in place on first load.</li>
 <li>
 <p><em>Rollback note:</em> 3.1.x and earlier cannot read the upgraded files. Always make a backup of <code>plugins/RTP/</code> before upgrading in case you need to roll back.</p>
-</li>
-<li>
-<p><strong>In-Game Packed Documentation &amp; Offline HTML Export (<code>/rtp docs</code>):</strong></p>
-</li>
-<li>Introduces <code>/rtp docs [topic]</code>, <code>/rtp docs list</code>, and <code>/rtp docs export</code> under permission <code>rtp.admin.docs</code>.</li>
-<li>
-<p>Operators can browse version-matched manuals in-game or export self-contained offline documentation bundles (<code>docs-bundle.html</code>).</p>
 </li>
 <li>
 <p><strong>Tag-Group Set Subtraction in <code>safety.yml</code>:</strong></p>

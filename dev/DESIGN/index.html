@@ -638,6 +638,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1398,6 +1419,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3792,6 +3855,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4011,6 +4158,24 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#rtp-fabric-implementation-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      rtp-fabric Implementation Notes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rtp-neoforge-implementation-notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      rtp-neoforge Implementation Notes
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4185,6 +4350,9 @@
 - <strong>One write path (S-004).</strong> Addon YAML listed in <code>configFiles()</code> joins the session <code>files</code> map and goes through Hot-Apply only: path checks, structural checks, then <code>validate</code>, <code>.bak</code>, atomic write and <code>applied</code>. Errors return in <code>apply_ack</code>.
 - <strong>Fail closed (S-006).</strong> The registry throws <code>IllegalStateException</code> before core loads. A session's extension list is fixed when its snapshot is built.</p>
 <h2 id="platform-adapter-design-details">Platform Adapter Design Details<a class="headerlink" href="#platform-adapter-design-details" title="Permanent link">&para;</a></h2>
+<blockquote>
+<p><strong>Authoritative Specification:</strong> For complete SPI function requirements, method-by-method contracts, threading rules, and a step-by-step implementation checklist for authoring a new platform adapter, see <a href="../SERVER_ADAPTER_GUIDE/"><code>SERVER_ADAPTER_GUIDE.md</code></a>.</p>
+</blockquote>
 <h3 id="rtp-core-implementation-notes">rtp-core Implementation Notes<a class="headerlink" href="#rtp-core-implementation-notes" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Lock-Free Configuration Storage</strong>: Configuration data is stored in <code>EnumMap</code>/<code>ConcurrentHashMap</code> structures that guarantee O(1) read access. Public methods return immutable views or primitive values accessed via <code>FactoryValue.getData()</code>.</li>
@@ -4217,10 +4385,25 @@
 </ul>
 <h3 id="rtp-folia-implementation-notes">rtp-folia Implementation Notes<a class="headerlink" href="#rtp-folia-implementation-notes" title="Permanent link">&para;</a></h3>
 <ul>
-<li><strong>Thread Ownership Checks</strong>: Before scheduling a regional task, the adapter calls <code>Bukkit.isOwnedByCurrentRegion(entity/location)</code>. If ownership is confirmed, the task runs immediately; otherwise it is submitted via <code>RegionScheduler.run(plugin, location, task)</code>.</li>
-<li><strong>Count-Bound Execution</strong>: Within regional threads, iterative background operations use <code>CountBoundTaskPipe</code> with a fixed instruction count (not wall-clock time), because Folia's per-region ticks make time-based slicing non-deterministic.</li>
+<li><strong>Thread Ownership Checks</strong>: Before scheduling a regional task, the adapter calls <code>Bukkit.isOwnedByCurrentRegion(entity/location)</code>. If ownership is confirmed and the thread's per-region budget is not spent and nothing is queued for that region, the task runs immediately; otherwise it joins that region's queue.</li>
+<li><strong>Per-Region Slices</strong> (<a href="../../adr/ADR-112-per-region-work-division-on-folia/">ADR-112</a>): one-shot regional tasks join a FIFO per region cell (8x8 chunks). One slice per cell runs on the owning region thread via <code>RegionScheduler.run</code>, runs tasks until the thread's <code>RegionThreadBudget</code> (<code>syncAllottedTime</code> per region tick, never accumulating beyond one budget) or the 32-task cap is reached, then re-queues behind other regions. Slow or late regions run one task per slice and report <code>isRegionSaturated</code>, which cold-to-hot promotion uses to pick candidates elsewhere.</li>
+<li><strong>Off-Region Continuations</strong>: <code>FoliaRTPWorld</code> completes RTP chunk futures on Folia's async scheduler, so selection logic chained on a chunk load never runs on the region thread that loaded it; live block reads re-enter through <code>runTask</code>.</li>
+<li><strong>Count-Bound Execution</strong>: <code>CountBoundTaskPipe</code> bounds each drain by a fixed task count and by the time budget on the draining thread, and always runs one task when the budget is positive.</li>
 <li><strong>Economy Delegation</strong>: Vault economy calls (<code>withdraw</code>, <code>deposit</code>, <code>getBalance</code>) are never invoked on a Folia region thread. They are dispatched to <code>GlobalRegionScheduler</code> or <code>AsyncScheduler</code>, and results are piped back to the originating region via a follow-up scheduled task.</li>
 <li><strong>Chunk Ticket Lifecycle</strong>: <code>getChunkAtAsync</code> allocates a Folia chunk ticket for validation, and <code>reservation.close()</code> explicitly removes the ticket when the chunk is no longer needed, preventing permanent force-loading.</li>
+</ul>
+<h3 id="rtp-fabric-implementation-notes">rtp-fabric Implementation Notes<a class="headerlink" href="#rtp-fabric-implementation-notes" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Event-Driven Bootstrap</strong>: <code>FabricEventBridge</code> listens to <code>ServerLifecycleEvents</code> (<code>SERVER_STARTED</code>, <code>SERVER_STOPPING</code>), <code>ServerTickEvents</code>, and <code>ServerPlayConnectionEvents</code> via reflection-guarded proxies to survive trimmed or variant runtimes.</li>
+<li><strong>Scheduling &amp; Tick Budgeting</strong>: <code>FabricScheduler</code> uses a private daemon thread pool for async execution and executes delayed/repeating tasks under a <code>TickBudget.syncNanos()</code> slice driven by <code>END_SERVER_TICK</code>.</li>
+<li><strong>Mapping &amp; Version Isolation</strong>: <code>FabricVersionAdapterRegistry</code> decouples intermediary mappings from Mojang deobfuscated mappings across Minecraft versions.</li>
+<li><strong>Commands</strong>: Integrates with Brigadier via <code>FabricCommandRegistrar</code>.</li>
+</ul>
+<h3 id="rtp-neoforge-implementation-notes">rtp-neoforge Implementation Notes<a class="headerlink" href="#rtp-neoforge-implementation-notes" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>Mojmap Runtime</strong>: Compiles directly against Mojang-mapped runtime names without intermediary mapping shims.</li>
+<li><strong>Event Bus Wiring</strong>: Driven by NeoForge <code>@EventBusSubscriber</code> / <code>@Mod</code> lifecycle events (<code>ServerStartedEvent</code>, <code>ServerStoppingEvent</code>, <code>ServerTickEvent.Post</code>, <code>RegisterCommandsEvent</code>).</li>
+<li><strong>Scheduling</strong>: <code>NeoForgeScheduler</code> drives sync tasks via <code>MinecraftServer.execute</code> and drains tick-budgeted timer queues during <code>ServerTickEvent.Post</code>.</li>
 </ul>
 
 

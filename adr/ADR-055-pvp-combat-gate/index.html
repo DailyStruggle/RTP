@@ -644,6 +644,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1404,6 +1425,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3897,6 +3960,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4021,7 +4168,7 @@
 <strong>Date:</strong> 2026-05-30 (wiring landed 2026-05-31)</p>
 <h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
 <p><code>/rtp</code> can be abused to escape mid-fight: a losing player teleports away the instant combat turns against them. Competing plugins address this; EzRTP 3.3.0 shipped "PvP-Tag Integration" as a soft-depend on external combat-tag plugins (PvPManager, SimpleCombatLog) with two knobs (<code>cancel-countdown-on-pvp-tag</code>, <code>cancel-queued-on-pvp-tag</code>) and locale messages. It performs no native damage tracking, so it does nothing without a third-party combat-tag plugin installed.</p>
-<p>RTP's <a href="../../dev/ROADMAP/">ROADMAP</a> Tier 2 already scoped an "Optional PvP / combat-tag check": off by default, native damage tracking plus an external soft-depend path, gated at the <code>/rtp</code> pre-dispatch surface with an S-004 audit on refusal. This ADR records the design before implementation (Rule D-005), delivered incrementally - this increment is the platform-agnostic foundation (rtp-api SPI + rtp-core native fallback + gate evaluator + config); platform damage listeners, command/execution wiring, and the PvPManager/SimpleCombatLog adapters follow.</p>
+<p>RTP's roadmap (now tracked in the Linear <code>LeafRTP</code> team; see <a href="../../dev/ROADMAP/"><code>ROADMAP.md</code></a>) already scoped an "Optional PvP / combat-tag check": off by default, native damage tracking plus an external soft-depend path, gated at the <code>/rtp</code> pre-dispatch surface with an S-004 audit on refusal. This ADR records the design before implementation (Rule D-005), delivered incrementally - this increment is the platform-agnostic foundation (rtp-api SPI + rtp-core native fallback + gate evaluator + config); platform damage listeners, command/execution wiring, and the PvPManager/SimpleCombatLog adapters follow.</p>
 <h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
 <p>Introduce an optional combat gate built on the same replaceable-provider pattern as the biome/anvil pre-filter:</p>
 <ol>
@@ -4074,7 +4221,7 @@
 </ul>
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <ul>
-<li><a href="../../dev/ROADMAP/">ROADMAP Tier 2 - Optional PvP / combat-tag check</a></li>
+<li>Roadmap entry "Optional PvP / combat-tag check": delivered; history in <a href="https://github.com/DailyStruggle/RTP/blob/V3/CHANGELOG.md"><code>CHANGELOG.md</code></a>. Open work is tracked in the Linear <code>LeafRTP</code> team (<a href="../../dev/ROADMAP/"><code>ROADMAP.md</code></a> pointer).</li>
 <li><a href="../ADR-026-external-hook-api-surface/">ADR-026 - external hook API surface</a>, <a href="../../dev/EXTERNAL_HOOKS/">EXTERNAL_HOOKS.md</a></li>
 <li><code>AnvilPrefilterRegistry</code> (the replaceable-provider precedent), REQ-RTP-S-004, REQ-RTP-F-013</li>
 <li>Code: <code>rtp-api/.../hooks/PvPCombatStateRegistry.java</code>, <code>PvPCombatAction.java</code>; <code>rtp-core/.../common/pvp/{NativePvPCombatTracker,PvPGate}.java</code></li>

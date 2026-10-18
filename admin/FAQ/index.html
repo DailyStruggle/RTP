@@ -1022,6 +1022,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../MIGRATION/" class="md-nav__link">
         
   
@@ -1782,6 +1803,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -4176,6 +4239,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4639,8 +4786,8 @@
 <p>Set it too high and you waste memory holding locations nobody will use. Set it too low and players may occasionally wait for the queue to refill.</p>
 <h3 id="will-rtp-lag-my-server">Will RTP lag my server?<a class="headerlink" href="#will-rtp-lag-my-server" title="Permanent link">&para;</a></h3>
 <p>Candidate checks and chunk loading run off the main thread. The main-thread work left is the teleport itself and the arriving player's first ticks. In my Paper benchmark there were no ticks over 50 ms across 4,096 paced teleports, but your hardware and world will differ. If you notice lag spikes, check:
-- <code>minTPS</code> and <code>maxMSPT</code> in <code>performance.yml</code>; RTP pauses background cache filling when TPS drops below <code>minTPS</code> or a tick takes longer than <code>maxMSPT</code>. On Folia the slowest region counts.
-- <code>syncAllottedTime</code>, which limits how long per tick RTP's main-thread work can take (capped at 25 ms).</p>
+- <code>minTPS</code> and <code>maxMSPT</code> in <code>performance.yml</code>; RTP pauses background cache filling when TPS drops below <code>minTPS</code> or a tick takes longer than <code>maxMSPT</code>. On Folia a slow region is handled on its own: RTP slows its work there and fills from other regions instead.
+- <code>syncAllottedTime</code>, which limits how long per tick RTP's main-thread work can take (capped at 25 ms). On Folia the limit applies to each region thread separately.</p>
 <h3 id="my-tps-is-dropping-when-players-teleport-what-do-i-check">My TPS is dropping when players teleport. What do I check?<a class="headerlink" href="#my-tps-is-dropping-when-players-teleport-what-do-i-check" title="Permanent link">&para;</a></h3>
 <ol>
 <li>Ensure you are on Paper or Folia; both provide async chunk loading APIs that reduce main-thread pressure compared to Spigot.</li>

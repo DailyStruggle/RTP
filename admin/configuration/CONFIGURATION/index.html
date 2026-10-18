@@ -644,6 +644,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../MIGRATION/" class="md-nav__link">
         
   
@@ -1647,6 +1668,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -4041,6 +4104,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4479,10 +4626,22 @@
 <td>Economy cost override for this region (overrides the global <code>economy.yml</code> price).</td>
 </tr>
 <tr>
+<td><code>cooldown</code></td>
+<td>Integer / Duration / String</td>
+<td>(global fallback)</td>
+<td>Per-region cooldown duration between successful teleports. Accepts seconds, duration strings (<code>5m</code>), or <code>"@config"</code>. Negative values / sentinels (<code>-1</code>, <code>infinite</code>, <code>permanent</code>) are not supported per region: they are ignored and the region falls back to the global <code>teleportCooldown</code> and shared timer. Defaults to global <code>teleportCooldown</code>.</td>
+</tr>
+<tr>
+<td><code>delay</code></td>
+<td>Integer / Duration / String</td>
+<td>(global fallback)</td>
+<td>Per-region warmup delay before teleporting. Accepts seconds, duration strings (<code>5s</code>, <code>40t</code>), <code>0</code> (instant), or <code>"@config"</code>. Defaults to global <code>teleportDelay</code>.</td>
+</tr>
+<tr>
 <td><code>spatialResolution</code></td>
-<td>Integer</td>
-<td><code>3</code></td>
-<td>Precision level for storing spatial memory in the database. Higher = more memory, finer detail.</td>
+<td>Integer / String</td>
+<td><code>"auto"</code></td>
+<td>Precision for spatial memory (bad location tracking). Can be <code>"auto"</code> or any positive integer (e.g. <code>1</code>, <code>3</code>, <code>4</code>). Higher values check fewer, more widely spaced spots (faster scans, less memory, but can miss small safe pockets).</td>
 </tr>
 <tr>
 <td><code>version</code></td>
@@ -4846,7 +5005,7 @@
 <span class="nt">cacheCap</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
 <span class="nt">activeChunkCap</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
 <span class="nt">price</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.0</span>
-<span class="nt">spatialResolution</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="nt">spatialResolution</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;auto&quot;</span>
 <span class="nt">shape</span><span class="p">:</span>
 <span class="w">  </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;CIRCLE&quot;</span>
 <span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;ACCUMULATE&quot;</span>

@@ -644,6 +644,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1404,6 +1425,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3966,6 +4029,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4180,7 +4327,7 @@
 </ul>
 <p>Where the prose below says "Fabric: vanilla structure NBT" or "WorldEdit clipboard API", read it as superseded by this amendment. The SPI shape (section 1, section 2), the config knob (section 3 minus the per-platform file extension), the load-async/paste-on-region-thread split (section 4), the claim/S-004 contracts, and the test plan (section 6) are unchanged.</p>
 <h2 id="context">Context<a class="headerlink" href="#context" title="Permanent link">&para;</a></h2>
-<p>The roadmap (Tier 2, <a href="../../dev/ROADMAP/"><code>docs/dev/ROADMAP.md</code></a>) carries an entry for <em>Region-specific schematic (<code>.schem</code>) support</em>: per-region arrival structures (a small platform, a lobby pad, an arrival shrine) pasted at the chosen <code>RTPLocation</code> once a teleport is confirmed. Operators want a teleporting player to land on a known, safe, decorated footprint rather than on raw generated terrain, and they want that footprint to differ per region (a hub region's pad vs. a wilderness region's stone disc).</p>
+<p>The roadmap (now tracked in the Linear <code>LeafRTP</code> team; see <a href="../../dev/ROADMAP/"><code>docs/dev/ROADMAP.md</code></a>) carried an entry for <em>Region-specific schematic (<code>.schem</code>) support</em>: per-region arrival structures (a small platform, a lobby pad, an arrival shrine) pasted at the chosen <code>RTPLocation</code> once a teleport is confirmed. Operators want a teleporting player to land on a known, safe, decorated footprint rather than on raw generated terrain, and they want that footprint to differ per region (a hub region's pad vs. a wilderness region's stone disc).</p>
 <p>Rule D-005 requires a proposal before implementation for any change that crosses module boundaries; this touches <code>rtp-api</code> (new SPI), <code>rtp-core</code> (config knob + paste invocation on the confirmed-location path), every backend adapter (<code>rtp-bukkit</code>/<code>rtp-paper</code>/<code>rtp-folia</code> via WorldEdit/FAWE soft-depend, <code>rtp-fabric</code> via vanilla structure NBT), and the resource/config tree. Hence this ADR.</p>
 <p>Several hard constraints shape the design:</p>
 <ul>
@@ -4315,7 +4462,7 @@
 </ul>
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Roadmap entry: <a href="../../dev/ROADMAP/"><code>docs/dev/ROADMAP.md</code></a> Tier 2, <em>Region-specific schematic (<code>.schem</code>) support</em>.</li>
+<li>Former roadmap entry <em>Region-specific schematic (<code>.schem</code>) support</em>: delivered; history in <a href="https://github.com/DailyStruggle/RTP/blob/V3/CHANGELOG.md"><code>CHANGELOG.md</code></a>. Open work is tracked in the Linear <code>LeafRTP</code> team (<a href="../../dev/ROADMAP/"><code>docs/dev/ROADMAP.md</code></a> pointer).</li>
 <li>Biome-getter hook prior art: <code>BukkitRTPWorld#setBiomeGetter</code> / <code>FoliaRTPWorld#setBiomeGetter</code>.</li>
 <li>Scheduling contract: <a href="https://github.com/DailyStruggle/RTP/blob/V3/.junie/AGENTS.md"><code>.junie/AGENTS.md</code></a> <em>Scheduler Usage</em>; <code>RTPScheduler</code> (<code>runTask(RTPLocation, ...)</code>).</li>
 <li>S-003 / S-004 / S-005 / S-006: <a href="../../dev/REQUIREMENTS/"><code>REQUIREMENTS.md section 3</code></a>; claim integration: <a href="../ADR-019-claim-plugin-integrations-folded-into-plugin/">ADR-019</a>.</li>

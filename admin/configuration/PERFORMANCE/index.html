@@ -644,6 +644,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../MIGRATION/" class="md-nav__link">
         
   
@@ -1530,6 +1551,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3924,6 +3987,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4098,14 +4245,14 @@
 <td><code>minTPS</code></td>
 <td>Double</td>
 <td><code>19.0</code></td>
-<td>Pause background cache filling (backlog picks, chunk loads for the ready queue, cold fill) when TPS drops below this. On Folia the slowest region counts. Players already waiting are still served. Resumes 0.5 TPS above the threshold. <code>0</code> disables. Range: 0.0–20.0.</td>
+<td>Pause background cache filling (backlog picks, chunk loads for the ready queue, cold fill) when TPS drops below this. On Folia the server-wide pause uses the mean across regions, and each region below <code>minTPS</code> is handled on its own: RTP runs one background task per region tick there and fills from other regions instead. Players already waiting are still served. Resumes 0.5 TPS above the threshold. <code>0</code> disables. Range: 0.0–20.0.</td>
 <td><strong>LOW</strong></td>
 </tr>
 <tr>
 <td><code>maxMSPT</code></td>
 <td>Double</td>
 <td><code>45.0</code></td>
-<td>Pause background cache filling when a tick takes longer than this many ms. TPS stays at 20 until ticks pass 50 ms, so this catches a loaded server earlier. On Folia the slowest region counts. Resumes 5 ms below the threshold. <code>0</code> disables.</td>
+<td>Pause background cache filling when a tick takes longer than this many ms. TPS stays at 20 until ticks pass 50 ms, so this catches a loaded server earlier. Resumes 5 ms below the threshold. On Folia only a region whose ticks overrun (over 52.5 ms apart) counts, and only for that region, because Folia exposes tick intervals rather than tick work. <code>0</code> disables.</td>
 <td><strong>LOW</strong></td>
 </tr>
 <tr>
@@ -4133,7 +4280,7 @@
 <td><code>syncAllottedTime</code></td>
 <td>Integer</td>
 <td><code>5</code></td>
-<td>Max milliseconds per tick for RTP's main-thread work (cancellations, queued commands, scripted actions, sync task queue). Values above 25 are treated as 25, so at least half of each tick stays free for the server and other plugins. Range: 1–25.</td>
+<td>Max milliseconds per tick for RTP's main-thread work (queued commands, scripted actions, sync task queue). On Folia it also applies to each region thread separately: RTP adds at most this much to any region's tick, however many players' work lands there, and the rest waits behind other regions. Values above 25 are treated as 25, so at least half of each tick stays free for the server and other plugins. Range: 1–25.</td>
 <td><strong>MEDIUM</strong> — Higher values allow faster processing at the risk of tick time.</td>
 </tr>
 <tr>

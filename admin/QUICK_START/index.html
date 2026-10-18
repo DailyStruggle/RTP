@@ -863,6 +863,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../MIGRATION/" class="md-nav__link">
         
   
@@ -1623,6 +1644,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -4017,6 +4080,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4285,10 +4432,10 @@
 <p>Or drag the region border on the map in <code>/rtp editor</code>, or edit the file by hand (<a href="#step-4-adjust-the-teleport-area">Step 4</a>). Then run <code>/rtp scan start</code>.</p>
 <hr />
 <h2 id="step-0-prerequisites-pregenerate-the-world">Step 0 — Prerequisites &amp; Pregenerate the World<a class="headerlink" href="#step-0-prerequisites-pregenerate-the-world" title="Permanent link">&para;</a></h2>
-<p><strong>Optional.</strong> Only Java 21+ is required. The rest makes the first teleports and the first <code>/rtp scan</code> faster: RTP loads chunks off the main thread on demand, so on a world that was never generated those first runs wait on chunk generation.</p>
+<p><strong>Optional.</strong> Only Java 17+ is required. The rest makes the first teleports and the first <code>/rtp scan</code> faster: RTP loads chunks off the main thread on demand, so on a world that was never generated those first runs wait on chunk generation.</p>
 <ol>
-<li><strong>Java 21+</strong> is required.</li>
-<li><strong>Pick your platform:</strong> Paper, Spigot, Folia, Fabric, or NeoForge.</li>
+<li><strong>Java 17+</strong> is required, or whatever your Minecraft version needs (Java 21 from 1.20.5, Java 25 on 26.x).</li>
+<li><strong>Pick your platform:</strong> Paper or Spigot 1.18+, Folia 1.21.11+, Fabric 1.20.1 or 1.21+, or NeoForge 1.21.1+, up to 26.3. Bug reports are accepted for 1.21.11 through the latest release; older versions are best effort, except Folia, which is experimental and not supported below 1.21.11 (<a href="../../dev/SUPPORT_MATRIX/">support matrix</a>).</li>
 <li><strong>Install Vault + an economy plugin first</strong> if you plan to charge for <code>/rtp</code> (Step 7).</li>
 <li><strong>Install your claim plugin first</strong> (GriefDefender, GriefPrevention, Lands, WorldGuard, Towny, …) if you want claim-aware teleport. RTP autodetects them at load.</li>
 <li><strong>Pregenerate</strong> (optional) each world you'll add to RTP, sized to the region from Step 4. A region with <code>radius: 4096b</code> needs 4,096 blocks pregenerated from <code>centerX, centerZ</code>, plus a small margin.</li>

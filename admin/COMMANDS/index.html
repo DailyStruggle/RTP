@@ -740,6 +740,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#rtp-editor-web-workspace-configuration-editor" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp editor — Web Workspace &amp; Configuration Editor
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#rtp-help-help" class="md-nav__link">
     <span class="md-ellipsis">
       /rtp help — Help
@@ -829,6 +838,27 @@
   
   <span class="md-ellipsis">
     Common recipes
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
   </span>
   
 
@@ -1605,6 +1635,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3999,6 +4071,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4170,6 +4326,15 @@
   <a href="#rtp-action-declarative-scripted-actions" class="md-nav__link">
     <span class="md-ellipsis">
       /rtp action — Declarative Scripted Actions
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-editor-web-workspace-configuration-editor" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp editor — Web Workspace &amp; Configuration Editor
     </span>
   </a>
   
@@ -4667,6 +4832,48 @@ The <code>scan</code> command is used to proactively map out the world. While th
 </table>
 <p>Actions with a configured <code>command:</code> block are also automatically registered as top-level standalone commands (e.g. <code>/challenge</code>, <code>/duel</code>, <code>/nearplayer</code>). See the dedicated <a href="../ACTIONS/">Action Engine guide</a> for full configuration details.</p>
 <hr />
+<h2 id="rtp-editor-web-workspace-configuration-editor"><code>/rtp editor</code> — Web Workspace &amp; Configuration Editor<a class="headerlink" href="#rtp-editor-web-workspace-configuration-editor" title="Permanent link">&para;</a></h2>
+<p>Generates an outbound ephemeral web editor session or offline standalone bundle to inspect diagnostics, adjust region boundary geometry, and configure plugin YAML with live documentation hints on a secondary display without port forwarding.</p>
+<p><strong>Syntax</strong>
+<div class="highlight"><pre><span></span><code>/rtp editor
+/rtp editor local
+/rtp editor apply token=&lt;token&gt;
+/rtp editor trust &lt;code&gt;
+/rtp editor untrust key=&lt;prefix|all&gt;
+</code></pre></div></p>
+<p><strong>Required permission:</strong> <code>rtp.editor</code></p>
+<table>
+<thead>
+<tr>
+<th>Form</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/rtp editor</code></td>
+<td>Gathers active configuration models, schemas, and region geometries, uploads an ephemeral session to the byte store, and emits a clickable browser link.</td>
+</tr>
+<tr>
+<td><code>/rtp editor local</code></td>
+<td>Generates a self-contained offline HTML editor bundle at <code>plugins/RTP/editor/index.html</code>.</td>
+</tr>
+<tr>
+<td><code>/rtp editor apply token=&lt;token&gt;</code></td>
+<td>Fetches and applies staged configuration changes from the byte store session.</td>
+</tr>
+<tr>
+<td><code>/rtp editor trust &lt;code&gt;</code></td>
+<td>Grants trust to a new browser session using the 6-character code shown in the web editor.</td>
+</tr>
+<tr>
+<td><code>/rtp editor untrust key=&lt;prefix\|all&gt;</code></td>
+<td>Revokes trust for a browser fingerprint prefix, or <code>all</code> to revoke all trusted browsers.</td>
+</tr>
+</tbody>
+</table>
+<p>See the <a href="../WEB_EDITOR_GUIDE/">Web Workspace &amp; Visual Editor Guide</a> for full operational and workflow documentation.</p>
+<hr />
 <h2 id="rtp-help-help"><code>/rtp help</code> — Help<a class="headerlink" href="#rtp-help-help" title="Permanent link">&para;</a></h2>
 <p>Displays a clickable, permission-filtered list of all available <code>/rtp</code> sub-commands. Only sub-commands for which the sender holds the required permission <strong>and</strong> which have a matching <code>MessagesKeys</code> entry are shown.</p>
 <p><strong>Syntax</strong>
@@ -4992,6 +5199,11 @@ The <code>scan</code> command is used to proactively map out the world. While th
 <td><code>rtp.update</code></td>
 <td>op</td>
 <td>Write individual config keys or list items (legacy node; subsumed by <code>rtp.config.set</code>).</td>
+</tr>
+<tr>
+<td><code>rtp.editor</code></td>
+<td>op</td>
+<td>Use <code>/rtp editor</code> and its subcommands (local, apply, trust, untrust).</td>
 </tr>
 <tr>
 <td><code>rtp.info</code></td>

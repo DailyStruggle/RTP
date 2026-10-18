@@ -644,6 +644,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1404,6 +1425,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3135,6 +3198,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#revision-2026-10-14-zero-dependency-dynamic-linear-reader-with-host-binding-built-in-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Revision (2026-10-14) - Zero-Dependency Dynamic Linear Reader with Host Binding &amp; Built-In Testing
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#revision-2026-10-06-linear-withdrawn-from-core-ships-later-as-a-guarded-addon" class="md-nav__link">
     <span class="md-ellipsis">
       Revision (2026-10-06) - Linear withdrawn from core; ships later as a guarded addon
@@ -3906,6 +3978,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3952,6 +4108,15 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#revision-2026-10-14-zero-dependency-dynamic-linear-reader-with-host-binding-built-in-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Revision (2026-10-14) - Zero-Dependency Dynamic Linear Reader with Host Binding &amp; Built-In Testing
+    </span>
+  </a>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#revision-2026-10-06-linear-withdrawn-from-core-ships-later-as-a-guarded-addon" class="md-nav__link">
@@ -4035,10 +4200,21 @@
 
 
 <h1 id="adr-077-multi-format-region-support-pluggable-region-readers-linear-via-addon">ADR-077 - Multi-Format Region Support: Pluggable Region Readers (Linear via Addon)<a class="headerlink" href="#adr-077-multi-format-region-support-pluggable-region-readers-linear-via-addon" title="Permanent link">&para;</a></h1>
-<p><strong>Status:</strong> Accepted (revised 2026-09-23, revised again 2026-10-06 - see Revisions)
+<p><strong>Status:</strong> Accepted (revised 2026-09-23, revised 2026-10-06, revised 2026-10-14 - see Revisions)
 <strong>Date:</strong> 2026-08-26
 <strong>Extends:</strong> <a href="../ADR-016-anvil-subsystem/">ADR-016</a> (Anvil Read-Only Subsystem)
 <strong>Related:</strong> <a href="../ADR-028-l3-backlog-cache/">ADR-028</a> (L3 Backlog Cache), <a href="../ADR-067-adaptive-scan-rate-and-mca-header-generation-check/">ADR-067</a> (Adaptive Scan Rate and Header Generation Check)</p>
+<h2 id="revision-2026-10-14-zero-dependency-dynamic-linear-reader-with-host-binding-built-in-testing">Revision (2026-10-14) - Zero-Dependency Dynamic Linear Reader with Host Binding &amp; Built-In Testing<a class="headerlink" href="#revision-2026-10-14-zero-dependency-dynamic-linear-reader-with-host-binding-built-in-testing" title="Permanent link">&para;</a></h2>
+<p>The Linear decoder is integrated into <code>api/anvil-api</code> via a zero-dependency architecture that resolves the previous deficiencies without shading third-party native libraries or bytecode:</p>
+<ol>
+<li><strong>Canonical Format Conformance</strong>: <code>LinearRegionReader</code> implements the exact canonical Linear v1/v2 specification (xymb <code>LinearRegionFileFormatTools</code>, Leaves, LinearPaper). Validates dual signature <code>0xc3ff13183cca9d9aL</code> at superblock offset 0 and footer offset <code>fileLength - 8</code>, parses the 32-byte superblock, reads the internal 8192-byte index table, slices raw uncompressed chunk NBT payloads using 64-bit arithmetic, and extracts typed <code>AnvilChunkView</code> representations.</li>
+<li><strong>Dynamic Host Runtime Binding (<code>Option A</code>)</strong>: Rather than shading native <code>zstd-jni</code> binaries (6.3 MiB) or pure-Java libraries, <code>DynamicZstdBinding</code> dynamically discovers host Zstandard decompressors (<code>com.github.luben.zstd.Zstd</code>, <code>io.airlift.compress.zstd.ZstdDecompressor</code>, or server-relocated classes) via <code>MethodHandles</code>. The core jar remains strictly zero-dependency (0 KB added, no native binaries, no classpath collisions).</li>
+<li><strong>Built-In Testing (BIT) Triad</strong>:</li>
+<li><strong>PBIT (Power-On Built-In Test)</strong>: Executes during startup initialization. Decompresses a static 36-byte micro-canary frame to verify native decompressor health within &lt; 5 ms. If the host environment lacks Zstandard classes or the canary fails, <code>.linear</code> registration is cleanly bypassed, logging a diagnostic notice and safely delegating to native async chunk loading (<code>REQ-RTP-S-004</code>, <code>REQ-RTP-S-005</code>).</li>
+<li><strong>CBIT (Continuous Built-In Test)</strong>: Embeds inline $O(1)$ tripwires (T1..T6) on every read, enforcing header/footer signatures, 64-bit stream bounds, a 64 MiB allocation ceiling, and <code>0x0A</code> (<code>TAG_Compound</code>) root identification. Any tripwire failure immediately returns <code>Verdict.UNKNOWN</code> without thread stalls.</li>
+<li><strong>Fast-Path Storage Resolution (<code>RegionFormatDetector</code>)</strong>: <code>RegionFormatDetector</code> surveys world region storage directories to establish a <code>WorldFormatProfile</code> (<code>MCA</code>, <code>LINEAR</code>, <code>EMPTY</code>, <code>hasMixedFormats</code>) with mtime-aware caching. <code>RegionFileResolver</code> routes chunk queries directly to the active format (1 stat call for pure MCA or pure Linear worlds), eliminating redundant failed syscalls on missing extensions.</li>
+<li><strong>Differential Ground-Truth Verification</strong>: Validated with 100% structural and semantic parity against real Minecraft server region data (<code>1_20_R1</code>, <code>1_21_R1</code>, and <code>26_1_R1</code>) transcoded via <code>LinearRegionFileFormatTools</code>. All 1,024 chunk positions, NBT root compounds, block states, biomes, and heightmaps match <code>AnvilReader</code> outputs identically.</li>
+</ol>
 <h2 id="revision-2026-10-06-linear-withdrawn-from-core-ships-later-as-a-guarded-addon">Revision (2026-10-06) - Linear withdrawn from core; ships later as a guarded addon<a class="headerlink" href="#revision-2026-10-06-linear-withdrawn-from-core-ships-later-as-a-guarded-addon" title="Permanent link">&para;</a></h2>
 <p>The built-in <code>LinearRegionReader</code> did not implement the real Linear format. The
 reference implementation (xymb <code>LinearRegionFileFormatTools</code>, <code>linear.py</code>, used by

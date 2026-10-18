@@ -644,6 +644,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../MIGRATION/" class="md-nav__link">
         
   
@@ -793,6 +814,15 @@
   <a href="#spatial-memory-mapping-issues" class="md-nav__link">
     <span class="md-ellipsis">
       Spatial Memory / Mapping Issues
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-biomex-lands-in-an-unexpected-region-or-world" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp biome=&lt;x&gt; Lands in an Unexpected Region or World
     </span>
   </a>
   
@@ -1512,6 +1542,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3906,6 +3978,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3984,6 +4140,15 @@
   <a href="#spatial-memory-mapping-issues" class="md-nav__link">
     <span class="md-ellipsis">
       Spatial Memory / Mapping Issues
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rtp-biomex-lands-in-an-unexpected-region-or-world" class="md-nav__link">
+    <span class="md-ellipsis">
+      /rtp biome=&lt;x&gt; Lands in an Unexpected Region or World
     </span>
   </a>
   
@@ -4138,12 +4303,7 @@ air, or into a claimed region they cannot build in.</p>
 </tr>
 <tr>
 <td>Folia</td>
-<td>1.20.x</td>
-<td><code>rtp-folia-v1_20_R1</code></td>
-</tr>
-<tr>
-<td>Folia</td>
-<td>1.21.x</td>
+<td>1.21.11</td>
 <td><code>rtp-folia-v1_21_R1</code></td>
 </tr>
 <tr>
@@ -4153,6 +4313,7 @@ air, or into a claimed region they cannot build in.</p>
 </tr>
 </tbody>
 </table>
+<p>Folia below 1.21.11 is not supported (ADR-113): Folia is experimental and its older builds are not maintained, so a crash there may not come from RTP at all. Upgrade Folia before troubleshooting.</p>
 <p>Replace the installed jar with the correct version and restart.</p>
 <p><em>Addon load order:</em> Move the offending addon to load after RTP by adding <code>depend: [RTP]</code> to
 the addon's <code>plugin.yml</code>, or ensure RTP is listed before the addon alphabetically if relying
@@ -4182,6 +4343,27 @@ fix the reported line, and restart.</p>
   recovery periods between scan cycles.
 - If the mapping process has genuinely stalled (no log activity for &gt; 5 minutes): run
   <code>/rtp scan cancel &lt;region&gt;</code> then <code>/rtp scan start &lt;region&gt;</code> to restart it.</p>
+<hr />
+<h2 id="rtp-biomex-lands-in-an-unexpected-region-or-world"><code>/rtp biome=&lt;x&gt;</code> Lands in an Unexpected Region or World<a class="headerlink" href="#rtp-biomex-lands-in-an-unexpected-region-or-world" title="Permanent link">&para;</a></h2>
+<p><strong>Symptom:</strong> A biome teleport such as <code>rtp player=&lt;name&gt; biome=MEADOW,PLAINS</code> sends the player
+to a different region or world than the one they were in, or never uses a gated
+(<code>requirePermission: true</code>) region the player has access to.</p>
+<p><strong>Diagnosis:</strong> When <code>region=</code> is omitted, LeafRTP picks the region automatically (ADR-063):
+1. It starts from the region mapped to the target player's current world (or to <code>world=&lt;w&gt;</code>
+   if given).
+2. If that region has not yet recorded the <strong>first</strong> biome in the list, it switches to the
+   region that has seen that biome most often. That region can be in any world.
+3. The switch checks <code>rtp.regions.&lt;name&gt;</code> against the command <strong>sender</strong>. A player sender
+   needs the exact node; <code>rtp.regions.*</code> alone is not enough. A console sender holds none, so
+   gated regions are always skipped, even when the target player has the node.</p>
+<p><strong>Resolution:</strong>
+- Pass <code>region=&lt;name&gt;</code> explicitly in command runners, actions, and menus. An explicit region
+  is used as given. <code>world=&lt;w&gt;</code> alone does not pin it: auto-selection still runs from that
+  world's region.
+- If you rely on auto-selection, put first a biome the home region has already recorded.
+  Only the first entry decides the region; the rest still count when picking the spot.
+- See <a href="../RECIPES/#curated-biome-lists-per-world-or-region">Recipes</a> for the console-run
+  pattern.</p>
 <hr />
 <h2 id="database-file-grows-unboundedly">Database File Grows Unboundedly<a class="headerlink" href="#database-file-grows-unboundedly" title="Permanent link">&para;</a></h2>
 <p><strong>Symptom:</strong> The H2 or SQLite database file in the plugin data folder grows continuously

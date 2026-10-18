@@ -12,24 +12,24 @@
         <meta name="author" content="DailyStruggle">
       
       
-        <link rel="canonical" href="https://dailystruggle.github.io/RTP/dev/scratch/BENCH_STATE/">
+        <link rel="canonical" href="https://dailystruggle.github.io/RTP/architecture/16-package-dag-and-decision-preservation-graph/">
       
       
       
       
-      <link rel="icon" href="../../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/images/favicon.png">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.39">
     
     
       
-        <title>Bench state: Paper 26.2 cross-plugin stress test (as of 2026-10-06 20:30) - LeafRTP</title>
+        <title>Core Package Architecture and Decision Traceability Map - LeafRTP</title>
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.8c3ca2c6.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.8c3ca2c6.min.css">
       
         
-        <link rel="stylesheet" href="../../../assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -48,7 +48,7 @@
       
     
     
-    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -74,7 +74,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#bench-state-paper-262-cross-plugin-stress-test-as-of-2026-10-06-2030" class="md-skip">
+        <a href="#core-package-architecture-and-decision-traceability-map" class="md-skip">
           Skip to content
         </a>
       
@@ -88,7 +88,7 @@
 
 <header class="md-header" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="../../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+    <a href="../.." title="LeafRTP" class="md-header__button md-logo" aria-label="LeafRTP" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -108,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Bench state: Paper 26.2 cross-plugin stress test (as of 2026-10-06 20:30)
+              Core Package Architecture and Decision Traceability Map
             
           </span>
         </div>
@@ -217,7 +217,7 @@
   
   
     <li class="md-tabs__item">
-      <a href="../../.." class="md-tabs__link">
+      <a href="../.." class="md-tabs__link">
         
   
     
@@ -236,7 +236,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../FOR_SERVER_ADMINS/" class="md-tabs__link">
+        <a href="../../FOR_SERVER_ADMINS/" class="md-tabs__link">
           
   
   Getting started
@@ -254,7 +254,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../admin/RUNBOOK/" class="md-tabs__link">
+        <a href="../../admin/RUNBOOK/" class="md-tabs__link">
           
   
   Operations
@@ -272,7 +272,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
+        <a href="../../admin/configuration/CONFIGURATION/" class="md-tabs__link">
           
   
   Configuration
@@ -290,7 +290,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../admin/proxies/INDEX/" class="md-tabs__link">
+        <a href="../../admin/proxies/INDEX/" class="md-tabs__link">
           
   
   Proxy mode
@@ -308,7 +308,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../site/why/" class="md-tabs__link">
+        <a href="../../site/why/" class="md-tabs__link">
           
   
   Developers
@@ -326,7 +326,7 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../../adr/" class="md-tabs__link">
+        <a href="../../adr/" class="md-tabs__link">
           
   
   Architecture decisions
@@ -359,7 +359,7 @@
 
 <nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="../../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
+    <a href="../.." title="LeafRTP" class="md-nav__button md-logo" aria-label="LeafRTP" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -389,7 +389,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../.." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -449,7 +449,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../FOR_SERVER_ADMINS/" class="md-nav__link">
+      <a href="../../FOR_SERVER_ADMINS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -470,7 +470,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/QUICK_START/" class="md-nav__link">
+      <a href="../../admin/QUICK_START/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -491,7 +491,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../site/intended-usage/" class="md-nav__link">
+      <a href="../../site/intended-usage/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -512,7 +512,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../site/what-not-to-do/" class="md-nav__link">
+      <a href="../../site/what-not-to-do/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -533,7 +533,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/PREFABS/" class="md-nav__link">
+      <a href="../../admin/PREFABS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -554,7 +554,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/COMMANDS/" class="md-nav__link">
+      <a href="../../admin/COMMANDS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -575,7 +575,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/ACTIONS/" class="md-nav__link">
+      <a href="../../admin/ACTIONS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -596,7 +596,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/FAQ/" class="md-nav__link">
+      <a href="../../admin/FAQ/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -617,7 +617,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/RECIPES/" class="md-nav__link">
+      <a href="../../admin/RECIPES/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -638,7 +638,28 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/MIGRATION/" class="md-nav__link">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../admin/MIGRATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -706,7 +727,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/RUNBOOK/" class="md-nav__link">
+      <a href="../../admin/RUNBOOK/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -727,7 +748,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/WEB_EDITOR_GUIDE/" class="md-nav__link">
+      <a href="../../admin/WEB_EDITOR_GUIDE/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -748,7 +769,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../HAZARDS/" class="md-nav__link">
+      <a href="../../dev/HAZARDS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -769,7 +790,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/ADDONS/" class="md-nav__link">
+      <a href="../../admin/ADDONS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -790,7 +811,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/CUSTOM_ITEMS/" class="md-nav__link">
+      <a href="../../admin/CUSTOM_ITEMS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -811,7 +832,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
+      <a href="../../admin/CLAIM_PLUGIN_COMPATIBILITY/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -879,7 +900,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/CONFIGURATION/" class="md-nav__link">
+      <a href="../../admin/configuration/CONFIGURATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -900,7 +921,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
+      <a href="../../admin/configuration/CONFIG_LIFECYCLE/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -921,7 +942,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
+      <a href="../../admin/configuration/CORE_CONFIG/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -942,7 +963,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/REGIONS/" class="md-nav__link">
+      <a href="../../admin/configuration/REGIONS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -963,7 +984,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/WORLDS/" class="md-nav__link">
+      <a href="../../admin/configuration/WORLDS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -984,7 +1005,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/SCHEMATICS/" class="md-nav__link">
+      <a href="../../admin/configuration/SCHEMATICS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1005,7 +1026,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/SAFETY/" class="md-nav__link">
+      <a href="../../admin/configuration/SAFETY/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1026,7 +1047,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/PERFORMANCE/" class="md-nav__link">
+      <a href="../../admin/configuration/PERFORMANCE/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1047,7 +1068,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/ECONOMY/" class="md-nav__link">
+      <a href="../../admin/configuration/ECONOMY/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1068,7 +1089,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
+      <a href="../../admin/configuration/EVENTS_AND_EFFECTS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1089,7 +1110,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
+      <a href="../../admin/configuration/INTEGRATIONS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1110,7 +1131,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/MESSAGES/" class="md-nav__link">
+      <a href="../../admin/configuration/MESSAGES/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1131,7 +1152,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/LANGUAGE/" class="md-nav__link">
+      <a href="../../admin/configuration/LANGUAGE/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1152,7 +1173,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/LOGGING/" class="md-nav__link">
+      <a href="../../admin/configuration/LOGGING/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1173,7 +1194,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/METRICS/" class="md-nav__link">
+      <a href="../../admin/configuration/METRICS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1194,7 +1215,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/configuration/TTL/" class="md-nav__link">
+      <a href="../../admin/configuration/TTL/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1262,7 +1283,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/proxies/INDEX/" class="md-nav__link">
+      <a href="../../admin/proxies/INDEX/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1283,7 +1304,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/proxies/CONFIGURATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CONFIGURATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1304,7 +1325,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/SINGLE_BACKEND_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1325,7 +1346,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
+      <a href="../../admin/proxies/CROSS_SERVER_VERIFICATION/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1393,7 +1414,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../site/why/" class="md-nav__link">
+      <a href="../../site/why/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1414,7 +1435,49 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../site/shape-algorithms/" class="md-nav__link">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/shape-algorithms/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1435,7 +1498,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
+      <a href="../../FOR_ADDON_DEVELOPERS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1456,7 +1519,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../ADDON_QUICKSTART/" class="md-nav__link">
+      <a href="../../ADDON_QUICKSTART/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1477,7 +1540,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../FOR_CONTRIBUTORS/" class="md-nav__link">
+      <a href="../../FOR_CONTRIBUTORS/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1545,7 +1608,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/" class="md-nav__link">
+      <a href="../../adr/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1566,7 +1629,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-000-development-workflow/" class="md-nav__link">
+      <a href="../../adr/ADR-000-development-workflow/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1587,7 +1650,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-001-archimedean-spiral-1d-mapping/" class="md-nav__link">
+      <a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1608,7 +1671,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-002-h2-sqlite-over-flat-file-cache/" class="md-nav__link">
+      <a href="../../adr/ADR-002-h2-sqlite-over-flat-file-cache/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1629,7 +1692,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-003-rtp-plugin-bridge-module/" class="md-nav__link">
+      <a href="../../adr/ADR-003-rtp-plugin-bridge-module/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1650,7 +1713,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-004-countbound-taskpipe-on-folia/" class="md-nav__link">
+      <a href="../../adr/ADR-004-countbound-taskpipe-on-folia/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1671,7 +1734,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-005-paperlib-removal/" class="md-nav__link">
+      <a href="../../adr/ADR-005-paperlib-removal/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1692,7 +1755,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-006-async-queue-pre-generation/" class="md-nav__link">
+      <a href="../../adr/ADR-006-async-queue-pre-generation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1713,7 +1776,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-007-per-user-isolated-queues/" class="md-nav__link">
+      <a href="../../adr/ADR-007-per-user-isolated-queues/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1734,7 +1797,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-008-memory-tracker-active-gc/" class="md-nav__link">
+      <a href="../../adr/ADR-008-memory-tracker-active-gc/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1755,7 +1818,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-009-configurable-spatial-distributions/" class="md-nav__link">
+      <a href="../../adr/ADR-009-configurable-spatial-distributions/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1776,7 +1839,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-010-versioned-platform-adapter-submodules/" class="md-nav__link">
+      <a href="../../adr/ADR-010-versioned-platform-adapter-submodules/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1797,7 +1860,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-011-rtp-api-separate-module/" class="md-nav__link">
+      <a href="../../adr/ADR-011-rtp-api-separate-module/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1818,7 +1881,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-012-chunk-reservation-abstraction/" class="md-nav__link">
+      <a href="../../adr/ADR-012-chunk-reservation-abstraction/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1839,7 +1902,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-013-addons-as-external-gradle-projects/" class="md-nav__link">
+      <a href="../../adr/ADR-013-addons-as-external-gradle-projects/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1860,7 +1923,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-015-stale-chunk-guard-countbound-pipes/" class="md-nav__link">
+      <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1881,7 +1944,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-016-anvil-subsystem/" class="md-nav__link">
+      <a href="../../adr/ADR-016-anvil-subsystem/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1902,7 +1965,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists/" class="md-nav__link">
+      <a href="../../adr/ADR-017-block-tags-and-state-predicates-in-safety-lists/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1923,7 +1986,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-018-agents-md-public-release-structure/" class="md-nav__link">
+      <a href="../../adr/ADR-018-agents-md-public-release-structure/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1944,7 +2007,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-019-claim-plugin-integrations-folded-into-plugin/" class="md-nav__link">
+      <a href="../../adr/ADR-019-claim-plugin-integrations-folded-into-plugin/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1965,7 +2028,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-020-language-bootstrap-and-locale-aware-configparser/" class="md-nav__link">
+      <a href="../../adr/ADR-020-language-bootstrap-and-locale-aware-configparser/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -1986,7 +2049,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-021-legacy-mc-and-java-support-scope/" class="md-nav__link">
+      <a href="../../adr/ADR-021-legacy-mc-and-java-support-scope/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2007,7 +2070,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-022-shape-cache-key-seed-plus-config-hash/" class="md-nav__link">
+      <a href="../../adr/ADR-022-shape-cache-key-seed-plus-config-hash/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2028,7 +2091,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-023-login-reserve-cache/" class="md-nav__link">
+      <a href="../../adr/ADR-023-login-reserve-cache/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2049,7 +2112,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-024-rtp-lite-assembly-variant/" class="md-nav__link">
+      <a href="../../adr/ADR-024-rtp-lite-assembly-variant/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2070,7 +2133,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/" class="md-nav__link">
+      <a href="../../adr/ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2091,7 +2154,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-026-external-hook-api-surface/" class="md-nav__link">
+      <a href="../../adr/ADR-026-external-hook-api-surface/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2112,7 +2175,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-028-l3-backlog-cache/" class="md-nav__link">
+      <a href="../../adr/ADR-028-l3-backlog-cache/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2133,7 +2196,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-032-teleport-pipeline-latency-histogram/" class="md-nav__link">
+      <a href="../../adr/ADR-032-teleport-pipeline-latency-histogram/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2154,7 +2217,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-033-neoforge-platform-in-scope/" class="md-nav__link">
+      <a href="../../adr/ADR-033-neoforge-platform-in-scope/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2175,7 +2238,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-034-memory-shape-catalog/" class="md-nav__link">
+      <a href="../../adr/ADR-034-memory-shape-catalog/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2196,7 +2259,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-035-interactive-menus-book-first/" class="md-nav__link">
+      <a href="../../adr/ADR-035-interactive-menus-book-first/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2217,7 +2280,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-036-network-mode-multi-server-multi-proxy/" class="md-nav__link">
+      <a href="../../adr/ADR-036-network-mode-multi-server-multi-proxy/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2238,7 +2301,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-037-harden-rtp-config-commands/" class="md-nav__link">
+      <a href="../../adr/ADR-037-harden-rtp-config-commands/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2259,7 +2322,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-038-rtpadmin-setup-wizards/" class="md-nav__link">
+      <a href="../../adr/ADR-038-rtpadmin-setup-wizards/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2280,7 +2343,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-039-rtpadmin-diagnostic-surfaces/" class="md-nav__link">
+      <a href="../../adr/ADR-039-rtpadmin-diagnostic-surfaces/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2301,7 +2364,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-040-cross-backend-metric-time-series-publication/" class="md-nav__link">
+      <a href="../../adr/ADR-040-cross-backend-metric-time-series-publication/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2322,7 +2385,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-041-config-command-and-save-implementation/" class="md-nav__link">
+      <a href="../../adr/ADR-041-config-command-and-save-implementation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2343,7 +2406,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-042-yaml-comment-preservation-block-only/" class="md-nav__link">
+      <a href="../../adr/ADR-042-yaml-comment-preservation-block-only/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2364,7 +2427,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-043-personal-queue-permission-semantics/" class="md-nav__link">
+      <a href="../../adr/ADR-043-personal-queue-permission-semantics/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2385,7 +2448,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-044-command-tree-menu-reflector/" class="md-nav__link">
+      <a href="../../adr/ADR-044-command-tree-menu-reflector/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2406,7 +2469,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-045-rtp-docs-menu-consumer/" class="md-nav__link">
+      <a href="../../adr/ADR-045-rtp-docs-menu-consumer/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2427,7 +2490,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-046-maps-api-module/" class="md-nav__link">
+      <a href="../../adr/ADR-046-maps-api-module/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2448,7 +2511,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-047-declarative-chart-composition-bridge/" class="md-nav__link">
+      <a href="../../adr/ADR-047-declarative-chart-composition-bridge/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2469,7 +2532,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-048-menu-builders-behind-server-accessor/" class="md-nav__link">
+      <a href="../../adr/ADR-048-menu-builders-behind-server-accessor/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2490,7 +2553,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-049-network-mode-platform-neutral-lift/" class="md-nav__link">
+      <a href="../../adr/ADR-049-network-mode-platform-neutral-lift/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2511,7 +2574,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-050-concrete-menu-commands-supersede-tokens/" class="md-nav__link">
+      <a href="../../adr/ADR-050-concrete-menu-commands-supersede-tokens/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2532,7 +2595,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-051-two-tier-api-extension-model/" class="md-nav__link">
+      <a href="../../adr/ADR-051-two-tier-api-extension-model/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2553,7 +2616,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-052-outcome-metrics-and-cause-tagged-bad-locations/" class="md-nav__link">
+      <a href="../../adr/ADR-052-outcome-metrics-and-cause-tagged-bad-locations/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2574,7 +2637,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/" class="md-nav__link">
+      <a href="../../adr/ADR-053-pipeline-latency-percentiles-and-slow-teleport-audit/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2595,7 +2658,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-054-rtprunnable-self-scheduling-thread-routing/" class="md-nav__link">
+      <a href="../../adr/ADR-054-rtprunnable-self-scheduling-thread-routing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2616,7 +2679,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-055-pvp-combat-gate/" class="md-nav__link">
+      <a href="../../adr/ADR-055-pvp-combat-gate/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2637,7 +2700,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-056-bare-rtp-root-action/" class="md-nav__link">
+      <a href="../../adr/ADR-056-bare-rtp-root-action/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2658,7 +2721,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-057-platform-agnostic-addon-spi/" class="md-nav__link">
+      <a href="../../adr/ADR-057-platform-agnostic-addon-spi/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2679,7 +2742,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-058-region-specific-schematic-paste/" class="md-nav__link">
+      <a href="../../adr/ADR-058-region-specific-schematic-paste/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2700,7 +2763,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-059-relative-ground-distance-safety-predicate/" class="md-nav__link">
+      <a href="../../adr/ADR-059-relative-ground-distance-safety-predicate/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2721,7 +2784,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-060-emergency-platform-block-restoration-timeout/" class="md-nav__link">
+      <a href="../../adr/ADR-060-emergency-platform-block-restoration-timeout/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2742,7 +2805,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-061-open-core-dual-licensing/" class="md-nav__link">
+      <a href="../../adr/ADR-061-open-core-dual-licensing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2763,7 +2826,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-062-biome-probability-weighting/" class="md-nav__link">
+      <a href="../../adr/ADR-062-biome-probability-weighting/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2784,7 +2847,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-063-biome-first-menu-and-auto-region-by-biome/" class="md-nav__link">
+      <a href="../../adr/ADR-063-biome-first-menu-and-auto-region-by-biome/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2805,7 +2868,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-064-config-comment-format-summary-line-as-menu-hover/" class="md-nav__link">
+      <a href="../../adr/ADR-064-config-comment-format-summary-line-as-menu-hover/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2826,7 +2889,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-065-world-override-region-and-world-menu/" class="md-nav__link">
+      <a href="../../adr/ADR-065-world-override-region-and-world-menu/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2847,7 +2910,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-066-foreign-config-importer/" class="md-nav__link">
+      <a href="../../adr/ADR-066-foreign-config-importer/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2868,7 +2931,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-067-adaptive-scan-rate-and-mca-header-generation-check/" class="md-nav__link">
+      <a href="../../adr/ADR-067-adaptive-scan-rate-and-mca-header-generation-check/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2889,7 +2952,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-068-cross-server-persisted-teleport-limits/" class="md-nav__link">
+      <a href="../../adr/ADR-068-cross-server-persisted-teleport-limits/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2910,7 +2973,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-069-claim-integrations-extracted-to-bundled-addon/" class="md-nav__link">
+      <a href="../../adr/ADR-069-claim-integrations-extracted-to-bundled-addon/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2931,7 +2994,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-070-platform-neutral-rtp-command-root/" class="md-nav__link">
+      <a href="../../adr/ADR-070-platform-neutral-rtp-command-root/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2952,7 +3015,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-071-config-organization-and-discoverability/" class="md-nav__link">
+      <a href="../../adr/ADR-071-config-organization-and-discoverability/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2973,7 +3036,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-072-teleport-view-distance-clamp-and-restore/" class="md-nav__link">
+      <a href="../../adr/ADR-072-teleport-view-distance-clamp-and-restore/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2994,7 +3057,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-073-config-default-inheritance-references/" class="md-nav__link">
+      <a href="../../adr/ADR-073-config-default-inheritance-references/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3015,7 +3078,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-074-operator-facing-throughput-and-cost-metrics/" class="md-nav__link">
+      <a href="../../adr/ADR-074-operator-facing-throughput-and-cost-metrics/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3036,7 +3099,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-075-platform-neutral-player-move-event-spi/" class="md-nav__link">
+      <a href="../../adr/ADR-075-platform-neutral-player-move-event-spi/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3057,7 +3120,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-076-config-folder-consolidation/" class="md-nav__link">
+      <a href="../../adr/ADR-076-config-folder-consolidation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3078,7 +3141,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-077-multi-format-region-support/" class="md-nav__link">
+      <a href="../../adr/ADR-077-multi-format-region-support/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3099,7 +3162,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-078-composable-cache-pipeline-stages/" class="md-nav__link">
+      <a href="../../adr/ADR-078-composable-cache-pipeline-stages/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3120,7 +3183,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-079-cause-based-ttl-and-staged-expiration/" class="md-nav__link">
+      <a href="../../adr/ADR-079-cause-based-ttl-and-staged-expiration/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3141,7 +3204,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-080-opt-in-simulation-benchmark-tier/" class="md-nav__link">
+      <a href="../../adr/ADR-080-opt-in-simulation-benchmark-tier/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3162,7 +3225,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-081-unified-blocked-biome-run-table/" class="md-nav__link">
+      <a href="../../adr/ADR-081-unified-blocked-biome-run-table/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3183,7 +3246,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-082-cache-conscious-b-plus-tree-primitive-arrays/" class="md-nav__link">
+      <a href="../../adr/ADR-082-cache-conscious-b-plus-tree-primitive-arrays/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3204,7 +3267,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-083-two-tier-probabilistic-region-routing/" class="md-nav__link">
+      <a href="../../adr/ADR-083-two-tier-probabilistic-region-routing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3225,7 +3288,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-084-layered-spiral-hilbert-rle-index/" class="md-nav__link">
+      <a href="../../adr/ADR-084-layered-spiral-hilbert-rle-index/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3246,7 +3309,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-085-spiral-addressed-hilbert-key-space/" class="md-nav__link">
+      <a href="../../adr/ADR-085-spiral-addressed-hilbert-key-space/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3267,7 +3330,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-086-external-web-map-integration/" class="md-nav__link">
+      <a href="../../adr/ADR-086-external-web-map-integration/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3288,7 +3351,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/" class="md-nav__link">
+      <a href="../../adr/ADR-087-adaptive-tick-budget-and-memory-backpressure-for-folia/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3309,7 +3372,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-088-configurable-downsampling-stride-filter/" class="md-nav__link">
+      <a href="../../adr/ADR-088-configurable-downsampling-stride-filter/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3330,7 +3393,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-089-universal-mapcanvas-bridge-biome-hazard-overlays-and-pipeline-gauges/" class="md-nav__link">
+      <a href="../../adr/ADR-089-universal-mapcanvas-bridge-biome-hazard-overlays-and-pipeline-gauges/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3351,7 +3414,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-090-test-driver-and-synthetic-mca-architecture/" class="md-nav__link">
+      <a href="../../adr/ADR-090-test-driver-and-synthetic-mca-architecture/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3372,7 +3435,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-091-headless-player-protocol-driver-for-devstack/" class="md-nav__link">
+      <a href="../../adr/ADR-091-headless-player-protocol-driver-for-devstack/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3393,7 +3456,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-092-hybrid-bit-packed-and-16-bit-run-container-hazard-table/" class="md-nav__link">
+      <a href="../../adr/ADR-092-hybrid-bit-packed-and-16-bit-run-container-hazard-table/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3414,7 +3477,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/" class="md-nav__link">
+      <a href="../../adr/ADR-093-declarative-scripted-actions-via-core-confinement-and-subspace-placement/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3435,7 +3498,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-094-quality-engineering-gates/" class="md-nav__link">
+      <a href="../../adr/ADR-094-quality-engineering-gates/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3456,7 +3519,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
+      <a href="../../adr/ADR-095-subspace-anchor-providers-and-near-teleport-primitives/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3477,7 +3540,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
+      <a href="../../adr/ADR-097-per-action-pre-validated-caches-and-bounded-retries/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3498,7 +3561,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-098-declarative-command-parameters-permissions-and-defaults/" class="md-nav__link">
+      <a href="../../adr/ADR-098-declarative-command-parameters-permissions-and-defaults/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3519,7 +3582,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-099-visual-region-creation-and-interactive-cartography-bridges/" class="md-nav__link">
+      <a href="../../adr/ADR-099-visual-region-creation-and-interactive-cartography-bridges/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3540,7 +3603,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-100-superseding-adr-024-sla-and-support-tier/" class="md-nav__link">
+      <a href="../../adr/ADR-100-superseding-adr-024-sla-and-support-tier/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3561,7 +3624,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-101-in-house-sql-connection-pool-and-hikaricp-retirement/" class="md-nav__link">
+      <a href="../../adr/ADR-101-in-house-sql-connection-pool-and-hikaricp-retirement/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3582,7 +3645,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-102-coverage-guided-fuzz-testing-and-parser-input-hardening/" class="md-nav__link">
+      <a href="../../adr/ADR-102-coverage-guided-fuzz-testing-and-parser-input-hardening/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3603,7 +3666,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-103-multi-version-platform-adapter-deduplication/" class="md-nav__link">
+      <a href="../../adr/ADR-103-multi-version-platform-adapter-deduplication/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3624,7 +3687,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-104-ephemeral-web-editor-and-packed-docs-integration/" class="md-nav__link">
+      <a href="../../adr/ADR-104-ephemeral-web-editor-and-packed-docs-integration/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3645,7 +3708,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-105-intent-based-documentation-architecture-and-operator-routing/" class="md-nav__link">
+      <a href="../../adr/ADR-105-intent-based-documentation-architecture-and-operator-routing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3666,7 +3729,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-106-shape-curve-helpers-and-signed-editor-channel/" class="md-nav__link">
+      <a href="../../adr/ADR-106-shape-curve-helpers-and-signed-editor-channel/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3687,7 +3750,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
+      <a href="../../adr/ADR-107-addon-editor-extensions-and-protocol-negotiation/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3708,7 +3771,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
+      <a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3729,7 +3792,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
+      <a href="../../adr/ADR-109-measured-cost-probe-first-gate/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3750,7 +3813,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
+      <a href="../../adr/ADR-110-purpose-gated-live-loads/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3771,7 +3834,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
+      <a href="../../adr/ADR-111-live-server-behaviour-fuzzing/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3792,7 +3855,91 @@
   
   
     <li class="md-nav__item">
-      <a href="../../../adr/ADR-TEMPLATE/" class="md-nav__link">
+      <a href="../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3840,100 +3987,28 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#environment" class="md-nav__link">
+  <a href="#executive-overview-package-dag-decision-hypergraph" class="md-nav__link">
     <span class="md-ellipsis">
-      Environment
+      Executive Overview (Package DAG &amp; Decision Hypergraph)
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#server-config-changes-made-in-earlier-work-still-in-place" class="md-nav__link">
+  <a href="#1-the-4-tier-package-hierarchy" class="md-nav__link">
     <span class="md-ellipsis">
-      Server config changes made in earlier work (still in place)
+      1. The 4-Tier Package Hierarchy
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#runs" class="md-nav__link">
-    <span class="md-ellipsis">
-      Runs
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#server-thread-bandwidth-from-spark-run-195124" class="md-nav__link">
-    <span class="md-ellipsis">
-      Server-thread "bandwidth" from spark (run 195124)
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#code-changes-made-this-session-uncommitted-all-tests-green" class="md-nav__link">
-    <span class="md-ellipsis">
-      Code changes made this session (uncommitted, all tests green)
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#deploy-before-the-next-run" class="md-nav__link">
-    <span class="md-ellipsis">
-      Deploy before the next run
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#open-items-next-steps" class="md-nav__link">
-    <span class="md-ellipsis">
-      Open items / next steps
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#analysis-scripts-gitignored-scriptstmpbench" class="md-nav__link">
-    <span class="md-ellipsis">
-      Analysis scripts (gitignored, scripts/tmp/bench/)
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#leading-prompts" class="md-nav__link">
-    <span class="md-ellipsis">
-      Leading prompts
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Leading prompts">
+    <nav class="md-nav" aria-label="1. The 4-Tier Package Hierarchy">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#prompt-a-continue-bench-testing-and-analysis" class="md-nav__link">
+  <a href="#tier-specifications" class="md-nav__link">
     <span class="md-ellipsis">
-      Prompt A: continue bench testing and analysis
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#prompt-b-move-away-from-regex-on-performance-paths" class="md-nav__link">
-    <span class="md-ellipsis">
-      Prompt B: move away from regex on performance paths
+      Tier Specifications
     </span>
   </a>
   
@@ -3941,6 +4016,108 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-structural-seam-decoupling-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Structural Seam Decoupling Patterns
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Structural Seam Decoupling Patterns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-task-execution-vs-resource-safety-tasksteleport-longleftrightarrow-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Task Execution vs. Resource Safety (tasks.teleport $\longleftrightarrow$ tools)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-command-tree-inversion-commands-longleftrightarrow-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Command Tree Inversion (commands $\longleftrightarrow$ commands.*)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-domain-models-vs-runtime-pipelines-selectionregion-longleftrightarrow-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Domain Models vs. Runtime Pipelines (selection.region $\longleftrightarrow$ tasks)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-composition-root-vs-global-state-commonrtp" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Composition Root vs. Global State (common.RTP)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-decision-and-requirement-traceability-hypergraph" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Decision and Requirement Traceability Hypergraph
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Decision and Requirement Traceability Hypergraph">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#standard-class-invariant-header-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Standard Class Invariant Header Format
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tag-invariant-definitions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tag Invariant Definitions
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-archunit-verification-guardrails" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. ArchUnit Verification Guardrails
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-component-tier-taxonomy" class="md-nav__link">
+    <span class="md-ellipsis">
+      5. Component Tier Taxonomy
+    </span>
+  </a>
   
 </li>
       
@@ -3962,173 +4139,281 @@
   
 
 
-<h1 id="bench-state-paper-262-cross-plugin-stress-test-as-of-2026-10-06-2030">Bench state: Paper 26.2 cross-plugin stress test (as of 2026-10-06 20:30)<a class="headerlink" href="#bench-state-paper-262-cross-plugin-stress-test-as-of-2026-10-06-2030" title="Permanent link">&para;</a></h1>
-<p>Hand-off file for continuing the LeafRTP stress-test analysis in a new thread.
-Gitignored (<code>docs/dev/scratch/</code>). Nothing below is committed.</p>
-<h2 id="environment">Environment<a class="headerlink" href="#environment" title="Permanent link">&para;</a></h2>
-<ul>
-<li>Server: <code>C:\GameServers\Minecraft\testServer\RTP-Paper\26.2</code> (Paper 26.2, Windows 11, JDK 21, 16 GB heap, spark bundled by Paper, built-in Java sampler only).</li>
-<li>Harness: <code>helpers/StressTestRTP</code> (<code>/rtpstress</code>); runs are written to <code>plugins\StressTestRTP\runs\&lt;stamp&gt;{.csv,-phases.csv,-heap.csv,-jfr-alloc.csv,-schema.txt}</code>.</li>
-<li>Bots: 3 accounts (<code>leaf26</code>, <code>leaf_26</code>, <code>leaf_27</code>), <code>immediate-redispatch: true</code>, so the offered load is "as fast as the plugin answers".</li>
-<li>World: pregenerated region files -40..39 on both axes. All 6 plugins are set to a CIRCLE ring of 1024-16384 blocks around 0,0.</li>
-<li>Plugins under test: LeafRTP (<code>plugins\RTP</code>), BetterRTP, EzRTP, JakesRTP, JustRTP, HuskHomes (HuskHomes was missing from run <code>190707</code>).</li>
-</ul>
-<h2 id="server-config-changes-made-in-earlier-work-still-in-place">Server config changes made in earlier work (still in place)<a class="headerlink" href="#server-config-changes-made-in-earlier-work-still-in-place" title="Permanent link">&para;</a></h2>
-<ul>
-<li>LeafRTP <code>config.yml</code>: radius 16384b, <code>mode: REROLL</code>, <code>expand: false</code>, <code>uniquePlacements</code> AUTO.</li>
-<li>LeafRTP <code>advanced/blocks.yml</code>: leaves moved to the unsafe list.</li>
-<li>LeafRTP <code>advanced/performance.yml</code>: <code>viewDistanceSelect: 0</code>, <code>viewDistanceTeleport: 0</code> (destination chunk only).</li>
-<li>JustRTP: <code>permission_groups</code> off (op bots were capped by the <code>mvp</code> group).</li>
-<li>EzRTP: <code>reject-liquid-above-overworld: true</code> (has no effect; EzRTP still lands about 32% on ocean surface).</li>
-<li>JustRTP: flags every y=127 outcome as "nether roof" and auto-guards (rejects) it, although these are overworld placements, so it likely rejects good land. Count this when comparing JustRTP's rate, latency and spread.</li>
-<li>Paper <code>config\paper-world-defaults.yml</code>: <code>delay-chunk-unloads-by: 0s</code> (stock is <code>10s</code>; the <code>.bak</code> beside it holds the stock value). In place for every run. It exposed LeafRTP's arrival sync load and the unchecked landings (the harness probe arrives after the chunk unloaded).</li>
-<li>BetterRTP / EzRTP / JakesRTP shape switched to circle.</li>
-</ul>
-<h2 id="runs">Runs<a class="headerlink" href="#runs" title="Permanent link">&para;</a></h2>
-<table>
-<thead>
-<tr>
-<th>Run</th>
-<th>LeafRTP jar</th>
-<th>Notes</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>20261006-135938</code></td>
-<td>pre-fix</td>
-<td>first 6-plugin baseline</td>
-</tr>
-<tr>
-<td><code>20261006-165659</code></td>
-<td>13:13 jar</td>
-<td>whole-file region reads; heap peak 16.3 GB</td>
-</tr>
-<tr>
-<td><code>20261006-175506</code></td>
-<td>17:39 jar</td>
-<td>sector reads; 98 pairs within 48 b</td>
-</tr>
-<tr>
-<td><code>20261006-190707</code></td>
-<td>18:53 jar</td>
-<td>cell-slot spacing: 0 pairs within 48 b, closest 73.4 b; 41.1 tp/s; complete except HuskHomes</td>
-</tr>
-<tr>
-<td><code>20261006-195124</code></td>
-<td>18:53 jar</td>
-<td>first run with spark profiles (server thread only); complete incl. HuskHomes. Baseline for the state before this session's changes. Caveats: other tasks were running on the machine during the run, and spark consistently cut throughput during its periodic save cycles</td>
-</tr>
-</tbody>
-</table>
-<h2 id="server-thread-bandwidth-from-spark-run-195124">Server-thread "bandwidth" from spark (run <code>195124</code>)<a class="headerlink" href="#server-thread-bandwidth-from-spark-run-195124" title="Permanent link">&para;</a></h2>
-<p>Busy server-thread time per teleport, from spark samples, scaled by wall/sampled (spark covered 91-94% of each phase because of rotation gaps). From that I subtracted the idle-server tick baseline (about 12 ms MSPT, or 240 ms/s), the harness's own frames and spark's own frames. Ceiling = 760 ms/s of free tick budget ÷ net ms per teleport, meaning the rate at which MSPT would reach 50.</p>
-<table>
-<thead>
-<tr>
-<th>Plugin</th>
-<th>Net main-thread ms / teleport</th>
-<th>Of which: blocked waiting (sync chunk load)</th>
-<th>Plugin's own code</th>
-<th>Paper <code>teleport</code></th>
-<th>Ceiling (tp/s at MSPT 50)</th>
-<th>Observed rate</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>LeafRTP</td>
-<td>~10.7</td>
-<td>3.45 (arrived player's first tick, <code>isInWall</code> &gt; <code>syncLoad</code>)</td>
-<td>1.79</td>
-<td>4.17</td>
-<td>~71</td>
-<td>35.4 (bench-bound, MSPT ~29)</td>
-</tr>
-<tr>
-<td>EzRTP</td>
-<td>~24.9</td>
-<td>18.4 (inside EzRTP frames)</td>
-<td>3.30</td>
-<td>3.66</td>
-<td>~30</td>
-<td>29.1 (main-thread-bound, MSPT ~50)</td>
-</tr>
-<tr>
-<td>BetterRTP</td>
-<td>~34.4</td>
-<td>33.7 (inside BetterRTP frames)</td>
-<td>2.65</td>
-<td>3.01</td>
-<td>~22</td>
-<td>9.75 (latency-bound, MSPT ~26)</td>
-</tr>
-</tbody>
-</table>
-<ul>
-<li>Harness cost on the server thread: 0.9-1.3 ms per teleport (CSV row open/close, <code>SyncLoadAttributor</code> stack walks, <code>logCompletion</code>). spark itself: 0.04-0.17 ms per teleport on the server thread, plus about 0.2 cores on its own threads.</li>
-<li>Sanity check: the model predicts LeafRTP at about 31 ms MSPT for 35.4 tp/s (observed 29-31), and EzRTP at about 50 ms (observed 49.5).</li>
-<li>With the LeafRTP fixes below plus the sync-load fix (implemented, not yet bench-verified), LeafRTP should drop to about 6.5 ms per teleport, a ceiling of roughly 115 tp/s. Not verified.</li>
-<li>Caveats: the 12 ms baseline comes from the idle pre-run window, while bots teleporting constantly raise the ticking cost. "Blocked" is wall time with the thread parked, not CPU. Run <code>195124</code> used the old LeafRTP jar (no palette memo, no schematic cache).</li>
-</ul>
-<h2 id="code-changes-made-this-session-uncommitted-all-tests-green">Code changes made this session (uncommitted, all tests green)<a class="headerlink" href="#code-changes-made-this-session-uncommitted-all-tests-green" title="Permanent link">&para;</a></h2>
-<p>LeafRTP:
-- <code>platforms/rtp-bukkit/rtp-bukkit-common/.../server/AbstractServerAccessor.java</code> and <code>platforms/rtp-folia/rtp-folia-common/.../server/AbstractFoliaServerAccessor.java</code>: <code>reconcilePaletteIdentifier</code> is memoized (ConcurrentHashMap, capped at 8192), which removes the per-call <code>Material.matchMaterial</code> regex compile.
-- <code>rtp-core/.../tasks/teleport/RegionSchematicService.java</code>: presence answers (hits and misses) are cached for 1 s, with <code>invalidateCache()</code>. <code>rtp-core/.../commands/prefab/PrefabSchematicInstaller.java</code> invalidates after installing.
-- Tests: <code>RegionSchematicServiceTest.presenceAnswerIsCachedUntilInvalidated</code>, plus memo assertions in <code>BukkitTeleportSafetyTest</code>.
-- <code>CHANGELOG.md</code> (Changed): "Less main-thread work per teleport on Paper, Spigot and Folia."
-- <code>docs/dev/POTENTIAL_BUGS.md</code>: High entry "Arrived players sync-load their landing chunk on the main thread (Paper)", now In Progress (Linear RTP-4).
-- Arrival sync-load fix (D-005 approved): <code>TeleportPipelineTask</code> keeps the landing reservation for <code>ARRIVAL_HOLD_TICKS</code> (20) after a successful <code>setLocation</code> via region-aware <code>RTP.scheduler.runTaskLater</code>; failures release immediately; <code>RTP.stop</code> flushes pending holds. <code>buildArrivalPlatform</code> passes a reservation-free location (<code>platform()</code> implementations closed it before the teleport). <code>databaseAccessor.cacheValue</code> before <code>whenComplete</code> is null-guarded. <code>MemoryTracker</code> counts pending holds as expected tickets and keeps their chunks in the orphan sweep (otherwise a false SEVERE leak alert plus early release every 60 s). Tests: <code>ReqRtpS005ArrivalChunkHoldTest</code> (5), updated <code>ReqRtpS002PipelineLeakAssertionTest</code> and <code>TeleportPipelineTaskMutationTest#runLoad_inline_on_primary_thread</code>; <code>RTPTestSetup.install</code> flushes pending holds.</p>
-<p>Harness (<code>helpers/StressTestRTP</code>), earlier today plus this session:
-- <code>CpuSampler</code>: per-thread-group CPU columns. The <code>Paper Common Worker</code> pattern is still missing from the chunk-system group, so it lands in <code>cpu_other_java_ms</code>.
-- <code>ChunkLoadCounter</code>: landing-area attribution, cut off by the same account's next dispatch; new columns <code>chunks_landing_area*</code>, <code>chunks_per_teleport</code>.
-- <code>SparkHook</code>: detects Paper's bundled spark; <code>--thread &lt;spark.threads&gt;</code> (default <code>*</code>); polls up to <code>spark.auto-summary-timeout-seconds</code> (default 30) for a new, size-stable <code>.sparkprofile</code> before writing <code>.summary.json</code>; log text names the real spark folder.
-- <code>MetricsRecorder</code>: one persistent buffered writer for the per-attempt CSV, flushed about every 1 s, on phase end and on stop, and closed on disable.
-- <code>StressTestRTPPlugin</code>: <code>chunk-load-cost-us-paper</code> / <code>-folia</code> keys are read per platform.
-- Tests: <code>CpuSamplerTest</code>, <code>ChunkLoadLandingAreaTest</code>, <code>SparkHookTest</code>, <code>MetricsRecorderWriterTest</code> (38/38 pass).</p>
-<p>Verification run: <code>:helpers:StressTestRTP:test</code>, <code>:rtp-core:test --tests *RegionSchematicServiceTest*</code>, <code>:rtp-bukkit:rtp-bukkit-common:test --tests *BukkitTeleportSafetyTest*</code>, <code>:rtp-folia:rtp-folia-common:compileJava</code>; for the arrival fix, the full <code>:rtp-core:test</code> suite. No full multi-module build.</p>
-<h2 id="deploy-before-the-next-run">Deploy before the next run<a class="headerlink" href="#deploy-before-the-next-run" title="Permanent link">&para;</a></h2>
+<h1 id="core-package-architecture-and-decision-traceability-map">Core Package Architecture and Decision Traceability Map<a class="headerlink" href="#core-package-architecture-and-decision-traceability-map" title="Permanent link">&para;</a></h1>
+<p><strong>Scope of this document.</strong> This document specifies and visualizes the package hierarchy, structural decoupling boundaries, and decision traceability hypergraph for <code>rtp-core</code>. It models the module's 4-tier Directed Acyclic Graph (DAG), diagrams the decoupled seams that eliminate cyclic package tangles, and specifies the closed hypergraph connecting implementation classes to governing ADRs, absolute prohibition requirements (S-001..S-007), and automated verification tests.</p>
+<p>Companion architectural decisions and references:
+- <a href="../../adr/ADR-000-development-workflow/">ADR-000</a>: Development Workflow and D-005 Guard Rail.
+- <a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>: Archimedean Spiral 1D Mapping.
+- <a href="../../adr/ADR-008-memory-tracker-active-gc/">ADR-008</a>: MemoryTracker as Active Task GC.
+- <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/">ADR-015</a>: Stale-Chunk Guard for Count-Bound Pipes.
+- <a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a>: Anvil Read-Only Subsystem.
+- <a href="../../adr/ADR-094-quality-engineering-gates/">ADR-094</a>: Quality-Engineering Gates and ArchUnit Enforcement.
+- <a href="../../adr/ADR-110-purpose-gated-live-loads/">ADR-110</a>: Purpose-Gated Live Loads.
+- <a href="../../adr/ADR-112-per-region-work-division-on-folia/">ADR-112</a>: Per-Region Work Division on Folia.
+- <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/">ADR-114</a>: Cost-Governed On-Demand Chunk Reads.
+- <a href="../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/">ADR-115</a>: Package DAG Disentanglement and Finite Decision-Preservation Hypergraph (Authoritative Decision).
+- <a href="../../dev/REQUIREMENTS/"><code>docs/dev/REQUIREMENTS.md</code></a>: Absolute Prohibition Requirements (S-001 through S-007).
+- <a href="../../dev/TRACEABILITY/"><code>docs/dev/TRACEABILITY.md</code></a>: Requirements to Code and Test Traceability Matrix.</p>
+<hr />
+<h2 id="executive-overview-package-dag-decision-hypergraph">Executive Overview (Package DAG &amp; Decision Hypergraph)<a class="headerlink" href="#executive-overview-package-dag-decision-hypergraph" title="Permanent link">&para;</a></h2>
+<p>The <code>rtp-core</code> module implements the platform-neutral coordinate math, memory tracking, multi-tier chunk resolution, and teleport execution pipelines. The architecture is structured around two governing models:</p>
 <ol>
-<li>Rebuild and copy the LeafRTP plugin jar and the StressTestRTP jar to the 26.2 server.</li>
-<li>Check the log for <code>spark profiler started for phase</code> and for <code>spark auto-summary written</code>. Profiles should now include async threads (<code>RTP-Anvil-IO</code>, <code>Craft Scheduler Thread - RTP</code>, <code>Paper Common Worker</code>).</li>
+<li>
+<p><strong>Acyclic Package Layering (0.0% SonarQube Package Tangles):</strong>
+   The packages in <code>rtp-core</code> are organized into a 4-tier Directed Acyclic Graph (DAG). Dependencies flow strictly downward (Tier 4 $\to$ Tier 3 $\to$ Tier 2 $\to$ Tier 1). Elimination of cyclic package tangles ensures that domain algorithms (such as <code>MemoryTracker</code> and <code>LocationGenerator</code>) operate as isolated, self-contained components without coupling to the plugin composition root or presentation layers.</p>
+</li>
+<li>
+<p><strong>Finite Decision Hypergraph (Code $\longleftrightarrow$ ADR $\longleftrightarrow$ Requirement $\longleftrightarrow$ Test):</strong>
+   Implementation invariants (including Archimedean spiral indexing, Anvil pre-filter deduplication equations, and weak-reference garbage collection sweeps) link directly to their governing design records. Classes declare their governing ADRs, prohibition requirements, and operational invariants in structured Javadoc headers, establishing a closed, traceable graph from requirement to automated verification.</p>
+</li>
 </ol>
-<h2 id="open-items-next-steps">Open items / next steps<a class="headerlink" href="#open-items-next-steps" title="Permanent link">&para;</a></h2>
+<pre class="mermaid"><code>flowchart TD
+    subgraph TargetDAG ["rtp-core 4-Tier Directed Acyclic Graph (DAG)"]
+        direction TB
+        T4["Tier 4: Orchestration &amp; Presentation&lt;br/&gt;(common.RTP, commands.*, web editor, menus)&lt;br/&gt;Leaf entry points; zero inbound dependencies"]
+        --&gt; T3["Tier 3: Execution Pipelines &amp; Coordination&lt;br/&gt;(tasks.teleport, pregen, cache refiller, action engine)&lt;br/&gt;Depends on T2 and T1"]
+        --&gt; T2["Tier 2: Domain Engines &amp; Memory&lt;br/&gt;(selection math, MemoryTracker, shapes, database)&lt;br/&gt;Pure algorithms; depends on T1"]
+        --&gt; T1["Tier 1: Foundation &amp; Contracts&lt;br/&gt;(configuration schema, SPIs, models, enums)&lt;br/&gt;0 outgoing core dependencies"]
+    end
+
+    classDef dag fill:#d1e7dd,stroke:#0f5132,stroke-width:2px,color:#0f5132;
+    class TargetDAG,T4,T3,T2,T1 dag;</code></pre>
+<hr />
+<h2 id="1-the-4-tier-package-hierarchy">1. The 4-Tier Package Hierarchy<a class="headerlink" href="#1-the-4-tier-package-hierarchy" title="Permanent link">&para;</a></h2>
+<p>Dependencies flow strictly downward: Tier 4 $\to$ Tier 3 $\to$ Tier 2 $\to$ Tier 1. Higher tiers consume lower tiers; upward or circular dependencies are prohibited.</p>
+<pre class="mermaid"><code>flowchart TD
+    subgraph T4 [Tier 4: Orchestration, Ingress &amp; Presentation]
+        direction TB
+        T4_RTP["io.github.dailystruggle.rtp.common (RTP Composition Root)"]
+        T4_CmdTree["io.github.dailystruggle.rtp.common.commands (Command Tree)"]
+        T4_CmdSub["io.github.dailystruggle.rtp.common.commands.* (Subcommands)"]
+        T4_Menu["io.github.dailystruggle.rtp.common.commands.menu.*"]
+        T4_Editor["io.github.dailystruggle.rtp.common.commands.editor.*"]
+        T4_Events["io.github.dailystruggle.rtp.common.event"]
+    end
+
+    subgraph T3 [Tier 3: Execution Pipelines &amp; Runtime Coordination]
+        direction TB
+        T3_Teleport["io.github.dailystruggle.rtp.common.tasks.teleport (TeleportPipelineTask)"]
+        T3_Tasks["io.github.dailystruggle.rtp.common.tasks (TaskPipes, ScanTask)"]
+        T3_Tick["io.github.dailystruggle.rtp.common.tasks.tick (Processing loops)"]
+        T3_Action["io.github.dailystruggle.rtp.common.action (ActionManager)"]
+        T3_Network["io.github.dailystruggle.rtp.common.network (Protocol dispatch)"]
+        T3_Importer["io.github.dailystruggle.rtp.common.importer"]
+    end
+
+    subgraph T2 [Tier 2: Domain Engines, Math &amp; Storage]
+        direction TB
+        T2_Selection["io.github.dailystruggle.rtp.common.selection.region (Regions, Queues)"]
+        T2_Shapes["io.github.dailystruggle.rtp.common.selection.region.selectors.*"]
+        T2_Tools["io.github.dailystruggle.rtp.common.tools (MemoryTracker, ChunkSafety)"]
+        T2_Database["io.github.dailystruggle.rtp.common.database (Accessors, Factory)"]
+        T2_Metrics["io.github.dailystruggle.rtp.common.metrics (Governors, Profiles)"]
+        T2_PlayerData["io.github.dailystruggle.rtp.common.playerData (Limits, Cache)"]
+    end
+
+    subgraph T1 [Tier 1: Foundation, Schemas &amp; Primitives]
+        direction TB
+        T1_Config["io.github.dailystruggle.rtp.common.configuration.schema (Immutable specs)"]
+        T1_Enums["io.github.dailystruggle.rtp.common.configuration.enums"]
+        T1_Math["io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table"]
+        T1_Pool["io.github.dailystruggle.rtp.common.database.pool"]
+        T1_Contracts["io.github.dailystruggle.rtp.common.tools.contracts (TrackableTask, TicketHolder)"]
+        T1_Text["io.github.dailystruggle.rtp.common.text"]
+    end
+
+    T4 --&gt; T3
+    T4 --&gt; T2
+    T4 --&gt; T1
+    T3 --&gt; T2
+    T3 --&gt; T1
+    T2 --&gt; T1
+
+    classDef t4 fill:#e2d9f3,stroke:#59359a,stroke-width:1px,color:#261447;
+    classDef t3 fill:#cfe2ff,stroke:#1f4e8a,stroke-width:1px,color:#0b1f3a;
+    classDef t2 fill:#d1e7dd,stroke:#0f5132,stroke-width:1px,color:#0f5132;
+    classDef t1 fill:#f8f9fa,stroke:#495057,stroke-width:1px,color:#212529;
+    class T4,T4_RTP,T4_CmdTree,T4_CmdSub,T4_Menu,T4_Editor,T4_Events t4;
+    class T3,T3_Teleport,T3_Tasks,T3_Tick,T3_Action,T3_Network,T3_Importer t3;
+    class T2,T2_Selection,T2_Shapes,T2_Tools,T2_Database,T2_Metrics,T2_PlayerData t2;
+    class T1,T1_Config,T1_Enums,T1_Math,T1_Pool,T1_Contracts,T1_Text t1;</code></pre>
+<h3 id="tier-specifications">Tier Specifications<a class="headerlink" href="#tier-specifications" title="Permanent link">&para;</a></h3>
 <ul>
-<li>[x] Run <code>195124</code> analysis for all six plugins (HuskHomes finished after the analysis; re-run <code>run190707.py</code> with the run id to fold its final row in).</li>
-<li>[x] Fix the S-005 sync-load on arrival: deferred arrival release implemented (see code changes above), unit-tested.</li>
-<li>[ ] Verify the arrival fix on the bench: spark <code>isInWall &gt; syncLoad</code> gone in the LeafRTP phase, unchecked landings down, no MSPT burst. Then remove the POTENTIAL_BUGS entry and close RTP-4.</li>
-<li>[x] Decide whether to keep <code>delay-chunk-unloads-by: 0s</code> (adversarial) or restore <code>10s</code> (stock) for future runs. (Restored <code>10s</code> for overnight run).</li>
-<li>[x] BetterRTP: set <code>MaxRadius: 17408</code> in <code>plugins/BetterRTP/config.yml</code> so effective radius is 16384b.</li>
-<li>[x] StressTestRTP: set <code>per-target-count: 0</code> (governed by <code>per-target-seconds: 3600</code>), <code>spark.timeout-seconds: 3900</code> for ~6.2 hour sustained overnight sequence.</li>
-<li>[x] Harness: add <code>Paper Common Worker</code> to the chunk-system group in <code>CpuSampler</code>.</li>
-<li>[x] Harness: the recorder proxy in <code>StressTestRTPPlugin</code> does not forward <code>flushPartialPhase</code> (resolved).</li>
-<li>[x] EzRTP: set <code>enable_fallback_to_cache: false</code> in <code>plugins/EzRTP/rtp.yml</code> to prevent candidate search cheating via pre-cached spots.</li>
-<li>[x] JakesRTP: set <code>shrink: 0</code> in <code>plugins/JakesRTP/distributions/default-symmetric.yml</code> to eliminate gaussian center-clustering cheat.</li>
-<li>[x] Rebuild and deploy: updated <code>LeafRTP-Pro-3.3.0.jar</code> and <code>StressTestRTP-1.0-SNAPSHOT.jar</code> deployed to <code>C:\GameServers\Minecraft\testServer\RTP-Paper\26.2\plugins\</code>.</li>
-<li>[ ] Harness: JustRTP landings are all "unchecked"; find out why the post-landing probe misses them.</li>
-<li>[ ] Harness: heap CSV is sometimes empty (142 bytes); the disk-class label flips between SATA SSD and NVMe.</li>
-<li>[ ] LeafRTP: MiniMessage parse plus JSON round-trip costs about 0.7 ms per teleport (cache the parsed template per key).</li>
-<li>[ ] Bench design: raise concurrency or the account count to find LeafRTP's real ceiling. Also run fixed-rate phases (<code>immediate-redispatch: false</code>, <code>dispatch-interval-ms</code> 250 / 111 / 40) so MSPT is compared at equal throughput, and rotate the phase order (LeafRTP always carries the cold start and the chunk-ticket memory probe).</li>
-<li>[ ] Separate thread: remove regex from hot or performance paths project-wide (see prompt B below).</li>
+<li><strong>Tier 1 (Foundation &amp; Schemas):</strong>
+  Contains pure data schemas, configuration records, domain enums, primitive spatial math tables, and lifecycle contracts. Classes in Tier 1 shall have zero dependencies on other <code>rtp-core</code> packages.</li>
+<li><strong>Tier 2 (Domain Engines &amp; Storage):</strong>
+  Contains core mathematical engines and state managers: Archimedean spiral and Hilbert spatial memory (<code>MemoryShape</code>), resource tracking (<code>MemoryTracker</code>), database accessors (<code>DatabaseAccessorFactory</code>), and concurrency governors (<code>ImmediateLoadGovernor</code>). Classes in Tier 2 depend strictly on Tier 1 contracts and schemas; they shall contain no references to command execution, player messaging, or presentation layers.</li>
+<li><strong>Tier 3 (Execution Pipelines &amp; Coordination):</strong>
+  Contains runtime task orchestrators and asynchronous pipelines: player teleport pipelines (<code>TeleportPipelineTask</code>), background queue pre-generation (<code>PregenTask</code>), scan crawlers (<code>ScanTask</code>), scripted action execution (<code>ActionManager</code>), and network synchronization. Depends on Tier 2 domain engines and Tier 1 foundation contracts.</li>
+<li><strong>Tier 4 (Orchestration &amp; Ingress):</strong>
+  Contains user-facing and external entry points: command dispatch trees, interactive book menus, web editor channels, event bridges, and the plugin composition root (<code>RTP.java</code>). Depends downward on Tiers 3, 2, and 1. Zero core packages shall depend on Tier 4.</li>
 </ul>
-<h2 id="analysis-scripts-gitignored-scriptstmpbench">Analysis scripts (gitignored, <code>scripts/tmp/bench/</code>)<a class="headerlink" href="#analysis-scripts-gitignored-scriptstmpbench" title="Permanent link">&para;</a></h2>
+<hr />
+<h2 id="2-structural-seam-decoupling-patterns">2. Structural Seam Decoupling Patterns<a class="headerlink" href="#2-structural-seam-decoupling-patterns" title="Permanent link">&para;</a></h2>
+<p>The 4-tier DAG resolves cyclic dependencies across packages by decoupling four critical structural seams:</p>
+<h3 id="1-task-execution-vs-resource-safety-tasksteleport-longleftrightarrow-tools">1. Task Execution vs. Resource Safety (<code>tasks.teleport</code> $\longleftrightarrow$ <code>tools</code>)<a class="headerlink" href="#1-task-execution-vs-resource-safety-tasksteleport-longleftrightarrow-tools" title="Permanent link">&para;</a></h3>
+<p><strong>Pattern: Interface Extraction.</strong>
+- <code>tools.MemoryTracker</code> manages resource lifecycles and garbage collection sweeps without coupling to the concrete execution details of <code>TeleportPipelineTask</code>.
+- <code>tools.contracts.TrackableTask</code> defines the lifecycle contract (<code>UUID id()</code>, <code>isCompleted()</code>, <code>getReservations()</code>, <code>cancel()</code>).
+- <code>TeleportPipelineTask</code> implements <code>TrackableTask</code>. <code>MemoryTracker</code> interacts strictly through the contract, isolating Tier 2 from runtime execution in Tier 3.</p>
+<pre class="mermaid"><code>flowchart LR
+    TeleportTask["tasks.teleport.TeleportPipelineTask&lt;br/&gt;(Tier 3: Execution)"]
+    --&gt; Trackable["tools.contracts.TrackableTask&lt;br/&gt;(Tier 1: Contract)"]
+    Tracker["tools.MemoryTracker&lt;br/&gt;(Tier 2: Safety Sweep)"]
+    --&gt; Trackable
+    TeleportTask --&gt; Tracker
+
+    classDef c1 fill:#cfe2ff,stroke:#1f4e8a,stroke-width:1px,color:#0b1f3a;
+    classDef c2 fill:#d1e7dd,stroke:#0f5132,stroke-width:1px,color:#0f5132;
+    classDef c3 fill:#f8f9fa,stroke:#495057,stroke-width:1px,color:#212529;
+    class TeleportTask c1;
+    class Tracker c2;
+    class Trackable c3;</code></pre>
+<h3 id="2-command-tree-inversion-commands-longleftrightarrow-commands">2. Command Tree Inversion (<code>commands</code> $\longleftrightarrow$ <code>commands.*</code>)<a class="headerlink" href="#2-command-tree-inversion-commands-longleftrightarrow-commands" title="Permanent link">&para;</a></h3>
+<p><strong>Pattern: Shared Base &amp; Provider Registration.</strong>
+- Root command infrastructure (<code>BaseRTPCmd</code>, parameter parsers) resides in <code>commands.base</code> (or leverages <code>commands-api</code>).
+- Concrete subcommands (<code>commands.admin.AdminCmd</code>, <code>commands.config.ConfigCmd</code>) depend downward on <code>commands.base</code>.
+- Subcommands register into the tree dynamically or via provider collections, ensuring child subcommands do not import the parent composition builder.</p>
+<h3 id="3-domain-models-vs-runtime-pipelines-selectionregion-longleftrightarrow-tasks">3. Domain Models vs. Runtime Pipelines (<code>selection.region</code> $\longleftrightarrow$ <code>tasks</code>)<a class="headerlink" href="#3-domain-models-vs-runtime-pipelines-selectionregion-longleftrightarrow-tasks" title="Permanent link">&para;</a></h3>
+<p><strong>Pattern: Separation of Schema &amp; Pipeline Coordination.</strong>
+- <code>Region</code> functions as a calculation manifold operating on immutable configuration schemas (<code>RegionConfigRecord</code>) defined in Tier 1.
+- Teleport execution pipelines are dispatched by Tier 3 coordinators (<code>QueueRefillCoordinator</code>), avoiding direct task invocation inside domain calculation classes.</p>
+<h3 id="4-composition-root-vs-global-state-commonrtp">4. Composition Root vs. Global State (<code>common.RTP</code>)<a class="headerlink" href="#4-composition-root-vs-global-state-commonrtp" title="Permanent link">&para;</a></h3>
+<p><strong>Pattern: Context Encapsulation &amp; Constructor Injection.</strong>
+- <code>RTP.java</code> operates strictly as a Tier 4 Composition Root: it instantiates and wires subsystems during startup, and tears them down during shutdown.
+- Internal domain classes receive required SPI services (<code>RTPScheduler</code>, <code>RTPServerAccessor</code>, <code>MemoryTracker</code>) via constructor parameters or a scoped <code>RTPContext</code>.
+- Classes in Tiers 1, 2, and 3 shall contain no static references to <code>RTP.java</code>.</p>
+<hr />
+<h2 id="3-decision-and-requirement-traceability-hypergraph">3. Decision and Requirement Traceability Hypergraph<a class="headerlink" href="#3-decision-and-requirement-traceability-hypergraph" title="Permanent link">&para;</a></h2>
+<p>The relationship between implementation, requirements, and design rationale forms a closed hypergraph:
+$$\mathcal{H} = (V, \mathcal{E}), \quad V = \mathcal{REQ} \cup \mathcal{ADR} \cup \mathcal{S} \cup \mathcal{C} \cup \mathcal{T}$$</p>
+<p>Every safety-critical class links directly to its governing requirements, design records, and automated test suites:</p>
+<pre class="mermaid"><code>graph LR
+    subgraph CodeLayer ["1. Implementation (In-Code Javadoc)"]
+        ClassFile["ImmediateLoadGovernor.java&lt;br/&gt;@governedBy ADR-114&lt;br/&gt;@trace REQ-RTP-S-005&lt;br/&gt;@invariant S-005&lt;br/&gt;@prohibition No semaphore bypass"]
+    end
+
+    subgraph DocLayer ["2. Design Rationale (ADR &amp; Requirements)"]
+        ADR["ADR-114 (Cost-Governed Reads)&lt;br/&gt;ADR-110 (Purpose-Gated Loads)&lt;br/&gt;REQ-RTP-S-005 (Async Chunk I/O)"]
+    end
+
+    subgraph TestLayer ["3. Verification (Automated Test)"]
+        TestFile["ImmediateLoadGovernorTest.java&lt;br/&gt;(Validates Concurrency Permits)"]
+    end
+
+    ClassFile --&gt;|Inspect Header| ADR
+    ClassFile --&gt;|Verify Edits| TestFile
+    ADR --&gt;|Defines Invariant| TestFile
+
+    classDef code fill:#cfe2ff,stroke:#1f4e8a,stroke-width:1px,color:#0b1f3a;
+    classDef doc fill:#fff3cd,stroke:#664d03,stroke-width:1px,color:#664d03;
+    classDef test fill:#d1e7dd,stroke:#0f5132,stroke-width:1px,color:#0f5132;
+    class ClassFile code;
+    class ADR doc;
+    class TestFile test;</code></pre>
+<h3 id="standard-class-invariant-header-format">Standard Class Invariant Header Format<a class="headerlink" href="#standard-class-invariant-header-format" title="Permanent link">&para;</a></h3>
+<p>Safety-critical classes declare their governing constraints using standardized Javadoc tags:</p>
+<div class="highlight"><pre><span></span><code><span class="cm">/**</span>
+<span class="cm"> * Enforces per-region and global concurrency bounds on native chunk generation</span>
+<span class="cm"> * during on-demand (LoadPurpose.IMMEDIATE) teleport execution.</span>
+<span class="cm"> *</span>
+<span class="cm"> * @governedBy ADR-110 (Purpose-Gated Live Loads)</span>
+<span class="cm"> * @governedBy ADR-114 (Cost-Governed On-Demand Chunk Reads)</span>
+<span class="cm"> * @trace REQ-RTP-S-004</span>
+<span class="cm"> * @trace REQ-RTP-S-005</span>
+<span class="cm"> * @invariant S-005: Zero synchronous chunk loading or blocking calls on the main/tick thread.</span>
+<span class="cm"> * @invariant Concurrency-Cap: Maximum 1 concurrent generation permit per region, 2 server-wide.</span>
+<span class="cm"> * @invariant Fail-Visibility: Requests timing out after 1200ms shall complete with msgBusy (S-004, S-007).</span>
+<span class="cm"> * @prohibition DO NOT remove semaphores to &quot;speed up&quot; concurrent player teleports; unbound</span>
+<span class="cm"> *              live chunk generation causes severe main-thread tick stalls and watchdog crashes.</span>
+<span class="cm"> */</span>
+<span class="kd">public</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="kd">class</span> <span class="nc">ImmediateLoadGovernor</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// ...</span>
+<span class="p">}</span>
+</code></pre></div>
+<h3 id="tag-invariant-definitions">Tag Invariant Definitions<a class="headerlink" href="#tag-invariant-definitions" title="Permanent link">&para;</a></h3>
 <ul>
-<li><code>spark_lib.py</code>: minimal <code>.sparkprofile</code> protobuf decoder (threads, nodes, times, children).</li>
-<li><code>spark4.py</code>: per-phase server-thread split (idle / run / wait by owner: plugin, harness, Paper teleport, spark). Edit the run id and phase CSV path at the top.</li>
-<li><code>spark5.py</code>: top stacks behind main-thread waits (<code>syncLoad</code>).</li>
-<li><code>run190707.py</code>: per-plugin latency, MSPT, landing safety, rings, close pairs, last-64 / back-to-back with shuffled baselines. Edit <code>R</code>.</li>
-<li><code>heap.py</code>: heap / MSPT / TPS per phase from <code>-heap.csv</code>.</li>
-<li>Run with <code>$env:PYTHONIOENCODING='utf-8'; python scripts\tmp\bench\&lt;script&gt;.py</code>.</li>
+<li><strong><code>@governedBy ADR-NNN</code></strong>: Declares the authoritative architectural decision record defining the engineering trade-offs and rationale.</li>
+<li><strong><code>@trace REQ-MODULE-FAMILY-NNN</code></strong>: Declares the functional or non-functional requirement satisfied by the component.</li>
+<li><strong><code>@invariant S-00x</code></strong>: Declares compliance with non-negotiable absolute prohibition requirements (S-001 through S-007).</li>
+<li><strong><code>@invariant &lt;Name&gt;</code></strong>: Declares mathematical, operational, or concurrency invariants (e.g., concurrency bounds, non-mutating reads).</li>
+<li><strong><code>@prohibition</code></strong>: Declares explicit negative constraints defining operations that refactoring shall not introduce.</li>
 </ul>
-<h2 id="leading-prompts">Leading prompts<a class="headerlink" href="#leading-prompts" title="Permanent link">&para;</a></h2>
-<h3 id="prompt-a-continue-bench-testing-and-analysis">Prompt A: continue bench testing and analysis<a class="headerlink" href="#prompt-a-continue-bench-testing-and-analysis" title="Permanent link">&para;</a></h3>
-<blockquote>
-<p>Continue the LeafRTP cross-plugin stress-test analysis on the Paper 26.2 server at <code>C:\GameServers\Minecraft\testServer\RTP-Paper\26.2</code>. Read <code>docs/dev/scratch/BENCH_STATE.md</code> first: it has the environment, run history, the server-thread bandwidth model, the uncommitted code changes and the open items. Analysis scripts are in <code>scripts/tmp/bench/</code>. Start with the newest run in <code>plugins\StressTestRTP\runs\</code>: per-plugin speed, latency, MSPT/TPS, CPU split (including the new per-thread and spark async-thread data), chunk loads, landing safety, spacing and spread. Compare against <code>20261006-190707</code> and <code>20261006-195124</code>, and report each plugin's main-thread bandwidth net of harness and profiler time. Then propose (D-005) the fix for the main-thread sync chunk load on arrival logged in <code>docs/dev/POTENTIAL_BUGS.md</code>.</p>
-</blockquote>
-<h3 id="prompt-b-move-away-from-regex-on-performance-paths">Prompt B: move away from regex on performance paths<a class="headerlink" href="#prompt-b-move-away-from-regex-on-performance-paths" title="Permanent link">&para;</a></h3>
-<blockquote>
-<p>In the RTP repo, find every use of <code>java.util.regex</code> (<code>Pattern</code>, <code>Matcher</code>, <code>String.matches</code>, <code>replaceAll</code>, <code>replaceFirst</code>, <code>split</code> with a non-trivial pattern) in shipped code (<code>rtp-api</code>, <code>rtp-core</code>, <code>api/*</code>, <code>platforms/*</code>, <code>addons/*</code>; skip tests and <code>helpers/</code>). Start from the advisory regex-hygiene scan (ADR-094 amendment, <code>config/pmd/regex.xml</code>): run <code>.\gradlew.bat :&lt;module&gt;:pmdRegexMain -PregexAnalysis</code> per module and use its findings as the inventory, then grep for anything it misses. Classify each one as hot path (per teleport, per chunk or block probe, per tick, per message send), warm (per command or reload) or cold (startup, editor, docs). For hot and warm paths, propose plain string or char-scanning replacements, or precompiled-once patterns where a real grammar is needed, keeping behaviour identical. Background: spark showed <code>Material.matchMaterial</code> compiling a regex per safety-scan block name (now memoized in <code>AbstractServerAccessor</code>). Present a D-005 proposal with affected classes, and include parity tests for each replacement before implementing. Once a rule's findings are cleared, propose moving that rule into the gating <code>config/pmd/ruleset.xml</code>.</p>
-</blockquote>
+<hr />
+<h2 id="4-archunit-verification-guardrails">4. ArchUnit Verification Guardrails<a class="headerlink" href="#4-archunit-verification-guardrails" title="Permanent link">&para;</a></h2>
+<p>Package acyclicity and tier separation are verified mechanically during the build by <code>RTPArchitectureTest</code> (<code>rtp-core/src/test/java/.../RTPArchitectureTest.java</code>):</p>
+<div class="highlight"><pre><span></span><code><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">RTPArchitectureTest</span><span class="w"> </span><span class="p">{</span>
+
+<span class="w">    </span><span class="nd">@ArchTest</span>
+<span class="w">    </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">ArchRule</span><span class="w"> </span><span class="n">packages_must_be_free_of_cycles</span><span class="w"> </span><span class="o">=</span>
+<span class="w">            </span><span class="n">slices</span><span class="p">().</span><span class="na">matching</span><span class="p">(</span><span class="s">&quot;io.github.dailystruggle.rtp.common.(*)..&quot;</span><span class="p">)</span>
+<span class="w">                    </span><span class="p">.</span><span class="na">should</span><span class="p">().</span><span class="na">beFreeOfCycles</span><span class="p">()</span>
+<span class="w">                    </span><span class="p">.</span><span class="na">because</span><span class="p">(</span><span class="s">&quot;Package tangles break modularity and prevent isolated component testing.&quot;</span><span class="p">);</span>
+
+<span class="w">    </span><span class="nd">@ArchTest</span>
+<span class="w">    </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">ArchRule</span><span class="w"> </span><span class="n">domain_engines_must_not_depend_on_orchestration</span><span class="w"> </span><span class="o">=</span>
+<span class="w">            </span><span class="n">noClasses</span><span class="p">().</span><span class="na">that</span><span class="p">().</span><span class="na">resideInAnyPackage</span><span class="p">(</span><span class="s">&quot;..selection..&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;..tools..&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;..database..&quot;</span><span class="p">)</span>
+<span class="w">                    </span><span class="p">.</span><span class="na">should</span><span class="p">().</span><span class="na">dependOnClassesThat</span><span class="p">().</span><span class="na">resideInAnyPackage</span><span class="p">(</span><span class="s">&quot;..commands..&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;io.github.dailystruggle.rtp.common&quot;</span><span class="p">)</span>
+<span class="w">                    </span><span class="p">.</span><span class="na">because</span><span class="p">(</span><span class="s">&quot;Domain engines in Tier 2 shall not have upward dependencies on Tier 4 orchestration.&quot;</span><span class="p">);</span>
+
+<span class="w">    </span><span class="nd">@ArchTest</span>
+<span class="w">    </span><span class="kd">static</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">ArchRule</span><span class="w"> </span><span class="n">foundation_must_have_zero_outgoing_core_dependencies</span><span class="w"> </span><span class="o">=</span>
+<span class="w">            </span><span class="n">classes</span><span class="p">().</span><span class="na">that</span><span class="p">().</span><span class="na">resideInAPackage</span><span class="p">(</span><span class="s">&quot;..configuration.schema..&quot;</span><span class="p">)</span>
+<span class="w">                    </span><span class="p">.</span><span class="na">should</span><span class="p">().</span><span class="na">onlyDependOnClassesThat</span><span class="p">().</span><span class="na">resideInAnyPackage</span><span class="p">(</span><span class="s">&quot;..configuration.schema..&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;..configuration.enums..&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;java..&quot;</span><span class="p">)</span>
+<span class="w">                    </span><span class="p">.</span><span class="na">because</span><span class="p">(</span><span class="s">&quot;Tier 1 Foundation schemas shall be completely free of domain and runtime dependencies.&quot;</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+<hr />
+<h2 id="5-component-tier-taxonomy">5. Component Tier Taxonomy<a class="headerlink" href="#5-component-tier-taxonomy" title="Permanent link">&para;</a></h2>
+<p>Components in <code>rtp-core</code> map to the 4-tier hierarchy according to functional domain and dependency characteristics:</p>
+<table>
+<thead>
+<tr>
+<th>Component Category</th>
+<th>Target Package</th>
+<th>Tier</th>
+<th>Exemplar Classes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Immutable schema, DTO, or enum</td>
+<td><code>common.configuration.schema</code> or <code>common.configuration.enums</code></td>
+<td>Tier 1</td>
+<td><code>RegionConfigRecord</code>, <code>ShapeType</code></td>
+</tr>
+<tr>
+<td>Foundation contract or lifecycle SPI</td>
+<td><code>common.tools.contracts</code></td>
+<td>Tier 1</td>
+<td><code>TrackableTask</code>, <code>ChunkTicketHolder</code></td>
+</tr>
+<tr>
+<td>Math curve, spatial memory, shape</td>
+<td><code>common.selection.region.selectors.*</code></td>
+<td>Tier 2</td>
+<td><code>CircleOptimizedDualLayer</code>, <code>CurveHash</code></td>
+</tr>
+<tr>
+<td>Storage, memory tracking, governor</td>
+<td><code>common.tools</code>, <code>common.database</code>, <code>common.metrics</code></td>
+<td>Tier 2</td>
+<td><code>MemoryTracker</code>, <code>ImmediateLoadGovernor</code></td>
+</tr>
+<tr>
+<td>Pipeline task, async scheduler</td>
+<td><code>common.tasks.teleport</code>, <code>common.tasks</code></td>
+<td>Tier 3</td>
+<td><code>TeleportPipelineTask</code>, <code>PregenTask</code></td>
+</tr>
+<tr>
+<td>Command, menu, web editor, UI, composition root</td>
+<td><code>common.commands.*</code>, <code>common.commands.menu.*</code>, <code>common</code></td>
+<td>Tier 4</td>
+<td><code>AdminCmd</code>, <code>EditorChannelWiring</code>, <code>RTP</code></td>
+</tr>
+</tbody>
+</table>
 
 
 
@@ -4187,10 +4472,10 @@ Gitignored (<code>docs/dev/scratch/</code>). Nothing below is committed.</p>
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.sections", "navigation.top", "toc.follow", "content.tabs.link", "content.code.copy", "search.suggest", "search.highlight"], "search": "../../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
-      <script src="../../../assets/javascripts/bundle.525ec568.min.js"></script>
+      <script src="../../assets/javascripts/bundle.525ec568.min.js"></script>
       
     
   </body>

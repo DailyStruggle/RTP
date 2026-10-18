@@ -644,6 +644,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1404,6 +1425,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3972,6 +4035,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4398,7 +4545,7 @@
    - Reads go through <code>RTPWorld.sampleBiomesInRegionFile(rcx, rcz, y, indices)</code>: the adapter reads only the region header and the sampled chunks' sectors (<code>AnvilRegionSampler</code>), disk only, off the tick thread (S-005). The per-tick budget counts chunk decodes (2,048) and bin visits (4,096), not files (rule F-002).
    - Viewport requests (item 6) queue up to 1,024 visible bins that are taken to full detail before the world pass continues.
    - Biome ids are normalised to namespaced lowercase (<code>minecraft:plains</code>, <code>iris:ash</code>).
-4. <strong>Live feed (<code>EditorLiveFeed</code>, <code>/rtp editor local</code> and the, per-world palettes, per-region rows (session-unique id, path progress, landing total, learned biome histogram) and the version of every tile group.
+4. **Live feed (<code>EditorLiveFeed</code>, <code>/rtp editor local</code> and the, per-world palettes, per-region rows (session-unique id, path progress, landing total, learned biome histogram) and the version of every tile group.
    - Tile groups are location-keyed and rewritten only when their content changed, written before the head lists their new version:
      - Land: <code>live/land-&lt;w&gt;_&lt;y&gt;_&lt;gx&gt;_&lt;gz&gt;.js</code>, the stored bins of 16 x 16 region files, <code>[rx, rz, level, base64Runs]</code>.
      - Hazards: <code>live/hazard-&lt;r&gt;_&lt;gx&gt;_&lt;gz&gt;.js</code>, the region's learned bad-location memory per chunk (<code>FailTypes</code> ordinal + 1), rescanned round-robin from memory (<code>HazardTiles</code>).
@@ -4407,20 +4554,20 @@
    - Region ids: a new or reshaped region (new shape object or range) gets a new id and restarts its path and hazard producers; the old id's files are deleted, and the page drops ids that leave the head.
    - The page re-injects <code>feed.js?seq=</code> as a script tag - the only cross-file read browsers permit from <code>file://</code> - and loads only groups that intersect its viewport and are newer than what it loaded (at most 8 requests in flight). Feed files contain passive JSON only.
    - The feed shall stop 30 minutes after the export, on plugin disable, when superseded by a newer export, or after 5 consecutive write failures; every stop is logged with its reason and the final head tells the page why (S-004). Directory preparation deletes only files matching the feed's own names.
-5. </strong>Export embedding:<strong>
+5. <strong>Export embedding:</strong>
    - Every export embeds <code>worldBiomes</code>, the bins already in the store, nearest the origin first, so the page opens with the map filled. Local exports embed stored detail up to ~4 MB of base64 per world; online byte-store sessions (immutable, no live feed) embed each bin collapsed to one run, at most 16,384 bins per world.
    - Region models carry the export-time hazard stream, the learned biome histogram, the landing total and the walk-path seed only. Regions whose shape ships a curve helper carry <code>curve</code> and curve-space <code>hazardRuns</code> instead of the seed and the hazard stream (ADR-106 section 4.4); hosted sessions receive live updates over the relay channel (ADR-106 section 5).
-6. </strong>Loopback channel (<code>EditorLoopbackChannel</code>, local exports):<strong> carries the signed editor protocol of <a href="../ADR-106-shape-curve-helpers-and-signed-editor-channel/">ADR-106</a> section 5 through <code>LoopbackTransport</code>: the same envelope, handshake, trust and message types as the hosted relay, with the 32 KiB frame cap. The rules below stay as the socket's own defence in depth.
+6. <strong>Loopback channel (<code>EditorLoopbackChannel</code>, local exports):</strong> carries the signed editor protocol of <a href="../ADR-106-shape-curve-helpers-and-signed-editor-channel/">ADR-106</a> section 5 through <code>LoopbackTransport</code>: the same envelope, handshake, trust and message types as the hosted relay, with the 32 KiB frame cap. The rules below stay as the socket's own defence in depth.
    - A non-blocking RFC 6455 listener bound to the loopback interface on an ephemeral port, driven by an <code>RTP.scheduler</code> timer (no own threads), opened per export and stopped with the feed. The export embeds its <code>ws://127.0.0.1:&lt;port&gt;/rtp-editor-ws?token=&lt;128-bit hex&gt;</code> address.
    - Handshake rules: loopback peer, loopback <code>Host</code>, Origin absent / <code>null</code> / localhost only, constant-time token compare, at most 4 clients; masked text frames up to 256 KiB, a 2 MiB outbound cap per client.
    - Server to page: each feed head is pushed as <code>{type: "feed"}</code>, so updates arrive without waiting for the next poll.
    - Page to server: <code>{type: "focus", world, y, minRx, minRz, maxRx, maxRz}</code> (debounced view rectangle) prioritises those bins; <code>{action: "apply", token, files}</code> Hot-Applies through the same validation pipeline as <code>/rtp editor apply</code> and is acknowledged with <code>apply_ack</code>. The page shall send nothing else besides the handshake, keepalive and ADR-107 addon types; walk paths and curve state flow server to page only, for applied geometry (ADR-106 section 5.9).
    - Without the channel (browser on another machine, channel failed to open: logged), the page works one-way from <code>feed.js</code>.
-7. </strong>Walk path tiles (<code>WalkPathTiles</code>):<strong> skipped, together with <code>HazardTiles</code>, for regions whose curve helper the page reports verified (ADR-106 section 4.7); they remain the local fallback for every other region.
+7. <strong>Walk path tiles (<code>WalkPathTiles</code>):</strong> skipped, together with <code>HazardTiles</code>, for regions whose curve helper the page reports verified (ADR-106 section 4.7); they remain the local fallback for every other region.
    - One producer per configured region with a curve-backed shape. Tiles covering the shape's chunk bounds are computed nearest the shape centre first, 16 per tick, using <code>MemoryShape.xzToLocation</code> / <code>locationToXZ</code> only (pure math, no world access). A chunk is on the curve when its location is in range and maps back to it, or to a direct neighbour.
    - Capped at 4,096 tiles (4.2M chunks) per region; reaching the cap is reported as truncated.
    - The page joins each on-curve chunk to the chunk holding the next curve location, so the path is exact at any zoom without the browser holding the whole curve.
-8. </strong>Biome distribution source order (Visual Region Editor):**
+8. <strong>Biome distribution source order (Visual Region Editor):</strong>
    1. Biomes learned by the region's own teleport attempts (<code>MemoryShape</code> biome cache; refreshed from the live feed), when present.
    2. Otherwise, chunks of the loaded land bins that fall inside the current, possibly unsaved, shape - at the detail each bin reached, coarse bins labelled as estimates - recomputed (debounced 200 ms, cached per shape and store version) on every shape edit and land update, labelled with the chunk count and the share of the shape's area covered.
    3. Otherwise, when nothing inside the shape is generated, the distribution of all surveyed land of the world, labelled as such, to guide placement.

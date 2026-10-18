@@ -638,6 +638,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1398,6 +1419,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3792,6 +3855,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3900,6 +4047,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#package-architecture-rtp-core" class="md-nav__link">
+    <span class="md-ellipsis">
+      Package Architecture (rtp-core)
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#key-concepts" class="md-nav__link">
     <span class="md-ellipsis">
       Key Concepts
@@ -3937,21 +4093,23 @@ For the rationale behind key architectural decisions (why, not just what), see <
 <h3 id="core-api-modules">Core &amp; API Modules<a class="headerlink" href="#core-api-modules" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>rtp-api</strong>: Contains the interfaces, APIs, and shared models used by the plugin and external integrations. Addon developers should compile against this module.</li>
-<li><strong>rtp-core</strong>: Contains the core logic of the plugin. This includes region management, random location selection algorithms (shapes), queue management, database interactions, and memory tracking. It is agnostic of the specific server platform.</li>
+<li><strong>rtp-core</strong>: Contains the core logic of the plugin. This includes region management, random location selection algorithms (shapes), queue management, database interactions, and memory tracking. It is agnostic of the specific server platform. Internal packages are strictly structured in a 4-tier Directed Acyclic Graph (DAG) to eliminate SonarQube package tangles and isolate domain algorithms from execution pipelines (ADR-115; see <a href="../../architecture/16-package-dag-and-decision-preservation-graph/">Package Architecture</a>).</li>
 <li><strong>anvil-api</strong> (<code>api/anvil-api</code>): A standalone, platform-neutral off-tick region decoder and prefilter framework (ADR-016, ADR-077). Defines the <code>RegionFileReader</code> SPI and ships one built-in reader, Anvil (<code>.mca</code> / Zlib / LZ4), decoded off the main thread. Addons may register other formats through <code>RegionFormatRegistry</code> or a <code>RegionFileReaderProvider</code> service; files in an unregistered format (e.g. <code>.linear</code>) are ignored and their chunks fall back to the platform's live async chunk load.</li>
 <li><strong>commands-api</strong>: A unified command framework (formerly external) now integrated to handle multi-platform command structures, including future support for Brigadier on Fabric.</li>
 <li><strong>effects-api</strong>: A unified visual/particle effects framework (formerly external) now integrated for cross-platform visual consistency.</li>
 </ul>
 <h3 id="platform-adapters">Platform Adapters<a class="headerlink" href="#platform-adapters" title="Permanent link">&para;</a></h3>
-<p>These modules implement platform-specific features to maximize performance on their respective servers while maintaining a unified core codebase.
+<p>These modules implement platform-specific features to maximize performance on their respective servers while maintaining a unified core codebase. For detailed requirements, function specifications, and lifecycle contracts when creating a new server adapter, see <a href="../SERVER_ADAPTER_GUIDE/">SERVER_ADAPTER_GUIDE.md</a>.
 * <strong>rtp-bukkit</strong>: The adapter for standard Spigot servers, implementing Bukkit/Spigot-specific event handling and chunk loading.
 * <strong>rtp-paper</strong>: The adapter for Paper servers, utilizing Paper-specific APIs for enhanced performance, such as asynchronous chunk loading.
 * <strong>rtp-folia</strong>: The adapter for Folia servers, handling Folia's unique region-based multithreading to ensure teleports and tasks run safely on the correct regional thread.
-* <strong>rtp-fabric</strong> (Planned): The adapter for Fabric servers, bridging the core logic to the Fabric modding environment and Minecraft's Brigadier command system.</p>
+* <strong>rtp-fabric</strong>: The adapter for Fabric servers, bridging the core logic to the Fabric modding environment and Minecraft's Brigadier command system.
+* <strong>rtp-neoforge</strong>: The adapter for NeoForge servers, bridging the core logic to the NeoForge modding environment and Minecraft's Brigadier command system.</p>
 <h3 id="plugin-entry-points">Plugin Entry Points<a class="headerlink" href="#plugin-entry-points" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>rtp-plugin</strong>: The main entry point for Bukkit-based platforms (Spigot, Paper, Folia). It bridges <code>rtp-core</code> and the platform-specific adapters.</li>
-<li><strong>rtp-fabric</strong> (Planned): Acts as its own entry point for the Fabric modding environment.</li>
+<li><strong>rtp-fabric</strong>: Acts as its own entry point for the Fabric modding environment.</li>
+<li><strong>rtp-neoforge</strong>: Acts as its own entry point for the NeoForge modding environment.</li>
 </ul>
 <h3 id="addons">Addons<a class="headerlink" href="#addons" title="Permanent link">&para;</a></h3>
 <ul>
@@ -3966,11 +4124,19 @@ For the rationale behind key architectural decisions (why, not just what), see <
     rtp-bukkit --&gt; rtp-plugin
     rtp-paper --&gt; rtp-plugin
     rtp-folia --&gt; rtp-plugin
-    rtp-core -.-&gt; rtp-fabric
+    rtp-core --&gt; rtp-fabric
+    rtp-core --&gt; rtp-neoforge
     rtp-api --&gt; addons</code></pre>
 <blockquote>
 <p><strong>Dependency rule:</strong> <code>rtp-core</code> and <code>rtp-api</code> must never import platform-specific classes (Bukkit, Spigot, Paper, Folia, Fabric). This is enforced by ArchUnit tests.</p>
 </blockquote>
+<h2 id="package-architecture-rtp-core">Package Architecture (<code>rtp-core</code>)<a class="headerlink" href="#package-architecture-rtp-core" title="Permanent link">&para;</a></h2>
+<p>All 78 packages within <code>rtp-core</code> are organized into a strict 4-tier Directed Acyclic Graph (DAG) to eliminate SonarQube package tangles and guarantee modular separation (ADR-115):
+- <strong>Tier 1 (Foundation &amp; Schemas):</strong> Immutable config records (<code>configuration.schema</code>), domain enums (<code>configuration.enums</code>), math tables, and SPI contracts (<code>tools.contracts</code>). Zero outgoing core dependencies.
+- <strong>Tier 2 (Domain Engines &amp; Storage):</strong> Spatial math and memory curves (<code>selection.region.selectors.*</code>), resource tracking (<code>tools.MemoryTracker</code>), and database accessors (<code>database.*</code>). Depends strictly on Tier 1.
+- <strong>Tier 3 (Execution Pipelines):</strong> Teleport pipelines (<code>tasks.teleport</code>), background pregen (<code>PregenTask</code>), and action coordination (<code>action.*</code>). Depends on Tier 2 and Tier 1.
+- <strong>Tier 4 (Orchestration &amp; Ingress):</strong> Leaf command trees (<code>commands.*</code>), interactive book menus, web editor channels, and the composition root (<code>RTP.java</code>).</p>
+<p>For the package DAG diagram, seam decoupling patterns, and decision traceability specifications, see <a href="../../architecture/16-package-dag-and-decision-preservation-graph/"><code>../architecture/16-package-dag-and-decision-preservation-graph.md</code></a>.</p>
 <h2 id="key-concepts">Key Concepts<a class="headerlink" href="#key-concepts" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Regions</strong>: The world is divided into manageable teleport regions. Each region handles its own teleport queue and shape parameters.</li>

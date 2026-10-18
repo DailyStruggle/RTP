@@ -638,6 +638,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1398,6 +1419,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3792,6 +3855,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -5183,8 +5330,8 @@ still skips <code>anvil-api</code> and <code>tags-api</code> (no published basel
 <td>Support matrix distinguishes tested vs best-effort; tested cells re-verified by CI on a schedule</td>
 <td><strong>MET</strong></td>
 <td>PARTIAL</td>
-<td><code>SUPPORT_MATRIX.md</code> accurately reflects scheduled CI and nightly devstack acceptance (<code>devstack/docker-compose.yml</code>: Velocity, Paper 1.21.11, Folia 1.21.11, Fabric 1.21.11 on Java 25, NeoForge 1.21.1 on Java 21).</td>
-<td>None.</td>
+<td><code>SUPPORT_MATRIX.md</code> marks a cell Tested only when a scheduled CI job boots it (ADR-113 amendment 4): the nightly devstack (<code>devstack/docker-compose.yml</code>: Velocity, Paper 1.21.11, Folia 1.21.11, Fabric 1.21.11 on Java 25, NeoForge 1.21.1 on Java 21) and the nightly <code>versions-smoke</code> job (Paper 26.3, Fabric 26.3 on Java 25).</td>
+<td>Bump the <code>versions-smoke</code> <code>VERSION</code> with each Minecraft release.</td>
 </tr>
 <tr>
 <td>5</td>
@@ -5207,8 +5354,8 @@ still skips <code>anvil-api</code> and <code>tags-api</code> (no published basel
 <td>Zero known CVEs in shipped dependencies, checked automatically</td>
 <td><strong>MET</strong></td>
 <td>NOT MET</td>
-<td><code>rtp-plugin</code> shades zero external libraries (bundles only in-house API and core modules). <code>.github/workflows/dependency-check.yml</code> builds plugin deliverables and scans <code>rtp-plugin/build/libs</code> gating on CVSS &gt;= 4 with <code>config/dependency-check-suppressions.xml</code>.</td>
-<td>None.</td>
+<td><code>rtp-plugin</code> shades zero external libraries: every class in <code>LeafRTP-3.3.0.jar</code> and its four bundled addon jars is under <code>io/github/dailystruggle/</code> (checked 2026-10-17), so all shipped code is in-repo and covered by SonarCloud and PMD. <code>.github/workflows/dependency-check.yml</code> is paused (manual dispatch only) because it has no third-party code to match.</td>
+<td>No automated check yet that the jar holds only in-repo packages; re-check by hand when a dependency is added, and restore the dependency-check triggers if a third-party library is ever shaded or bundled.</td>
 </tr>
 </tbody>
 </table>
@@ -5256,7 +5403,10 @@ approved designs; build and workflow changes go through the usual proposal step.
 <li><strong>F-4 (criterion 4).</strong> The nightly devstack covers MC 1.21.11 on Java 25 for
   Paper/Folia/Fabric/Velocity, and NeoForge 1.21.1 on Java 21. <code>SUPPORT_MATRIX.md</code> section 1
   says the nightly runs "on Java 21 LTS", section 3.1 marks MC 1.20.x and Fabric 26.x as Tested,
-  and the section 4 topology omits NeoForge.</li>
+  and the section 4 topology omits NeoForge.
+  <strong>Resolved (2026-10-15):</strong> the matrix was re-derived from the nightly jobs (ADR-113 amendment 4);
+  Tested cells without a scheduled CI boot are now Best-effort, and a nightly single-server job
+  covers the latest release (26.3).</li>
 <li><strong>F-5 (criterion 5).</strong> Pro releases publish no SBOM, checksums or signature. Signing is optional
   and silent on both release paths. The acceptance log is not bound to the released commit.
   <code>release-bbb.yml</code> comments still say <code>release.yml</code> triggers on the same PR merge, which
@@ -5272,7 +5422,10 @@ approved designs; build and workflow changes go through the usual proposal step.
   five are enforced. <code>anvil-api</code> and <code>tags-api</code> are still not published, so their check still skips.</li>
 <li><strong>F-7 (criterion 7).</strong> The Dependency-Check job scans source files, not the resolved Gradle
   dependency graph or the shaded jar. A green run therefore does not show zero CVEs in
-  shipped dependencies.</li>
+  shipped dependencies.
+  <strong>Resolved (2026-10-17):</strong> the shipped jars contain no third-party classes, so there is no
+  shipped dependency to scan. The workflow is paused (manual dispatch only) and the Dependency
+  CVEs row is dropped from <code>docs/site/quality-gates.md</code>.</li>
 <li><strong>F-8 (item 48 regression).</strong> <code>cross_plugin_destinations_scatter_chart.png</code> and
   <code>cross_plugin_destinations_scatter_chart_16k.png</code> are tracked at the repository root again
   (the root <code>*.log</code> files are gitignored local clutter only).

@@ -849,6 +849,7 @@
       <div id="map-hud">
         <span>Region: <b id="hud-region" style="color:var(--accent);">default</b></span> |
         <span id="hud-coords">X: 0  Z: 0</span> |
+        <span id="hud-biome" style="color:var(--teal);">Biome: -</span> |
         <span id="hud-shape" style="color:var(--green);">CIRCLE</span> |
         <span id="hud-curve" data-status="" data-reason="" style="color:var(--subtext);">Path: -</span>
       </div>
@@ -4094,6 +4095,28 @@ function currentWorldName() {
   return (regionState && regionState.world) || (regionProfiles.default && regionProfiles.default.world) || 'world';
 }
 
+function getBiomeAt(worldX, worldZ) {
+  if (!Number.isFinite(worldX) || !Number.isFinite(worldZ)) return null;
+  const world = currentWorldName();
+  const store = worldBiomes[world];
+  if (!store || !store.palette || store.palette.length === 0) return null;
+  const chunkX = Math.floor(worldX / 16);
+  const chunkZ = Math.floor(worldZ / 16);
+  const rx = Math.floor(chunkX / 32);
+  const rz = Math.floor(chunkZ / 32);
+  const bin = store.bins.get(rx + ',' + rz);
+  if (!bin || !bin.runs) return null;
+  if (!bin.cells) bin.cells = decodeBinRuns(bin.runs);
+  if (!bin.cells) return null;
+  const lx = ((chunkX % 32) + 32) % 32;
+  const lz = ((chunkZ % 32) + 32) % 32;
+  const d = HILBERT_XZ2D[lz * BIN_EDGE + lx];
+  const v = bin.cells[d];
+  if (!v || v <= 0 || v > store.palette.length) return null;
+  const raw = store.palette[v - 1];
+  return raw ? raw.replace(/^minecraft:/, '') : null;
+}
+
 function requestMapRedraw() {
   if (mapRedrawPending) return;
   mapRedrawPending = true;
@@ -5965,7 +5988,7 @@ function computeDiskBiomeShares() {
   for (const bin of store.bins.values()) {
     const bx0 = bin.rx * LAND_TILE_BLOCKS, bz0 = bin.rz * LAND_TILE_BLOCKS;
     if (bx0 + LAND_TILE_BLOCKS < ox - reach || bx0 > ox + reach || bz0 + LAND_TILE_BLOCKS < oz - reach || bz0 > oz + reach) continue;
-    const cells = decodeBinRuns(bin.runs);
+    const cells = bin.cells || (bin.cells = decodeBinRuns(bin.runs));
     if (!cells) continue;
     for (let d = 0; d < BIN_CELLS; d++) {
       const v = cells[d];
@@ -6786,6 +6809,11 @@ canvas.addEventListener('mousemove', (e) => {
   const worldX = (mx - wox) / scale;
   const worldZ = (my - woy) / scale;
   document.getElementById('hud-coords').textContent = `X: ${Math.round(worldX)}  Z: ${Math.round(worldZ)}`;
+  const biomeEl = document.getElementById('hud-biome');
+  if (biomeEl) {
+    const biome = getBiomeAt(worldX, worldZ);
+    biomeEl.textContent = biome ? `Biome: ${biome}` : 'Biome: -';
+  }
 
   if (regionHandleDrag) {
     dragRegionHandle(worldX, worldZ);
@@ -6859,6 +6887,8 @@ canvas.addEventListener('mousedown', (e) => {
 });
 
 canvas.addEventListener('mouseleave', () => {
+  const biomeEl = document.getElementById('hud-biome');
+  if (biomeEl) biomeEl.textContent = 'Biome: -';
   if (regionHandleDrag || !hoverRegionHandle) return;
   hoverRegionHandle = '';
   drawMap();

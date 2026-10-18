@@ -644,6 +644,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../MIGRATION/" class="md-nav__link">
         
   
@@ -1569,6 +1590,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3963,6 +4026,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4154,7 +4301,7 @@
 <hr />
 <h2 id="1-problem-statement-the-simultaneous-view-edit-dilemma">1. Problem Statement: The Simultaneous View &amp; Edit Dilemma<a class="headerlink" href="#1-problem-statement-the-simultaneous-view-edit-dilemma" title="Permanent link">&para;</a></h2>
 <p>Traditional server management confronts operators with screen conflicts and accessibility hurdles:
-- <strong>Screen Lock:</strong> Opening in-game books (<code>/rtp docs</code>) or inventory menus locks the Minecraft client screen. Operators cannot comfortably cross-reference documentation while tweaking complex configuration files or command arguments.
+- <strong>Screen Lock:</strong> Opening in-game books or inventory menus locks the Minecraft client screen. Operators cannot comfortably cross-reference documentation while tweaking complex configuration files or command arguments.
 - <strong>Port-Forwarding &amp; Remote Hosting Restrictions:</strong> Running an embedded HTTP listener inside the Minecraft JVM requires inbound firewall ports, which are frequently blocked by shared hosting environments or home NATs. Embedded servers also introduce network attack surfaces (e.g. CSRF, unauthenticated sockets).
 - <strong>Geometric Complexity:</strong> Manually hand-typing coordinates for multi-vertex polygons (<code>POLYGON</code>) or inner exclusion rings (<code>centerRadius</code>) is error-prone and unintuitive.</p>
 <p>LeafRTP resolves these issues using an <strong>outbound ephemeral session architecture</strong> modeled after <code>spark</code> and <code>LuckPerms</code>, paired with offline in-game book lowering.</p>
@@ -4239,7 +4386,7 @@
 <p>Run the editor command in-game:
 <div class="highlight"><pre><span></span><code>/rtp editor
 </code></pre></div>
-<em>(Alternatively, execute <code>/rtp admin</code> and click the </em><em>[🌐 Web Editor]</em><em> button in the administration panel).</em></p>
+<em>(Alternatively, execute <code>/rtp admin</code> and click the <strong>[🌐 Web Editor]</strong> button in the administration panel).</em></p>
 <p>The server asynchronously gathers active configuration models, active region geometries, and documentation schemas, dispatches an outbound payload, and emits a clickable chat link:
 <div class="highlight"><pre><span></span><code>[RTP] Ephemeral editor session generated:
 https://dailystruggle.github.io/RTP/editor#e4d2a90f1b2c3d4e
@@ -4255,28 +4402,26 @@ https://dailystruggle.github.io/RTP/editor#e4d2a90f1b2c3d4e
 <li><strong>Live Values:</strong> The cursor changes over a handle, and a label shows the value as you drag (e.g. <code>radius 260c (4160 b)</code>). The YAML diff updates while you drag; the server path preview is requested once, when you let go.</li>
 <li><strong>Drag Vertices:</strong> Click and drag polygon vertices to adjust region perimeters. Vertices take priority over the move / resize handles. Redundant collinear points are simplified dynamically.</li>
 <li><strong>Type Exact Values:</strong> Every value a handle changes can also be typed in the shape settings form, which uses the same staging path.</li>
-<li>
-<p><strong>Visualization Layers:</strong> Toggle overlays for chunk-resolution pregenerated land (biome data streamed progressively to maintain &gt; 5 FPS), rejected candidate blocks (<code>bad-locations</code>), and 1D Archimedean spiral walk traces.</p>
-</li>
-<li>
-<p><strong>Panel 2: 📊 Diagnostics &amp; Telemetry</strong></p>
-</li>
+<li><strong>Visualization Layers:</strong> Toggle overlays for chunk-resolution pregenerated land (biome data streamed progressively to maintain &gt; 5 FPS), rejected candidate blocks (<code>bad-locations</code>), and 1D Archimedean spiral walk traces.</li>
+</ul>
+<p><img alt="Visual Region Editor with Polygon Boundaries, Math Invariants &amp; Live Diff" src="../../assets/img/web_editor_cartography.png" /></p>
+<ul>
+<li><strong>Panel 2: 📊 Diagnostics &amp; Telemetry</strong></li>
 <li>Monitor real-time L1 hot chunk queue depth (active tickets), L2 cold queue depth, and L3 backlog binned cache.</li>
-<li>
-<p>Check <code>MemoryTracker</code> watchdog status and active worker thread counts.</p>
-</li>
-<li>
-<p><strong>Panel 3: ⚙ Config &amp; Prefabs</strong></p>
-</li>
+<li>Check <code>MemoryTracker</code> watchdog status and active worker thread counts.</li>
+</ul>
+<p><img alt="Diagnostics &amp; Telemetry with Tick Rates, Reservoir Depths &amp; Memory" src="../../assets/img/web_editor_diagnostics.png" /></p>
+<ul>
+<li><strong>Panel 3: ⚙ Config &amp; Prefabs</strong></li>
 <li>Edit <code>config.yml</code>, <code>messages.yml</code>, or <code>regions/*.yml</code> directly.</li>
-<li>
-<p>The <strong>Contextual Doc Tracker</strong> drawer tracks your cursor in real time, displaying parameter definitions, default values, units, and links to relevant documentation and ADRs.</p>
-</li>
-<li>
-<p><strong>Panel 4: 📖 Shipped Docs</strong></p>
-</li>
+<li>The <strong>Contextual Doc Tracker</strong> drawer tracks your cursor in real time, displaying parameter definitions, default values, units, and links to relevant documentation and ADRs.</li>
+</ul>
+<p><img alt="Configuration Editor &amp; Contextual Doc Tracker" src="../../assets/img/web_editor_docs.png" /></p>
+<ul>
+<li><strong>Panel 4: 📖 Shipped Docs</strong></li>
 <li>Read bundled operator runbooks and guides directly inside the web workspace.</li>
 </ul>
+<p><img alt="Shipped Documentation Browser" src="../../assets/img/web_editor_shipped_docs.png" /></p>
 <h3 id="step-3-inspect-the-staging-diff">Step 3: Inspect the Staging Diff<a class="headerlink" href="#step-3-inspect-the-staging-diff" title="Permanent link">&para;</a></h3>
 <p>Before committing changes, review the <strong>📋 Staging Diff Inspector</strong> sidebar on the right of the workspace.
 Every modification is staged as an explicit delta:
@@ -4300,8 +4445,7 @@ The <strong>Math Invariant Guard</strong> confirms that all geometric shapes are
 <ol>
 <li>Generate a self-contained offline HTML bundle via console or chat:
    <div class="highlight"><pre><span></span><code>/rtp editor local
-</code></pre></div>
-   <em>(or <code>/rtp docs export</code>)</em></li>
+</code></pre></div></li>
 <li>The server outputs a single standalone file at:
    <div class="highlight"><pre><span></span><code>plugins/RTP/editor/index.html
 </code></pre></div></li>
@@ -4347,7 +4491,7 @@ The <strong>Math Invariant Guard</strong> confirms that all geometric shapes are
 <ul>
 <li><a href="../../FOR_SERVER_ADMINS/"><code>FOR_SERVER_ADMINS.md</code></a> — Server administrator onboarding and reading order.</li>
 <li><a href="../QUICK_START/"><code>QUICK_START.md</code></a> — Fast 10-minute setup guide.</li>
-<li><a href="../COMMANDS/"><code>COMMANDS.md</code></a> — Full command reference for <code>/rtp editor</code>, <code>/rtp editor apply</code>, and <code>/rtp docs</code>.</li>
+<li><a href="../COMMANDS/"><code>COMMANDS.md</code></a> — Full command reference for <code>/rtp editor</code> and <code>/rtp editor apply</code>.</li>
 <li><a href="../RUNBOOK/"><code>RUNBOOK.md</code></a> — Incident response and operational troubleshooting.</li>
 <li><a href="../configuration/CONFIGURATION/"><code>CONFIGURATION.md</code></a> — Complete configuration parameter reference.</li>
 <li><a href="https://github.com/DailyStruggle/RTP/blob/V3/adr/ADR-104-ephemeral-web-editor-and-packed-docs-integration.md"><code>ADR-104</code></a> — Architectural design record for ephemeral web editor and in-game docs.</li>

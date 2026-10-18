@@ -638,6 +638,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1398,6 +1419,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3792,6 +3855,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3888,11 +4035,11 @@
 </ul>
 <hr />
 <h2 id="executive-overview-per-attempt-flow">Executive Overview (Per-Attempt Flow)<a class="headerlink" href="#executive-overview-per-attempt-flow" title="Permanent link">&para;</a></h2>
-<p>This overview illustrates how candidate coordinates progress through generation, chunk resolution, and validation checks. Any failure causes the candidate to be recorded as invalid and prompts a retry, while full validation preloads view-distance chunks for instant arrival.</p>
+<p>This overview illustrates how candidate coordinates progress through generation, probe-first gating, purpose-gated and cost-governed chunk resolution, and validation checks. Any failure causes the candidate to be recorded as invalid and prompts a retry, while full validation preloads view-distance chunks for instant arrival.</p>
 <pre class="mermaid"><code>flowchart LR
     A["Shape Candidate&lt;br/&gt;(cx, cz)"] --&gt; B{"Inside WorldBorder?"}
     B -- "No" --&gt; Ret["Record Failure &amp;&lt;br/&gt;Reschedule Attempt"]
-    B -- "Yes" --&gt; C["Resolve Chunk&lt;br/&gt;(Anvil Off-Tick or Live)"]
+    B -- "Yes" --&gt; C["Resolve Chunk&lt;br/&gt;(Purpose-Gated &amp;amp;&lt;br/&gt;Cost-Governed)"]
     C --&gt; D{"Vertical &amp; Biome&lt;br/&gt;Match?"}
     D -- "No" --&gt; Ret
     D -- "Yes" --&gt; E{"Safety &amp; Claim&lt;br/&gt;Verifiers Pass?"}
@@ -3936,20 +4083,57 @@ flowchart TD
     BorderFail --&gt; BorderCap{&amp;gt; 1000 fails?}
     BorderCap -- Yes --&gt; BorderAbort[result = empty&lt;br/&gt;log region outside border]:::fail
     BorderCap -- No  --&gt; Reschedule[rescheduleNextAttempt&lt;br/&gt;outer loop re-enters]:::async
-    BorderCheck -- Yes --&gt; RequestChunk
+    BorderCheck -- Yes --&gt; ProbeFirstCheck
 
-%% 3. Probe-first chunk resolution (ADR-016 section 13.1)
-    subgraph ChunkStage [Chunk resolution — cached then anvil then live]
-        RequestChunk[world.getOrLoadChunk cx, cz]:::async --&gt; ChunkOK{resolved&lt;br/&gt;non-null?}
+%% 3. Purpose-gated and cost-governed chunk resolution (ADR-109, ADR-110, ADR-114, ADR-112)
+    subgraph ChunkStage [Chunk resolution — probe-first, purpose-gated &amp; governed deduplication]
+        ProbeFirstCheck{ProbeFirstGovernor&lt;br/&gt;should probe?&lt;br/&gt;ADR-109}
+        ProbeFirstCheck -- Yes --&gt; ColumnProbe[probeChunkColumn minY-1..maxY&lt;br/&gt;Lean vertical surface test]:::async
+        ColumnProbe --&gt; ProbeOK{Probe safe?}
+        ProbeOK -- No --&gt; ProbeReject[gov.recordProbe reject&lt;br/&gt;FailTypes.vert/safety]:::fail
+        ProbeOK -- Yes --&gt; PurposeGate
+
+        ProbeFirstCheck -- No --&gt; PurposeGate{LoadPurpose?&lt;br/&gt;ADR-110 / ADR-114}
+
+        %% Speculative Refill Branch (ADR-110)
+        PurposeGate -- SPECULATIVE --&gt; ReadOnly[world.getOrReadChunk cx, cz&lt;br/&gt;Resident cache or Anvil disk]:::async
+        ReadOnly --&gt; ReadHit{Present on disk&lt;br/&gt;or in cache?}
+        ReadHit -- Yes --&gt; SelfCheck
+        ReadHit -- No  --&gt; HeapCheck{Heap under&lt;br/&gt;pressure?&lt;br/&gt;HeapPressureMonitor}
+        HeapCheck -- Yes --&gt; DeferCandidate[completeDeferred&lt;br/&gt;gate.onDeferredCenter]:::fail
+        HeapCheck -- No  --&gt; PinCheck{LiveLoadGate&lt;br/&gt;tryAcquirePin &amp;lt; cap?}
+        PinCheck -- Yes (Pinned) --&gt; NativeLoad[world.getOrLoadChunk cx, cz&lt;br/&gt;with ChunkReservation]:::async
+        PinCheck -- No (Unpinned) --&gt; NativeLoad
+        PinCheck -- Defer --&gt; DeferCandidate
+
+        %% Immediate / On-Demand Branch (ADR-114)
+        PurposeGate -- IMMEDIATE --&gt; CacheTier1{Tier 1: In resident&lt;br/&gt;chunk cache?}
+        CacheTier1 -- Yes --&gt; SelfCheck
+        CacheTier1 -- No  --&gt; McaHeaderCheck{Zero-decode MCA check&lt;br/&gt;isOccupied &amp;lt; 1&amp;mu;s&lt;br/&gt;ADR-067 / ADR-114}
+        McaHeaderCheck -- Ungenerated --&gt; NativePermit
+        McaHeaderCheck -- Generated --&gt; DedupThreshold{P_reject &amp;gt; threshold?&lt;br/&gt;C_file / C_native + W*C_sync}
+        DedupThreshold -- "No (Safe / Normal Tick)" --&gt; NativePermit
+        DedupThreshold -- "Yes (Hazard / High MSPT)" --&gt; AnvilPreFilter[AnvilChunkView decode&lt;br/&gt;Off-thread AnvilIoPool]:::async
+        AnvilPreFilter --&gt; AnvilSafe{Candidate safe?}
+        AnvilSafe -- No (Hazard) --&gt; AnvilReject[Discard off-thread&lt;br/&gt;Shed deadweight load&lt;br/&gt;0ms tick cost]:::fail
+        AnvilSafe -- Yes --&gt; NativePermit{ImmediateLoadGovernor&lt;br/&gt;Acquire in-flight permit&lt;br/&gt;Max 1/reg, 2 global}
+        NativePermit -- Permit Acquired --&gt; NativeLoad
+        NativePermit -- Timeout / Backpressure --&gt; BusyFail[FailTypes.timeout&lt;br/&gt;msgBusy / S-004]:::fail
+
+        NativeLoad --&gt; ChunkOK{resolved&lt;br/&gt;non-null?}
         ChunkOK -- No  --&gt; NullChunk[FailTypes.nullChunk&lt;br/&gt;reason=ticketFailed or&lt;br/&gt;chunkLoadTimeout or&lt;br/&gt;asyncLoadNull]:::fail
         ChunkOK -- Yes --&gt; SelfCheck{chunk.isSelfContained?&lt;br/&gt;anvil = yes / live = no}
         SelfCheck -- Yes --&gt; Evaluate[proceedWithEvaluation&lt;br/&gt;stays on async thread]:::async
-        SelfCheck -- No  --&gt; LiveHop[dispatchLiveEvaluation&lt;br/&gt;hop to region-owning thread&lt;br/&gt;allocate ChunkReservation&lt;br/&gt;see diagram 03]:::async
+        SelfCheck -- No  --&gt; LiveHop[dispatchLiveEvaluation&lt;br/&gt;Folia regional thread hop&lt;br/&gt;allocate ChunkReservation&lt;br/&gt;see diagram 03 / ADR-112]:::async
         LiveHop --&gt; StaleGuard{stale-chunk&lt;br/&gt;guard passes?&lt;br/&gt;ADR-015}
         StaleGuard -- No --&gt; StaleRetry[staleRetries++&lt;br/&gt;re-request or attribute&lt;br/&gt;staleChunkBeforeVert]:::fail
         StaleGuard -- Yes --&gt; Evaluate
     end
     NullChunk --&gt; Reschedule
+    ProbeReject --&gt; Reschedule
+    DeferCandidate --&gt; Reschedule
+    AnvilReject --&gt; Reschedule
+    BusyFail --&gt; Reschedule
 
 %% 4. Vert adjust + biome filter
     Evaluate --&gt; VertAdjust[vert.adjust chunk&lt;br/&gt;returns x,y,z or null]
@@ -3999,6 +4183,10 @@ flowchart TD
 </li>
 <li><strong><code>FailTypes</code> is the public failure vocabulary.</strong> The buckets (<code>biome</code>, <code>worldBorder</code>, <code>vert</code>, <code>safety</code>, <code>safetyExternal</code>, <code>nullChunk</code>, <code>timeout</code>, <code>misc</code>) are the only labels any admin ever sees in <code>rtp verbose</code> output; the sub-reason strings (<code>neighborNull</code>, <code>ticketFailed</code>, <code>chunkLoadTimeout</code>, <code>asyncLoadNull</code>, <code>staleChunkBeforeVert</code>, <code>OUTSIDE_BORDER</code>, <code>biome=&lt;NAME&gt;</code>) are diagnostics layered on top. A regression guard (<code>ReqRtpS004NullChunkAttributionTest</code>) locks the <code>nullChunk</code> attribution — do not refactor without reading it.</li>
 <li><strong>Shape is the algorithmic heart</strong> — <code>MemoryShape.rand()</code> is the bounded Archimedean spiral 1D mapping (ADR-001). <code>biomeRecall</code> swaps the uniform pick for a prefix-sum weighted pick over previously accepted-by-biome entries — it dramatically speeds up rare-biome targeting at the cost of clustering (<code>biomeRecallForced: false</code> falls back to uniform when memory is empty).</li>
+<li><strong>Probe-first column check (ADR-109).</strong> Before invoking full chunk resolution, <code>ProbeFirstGovernor</code> determines whether to run a lean column probe (<code>probeChunkColumn</code>) across <code>minY-1..maxY</code>. If the column fails standing-surface safety (e.g. lava, ocean), the candidate is rejected in $&lt;0.2\text{ ms}$ without decoding the full chunk payload, dynamically adapting probe usage based on an EWMA cost-benefit model.</li>
+<li><strong>Purpose-gated live loads (ADR-110).</strong> Background queue refills run under <code>LoadPurpose.SPECULATIVE</code>. The task calls <code>world.getOrReadChunk(cx, cz)</code> to read resident cache or Anvil disk files off-tick. Chunks missing from disk require acquiring a pin via <code>LiveLoadGate.tryAcquirePin()</code> bounded by <code>activeChunkCap</code>; if pin slots are full or <code>HeapPressureMonitor</code> signals memory distress, candidate attempts defer cleanly rather than competing with active player traffic or thrashing the JVM heap.</li>
+<li><strong>Cost-governed on-demand deduplication &amp; native admission (ADR-114).</strong> Immediate on-demand tasks (<code>LoadPurpose.IMMEDIATE</code>: empty-queue fallback, <code>/rtp biome:...</code>, unqueued teleports) bypass speculative gating and follow a thread-weighted deduplication policy. Chunk presence on disk is checked in $&lt;1\ \mu\text{s}$ via <code>AnvilRegionOccupancyCache</code>. If present, the governor evaluates whether candidate rejection rates justify off-thread pre-filtering ($P_{\text{reject}} &gt; \frac{C_{\text{file, async}}}{C_{\text{native, async}} + W_{\text{tick}}(\text{MSPT}) \cdot C_{\text{native, sync}}}$). In safe terrain under stable ticks, the task bypasses Anvil and loads directly to eliminate duplicate decompression and NBT parsing. In hazardous terrain or under tick distress ($\text{MSPT} &gt; 35\text{ ms}$), off-thread Anvil pre-filtering is engaged to shed deadweight native generation and protect communal tick health. Native loads are admitted through <code>ImmediateLoadGovernor</code> in-flight semaphores (max 1 per region, max 2 global) with tick damping $\Phi_{\text{tick}}(\text{MSPT})$. See diagram 15 for the dedicated specification.</li>
+<li><strong>Folia regional thread handoff (ADR-112).</strong> Chunk futures complete off the region thread. <code>PregenTask</code> continues candidate evaluation asynchronously before dispatching to the owning region scheduler for arrival verification and stale-chunk gating.</li>
 <li><strong>Self-contained vs live-backed chunks branch the threading model.</strong> Anvil-backed chunks (<code>isSelfContained() == true</code>, see ADR-016) are thread-safe for reads and stay on the async worker; live server chunks must hop to the region-owning thread via <code>dispatchLiveEvaluation</code>, which also allocates the <code>ChunkReservation</code> (see diagram 03 for ticket lifecycle) and arms the ADR-015 stale-chunk guard. Getting this branch wrong is the single most common S-005 violation when porting to a new platform.</li>
 <li><strong><code>maxAttempts</code> is soft.</strong> Every biome reject and every worldborder reject <em>increments</em> <code>maxAttempts</code> (up to the biome-checks cap), so the loop has a budget proportional to legitimate misses. This is deliberate: <code>vert</code> and <code>safety</code> failures cost a hard attempt, but biome misses are cheap and effectively free against the cap until <code>maxBiomeChecks</code> is hit.</li>
 <li><strong>Success preloads a view-distance <code>ChunkSet</code>.</strong> <code>completeSuccess</code> does not just return coordinates — it allocates (asynchronously) the chunks the player will see on arrival (<code>max(safetyRadius, viewDistanceSelect)</code> radius) and transfers ownership of that <code>ChunkSet</code> via <code>GenerationResult</code> so the caller can hand it to the LOAD stage (diagram 01) without a second round-trip.</li>
@@ -4006,9 +4194,10 @@ flowchart TD
 </ul>
 <p>Related code:</p>
 <ul>
-<li><code>rtp-core</code>: <code>PregenTask</code>, <code>QueueTask</code>, <code>PregenState</code>, <code>LocationGenerator</code>, <code>GlobalRegionVerifiers</code>, <code>selectors/memory/shapes/MemoryShape</code>, <code>selectors/verticalAdjustors/*</code>.</li>
-<li><code>rtp-api</code>: <code>ILocationGenerator</code>, <code>GenerationContext</code>, <code>GenerationResult</code>, <code>RTPChunk</code>, <code>RTPWorld</code>.</li>
-<li>ADRs: <a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a> (spiral), <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/">ADR-015</a> (stale guard + Option B), <a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a> (Anvil probe-first).</li>
+<li><code>rtp-core</code>: <code>PregenTask</code>, <code>QueueTask</code>, <code>PregenState</code>, <code>LocationGenerator</code>, <code>LiveLoadGate</code>, <code>ProbeFirstGovernor</code>, <code>ImmediateLoadGovernor</code>, <code>GlobalRegionVerifiers</code>, <code>selectors/memory/shapes/MemoryShape</code>, <code>selectors/verticalAdjustors/*</code>.</li>
+<li><code>rtp-api</code>: <code>ILocationGenerator</code>, <code>GenerationContext</code>, <code>GenerationResult</code>, <code>RTPChunk</code>, <code>RTPWorld</code>, <code>LoadPurpose</code>.</li>
+<li>ADRs: <a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a> (spiral), <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/">ADR-015</a> (stale guard + Option B), <a href="../../adr/ADR-016-anvil-subsystem/">ADR-016</a> (Anvil probe-first), <a href="../../adr/ADR-109-measured-cost-probe-first-gate/">ADR-109</a> (measured-cost probe-first gate), <a href="../../adr/ADR-110-purpose-gated-live-loads/">ADR-110</a> (purpose-gated live loads), <a href="../../adr/ADR-112-per-region-work-division-on-folia/">ADR-112</a> (per-region work division on Folia), <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/">ADR-114</a> (cost-governed on-demand chunk reads).</li>
+<li>Companion deep-dive: <a href="../15-cost-governed-chunk-reads-and-native-admission/"><code>docs/architecture/15-cost-governed-chunk-reads-and-native-admission.md</code></a>.</li>
 <li>Requirements: <code>REQ-RTP-S-004</code> (no silent failures), <code>REQ-RTP-S-005</code> (no sync chunk I/O on main thread) — see <a href="../../dev/TRACEABILITY/"><code>TRACEABILITY.md</code></a>.</li>
 </ul>
 

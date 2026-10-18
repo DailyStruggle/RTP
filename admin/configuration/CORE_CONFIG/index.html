@@ -644,6 +644,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../MIGRATION/" class="md-nav__link">
         
   
@@ -1536,6 +1557,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3930,6 +3993,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4111,7 +4258,7 @@
 <td><code>teleportDelay</code></td>
 <td>Integer / Duration</td>
 <td><code>2</code></td>
-<td>Wait time before teleport occurs. Accepts raw seconds (<code>2</code>) or duration units (e.g. <code>2s</code>, <code>40t</code>, <code>1500ms</code>). <code>0</code> teleports immediately (skips the cancel-on-move window).</td>
+<td>Wait time before teleport occurs. Accepts raw seconds (<code>2</code>) or duration units (e.g. <code>2s</code>, <code>40t</code>, <code>1500ms</code>). <code>0</code> teleports immediately (skips the cancel-on-move window). Serves as the global fallback when a region does not configure an explicit <code>delay</code>.</td>
 </tr>
 <tr>
 <td><code>cancelDistance</code></td>
@@ -4123,7 +4270,7 @@
 <td><code>teleportCooldown</code></td>
 <td>Integer / Duration</td>
 <td><code>300</code></td>
-<td>Wait time between successful RTP uses. Accepts raw seconds (<code>300</code>) or duration units (e.g. <code>5m</code>, <code>300s</code>, <code>1h</code>). Bypassed by <code>rtp.nocooldown</code>.</td>
+<td>Wait time between successful RTP uses. Accepts raw seconds (<code>300</code>) or duration units (e.g. <code>5m</code>, <code>300s</code>, <code>1h</code>). Bypassed by <code>rtp.nocooldown</code>. Serves as the global fallback when a region does not configure an explicit <code>cooldown</code>.</td>
 </tr>
 <tr>
 <td><code>lockAfterUses</code></td>
@@ -4245,10 +4392,22 @@
 <td><code>false</code></td>
 <td>Default <code>requirePermission</code> for regions/worlds.</td>
 </tr>
+<tr>
+<td><code>cooldown</code></td>
+<td>Integer / Duration</td>
+<td>(global <code>teleportCooldown</code>)</td>
+<td>Default region <code>cooldown</code> inherited by regions configuring <code>cooldown: "@config"</code>. If omitted from <code>defaults:</code>, falls back to global <code>teleportCooldown</code>.</td>
+</tr>
+<tr>
+<td><code>delay</code></td>
+<td>Integer / Duration</td>
+<td>(global <code>teleportDelay</code>)</td>
+<td>Default region <code>delay</code> inherited by regions configuring <code>delay: "@config"</code>. If omitted from <code>defaults:</code>, falls back to global <code>teleportDelay</code>.</td>
+</tr>
 </tbody>
 </table>
 <blockquote>
-<p>The type-bearing <code>shape</code>/<code>vert</code> settings inherit as a <strong>whole named block</strong>, while type-free scalars inherit individually. Other source files own their own defaults: e.g. a region's <code>price</code> can reference <code>@economy</code> to inherit from <a href="../ECONOMY/">economy.yml</a>.</p>
+<p>The type-bearing <code>shape</code>/<code>vert</code> settings inherit as a <strong>whole named block</strong>, while type-free scalars (<code>cacheCap</code>, <code>backlogCacheCap</code>, <code>activeChunkCap</code>, <code>spatialResolution</code>, <code>requirePermission</code>, <code>cooldown</code>, <code>delay</code>) inherit individually. Other source files own their own defaults: e.g. a region's <code>price</code> can reference <code>@economy</code> to inherit from <a href="../ECONOMY/">economy.yml</a>.</p>
 <p><strong>Teleport distance lives here.</strong> On a single-world server, <code>defaults.shape.radius</code> is the one place to set how far <code>/rtp</code> throws players, because the bundled <code>regions/default.yml</code> ships <code>shape: "@config"</code>. Sizes default to <strong>chunks</strong> (1 chunk = 16 blocks), so <code>radius: 256</code> is 4,096 blocks and <code>radius: 625</code> is 10,000 blocks; <code>centerRadius</code> is the matching minimum distance. You can also specify spatial unit suffixes directly, such as <code>4096b</code> (or <code>4096m</code>), <code>256c</code>, <code>4r</code>, or <code>5km</code>. Full reference, including unit suffixes, auto-interpretation, and per-region and per-command overrides: <a href="../REGIONS/#region-size-radius-and-centerradius">REGIONS.md → Region Size</a>.</p>
 </blockquote>
 <hr />

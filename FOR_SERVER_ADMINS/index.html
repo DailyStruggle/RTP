@@ -785,6 +785,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1545,6 +1566,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3939,6 +4002,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4107,7 +4254,7 @@ If you install, configure, or maintain RTP on a Paper, Spigot, Folia, Fabric, or
 <h2 id="minimum-operational-requirements">Minimum Operational Requirements<a class="headerlink" href="#minimum-operational-requirements" title="Permanent link">&para;</a></h2>
 <p>RTP is engineered for minimal main-thread tick impact and deterministic memory management. Pre-warmed destination queues, spatial rejection memory, and off-tick region file pre-filtering keep candidate checks off the tick thread and avoid the unbounded reroll loops that cause GC churn in naive implementations. On Paper and Folia, chunk loads go through the async API; on Spigot, a candidate the pre-filter cannot answer (ungenerated terrain, unknown data version) costs one on-tick chunk load. Memory usage is bounded and tracked by an active ticket reaper.</p>
 <ul>
-<li><strong>Java 21+</strong> (hard requirement).</li>
+<li><strong>Java 17+</strong> (hard requirement), or newer where Minecraft needs it: Java 21 from 1.20.5, Java 25 on 26.x. Supported versions: Paper and Spigot 1.18+, Folia 1.21.11+, Fabric 1.20.1 and 1.21+, NeoForge 1.21.1+, up to 26.3; bug reports are accepted for 1.21.11 through the latest release (<a href="../dev/SUPPORT_MATRIX/">support matrix</a>). Folia is experimental and only its current builds are maintained, so older Folia is not supported.</li>
 <li><strong>Predictable memory footprint.</strong> <code>cacheCap</code> and <code>activeChunkCap</code> (in region files) are <em>absolute</em> per-region bounds. Cached entries are lightweight coordinate descriptors; destination chunks are kept in memory only while in the hot L1 queue. Total cache memory scales with configured region counts, not world radius. Spatial memory uses compressed bit-segments to record rejected terrain without storing chunk objects. RTP includes an active heap-pressure gate (<code>performance.yml</code> -&gt; <code>maxHeapPercent</code>, default 85%) that throttles background pre-warming under memory pressure while pre-cached teleports continue serving instantly.</li>
 </ul>
 <p><strong>Reference environment (measured, not a certified minimum).</strong> The in-repo devstack and stress harness run on a <strong>Ryzen 9 3900X with 16 GiB allocated to the server</strong>. Treat this as a known-good baseline rather than a floor - a single small region needs far less. A properly-sourced minimum (heap per region at a given <code>cacheCap</code>) is planned once opt-in telemetry lands to measure real deployments; until then, provision generously and watch the console for <code>maxHeapPercent</code> warnings.</p>

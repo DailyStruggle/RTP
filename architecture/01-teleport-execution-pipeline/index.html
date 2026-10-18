@@ -638,6 +638,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1398,6 +1419,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3792,6 +3855,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3857,6 +4004,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#architectural-notes-cross-references" class="md-nav__link">
+    <span class="md-ellipsis">
+      Architectural Notes &amp; Cross-References
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3887,7 +4043,7 @@
 </blockquote>
 <hr />
 <h2 id="executive-overview-macro-pipeline">Executive Overview (Macro Pipeline)<a class="headerlink" href="#executive-overview-macro-pipeline" title="Permanent link">&para;</a></h2>
-<p>This high-level overview shows the core execution flow of an <code>/rtp</code> request. Pre-verified locations are served immediately from cache, while cache misses trigger asynchronous background candidate generation and safety checks before handing off to the player teleport stage.</p>
+<p>This high-level overview shows the core execution flow of an <code>/rtp</code> request. Pre-verified locations are served immediately from cache, while cache misses trigger asynchronous on-demand candidate generation (<code>LoadPurpose.IMMEDIATE</code>) using governed deduplication (ADR-114) and safety verification before handing off to player teleportation.</p>
 <pre class="mermaid"><code>flowchart LR
     A["Player Runs /rtp"] --&gt; B{"Location in Cache?"}
 
@@ -3895,8 +4051,8 @@
     B -- "Yes [Instant]" --&gt; C["Hot L1 Cache&lt;br/&gt;(Pre-verified Location)"]
 
     %% Async Generation Path
-    B -- "No [Async Fill]" --&gt; D["Spiral Generator&lt;br/&gt;(Archimedean 1D Math)"]
-    D --&gt; E["Anvil Disk Probe&lt;br/&gt;(Read .mca Off-Tick)"]
+    B -- "No [On-Demand Fill]" --&gt; D["Spiral Generator&lt;br/&gt;(Archimedean 1D Math)"]
+    D --&gt; E["Governed Deduplication&lt;br/&gt;(Tier 2 Anvil vs Direct Load)"]
     E --&gt; F["Safety &amp; Claim Scan&lt;br/&gt;(Lava, Void, Claims)"]
     F --&gt; C
 
@@ -3929,12 +4085,13 @@
     }
 
     state Async_Worker_Context {
-        GenRandom : [SETUP Stage] Generate (X,Z)
-        ReqTicket : [LOAD Stage] addPluginChunkTicket()
+        GenRandom : [SETUP Stage] Generate (X,Z) ~ f(x,z)
+        GovernLoad : [LOAD Stage] Governed Deduplication &amp; Semaphore (ADR-114)
+        ReqTicket : addPluginChunkTicket() &amp; ChunkReservation
     }
 
     state Region_Thread_Context {
-        EvalBlocks : Evaluate Safety (isSafe)
+        EvalBlocks : Evaluate Safety (isSafe) &amp; Stale Guard
     }
 
     state Entity_Scheduler_Context {
@@ -3958,18 +4115,20 @@
 %% Public Queue Loop
     perm_check --&gt; QueueWait : Lacks 'unqueued' perm
     QueueWait --&gt; QueueWait : Loop while Cache Empty
-    QueueWait --&gt; ReqTicket : Location Prepared (Spawn Async Worker)
+    QueueWait --&gt; ReqTicket : Location Prepared by Refill (diagram 02)
 
-%% Unqueued Path
-    perm_check --&gt; GenRandom : Has 'unqueued' perm (Start SETUP)
+%% Unqueued / Immediate Path (ADR-110, ADR-114)
+    perm_check --&gt; GenRandom : Has 'unqueued' perm (LoadPurpose.IMMEDIATE)
 
 %% Generation &amp; Ticket Pipeline
-    GenRandom --&gt; ReqTicket : Coords Generated
-    ReqTicket --&gt; EvalBlocks : CompletableFuture.thenAccept(...)
+    GenRandom --&gt; GovernLoad : Coords Generated
+    GovernLoad --&gt; ReqTicket : Dedup Bypass or Safe Prefilter (Permit Acquired)
+    GovernLoad --&gt; Teardown : In-Flight Timeout / Backpressure (msgBusy)
+    ReqTicket --&gt; EvalBlocks : Future Completes (ADR-112 Async-to-Sync Handoff)
 
 %% Evaluation Branches
     EvalBlocks --&gt; MovePlayer : Safe Landing Found
-    EvalBlocks --&gt; GenRandom : Unsafe (Retry Search Loop)
+    EvalBlocks --&gt; GenRandom : Unsafe (Resample s_i+1 ~ f(x,z))
     EvalBlocks --&gt; Teardown : Max Retries Exhausted
 
 %% Finalization
@@ -3982,9 +4141,23 @@
     classDef data    fill:#fff2b3,stroke:#8a6d1f,color:#3a2f0b;
     classDef cleanup fill:#e2e2e2,stroke:#555555,color:#111111;
     class MovePlayer success
-    class GenRandom,ReqTicket,EvalBlocks async
+    class GenRandom,GovernLoad,ReqTicket,EvalBlocks async
     class QueryCache,QueueWait data
     class Teardown cleanup</code></pre>
+<hr />
+<h2 id="architectural-notes-cross-references">Architectural Notes &amp; Cross-References<a class="headerlink" href="#architectural-notes-cross-references" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong>Hot cache vs unqueued dispatch:</strong> Serving pre-verified locations from the L1 queue (<code>keptLocations</code>) avoids all generation latency. When a player possesses <code>rtp.unqueued</code> or when the public queue is depleted, <code>PregenTask</code> runs under <code>LoadPurpose.IMMEDIATE</code>.</li>
+<li><strong>Governed on-demand deduplication (ADR-114):</strong> Immediate tasks do not blindly trigger unconstrained native chunk loads. The <code>ImmediateLoadGovernor</code> evaluates the thread-weighted threshold ($P_{\text{reject}} &gt; \frac{C_{\text{file, async}}}{C_{\text{native, async}} + W_{\text{tick}}(\text{MSPT}) \cdot C_{\text{native, sync}}}$). In safe terrain under stable ticks, it deduplicates by bypassing Anvil and dispatching directly to native loading, eliminating duplicate decompression and NBT decoding. In hazardous terrain or under tick distress, it engages off-thread Anvil pre-filtering to shed bad candidates without consuming main-thread tick budget.</li>
+<li><strong>In-flight generation bounding:</strong> Live native generation during unqueued bursts is strictly bounded by regional (max 1) and global (max 2) semaphores, protecting the shared tick loop from sudden MSPT spikes and watchdog timeouts.</li>
+<li><strong>Asynchronous regional handoff (ADR-112):</strong> On Folia, chunk futures complete off the region thread. <code>TeleportPipelineTask</code> continues generation results asynchronously before handing off to the regional entity scheduler within the regional token bucket for arrival validation and teleportation.</li>
+<li><strong>Guaranteed teardown (S-002, S-004):</strong> Chunk reservations are tracked in <code>MemoryTracker</code> and closed on every exit path (successful teleport, hazard rejection, timeout, or cancellation).</li>
+</ul>
+<p>Related documentation:
+- Companion deep-dive on chunk resolution: <a href="../15-cost-governed-chunk-reads-and-native-admission/"><code>docs/architecture/15-cost-governed-chunk-reads-and-native-admission.md</code></a>.
+- Candidate selection per attempt: <a href="../08-location-selection-per-attempt/"><code>docs/architecture/08-location-selection-per-attempt.md</code></a>.
+- Chunk ticket lifecycle: <a href="../03-chunk-ticket-lifecycle/"><code>docs/architecture/03-chunk-ticket-lifecycle.md</code></a>.
+- Governing ADRs: <a href="../../adr/ADR-001-archimedean-spiral-1d-mapping/">ADR-001</a>, <a href="../../adr/ADR-015-stale-chunk-guard-countbound-pipes/">ADR-015</a>, <a href="../../adr/ADR-110-purpose-gated-live-loads/">ADR-110</a>, <a href="../../adr/ADR-112-per-region-work-division-on-folia/">ADR-112</a>, <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/">ADR-114</a>.</p>
 
 
 

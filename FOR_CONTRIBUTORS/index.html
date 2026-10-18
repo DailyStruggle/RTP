@@ -644,6 +644,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1425,6 +1446,48 @@
   
   
     <li class="md-nav__item">
+      <a href="../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../site/shape-algorithms/" class="md-nav__link">
         
   
@@ -1619,6 +1682,15 @@
   <a href="#9-docsadr" class="md-nav__link">
     <span class="md-ellipsis">
       9. docs/adr/
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#10-pull_request_processmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. PULL_REQUEST_PROCESS.md
     </span>
   </a>
   
@@ -3948,6 +4020,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4086,6 +4242,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#10-pull_request_processmd" class="md-nav__link">
+    <span class="md-ellipsis">
+      10. PULL_REQUEST_PROCESS.md
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4148,9 +4313,12 @@ The <code>scripts/check_traceability.sh</code> CI script fails if any <code>REQ-
 <h3 id="9-docsadr">9. <a href="../adr/">docs/adr/</a><a class="headerlink" href="#9-docsadr" title="Permanent link">&para;</a></h3>
 <p>Architecture Decision Records — the <em>why</em> behind key design choices and the alternatives that were rejected.
 Read the relevant ADRs before changing anything the decisions describe.</p>
+<h3 id="10-pull_request_processmd">10. <a href="../dev/PULL_REQUEST_PROCESS/">PULL_REQUEST_PROCESS.md</a><a class="headerlink" href="#10-pull_request_processmd" title="Permanent link">&para;</a></h3>
+<p>The end-to-end pull request lifecycle: branching conventions, local pre-PR verification gates, CI pipeline anatomy, and definition of ready to merge.</p>
 <hr />
 <h2 id="reference-material">Reference Material<a class="headerlink" href="#reference-material" title="Permanent link">&para;</a></h2>
 <ul>
+<li><a href="../dev/PULL_REQUEST_PROCESS/">PULL_REQUEST_PROCESS.md</a> — pull request lifecycle, pre-PR verification checklist, and CI pipeline reference.</li>
 <li><a href="../dev/HAZARDS/">HAZARDS.md</a> — hazard register (also the per-component failure catalog); consult when a change touches chunk loading, scheduling, or memory management, or when writing or reviewing error-handling code.</li>
 <li><a href="https://github.com/dailystruggle/RTP/blob/V3/CHANGELOG.md">CHANGELOG.md</a> — release history; follow the existing format when adding an Unreleased entry.</li>
 </ul>

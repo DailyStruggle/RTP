@@ -638,6 +638,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1398,6 +1419,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3792,6 +3855,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3944,7 +4091,7 @@
 <h1 id="platform-support-matrix">Platform Support Matrix<a class="headerlink" href="#platform-support-matrix" title="Permanent link">&para;</a></h1>
 <blockquote>
 <p><strong>Scope:</strong> Repository-wide platform, Minecraft version, and Java runtime compatibility.
-<strong>Requirement:</strong> REQ-RTP-SYS-001 (Java 21+ required), ADR-021 (legacy MC and Java out of scope), ADR-033 (NeoForge in scope), ADR-036 (network mode / proxies).
+<strong>Requirement:</strong> REQ-RTP-SYS-001 (Java 17+ required, plus whatever the host Minecraft version requires), ADR-021 (legacy MC and Java out of scope), ADR-113 (Java 17 baseline, unofficial 1.18+), ADR-033 (NeoForge in scope), ADR-036 (network mode / proxies).
 <strong>Rule:</strong> Every cell is explicitly classified as <strong>Tested</strong>, <strong>Best-effort</strong>, or <strong>Unsupported</strong>. No cell may say "should work".</p>
 </blockquote>
 <hr />
@@ -3952,13 +4099,16 @@
 <ul>
 <li><strong>Tested:</strong> Verified by continuous or scheduled automated CI pipelines (including the nightly multi-node devstack acceptance harness, dedicated carrier compilation/unit suites, or multi-release ArchUnit/mock gates). Regressions in tested environments block release.</li>
 <li><em>Devstack Scheduled Acceptance (Nightly):</em> Velocity (Java 25), Paper (1.21.11, Java 25), Folia (1.21.11, Java 25), Fabric (1.21.11, Java 25), and NeoForge (1.21.1, Java 21) across multi-node containerized integration with Redis, cross-server token flow, and lifecycle verification.</li>
-<li><em>CI Build &amp; Adapter Gates (Every Commit):</em> Compiles, tests, and enforces architectural invariants across all active carrier modules (Java 21 base bytecode, Java 25 experimental/unobf).</li>
-<li><strong>Best-effort:</strong> Compatible architecture or downstream fork sharing the execution path of a tested platform, but lacking dedicated automated end-to-end integration runs in CI on every commit/night. Community bug reports are accepted and addressed, but fixes are prioritized behind tested platforms.</li>
-<li><strong>Unsupported:</strong> Incompatible threading models, missing required platform APIs, unsupported Java versions (&lt; 21), or platforms explicitly declared out of scope (e.g. legacy Forge &lt;= 1.20.1, Sponge, Bedrock-native). Bug reports on unsupported platforms are closed without investigation.</li>
+<li><em>Latest-Release Smoke (Nightly):</em> Paper 26.3 and Fabric 26.3 (Java 25) as single servers (<code>devstack/run-versions-smoke.sh</code>): <code>rtp test accessor</code> passes, the location queues fill, and the server logs no crash.</li>
+<li><em>CI Build &amp; Adapter Gates (Every Commit):</em> Compiles, tests, and enforces architectural invariants across all active carrier modules (Java 17 shared and pre-1.20.5 bytecode, Java 21 for the 1.21.x carriers, Java 25 for 26.x and unobf).</li>
+<li>A version that has only been booted by hand (for example the Java 17 stack in <code>devstack/docker-compose.legacy.yml</code>) is <strong>Best-effort</strong>, not Tested.</li>
+<li><strong>Best-effort:</strong> Compatible architecture or downstream fork sharing the execution path of a tested platform, but lacking dedicated automated end-to-end integration runs in CI on every commit/night. Bug reports are accepted inside the bug-report window below, with fixes prioritized behind tested platforms; outside it they may be closed without a fix.</li>
+<li><strong>Bug-report window (ADR-113):</strong> Bug reports are accepted for Minecraft 1.21.11 through the latest release, on every platform column below that is not <strong>Unsupported</strong>. Older Minecraft versions keep their classification but are outside the window. A later release will deprecate 1.21.11, which moves the window floor up without removing 1.21.11 support.</li>
+<li><strong>Unsupported:</strong> Incompatible threading models, missing required platform APIs, unsupported Java versions (&lt; 17), or platforms explicitly declared out of scope (e.g. legacy Forge &lt;= 1.20.1, Sponge, Bedrock-native). Bug reports on unsupported platforms are closed without investigation.</li>
 </ul>
 <hr />
 <h2 id="2-java-runtime-support">2. Java Runtime Support<a class="headerlink" href="#2-java-runtime-support" title="Permanent link">&para;</a></h2>
-<p>RTP requires Java 21 or higher across all platforms and components (REQ-RTP-SYS-001).</p>
+<p>RTP requires Java 17 or higher, together with the Java runtime the host Minecraft version requires (REQ-RTP-SYS-001). The shared modules, the pre-1.20.5 carriers and the plugin entry points are Java 17 bytecode; the 1.21.x and 26.x carriers are Java 21 / 25 bytecode and only load on those Minecraft versions (ADR-113).</p>
 <table>
 <thead>
 <tr>
@@ -3969,9 +4119,14 @@
 </thead>
 <tbody>
 <tr>
+<td style="text-align: left;"><strong>Java 17 LTS</strong></td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: left;">Minecraft 1.18 - 1.20.4 servers (Spigot and Paper) and Fabric 1.20.1. Toolchain is still Java 21 with <code>release = 17</code>; no Java 17 CI runtime (booted by hand on Paper 1.18.2 and Fabric 1.20.1).</td>
+</tr>
+<tr>
 <td style="text-align: left;"><strong>Java 21 LTS</strong></td>
 <td style="text-align: center;"><strong>Tested</strong></td>
-<td style="text-align: left;">Primary reference runtime. CI default and base compilation bytecode target across all modules and devstack.</td>
+<td style="text-align: left;">Primary reference runtime. CI default toolchain and devstack runtime; bytecode target of the 1.21.x carriers.</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong>Java 22</strong></td>
@@ -3989,9 +4144,9 @@
 <td style="text-align: left;">Secondary CI toolchain in <code>.github/workflows/gradle.yml</code> and devstack for modern experimental carriers (e.g. MC 26.x unobf Mojmap carriers).</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>Java &lt;= 20</strong></td>
+<td style="text-align: left;"><strong>Java &lt;= 16</strong></td>
 <td style="text-align: center;"><strong>Unsupported</strong></td>
-<td style="text-align: left;">Fails closed on initialization. Modern language features, records, and virtual threads require Java 21+.</td>
+<td style="text-align: left;"><code>UnsupportedClassVersionError</code> (classfile 61).</td>
 </tr>
 </tbody>
 </table>
@@ -4002,6 +4157,7 @@
 <thead>
 <tr>
 <th style="text-align: left;">Minecraft Version</th>
+<th style="text-align: center;">Bug reports</th>
 <th style="text-align: center;">Paper (+ forks)</th>
 <th style="text-align: center;">Folia</th>
 <th style="text-align: center;">Spigot</th>
@@ -4011,39 +4167,98 @@
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><strong>MC 26.x (26.1, 26.2, 26.3+)</strong></td>
+<td style="text-align: left;"><strong>MC 26.4 snapshots</strong></td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;"><strong>Unsupported</strong></td>
+<td style="text-align: center;"><strong>Unsupported</strong></td>
+<td style="text-align: center;"><strong>Unsupported</strong></td>
 <td style="text-align: center;"><strong>Best-effort</strong></td>
-<td style="text-align: center;"><strong>Best-effort</strong></td>
-<td style="text-align: center;"><strong>Best-effort</strong></td>
-<td style="text-align: center;"><strong>Tested</strong></td>
-<td style="text-align: center;"><strong>Best-effort</strong></td>
-</tr>
-<tr>
-<td style="text-align: left;"><strong>MC 1.21.x</strong> (1.21.0 - 1.21.4+)</td>
-<td style="text-align: center;"><strong>Tested</strong></td>
-<td style="text-align: center;"><strong>Tested</strong></td>
-<td style="text-align: center;"><strong>Best-effort</strong></td>
-<td style="text-align: center;"><strong>Tested</strong></td>
-<td style="text-align: center;"><strong>Tested</strong></td>
-</tr>
-<tr>
-<td style="text-align: left;"><strong>MC 1.20.5 - 1.20.6</strong></td>
-<td style="text-align: center;"><strong>Tested</strong></td>
-<td style="text-align: center;"><strong>Tested</strong></td>
-<td style="text-align: center;"><strong>Best-effort</strong></td>
-<td style="text-align: center;"><strong>Tested</strong></td>
 <td style="text-align: center;"><strong>Unsupported</strong></td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>MC 1.20.0 - 1.20.4</strong></td>
+<td style="text-align: left;"><strong>MC 26.3</strong> (latest release)</td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;"><strong>Tested</strong></td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Tested</strong></td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>MC 26.1 - 26.2</strong></td>
+<td style="text-align: center;">Yes</td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>MC 1.21.11</strong></td>
+<td style="text-align: center;">Yes</td>
 <td style="text-align: center;"><strong>Tested</strong></td>
 <td style="text-align: center;"><strong>Tested</strong></td>
 <td style="text-align: center;"><strong>Best-effort</strong></td>
 <td style="text-align: center;"><strong>Tested</strong></td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>MC 1.21.2 - 1.21.10</strong></td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Unsupported</strong></td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>MC 1.21.1</strong></td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Unsupported</strong></td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Tested</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>MC 1.21.0</strong></td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Unsupported</strong></td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
 <td style="text-align: center;"><strong>Unsupported</strong></td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong>MC 1.19.4 and older</strong></td>
+<td style="text-align: left;"><strong>MC 1.20.2 - 1.20.6</strong></td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Unsupported</strong></td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Unsupported</strong></td>
+<td style="text-align: center;"><strong>Unsupported</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>MC 1.20 - 1.20.1</strong></td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Unsupported</strong></td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Best-effort</strong> (1.20.1)</td>
+<td style="text-align: center;"><strong>Unsupported</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>MC 1.18 - 1.19.4</strong></td>
+<td style="text-align: center;">No</td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Unsupported</strong></td>
+<td style="text-align: center;"><strong>Best-effort</strong></td>
+<td style="text-align: center;"><strong>Unsupported</strong></td>
+<td style="text-align: center;"><strong>Unsupported</strong></td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>MC 1.17.1 and older</strong></td>
+<td style="text-align: center;">No</td>
 <td style="text-align: center;"><strong>Unsupported</strong></td>
 <td style="text-align: center;"><strong>Unsupported</strong></td>
 <td style="text-align: center;"><strong>Unsupported</strong></td>
@@ -4052,22 +4267,26 @@
 </tr>
 </tbody>
 </table>
+<p>The <em>Bug reports</em> column is the ADR-113 window. NeoForge 1.21.1 is nightly-tested but sits below it. Folia's floor is 1.21.11, which coincides with the window floor.</p>
 <h4 id="platform-specific-notes">Platform-Specific Notes:<a class="headerlink" href="#platform-specific-notes" title="Permanent link">&para;</a></h4>
 <ul>
 <li><strong>Paper &amp; Forks (Leaf, Leaves, Purpur, Pufferfish, Airplane, DivineMC):</strong></li>
-<li><strong>Status:</strong> <strong>Tested</strong> (Paper on 1.20.x, 1.21.x via automated build gates and nightly devstack); <strong>Best-effort</strong> (downstream forks and MC 26.x tracking).</li>
+<li><strong>Status:</strong> <strong>Tested</strong> (1.21.11 in the nightly multi-server devstack, 26.3 in the nightly latest-release smoke); <strong>Best-effort</strong> (1.18 - 1.21.10, 26.1 - 26.2, and downstream forks). Paper 1.18.2, 1.21.11, 26.1.2 and 26.3 have also been booted by hand with the <code>api-version: '1.18'</code> jar.</li>
+<li>Paper ships no snapshot builds, so 26.4 snapshots are not a Paper target.</li>
 <li>Uses native Paper asynchronous chunk loading (<code>World.getChunkAtAsync</code>). Linear (<code>.linear</code> / ZSTD) worlds are supported through the live async chunk load path; core does not pre-filter <code>.linear</code> files unless an addon registers a reader (ADR-077).</li>
 <li><strong>Folia:</strong></li>
-<li><strong>Status:</strong> <strong>Tested</strong> (1.20.x, 1.21.x via automated build gates, thread affinity ArchUnit rules, and nightly devstack).</li>
+<li><strong>Status:</strong> <strong>Tested</strong> (1.21.11 in the nightly multi-server devstack, plus thread-affinity ArchUnit rules on every commit); <strong>Best-effort</strong> (26.1 - 26.3; no 26.x Folia server runs in CI, Folia 26.1.2 passed a one-off bot sweep); <strong>Unsupported</strong> below 1.21.11.</li>
+<li><strong>Floor 1.21.11 (ADR-113 amendment 5):</strong> Folia is an experimental fork whose stable builds track only its current releases (1.21.11 and 26.1 when this floor was set). Older Folia builds are not maintained upstream and can crash on their own; in the bot sweep Folia 1.20.4 and 1.21.4 stopped at boot with <code>Scheduling chunk load off-main</code>. The jar still loads on older Folia, but no fix is made for those versions and bug reports from them are closed.</li>
 <li>Operates strictly under Folia Region &amp; Entity schedulers with Count-Bound task pipelines (ADR-004, ADR-015). Off-tick Anvil pre-filtering on common pool avoids cross-region hops.</li>
 <li><strong>Spigot:</strong></li>
-<li><strong>Status:</strong> <strong>Best-effort</strong> (1.20.x, 1.21.x; compiles via <code>rtp-bukkit</code> adapter and unit tested, but lacks scheduled live multi-server devstack verification in CI).</li>
+<li><strong>Status:</strong> <strong>Best-effort</strong> (1.18 - 26.x; compiles via <code>rtp-bukkit</code> adapter and unit tested, but no Spigot server runs in CI).</li>
 <li>Uses background Anvil (<code>.mca</code>) parser for off-tick candidate pre-filtering to prevent main-thread chunk load stalls (S-005).</li>
 <li><strong>Fabric:</strong></li>
-<li><strong>Status:</strong> <strong>Tested</strong> (1.20.x, 1.21.x, 26.x via Loom carrier build suites, Java 25 toolchain gates, and nightly devstack).</li>
+<li><strong>Status:</strong> <strong>Tested</strong> (1.21.11 in the nightly multi-server devstack, 26.3 in the nightly latest-release smoke); <strong>Best-effort</strong> (1.20.1, 1.21 - 1.21.10, 26.1 - 26.2, and the 26.4 snapshot carrier). Fabric 1.20.1, 1.21.1, 1.21.8 and 26.1.2 have been booted by hand.</li>
+<li><strong>Unsupported:</strong> 1.20.2 - 1.20.6. <code>fabric.mod.json</code> lets the jar load there and <code>RTPFabricMod</code> routes it to the 1.20.1 adapter, but no server has run it, and 1.20.5 changed the chunk-result and item APIs that adapter is compiled against.</li>
 <li>First-class Loom-remapped obf and Mojmap-unobf carrier modules with native async chunk futures (<code>ServerLevel.getChunkSource().getChunkFuture</code>) and <code>FabricScheduler</code>.</li>
 <li><strong>NeoForge:</strong></li>
-<li><strong>Status:</strong> <strong>Tested</strong> (1.21.1 via automated ModDevGradle carrier suites, and nightly acceptance devstack node on Java 21); <strong>Best-effort</strong> (26.x tracking).</li>
+<li><strong>Status:</strong> <strong>Tested</strong> (1.21.1 in the nightly multi-server devstack on Java 21); <strong>Best-effort</strong> (1.21.2 - 1.21.11 and 26.x; no server on those versions has been booted).</li>
 <li>Native ModDevGradle Mojmap runtime mod with <code>NeoForgeScheduler</code> and Brigadier command adapter (ADR-033). Legacy Forge (&lt;= 1.20.1) is explicitly <strong>Unsupported</strong>.</li>
 </ul>
 <hr />
@@ -4153,6 +4372,9 @@
 <li><strong>Multi-Server Acceptance Devstack:</strong></li>
 <li>Boots multi-node Docker Compose network: 1 Redis + 2 Velocity proxies + 2 Paper lobbies + 1 Paper backend + 1 Folia backend + 1 Fabric backend + 1 NeoForge backend.</li>
 <li>Executes cross-server reservation token redemption, timeout reaping, and failover validation.</li>
+<li><strong>Latest-Release Smoke:</strong></li>
+<li>Nightly <code>versions-smoke</code> job in <code>devstack-acceptance.yml</code>, one job per service in <code>devstack/docker-compose.versions.yml</code> (Paper 26.3, Fabric 26.3).</li>
+<li>Runs <code>devstack/run-versions-smoke.sh</code>: accessor self-test, non-empty location queue, no tick-loop crash, OOM or classfile-version error. The pinned <code>VERSION</code> is bumped with each Minecraft release.</li>
 </ol>
 
 

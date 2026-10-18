@@ -718,6 +718,27 @@
   
   
     <li class="md-nav__item">
+      <a href="site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1478,6 +1499,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3872,6 +3935,90 @@
   
   
     <li class="md-nav__item">
+      <a href="adr/ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="adr/ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="adr/ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="adr/ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -3977,7 +4124,7 @@
 <p><a href="https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml"><img alt="Build" src="https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml/badge.svg" /></a>
 <a href="https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml"><img alt="Coverage" src="assets/badges/coverage.svg" /></a>
 <a href="https://github.com/DailyStruggle/RTP/releases"><img alt="Release" src="https://img.shields.io/github/v/release/DailyStruggle/RTP" /></a>
-<a href="https://adoptium.net/"><img alt="Java" src="https://img.shields.io/badge/Java-21-blue" /></a></p>
+<a href="https://adoptium.net/"><img alt="Java" src="https://img.shields.io/badge/Java-17%2B-blue" /></a></p>
 <p>A random-teleportation plugin built to fill operator needs still unmet by the more
 popular RTP plugins:</p>
 <ul>
@@ -3995,9 +4142,13 @@ popular RTP plugins:</p>
 reroll, without affecting the random distribution. See <a href="site/why/">Why</a> for the source
 algorithm.</p>
 <h2 id="supported-platforms">Supported platforms<a class="headerlink" href="#supported-platforms" title="Permanent link">&para;</a></h2>
-<p><strong>Backend servers</strong> (where the plugin/mod jar runs and teleports happen): Paper, Folia,
-Spigot, Fabric, and NeoForge (Minecraft 1.20.x / 1.21.x / 26.x). Java 21+ is required.
-Legacy Forge is not native - run the Spigot/Paper jar under Arclight / Mohist.</p>
+<p><strong>Backend servers</strong> (where the plugin/mod jar runs and teleports happen): Paper and
+Spigot 1.18+, Folia 1.21.11+, Fabric 1.20.1 and 1.21+, and NeoForge 1.21.1+, up to Minecraft
+26.3. Java 17+ is required (Minecraft itself needs Java 21 from 1.20.5 and Java 25 on
+26.x). Bug reports are accepted for 1.21.11 through the latest release; older versions are
+best effort, except Folia, which is experimental and not supported below 1.21.11
+(<a href="dev/SUPPORT_MATRIX/">support matrix</a>). Legacy Forge is not native - run the
+Spigot/Paper jar under Arclight / Mohist.</p>
 <p><strong>Proxy</strong> (a different role, not another backend): the same jar also runs on a <strong>Velocity</strong>
 proxy, where it acts as the router/transport for cross-server "network mode" rather than
 teleporting players itself. Drop the jar in the proxy's <code>plugins/</code>, install RTP on each

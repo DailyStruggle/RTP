@@ -644,6 +644,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../site/features/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Features
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../admin/MIGRATION/" class="md-nav__link">
         
   
@@ -1404,6 +1425,48 @@
   
   <span class="md-ellipsis">
     Why LeafRTP exists
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/how-it-works/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    How it works
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../site/quality-gates/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Testing and quality gates
   </span>
   
 
@@ -3948,6 +4011,90 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-112-per-region-work-division-on-folia/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-112-per-region-work-division-on-folia
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-113-java-17-baseline-and-26x-support-boundary/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-113 - Java 17 Bytecode Baseline, MC 26.x+ Official Support Boundary, and Format-Adaptive Unofficial Compatibility
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-114-cost-governed-on-demand-chunk-reads/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-114 - Cost-Governed On-Demand Chunk Reads and Native Fallback Admission
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ADR-115-package-dag-disentanglement-and-decision-preservation-hypergraph/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-115 — Package DAG Disentanglement and Finite Decision-Preservation Hypergraph
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4261,7 +4408,7 @@
 </tr>
 <tr>
 <td>Live competitor API shim (read competitor files / emulate its API at runtime)</td>
-<td>Different goal (absorbing the menu-plugin ecosystem), heavier, and a permanent runtime coupling. Tracked as its own ROADMAP item; this importer is a one-shot aid.</td>
+<td>Different goal (absorbing the menu-plugin ecosystem), heavier, and a permanent runtime coupling. Tracked as its own Linear issue (<code>RTP-52</code>); this importer is a one-shot aid.</td>
 </tr>
 <tr>
 <td>Importer in <code>rtp-plugin</code> / an addon</td>
@@ -4285,11 +4432,11 @@
 </ul>
 <h2 id="references">References<a class="headerlink" href="#references" title="Permanent link">&para;</a></h2>
 <ul>
-<li>ROADMAP: "BetterRTP config importer (one-shot migration aid)" and the parity items "cooldown usage cap (<code>LockAfter</code>)" and "persist RTP destination as a permanent spawn anchor (<code>SetAsRespawn</code>)" in <a href="../../dev/ROADMAP/"><code>docs/dev/ROADMAP.md</code></a>.</li>
+<li>Former roadmap items "BetterRTP config importer (one-shot migration aid)" and the parity items "cooldown usage cap (<code>LockAfter</code>)" and "persist RTP destination as a permanent spawn anchor (<code>SetAsRespawn</code>)": open work is tracked in the Linear <code>LeafRTP</code> team (<a href="../../dev/ROADMAP/"><code>docs/dev/ROADMAP.md</code></a> pointer).</li>
 <li>In-house YAML parser: <code>RtpYamlConfig</code> / <code>RtpYamlSection</code> (<code>rtp-core/.../common/configuration/yaml/</code>); see <a href="../ADR-025-replace-simpleyaml-with-internal-snakeyaml-wrapper/">ADR-025</a>.</li>
 <li>Region shapes / Polygon: <a href="../ADR-034-memory-shape-catalog/">ADR-034</a>.</li>
 <li>Backup + two-phase <code>apply</code>/<code>confirm</code> UX prior art: the <code>rtp prefab</code> flow and <code>performance.yml#prefab.bakRetention</code>.</li>
-<li>Distinct runtime shim: the "BetterRTP API compatibility shim" ROADMAP item; external-hook policy <a href="../ADR-026-external-hook-api-surface/">ADR-026</a>.</li>
+<li>Distinct runtime shim: the "BetterRTP API compatibility shim" Linear issue (<code>RTP-52</code>); external-hook policy <a href="../ADR-026-external-hook-api-surface/">ADR-026</a>.</li>
 <li>Process: D-005 (Propose Before Implementation).</li>
 </ul>
 
