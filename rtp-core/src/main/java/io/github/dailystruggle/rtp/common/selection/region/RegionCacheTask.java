@@ -40,7 +40,11 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
      */
     private final AtomicBoolean released = new AtomicBoolean(false);
 
-    /** Fill deadline in ticks (30 s); matches the per-player chunk-set failsafe. */
+    /**
+     * Fill deadline in ticks (30 s); matches the per-player chunk-set failsafe. Releases the slot
+     * only: a per-player result whose generation finished is still delivered when its preload
+     * completes after the deadline (computed work is not discarded; cache-deficit overshoot accepted).
+     */
     static final long FILL_DEADLINE_TICKS = 600L;
 
     /** Owning pipe's pacer; charged dispatch-to-release wall time once per fill. */
@@ -140,8 +144,8 @@ public class RegionCacheTask extends RTPRunnable implements CompletionPaced {
         // Fills in flight are capped by the Region.execute deficit; the start rate by the pipe
         // pacer, charged the wall time from here to releaseInFlight(). Not every chunk is
         // loadable and not every adapter bounds its load, so a fill that has not finished by
-        // FILL_DEADLINE_TICKS releases its slot and charges the deadline to the pacer; a result
-        // arriving later is dropped (see processResult).
+        // FILL_DEADLINE_TICKS releases its slot and charges the deadline to the pacer; a generation
+        // result arriving later is dropped (see processResult), a pending player preload is not.
         dispatchNanos = System.nanoTime();
 
         // Diagnostic counter: bumped only on the actual issuance path (after
