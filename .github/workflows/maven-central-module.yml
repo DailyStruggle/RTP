@@ -1,0 +1,171 @@
+name: Publish one module to Maven Central
+
+# One-off repair: signs and uploads a SINGLE module, built from a given commit,
+# to the Sonatype Central Portal. Use it when an already-published POM points at
+# a sibling coordinate that was never uploaded (e.g. rtp-core:3.3.0 -> anvil-api:3.3.0).
+# Central versions are immutable, so the published POM cannot be fixed; uploading
+# the missing coordinate at the same version makes it resolve.
+#
+# `ref` must be the exact commit the existing release was built from, so the
+# module's bytes and version match what the published POMs expect. If that
+# commit predates the module joining publishedModulePaths in the root
+# build.gradle, the module is added to the list in the CI checkout only.
+#
+# Secrets and signing are the same as maven-central.yml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Commit SHA or tag the existing release was built from'
+        required: true
+      module:
+        description: 'Gradle project path of the module to publish'
+        required: true
+        default: ':anvil-api'
+      auto_publish:
+        description: 'Release immediately instead of waiting for the Publish click on the Portal'
+        type: boolean
+        default: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 1
+
+      - name: Resolve coordinate
+        id: coord
+        env:
+          MODULE: ${{ inputs.module }}
+        run: |
+          if ! printf '%s' "${MODULE}" | grep -Eq '^(:[A-Za-z0-9_-]+)+$'; then
+            echo "::error::Invalid Gradle project path: ${MODULE}"
+            exit 1
+          fi
+          VERSION=$(grep -E '^version=' gradle.properties | cut -d '=' -f 2 | tr -d '[:space:]')
+          ARTIFACT="${MODULE##*:}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "artifact=${ARTIFACT}" >> "$GITHUB_OUTPUT"
+          echo "Publishing io.github.dailystruggle:${ARTIFACT}:${VERSION} from $(git rev-parse HEAD)"
+
+      # Unlike maven-central.yml this fails instead of skipping: a dispatch for an
+      # already-published coordinate is an operator mistake, not a no-op push.
+      - name: Fail if coordinate already published
+        env:
+          CENTRAL_TOKEN_USER: ${{ secrets.CENTRAL_TOKEN_USER }}
+          CENTRAL_TOKEN_PASS: ${{ secrets.CENTRAL_TOKEN_PASS }}
+          ARTIFACT: ${{ steps.coord.outputs.artifact }}
+          VERSION: ${{ steps.coord.outputs.version }}
+        run: |
+          AUTH=$(printf '%s:%s' "${CENTRAL_TOKEN_USER}" "${CENTRAL_TOKEN_PASS}" | base64 -w0)
+          HTTP_CODE=$(curl --silent --show-error --write-out '%{http_code}' --output published.json \
+            -H "Authorization: Bearer ${AUTH}" \
+            "https://central.sonatype.com/api/v1/publisher/published?namespace=io.github.dailystruggle&name=${ARTIFACT}&version=${VERSION}")
+          echo "Portal responded HTTP ${HTTP_CODE}: $(cat published.json)"
+          if [ "${HTTP_CODE}" != "200" ]; then
+            echo "::error::Central published-check failed (HTTP ${HTTP_CODE})."
+            exit 1
+          fi
+          if jq -e '.published == true' published.json >/dev/null; then
+            echo "::error::io.github.dailystruggle:${ARTIFACT}:${VERSION} is already published."
+            exit 1
+          fi
+
+      - name: Ensure module is in publishedModulePaths
+        env:
+          MODULE: ${{ inputs.module }}
+        run: |
+          in_list() {
+            awk '/^def publishedModulePaths = \[/{f=1;next} f&&/^\]/{exit} f' build.gradle | grep -qF "'${MODULE}'"
+          }
+          if ! in_list; then
+            sed -i "/^def publishedModulePaths = \[/a\        '${MODULE}'," build.gradle
+            echo "::notice::Added ${MODULE} to publishedModulePaths in the CI checkout."
+          fi
+          in_list || { echo "::error::Could not add ${MODULE} to publishedModulePaths."; exit 1; }
+          awk '/^def publishedModulePaths = \[/{f=1} f{print} f&&/^\]/{exit}' build.gradle
+
+      # Same JDK set as maven-central.yml: the JDK-25 modules stay in the build graph.
+      - name: Set up JDKs (21 + 25)
+        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+        with:
+          distribution: 'temurin'
+          java-version: |
+            21
+            25
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Sign + stage to Central staging
+        env:
+          MODULE: ${{ inputs.module }}
+          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
+        run: ./gradlew --no-daemon "${MODULE}:publishMavenJavaPublicationToCentralStagingRepository"
+
+      # Fails on a missing signature or on any file outside the one coordinate,
+      # so the bundle cannot touch an already-published artifact.
+      - name: Verify staging tree
+        env:
+          ARTIFACT: ${{ steps.coord.outputs.artifact }}
+          VERSION: ${{ steps.coord.outputs.version }}
+        run: |
+          find build/central-staging -type f | sort
+          EXPECTED="build/central-staging/io/github/dailystruggle/${ARTIFACT}"
+          STRAY=$(find build/central-staging -type f -not -path "${EXPECTED}/*" | grep -v '/maven-metadata\.xml' || true)
+          if [ -n "${STRAY}" ]; then
+            echo "::error::Staging tree contains files outside ${EXPECTED}:"
+            echo "${STRAY}"
+            exit 1
+          fi
+          for f in "${ARTIFACT}-${VERSION}.pom" "${ARTIFACT}-${VERSION}.jar" "${ARTIFACT}-${VERSION}-sources.jar" "${ARTIFACT}-${VERSION}-javadoc.jar"; do
+            for ext in "" ".asc"; do
+              if [ ! -f "${EXPECTED}/${VERSION}/${f}${ext}" ]; then
+                echo "::error::Missing ${f}${ext} -- check the build and the SIGNING_KEY secret."
+                exit 1
+              fi
+            done
+          done
+
+      - name: Bundle the staging tree
+        run: |
+          cd build/central-staging
+          zip -r ../central-bundle.zip .
+          cd -
+          ls -l build/central-bundle.zip
+
+      - name: Upload bundle to the Central Portal
+        env:
+          CENTRAL_TOKEN_USER: ${{ secrets.CENTRAL_TOKEN_USER }}
+          CENTRAL_TOKEN_PASS: ${{ secrets.CENTRAL_TOKEN_PASS }}
+          PUBLISHING_TYPE: ${{ inputs.auto_publish && 'AUTOMATIC' || 'USER_MANAGED' }}
+          ARTIFACT: ${{ steps.coord.outputs.artifact }}
+          VERSION: ${{ steps.coord.outputs.version }}
+        run: |
+          AUTH=$(printf '%s:%s' "${CENTRAL_TOKEN_USER}" "${CENTRAL_TOKEN_PASS}" | base64 -w0)
+          HTTP_CODE=$(curl --silent --show-error --write-out '%{http_code}' --output upload-response.txt \
+            -H "Authorization: Bearer ${AUTH}" \
+            -F bundle=@build/central-bundle.zip \
+            "https://central.sonatype.com/api/v1/publisher/upload?name=${ARTIFACT}-${VERSION}&publishingType=${PUBLISHING_TYPE}")
+          echo "Portal responded HTTP ${HTTP_CODE}:"
+          cat upload-response.txt || true
+          echo
+          if [ "${HTTP_CODE}" -lt 200 ] || [ "${HTTP_CODE}" -ge 300 ]; then
+            echo "::error::Central Portal upload failed (HTTP ${HTTP_CODE})."
+            exit 1
+          fi
+          if [ "${PUBLISHING_TYPE}" = "AUTOMATIC" ]; then
+            echo "::notice::Deployment uploaded and will release automatically once validated."
+          else
+            echo "::notice::Deployment uploaded. Review + click Publish at https://central.sonatype.com -> Deployments."
+          fi
