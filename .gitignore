@@ -195,6 +195,8 @@ scripts/release/generated/
 # Node.js dependencies and devstack client artifacts
 node_modules/
 package-lock.json
+# Tracked: devstack-acceptance.yml installs the bot with `npm ci`, which needs it.
+!devstack/clients/package-lock.json
 
 # Staging/diagnostic charts at repository root or module root (charts belong in docs/assets/img or build/reports)
 /*.png

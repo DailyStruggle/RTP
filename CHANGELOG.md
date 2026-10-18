@@ -185,6 +185,8 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 ### Fixed
 
+- **Moving during the `/rtp` warmup now cancels the teleport.** Walking farther than `cancelDistance` during `teleportDelay` was ignored for `/rtp`, because the player's starting position was never recorded, so the teleport went ahead anyway.
+
 - **RTP could freeze Fabric 1.20.1 and 1.21.1 servers and run them out of memory.** Each chunk load added a chunk ticket that kept a large area around the candidate loaded and was never released, so the server kept generating chunks, partly on the main thread. Loaded chunks were also read as missing, so no locations were found there. Tickets now cover only the area RTP needs and are released after use, and chunks load off the main thread.
 
 - **On Fabric 1.21.5 through 1.21.11, RTP read every chunk it loaded as missing and could release a cached location's chunk early.** Chunk results are now read correctly, and the temporary load ticket no longer removes the ticket that keeps a cached location loaded. Chunk loads now always use the non-blocking path, so they can't stall the main thread.

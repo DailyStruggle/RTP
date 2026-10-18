@@ -42,6 +42,17 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 
 ## Open
 
+### 2026-10-18 - Rift fall trips `cancelDistance`; teleport cancels and the player is left in the rift
+
+- **Severity:** High
+- **Status:** Open
+- **Discovered during:** verifying the countdown boss-bar clear on teleport cancel (demo server, `rift` preset)
+- **Location:** `addons/LeafRTPRiftAddon/.../RiftEffect.java` `run()` (carve and restore); `rtp-plugin/.../bukkitListeners/OnPlayerMove.java` (cancel check)
+- **Symptom / hypothesis:** With `RIFT.6.3` at `preload`, `teleportDelay` 4 and `cancelDistance` 2, a bot that stood still fell about 4 blocks into the rift and got "Teleport cancelled!" 0.5 s after `/rtp`. It stayed at the bottom of the rift, and after the restore its health flickered 20/19 (likely suffocation). The fall counts as movement now that `/rtp` records its origin, and the rift does not react to the cancel.
+- **Impact:** With the Rift addon, every delayed `/rtp` cancels itself, and the player can end up inside the restored terrain.
+- **Suggested next step:** Exempt the rift's own fall from the cancel check (origin recorded after the carve, or ignore movement inside an open rift), and on `RTPTeleportCancel.postActions` restore the rift with the player moved clear. Interim: `cancelDistance` above rift radius plus fall height.
+- **Linear:** RTP-71
+
 ### 2026-10-08 — Probe governor's probe time includes coalescer queue wait
 
 - **Severity:** Medium
@@ -89,6 +100,38 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Suggested next step:** Fix pending the first scheduled CI run: the workflow runs one job per `@FuzzTest` method with `JAZZER_MAX_DURATION`, the root `Test` config declares the Jazzer env vars as inputs and disables up-to-date checks in fuzz mode, and `fuzzReadChunkView` / `fuzzReadColumnProbe` carry real-region seeds (local 15 s runs of both passed). Remaining: seeds for the LZ4 and NBT targets (needs extracted payloads); crash reproducers go under `<Class>Inputs/`. Remove this entry once a CI run shows all five jobs fuzzing for the set duration.
 - **Linear:** RTP-21
 
+### 2026-10-18 - Built-in effects registered per platform from hand-copied lists; `GLIDE`, `TITLE` and `DROP_*` missing on some platforms
+
+- **Severity:** Medium
+- **Status:** Triaged
+- **Discovered during:** review of the claim that `TITLE` is only wired on Fabric and NeoForge
+- **Location:** `api/effects-api/.../bukkit/BukkitEffectsInitializer.java` `registerAll()`; `api/effects-api/effects-api-fabric-unobf/.../FabricEffectsInitializer.java` `registerAll()`; `platforms/rtp-neoforge/rtp-neoforge-common/.../NeoForgeEffectsInitializer.java`; `NeoForgeHandles` (`sendTitle`, `playNote`, `spawnFirework` have empty bodies)
+- **Symptom / hypothesis:** The shared effect classes are platform-neutral, but each platform registers them from its own `EffectFactory.addEffect(...)` list and no test compares the lists. Bukkit lacks `TITLE`; Fabric 26.x lacks `GLIDE`; NeoForge lacks `GLIDE`, `DROP_INVENTORY` and `DROP_EXP`. The cause is a second, effects-only platform seam (`HandleRegistry`) beside `RTPServerAccessor`.
+- **Impact:** Unregistered effect tokens in `definitions/effects/*.yml` and `rtp.effect.*` nodes are skipped without a message; operators lose effects when moving between platforms. Disclosed in `docs/admin/configuration/EVENTS_AND_EFFECTS.md` (*Platform availability*).
+- **Suggested next step:** 3.3.x patch: add the missing `addEffect` lines plus a registration parity test. Root fix: [ADR-116](../adr/ADR-116-effects-through-neutral-server-accessor.md) (Proposed) - neutral accessor module, platform primitives on the accessor, one registration in effects-api.
+- **Linear:** RTP-70
+
+### 2026-10-18 - Web editor paints whole walk-path squares red when hazard runs exceed the cap
+
+- **Severity:** Medium
+- **Status:** Open
+- **Discovered during:** user report of solid red squares on the walk path (SQUARE region, radius 830c, centerRadius 121, P=16, Paper 26.2)
+- **Location:** `rtp-core/.../commands/editor/EditorCurveModel.java` `MAX_HAZARD_RUN_BYTES`; `EditorSessionManager.generateVisualizationPayload` (`hazardRunsSkipped: "hazard-cap"`); `EditorLiveFeed` / `HazardTiles`; `docs/editor/index.html` `pathHazardSampler`
+- **Symptom / hypothesis:** 100,140 bad runs exceed the 256 KiB cap, so the page colours the path from the export-time 2D grid (128x128 cells, about 13 chunks each); one bad chunk turns a whole cell red, and live hazard updates stop. Curve, scan data and `ScanTask` checked and ruled out; at 512c the exact runs fit and the render is correct.
+- **Impact:** Misleading solid-red blocks in the editor on large regions; display only, selection unaffected.
+- **Suggested next step:** Ship hazard runs coarse to fine like biomes (`BiomeBinCodec` levels 32/4/1, finer levels bin by bin via a level field on `hazard-delta`, bad share per stretch). Stopgap: raise the cap to about 1 MiB.
+- **Linear:** RTP-72
+
+### 2026-10-18 - Devstack compose files set `RUN_AS_UID`/`RUN_AS_GID`, which the itzg image ignores
+
+- **Severity:** Medium
+- **Status:** Open
+- **Discovered during:** fixing the nightly `versions-smoke` jobs (`docker-compose.versions.yml` now uses `UID`/`GID`)
+- **Location:** `devstack/docker-compose.yml` (backends), `docker-compose.compat.yml`, `docker-compose.fabric.yml`, `docker-compose.legacy.yml`, `docker-compose.sweep.yml`
+- **Symptom / hypothesis:** The itzg `start` script reads `UID`/`GID` and drops to uid 1000 otherwise (`docker run -e RUN_AS_UID=0` logs `Running as uid=1000`); `user: "0:0"` does not help because the entrypoint still demotes via `gosu`. Works on Docker Desktop for Windows (permissive binds), fails on Linux where Docker creates missing bind dirs root-owned (`AccessDeniedException: ./world/session.lock`).
+- **Impact:** The nightly `Devstack Acceptance Smoke` job (now past `npm ci`) and Linux contributors are likely to hit the same boot failure.
+- **Suggested next step:** Replace `RUN_AS_UID`/`RUN_AS_GID` with `UID: "0"`/`GID: "0"` plus `SKIP_CHOWN_DATA: "TRUE"`, then re-run the nightly workflow.
+
 ### 2026-10-14 - Folia safety scan reads live neighbour chunks off-thread when the centre is an Anvil view
 
 - **Severity:** Medium
@@ -130,6 +173,36 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** Violates the Tier 1-4 package DAG in ADR-115, tangling configuration parsing with pipeline task dispatching and region lifecycle.
 - **Suggested next step:** Extract reload orchestration into a Tier 4 coordinator (`ConfigReloader` / `RTPConfigLifecycleCoordinator`), and invert pipeline task creation in `Region` using a task factory or dispatcher delegate.
 - **Linear:** RTP-68
+
+### 2026-10-18 - Quarantine warning drops the YAML parse reason
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** GIF demo presets (a trigger written with inline `pos1: { x: .. }` maps)
+- **Location:** `rtp-core/.../configuration/ConfigParser.java` `check` (~1060-1072)
+- **Symptom / hypothesis:** When the file database cannot load a YAML file, the log says only "could not be parsed; quarantining". The `RtpYamlParseException` key and line (here `rtpYaml.unsupported.flowMap`) never reach the operator, and for an action file with no shipped default the file just disappears into `*.corrupt-<ts>`.
+- **Impact:** Operators who copy the inline-map trigger example from older docs lose the action with no hint why.
+- **Suggested next step:** Carry the parse exception from the file database to this warning and log its message key and line.
+
+### 2026-10-18 - Deleted effect group file is written back once on the next start
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** GIF demo presets (`definitions/effects/rift.yml` removed while the server was stopped)
+- **Location:** effects `MultiConfigParser` save path (not traced); seen on Paper 26.2 with LeafRTP 3.3.0
+- **Symptom / hypothesis:** After a run that loaded `rift.yml`, stopping the server, deleting the file and removing the Rift addon jar, the next start recreates `rift.yml`. Deleting it again then stays deleted. Likely the group list persists (database or shutdown save) and is re-materialised once.
+- **Impact:** An operator deleting an effect group while the server is down can see it come back once.
+- **Suggested next step:** Reproduce with a plain group file (no addon), find where the group list is persisted, and drop groups whose file is gone at load.
+
+### 2026-10-18 - `gif-preset.sh` exits silently when no LeafRTP-Pro jar is present
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** portal preset trigger box (testing `write_portal` against a scratch server dir)
+- **Location:** `scripts/gif-preset.sh` line 26 (`PRO_JAR="$(ls ... | head -1)"`)
+- **Symptom / hypothesis:** Under `set -euo pipefail` the failing `ls` makes the assignment fail, so the script exits with status 2 before printing anything, for every preset including `list` and `status`.
+- **Impact:** On a demo dir without the Pro jar the script appears to do nothing.
+- **Suggested next step:** Append `|| true` to the substitution; `want_addon` already reports a missing jar for the `gui` preset.
 
 ### 2026-10-14 - FoliaRegionProcessor is never constructed
 
@@ -291,6 +364,41 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** For location `500` with `rotation=90`, `xzToLocation(locationToXZ(500))` returns `-9549`. The two transforms are probably rotating in opposite or inconsistent directions.
 - **Impact:** Any path that maps a placement back to its index (verification, coverage bookkeeping, backlog) mis-identifies placements on rotated rectangles.
 - **Suggested next step:** Write a round-trip property test across rotations 0/45/90/180, then fix the inverse rotation.
+
+### 2026-10-18 - `ActionLifecycleTerminalAndConfinementTest` fails when run after other `rtp-core` tests
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** `teleportDelay` seconds fix (filtered run `--tests '*ConfigParser*' '*TeleportPipelineTask*' '*Placeholder*' '*Delay*' '*Cooldown*'`)
+- **Location:** `rtp-core/src/test/.../action/ActionLifecycleTerminalAndConfinementTest.java` ~123 and ~206 (casts `RTP.scheduler` to `MockRTPScheduler`); `RTP.java` ~1484-1488 wraps `RTP.scheduler` in `ProfilingRTPScheduler`
+- **Symptom / hypothesis:** "Delayed terminal lifecycle step aborts if player went offline" throws `ClassCastException: ProfilingRTPScheduler cannot be cast to MockRTPScheduler` in a shared JVM and passes alone. An earlier test leaves the profiling wrapper installed on the static scheduler.
+- **Impact:** Test-order flake only; no runtime effect.
+- **Suggested next step:** Install a fresh `MockRTPScheduler` in the test's own setup (or unwrap `ProfilingRTPScheduler`) instead of casting the shared static.
+
+### 2026-10-13 - Block-list rejection log still names `safety.yml`
+
+- **Severity:** Cosmetic
+- **Status:** Open
+- **Discovered during:** v3.3.0 pre-release front-page audit (block-list grammar section)
+- **Location:** `PregenState` / `QueueTask` warnings `[safety.yml] rejected unsafe-blocks token ...`
+- **Symptom / hypothesis:** `unsafeBlocks` / `airBlocks` live in `advanced/blocks.yml` (lists in an old `safety.yml` are migrated there, ADR-071), but the warning prefix still names `safety.yml`.
+- **Impact:** Operators look in the wrong file for the rejected token. FRONT_PAGE.md quotes the current text and explains the mismatch, so it needs updating with the fix.
+- **Suggested next step:** Change the prefix to `[advanced/blocks.yml]` (message text is a log string, not a `messages.yml` key) and update the quoted line in `docs/publishing/FRONT_PAGE.md`.
+
+### 2026-10-13 - `/rtp config language` suggests 5 of the 11 bundled locales
+
+- **Severity:** Cosmetic
+- **Status:** Open
+- **Discovered during:** front-page underselling pass (11-languages bullet)
+- **Location:** `rtp-core/.../commands/config/LanguageCmd.java` `BUNDLED_LOCALES` (en, de, es, fr, nl); `LanguageBootstrap.writeDefault` fallback comment ("Bundled locales: en, de, es, fr")
+- **Symptom / hypothesis:** `rtp-plugin/src/main/resources/lang/` ships de, es, fr, it, ja, ko, nl, pl, pt, ru, zh (plus the `cat` novelty locale). `sanitize` accepts all of them, but tab completion and the fallback `language.yml` comment list fewer.
+- **Impact:** Operators may not know it, ja, ko, pl, pt, ru or zh exist unless they read the docs; typing them works.
+- **Suggested next step:** Derive the suggestion set from the jar's `lang/` entries (or one shared constant checked by `LocaleParityTest`) and use it for the fallback comment.
+
+<!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->
+ypothesis:** "Delayed terminal lifecycle step aborts if player went offline" throws `ClassCastException: ProfilingRTPScheduler cannot be cast to MockRTPScheduler` in a shared JVM and passes alone. An earlier test leaves the profiling wrapper installed on the static scheduler.
+- **Impact:** Test-order flake only; no runtime effect.
+- **Suggested next step:** Install a fresh `MockRTPScheduler` in the test's own setup (or unwrap `ProfilingRTPScheduler`) instead of casting the shared static.
 
 ### 2026-10-13 - Block-list rejection log still names `safety.yml`
 

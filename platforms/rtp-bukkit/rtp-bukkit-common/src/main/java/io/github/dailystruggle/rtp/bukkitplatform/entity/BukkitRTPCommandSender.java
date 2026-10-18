@@ -201,7 +201,7 @@ public class BukkitRTPCommandSender implements RTPCommandSender {
         if (RTP.configs == null) return 0;
         ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
         Object val = (configParser != null) ? configParser.getConfigValue(ConfigKeys.teleportCooldown, 0) : 0;
-        return ConfigParser.parseDurationMillis(val, 0L);
+        return ConfigParser.parseSecondsDurationMillis(val, 0L);
       }
       return TimeUnit.SECONDS.toMillis(cooldown);
     } catch (Throwable t) {
@@ -218,7 +218,7 @@ public class BukkitRTPCommandSender implements RTPCommandSender {
         if (RTP.configs == null) return 0;
         ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
         Object val = (configParser != null) ? configParser.getConfigValue(ConfigKeys.teleportDelay, 0) : 0;
-        return ConfigParser.parseDurationMillis(val, 0L);
+        return ConfigParser.parseSecondsDurationMillis(val, 0L);
       }
       return TimeUnit.SECONDS.toMillis(delay);
     } catch (Throwable t) {

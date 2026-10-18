@@ -564,6 +564,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
                         player.getLocation().z());
         RTP.getInstance().latestTeleportData.put(playerId, teleportData);
       }
+      recordOriginIfMissing(player);
       teleportData.nextTask = this;
       teleportData.targetRegion = region;
 
@@ -769,6 +770,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
                           player.getLocation().z());
           RTP.getInstance().latestTeleportData.put(playerId, teleportData);
         }
+        recordOriginIfMissing(player);
         teleportData.nextTask = this;
         teleportData.targetRegion = region;
         teleportData.selectedCoords = coords;
@@ -888,8 +890,14 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
       // Fallback to coordinates-based lookup at the region level if available.
       // RTPChunkManager no longer supports direct coordinate-based lookups.
       if (chunkSet == null) {
+        // Cached location with no chunk set to await: the teleportDelay warmup still applies.
+        long toTicks = remainingDelayTicks();
         currentPhase = Phase.TELEPORT;
-        RTP.scheduler.runTask(this);
+        if (toTicks > 0) {
+          RTP.scheduler.runTaskForPlayer(player(), this, toTicks);
+        } else {
+          RTP.scheduler.runTask(this);
+        }
         return;
       }
 
@@ -913,13 +921,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
 
                 RTP.log(Level.FINER, "[PIPELINE_TRACE] runLoad chunkSet completed result=" + aBoolean);
 
-                long start = System.currentTimeMillis();
-                long lastTime = teleportData.time;
-                long delay = RTP.getDelay(sender(), region != null ? region.getSettings() : null);
-                long dT = (start - lastTime);
-                long remainingTime = delay - dT;
-                long toTicks = remainingTime / 50;
-                if (toTicks < 0) toTicks = 0;
+                long toTicks = remainingDelayTicks();
 
                 loadPostActions.forEach(consumer -> consumer.accept(this));
                 currentPhase = Phase.TELEPORT;
@@ -934,6 +936,30 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
       currentPhase = Phase.CLEANUP;
       runCleanup();
     }
+  }
+
+  /**
+   * Adopted TeleportData (RTPCmd, Region.execute) carries only the sender; without an origin the
+   * cancelDistance move check and /rtp back have nothing to measure from.
+   */
+  private void recordOriginIfMissing(RTPPlayer player) {
+    if (teleportData.originalCoords != null) return;
+    RTPLocation loc = player.getLocation();
+    if (loc == null || loc.world() == null) return;
+    teleportData.originalCoords = new RTPCoords(loc.world().name(), loc.x(), loc.y(), loc.z());
+    if (teleportData.originWorldName == null) teleportData.originWorldName = loc.world().name();
+    if (teleportData.originServerId == null
+        && io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE != null) {
+      teleportData.originServerId =
+          io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap.LIVE.serverId();
+    }
+  }
+
+  /** Ticks left of the teleportDelay warmup measured from {@code teleportData.time}; never negative. */
+  private long remainingDelayTicks() {
+    long delay = RTP.getDelay(sender(), region != null ? region.getSettings() : null);
+    long remainingTime = delay - (System.currentTimeMillis() - teleportData.time);
+    return Math.max(remainingTime / 50, 0L);
   }
 
   private void runTeleport() {
