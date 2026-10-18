@@ -187,9 +187,9 @@ Changing a radius invalidates cached locations for that region, so the first few
 ### Common Shape Keys
 - `name`: The shape engine to use.
 - `mode`: The selection logic.
-  - `ACCUMULATE`: (Recommended) Draws only from chunks not known to be bad, so learned bad ground costs nothing. Best for most cases. With `expand: false` a spot can occasionally come up again; see [Spacing, repeats and worst case by mode](#spacing-repeats-and-worst-case-by-mode).
+  - `ACCUMULATE`: Draws only from chunks not known to be bad, so learned bad ground costs nothing and every draw is a guaranteed O(1). Use it if you need that guarantee. With `expand: false` a spot can occasionally come up again; see [Spacing, repeats and worst case by mode](#spacing-repeats-and-worst-case-by-mode).
   - `NEAREST`: Finds the closest non-blocked spot. Fast but may cause clustering.
-  - `REROLL`: Skips known-bad chunks and draws again. On `CIRCLE` and `SQUARE` no spot comes up twice until the shuffle has cycled, and spacing stays exact; each known-bad chunk costs one in-memory check. See [Spacing, repeats and worst case by mode](#spacing-repeats-and-worst-case-by-mode).
+  - `REROLL`: (Default) Skips known-bad chunks and draws again. On `CIRCLE` and `SQUARE` no spot comes up twice until the shuffle has cycled, and spacing stays exact; each known-bad chunk costs one in-memory check, so a draw is O(1) apart from that rejection cost. See [Spacing, repeats and worst case by mode](#spacing-repeats-and-worst-case-by-mode).
   - `NONE`: No pre-check. Fastest but ignores pre-computed safety data.
 - `centerX` / `centerZ`: The center of the region in **chunks**.
 - `uniquePlacements`: Chunk radius cleared around a spot once a player lands there so it is never reused. `0` = off, `1` = the landing chunk only, `N` = an `(2N-1)x(2N-1)` chunk square. (Legacy `true`/`false` still work and map to `1`/`0`.) It only takes effect with `expand: true`, where the region grows to replace the cleared area; with `expand: false` it is ignored so the region cannot run out of destinations. Setting `auto` automatically derives the radius from the server's effective view distance (lowest power of 2 at or under view distance, e.g. 10 -> 8 chunks). When paired with `expand: true` in dual-layer shapes, it enables zero-memory dyadic stride downsampling ($S = (2R_u-1)^2$), keeping concurrent players isolated by view distance while driving rapid outward frontier expansion.
@@ -202,7 +202,7 @@ Candidates come from a keyed shuffle of the region, drawn in lanes that take the
 
 The two modes handle known-bad ground differently:
 
-| | `ACCUMULATE` (default) | `REROLL` |
+| | `ACCUMULATE` | `REROLL` (default) |
 |---|---|---|
 | What it draws from | Only chunks not known to be bad | Every chunk; a known-bad chunk is skipped and the next one drawn |
 | Back-to-back spacing | In a simulation with 40% bad ground, pairs under 256 blocks were about 95% rarer than with random picks. Loosens toward random where the region has learned large bad areas (from `/rtp scan` or pregen) | Exact. A bad chunk removes one spot from the lane and moves no other |

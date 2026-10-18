@@ -35,18 +35,19 @@ the document is partitioned into three non-overlapping functional zones. Do not
 blur boundaries between zones when updating copy:
 
 Section order (fixed; do not reorder per target):
-  1. What it is + hero image + one-line install   (what is this, can I use it)
+  1. What it is + hero image   (what is this, can I use it)
   2. The short version: 1 headline + 5 outcome bullets; the rest sit in a
      collapsed 'More highlights' block   (why this one)
      Short-version bullets are `[**Adjective**](link): measured fact.`
      (Efficient, Fast, Distinct, Portable, ...). Keep that form; do not turn
      the labels into sentences.
   3. Zone 2: common setups, install, features summary   (how do I use it)
-  4. Zone 3: performance, how it works summary, FAQ   (why should I believe it)
+  4. Zone 3: performance, how it works summary, testing and quality gates   (why should I believe it)
   5. Why I made it
+  6. Reference after the story: paid-listing block (BuiltByBit only), commands and permissions, configuration files, block-list grammar, FAQ, support   (look things up)
 Rule: a section moves up only if the section above it answers a question the
-reader asks earlier. The one-line install above the fold is the only allowed
-duplication of Install. Hero: a web editor screenshot (map, no jargon); the
+reader asks earlier. Install steps appear once, in Install; do not repeat
+them above the fold. Hero: a web editor screenshot (map, no jargon); the
 spatial-memory walk image stays in Zone 3 (it reads as noise above the fold).
 Use screenshots whose status pill reads LINK - CONNECTED.
 Bullets anywhere on the page are a label, a link to the proof and a fact.
@@ -79,13 +80,15 @@ Zone 2: Operational On-Ramp & Zero-Friction Migration (Immediate Action)
 Zone 3: Architectural Proof & Technical Transparency (Deep Foundation)
   - Audience: Folia operators, network architects, skeptics, and engineers.
   - Scope: Full benchmark tables (harness in helpers/StressTestRTP/), scatter
-    charts, spatial memory benchmarks, region-file pre-filter (.mca and .linear), quality gates, and FAQ.
+    charts, spatial memory benchmarks, region-file pre-filter (.mca and .linear),
+    quality gates, and test findings. The FAQ and other reference blocks sit in
+    section 6, after 'Why I made it'.
   - Rule: Retain 100% mathematical and technical precision. Nothing is deleted:
     full feature lists, mechanism write-ups and the quality-gate table live in
     docs/site/features.md, how-it-works.md and quality-gates.md, and this page
     keeps a short summary plus a relative link to each. Edit the moved text in
     the docs page, not here. Benchmarks, caveats and the test findings stay on
-    this page. Commands/permissions stay here until docs/admin/COMMANDS.md
+    this page. Commands/permissions sit in section 6 until docs/admin/COMMANDS.md
     covers every command and permission in that block (it lacks several).
     Head-to-head competitor comparisons live strictly in the Performance section.
 
@@ -94,6 +97,18 @@ Listing metadata (for the marketplace form fields, not emitted):
   Free title:             "LeafRTP"       tagline: "Off-tick random teleport engine with spatial memory"
   (Modrinth's short description still reads "Fast Random Teleportation for everyone,
    configurable and extensible" - replace it there with the free tagline above.)
+
+Reviewer notes (read before reviewing the Performance section):
+  - LeafRTP's shipped defaults (refill `period: 20`, ready queue 50, backlog
+    1,000, pause on low TPS) are sized for typical usage rates. They do not
+    change per-teleport cost or how the plugin performs; they only cap how
+    fast input is accepted. The benchmark config lifts that cap so the
+    harness can find the break point. Do not report the bench tuning as an
+    unfair advantage or a hidden disclosure problem.
+  - The Folia numbers reproduce on the current build. Long runs always span
+    several builds; do not ask for every run to be on one build.
+  - Spacing: the pass threshold is 48 blocks; the closest measured pair was
+    70 blocks. Both figures are true; use them together.
 
 Private / Author notes:
   - Run a future memory leak test using the behaviour leak fuzzer (`scripts/bench_fuzz.py`) across all candidate plugins on Folia/Paper to evaluate long-duration heap bounds and update the memory retention comparisons.
@@ -121,8 +136,6 @@ I've worked on it in my own time since 2021. The benchmarks and the test harness
 
 One jar for Paper and Spigot (1.18+), Folia (1.21.11+), Fabric (1.20.1 and 1.21+, needs Fabric API) and NeoForge (1.21.1+), up to 26.3. It also loads on Velocity for `/rtp` across a network.
 
-**Install:** drop `{{jar}}` into `plugins/` (or `mods/`), start the server, type `/rtp`. Full steps are in [Install](#install).
-
 ![Web editor: a circular region with an inner exclusion zone drawn over the world map](../assets/img/web_editor_region_map.png)
 
 *Drawing where players land, in the browser editor (`/rtp editor`).*
@@ -147,7 +160,7 @@ On Folia, spots are checked against the world files on disk first, nothing waits
 
 - [**Efficient**](https://dailystruggle.github.io/RTP/admin/configuration/PERFORMANCE/): the server stayed at full speed through all 4,194 paced teleports, at up to 20 a second.
 - [**Fast**](#performance): 40 teleports per second on Paper and 180 per second on Folia, at full server speed.
-- [**Distinct**](https://dailystruggle.github.io/RTP/site/why/): no two players sent to the same block in two Paper 26.2 stress runs of 15,420 and 15,494 teleports.
+- [**Distinct**](../site/how-it-works.md#spacing-between-players): in two Paper 26.2 runs of 4,096 teleports each, no two players landed within 48 blocks of each other and the closest pair was 70 blocks apart; random picks put about 80 pairs that close in each run.
 - [**Portable**](https://dailystruggle.github.io/RTP/admin/MIGRATION/#migrating-from-another-rtp-plugin): `/rtp config import` reads your BetterRTP, JustRTP or EzRTP config, previews it, and never overwrites without `overwrite=true`.
 - [**One jar**](https://dailystruggle.github.io/RTP/admin/QUICK_START/): the same core on Paper, Spigot, Folia, Fabric and NeoForge, and on Velocity for `/rtp` across a network.
 
@@ -170,7 +183,7 @@ These work without extra plugins:
 
 - [**Spawn portals & launch pads**](https://dailystruggle.github.io/RTP/admin/ACTIONS/): Step-in trigger zones over portal frames or launch pads run teleports, with an optional countdown hologram and effects.
 - [**First-join random spawn**](https://dailystruggle.github.io/RTP/admin/RECIPES/#rtp-on-first-join-random-spawn-for-new-players): Grant `rtp.onevent.firstjoin` to send new players to random spots on login. A reserve cache keeps a destination ready.
-- [**Survival and resource worlds**](https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/#spacing-repeats-and-worst-case-by-mode): Players start far from each other's bases. In the Paper 26.2 runs, none of 4,096 landings was within 48 blocks of another. On the default `ACCUMULATE` mode a used spot can still come up again about as often as pure random picking would; set the region to `REROLL` if every spot must be used once before any repeats.
+- [**Survival and resource worlds**](https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/#spacing-repeats-and-worst-case-by-mode): Players start far from each other's bases. In two Paper 26.2 runs of 4,096 teleports each, no two landings were within 48 blocks and the closest pair was 70 blocks apart. The default `REROLL` mode uses every spot once before any repeats; set the region to `ACCUMULATE` if every pick must take a fixed time, and a used spot can then come up again about as often as pure random picking would.
 
 More setups: [Features](../site/features.md#common-setups), [recipes](../admin/RECIPES.md), [actions guide](../admin/ACTIONS.md).
 
@@ -213,13 +226,17 @@ More: [Features](../site/features.md). Commands and permissions are in the colla
 
 ## Performance
 
-Most of an rtp plugin's work happens inside server API calls, so a profiler lists it under generic chunk functions. The public harness in [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP) attributes it back to the plugin. Rig: AMD Ryzen Threadripper 7970X (32 cores / 64 threads, 128 GB RAM, NVMe), Ubuntu 24.04 LTS, Java 25, 16 GB heap, 48 scripted bot clients (`devstack/clients/bench-swarm.js`). On Paper, the server ran under realtime scheduling (`SCHED_FIFO`, priority 10) with only the plugin under test loaded, and restarted before every run. Each run steps through 60 s stages at 5, 10, 20, 40, 80, 160 and 320 teleports per second and stops after two failed stages in a row. The other plugins' Paper rows pool 4 runs each from 2026-10-17; LeafRTP's pool 2 runs of the current 3.3.0 build from 2026-10-18 (`20261018-022257`, `20261018-023204`). The Folia columns come from earlier Folia runs and haven't been rerun on this build. Each plugin ran on the latest version it supported at the time of the run, with cooldowns, delays and countdowns zeroed and its queue on at its default size where it has one. The other plugins ran at their documented defaults, because I can't tune settings their authors don't document. LeafRTP ran tuned ([config and the full list of changes](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP/bench-config/paper-26.2)): queue refill every tick (`period: 1`; the shipped default is `period: 20`) with no pause when server speed drops, a smaller ready queue (10 spots; shipped 50) and no backlog of unverified spots (shipped 1,000). The tuning was for finding where it breaks: it lets LeafRTP spend more server time per second than the shipped settings allow, while a shipped install refills more slowly and pauses when the server lags. Read the LeafRTP rows as a throughput ceiling under worst-case load, not as what an untouched install does.
+Most of an rtp plugin's work happens inside server API calls, so a profiler lists it under generic chunk functions. The public harness in [`helpers/StressTestRTP/`](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP) attributes it back to the plugin. Rig: AMD Ryzen Threadripper 7970X (32 cores / 64 threads, 128 GB RAM, NVMe), Ubuntu 24.04 LTS, Java 25, 16 GB heap, 48 scripted bot clients (`devstack/clients/bench-swarm.js`). On Paper, the server ran under realtime scheduling (`SCHED_FIFO`, priority 10) with only the plugin under test loaded, and restarted before every run.
+
+Each Paper run steps through 60 s stages at 5, 10, 20, 40, 80, 160 and 320 teleports per second and stops after two failed stages in a row. The other plugins' Paper rows pool 4 runs each from 2026-10-17; LeafRTP's pool 2 runs of the 3.3.0 build (`20261018-022257`, `20261018-023204`). The Folia columns come from separate Folia ramps, and they reproduce on the current build. Each plugin ran on the latest version it supported at the time of the run, with cooldowns, delays and countdowns zeroed and its queue on at its default size where it has one.
+
+The other plugins ran at their documented defaults, because I can't tune settings their authors don't document. LeafRTP's shipped refill, queue and backlog settings (refill every 20 ticks, a 50-spot ready queue, a 1,000-spot backlog, a pause when server speed drops) are sized for typical player traffic, and all they do is limit how fast new requests are taken in. The bench config lifts that limit so the harness can find the break point: refill every tick (`period: 1`) with no pause, a 10-spot ready queue and no backlog ([config and the full list of changes](https://github.com/dailystruggle/RTP/tree/V3/helpers/StressTestRTP/bench-config/paper-26.2)). The cost of each teleport is the same either way.
 
 <!-- only: bbb -->
 Both LeafRTP downloads are built from the same code, and the LeafRTP rows apply to either.
 <!-- /only -->
 
-Terms used below: **TP/s** is teleports per second. **TPS** is server ticks per second; 20 is full speed. **MSPT** is milliseconds per tick; above 50 ms the server falls below 20 TPS and players feel lag. A **lag spike** is a tick over 50 ms. **Safe max** is the highest stage a plugin passed in every run: it delivered at least 95% of the requested rate, MSPT p95 stayed at or under 50 ms, and at most 1% of teleports failed. **p95 / p99** is the time that 95% / 99% of teleports came in under.
+Terms used below: **TP/s** is teleports per second. **TPS** is server ticks per second; 20 is full speed and the most it can reach, and normal variation measures a little under it. **MSPT** is milliseconds per tick; above 50 ms the server falls below 20 TPS and players feel lag. A **lag spike** is a tick over 50 ms. **Off-tick** work runs off the server's main tick thread, so it doesn't stall the game loop. A **ready queue** is a stock of spots checked in advance, so most `/rtp` calls are answered without a live check. A **chunk ticket** is a hold that keeps one chunk (a 16 x 16 block column) loaded until the hold is released. **Rejection sampling** picks a random spot, checks it, and draws again on failure, with no cap on retries. **REROLL** (the default) and **ACCUMULATE** are two selection modes: `REROLL` skips known-bad chunks and draws again, at one in-memory check per known-bad chunk, and `ACCUMULATE` draws only from chunks not known to be bad, so every pick is a guaranteed O(1) ([spacing notes](https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/#spacing-repeats-and-worst-case-by-mode)). **Safe max** is the highest stage a plugin passed in every run, with the same rule on Paper and Folia: it delivered at least 95% of the requested rate, MSPT p95 stayed at or under 50 ms, and at most 1% of teleports failed. **p95 / p99** is the time that 95% / 99% of teleports came in under.
 
 I compare throughput under load, latency from `/rtp` to arrival, and tick stability. On Paper, world ticking runs on a single main thread, while on Folia, world ticking is distributed across independent regional worker threads. LeafRTP checks candidates against region files (`.mca` and `.linear`) off-tick and keeps a queue of verified destinations, avoiding synchronous chunk loading and main-thread stalls.
 
@@ -227,7 +244,7 @@ I compare throughput under load, latency from `/rtp` to arrival, and tick stabil
 
 These are snapshots of each plugin under one harness on my hardware. The other plugins make different trade-offs, and most don't aim for 100+ TP/s.
 
-| Plugin | Paper safe max | Paper peak | Folia safe max (20 TPS) | Folia peak |
+| Plugin | Paper safe max | Paper peak | Folia safe max | Folia peak |
 |---|---|---|---|---|
 | **LeafRTP** | **40 TP/s** (MSPT 45 ms, min TPS 19.2) | **103.3 TP/s** | **180 TP/s** (MSPT < 50 ms) | **249.7 TP/s** (19.0 avg TPS) |
 | HuskHomes | 40 TP/s (MSPT 46 ms, min TPS 16.4) | 46.0 TP/s | 60 TP/s | 60.0 TP/s |
@@ -239,7 +256,19 @@ These are snapshots of each plugin under one harness on my hardware. The other p
 In the Paper columns, MSPT is the highest per-run p95 at the safe-max stage, and min TPS is the lowest 10 s average in any of those runs.
 
 - **Paper vs. Folia:** Paper places every arriving player on one main thread, so no plugin here gets much past 40 TP/s at 20 TPS. Above its safe max on Paper, LeafRTP still completed every teleport: 21,924 of 21,924 in the 80 and 160 TP/s stages, delivering up to 103.3 TP/s while the server slowed to about 9-10 TPS (MSPT p95 88-105 ms). Folia spreads that work across region threads, and LeafRTP reached 180 TP/s at 19.6 regional TPS (198 ms median latency), peaking at 249.7 TP/s.
-- **Latency at equal load:** time from `/rtp` to arrival, pooled over each plugin's Paper runs ([table](https://github.com/dailystruggle/RTP/blob/V3/helpers/StressTestRTP/RESULTS.md#paper-262-linux-realtime---latency-at-5-to-40-tps)). At 5, 10 and 20 TP/s, LeafRTP's p50 was 5 ms at every rate and its p99 was 6, 6 and 7 ms (max 58 ms over 4,194 teleports, MSPT p95 21-37 ms per run). JakesRTP had the lowest median (0, 3 and 4 ms) with p99 of 13, 26 and 23 ms, but its MSPT p95 reached 77-118 ms at 40 TP/s. Over the same three rates, HuskHomes' p99 was 426-517 ms, BetterRTP's 709-815 ms and JustRTP's 2,471-2,480 ms. EzRTP's was 905 ms at 5 TP/s, and it failed the 10 TP/s stage on timeouts. At 40 TP/s the ready queue runs out in this config and LeafRTP's p50 rises to 158 ms (p99 285 ms); HuskHomes' was 568 ms (p99 1,574 ms).
+
+**Latency at equal load:** time from `/rtp` to arrival, pooled over each plugin's Paper runs. Each cell is p50 / p99 in milliseconds ([full table with p95](https://github.com/dailystruggle/RTP/blob/V3/helpers/StressTestRTP/RESULTS.md#paper-262-linux-realtime---latency-at-5-to-40-tps)).
+
+| Plugin | 5 TP/s | 10 TP/s | 20 TP/s | 40 TP/s |
+|---|---|---|---|---|
+| **LeafRTP** | 5 / 6 | 5 / 6 | 5 / 7 | 158 / 285 |
+| JakesRTP | 0 / 13 | 3 / 26 | 4 / 23 | 4 / 24 (MSPT p95 77-118 ms) |
+| HuskHomes | 221 / 517 | 224 / 426 | 275 / 474 | 568 / 1,574 |
+| BetterRTP | 156 / 709 | 199 / 806 | 199 / 815 | 510 / 4,323 (127 failed) |
+| EzRTP | 154 / 905 | failed (619 of 2,396) | - | - |
+| JustRTP | 367 / 2,471 | 473 / 2,480 | 476 / 2,477 | failed (25.5 of 40 TP/s delivered) |
+
+`-` means no result in the pooled runs. For LeafRTP at 5, 10 and 20 TP/s the max was 58 ms over 4,194 teleports, and its MSPT p95 was 21-37 ms per run. JakesRTP had the lowest median at those rates, but its MSPT p95 reached 77-118 ms at 40 TP/s. At 40 TP/s LeafRTP's ready queue runs out in this config, so those teleports wait on a live selection.
 
 <details>
 <summary><b>What I changed on each plugin so they do the same job</b></summary>
@@ -301,7 +330,7 @@ What they found:
 
 - **Retained player sessions (fuzzer).** LeafRTP kept a disconnected player's objects alive through its last-teleport records. The fuzzer flagged it and it reproduced on replay; it is fixed in 3.3.0 and covered by a regression test. The latest 3.3.0 run retained 0 players across 86 episodes, including config reloads. The run found nothing within its budget, which doesn't rule a leak out.
 - **Main-thread chunk load on arrival (spark).** A profile of the Paper stress run put 14.1 s of a 115.7 s phase (about 3.4 ms per teleport) in the arriving player's first tick loading its landing chunk synchronously. The cause was the arrival chunk ticket being released before the player's own ticket held it. The fix keeps the ticket through the first ticks. A later spark profile of the Linux 100 TP/s run (`20261009-085505`, 5.8k teleports per profile window) shows `Entity.isInWall` at 0.02-0.03 s of 59.5 s on the server thread, with no chunk load under it.
-- **Repeats under spacing (simulation).** Modelling consecutive landings showed that with `expand: false` a used chunk can come up again at about the random-pick rate. This is disclosed in [the region spacing notes](https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/#spacing-repeats-and-worst-case-by-mode). Both obvious fixes were tested and ruled out.
+- **Repeats under spacing (simulation).** Modelling consecutive landings showed that with `expand: false` a used chunk can come up again under "ACCUMULATE" mode due to continuously shifting offsets. This is disclosed in [the region spacing notes](https://dailystruggle.github.io/RTP/admin/configuration/REGIONS/#spacing-repeats-and-worst-case-by-mode). Both obvious fixes were tested and ruled out.
 - **Harness errors.** An overnight driver loaded the wrong plugin set for four Linux rows, so they measured a server without the plugin. I caught it on inspection and threw those rows out.
 - **Fuzzer scoring noise.** An object count the control run lacks can score as a leak while retained memory matches the control. I read verdicts against bytes retained and replay every candidate before trusting it.
 
@@ -380,7 +409,9 @@ Switching between the free download and this one is a jar swap. Config, data fil
 | `/rtp clear <cache\|cooldown\|queue\|limit\|invuln>` | Clear location caches, cooldowns, queues, use limits or invulnerability | `rtp.admin` |
 | `/rtp info` | Operator diagnostics | `rtp.info` |
 | `/rtp reload [file]` | Reload all configuration, or one file | `rtp.reload` |
-| `/rtp config <file> view\|set <k>=<v>` | View or set a config key, then reload | `rtp.config` |
+| `/rtp config <file> <key>=<value> [...]` | Set one or more keys in a file (dotted for nested keys, e.g. `/rtp config regions default shape.radius=10km`), save, then reload | `rtp.config` + `rtp.update` |
+| `/rtp config <file> view\|viewraw` | Open a config file as a book menu, or print its raw YAML to chat | `rtp.config` |
+| `/rtp config <regions\|worlds> add=<name>\|remove=<name>` | Create or delete a region or world file (`default` can't be removed) | `rtp.config` |
 | `/rtp config import [source] [path=<dir>] [overwrite=true]` | Translate another rtp plugin's config (auto-detected, or any folder via `path=`); never overwrites without `overwrite=true` | `rtp.config` |
 | `/rtp config import permissions [source] [apply=true]` | Dry-run the LuckPerms commands that copy BetterRTP, JustRTP or EzRTP nodes onto `rtp.*`; `apply=true` runs them | `rtp.config` |
 | `/rtp config language <locale>` | Switch config files and messages to a bundled locale, then reload | `rtp.config` |
@@ -398,9 +429,12 @@ Switching between the free download and this one is a jar swap. Config, data fil
 | `rtp.params` | `op` | Per-call overrides (`centerx=`, `centerz=`, `radius=`) |
 | `rtp.personalqueue` | `false` | Reserve a per-player pre-warmed location |
 | `rtp.onevent.*` | `false` | Auto-RTP on join / firstjoin / respawn / changeworld / move / teleport |
-| `rtp.back` | `op` | `/rtp back` (not declared in `plugin.yml`; op by server default) |
-| `rtp.editor` | `op` | `/rtp editor` and its subcommands (not declared in `plugin.yml`; op by server default) |
-| `rtp.gui` | `op` | `/rtp gui` (not declared in `plugin.yml`; op by server default) |
+| `rtp.back` | `op` | `/rtp back` |
+| `rtp.editor` | `op` | `/rtp editor` and its subcommands |
+| `rtp.gui` | `op` | `/rtp gui` |
+| `rtp.action` | `op` | `/rtp action <name>`; each action also checks `rtp.action.<name>` (or the permission set in its file) |
+| `rtp.action.cancel` | `op` | `/rtp action cancel` for your own entries; `rtp.action.cancel.other` for other players and session IDs |
+| `rtp.update` | `op` | Setting keys with `/rtp config <file> <key>=<value>`; granted by `rtp.config` |
 | `rtp.servers.*` | `true` | Cross-server destinations in network mode (was `op` before 3.3.0) |
 | `rtp.admin` | `op` | `/rtp clear`, plus `rtp.reload`, `rtp.config`, `rtp.scan`, `rtp.info` and `rtp.menu.admin` |
 | `rtp.admin.setup` | `op` | `/rtp admin setup` wizard |
@@ -411,7 +445,7 @@ Switching between the free download and this one is a jar swap. Config, data fil
 | File | Controls | Example keys |
 | --- | --- | --- |
 | `config.yml` | Delays, cooldowns, move-cancel distance | `teleportDelay`, `teleportCooldown`, `cancelDistance` |
-| `definitions/regions/<name>.yml` | Shape, radius, center, price, permissions | `shape`, `radius`, `price`, `requirePermission` |
+| `definitions/regions/<name>.yml` | Shape, radius, center, price, permissions | `shape.name`, `shape.radius`, `price`, `requirePermission` |
 | `safety.yml` | Invulnerability, landing platforms, PvP check | `invulnerabilityTime`, `platformRadius`, `pvpCheckEnabled` |
 | `advanced/blocks.yml` | Unsafe blocks (lava, water), air blocks and block tags | `unsafeBlocks`, `airBlocks` |
 | `economy.yml` | Vault pricing and cancellation refunds | `price`, `refundOnCancel` |
@@ -443,13 +477,13 @@ Unknown tags and properties fail open: a config written for a newer MC version s
 <summary><b>FAQ</b></summary>
 
 **Q: Will players land on top of each other or in each other's bases?**
-A: Rarely, and no player positions are tracked. In the Paper 26.2 runs (4,096 teleports each) no spot repeated and the closest pair of landings was 70 blocks apart; that is a measured result, not a minimum. On the default `ACCUMULATE` mode a used spot can come up again at about the random-pick rate; `REROLL` doesn't repeat a spot until the shuffle has cycled. See [Spacing between players](../site/how-it-works.md#spacing-between-players).
+A: Rarely, and no player positions are tracked. In two Paper 26.2 runs of 4,096 teleports each, no spot repeated, no two landings were within 48 blocks and the closest pair was 70 blocks apart; that is a measured result, not a guaranteed minimum. The default `REROLL` mode doesn't repeat a spot until the shuffle has cycled; on `ACCUMULATE` a used spot can come up again at about the random-pick rate. See [Spacing between players](../site/how-it-works.md#spacing-between-players).
 
 **Q: How does it avoid lagging the server?**
 A: Most `/rtp` calls are served from a queue of locations checked before anyone typed the command. The queue refills off the main thread: it skips ground it has already rejected and checks the rest against the region files before loading any chunk. Details are in [How it works](../site/how-it-works.md).
 
 **Q: Is it complicated to set up?**
-A: No. Sizing and configuring your regions takes a couple of minutes through the guided setup wizard (`/rtp admin setup`), the web workspace (`/rtp editor`), or in-game book (`/rtp admin`). If you are migrating from another plugin, `/rtp config import` finds its folder and translates your existing files, with a preview before anything is written.
+A: No. The guided setup wizard (`/rtp admin setup`) picks a preset for your server type. It doesn't ask for a radius, so size each region in the web workspace (`/rtp editor`), the in-game book (`/rtp admin`), or with one command (`/rtp config regions default shape.radius=10km`). If you are migrating from another plugin, `/rtp config import` finds its folder and translates your existing files, with a preview before anything is written.
 
 **Q: How is the web editor secured? Does it open ports on my server?**
 A: Not to the outside. The hosted editor needs no inbound port: it connects outbound over TLS to an ephemeral WebSocket relay. Local mode (`/rtp editor local`) binds a token-authenticated socket on `127.0.0.1` only, which nothing outside the machine can reach. All messages require RSA-2048 signatures with strictly increasing sequence counters and single-use, expiring trust nonces.
@@ -461,7 +495,7 @@ A: "RTP" is the generic name for random teleport, and the old name was just the 
 A: Yes, on Folia 1.21.11 and newer. Folia is experimental and only its current builds are maintained, so older Folia builds aren't supported; they can crash on their own. How it loads chunks there is under [Chunk loading, by platform](../site/how-it-works.md#chunk-loading-by-platform). In the Folia benchmarks it had 0 watchdog stalls.
 
 **Q: How do I set up teleportation between worlds?**
-A: Resolution order: the player's current world (or the `world=` parameter) -> that world's target region -> the region's target world. See the admin guide.
+A: Resolution order: the player's current world (or the `world=` parameter) -> that world's target region -> the region's target world. See [World configuration](../admin/configuration/WORLDS.md).
 
 **Q: Do you support triangle / diamond region shapes?**
 A: Use the `Polygon` shape. A triangle is a 3-vertex polygon and a diamond is a rotated square.
@@ -506,7 +540,7 @@ A: Open a GitHub issue with your server version, LeafRTP version, platform, the 
 Support is me, in my spare time, so it's best effort.
 
 - For config questions, try the [web workspace](../admin/WEB_EDITOR_GUIDE.md) first (`/rtp editor`): it shows each setting's docs next to the value. I help with bugs and anything still unclear after that.
-- A bug report needs: server version, LeafRTP version, platform, `config.yml`, `regions/`, `safety.yml`, and the relevant part of the server log. If something's missing I'll ask for it.
+- A bug report needs: server version, LeafRTP version, platform, `config.yml`, `definitions/regions/`, `safety.yml`, `advanced/blocks.yml`, and the relevant part of the server log. If something's missing I'll ask for it.
 - "It doesn't work" isn't something I can act on. Tell me what you did, what you expected, and what happened instead.
 - There's no guaranteed response time. Safety bugs (bad landings, chunk leaks, claim bypasses) get looked at first.
 - Feature requests go in GitHub issues.

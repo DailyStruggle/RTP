@@ -109,7 +109,7 @@ defaults:
     # @type: enum
     # @source: shape
     name: "CIRCLE"
-    mode: "ACCUMULATE"
+    mode: "REROLL"
     radius: 4096b
     centerRadius: 64
     centerX: 0

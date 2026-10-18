@@ -35,7 +35,7 @@ public class Ellipse extends MemoryShape<EllipseMemoryShapeParams> {
 
   static {
     try {
-      defaults.put(EllipseMemoryShapeParams.mode, Mode.ACCUMULATE);
+      defaults.put(EllipseMemoryShapeParams.mode, Mode.REROLL);
       defaults.put(EllipseMemoryShapeParams.radius, 256);
       defaults.put(EllipseMemoryShapeParams.radius2, 256);
       defaults.put(EllipseMemoryShapeParams.centerRadius, 64);

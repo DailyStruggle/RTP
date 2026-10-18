@@ -83,7 +83,7 @@ defaults:
     # @type: enum
     # @source: shape
     name: "CIRCLE"
-    mode: "ACCUMULATE"
+    mode: "REROLL"
 
     # Outer edge, in blocks (4096 blocks = 256 chunks).
     radius: 4096b

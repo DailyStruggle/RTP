@@ -30,7 +30,7 @@ worldBorderOverride: false
 # Example per-region override (mirrors the defaults.shape block in config.yml):
 #   shape:
 #     name: "CIRCLE"
-#     mode: "ACCUMULATE"
+#     mode: "REROLL"
 #     radius: 256
 #     centerRadius: 64
 shape: "@config"

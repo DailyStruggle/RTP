@@ -22,6 +22,6 @@ Add an `rtp-fabric-v26_4_R1` submodule and register it for runtime dispatch on t
 ## Consequences
 
 ### Positive
-- Full runtime compatibility when running on Minecraft 26.4 under Fabric.
+- Fabric servers on Minecraft 26.4 resolve a dedicated adapter instead of failing at startup. The carrier is compiled against `26.4-snapshot-4` and has not been booted; runtime compatibility is unverified until 26.4 ships final and passes the latest-release smoke.
 - Preserves the per-line version isolation pattern (ADR-001/ADR-015), ensuring any 26.4 specific API drift does not impact 26.1, 26.2, or 26.3 carriers.
 - Build hosts without JDK 25 continue to build Java 21 modules normally via `-PexcludeJdk25`.

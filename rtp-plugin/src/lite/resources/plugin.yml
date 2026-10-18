@@ -3,6 +3,8 @@
 # this descriptor (the full descriptor is excluded from the lite artifact via
 # DuplicatesStrategy.EXCLUDE).
 # Under ADR-100, the lite assembly has 100% technical and functional parity with Pro.
+# Everything except `main:` shall mirror src/main/resources/plugin.yml verbatim;
+# LitePluginDescriptorParityTest fails the build on drift.
 
 name: RTP
 version: '${version}'
@@ -47,7 +49,8 @@ commands:
 #   rtp.world(s) / rtp.region(s) - cross-world / cross-region targeting (op)
 #   rtp.onevent.*           - automatic RTP on player events (default: false)
 #   rtp.biome.*             - biome-targeted teleports (op)
-#   rtp.scan / rtp.info / rtp.reload / rtp.config - admin tooling (op)
+#   rtp.scan / rtp.info / rtp.reload / rtp.config / rtp.update - admin tooling (op)
+#   rtp.back / rtp.gui / rtp.editor / rtp.action* / rtp.admin.* - subcommands (op)
 #   rtp.*                   - aggregate; grants all of the above
 permissions:
   rtp.see:
@@ -64,6 +67,11 @@ permissions:
     default: op
   rtp.config:
     description: allow player to use /rtp config
+    default: op
+    children:
+      rtp.update: true
+  rtp.update:
+    description: allow player to set config keys through /rtp config <file> <key>=<value>
     default: op
   rtp.scan:
     description: allow player to start scan tasks
@@ -119,8 +127,80 @@ permissions:
     default: op
     children:
       rtp.unqueued: true
+  rtp.personalqueue:
+    description: reserve a next location for this player
+    default: false
+  rtp.onevent.join:
+    description: randomly teleport player on every join
+    default: false
+  rtp.onevent.firstjoin:
+    description: randomly teleport player on player's first join
+    default: false
+  rtp.onevent.respawn:
+    description: randomly teleport player on respawn after death
+    default: false
+  rtp.onevent.changeworld:
+    description: randomly teleport player upon changing worlds
+    default: false
+  rtp.onevent.move:
+    description: randomly teleport player on movement
+    default: false
+  rtp.onevent.teleport:
+    description: randomly teleport player on teleport, recursively
+    default: false
+  rtp.onevent.*:
+    description: inescapable chaos
+    default: false
+    children:
+      rtp.onevent.join: true
+      rtp.onevent.firstjoin: true
+      rtp.onevent.respawn: true
+      rtp.onevent.changeworld: true
+      rtp.onevent.move: true
+      rtp.onevent.teleport: true
+  rtp.biome:
+    description: teleport to any biome you have permission for
+    default: op
+  rtp.biome.free:
+    description: use the biome parameter for free
+    default: op
+  rtp.biome.*:
+    description: use any biome type
+    default: op
+    children:
+      rtp.biome: true
+  rtp.menu.admin:
+    description: show the admin panel entry row in the /rtp menu front page (operator tools submenu)
+    default: op
   rtp.info:
     description: see plugin info and settings
+    default: op
+  rtp.version:
+    description: allow player to use /rtp version (alias /rtp about) to see plugin and server identity
+    default: true
+  rtp.back:
+    description: allow player to use /rtp back to return to where they were before the last teleport
+    default: op
+  rtp.gui:
+    description: allow player to use /rtp gui to open the menu a GUI addon bound to /rtp
+    default: op
+  rtp.editor:
+    description: allow player to use /rtp editor and its subcommands (local, trust, untrust, apply)
+    default: op
+  rtp.action:
+    description: allow player to use /rtp action <name>; each action also checks its own permission (rtp.action.<name> by default)
+    default: op
+  rtp.action.cancel:
+    description: allow player to use /rtp action cancel to leave a queue or cancel their own action entry
+    default: op
+  rtp.action.cancel.other:
+    description: allow player to cancel another player's action entry or a session by UUID
+    default: op
+  rtp.admin.setup:
+    description: allow player to use the /rtp admin setup wizard
+    default: op
+  rtp.admin.prefab:
+    description: allow player to use /rtp admin prefab
     default: op
   rtp.admin:
     description: allow player to use /rtp clear and grant all other admin tooling
@@ -130,15 +210,16 @@ permissions:
       rtp.config: true
       rtp.scan: true
       rtp.info: true
+      rtp.menu.admin: true
   rtp.*:
-    description: grants access to all rtp commands
+    description: access all rtp subcommands
     default: op
     children:
       rtp.see: true
       rtp.use: true
-      rtp.free: true
       rtp.reload: true
       rtp.config: true
+      rtp.update: true
       rtp.noCooldown: true
       rtp.noDelay: true
       rtp.noDelay.chunks: true
@@ -152,41 +233,17 @@ permissions:
       rtp.servers.*: true
       rtp.params: true
       rtp.unqueued: true
+      rtp.biome: true
+      rtp.biome.*: true
+      rtp.menu.admin: true
+      rtp.scan: true
+      rtp.version: true
+      rtp.back: true
+      rtp.gui: true
+      rtp.editor: true
+      rtp.action: true
+      rtp.action.cancel: true
+      rtp.action.cancel.other: true
+      rtp.admin.setup: true
+      rtp.admin.prefab: true
       rtp.admin: true
-  rtp.biome.*:
-    description: allow player to specify any biome
-    default: op
-  rtp.onevent.*:
-    description: allow player to receive automatic RTP on all supported events
-    default: false
-    children:
-      rtp.onevent.join: true
-      rtp.onevent.respawn: true
-      rtp.onevent.changeWorld: true
-  rtp.onevent.join:
-    description: trigger /rtp when player joins the server
-    default: false
-  rtp.onevent.respawn:
-    description: trigger /rtp when player respawns (after death)
-    default: false
-  rtp.onevent.changeWorld:
-    description: trigger /rtp when player changes worlds
-    default: false
-  rtp.effects.*:
-    description: enable all configured teleport particle and sound effects
-    default: false
-  rtp.select.*:
-    description: access to selection shape overrides
-    default: op
-  rtp.bypass.*:
-    description: bypass all gameplay restrictions (cooldowns, delays, safety checks)
-    default: false
-    children:
-      rtp.noCooldown: true
-      rtp.noDelay: true
-      rtp.noDelay.chunks: true
-      rtp.noCancel: true
-      rtp.free: true
-  rtp.cost.bypass:
-    description: bypass economy charges
-    default: false

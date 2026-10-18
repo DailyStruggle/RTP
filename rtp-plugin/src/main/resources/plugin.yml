@@ -52,7 +52,8 @@ commands:
 #   rtp.world(s) / rtp.region(s) - cross-world / cross-region targeting (op)
 #   rtp.onevent.*           - automatic RTP on player events (default: false)
 #   rtp.biome.*             - biome-targeted teleports (op)
-#   rtp.scan / rtp.info / rtp.reload / rtp.config - admin tooling (op)
+#   rtp.scan / rtp.info / rtp.reload / rtp.config / rtp.update - admin tooling (op)
+#   rtp.back / rtp.gui / rtp.editor / rtp.action* / rtp.admin.* - subcommands (op)
 #   rtp.*                   - aggregate; grants all of the above
 permissions:
   rtp.see:
@@ -69,6 +70,11 @@ permissions:
     default: op
   rtp.config:
     description: allow player to use /rtp config
+    default: op
+    children:
+      rtp.update: true
+  rtp.update:
+    description: allow player to set config keys through /rtp config <file> <key>=<value>
     default: op
   rtp.scan:
     description: allow player to start scan tasks
@@ -175,6 +181,30 @@ permissions:
   rtp.version:
     description: allow player to use /rtp version (alias /rtp about) to see plugin and server identity
     default: true
+  rtp.back:
+    description: allow player to use /rtp back to return to where they were before the last teleport
+    default: op
+  rtp.gui:
+    description: allow player to use /rtp gui to open the menu a GUI addon bound to /rtp
+    default: op
+  rtp.editor:
+    description: allow player to use /rtp editor and its subcommands (local, trust, untrust, apply)
+    default: op
+  rtp.action:
+    description: allow player to use /rtp action <name>; each action also checks its own permission (rtp.action.<name> by default)
+    default: op
+  rtp.action.cancel:
+    description: allow player to use /rtp action cancel to leave a queue or cancel their own action entry
+    default: op
+  rtp.action.cancel.other:
+    description: allow player to cancel another player's action entry or a session by UUID
+    default: op
+  rtp.admin.setup:
+    description: allow player to use the /rtp admin setup wizard
+    default: op
+  rtp.admin.prefab:
+    description: allow player to use /rtp admin prefab
+    default: op
   rtp.admin:
     description: allow player to use /rtp clear and grant all other admin tooling
     default: op
@@ -192,6 +222,7 @@ permissions:
       rtp.use: true
       rtp.reload: true
       rtp.config: true
+      rtp.update: true
       rtp.noCooldown: true
       rtp.noDelay: true
       rtp.noDelay.chunks: true
@@ -210,4 +241,12 @@ permissions:
       rtp.menu.admin: true
       rtp.scan: true
       rtp.version: true
+      rtp.back: true
+      rtp.gui: true
+      rtp.editor: true
+      rtp.action: true
+      rtp.action.cancel: true
+      rtp.action.cancel.other: true
+      rtp.admin.setup: true
+      rtp.admin.prefab: true
       rtp.admin: true
