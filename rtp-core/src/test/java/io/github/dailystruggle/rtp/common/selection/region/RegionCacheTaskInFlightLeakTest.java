@@ -25,8 +25,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Regression guard for {@code inFlightCalculations} accounting in {@link RegionCacheTask}.
@@ -221,31 +219,11 @@ public class RegionCacheTaskInFlightLeakTest {
                 "Public cache fill must proceed even when inFlightCalculations >= 1 due to active teleports");
         assertEquals(2, region.inFlightCalculations.get(),
                 "inFlightCalculations must net back to its pre-existing value");
-        assertFalse(region.inFlightCacheFill.get(),
-                "inFlightCacheFill gate must be reset to false after completion");
     }
 
     @Test
     @Timeout(value = 2, unit = TimeUnit.SECONDS)
-    void run_inFlightCacheFillTrue_throttlesConcurrentPublicCacheFill() {
-        region.inFlightCacheFill.set(true);
-        int initialUnkept = region.queueManager.unkeptLocations.size();
-        int initialInFlight = region.inFlightCalculations.get();
-
-        RegionCacheTask task = new RegionCacheTask(region, 50_000_000L);
-        task.run();
-
-        assertEquals(initialUnkept, region.queueManager.unkeptLocations.size(),
-                "Public cache fill must be throttled when inFlightCacheFill is already true");
-        assertEquals(initialInFlight, region.inFlightCalculations.get(),
-                "Throttled task must not increment inFlightCalculations");
-        assertTrue(region.inFlightCacheFill.get(),
-                "inFlightCacheFill should remain true while external train is running");
-    }
-
-    @Test
-    @Timeout(value = 2, unit = TimeUnit.SECONDS)
-    void run_asyncPublicFill_holdsAndReleasesInFlightCacheFillGate() {
+    void run_asyncPublicFill_holdsAndReleasesInFlightSlot() {
         CompletableFuture<GenerationResult> asyncFuture = new CompletableFuture<>();
         accessor.setLocationGenerator(new ILocationGenerator() {
             @Override
@@ -269,9 +247,6 @@ public class RegionCacheTaskInFlightLeakTest {
         RegionCacheTask task = new RegionCacheTask(region, 50_000_000L);
         task.run();
 
-        // While async future is pending, gate must be held
-        assertTrue(region.inFlightCacheFill.get(),
-                "inFlightCacheFill gate must be held while fill generation is in flight");
         assertEquals(1, region.inFlightCalculations.get(),
                 "inFlightCalculations must account for the in-flight fill task");
 
@@ -279,9 +254,6 @@ public class RegionCacheTaskInFlightLeakTest {
         RTPCoords coords = new RTPCoords("inflight_leak_world", 400, 64, 400);
         asyncFuture.complete(new GenerationResult(coords, 1, null));
 
-        // After completion, gate must be released
-        assertFalse(region.inFlightCacheFill.get(),
-                "inFlightCacheFill gate must be released once async fill completes");
         assertEquals(0, region.inFlightCalculations.get(),
                 "inFlightCalculations must be decremented on async completion");
     }

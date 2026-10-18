@@ -1015,10 +1015,11 @@ final class PregenTask implements Runnable {
         final long loadStart = System.nanoTime();
         state.world.getOrLoadChunk(cx, cz, "PregenTask.requestChunk")
                 .whenComplete((chunk, ex) -> {
+                    // Failed loads are charged too: dropping the slowest outcomes biases cost low.
                     long duration = System.nanoTime() - loadStart;
-                    if (gov != null && ex == null) gov.recordLoad(afterProbe, duration);
+                    if (gov != null) gov.recordLoad(afterProbe, duration);
                     ImmediateLoadGovernor immGov = immediateGovernor();
-                    if (immGov != null && ex == null) {
+                    if (immGov != null) {
                         immGov.recordNativeLoad(duration / 1_000_000.0, 1.0);
                     }
                     if (ex != null) {
@@ -1070,8 +1071,13 @@ final class PregenTask implements Runnable {
                 new CompletableFuture<>());
         final ChunkReservation reservation = new ChunkReservation(ticket, state.world);
 
+        final long ticketStart = System.nanoTime();
         reservation.readyFuture().orTimeout(2, TimeUnit.SECONDS).whenComplete((v, ex) -> {
             if (ex != null) {
+                ImmediateLoadGovernor immGov = immediateGovernor();
+                if (immGov != null) {
+                    immGov.recordNativeLoad((System.nanoTime() - ticketStart) / 1_000_000.0, 1.0);
+                }
                 RTP.log(Level.WARNING,
                         "[RTP] Chunk ticket application did not complete within 2s ("
                                 + state.world.name() + " " + cx + "," + cz

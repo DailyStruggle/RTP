@@ -52,7 +52,24 @@ Test B (`20261008-024412`) holds every plugin to the same offered rate (one `/rt
 
 ---
 
-## Paper 26.2 Linux - paced 5 TP/s, 14 ladder runs per plugin
+## Paper 26.2 Linux realtime - latency at 5 to 40 TP/s
+
+> Threadripper 7970X rig (Ubuntu 24.04, OpenJDK 25, `-Xmx16G`, 48 non-op Mineflayer bots). The Paper JVM ran under `SCHED_FIFO` priority 10 (every server thread class `FF`), with only the plugin under test loaded and a restart before every run. Each run is a ramp of 60 s stages at 5, 10, 20, 40, 80, 160 and 320 TP/s that stops after two failed stages in a row. Competitor rows pool 4 ramps each (2026-10-17 20:24 to 23:56 UTC). LeafRTP's row pools 2 ramps of the current 3.3.0 build (`20261018-022257`, `20261018-023204`; jar sha256 `e4ef65af...`, `mode: "REROLL"`, `cacheCap: 10`, `backlogCacheCap: 0`, `activeChunkCap: 5`, all recorded in each run's `-provenance.txt` and config snapshot). Latency is dispatch to arrival over every successful attempt dispatched inside the stage window. MSPT p95 is the per-run stage value; no idle baseline is subtracted.
+
+| Plugin | Runs | 5 TP/s p50 / p95 / p99 | 10 TP/s p50 / p95 / p99 | 20 TP/s p50 / p95 / p99 | 40 TP/s p50 / p95 / p99 | Safe max (all runs PASS) |
+|---|---:|---|---|---|---|---|
+| **LeafRTP** | 2 | 5 / 5 / 6 ms | 5 / 5 / 6 ms | 5 / 5 / 7 ms | 158 / 232 / 285 ms | 40 TP/s |
+| **JakesRTP** | 4 | **0** / 7 / 13 ms | **3** / 14 / 26 ms | **4** / 15 / 23 ms | 4 / 15 / 24 ms (FAIL: MSPT p95 77-118 ms) | 20 TP/s |
+| **HuskHomes** | 4 | 221 / 370 / 517 ms | 224 / 365 / 426 ms | 275 / 381 / 474 ms | 568 / 1,071 / 1,574 ms | 40 TP/s |
+| **BetterRTP** | 4 | 156 / 506 / 709 ms | 199 / 514 / 806 ms | 199 / 522 / 815 ms | 510 / 3,242 / 4,323 ms (FAIL: 127 failed) | 20 TP/s |
+| **EzRTP** | 4 | 154 / 602 / 905 ms | FAIL (619 of 2,396 failed) | - | - | 5 TP/s |
+| **JustRTP** | 4 | 367 / 1,666 / 2,471 ms | 473 / 1,622 / 2,480 ms | 476 / 1,626 / 2,477 ms | FAIL (25.5 of 40 TP/s delivered) | 20 TP/s |
+
+LeafRTP completed 30,914 of 30,914 teleports across both ramps, with 0 exact-block repeats in either run (15,420 and 15,494 landings). Its MSPT p95 was 21.2-21.3 ms at 5 TP/s, 24.6-24.7 ms at 10, 35.4-36.9 ms at 20 and 42.6-45.2 ms at 40; it failed 80 TP/s on MSPT p95 (87.9-90.5 ms) with 0 failed teleports. At 40 TP/s its ready queue runs out with this config, so those teleports wait on a live selection.
+
+---
+
+## Paper 26.2 Linux - paced 5 TP/s, 14 ladder runs per plugin [Historical]
 
 > Threadripper 7970X rig (Ubuntu 24.04, OpenJDK 25, `-Xmx16G`, 48 non-op Mineflayer bots, server view distance 4, harness caps each bot to 2), same rig as the open-loop ramps in [`PRE_WRITEUP.md`](./PRE_WRITEUP.md) section 5.10. Each row pools the first stage (5 TP/s offered, 60 s, 299 attempts) of the 14 ramp runs per plugin from `20261009-092205` to `20261010-070617` in which that plugin was the one loaded; the two earlier rounds measured a server without the plugin and are excluded (section 5.10 validity note). LeafRTP ran the tuned bench config. Latency is dispatch to arrival over every attempt dispatched inside the stage window; MSPT p95 and min TPS are the per-run stage values. No idle baseline was recorded, so MSPT is gross.
 
