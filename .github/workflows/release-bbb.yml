@@ -3,10 +3,12 @@ name: Release LeafRTP to BuiltByBit (BBCode sites)
 # Owns the commercial/Pro release side: publishes LeafRTP Pro to BuiltByBit
 # and creates the `v<version>` git release tag upon PR merge.
 #
-# Release Staging (ADR-100 section 2.3):
-#   - LeafRTP Pro releases first on PR merge (or manual workflow_dispatch).
-#   - LeafRTP (Lite) is intentionally delayed (e.g. 1-2 weeks until Pro settles)
-#     and is subsequently triggered manually via `release.yml` (workflow_dispatch).
+# Release cadence (ADR-117):
+#   - Both editions share one version line (`version` in gradle.properties).
+#   - LeafRTP Pro ships on PR merge (or manual workflow_dispatch), including
+#     patch releases owed to paying customers under the support terms.
+#   - LeafRTP (Lite) ships when the maintainer chooses, via `release.yml`
+#     (workflow_dispatch), with no holding period. It may skip patch versions.
 #
 # Automates the BuiltByBit side on PR merge:
 #   - Creates and pushes the `v<version>` Git tag.
@@ -29,7 +31,7 @@ name: Release LeafRTP to BuiltByBit (BBCode sites)
 #   - CycloneDX Software Bill of Materials (bom.json)
 #
 # The Lite jar, Modrinth publish, Hangar publish, and the public GitHub Release
-# are handled separately on demand by release.yml after Pro settles.
+# are handled separately on demand by release.yml.
 #
 # Required repository secrets:
 #   Either:
@@ -282,8 +284,8 @@ jobs:
           fi
 
       # Modrinth, Hangar, and the public GitHub Release are intentionally NOT
-      # handled here: release.yml owns them and is dispatched manually once Pro
-      # settles (ADR-100 section 2.3). Keeping them out of this workflow keeps
+      # handled here: release.yml owns them and is dispatched manually for the
+      # versions Lite ships (ADR-117). Keeping them out of this workflow keeps
       # each site's publish in exactly one place (no Modrinth version collision,
       # no duplicate GitHub Release).
 

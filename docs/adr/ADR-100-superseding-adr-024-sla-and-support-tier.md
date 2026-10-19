@@ -1,6 +1,6 @@
 # ADR-100 — Superseding ADR-024: Technical Parity and Pro as SLA & Support Tier
 
-**Status:** Accepted (amended 2026-10-05 by [ADR-108](ADR-108-all-mit-licensing-pro-as-support.md): section 2 "Commercial Indemnity & Grant" withdrawn - all source is MIT)
+**Status:** Accepted (amended 2026-10-05 by [ADR-108](ADR-108-all-mit-licensing-pro-as-support.md): section 2 "Commercial Indemnity & Grant" withdrawn - all source is MIT; amended 2026-10-18 by [ADR-117](ADR-117-release-cadence-contractual-pro-discretionary-lite.md): section 2.3 "Release Staging" replaced - no holding period for Lite)
 **Date:** 2026-10-01
 **Supersedes:** [ADR-024](ADR-024-rtp-lite-assembly-variant.md) (RTP-lite Assembly Variant)
 **Relevant Requirements:** REQ-RTP-SYS-001, REQ-RTP-F-013, REQ-RTP-S-004
@@ -35,9 +35,10 @@ Subsequent engineering advancements eliminated the technical foundation of the s
    - **Commercial Indemnity & Grant:** Pro provides explicit commercial rights under the PolyForm Commercial License for networks monetizing gameplay.
    - **Sponsorship & Sustainable Funding:** Pro is the donor/sponsor vehicle funding continuous open-source maintenance.
 
-3. **Release Staging:**
-   - **Pro Marketplaces:** Receive continuous production and early-access builds (with weekend releases).
-   - **Public Distribution (Modrinth / SpigotMC Free):** Receives stable milestone builds on a scheduled cadence (e.g. 1-2 weeks post-commercial release) to ensure stability for community operators.
+3. **Release Staging** (replaced 2026-10-18 by [ADR-117](ADR-117-release-cadence-contractual-pro-discretionary-lite.md)):
+   - Both editions share one version line. Pro marketplaces receive every release, including patch releases owed to paying customers under the support terms.
+   - Public distribution (Modrinth / Hangar / GitHub Releases) receives the versions the maintainer chooses to publish, with no fixed holding period.
+   - The original text (Pro early access; public builds 1-2 weeks after the commercial release) is withdrawn.
 
 ---
 

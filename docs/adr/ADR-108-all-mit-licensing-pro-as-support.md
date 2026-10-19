@@ -1,6 +1,6 @@
 # ADR-108 - All-MIT Licensing; Pro as Support, Not Source
 
-**Status:** Accepted
+**Status:** Accepted (decision 2 amended 2026-10-18 by [ADR-117](ADR-117-release-cadence-contractual-pro-discretionary-lite.md): early-access staging removed)
 **Date:** 2026-10-05
 **Supersedes:** [ADR-061](ADR-061-open-core-dual-licensing.md) (Open-Core Dual Licensing)
 **Amends:** [ADR-100](ADR-100-superseding-adr-024-sla-and-support-tier.md) section 2 ("Commercial Indemnity & Grant")
@@ -19,7 +19,7 @@ ADR-061's precondition for relicensing ("any third-party-copyright contribution 
 ## Decision
 
 1. **All source is MIT.** The root `LICENSE` carries the MIT text (identical to `LICENSE-MIT`). Every module, adapter, addon without its own grant, and both binaries (`LeafRTP-<version>.jar`, `LeafRTP-Pro-<version>.jar`) are MIT. Module-local grants that already exist (`rtp-api/LICENSE`, `rtp-core/LICENSE`, NeoForge GPL-3.0-or-later carriers per `neoforge.mods.toml`, addon-specific licences) keep governing their files.
-2. **Pro sells service, not code.** Purchasing Pro buys priority/SLA support routing (ADR-100 buyer metadata), early-access release staging (ADR-100 section 2.3) and sponsorship. It grants no extra copyright licence, because MIT already grants commercial use. ADR-100's "Commercial Indemnity & Grant" bullet is withdrawn; no indemnity is offered unless a separate written support agreement says so.
+2. **Pro sells service, not code.** Purchasing Pro buys priority/SLA support routing (ADR-100 buyer metadata), including patch releases owed to the buyer under the support terms, and sponsorship. It buys no early access to code ([ADR-117](ADR-117-release-cadence-contractual-pro-discretionary-lite.md) withdrew the original early-access release staging). It grants no extra copyright licence, because MIT already grants commercial use. ADR-100's "Commercial Indemnity & Grant" bullet is withdrawn; no indemnity is offered unless a separate written support agreement says so.
 3. **Releases already published keep the licence they shipped with.** This decision applies from the first release after 2026-10-05; MIT is strictly more permissive, so no earlier licensee loses rights.
 4. **No build delta remains.** The safety tag / predicate grammar lives in `rtp-api` (`SafetyTokenParser`) and `rtp-core` (`SafetyTokenExpander`, resolving tags through `RTPServerAccessor.blockTagSnapshot()`) and ships in both jars. The lite `rtp/tags/**` exclude and its `liteJarStructureCheck` entry guarded `:tags-api`, an offline resolver neither jar depends on, so they are removed. The `**(Pro)**` CHANGELOG marker is retired for new entries; no feature shall be made Pro-exclusive.
 
@@ -51,4 +51,4 @@ ADR-061's precondition for relicensing ("any third-party-copyright contribution 
 
 - `LICENSE`, `LICENSE-MIT`, `rtp-api/LICENSE`, `rtp-core/LICENSE`.
 - [`docs/dev/LICENSING.md`](../dev/LICENSING.md) - licence matrix and edition comparison.
-- [ADR-061](ADR-061-open-core-dual-licensing.md), [ADR-024](ADR-024-rtp-lite-assembly-variant.md), [ADR-100](ADR-100-superseding-adr-024-sla-and-support-tier.md).
+- [ADR-061](ADR-061-open-core-dual-licensing.md), [ADR-024](ADR-024-rtp-lite-assembly-variant.md), [ADR-100](ADR-100-superseding-adr-024-sla-and-support-tier.md), [ADR-117](ADR-117-release-cadence-contractual-pro-discretionary-lite.md).

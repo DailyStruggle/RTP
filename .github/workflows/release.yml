@@ -3,10 +3,15 @@ name: Release rtp-lite to Modrinth, Hangar and GitHub Releases (markdown sites)
 # Owns the public/Lite release side: publishes the lite assembly variant to
 # Modrinth, Hangar, and GitHub Releases.
 #
-# Release Staging (ADR-100 section 2.3):
-#   - LeafRTP Pro releases first on PR merge (via release-bbb.yml) and creates the git tag.
-#   - LeafRTP (Lite) is intentionally delayed to allow the Pro release to settle in production.
-#   - This workflow is triggered on demand via `workflow_dispatch` when Pro is verified stable.
+# Release cadence (ADR-117):
+#   - Both editions share one version line (`version` in gradle.properties).
+#   - Pro (release-bbb.yml) ships on PR merge and creates the git tag; it also
+#     carries patch releases owed to paying customers under the support terms.
+#   - Lite ships when the maintainer chooses to publish a version, with no
+#     holding period. It may skip patch versions; it never carries code that
+#     no Pro release has shipped.
+#   - Triggered on demand via `workflow_dispatch`, from the commit that was
+#     released (pass `--ref <branch-or-tag>`).
 #
 # Publishes the lite assembly variant (ADR-024, Lite only) to the Modrinth
 # project `leafrtp` (https://modrinth.com/plugin/leafrtp, addressed by its
@@ -297,9 +302,18 @@ jobs:
             fabric
             neoforge
             velocity
-          # MC versions: 1.20+ for Bukkit/Paper/Spigot/Folia; lowest supported for Fabric and NeoForge is 1.21.1.
+          # MC versions: 1.18+ for Bukkit/Paper/Spigot (ADR-113, best effort below
+          # 1.21.11); Folia 1.21.11+; Fabric 1.20.1 and 1.21+; NeoForge 1.21.1+.
           # Testing up to 26.3.
           game-versions: |
+            1.18
+            1.18.1
+            1.18.2
+            1.19
+            1.19.1
+            1.19.2
+            1.19.3
+            1.19.4
             1.20
             1.20.1
             1.20.2

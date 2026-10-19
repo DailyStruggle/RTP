@@ -4,7 +4,7 @@ The Folia-native, region-aware random teleport plugin for production Minecraft s
 
 **Supported:** Spigot and Paper 1.18+, Folia 1.21.11+, Fabric 1.20.1 and 1.21+, NeoForge 1.21.1+, up to 26.3. Bug reports are accepted for 1.21.11 through the latest release ([support matrix](docs/dev/SUPPORT_MATRIX.md)).
 
-🔗 **[Get RTP Pro on BuiltByBit](https://builtbybit.com/resources/leafrtp-pro.105418/)** — supports continued development and buys priority support and early-access builds. The code is the same MIT-licensed engine as the free build.
+🔗 **[Get RTP Pro on BuiltByBit](https://builtbybit.com/resources/leafrtp-pro.105418/)** — supports continued development and buys priority support, including fixes for the problems you report. The code is the same MIT-licensed engine as the free build.
 
 [![Build](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml/badge.svg)](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml)
 [![Release](https://img.shields.io/github/v/release/DailyStruggle/RTP)](https://github.com/DailyStruggle/RTP/releases)
@@ -182,6 +182,6 @@ The short version:
 
 RTP is **MIT-licensed** ([`LICENSE`](LICENSE); see [ADR-108](docs/adr/ADR-108-all-mit-licensing-pro-as-support.md)): all source in this repository and both the free and Pro binaries may be used, modified, and redistributed, including commercially.
 
-Pro is a support tier, not a code licence: buying it gets priority support, early-access builds, and funds development ([ADR-100](docs/adr/ADR-100-superseding-adr-024-sla-and-support-tier.md)).
+Pro is a support tier, not a code licence: buying it gets priority support, including patch releases for the problems you report, and funds development ([ADR-100](docs/adr/ADR-100-superseding-adr-024-sla-and-support-tier.md), [ADR-117](docs/adr/ADR-117-release-cadence-contractual-pro-discretionary-lite.md)).
 
 Where a module or file ships its own `LICENSE` or SPDX header (e.g. the GPL-3.0-or-later NeoForge carriers), that grant governs the file. Releases published before 2026-10-05 keep the licence they shipped with.

@@ -1153,9 +1153,8 @@ tasks.named('processLiteResources') {
     // Capture lite's version at configuration time so the filesMatching
     // closure does not reach Task.project at execution time
     // (deprecated in Gradle 9, fatal in Gradle 10).
-    // Lite tracks its own version line (`ext.liteVersion`, set in root
-    // build.gradle) independent of Pro's `project.version`.
-    def projectVersion = project.ext.liteVersion
+    // One version line for both jars (ADR-117).
+    def projectVersion = project.version.toString()
     inputs.property "version", projectVersion
     filesMatching(["plugin.yml", "fabric.mod.json"]) {
         expand "version": projectVersion
@@ -1177,7 +1176,7 @@ tasks.register('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks
     // `jar` / `remapJar` split.
     archiveBaseName.set('LeafRTP')
     archiveClassifier.set('dev')
-    archiveVersion.set(project.ext.liteVersion.toString())
+    archiveVersion.set(project.version.toString())
 
     // Concatenate duplicate META-INF/services entries (e.g. the Paper + Fabric
     // MenuRendererProvider / AnvilInputOpenerProvider registrations) so every
@@ -1426,7 +1425,7 @@ tasks.register('remapLiteJar', net.fabricmc.loom.task.RemapJarTask) {
     inputFile.set(tasks.named('shadowLiteJar', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar).flatMap { it.archiveFile })
     archiveBaseName.set('LeafRTP')
     archiveClassifier.set('')
-    archiveVersion.set(providers.gradleProperty('liteVersion').getOrElse('3.1.2'))
+    archiveVersion.set(project.version.toString())
 
     // Resolve carrier jars and capture the merge closure at configuration time
     // so doLast does not reach Task.project at execution time

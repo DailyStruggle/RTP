@@ -10,7 +10,7 @@
 RTP is **MIT-licensed** ([ADR-108](../adr/ADR-108-all-mit-licensing-pro-as-support.md)):
 
 1. **All source is MIT.** Every module, platform adapter, the network/proxy modules, and both binaries (**LeafRTP (Lite)** and **LeafRTP Pro**) are licensed under the MIT License (root `LICENSE`, identical to `LICENSE-MIT`). Anyone can use, modify, distribute, or bundle them, commercially or non-commercially.
-2. **Pro is a service, not a licence.** Buying Pro grants no additional copyright rights; it buys priority/SLA support routing, early-access builds, and sponsorship (ADR-100).
+2. **Pro is a service, not a licence.** Buying Pro grants no additional copyright rights; it buys priority/SLA support routing, patch releases owed under that support, and sponsorship (ADR-100, [ADR-117](../adr/ADR-117-release-cadence-contractual-pro-discretionary-lite.md)). It buys no early access to code.
 3. **More specific grants win.** NeoForge platform components and carrier modules are licensed under **GPL-3.0-or-later** (`neoforge.mods.toml`). Addon modules that ship their own licence keep it.
 4. **Earlier releases.** Releases published before 2026-10-05 keep the licence they shipped with (ADR-061 open-core terms); MIT is strictly more permissive, so no licensee loses rights.
 
@@ -42,7 +42,7 @@ As detailed in [ADR-100](../adr/ADR-100-superseding-adr-024-sla-and-support-tier
 |---|:---:|:---:|---|
 | **License** | **MIT** | **MIT** | Lite jar bundles `LICENSE-MIT`; Pro jar ships the identical root `LICENSE`. |
 | **Support** | Community | Priority / SLA | Routed via marketplace buyer metadata (ADR-100). |
-| **Release cadence** | Stable milestones | Early access | ADR-100 section 2.3. |
+| **Release cadence** | Versions the maintainer chooses to publish, no holding period | Every release, including patches owed to buyers | One version line for both jars (ADR-117). |
 | **Single-Server Random Teleport** | Yes | Yes | Identical Archimedean spiral and Hilbert curve candidate selection. |
 | **Paper & Spigot Support** | Yes | Yes | Full native async chunk loading via Paper adapter. |
 | **Fabric Support** | Yes | Yes | Supported across 1.20.x, 1.21.x, and MC 26.x unobf carriers. |

@@ -149,7 +149,7 @@ This listing is how you pay for support. The code is the same as the [free downl
 <!-- /only -->
 <!-- only: bbb-lite -->
 <!-- kind: promo -->
-There is also a paid LeafRTP-Pro listing on BuiltByBit. It is the same code, and nothing in the plugin is locked. Paying gets you priority support and early builds.
+There is also a paid LeafRTP-Pro listing on BuiltByBit. It is the same code, and nothing in the plugin is locked. Paying gets you priority support, and a patch release when a bug you report needs one.
 <!-- /kind -->
 <!-- /only -->
 <!-- only: hangar -->
@@ -388,9 +388,9 @@ Same code, config and commands as the free download, under the same MIT license.
 | This listing | Free download |
 |---|---|
 | Priority on my support queue | Community support, best effort |
-| New Minecraft versions and platforms first | Stable builds, once they've settled here |
+| A patch release when a bug you report needs one | Updates when I choose to publish them |
 
-New platforms and backends go out here first because they need hands-on support while they settle, and this is the only place I promise that. Once something is stable it goes to the free channel. A native BungeeCord proxy adapter is planned; for now BungeeCord networks use plugin messaging on the backend.
+Both downloads are built from the same code under the same version numbers. What this listing adds is a promise: if you hit a bug, I fix it and ship you the patch here. The free download gets updates because I want to put them out, not because it's owed them. A native BungeeCord proxy adapter is planned; for now BungeeCord networks use plugin messaging on the backend.
 
 Switching between the free download and this one is a jar swap. Config, data files and commands stay the same.
 <!-- /kind -->
@@ -536,7 +536,7 @@ A: Yes. Icons in `guimenu.yml` take `ia:<id>`, `oraxen:<id>`, `nexo:<id>`, `hdb:
 <!-- only: bbb-pro -->
 <!-- kind: promo -->
 **Q: Should I pay for this or use the free download?**
-A: The free one works exactly the same. Pay if you want priority support or early builds, or if it has saved you enough lag and setup time that you want it to keep being maintained.
+A: The free one works exactly the same. Pay if you want priority support and a fix for the problems you report, or if it has saved you enough lag and setup time that you want it to keep being maintained.
 <!-- /kind -->
 <!-- /only -->
 
@@ -561,7 +561,7 @@ Support is me, in my spare time, so it's best effort.
 <!-- kind: promo -->
 Support comes from me, the person who wrote the code.
 
-- Tickets from this listing go ahead of free-download tickets, and this is where early-access platforms and backends get supported while they settle.
+- Tickets from this listing go ahead of free-download tickets. A confirmed bug that blocks you gets a patch release here.
 - Response time: 24-72 h on weekdays. Safety bugs go first regardless.
 - Bug reports with server version, plugin version, platform, configs and log lines get fixed fastest. Most setup questions are answered in the admin guide.
 - Feature requests go in GitHub issues.
