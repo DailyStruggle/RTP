@@ -3960,6 +3960,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-117-release-cadence-contractual-pro-discretionary-lite/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-117 - Release Cadence: Contractual Pro Patches, Discretionary Lite Releases, One Version Line
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4742,19 +4763,19 @@ dependencies {
 <code>docs/FOR_ADDON_DEVELOPERS.md</code> and <code>docs/ADDON_QUICKSTART.md</code>).</p>
 <hr />
 <h2 id="release-staging-binary-distribution-pro-vs-lite">Release Staging &amp; Binary Distribution (Pro vs. Lite)<a class="headerlink" href="#release-staging-binary-distribution-pro-vs-lite" title="Permanent link">&para;</a></h2>
-<p>Per <strong>ADR-100 section 2.3 ("Release Staging")</strong>, binary distribution follows a staged rollout to ensure stability:</p>
+<p>Per <strong><a href="../../adr/ADR-117-release-cadence-contractual-pro-discretionary-lite/">ADR-117</a></strong>, both jars share one version line (<code>version</code> in <code>gradle.properties</code>) and are built from the same commit. The editions differ in obligation, not in timing:</p>
 <ol>
 <li><strong>LeafRTP Pro (BuiltByBit / Commercial):</strong></li>
 <li><strong>Trigger:</strong> Automated on merging a release PR into <code>V3</code>/<code>V2</code>/<code>V1</code> (or manual <code>workflow_dispatch</code>) via <code>.github/workflows/release-bbb.yml</code>.</li>
 <li><strong>Actions:</strong> Tags the repository with <code>v&lt;version&gt;</code>, builds <code>LeafRTP-Pro-&lt;version&gt;.jar</code>, generates SBOM and signatures, and publishes immediately to BuiltByBit.</li>
 <li>
-<p><strong>Settling Period:</strong> Pro users receive early-access updates and continuous production builds. This 1-2 week window allows edge cases and regressions to be identified and resolved.</p>
+<p><strong>Scope:</strong> Every release, including patch releases cut to resolve a paying customer's reported problem under the support terms.</p>
 </li>
 <li>
 <p><strong>LeafRTP Lite (Modrinth, Hangar, GitHub Releases):</strong></p>
 </li>
-<li><strong>Trigger:</strong> Manual trigger via <code>.github/workflows/release.yml</code> (<code>workflow_dispatch</code>).</li>
-<li><strong>Cadence:</strong> Initiated after the Pro release settles in production (typically 1-2 weeks post-Pro release).</li>
+<li><strong>Trigger:</strong> Manual trigger via <code>.github/workflows/release.yml</code> (<code>workflow_dispatch</code>), run from the released commit: <code>gh workflow run release.yml --ref &lt;branch-or-tag&gt;</code>.</li>
+<li><strong>Cadence:</strong> Whenever the maintainer chooses to publish a version; there is no holding period. Lite may skip patch versions, and never ships a version or commit that no Pro release has shipped.</li>
 <li><strong>Actions:</strong> Builds <code>LeafRTP-&lt;version&gt;.jar</code> (lite variant), attaches signatures and SBOM, creates the public GitHub Release, and publishes to Modrinth and Hangar with Lite-filtered release notes.</li>
 </ol>
 <hr />

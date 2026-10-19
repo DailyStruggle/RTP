@@ -4038,6 +4038,27 @@
   
   
     <li class="md-nav__item">
+      <a href="ADR-117-release-cadence-contractual-pro-discretionary-lite/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-117 - Release Cadence: Contractual Pro Patches, Discretionary Lite Releases, One Version Line
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4616,7 +4637,7 @@
 <tr>
 <td><a href="ADR-100-superseding-adr-024-sla-and-support-tier/">ADR-100</a></td>
 <td>Superseding ADR-024: Technical Parity and Pro as SLA &amp; Support Tier (100% technical and database parity between distributions; Pro re-framed as SLA, Support Agreement, commercial indemnity, and verified sponsor tier; marketplace DRM used to route priority support)</td>
-<td>Accepted (2026-10-01; commercial-grant bullet withdrawn by ADR-108)</td>
+<td>Accepted (2026-10-01; commercial-grant bullet withdrawn by ADR-108; release staging replaced by ADR-117)</td>
 </tr>
 <tr>
 <td><a href="ADR-101-in-house-sql-connection-pool-and-hikaricp-retirement/">ADR-101</a></td>
@@ -4655,8 +4676,8 @@
 </tr>
 <tr>
 <td><a href="ADR-108-all-mit-licensing-pro-as-support/">ADR-108</a></td>
-<td>All-MIT Licensing; Pro as Support, Not Source (root <code>LICENSE</code> becomes MIT for all source and both jars; Pro sells priority support, early access and sponsorship with no extra licence; withdraws ADR-100's commercial-grant bullet; the lite <code>tags-api</code> exclusion recorded as the one remaining parity follow-up)</td>
-<td>Accepted (2026-10-05; supersedes ADR-061)</td>
+<td>All-MIT Licensing; Pro as Support, Not Source (root <code>LICENSE</code> becomes MIT for all source and both jars; Pro sells priority support and sponsorship with no extra licence; withdraws ADR-100's commercial-grant bullet; the lite <code>tags-api</code> exclusion recorded as the one remaining parity follow-up)</td>
+<td>Accepted (2026-10-05; supersedes ADR-061; early access removed by ADR-117)</td>
 </tr>
 <tr>
 <td><a href="ADR-109-measured-cost-probe-first-gate/">ADR-109</a></td>
@@ -4697,6 +4718,11 @@
 <td><a href="ADR-116-effects-through-neutral-server-accessor/">ADR-116</a></td>
 <td>Effects Through a Neutral Server Accessor, Not Per-Platform Initializers (accessor contract moves from <code>rtp-api</code> to a module with no RTP dependency that <code>rtp-api</code> re-exports; effects-api depends only on it; platforms implement effect primitives on the accessor; <code>HandleRegistry</code> and the four hand-copied <code>*EffectsInitializer</code> registration lists removed; one built-in registration with explicit unsupported-primitive reporting; <code>effectsapi/bukkit</code> moves to the Bukkit carrier; parity and no-platform-import tests; amends effects-api-ADR-003/006; RTP-70)</td>
 <td>Proposed (after 3.3.0)</td>
+</tr>
+<tr>
+<td><a href="ADR-117-release-cadence-contractual-pro-discretionary-lite/">ADR-117</a></td>
+<td>Release Cadence: Contractual Pro Patches, Discretionary Lite Releases, One Version Line (one <code>version</code> for both jars, <code>liteVersion</code> removed; Pro receives every release including patches owed to paying customers; Lite ships the versions the maintainer chooses, with no holding period, may skip patches, never ships a commit Pro has not; no early access as a product, pre-releases open to both; amends ADR-100 section 2.3 and ADR-108 decision 2)</td>
+<td>Accepted (2026-10-18)</td>
 </tr>
 </tbody>
 </table>

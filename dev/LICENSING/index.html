@@ -3960,6 +3960,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../../adr/ADR-117-release-cadence-contractual-pro-discretionary-lite/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-117 - Release Cadence: Contractual Pro Patches, Discretionary Lite Releases, One Version Line
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../adr/ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4071,7 +4092,7 @@
 <p>RTP is <strong>MIT-licensed</strong> (<a href="../../adr/ADR-108-all-mit-licensing-pro-as-support/">ADR-108</a>):</p>
 <ol>
 <li><strong>All source is MIT.</strong> Every module, platform adapter, the network/proxy modules, and both binaries (<strong>LeafRTP (Lite)</strong> and <strong>LeafRTP Pro</strong>) are licensed under the MIT License (root <code>LICENSE</code>, identical to <code>LICENSE-MIT</code>). Anyone can use, modify, distribute, or bundle them, commercially or non-commercially.</li>
-<li><strong>Pro is a service, not a licence.</strong> Buying Pro grants no additional copyright rights; it buys priority/SLA support routing, early-access builds, and sponsorship (ADR-100).</li>
+<li><strong>Pro is a service, not a licence.</strong> Buying Pro grants no additional copyright rights; it buys priority/SLA support routing, patch releases owed under that support, and sponsorship (ADR-100, <a href="../../adr/ADR-117-release-cadence-contractual-pro-discretionary-lite/">ADR-117</a>). It buys no early access to code.</li>
 <li><strong>More specific grants win.</strong> NeoForge platform components and carrier modules are licensed under <strong>GPL-3.0-or-later</strong> (<code>neoforge.mods.toml</code>). Addon modules that ship their own licence keep it.</li>
 <li><strong>Earlier releases.</strong> Releases published before 2026-10-05 keep the licence they shipped with (ADR-061 open-core terms); MIT is strictly more permissive, so no licensee loses rights.</li>
 </ol>
@@ -4182,9 +4203,9 @@
 </tr>
 <tr>
 <td><strong>Release cadence</strong></td>
-<td style="text-align: center;">Stable milestones</td>
-<td style="text-align: center;">Early access</td>
-<td>ADR-100 section 2.3.</td>
+<td style="text-align: center;">Versions the maintainer chooses to publish, no holding period</td>
+<td style="text-align: center;">Every release, including patches owed to buyers</td>
+<td>One version line for both jars (ADR-117).</td>
 </tr>
 <tr>
 <td><strong>Single-Server Random Teleport</strong></td>

@@ -4065,6 +4065,27 @@
   
   
     <li class="md-nav__item">
+      <a href="../ADR-117-release-cadence-contractual-pro-discretionary-lite/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    ADR-117 - Release Cadence: Contractual Pro Patches, Discretionary Lite Releases, One Version Line
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ADR-TEMPLATE/" class="md-nav__link">
         
   
@@ -4185,7 +4206,7 @@
 
 
 <h1 id="adr-108-all-mit-licensing-pro-as-support-not-source">ADR-108 - All-MIT Licensing; Pro as Support, Not Source<a class="headerlink" href="#adr-108-all-mit-licensing-pro-as-support-not-source" title="Permanent link">&para;</a></h1>
-<p><strong>Status:</strong> Accepted
+<p><strong>Status:</strong> Accepted (decision 2 amended 2026-10-18 by <a href="../ADR-117-release-cadence-contractual-pro-discretionary-lite/">ADR-117</a>: early-access staging removed)
 <strong>Date:</strong> 2026-10-05
 <strong>Supersedes:</strong> <a href="../ADR-061-open-core-dual-licensing/">ADR-061</a> (Open-Core Dual Licensing)
 <strong>Amends:</strong> <a href="../ADR-100-superseding-adr-024-sla-and-support-tier/">ADR-100</a> section 2 ("Commercial Indemnity &amp; Grant")</p>
@@ -4200,7 +4221,7 @@
 <h2 id="decision">Decision<a class="headerlink" href="#decision" title="Permanent link">&para;</a></h2>
 <ol>
 <li><strong>All source is MIT.</strong> The root <code>LICENSE</code> carries the MIT text (identical to <code>LICENSE-MIT</code>). Every module, adapter, addon without its own grant, and both binaries (<code>LeafRTP-&lt;version&gt;.jar</code>, <code>LeafRTP-Pro-&lt;version&gt;.jar</code>) are MIT. Module-local grants that already exist (<code>rtp-api/LICENSE</code>, <code>rtp-core/LICENSE</code>, NeoForge GPL-3.0-or-later carriers per <code>neoforge.mods.toml</code>, addon-specific licences) keep governing their files.</li>
-<li><strong>Pro sells service, not code.</strong> Purchasing Pro buys priority/SLA support routing (ADR-100 buyer metadata), early-access release staging (ADR-100 section 2.3) and sponsorship. It grants no extra copyright licence, because MIT already grants commercial use. ADR-100's "Commercial Indemnity &amp; Grant" bullet is withdrawn; no indemnity is offered unless a separate written support agreement says so.</li>
+<li><strong>Pro sells service, not code.</strong> Purchasing Pro buys priority/SLA support routing (ADR-100 buyer metadata), including patch releases owed to the buyer under the support terms, and sponsorship. It buys no early access to code (<a href="../ADR-117-release-cadence-contractual-pro-discretionary-lite/">ADR-117</a> withdrew the original early-access release staging). It grants no extra copyright licence, because MIT already grants commercial use. ADR-100's "Commercial Indemnity &amp; Grant" bullet is withdrawn; no indemnity is offered unless a separate written support agreement says so.</li>
 <li><strong>Releases already published keep the licence they shipped with.</strong> This decision applies from the first release after 2026-10-05; MIT is strictly more permissive, so no earlier licensee loses rights.</li>
 <li><strong>No build delta remains.</strong> The safety tag / predicate grammar lives in <code>rtp-api</code> (<code>SafetyTokenParser</code>) and <code>rtp-core</code> (<code>SafetyTokenExpander</code>, resolving tags through <code>RTPServerAccessor.blockTagSnapshot()</code>) and ships in both jars. The lite <code>rtp/tags/**</code> exclude and its <code>liteJarStructureCheck</code> entry guarded <code>:tags-api</code>, an offline resolver neither jar depends on, so they are removed. The <code>**(Pro)**</code> CHANGELOG marker is retired for new entries; no feature shall be made Pro-exclusive.</li>
 </ol>
@@ -4250,7 +4271,7 @@
 <ul>
 <li><code>LICENSE</code>, <code>LICENSE-MIT</code>, <code>rtp-api/LICENSE</code>, <code>rtp-core/LICENSE</code>.</li>
 <li><a href="../../dev/LICENSING/"><code>docs/dev/LICENSING.md</code></a> - licence matrix and edition comparison.</li>
-<li><a href="../ADR-061-open-core-dual-licensing/">ADR-061</a>, <a href="../ADR-024-rtp-lite-assembly-variant/">ADR-024</a>, <a href="../ADR-100-superseding-adr-024-sla-and-support-tier/">ADR-100</a>.</li>
+<li><a href="../ADR-061-open-core-dual-licensing/">ADR-061</a>, <a href="../ADR-024-rtp-lite-assembly-variant/">ADR-024</a>, <a href="../ADR-100-superseding-adr-024-sla-and-support-tier/">ADR-100</a>, <a href="../ADR-117-release-cadence-contractual-pro-discretionary-lite/">ADR-117</a>.</li>
 </ul>
 
 
