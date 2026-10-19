@@ -4299,8 +4299,17 @@
 <li><strong>Effects</strong>: particles, sounds, fireworks, potions, titles, action bar notices, console or player commands, and holograms on every teleport phase, each controlled by <code>rtp.effect.&lt;stage&gt;.*</code> permissions. Holograms use the 1.19.4+ text display entity directly; DecentHolograms and HolographicDisplays are supported if present.</li>
 <li><strong>Landing platforms &amp; safety</strong>: temporary landing platforms decay automatically so nobody drops into ocean, void or open air, paired with a post-teleport invulnerability window, cancel on movement or damage, countdown holograms and warmup messages.</li>
 </ul>
-<p><img alt="In-game destination menu with live server health tooltip" src="../../assets/img/menu_server_health.png" /></p>
-<p><em><code>/rtp menu</code>: in-game chest menu with live server health and destination selection.</em></p>
+<p><img alt="In-game destination menu: the teleport tile shows status, cost and warmup" src="../../assets/img/menu_teleport_tile.png" /></p>
+<p><em>The GUI addon's chest menu (Paper 26.2): the teleport tile shows status, cost and warmup before you click; the other tiles pick a region, biome or special teleport.</em></p>
+<details>
+<summary><b>Server health tile</b></summary>
+
+![In-game destination menu with live server health tooltip](../assets/img/menu_server_health.png)
+
+*The same menu's server health tile: TPS, MSPT and player count.*
+
+</details>
+
 <h2 id="gameplay-and-worlds">Gameplay and worlds<a class="headerlink" href="#gameplay-and-worlds" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>Regions</strong>: any number per world with customizable shape (Square, Circle, Ellipse, Rectangle, Polygon), radius, center, curve weighting, vertical bounds, world override, required permission, and price. Vertical adjustors (Linear, Jump, Fixed) for sky islands, void worlds, aerial parachute drops, and Nether ceilings. A world's <code>override</code> key (<code>definitions/worlds/&lt;name&gt;.yml</code>) routes Nether or End teleports to designated safe worlds.</li>
