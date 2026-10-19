@@ -36,7 +36,7 @@ public class FactionsBoundaryProvider implements ClaimBoundaryProvider {
     if (!exists || playerId == null || worldName == null) {
       return Optional.empty();
     }
-    if (Bukkit.getServer() == null || Bukkit.getPluginManager() == null || !Bukkit.getPluginManager().isPluginEnabled("Factions")) {
+    if (!ClaimPlugins.isEnabled(SaberFactionsChecker.PLUGIN_NAME)) {
       return Optional.empty();
     }
 
@@ -171,7 +171,7 @@ public class FactionsBoundaryProvider implements ClaimBoundaryProvider {
     if (!exists || worldName == null) {
       return Optional.empty();
     }
-    if (Bukkit.getServer() == null || Bukkit.getPluginManager() == null || !Bukkit.getPluginManager().isPluginEnabled("Factions")) {
+    if (!ClaimPlugins.isEnabled(SaberFactionsChecker.PLUGIN_NAME)) {
       return Optional.empty();
     }
 
@@ -181,15 +181,9 @@ public class FactionsBoundaryProvider implements ClaimBoundaryProvider {
 
       Object faction = null;
       try {
-        Class<?> boardClass = Class.forName("com.massivecraft.factions.Board");
-        Object board = boardClass.getMethod("getInstance").invoke(null);
-        if (board != null) {
-          Class<?> fLocationClass = Class.forName("com.massivecraft.factions.FLocation");
-          Object fLocation = fLocationClass.getConstructor(String.class, int.class, int.class).newInstance(worldName, cx, cz);
-          faction = boardClass.getMethod("getFactionAt", fLocationClass).invoke(board, fLocation);
-        }
+        faction = BoardApi.factionAt(worldName, cx, cz);
       } catch (Throwable ignored) {
-        // Ignored: Board or FLocation reflection lookup failed
+        // Ignored: Board lookup failed; the adaptive prober below decides
       }
 
       if (faction == null) {
@@ -303,6 +297,17 @@ public class FactionsBoundaryProvider implements ClaimBoundaryProvider {
             t);
       }
       return Optional.empty();
+    }
+  }
+
+  /** Loaded on first call, so Factions classes link only while the plugin is enabled (ADR-118). */
+  private static final class BoardApi {
+    private BoardApi() {}
+
+    static Object factionAt(String worldName, int chunkX, int chunkZ) {
+      com.massivecraft.factions.Board board = com.massivecraft.factions.Board.getInstance();
+      if (board == null) return null;
+      return board.getFactionAt(new com.massivecraft.factions.FLocation(worldName, chunkX, chunkZ));
     }
   }
 

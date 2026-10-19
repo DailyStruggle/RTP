@@ -1,19 +1,18 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
-import java.util.Optional;
+import net.william278.husktowns.api.BukkitHuskTownsAPI;
 
 /**
- * Checker for HuskTowns claims.
+ * Checker for HuskTowns claims, compiled against {@code net.william278.husktowns:husktowns-bukkit}.
  *
- * <p>HuskTowns 3.x ({@code net.william278.husktowns}) exposes a Bukkit API singleton via static
- * {@code BukkitHuskTownsAPI.getInstance()} (throws while the API is not registered).
- * {@code getClaimAt(org.bukkit.Location)} returns an {@link Optional} holding the town claim at
- * that location; a {@code getClaimAt(org.bukkit.Chunk)} overload exists but needs a loaded chunk,
- * so the {@code Location} overload is resolved by exact signature. Resolved reflectively so RTP
- * carries no compile-time dependency on HuskTowns.
+ * <p>{@link BukkitHuskTownsAPI#getInstance()} (throws while unregistered) answers
+ * {@code getClaimAt(Location)} with the town claim at that location, if any. The
+ * {@code getClaimAt(Chunk)} overload needs a loaded chunk and is not used. API types are touched
+ * only in {@link Api}, after the enabled check (ADR-118).
  *
  * <p>Fails open (returns false) when HuskTowns is not enabled. Fails closed (returns true, per
- * REQ-RTP-S-003) when it is enabled but this API chain cannot be resolved or the lookup throws.
+ * REQ-RTP-S-003) through {@link ClaimCheckFailure} when it is enabled but the API is not
+ * registered, is incompatible, or the lookup throws.
  */
 public class HuskTownsChecker {
   private HuskTownsChecker() {}
@@ -44,17 +43,20 @@ public class HuskTownsChecker {
     if (location == null || location.getWorld() == null) return false;
     if (!ClaimPlugins.isEnabled(PLUGIN_NAME)) return false;
     try {
-      Class<?> apiClass = Class.forName("net.william278.husktowns.api.BukkitHuskTownsAPI");
-      Object api = apiClass.getMethod("getInstance").invoke(null);
-      if (api == null) throw new IllegalStateException("BukkitHuskTownsAPI.getInstance() is null");
-      Object result =
-          apiClass.getMethod("getClaimAt", org.bukkit.Location.class).invoke(api, location);
-      if (!(result instanceof Optional<?> claim)) {
-        throw new IllegalStateException("getClaimAt(Location) returned " + result);
-      }
-      return claim.isPresent();
+      return Api.isClaimAt(location);
     } catch (Throwable t) {
       return ClaimCheckFailure.handle(PLUGIN_NAME, t);
+    }
+  }
+
+  /** Loaded on first call, so HuskTowns classes link only while the plugin is enabled. */
+  private static final class Api {
+    private Api() {}
+
+    static boolean isClaimAt(org.bukkit.Location location) {
+      BukkitHuskTownsAPI api = BukkitHuskTownsAPI.getInstance();
+      if (api == null) throw new IllegalStateException("BukkitHuskTownsAPI.getInstance() is null");
+      return api.getClaimAt(location).isPresent();
     }
   }
 }

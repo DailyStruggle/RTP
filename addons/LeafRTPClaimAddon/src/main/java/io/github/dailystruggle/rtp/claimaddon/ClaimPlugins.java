@@ -1,8 +1,9 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
+import java.util.Optional;
+import java.util.function.Supplier;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
-import org.bukkit.plugin.PluginManager;
 
 /**
  * Per-call plugin gate for the reflective claim checkers.
@@ -14,11 +15,23 @@ import org.bukkit.plugin.PluginManager;
 final class ClaimPlugins {
   private ClaimPlugins() {}
 
+  /**
+   * Unannotated view of {@code Bukkit.getServer()}, which is {@code @NotNull} but returns null
+   * until a server is installed (tests, early class loading). Read through a supplier so static
+   * analysis does not treat the null check in {@link #server()} as dead code.
+   */
+  private static final Supplier<Server> BUKKIT_SERVER = Bukkit::getServer;
+
+  /** The Bukkit server, or empty before one is installed. */
+  static Optional<Server> server() {
+    return Optional.ofNullable(BUKKIT_SERVER.get());
+  }
+
   /** True when a Bukkit server is present and {@code pluginName} is enabled on it. */
   static boolean isEnabled(String pluginName) {
-    Server server = Bukkit.getServer();
-    if (server == null) return false;
-    PluginManager pluginManager = server.getPluginManager();
-    return pluginManager != null && pluginManager.isPluginEnabled(pluginName);
+    return server()
+        .map(Server::getPluginManager)
+        .map(pluginManager -> pluginManager.isPluginEnabled(pluginName))
+        .orElse(false);
   }
 }

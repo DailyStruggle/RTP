@@ -189,7 +189,7 @@
         <Bug pattern="NP_NONNULL_PARAM_VIOLATION,NP_NULL_PARAM_DEREF"/>
     </Match>
     <Match>
-        <Class name="io.github.dailystruggle.rtp.common.tasks.ScanTask"/>
+        <Class name="io.github.dailystruggle.rtp.common.tasks.scan.ScanTask"/>
         <Bug pattern="NP_NONNULL_PARAM_VIOLATION"/>
     </Match>
 

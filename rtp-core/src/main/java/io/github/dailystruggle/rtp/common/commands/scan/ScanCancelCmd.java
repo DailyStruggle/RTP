@@ -4,7 +4,7 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.tasks.ScanTask;
+import io.github.dailystruggle.rtp.common.tasks.scan.ScanTask;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;

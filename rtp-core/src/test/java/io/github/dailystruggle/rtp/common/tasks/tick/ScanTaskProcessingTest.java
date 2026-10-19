@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.tasks.tick;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
-import io.github.dailystruggle.rtp.common.tasks.ScanTask;
+import io.github.dailystruggle.rtp.common.tasks.scan.ScanTask;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

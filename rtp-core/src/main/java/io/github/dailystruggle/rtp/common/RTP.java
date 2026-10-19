@@ -31,7 +31,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdj
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.fixed.FixedAdjustor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.jump.JumpAdjustor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
-import io.github.dailystruggle.rtp.common.tasks.ScanTask;
+import io.github.dailystruggle.rtp.common.tasks.scan.ScanTask;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
@@ -292,6 +292,14 @@ public class RTP {
 
     registerDefaultShapes();
     registerDefaultVerticalAdjustors();
+
+    // ADR-115: reload steps on tasks and regions live in Tier 4. Installed in static init
+    // because every Configs constructor touches RTP.configs, so any Configs (tests included)
+    // reloads with the coordinator.
+    Configs.setReloadLifecycle(new io.github.dailystruggle.rtp.common.lifecycle.ConfigReloadCoordinator());
+    // Same for the scan and teleport tasks a Region starts: every Region path reads RTP statics
+    // before dispatching, so this class is initialised first.
+    Region.setTaskDispatcher(new io.github.dailystruggle.rtp.common.lifecycle.RegionTaskCoordinator());
 
     // --- INJECT IMPLEMENTATIONS INTO THE API ---
     // Two-tier API model: custom Shape / VerticalAdjustor registration is an

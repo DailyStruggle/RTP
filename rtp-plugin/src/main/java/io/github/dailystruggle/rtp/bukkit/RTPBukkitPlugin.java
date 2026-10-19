@@ -468,7 +468,7 @@ public final class RTPBukkitPlugin extends JavaPlugin {
 
     try {
       RTP.log(java.util.logging.Level.FINER, "[RTP] onDisable ScanTask.kill + clear scan progress bars");
-      io.github.dailystruggle.rtp.common.tasks.ScanTask.kill();
+      io.github.dailystruggle.rtp.common.tasks.scan.ScanTask.kill();
       io.github.dailystruggle.rtp.common.tasks.tick.ScanProgressBars.clear();
     } catch (NoClassDefFoundError ignored) {
     }

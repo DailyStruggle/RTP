@@ -3,10 +3,8 @@ package io.github.dailystruggle.rtp.claimaddon;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import java.util.logging.Level;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Server;
-import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.ServicesManager;
 import pl.minecodes.plots.api.plot.PlotServiceApi;
 
@@ -50,15 +48,14 @@ public class MinePlotsChecker {
    */
   public static boolean isInClaim(Location location) {
     if (location == null || location.getWorld() == null) return false;
-    Server server = Bukkit.getServer();
-    if (server == null) return false;
-    PluginManager pluginManager = server.getPluginManager();
-    if (pluginManager == null || !pluginManager.isPluginEnabled(PLUGIN_NAME)) return false;
+    if (!ClaimPlugins.isEnabled(PLUGIN_NAME)) return false;
 
     try {
-      ServicesManager servicesManager = server.getServicesManager();
       PlotServiceApi service =
-          servicesManager == null ? null : servicesManager.load(PlotServiceApi.class);
+          ClaimPlugins.server()
+              .map(Server::getServicesManager)
+              .map(servicesManager -> servicesManager.load(PlotServiceApi.class))
+              .orElse(null);
       if (service == null) {
         if (!warnedMissingService) {
           warnedMissingService = true;

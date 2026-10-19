@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.tasks.tick;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.tasks.ScanTask;
+import io.github.dailystruggle.rtp.common.tasks.scan.ScanTask;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
 import java.util.Map;

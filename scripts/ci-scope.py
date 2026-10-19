@@ -27,8 +27,15 @@ Usage (CI passes the event's base and head):
     python scripts/ci-scope.py --base <sha> [--head HEAD]
     python scripts/ci-scope.py --force-full
 
-Writes `scope=`, `tasks=`, one `<set>=true|false` per set and `full=true|false`
-(every set affected) to $GITHUB_OUTPUT when set; always prints them.
+Writes `scope=`, `tasks=`, one `<set>=true|false` per set, `full=true|false`
+(every set affected) and one `<set>_tasks=` per set (`:<p>:build` for each
+affected project of the set, `:<p>:test` for test-only consumers; every
+project when unscoped) to $GITHUB_OUTPUT when set; always prints them.
+
+    python scripts/ci-scope.py --check-workflow .github/workflows/gradle.yml
+
+fails when a set job does not (transitively) `needs:` the job of a set its
+projects reference, so the job chain cannot drift from the Gradle graph.
 Stdlib only (Python 3.12+).
 """
 
@@ -44,7 +51,7 @@ from pathlib import Path
 
 LEAF_ROOTS: tuple[str, ...] = ("addons", "helpers")
 
-# Mirrors the paths-ignore list of .github/workflows/gradle.yml. GitHub's `*`
+# Mirrors the push paths-ignore list of .github/workflows/gradle.yml. GitHub's `*`
 # does not cross `/`, so `*.md` and `LICENSE*` match repo-root files only.
 IGNORED_PATTERNS: tuple[str, ...] = (
     "docs/**",
@@ -170,14 +177,15 @@ def owner(path: str, tree: dict[str, str]) -> str | None:
     return best
 
 
-def affected_sets(
+def affected_projects(
     changed: list[str],
     tree: dict[str, str],
     refs: dict[str, set[str]],
     consumers: dict[str, set[str]],
-) -> dict[str, bool]:
-    """Set name -> whether any of its projects is affected by `changed`."""
-    every = {name: True for name in SETS}
+) -> tuple[set[str], set[str]] | None:
+    """(projects to build, projects whose tests alone must run), or None when
+    the change cannot be scoped (path outside every project, or a project in
+    no set) and everything must build."""
     affected: set[str] = set()
     test_only: set[str] = set()
     for path in changed:
@@ -188,7 +196,7 @@ def affected_sets(
         if project is None:
             if path.split("/", 1)[0] in LEAF_ROOTS and path.endswith(".md"):
                 continue
-            return every
+            return None
         affected.add(project)
         group = owning_group(path)
         if group is not None:
@@ -205,13 +213,129 @@ def affected_sets(
                 affected.add(project)
                 grew = True
 
+    if any(set_of(p) is None for p in affected | test_only):
+        return None
+    return affected, test_only - affected
+
+
+def affected_sets(
+    changed: list[str],
+    tree: dict[str, str],
+    refs: dict[str, set[str]],
+    consumers: dict[str, set[str]],
+) -> dict[str, bool]:
+    """Set name -> whether any of its projects is affected by `changed`."""
+    result = affected_projects(changed, tree, refs, consumers)
+    if result is None:
+        return {name: True for name in SETS}
+    affected, test_only = result
     flags = {name: False for name in SETS}
     for project in affected | test_only:
-        name = set_of(project)
-        if name is None:
-            return every
-        flags[name] = True
+        flags[set_of(project)] = True
     return flags
+
+
+def set_tasks(
+    tree: dict[str, str],
+    result: tuple[set[str], set[str]] | None,
+) -> dict[str, list[str]]:
+    """Set name -> Gradle tasks its CI job runs: `:<p>:build` per affected
+    project, `:<p>:test` per test-only project. None (unscoped) builds every
+    project in the tree."""
+    affected, test_only = result if result is not None else (set(tree), set())
+    tasks: dict[str, list[str]] = {name: [] for name in SETS}
+    for project in sorted(affected):
+        name = set_of(project)
+        if name is not None:
+            tasks[name].append(f":{project}:build")
+    for project in sorted(test_only):
+        tasks[set_of(project)].append(f":{project}:test")
+    return tasks
+
+
+def set_graph(tree: dict[str, str], refs: dict[str, set[str]]) -> dict[str, set[str]]:
+    """Set name -> other sets its projects reference (build-order edges)."""
+    graph: dict[str, set[str]] = {name: set() for name in SETS}
+    for project, deps in refs.items():
+        source = set_of(project)
+        if source is None:
+            continue
+        for dep in deps:
+            target = set_of(dep) if dep in tree else None
+            if target is not None and target != source:
+                graph[source].add(target)
+    return graph
+
+
+_JOB_RE = re.compile(r"^  ([A-Za-z0-9_-]+):\s*$")
+_NEEDS_INLINE_RE = re.compile(r"^    needs:\s*(\S.*)$")
+_NEEDS_BLOCK_RE = re.compile(r"^    needs:\s*$")
+_LIST_ITEM_RE = re.compile(r"^      -\s*([A-Za-z0-9_-]+)\s*$")
+
+
+def workflow_needs(text: str) -> dict[str, set[str]]:
+    """Job id -> direct `needs:` of a GitHub workflow (inline, list or block form)."""
+    needs: dict[str, set[str]] = {}
+    in_jobs = False
+    job: str | None = None
+    block = False
+    for line in text.splitlines():
+        if line.startswith("jobs:"):
+            in_jobs = True
+            continue
+        if not in_jobs:
+            continue
+        if line and not line.startswith(" ") and not line.startswith("#"):
+            break
+        match = _JOB_RE.match(line)
+        if match:
+            job = match.group(1)
+            needs[job] = set()
+            block = False
+            continue
+        if job is None:
+            continue
+        inline = _NEEDS_INLINE_RE.match(line)
+        if inline:
+            value = inline.group(1).split("#", 1)[0].strip().strip("[]")
+            needs[job] |= {v.strip() for v in value.split(",") if v.strip()}
+            block = False
+            continue
+        if _NEEDS_BLOCK_RE.match(line):
+            block = True
+            continue
+        item = _LIST_ITEM_RE.match(line) if block else None
+        if item:
+            needs[job].add(item.group(1))
+        elif block and line.strip():
+            block = False
+    return needs
+
+
+def check_workflow(graph: dict[str, set[str]], needs: dict[str, set[str]]) -> list[str]:
+    """Violations of: every set has a job of the same id, and for each set edge
+    A -> B one job transitively needs the other (B before A, or A before B
+    when the edge closes a cycle such as rtp-core <-> rtp-proxy-common)."""
+    def closure(job: str) -> set[str]:
+        seen: set[str] = set()
+        stack = list(needs.get(job, set()))
+        while stack:
+            current = stack.pop()
+            if current not in seen:
+                seen.add(current)
+                stack.extend(needs.get(current, set()))
+        return seen
+
+    errors = [f"no job '{name}' for project set '{name}'" for name in SETS if name not in needs]
+    for source, targets in graph.items():
+        for target in sorted(targets):
+            if source not in needs or target not in needs or target in closure(source):
+                continue
+            if source in graph.get(target, set()) and source in closure(target):
+                continue
+            errors.append(f"job '{source}' builds projects referencing '{target}' "
+                          f"but does not need job '{target}'")
+    return errors
 
 
 def test_source_consumers(root: Path, dirs: dict[str, str]) -> dict[str, set[str]]:
@@ -287,10 +411,16 @@ def changed_files(base: str, head: str) -> list[str] | None:
     return [line.strip() for line in out.stdout.splitlines() if line.strip()]
 
 
-def emit(scope: str, tasks: list[str], flags: dict[str, bool]) -> None:
+def emit(
+    scope: str,
+    tasks: list[str],
+    flags: dict[str, bool],
+    per_set: dict[str, list[str]],
+) -> None:
     lines = [f"scope={scope}", f"tasks={' '.join(tasks)}"]
     lines += [f"{name}={'true' if flags.get(name) else 'false'}" for name in SETS]
     lines.append(f"full={'true' if all(flags.get(name) for name in SETS) else 'false'}")
+    lines += [f"{name}_tasks={' '.join(per_set.get(name, []))}" for name in SETS]
     for line in lines:
         print(line)
     target = os.environ.get("GITHUB_OUTPUT")
@@ -305,30 +435,44 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--base", default="", help="git ref/sha the change set starts from")
     parser.add_argument("--head", default="HEAD", help="git ref/sha the change set ends at")
     parser.add_argument("--force-full", action="store_true", help="skip detection and build everything")
+    parser.add_argument("--check-workflow", metavar="PATH",
+                        help="only verify that the workflow's set jobs `needs:` follow the "
+                             "project dependency graph; exit 1 on a missing edge")
     args = parser.parse_args(argv[1:])
-
-    every = {name: True for name in SETS}
-    if args.force_full or not args.base or args.base == ZERO_SHA:
-        print("Full build: forced, or no usable baseline.")
-        emit("full", [], every)
-        return 0
-
-    changed = changed_files(args.base, args.head)
-    if changed is None:
-        print("Full build: change set could not be determined.")
-        emit("full", [], every)
-        return 0
 
     root = Path.cwd()
     settings = (root / "settings.gradle").read_text(encoding="utf-8")
     dirs = project_dirs(settings)
     tree = project_dirs(settings, parents=True)
     refs = all_refs(root, tree)
+
+    if args.check_workflow:
+        needs = workflow_needs(Path(args.check_workflow).read_text(encoding="utf-8"))
+        errors = check_workflow(set_graph(tree, refs), needs)
+        for error in errors:
+            print(f"error: {args.check_workflow}: {error}", file=sys.stderr)
+        if not errors:
+            print(f"{args.check_workflow}: set job order matches the project graph.")
+        return 1 if errors else 0
+
+    every = {name: True for name in SETS}
+    if args.force_full or not args.base or args.base == ZERO_SHA:
+        print("Full build: forced, or no usable baseline.")
+        emit("full", [], every, set_tasks(tree, None))
+        return 0
+
+    changed = changed_files(args.base, args.head)
+    if changed is None:
+        print("Full build: change set could not be determined.")
+        emit("full", [], every, set_tasks(tree, None))
+        return 0
+
     consumers = test_source_consumers(root, dirs)
     scope, tasks = classify(changed, dirs, refs, consumers)
+    result = affected_projects(changed, tree, refs, consumers)
     flags = affected_sets(changed, tree, refs, consumers)
     print(f"{len(changed)} changed file(s) vs {args.base}")
-    emit(scope, tasks, flags)
+    emit(scope, tasks, flags, set_tasks(tree, result))
     return 0
 
 
