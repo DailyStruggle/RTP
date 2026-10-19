@@ -18,10 +18,10 @@ import io.github.dailystruggle.rtp.common.metrics.ChunkLoadProfile;
 import io.github.dailystruggle.rtp.common.metrics.RTPMetricsExtension;
 import io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.LockFreeLocationBuffer;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionQueueManager;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -428,7 +428,7 @@ class RtpBStatsCatalogueDetectorsTest {
     private static String rateBucket(int successes, int failures) {
         RtpOutcomeStats.GLOBAL.reset();
         for (int i = 0; i < successes; i++) RtpOutcomeStats.GLOBAL.recordSuccess();
-        for (int i = 0; i < failures; i++) RtpOutcomeStats.GLOBAL.recordFailure(LocationGenerator.FailTypes.values()[0]);
+        for (int i = 0; i < failures; i++) RtpOutcomeStats.GLOBAL.recordFailure(FailTypes.values()[0]);
         return RtpBStatsCatalogue.aggregateSuccessRateBucket();
     }
 
@@ -436,8 +436,8 @@ class RtpBStatsCatalogueDetectorsTest {
     @DisplayName("aggregate_top_failure_cause names the most frequent FailTypes, or none")
     void topFailureCause() {
         assertEquals("none", RtpBStatsCatalogue.detectTopFailureCause());
-        LocationGenerator.FailTypes[] types = LocationGenerator.FailTypes.values();
-        LocationGenerator.FailTypes expected = types[types.length - 1];
+        FailTypes[] types = FailTypes.values();
+        FailTypes expected = types[types.length - 1];
         RtpOutcomeStats.GLOBAL.recordFailure(types[0]);
         RtpOutcomeStats.GLOBAL.recordFailure(expected);
         RtpOutcomeStats.GLOBAL.recordFailure(expected);

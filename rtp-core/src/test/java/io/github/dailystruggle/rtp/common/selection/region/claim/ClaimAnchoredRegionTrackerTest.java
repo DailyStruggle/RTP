@@ -6,13 +6,13 @@ import io.github.dailystruggle.rtp.api.claim.ClaimBoundary;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SubspaceShape;
+import io.github.dailystruggle.rtp.common.selection.region.SubspaceShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
@@ -221,7 +221,7 @@ public class ClaimAnchoredRegionTrackerTest {
 
     // Shape keys are chunk units: mark chunk (2, 2) (blocks 32..47) as bad in source
     long loc1D = sourceCircle.xzToLocation(2, 2);
-    sourceCircle.addBadChunk(loc1D, LocationGenerator.FailTypes.biome);
+    sourceCircle.addBadChunk(loc1D, FailTypes.biome);
     assertTrue(sourceCircle.isKnownBad(2, 2));
 
     assertFalse(targetCircle.isKnownBad(2, 2));

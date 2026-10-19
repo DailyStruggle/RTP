@@ -192,7 +192,7 @@ public enum CommandMessages {
   menuAdminPanelRowEditor,
   /** Hover text for the admin-panel editor row. No placeholders. */
   menuAdminPanelHoverEditor,
-  /** Section divider above the Documentation & Editor block on the admin panel. */
+  /** Section divider above the Documentation &amp; Editor block on the admin panel. */
   menuAdminPanelSectionDocs,
   /** Admin-panel row: open the regions multi-config submenu. No placeholders. */
   menuAdminPanelRowRegions,

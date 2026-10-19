@@ -11,6 +11,7 @@ import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.mock.TrackedMockWorld;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * REQ-RTP-S-004 / ADR-016 verification: nullChunk attribution in pregen diagnostics.
- * Asserts that rejected/null chunk loads are tracked in {@link LocationGenerator.FailTypes#nullChunk}
+ * Asserts that rejected/null chunk loads are tracked in {@link FailTypes#nullChunk}
  * with {@code reason=asyncLoadNull} rather than silently dropped.
  */
 @DisplayName("REQ-RTP-S-004 / ADR-016: null-chunk drops are attributed to FailTypes.nullChunk")

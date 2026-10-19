@@ -1,11 +1,11 @@
 package io.github.dailystruggle.rtp.common.benchmark;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.LockFreeLocationBuffer;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -140,7 +140,7 @@ final class MemoryModels {
         if (!stream.safeGround(packed)) {
           // Cause-typed (ADR-079): expiry is decided by why the ground failed, not by one blanket
           // wall clock. Unsafe terrain is an immutable fact and does not need re-learning.
-          memory.addBadLocation(key, LocationGenerator.FailTypes.safety);
+          memory.addBadLocation(key, FailTypes.safety);
           learnedBadChunks++;
           continue;
         }
@@ -214,7 +214,7 @@ final class MemoryModels {
       for (int cx = -scanned; cx < scanned; cx++) {
         for (int cz = -scanned; cz < scanned; cz++) {
           if (stream.safeGround(CandidateStream.pack(cx, cz))) continue;
-          memory.addBadLocation(memory.xzToLocation(cx, cz), LocationGenerator.FailTypes.safety);
+          memory.addBadLocation(memory.xzToLocation(cx, cz), FailTypes.safety);
           scanMarks++;
           // Scan marks are knowledge like any other, so they count toward the total the dirtiness
           // gate compares against. Tracked separately in scanMarks only so the report can subtract

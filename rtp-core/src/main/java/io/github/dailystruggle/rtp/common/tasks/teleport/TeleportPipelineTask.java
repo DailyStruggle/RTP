@@ -398,7 +398,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
     if (region == null) return new double[] {0.0, 0.0};
     Object shapeObj = region.getShape();
     if (shapeObj == null) return new double[] {0.0, 0.0};
-    if (shapeObj instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SubspaceShape subspaceShape) {
+    if (shapeObj instanceof io.github.dailystruggle.rtp.common.selection.region.SubspaceShape subspaceShape) {
       io.github.dailystruggle.rtp.common.selection.region.RTPLocation anchor = subspaceShape.getAnchor();
       if (anchor != null) {
         return new double[] {anchor.coords().x(), anchor.coords().z()};

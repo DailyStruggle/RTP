@@ -10,12 +10,12 @@ import io.github.dailystruggle.rtp.common.commands.editor.channel.InMemoryTransp
 import io.github.dailystruggle.rtp.common.commands.editor.channel.TrustedEditors;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -157,7 +157,7 @@ class EditorChannelWiringTest {
         square.set(GenericMemoryShapeParams.centerRadius, 0L);
         square.set(GenericMemoryShapeParams.centerX, 0L);
         square.set(GenericMemoryShapeParams.centerZ, 0L);
-        square.addBadLocation(square.xzToLocation(1, 1), LocationGenerator.FailTypes.biome);
+        square.addBadLocation(square.xzToLocation(1, 1), FailTypes.biome);
         square.flushAndRebuild(1L);
         Map<String, MemoryShape<?>> shapes = new LinkedHashMap<>(Map.of("alpha", square));
         EditorLiveFeed live = new EditorLiveFeed(tempDir.resolve("live"), false, List.of(),
@@ -173,7 +173,7 @@ class EditorChannelWiringTest {
         assertEquals(channel.pluginFingerprint(), reset.get("from").getAsString(), "from stays the sender header");
         assertFalse(reset.has("to"), "a broadcast has no recipient header");
 
-        square.addBadLocation(square.xzToLocation(-10, 7), LocationGenerator.FailTypes.biome);
+        square.addBadLocation(square.xzToLocation(-10, 7), FailTypes.biome);
         square.flushAndRebuild(2L);
         assertTrue(live.tick(), "stopped: " + live.stopReason());
         JsonObject delta = page.last("hazard-delta");

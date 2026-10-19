@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -27,7 +28,7 @@ class PregeneratedPreferenceTest {
 
     @Test
     void failTypeExists() {
-        LocationGenerator.FailTypes t = LocationGenerator.FailTypes.valueOf("ungenerated");
+        FailTypes t = FailTypes.valueOf("ungenerated");
         assertNotNull(t);
     }
 

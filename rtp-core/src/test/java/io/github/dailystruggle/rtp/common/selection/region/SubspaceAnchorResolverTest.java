@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import java.io.File;
 import java.util.*;
 import org.junit.jupiter.api.BeforeEach;
@@ -126,7 +127,7 @@ class SubspaceAnchorResolverTest {
     DummyMemoryShape memShape = new DummyMemoryShape();
     // Simulate external claim rejection recorded in MemoryShape under ADR-079 (chunk coords 15, 20)
     long claimLoc = memShape.xzToLocation(15, 20);
-    memShape.addBadLocation(claimLoc, LocationGenerator.FailTypes.safetyExternal, 1000L);
+    memShape.addBadLocation(claimLoc, FailTypes.safetyExternal, 1000L);
     memShape.flushAndRebuild(1L);
 
     Region region = createDummyRegion(memShape);

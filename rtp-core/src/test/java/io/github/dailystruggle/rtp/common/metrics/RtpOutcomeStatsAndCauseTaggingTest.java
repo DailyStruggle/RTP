@@ -2,10 +2,10 @@ package io.github.dailystruggle.rtp.common.metrics;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -29,10 +29,10 @@ public class RtpOutcomeStatsAndCauseTaggingTest {
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
     }
 
-    private static final byte BIOME = (byte) LocationGenerator.FailTypes.biome.ordinal();
+    private static final byte BIOME = (byte) FailTypes.biome.ordinal();
     private static final byte SAFETY_EXTERNAL =
-            (byte) LocationGenerator.FailTypes.safetyExternal.ordinal();
-    private static final byte MISC = (byte) LocationGenerator.FailTypes.misc.ordinal();
+            (byte) FailTypes.safetyExternal.ordinal();
+    private static final byte MISC = (byte) FailTypes.misc.ordinal();
 
     private Circle shape;
 
@@ -54,20 +54,20 @@ public class RtpOutcomeStatsAndCauseTaggingTest {
         stats.recordSuccess();
         stats.recordSuccess();
         stats.recordSuccess();
-        stats.recordFailure(LocationGenerator.FailTypes.biome);
-        stats.recordFailure(LocationGenerator.FailTypes.biome);
-        stats.recordFailure(LocationGenerator.FailTypes.safetyExternal);
+        stats.recordFailure(FailTypes.biome);
+        stats.recordFailure(FailTypes.biome);
+        stats.recordFailure(FailTypes.safetyExternal);
         stats.recordFailure(null); // no-op
 
         assertEquals(3L, stats.successCount());
-        assertEquals(2L, stats.failureCount(LocationGenerator.FailTypes.biome));
-        assertEquals(1L, stats.failureCount(LocationGenerator.FailTypes.safetyExternal));
-        assertEquals(0L, stats.failureCount(LocationGenerator.FailTypes.timeout));
+        assertEquals(2L, stats.failureCount(FailTypes.biome));
+        assertEquals(1L, stats.failureCount(FailTypes.safetyExternal));
+        assertEquals(0L, stats.failureCount(FailTypes.timeout));
         assertEquals(3L, stats.totalFailures());
         assertEquals(0.5d, stats.successRate(), 1e-9, "3 successes of 6 outcomes = 0.5");
 
         assertEquals(2L,
-                stats.failureBreakdown().get(LocationGenerator.FailTypes.biome).longValue());
+                stats.failureBreakdown().get(FailTypes.biome).longValue());
 
         stats.reset();
         assertEquals(0L, stats.successCount());
@@ -82,8 +82,8 @@ public class RtpOutcomeStatsAndCauseTaggingTest {
     @Test
     @DisplayName("rebuild keeps one cause per distinct bad-location run, aligned to keys")
     void rebuild_keepsCausePerRun() {
-        shape.addBadLocation(10L, LocationGenerator.FailTypes.biome);
-        shape.addBadLocation(1000L, LocationGenerator.FailTypes.safetyExternal);
+        shape.addBadLocation(10L, FailTypes.biome);
+        shape.addBadLocation(1000L, FailTypes.safetyExternal);
         shape.flushAndRebuild(1L);
 
         long[] keys = shape.badKeysSnapshot();
@@ -110,8 +110,8 @@ public class RtpOutcomeStatsAndCauseTaggingTest {
     @Test
     @DisplayName("coalesced runs keep the first run's cause (first-cause-wins)")
     void rebuild_coalescedRunKeepsFirstCause() {
-        shape.addBadLocation(10L, LocationGenerator.FailTypes.biome);
-        shape.addBadLocation(11L, LocationGenerator.FailTypes.safety);
+        shape.addBadLocation(10L, FailTypes.biome);
+        shape.addBadLocation(11L, FailTypes.safety);
         // spatialResolution 5 coalesces 10 and 11 into a single run.
         shape.flushAndRebuild(5L);
 
@@ -128,8 +128,8 @@ public class RtpOutcomeStatsAndCauseTaggingTest {
     @Test
     @DisplayName("save/load round-trips the per-run cause through the v2 .bin format")
     void binRoundTrip_preservesCause() {
-        shape.addBadLocation(10L, LocationGenerator.FailTypes.biome);
-        shape.addBadLocation(1000L, LocationGenerator.FailTypes.safetyExternal);
+        shape.addBadLocation(10L, FailTypes.biome);
+        shape.addBadLocation(1000L, FailTypes.safetyExternal);
         shape.flushAndRebuild(1L);
 
         String file = "causeRoundTrip";

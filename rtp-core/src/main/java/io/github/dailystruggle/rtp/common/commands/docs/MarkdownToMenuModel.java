@@ -31,7 +31,8 @@ public final class MarkdownToMenuModel {
     private static final Pattern INLINE_CODE_PATTERN = Pattern.compile("`([^`]+)`");
     private static final Pattern BOLD_PATTERN = Pattern.compile("\\*\\*([^*]+)\\*\\*");
     private static final Pattern HEADING_PREFIX = Pattern.compile("^#+\\s*");
-    private static final Pattern NUMBERED_ITEM = Pattern.compile("^\\d+\\.\\s+.*");
+    /** Prefix probe ({@code lookingAt}); the line body needs no regex. */
+    private static final Pattern NUMBERED_ITEM = Pattern.compile("\\d++\\.\\s");
     private static final Pattern URL_ANCHOR = Pattern.compile("#.*$");
     private static final Pattern WHITESPACE = Pattern.compile("\\s+");
 
@@ -139,7 +140,7 @@ public final class MarkdownToMenuModel {
             }
 
             // Numbered list item
-            if (NUMBERED_ITEM.matcher(trimmed).matches()) {
+            if (NUMBERED_ITEM.matcher(trimmed).lookingAt()) {
                 int dotIdx = trimmed.indexOf('.');
                 String num = trimmed.substring(0, dotIdx + 1);
                 String rest = trimmed.substring(dotIdx + 1).trim();

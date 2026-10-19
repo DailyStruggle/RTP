@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
@@ -7,7 +8,7 @@ import java.util.concurrent.atomic.AtomicLongArray;
 
 /**
  * Process-global, wait-free accumulator of location-generation outcomes and rejection breakdown.
- * Tracks successes and failures bucketed by {@link LocationGenerator.FailTypes}.
+ * Tracks successes and failures bucketed by {@link FailTypes}.
  */
 public final class RtpOutcomeStats {
 
@@ -19,7 +20,7 @@ public final class RtpOutcomeStats {
 
     private final AtomicLong successes = new AtomicLong(0L);
     private final AtomicLongArray failuresByCause =
-            new AtomicLongArray(LocationGenerator.FailTypes.values().length);
+            new AtomicLongArray(FailTypes.values().length);
 
     /** Records one successful location generation. */
     public void recordSuccess() {
@@ -27,7 +28,7 @@ public final class RtpOutcomeStats {
     }
 
     /** Records one rejected attempt, bucketed by {@code cause}. No-op on {@code null}. */
-    public void recordFailure(LocationGenerator.FailTypes cause) {
+    public void recordFailure(FailTypes cause) {
         if (cause == null) return;
         failuresByCause.incrementAndGet(cause.ordinal());
     }
@@ -38,7 +39,7 @@ public final class RtpOutcomeStats {
     }
 
     /** Failures recorded for a single cause. */
-    public long failureCount(LocationGenerator.FailTypes cause) {
+    public long failureCount(FailTypes cause) {
         if (cause == null) return 0L;
         return failuresByCause.get(cause.ordinal());
     }
@@ -64,10 +65,10 @@ public final class RtpOutcomeStats {
     }
 
     /** Immutable-style snapshot of per-cause failure counts. Causes with zero are included. */
-    public Map<LocationGenerator.FailTypes, Long> failureBreakdown() {
-        Map<LocationGenerator.FailTypes, Long> out =
-                new EnumMap<>(LocationGenerator.FailTypes.class);
-        for (LocationGenerator.FailTypes cause : LocationGenerator.FailTypes.values()) {
+    public Map<FailTypes, Long> failureBreakdown() {
+        Map<FailTypes, Long> out =
+                new EnumMap<>(FailTypes.class);
+        for (FailTypes cause : FailTypes.values()) {
             out.put(cause, failuresByCause.get(cause.ordinal()));
         }
         return out;

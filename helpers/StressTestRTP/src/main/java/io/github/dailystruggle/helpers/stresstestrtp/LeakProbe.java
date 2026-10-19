@@ -101,9 +101,10 @@ public final class LeakProbe implements Listener {
     static final String METRICS_HEADER = "epoch_ms,label,metric,value";
 
     private static final Pattern HISTO_LINE = Pattern.compile("^\\s*\\d+:\\s+(\\d+)\\s+(\\d+)\\s+(\\S+)");
-    /** NMT summary category line, e.g. {@code -  Java Heap (reserved=16777216KB, committed=16777216KB)}. */
+    /** NMT summary category line, e.g. {@code -  Java Heap (reserved=16777216KB, committed=16777216KB)}.
+     *  Possessive name group keeps trailing blanks (no backtracking); {@link #metricSafe} trims them. */
     private static final Pattern NMT_LINE = Pattern.compile(
-            "^-\\s++(\\S[^(]*?)\\s*+\\(reserved=(\\d++)KB,\\s*+committed=(\\d++)KB");
+            "^-\\s++([^(\\s][^(]*+)\\(reserved=(\\d++)KB,\\s*+committed=(\\d++)KB");
     private static final Pattern NMT_TOTAL = Pattern.compile(
             "^Total:\\s+reserved=(\\d+)KB,\\s*committed=(\\d+)KB");
     private static final Pattern PROC_STATUS_KB = Pattern.compile("^(\\w+):\\s+(\\d+)\\s+kB");

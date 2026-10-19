@@ -91,7 +91,7 @@ public class DualLayerStrideQuotaRotationTest {
     assertEquals(0, table1.totalCovered());
 
     // Raw discovery adds to dirty cache without publishing snapshot yet
-    square.addBadLocation(50L, io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.safety, 3600L);
+    square.addBadLocation(50L, io.github.dailystruggle.rtp.common.selection.model.FailTypes.safety, 3600L);
     // Before flush, snapshot has not changed -> cached table returned
     SegmentedKeyRunTable tableSame = square.getOrBuildSegmentedTable(range);
     assertSame(table1, tableSame, "Segmented table should be cached while snapshot reference has not changed");

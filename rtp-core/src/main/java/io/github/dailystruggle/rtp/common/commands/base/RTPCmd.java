@@ -26,6 +26,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import io.github.dailystruggle.rtp.common.configuration.Messages;
+import io.github.dailystruggle.rtp.common.selection.model.BiomeNames;
 public interface RTPCmd extends BaseRTPCmd {
 
   /**
@@ -66,6 +67,46 @@ public interface RTPCmd extends BaseRTPCmd {
     return rtpArgs != null
         && rtpArgs.containsKey("world")
         && rtpArgs.containsKey("region");
+  }
+
+  /**
+   * Returns the local region explicitly requested via {@code region:<name>} / {@code region=<name>}
+   * when the sender may use it and it carries a cooldown override; {@code null} otherwise.
+   * Permission mirrors the {@code region} parameter: {@code rtp.region}, plus
+   * {@code rtp.regions.<name>|*} when the region sets requirePermission. Network
+   * ({@code server:region}) and multi-value requests return {@code null}; compute() decides those.
+   *
+   * @param sender the command sender
+   * @param args   raw {@code /rtp} arguments, may be {@code null}
+   * @return the permitted requested region with a cooldown override, or {@code null}
+   */
+  static Region requestedRegionWithOverride(RTPCommandSender sender, String[] args) {
+    if (sender == null || args == null || RTP.selectionAPI == null) return null;
+    String regionName = null;
+    for (String a : args) {
+      if (a == null || a.length() < 7) continue;
+      String prefix = a.substring(0, 7).toLowerCase(Locale.ROOT);
+      if (!prefix.equals("region:") && !prefix.equals("region=")) continue;
+      if (regionName != null) return null;
+      regionName = a.substring(7).trim();
+    }
+    if (regionName == null || regionName.isEmpty()
+        || regionName.indexOf(',') >= 0 || regionName.indexOf(':') >= 0) {
+      return null;
+    }
+    Region region = RTP.selectionAPI.getRegion(regionName);
+    if (region == null) return null;
+    RegionSettings settings = region.getSettings();
+    if (settings == null || settings.cooldownMillis() == null || settings.cooldownMillis() < 0) {
+      return null;
+    }
+    if (!sender.hasPermission("rtp.region")) return null;
+    if (settings.requirePermission()
+        && !sender.hasPermission("rtp.regions." + regionName)
+        && !sender.hasPermission("rtp.regions.*")) {
+      return null;
+    }
+    return region;
   }
 
   /**
@@ -232,8 +273,21 @@ public interface RTPCmd extends BaseRTPCmd {
         }
       }
 
-      if (!hasSubCommand && !hasTargetArg) {
+      // A permitted, explicitly requested region with a cooldown override is guarded by that
+      // override (same rules as compute()); other target args are left to compute().
+      Region requestedRegion = hasSubCommand ? null : requestedRegionWithOverride(sender, args);
+      if (!hasSubCommand && (!hasTargetArg || requestedRegion != null)) {
         long cd = sender.cooldown();
+        if (requestedRegion != null) {
+          cd = RTP.getCooldown(sender, requestedRegion.getSettings());
+          long lastRegionTp = RTP.getLastRegionTeleportTime(senderId, requestedRegion.name);
+          if (lastRegionTp <= 0L && senderData.completed && (senderData.targetRegion == null
+              || requestedRegion.name.equalsIgnoreCase(senderData.targetRegion.name))) {
+            lastRegionTp = senderData.time;
+          }
+          dt = (lastRegionTp > 0L) ? System.currentTimeMillis() - lastRegionTp : Long.MAX_VALUE;
+          if (dt < 0) dt = Long.MAX_VALUE + dt;
+        }
         if (dt < cd) {
           String msg = (String) RTP.configs.getConfigValue(PlayerMessages.cooldownMessage, "");
           messageMethod.accept(msg);

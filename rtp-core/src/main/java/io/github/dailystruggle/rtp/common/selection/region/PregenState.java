@@ -13,6 +13,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -76,7 +77,7 @@ final class PregenState {
      */
     final long maxAttemptsCeiling;
 
-    final Map<LocationGenerator.FailTypes, Map<String, Long>> failMap;
+    final Map<FailTypes, Map<String, Long>> failMap;
     final List<Map.Entry<Long, Long>> selections = new ArrayList<>();
     /**
      * Per-attempt outcome breadcrumb trail recorded across {@code PregenTask} attempt lifecycle.
@@ -132,8 +133,8 @@ final class PregenState {
         this.resolution = resolution;
         this.performance = performance;
 
-        this.failMap = new EnumMap<>(LocationGenerator.FailTypes.class);
-        for (LocationGenerator.FailTypes f : LocationGenerator.FailTypes.values()) {
+        this.failMap = new EnumMap<>(FailTypes.class);
+        for (FailTypes f : FailTypes.values()) {
             this.failMap.put(f, new HashMap<>());
         }
     }

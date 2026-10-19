@@ -8,6 +8,8 @@ import io.github.dailystruggle.rtp.common.tools.CfDiag;
 import io.github.dailystruggle.rtp.common.tools.ServerHealthGate;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
+import io.github.dailystruggle.rtp.common.selection.model.BiomeNames;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -19,7 +21,7 @@ import java.util.logging.Level;
  * drives the attempt loop, rescheduling across async stages (chunk I/O, verifiers)
  * to avoid blocking worker threads.
  *
- * <p>Preserves all {@link LocationGenerator.FailTypes} attributions from the blocking
+ * <p>Preserves all {@link FailTypes} attributions from the blocking
  * implementation.
  */
 final class PregenTask implements Runnable {
@@ -197,7 +199,7 @@ final class PregenTask implements Runnable {
      * Maps an outcome breadcrumb to the process-global
      * {@link io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats}.
      * The leading token (up to the first {@code '/'} or space) is either
-     * {@code "success"} or the name of a {@link LocationGenerator.FailTypes}
+     * {@code "success"} or the name of a {@link FailTypes}
      * constant. Unrecognised tokens are bucketed as {@code FailTypes.misc}.
      */
     private static void recordOutcomeMetric(String name) {
@@ -214,11 +216,11 @@ final class PregenTask implements Runnable {
         }
         // Run-control breadcrumbs, not verdicts: the candidate was neither accepted nor rejected.
         if (token.equals("deferred") || token.equals("drained")) return;
-        LocationGenerator.FailTypes cause;
+        FailTypes cause;
         try {
-            cause = LocationGenerator.FailTypes.valueOf(token);
+            cause = FailTypes.valueOf(token);
         } catch (IllegalArgumentException ex) {
-            cause = LocationGenerator.FailTypes.misc;
+            cause = FailTypes.misc;
         }
         RtpOutcomeStats.GLOBAL.recordFailure(cause);
     }
@@ -683,7 +685,7 @@ final class PregenTask implements Runnable {
                 return;
             }
             if (state.verbose) {
-                state.failMap.get(LocationGenerator.FailTypes.worldBorder)
+                state.failMap.get(FailTypes.worldBorder)
                         .put("OUTSIDE_BORDER", state.worldBorderFails);
             }
             recordOutcome("worldBorder/OUTSIDE_BORDER");
@@ -709,7 +711,7 @@ final class PregenTask implements Runnable {
             double clamped = Math.min(1.0d, pregenPref);
             if (clamped >= 1.0d || java.util.concurrent.ThreadLocalRandom.current().nextDouble() < clamped) {
                 if (state.verbose) {
-                    state.failMap.get(LocationGenerator.FailTypes.ungenerated)
+                    state.failMap.get(FailTypes.ungenerated)
                             .merge("UNGENERATED", 1L, Long::sum);
                 }
                 recordOutcome("ungenerated/UNGENERATED");
@@ -850,7 +852,7 @@ final class PregenTask implements Runnable {
             if (BiomeNames.matches(state.biomeNames, ub) != state.biomeWhitelist) {
                 if (state.maxAttempts < state.maxAttemptsCeiling) state.maxAttempts++;
                 if (state.verbose) {
-                    state.failMap.get(LocationGenerator.FailTypes.prefilterBiome)
+                    state.failMap.get(FailTypes.prefilterBiome)
                             .compute("biome=" + ub, (s, a) -> (a == null) ? 1L : ++a);
                 }
                 recordOutcome("prefilterBiome/" + ub);
@@ -867,7 +869,7 @@ final class PregenTask implements Runnable {
             if (MaterialNames.matches(state.unsafeBlocks, ub)) {
                 if (state.maxAttempts < state.maxAttemptsCeiling) state.maxAttempts++;
                 if (state.verbose) {
-                    state.failMap.get(LocationGenerator.FailTypes.prefilterBlock)
+                    state.failMap.get(FailTypes.prefilterBlock)
                             .compute("block=" + ub, (s, a) -> (a == null) ? 1L : ++a);
                 }
                 recordOutcome("prefilterBlock/" + ub);
@@ -936,7 +938,7 @@ final class PregenTask implements Runnable {
             // Mode B: Predicate-constrained queries (/rtp biome:...) prune ungenerated chunks off-thread
             if (isPredicateConstrained) {
                 if (state.verbose) {
-                    state.failMap.get(LocationGenerator.FailTypes.ungenerated)
+                    state.failMap.get(FailTypes.ungenerated)
                             .compute("reason=prunedUngeneratedPredicate", (s, a) -> (a == null) ? 1L : ++a);
                 }
                 recordOutcome("ungenerated/prunedUngeneratedPredicate chunk=(" + cx + "," + cz + ")");
@@ -993,7 +995,7 @@ final class PregenTask implements Runnable {
         immGov.acquirePermit(ServerHealthGate::lastMspt, 1200).whenComplete((permit, ex) -> {
             if (ex != null) {
                 if (state.verbose) {
-                    state.failMap.get(LocationGenerator.FailTypes.timeout)
+                    state.failMap.get(FailTypes.timeout)
                             .compute("reason=generationThrottledTimeout", (s, a) -> (a == null) ? 1L : ++a);
                 }
                 recordOutcome("timeout/generationThrottledTimeout chunk=(" + cx + "," + cz + ")");
@@ -1028,7 +1030,7 @@ final class PregenTask implements Runnable {
                                         + " chunk=(" + cx + "," + cz + "): "
                                         + ex.getClass().getSimpleName() + ": " + ex.getMessage());
                         if (state.verbose) {
-                            state.failMap.get(LocationGenerator.FailTypes.nullChunk)
+                            state.failMap.get(FailTypes.nullChunk)
                                     .compute("reason=ticketFailed", (s, a) -> (a == null) ? 1L : ++a);
                         }
                         recordOutcome("nullChunk/ticketFailed");
@@ -1037,7 +1039,7 @@ final class PregenTask implements Runnable {
                     }
                     if (chunk == null) {
                         if (state.verbose) {
-                            state.failMap.get(LocationGenerator.FailTypes.nullChunk)
+                            state.failMap.get(FailTypes.nullChunk)
                                     .compute("reason=asyncLoadNull", (s, a) -> (a == null) ? 1L : ++a);
                         }
                         recordOutcome("nullChunk/asyncLoadNull chunk=(" + cx + "," + cz + ")");
@@ -1083,7 +1085,7 @@ final class PregenTask implements Runnable {
                                 + state.world.name() + " " + cx + "," + cz
                                 + "); rejecting candidate.");
                 if (state.verbose) {
-                    state.failMap.get(LocationGenerator.FailTypes.timeout)
+                    state.failMap.get(FailTypes.timeout)
                             .compute("reason=ticketApplyTimeout", (s, a) -> (a == null) ? 1L : ++a);
                 }
                 recordOutcome("timeout/ticketApplyTimeout");
@@ -1126,7 +1128,7 @@ final class PregenTask implements Runnable {
                                     () -> requestChunk(cx, cz, finalL, staleRetries + 1));
                         } else {
                             if (state.verbose) {
-                                state.failMap.get(LocationGenerator.FailTypes.nullChunk)
+                                state.failMap.get(FailTypes.nullChunk)
                                         .compute("reason=staleChunkBeforeVert", (s, a) -> (a == null) ? 1L : ++a);
                             }
                             recordOutcome("nullChunk/staleChunkBeforeVert chunk=(" + cx + "," + cz + ")");
@@ -1170,7 +1172,7 @@ final class PregenTask implements Runnable {
             RTPChunk<?> live = state.world.getCachedChunk(centerKey);
             if (live == null || !state.world.isChunkLoaded(cx, cz)) {
                 if (state.verbose) {
-                    state.failMap.get(LocationGenerator.FailTypes.nullChunk)
+                    state.failMap.get(FailTypes.nullChunk)
                             .compute("reason=staleAfterDispatch", (s, a) -> (a == null) ? 1L : ++a);
                 }
                 recordOutcome("nullChunk/staleAfterDispatch chunk=(" + cx + "," + cz + ")");
@@ -1193,10 +1195,10 @@ final class PregenTask implements Runnable {
                 // addBadChunk: chunk-uniform - within a chunk the per-column selection order
                 // is deterministic, so the twin spiral index picks the same column and
                 // vert.adjust returns null identically.
-                ((MemoryShape<?>) state.shape).addBadChunk(finalL, LocationGenerator.FailTypes.vert);
+                ((MemoryShape<?>) state.shape).addBadChunk(finalL, FailTypes.vert);
             }
             if (state.verbose) {
-                state.failMap.get(LocationGenerator.FailTypes.vert)
+                state.failMap.get(FailTypes.vert)
                         .compute("biome=", (s, a) -> (a == null) ? 1L : ++a);
             }
             recordOutcome("vert/no-stand-y");
@@ -1216,11 +1218,11 @@ final class PregenTask implements Runnable {
             if (state.defaultBiomes && state.shape instanceof MemoryShape && state.biomeRecall) {
                 // addBadChunk: chunk-uniform - biome is a per-chunk property; the twin spiral
                 // index decodes to the same chunk and is guaranteed to fail the same biome check.
-                ((MemoryShape<?>) state.shape).addBadChunk(finalL, LocationGenerator.FailTypes.biome);
+                ((MemoryShape<?>) state.shape).addBadChunk(finalL, FailTypes.biome);
             }
             if (state.verbose) {
                 String cb = currBiome;
-                state.failMap.get(LocationGenerator.FailTypes.biome)
+                state.failMap.get(FailTypes.biome)
                         .compute("biome=" + cb, (s, a) -> (a == null) ? 1L : ++a);
             }
             recordOutcome("biome/" + currBiome);
@@ -1289,7 +1291,7 @@ final class PregenTask implements Runnable {
                                 "[RTP] Safety-check neighbour loads failed ("
                                         + state.world.name() + " center=(" + cx + "," + cz + ")): " + ex);
                         if (state.verbose) {
-                            state.failMap.get(LocationGenerator.FailTypes.nullChunk)
+                            state.failMap.get(FailTypes.nullChunk)
                                     .compute("reason=neighborNull", (s, a) -> (a == null) ? 1L : ++a);
                         }
                         recordOutcome("nullChunk/neighborNull-allOf");
@@ -1326,7 +1328,7 @@ final class PregenTask implements Runnable {
                     }
                     if (!ok) {
                         if (state.verbose) {
-                            state.failMap.get(LocationGenerator.FailTypes.nullChunk)
+                            state.failMap.get(FailTypes.nullChunk)
                                     .compute("reason=neighborNull", (s, a) -> (a == null) ? 1L : ++a);
                         }
                         recordOutcome("nullChunk/neighborNull-cacheMiss");
@@ -1408,7 +1410,7 @@ final class PregenTask implements Runnable {
                 RTPChunk<?> c1 = (idx >= 0 && idx < localChunks.length) ? localChunks[idx] : null;
                 if (c1 == null) {
                     if (state.verbose) {
-                        state.failMap.get(LocationGenerator.FailTypes.nullChunk)
+                        state.failMap.get(FailTypes.nullChunk)
                                 .compute("reason=neighborNull", (s, a) -> (a == null) ? 1L : ++a);
                     }
                     pass = false;
@@ -1427,7 +1429,7 @@ final class PregenTask implements Runnable {
         if (!pass) {
             if (state.verbose) {
                 final int fx = finalX, fy = finalY, fz = finalZ;
-                state.failMap.get(LocationGenerator.FailTypes.safety)
+                state.failMap.get(FailTypes.safety)
                         .compute("location=(" + fx + "," + fy + "," + fz + ")",
                                 (s, a) -> (a == null) ? 1L : ++a);
             }
@@ -1436,7 +1438,7 @@ final class PregenTask implements Runnable {
                 // addBadChunk: chunk-uniform - within a chunk the per-column selection order
                 // is deterministic, so the twin spiral index picks the same column and the
                 // same (2r+1)^3 safety scan rejects it again.
-                ((MemoryShape<?>) state.shape).addBadChunk(finalL, LocationGenerator.FailTypes.safety);
+                ((MemoryShape<?>) state.shape).addBadChunk(finalL, FailTypes.safety);
             }
             closeIfPresent(reservation);
             rescheduleNextAttempt();
@@ -1452,7 +1454,7 @@ final class PregenTask implements Runnable {
                         String className = (failedClass != null) ? failedClass.getSimpleName() : "verifier";
                         if (state.verbose) {
                             final int fx = finalX, fy = finalY, fz = finalZ;
-                            state.failMap.get(LocationGenerator.FailTypes.safetyExternal)
+                            state.failMap.get(FailTypes.safetyExternal)
                                     .compute("location=(" + fx + "," + fy + "," + fz + ")[verifier=" + className + "]",
                                             (s, a) -> (a == null) ? 1L : ++a);
                         }
@@ -1529,7 +1531,7 @@ final class PregenTask implements Runnable {
                             + "] failed to generate a location within "
                             + state.maxAttempts
                             + " tries. Adjust your configuration.");
-            for (Map.Entry<LocationGenerator.FailTypes, Map<String, Long>> mapEntry : state.failMap.entrySet()) {
+            for (Map.Entry<FailTypes, Map<String, Long>> mapEntry : state.failMap.entrySet()) {
                 Map<String, Long> map = mapEntry.getValue();
                 String[] output = new String[map.size()];
                 int pos = 0;

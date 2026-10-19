@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common;
 
+import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
@@ -393,4 +394,38 @@ public class RTPArchitectureTest {
                     .resideInAPackage("io.github.dailystruggle.rtp.common.selection..")
                     .because("ADR-115 seam 3: selection.region depends on common.tasks, so the "
                             + "base task package must not depend back on it.");
+
+    /**
+     * Rule 17 - Spatial Memory Stays Below Regions (ADR-115, RTP-67).
+     *
+     * <p>{@code Region} owns its {@code MemoryShape}, so shapes, TTL policy and residency must
+     * not reach back into the classes of {@code selection.region}. Shared value types they need
+     * ({@code FailTypes}, {@code BiomeNames}) live in {@code selection.model}; {@code SubspaceShape}
+     * wraps a {@code Region} and so lives in {@code selection.region}.
+     */
+    @ArchTest
+    static final ArchRule spatial_memory_must_not_depend_on_region_classes =
+            noClasses()
+                    .that().resideInAPackage(
+                            "io.github.dailystruggle.rtp.common.selection.region.selectors.memory..")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("io.github.dailystruggle.rtp.common.selection.region")
+                    .because("ADR-115: selection.region depends on spatial memory, so memory "
+                            + "must not depend back on it.");
+
+    /**
+     * Rule 18 - Selection Model Is Tier 1 (ADR-115, RTP-67).
+     *
+     * <p>{@code selection.model} holds value types shared by shapes, regions and diagnostics, and
+     * depends on no other {@code rtp-core} package.
+     */
+    @ArchTest
+    static final ArchRule selection_model_must_not_depend_on_core =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.selection.model..")
+                    .should().dependOnClassesThat(
+                            JavaClass.Predicates.resideInAPackage(CORE_PACKAGE).and(
+                                    JavaClass.Predicates.resideOutsideOfPackage(
+                                            "io.github.dailystruggle.rtp.common.selection.model..")))
+                    .because("ADR-115 Tier 1: shared selection value types have no core dependencies.");
 }

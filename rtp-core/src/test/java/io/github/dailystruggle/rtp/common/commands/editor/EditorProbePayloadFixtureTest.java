@@ -5,7 +5,6 @@ import com.google.gson.JsonParser;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.CircleOptimizedDualLayer;
@@ -14,6 +13,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -92,9 +92,9 @@ class EditorProbePayloadFixtureTest {
             EditorSessionManager manager = new EditorSessionManager();
             CircleOptimizedDualLayer circle = generic(new CircleOptimizedDualLayer("PROBE_CIRCLE"), 300, 40, -12, 7);
             long range = circle.getRange();
-            circle.addBadLocation(range / 3, LocationGenerator.FailTypes.biome);
-            circle.addBadLocation(range / 2, LocationGenerator.FailTypes.uniquePlacement);
-            circle.addBadLocation(2 * range / 3, LocationGenerator.FailTypes.worldBorder);
+            circle.addBadLocation(range / 3, FailTypes.biome);
+            circle.addBadLocation(range / 2, FailTypes.uniquePlacement);
+            circle.addBadLocation(2 * range / 3, FailTypes.worldBorder);
             circle.flushAndRebuild(1L);
             SquareOptimizedDualLayer square = generic(new SquareOptimizedDualLayer("PROBE_SQUARE"), 200, 16, 30, -30);
 

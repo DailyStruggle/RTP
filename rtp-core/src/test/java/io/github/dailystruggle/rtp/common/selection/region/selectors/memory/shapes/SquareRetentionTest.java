@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import java.util.HashSet;
 import java.util.Set;

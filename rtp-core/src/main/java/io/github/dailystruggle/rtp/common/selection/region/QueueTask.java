@@ -14,6 +14,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;

@@ -10,7 +10,7 @@ import io.github.dailystruggle.rtp.common.benchmark.IndexConfigPlanner.Situation
 import io.github.dailystruggle.rtp.common.benchmark.ModelCrossoverPlanner.ModelChoice;
 import io.github.dailystruggle.rtp.common.benchmark.SimulationReport.Provenance;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import java.nio.file.Path;

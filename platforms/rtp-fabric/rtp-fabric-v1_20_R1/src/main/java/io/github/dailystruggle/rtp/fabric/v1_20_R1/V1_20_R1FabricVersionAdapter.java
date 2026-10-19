@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter;
 import io.github.dailystruggle.rtp.fabric.version.RTPChunkHandle;
 import io.github.dailystruggle.rtp.fabric.version.RTPLevelHandle;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import com.mojang.datafixers.util.Either;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;

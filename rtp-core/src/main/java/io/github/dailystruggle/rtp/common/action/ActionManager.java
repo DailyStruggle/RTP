@@ -1130,8 +1130,7 @@ public final class ActionManager implements ActionService {
                     long locKey = memShape.xzToLocation(cx, cz);
                     memShape.addBadChunk(
                         locKey,
-                        io.github.dailystruggle.rtp.common.selection.region.LocationGenerator
-                            .FailTypes.safetyExternal);
+                        io.github.dailystruggle.rtp.common.selection.model.FailTypes.safetyExternal);
                   }
                 }
                 cached.release();

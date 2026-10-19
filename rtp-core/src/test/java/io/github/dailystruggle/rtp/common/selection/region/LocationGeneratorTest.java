@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -151,8 +152,8 @@ class LocationGeneratorTest {
 
     @Test
     void fail_types_enum_coverage() {
-        for (LocationGenerator.FailTypes type : LocationGenerator.FailTypes.values()) {
-            assertNotNull(LocationGenerator.FailTypes.valueOf(type.name()));
+        for (FailTypes type : FailTypes.values()) {
+            assertNotNull(FailTypes.valueOf(type.name()));
         }
     }
 

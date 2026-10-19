@@ -8,9 +8,9 @@ import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SubspaceShape;
 
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -446,7 +446,7 @@ public final class GroupPlacementDispatcher implements GroupPlacementService {
                               int cx = rejected.x() >> 4;
                               int cz = rejected.z() >> 4;
                               long loc = memShape.xzToLocation(cx, cz);
-                              memShape.addBadChunk(loc, LocationGenerator.FailTypes.safetyExternal);
+                              memShape.addBadChunk(loc, FailTypes.safetyExternal);
                             }
                             unassignedOrRejected.add(cand);
                           }

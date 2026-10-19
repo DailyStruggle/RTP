@@ -43,9 +43,12 @@ class EditorSchemaDiagnosticsTest {
             String schema = new EditorSessionManager().buildSchemaJson();
             assertTrue(schema.startsWith("{\"shape\":{"), schema);
             assertTrue(schema.contains("\"CHUNKY_SCHEMA_TEST\":{"), "add-on shape name without .YML suffix: " + schema);
-            assertTrue(schema.matches("(?s).*\"CHUNKY_SCHEMA_TEST\":\\{.*?\"radius\":\\{\"type\":\"integer\".*"), "shape parameter typed: " + schema);
-            assertTrue(schema.matches("(?s).*\"CHUNKY_SCHEMA_TEST\":\\{.*?\"mode\":\\{\"options\":\\[[^\\]]*\"ACCUMULATE\"[^\\]]*\\],\"type\":\"enum\".*"), "enum parameter lists options: " + schema);
-            assertTrue(schema.matches("(?s).*\"vert\":\\{.*\"LINEAR\":\\{.*?\"minY\":\\{\"type\":\"integer\".*"), "adjustor parameter typed: " + schema);
+            int shapeAt = schema.indexOf("\"CHUNKY_SCHEMA_TEST\":{");
+            assertTrue(schema.indexOf("\"radius\":{\"type\":\"integer\"", shapeAt) >= 0, "shape parameter typed: " + schema);
+            assertTrue(enumListsOption(schema, shapeAt, "\"mode\":{\"options\":[", "\"ACCUMULATE\""), "enum parameter lists options: " + schema);
+            int vertAt = schema.indexOf("\"vert\":{");
+            int linearAt = vertAt < 0 ? -1 : schema.indexOf("\"LINEAR\":{", vertAt);
+            assertTrue(linearAt >= 0 && schema.indexOf("\"minY\":{\"type\":\"integer\"", linearAt) >= 0, "adjustor parameter typed: " + schema);
 
             String payload = new EditorSessionManager().createPayloadJson(Map.of("config.yml", "teleportDelay: 2\n"));
             assertTrue(payload.contains("\"schema\":{\"shape\":{"), "payload carries schema");
@@ -53,6 +56,21 @@ class EditorSchemaDiagnosticsTest {
             shapes.remove("chunky_schema_test");
             if (addedLinear) verts.remove("LINEAR");
         }
+    }
+
+    /** Some {@code head} after {@code from} has an options list holding {@code option} and is typed enum.
+     *  Index scan instead of a {@code .*?} regex: linear in the schema length. */
+    private static boolean enumListsOption(String schema, int from, String head, String option) {
+        if (from < 0) return false;
+        for (int at = schema.indexOf(head, from); at >= 0; at = schema.indexOf(head, at + 1)) {
+            int start = at + head.length();
+            int end = schema.indexOf(']', start);
+            if (end < 0) return false;
+            if (schema.substring(start, end).contains(option) && schema.startsWith("],\"type\":\"enum\"", end)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Test

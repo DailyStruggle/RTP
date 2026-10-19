@@ -13,7 +13,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
-import io.github.dailystruggle.rtp.common.selection.region.BiomeNames;
+import io.github.dailystruggle.rtp.common.selection.model.BiomeNames;
 import io.github.dailystruggle.rtp.common.selection.region.MaterialNames;
 import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -1680,7 +1680,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                                   for (int bz = bMinZ; bz <= bMaxZ; bz++) {
                                     long loc = shape.xzToLocation(bx, bz);
                                     if (loc >= 0 && loc < shape.getEffectiveRange() && !shape.isKnownBad(loc)) {
-                                      shape.addBadLocation(loc, io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.safetyExternal);
+                                      shape.addBadLocation(loc, io.github.dailystruggle.rtp.common.selection.model.FailTypes.safetyExternal);
                                       newlyMarked++;
                                     }
                                   }

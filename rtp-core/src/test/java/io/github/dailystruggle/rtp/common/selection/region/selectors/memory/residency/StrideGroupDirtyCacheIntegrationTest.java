@@ -4,9 +4,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.dailystruggle.rtp.anvil.StorageLatencyProbe;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -60,9 +60,9 @@ class StrideGroupDirtyCacheIntegrationTest {
     long keyInGroup1 = keysPerGroup + 50L;
 
     // Mark key in group 0 (resident)
-    shape.addBadLocation(keyInGroup0, LocationGenerator.FailTypes.biome);
+    shape.addBadLocation(keyInGroup0, FailTypes.biome);
     // Mark key in group 1 (non-resident)
-    shape.addBadLocation(keyInGroup1, LocationGenerator.FailTypes.safety);
+    shape.addBadLocation(keyInGroup1, FailTypes.safety);
 
     // Both keys must report known bad (via dirty caching / shard)
     assertTrue(shape.isKnownBad(keyInGroup0), "Key in resident group 0 must be known bad");
