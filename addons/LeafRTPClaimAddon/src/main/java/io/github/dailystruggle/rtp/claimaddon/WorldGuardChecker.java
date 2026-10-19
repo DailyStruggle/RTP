@@ -19,7 +19,6 @@ public class WorldGuardChecker {
   private WorldGuardChecker() {}
   public static StateFlag CAN_RTP_SELECT_HERE = null;
   private static WorldGuardPlugin worldGuardPlugin = null;
-  private static boolean exists = true;
   private static volatile boolean flagSetupAttempted = false;
 
   public static void setupWGFlag() {
@@ -47,14 +46,13 @@ public class WorldGuardChecker {
   }
 
   public static Boolean isInClaim(io.github.dailystruggle.rtp.api.world.RTPCoords location) {
-    if (!exists || location == null) return false;
+    if (location == null) return false;
     org.bukkit.Location loc = ClaimLocationResolver.toLocation(location);
     if (loc == null) return false;
     return isInClaim(loc);
   }
 
   public static Boolean isInClaim(org.bukkit.Location location) {
-    if (!exists) return false;
     try {
       if (getWorldGuard() == null) return false;
       // One attempt only: the registry locks once WorldGuard enables, so a late registration
@@ -78,7 +76,7 @@ public class WorldGuardChecker {
       if (optIn == null) return true;
       return !set.testState(null, optIn);
     } catch (Throwable t) {
-      return ClaimCheckFailure.handle("WorldGuard", t, () -> exists = false);
+      return ClaimCheckFailure.handle("WorldGuard", t);
     }
   }
 }

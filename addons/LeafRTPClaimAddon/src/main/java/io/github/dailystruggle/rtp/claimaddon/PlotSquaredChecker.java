@@ -5,123 +5,66 @@ import java.lang.reflect.Method;
 /**
  * Checker for PlotSquared plots and plot roads.
  *
- * <p>PlotSquared ({@code com.plotsquared}) manages designated plot worlds where player builds
- * are confined to claimed plots separated by roads. We resolve PlotSquared's location and plot
- * models reflectively so RTP carries no compile-time dependency on PlotSquared.
+ * <p>PlotSquared 6/7 ({@code com.plotsquared.core}) maps a block to its plot through static
+ * {@code com.plotsquared.core.location.Location.at(String world, int x, int y, int z)}; that
+ * location answers {@code isPlotRoad()} and {@code getPlot()} ({@code null} on roads and outside
+ * plot areas). Inside a plot area an unclaimed plot is still a {@code Plot}, so ownership is
+ * {@code Plot#hasOwner()}; {@code isBasePlot()} only describes merge structure. Several 4-argument
+ * {@code at} overloads take a {@code String} first, so the method is resolved by exact signature.
+ * Resolved reflectively so RTP carries no compile-time dependency on PlotSquared.
  *
- * <p>When inside a plot world, any location that is claimed ({@code plot.isClaimed() || plot.isBasePlot()})
- * or is on a plot road ({@code pLoc.isPlotRoad()}) is treated as non-RTP-safe to prevent landing
- * players on claimed property or interfering with plot bounds.
- *
- * <p>When PlotSquared is absent or the location is outside any PlotArea, the verifier safely returns false.
+ * <p>Owned plots and plot roads are rejected; unowned plots and land outside plot areas are not.
+ * Fails open (returns false) when PlotSquared is not enabled. Fails closed (returns true, per
+ * REQ-RTP-S-003) when it is enabled but this API chain cannot be resolved or the lookup throws.
  */
 public class PlotSquaredChecker {
   private PlotSquaredChecker() {}
 
-  private static boolean exists = true;
-  private static Boolean available = null;
-
-  private static boolean isAvailable() {
-    if (!exists) return false;
-    if (available != null) return available;
-    try {
-      Class.forName("com.plotsquared.core.location.Location");
-      available = true;
-    } catch (Throwable t) {
-      available = false;
-    }
-    return available;
-  }
+  /** Bukkit plugin name from PlotSquared's {@code plugin.yml} (case-sensitive lookup). */
+  static final String PLUGIN_NAME = "PlotSquared";
 
   /**
-   * Check if an RTP coordinate is within a claimed plot or plot road.
+   * Check if an RTP coordinate is within an owned plot or on a plot road.
    *
    * @param location the coordinate to check
-   * @return true if in a claimed plot or road, false otherwise
+   * @return true if in an owned plot or on a road, or if the lookup fails while PlotSquared is
+   *     enabled
    */
   public static Boolean isInClaim(io.github.dailystruggle.rtp.api.world.RTPCoords location) {
-    if (!exists || location == null || !isAvailable()) return false;
+    if (location == null) return false;
     org.bukkit.Location loc = ClaimLocationResolver.toLocation(location);
     if (loc == null) return false;
     return isInClaim(loc);
   }
 
   /**
-   * Check if a Bukkit location is within a claimed plot or plot road.
+   * Check if a Bukkit location is within an owned plot or on a plot road.
    *
    * @param location the location to check
-   * @return true if in a claimed plot or road, false otherwise
+   * @return true if in an owned plot or on a road, or if the lookup fails while PlotSquared is
+   *     enabled
    */
   public static Boolean isInClaim(org.bukkit.Location location) {
-    if (!exists || location == null || location.getWorld() == null || !isAvailable()) return false;
+    if (location == null || location.getWorld() == null) return false;
+    if (!ClaimPlugins.isEnabled(PLUGIN_NAME)) return false;
     try {
       Class<?> pLocClass = Class.forName("com.plotsquared.core.location.Location");
-      Method atMethod = findAtMethod(pLocClass);
-      if (atMethod == null) return false;
-
-      Object pLoc;
-      if (atMethod.getParameterCount() == 4) {
-        pLoc = atMethod.invoke(null, location.getWorld().getName(), location.getBlockX(), location.getBlockY(), location.getBlockZ());
-      } else if (atMethod.getParameterCount() == 3) {
-        pLoc = atMethod.invoke(null, location.getWorld().getName(), location.getBlockX(), location.getBlockZ());
-      } else {
-        return false;
-      }
-      if (pLoc == null) return false;
-
-      // Check if location is a road
-      Method isPlotRoad = findMethod(pLoc.getClass(), "isPlotRoad");
-      if (isPlotRoad != null) {
-        Object isRoad = isPlotRoad.invoke(pLoc);
-        if (Boolean.TRUE.equals(isRoad)) return true;
-      }
-
-      // Check if location has an active plot
-      Method getPlot = findMethod(pLoc.getClass(), "getPlot");
-      if (getPlot != null) {
-        Object plot = getPlot.invoke(pLoc);
-        if (plot != null) {
-          Method isClaimed = findMethod(plot.getClass(), "isClaimed");
-          if (isClaimed != null && Boolean.TRUE.equals(isClaimed.invoke(plot))) {
-            return true;
-          }
-          Method isBasePlot = findMethod(plot.getClass(), "isBasePlot");
-          if (isBasePlot != null && Boolean.TRUE.equals(isBasePlot.invoke(plot))) {
-            return true;
-          }
-          // If a plot object exists and is not unclaimed/empty
-          Method hasOwner = findMethod(plot.getClass(), "hasOwner");
-          if (hasOwner != null && Boolean.TRUE.equals(hasOwner.invoke(plot))) {
-            return true;
-          }
-        }
-      }
-
-      return false;
+      Method at = pLocClass.getMethod("at", String.class, int.class, int.class, int.class);
+      Object pLoc =
+          at.invoke(
+              null,
+              location.getWorld().getName(),
+              location.getBlockX(),
+              location.getBlockY(),
+              location.getBlockZ());
+      if (pLoc == null) throw new IllegalStateException("Location.at(...) is null");
+      if (Boolean.TRUE.equals(pLocClass.getMethod("isPlotRoad").invoke(pLoc))) return true;
+      Method getPlot = pLocClass.getMethod("getPlot");
+      Object plot = getPlot.invoke(pLoc);
+      if (plot == null) return false;
+      return Boolean.TRUE.equals(getPlot.getReturnType().getMethod("hasOwner").invoke(plot));
     } catch (Throwable t) {
-      return ClaimCheckFailure.handle("PlotSquared", t, () -> exists = false);
+      return ClaimCheckFailure.handle(PLUGIN_NAME, t);
     }
-  }
-
-  private static Method findAtMethod(Class<?> pLocClass) {
-    for (Method m : pLocClass.getMethods()) {
-      if ("at".equals(m.getName())) {
-        Class<?>[] pts = m.getParameterTypes();
-        if (pts.length == 4 && pts[0] == String.class) {
-          return m;
-        }
-        if (pts.length == 3 && pts[0] == String.class) {
-          return m;
-        }
-      }
-    }
-    return null;
-  }
-
-  private static Method findMethod(Class<?> type, String name) {
-    for (Method m : type.getMethods()) {
-      if (m.getName().equals(name) && m.getParameterCount() == 0) return m;
-    }
-    return null;
   }
 }

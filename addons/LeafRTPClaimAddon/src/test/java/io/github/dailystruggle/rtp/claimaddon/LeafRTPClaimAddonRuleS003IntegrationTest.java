@@ -127,13 +127,6 @@ public class LeafRTPClaimAddonRuleS003IntegrationTest {
     rtpWorld = new MockRTPWorld("test_world");
     accessor.addWorld(rtpWorld);
 
-    // Reset checkers static flags
-    resetCheckerExists(GriefPreventionChecker.class);
-    resetCheckerExists(WorldGuardChecker.class);
-    resetCheckerExists(TownyAdvancedChecker.class);
-    resetCheckerExists(HuskClaimsChecker.class);
-    resetCheckerExists(HuskTownsChecker.class);
-
     // Setup GriefPrevention mock
     mockGp = mock(GriefPrevention.class);
     mockDataStore = mock(DataStore.class);
@@ -226,6 +219,10 @@ public class LeafRTPClaimAddonRuleS003IntegrationTest {
       return !inside;
     });
 
+    // Reflective checkers gate each call on their plugin being enabled.
+    when(mockPluginManager.isPluginEnabled(HuskClaimsChecker.PLUGIN_NAME)).thenReturn(true);
+    when(mockPluginManager.isPluginEnabled(HuskTownsChecker.PLUGIN_NAME)).thenReturn(true);
+
     // Setup HuskClaims stub
     BukkitHuskClaimsAPI.getInstance().setClaimPredicate(loc -> {
       if (!claimedProviders.contains("huskclaims")) return false;
@@ -304,21 +301,6 @@ public class LeafRTPClaimAddonRuleS003IntegrationTest {
     BukkitHuskTownsAPI.getInstance().setClaimPredicate(loc -> false);
 
     RTPTestSetup.cleanUp();
-  }
-
-  private void resetCheckerExists(Class<?> clazz) {
-    try {
-      Field existsField = clazz.getDeclaredField("exists");
-      existsField.setAccessible(true);
-      existsField.set(null, true);
-    } catch (Throwable ignored) {
-    }
-    try {
-      Field availableField = clazz.getDeclaredField("available");
-      availableField.setAccessible(true);
-      availableField.set(null, null);
-    } catch (Throwable ignored) {
-    }
   }
 
   /**

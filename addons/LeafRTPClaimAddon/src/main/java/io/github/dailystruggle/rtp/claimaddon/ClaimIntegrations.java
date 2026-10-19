@@ -95,6 +95,7 @@ public final class ClaimIntegrations {
     if (parser == null) return;
 
     RegionVerifierRegistry verifiers = RTPAPI.hooks().verifiers();
+    ClaimCheckFailure.resetReports();
 
     // Unregister any previously registered verifiers from these checkers so reload dynamically updates toggles
     verifiers.unregisterBySource(SaberFactionsChecker.class);
@@ -114,21 +115,21 @@ public final class ClaimIntegrations {
     verifiers.unregisterBySource(UltimateClaimsChecker.class);
     verifiers.unregisterBySource(MinePlotsChecker.class);
 
-    register(parser, verifiers, IntegrationsKeys.rerollSaberFactions, "Factions", SaberFactionsChecker.class, () -> SaberFactionsChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollFactionsBridge, "FactionsBridge", FactionsBridgeChecker.class, () -> FactionsBridgeChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollSaberFactions, SaberFactionsChecker.PLUGIN_NAME, SaberFactionsChecker.class, () -> SaberFactionsChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollFactionsBridge, FactionsBridgeChecker.PLUGIN_NAME, FactionsBridgeChecker.class, () -> FactionsBridgeChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollGriefDefender, "GriefDefender", GriefDefenderChecker.class, () -> GriefDefenderChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollGriefPrevention, "GriefPrevention", GriefPreventionChecker.class, () -> GriefPreventionChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollLands, "Lands", LandsChecker.class, () -> LandsChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollRedProtect, "RedProtect", RedProtectChecker.class, () -> RedProtectChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollResidence, "Residence", ResidenceChecker.class, () -> ResidenceChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollCrashClaim, "CrashClaim", CrashClaimChecker.class, () -> CrashClaimChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollHuskClaims, "HuskClaims", HuskClaimsChecker.class, () -> HuskClaimsChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollHuskTowns, "HuskTowns", HuskTownsChecker.class, () -> HuskTownsChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollPlotSquared, "PlotSquared", PlotSquaredChecker.class, () -> PlotSquaredChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollKingdomsX, "Kingdoms", KingdomsXChecker.class, () -> KingdomsXChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollResidence, ResidenceChecker.PLUGIN_NAME, ResidenceChecker.class, () -> ResidenceChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollCrashClaim, CrashClaimChecker.PLUGIN_NAME, CrashClaimChecker.class, () -> CrashClaimChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollHuskClaims, HuskClaimsChecker.PLUGIN_NAME, HuskClaimsChecker.class, () -> HuskClaimsChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollHuskTowns, HuskTownsChecker.PLUGIN_NAME, HuskTownsChecker.class, () -> HuskTownsChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollPlotSquared, PlotSquaredChecker.PLUGIN_NAME, PlotSquaredChecker.class, () -> PlotSquaredChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollKingdomsX, KingdomsXChecker.PLUGIN_NAME, KingdomsXChecker.class, () -> KingdomsXChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollTownyAdvanced, "Towny", TownyAdvancedChecker.class, () -> TownyAdvancedChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollWorldGuard, "WorldGuard", WorldGuardChecker.class, () -> WorldGuardChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollUltimateClaims, "UltimateClaims", UltimateClaimsChecker.class, () -> UltimateClaimsChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollUltimateClaims, UltimateClaimsChecker.PLUGIN_NAME, UltimateClaimsChecker.class, () -> UltimateClaimsChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollMinePlots, MinePlotsChecker.PLUGIN_NAME, MinePlotsChecker.class, () -> MinePlotsChecker::isInClaim);
   }
 
