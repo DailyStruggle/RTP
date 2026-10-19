@@ -193,6 +193,10 @@ Pull requests trigger automated GitHub Actions workflows configured in `.github/
 flowchart LR
     subgraph CI["GitHub Actions (gradle.yml)"]
         direction TB
+        S["changes\n(scripts/ci-scope.py)"]
+        S -->|full| A
+        S -->|full| B
+        S -->|leaf| L["build-leaf\n(touched addons/helpers only)"]
         A["build-reduced-jdk21\n(JDK 21 Sandbox & Exclusion Assemble)"]
         B["build-full\n(JDK 21 + 25, Toolchains, All Carriers)"]
         B --> C["Spotless & Binary Compatibility"]
@@ -205,6 +209,14 @@ flowchart LR
 
 ### Job Descriptions
 
+0. **`changes`:**
+   - On a pull request, runs `scripts/ci-scope.py` over the diff against the PR base and emits a scope:
+     - `full`: any path outside `addons/<Name>/` and `helpers/<Name>/` (core, APIs, platforms, `rtp-plugin`, Gradle or CI config), or no usable baseline (failed diff). Runs `build-reduced-jdk21` and `build-full`.
+     - `leaf`: every change is inside addon/helper projects. Runs `build-leaf` only.
+     - `none`: only ignorable paths (docs, root markdown). Runs nothing.
+   - Pushes to `V1`/`V2`/`V3` (merges) and `workflow_dispatch` always emit `full`, so the shaded `rtp-plugin` jar that bundles the addons is rebuilt on every merge.
+   - Also emits one `true`/`false` flag per project set (`core`, `bukkit`, `fabric`, `neoforge`, `proxy`, `plugin`, `addons`, `helpers`) and `full` (every set affected). A set is flagged when a changed file lies in one of its projects, or one of its projects references an affected project through `project(':...')` or `findProject(':...')`, transitively; a parent project's change flags its children. Paths outside every project (root Gradle files, `gradle/`, `.github/`, `scripts/`) flag every set. The flags are the inputs for per-set jobs; no job consumes them yet.
+   - Skipped jobs report as passing, so required status checks stay satisfiable.
 1. **`build-reduced-jdk21`:**
    - Runs on Ubuntu with Temurin JDK 21.
    - Validates the reduced build variant using exclusion flags:
@@ -218,6 +230,13 @@ flowchart LR
    - Executes SonarCloud analysis (when `SONAR_TOKEN` is present), reusing build bytecode, PMD reports, and JaCoCo XML.
    - Executes `scripts/diff-coverage.py` against the base ref (`origin/V3`), enforcing the 80% coverage threshold on modified code.
    - Publishes test reports and uploads coverage and binary artifacts.
+3. **`build-leaf`:**
+   - Provisions JDK 21 and 25 (for the MC 26.x GUI renderer carriers).
+   - Runs traceability, mojibake and Spotless checks, then `./gradlew <tasks> -PstaticAnalysis` with the tasks from `changes`:
+     - `:<project>:build` for every Gradle project of each touched addon/helper, plus any addon/helper that references one of them via `project(':...')`;
+     - `:<module>:test` for any non-addon module whose test sources read a touched addon by path (e.g. `rtp-core` tests loading the shipped `LeafRTPActionAddon` action definitions).
+   - Core modules compile as dependencies but their tests, coverage, Sonar and japicmp do not run; addons and helpers are excluded from coverage and publish no API.
+   - Does not rebuild the shaded `rtp-plugin` jar; the bundled-addon copy inside it is verified by the `full` run on merge.
 
 ### Auxiliary Workflows
 
