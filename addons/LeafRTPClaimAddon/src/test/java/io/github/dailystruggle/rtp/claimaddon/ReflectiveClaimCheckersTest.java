@@ -76,9 +76,9 @@ class ReflectiveClaimCheckersTest {
   }
 
   @Test
-  @DisplayName("UltimateClaimsChecker and MinePlotsChecker fail-closed on error when mock server/world is present")
-  void testCheckersFailClosedOnError() {
-    // If location is provided with a valid mock or if reflection fails during execution, verify fail-closed
+  @DisplayName("UltimateClaimsChecker and MinePlotsChecker fail open when the claim plugin is absent or disabled")
+  void testCheckersFailOpenWhenPluginAbsent() {
+    // Fail-closed paths for MinePlots are covered by MinePlotsCheckerS003Test
     org.bukkit.Server mockServer = org.mockito.Mockito.mock(org.bukkit.Server.class);
     org.bukkit.World mockWorld = org.mockito.Mockito.mock(org.bukkit.World.class);
     org.mockito.Mockito.when(mockServer.getWorld("world")).thenReturn(mockWorld);
@@ -91,7 +91,7 @@ class ReflectiveClaimCheckersTest {
 
       org.bukkit.Location loc = new org.bukkit.Location(mockWorld, 100, 64, 200);
 
-      // Classes not on classpath, so fails-open (plugin absent)
+      // UltimateClaims classes are not on the classpath; minePlots is not enabled (no plugin manager)
       assertFalse(UltimateClaimsChecker.isInClaim(loc));
       assertFalse(MinePlotsChecker.isInClaim(loc));
     } catch (Exception e) {
@@ -166,56 +166,5 @@ class ReflectiveClaimCheckersTest {
     );
     assertInstanceOf(RuntimeException.class, ite.getCause());
     assertEquals("Simulated database failure", ite.getCause().getMessage());
-  }
-
-  @Test
-  @DisplayName("MinePlots reflective API contracts verify expected methods exist without NoSuchMethodException")
-  void testMinePlotsReflectiveMethodResolution() throws Exception {
-    class MockPlot {
-      private final boolean claimed;
-      MockPlot(boolean claimed) { this.claimed = claimed; }
-      public boolean isClaimed() { return claimed; }
-    }
-
-    class MockPlotServiceApi {
-      public Object getPlot(org.bukkit.Location loc) {
-        if (loc.getBlockX() == 100) return new MockPlot(true);
-        if (loc.getBlockX() == 150) return new MockPlot(false);
-        if (loc.getBlockX() == 999) throw new IllegalStateException("Service unavailable");
-        return null;
-      }
-    }
-
-    MockPlotServiceApi service = new MockPlotServiceApi();
-
-    // Verify reflective resolution that MinePlotsChecker performs
-    java.lang.reflect.Method getPlotMethod = service.getClass().getMethod("getPlot", org.bukkit.Location.class);
-    assertNotNull(getPlotMethod);
-
-    org.bukkit.World mockWorld = org.mockito.Mockito.mock(org.bukkit.World.class);
-    org.bukkit.Location claimedLoc = new org.bukkit.Location(mockWorld, 100, 64, 200);
-    org.bukkit.Location unclaimedPlotLoc = new org.bukkit.Location(mockWorld, 150, 64, 200);
-    org.bukkit.Location outsideLoc = new org.bukkit.Location(mockWorld, 200, 64, 200);
-    org.bukkit.Location errorLoc = new org.bukkit.Location(mockWorld, 999, 64, 200);
-
-    Object claimedPlot = getPlotMethod.invoke(service, claimedLoc);
-    assertNotNull(claimedPlot);
-    java.lang.reflect.Method isClaimedMethod = claimedPlot.getClass().getMethod("isClaimed");
-    assertNotNull(isClaimedMethod);
-    assertEquals(true, isClaimedMethod.invoke(claimedPlot));
-
-    Object unclaimedPlot = getPlotMethod.invoke(service, unclaimedPlotLoc);
-    assertNotNull(unclaimedPlot);
-    assertEquals(false, isClaimedMethod.invoke(unclaimedPlot));
-
-    assertNull(getPlotMethod.invoke(service, outsideLoc));
-
-    // Non-method exceptions thrown during query
-    java.lang.reflect.InvocationTargetException ite = assertThrows(
-        java.lang.reflect.InvocationTargetException.class,
-        () -> getPlotMethod.invoke(service, errorLoc)
-    );
-    assertInstanceOf(IllegalStateException.class, ite.getCause());
-    assertEquals("Service unavailable", ite.getCause().getMessage());
   }
 }
