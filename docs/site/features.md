@@ -64,9 +64,18 @@ All configuration routes edit the same files, accept human units (`radius: 10km`
 - **Effects**: particles, sounds, fireworks, potions, titles, action bar notices, console or player commands, and holograms on every teleport phase, each controlled by `rtp.effect.<stage>.*` permissions. Holograms use the 1.19.4+ text display entity directly; DecentHolograms and HolographicDisplays are supported if present.
 - **Landing platforms & safety**: temporary landing platforms decay automatically so nobody drops into ocean, void or open air, paired with a post-teleport invulnerability window, cancel on movement or damage, countdown holograms and warmup messages.
 
+![In-game destination menu: the teleport tile shows status, cost and warmup](../assets/img/menu_teleport_tile.png)
+
+*The GUI addon's chest menu (Paper 26.2): the teleport tile shows status, cost and warmup before you click; the other tiles pick a region, biome or special teleport.*
+
+<details>
+<summary><b>Server health tile</b></summary>
+
 ![In-game destination menu with live server health tooltip](../assets/img/menu_server_health.png)
 
-*`/rtp menu`: in-game chest menu with live server health and destination selection.*
+*The same menu's server health tile: TPS, MSPT and player count.*
+
+</details>
 
 ## Gameplay and worlds
 

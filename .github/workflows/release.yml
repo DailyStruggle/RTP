@@ -268,7 +268,7 @@ jobs:
           fi
 
       - name: Publish GitHub Release (Items 37, 39, 42)
-        uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d190 # v2.0.8
+        uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2.0.8
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: rtp-lite ${{ steps.version.outputs.version }}
@@ -283,7 +283,7 @@ jobs:
             rtp-plugin/build/reports/bom.json
 
       - name: Publish to Modrinth
-        uses: Kir-Antipov/mc-publish@086e3926861ca1252119e0b1f2010874e4c2780e # v3.3
+        uses: Kir-Antipov/mc-publish@52307b03863581dec6b652b83e597aec02ebb075 # v3.3
         with:
           modrinth-id: TZNIQSHX
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
