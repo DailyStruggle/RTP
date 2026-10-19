@@ -13,18 +13,18 @@ Claim integrations are packaged in `addons/LeafRTPClaimAddon` (Bukkit/Paper/Foli
 | **Towny Advanced** | Bukkit / Paper / Folia | `TownyAdvancedChecker` | Native CompileOnly (`TownyAPI.isWilderness`) | Yes (`TownyBoundaryProvider`) | `0.100.x`, `0.99.x`, `0.98.x` |
 | **GriefPrevention** | Bukkit / Paper / Folia | `GriefPreventionChecker` | Native CompileOnly (`DataStore.getClaimAt`) | Yes (`GriefPreventionBoundaryProvider`) | `16.18.x`, `16.17.x` |
 | **Lands** | Bukkit / Paper / Folia | `LandsChecker` | Native CompileOnly (`LandsIntegration.isClaimed`) | Yes (`LandsChecker.getBoundaryAt`) | `7.x`, `6.x` |
-| **SaberFactions** | Bukkit / Paper / Folia | `SaberFactionsChecker` | Reflective (`Board.getFactionAt`) | Yes (`FactionsBoundaryProvider`) | `v4.x`, `v3.x` |
-| **FactionsBridge** | Bukkit / Paper / Folia | `FactionsBridgeChecker` | Reflective (`FactionsBridge.getFactionsAPI`) | No | `1.3.x+` (Bridges FactionsUUID, Saber, Kingdoms) |
+| **SaberFactions** / FactionsUUID (`Factions`) | Bukkit / Paper / Folia | `SaberFactionsChecker` | Reflective (`Board.getInstance().getFactionAt(new FLocation(Location))`, `Faction.isWilderness`) | Yes (`FactionsBoundaryProvider`) | Best effort: tested against stubs of the SaberFactions / FactionsUUID `1.6.x` source, not a live server |
+| **FactionsBridge** | Bukkit / Paper / Folia | `FactionsBridgeChecker` | Reflective (`FactionsBridge.getFactionsAPI().getFactionAt(Location)`, `Faction.isWilderness`) | No | Best effort: tested against stubs of the `1.4.2` source, not a live server |
 | **GriefDefender** | Bukkit / Paper / Folia | `GriefDefenderChecker` | Native CompileOnly (`G griefDefender.getCore().getClaimAt`) | No | `2.1.x`, `2.0.x` |
 | **WorldGuard** | Bukkit / Paper / Folia | `WorldGuardChecker` | Native CompileOnly (`RegionManager.getApplicableRegions`) | No | `7.0.x`, `7.1.x` |
 | **RedProtect** | Bukkit / Paper / Folia | `RedProtectChecker` | Native CompileOnly (`RedProtect.get().getAPI().getRegion`) | No | `7.7.x` |
-| **Residence** | Bukkit / Paper / Folia | `ResidenceChecker` | Reflective (`Residence.getInstance().getClaimAt`) | No | `5.1.x`, `5.0.x` |
-| **CrashClaim** | Bukkit / Paper / Folia | `CrashClaimChecker` | Reflective (`CrashClaim.getApi().getClaim`) | No | `1.x` |
-| **HuskClaims** | Bukkit / Paper / Folia | `HuskClaimsChecker` | Reflective (`BukkitHuskClaimsAPI.isClaimAt`) | No | `1.4.x`, `1.3.x` |
-| **HuskTowns** | Bukkit / Paper / Folia | `HuskTownsChecker` | Reflective (`BukkitHuskTownsAPI.getClaimAt`) | No | `3.0.x`, `2.x` |
-| **PlotSquared** | Bukkit / Paper / Folia | `PlotSquaredChecker` | Reflective (`PlotAPI.wrapPlayer` / `PlotArea.getPlot`) | No | `v7.x`, `v6.x` |
-| **KingdomsX** | Bukkit / Paper / Folia | `KingdomsXChecker` | Reflective (`Kingdoms.getLand`) | No | `1.15.x+` |
-| **UltimateClaims** | Bukkit / Paper / Folia | `UltimateClaimsChecker` | Reflective (`ClaimManager.getClaim`) | No | `2.x`, `1.x` |
+| **Residence** | Bukkit / Paper / Folia | `ResidenceChecker` | Reflective (`Residence.getInstance().getResidenceManager().getByLoc(Location)`) | No | Best effort: tested against stubs of the `6.0.x` source, not a live server |
+| **CrashClaim** | Bukkit / Paper / Folia | `CrashClaimChecker` | Reflective (`CrashClaim.getPlugin().getApi().getClaim(Location)`) | No | Best effort: tested against stubs of the `1.0.42` source, not a live server |
+| **HuskClaims** | Bukkit / Paper / Folia | `HuskClaimsChecker` | Reflective (`BukkitHuskClaimsAPI.getInstance().isClaimAt(Position)`) | No | Best effort: tested against stubs of the `1.5.x` source, not a live server |
+| **HuskTowns** | Bukkit / Paper / Folia | `HuskTownsChecker` | Reflective (`BukkitHuskTownsAPI.getInstance().getClaimAt(Location)`) | No | Best effort: tested against stubs of the `3.x` source, not a live server; `2.x` unsupported |
+| **PlotSquared** | Bukkit / Paper / Folia | `PlotSquaredChecker` | Reflective (`Location.at(String, int, int, int)`, `isPlotRoad`, `getPlot().hasOwner()`; owned plots and roads rejected) | No | Best effort: tested against stubs of the `v7` source, not a live server |
+| **KingdomsX** (`Kingdoms`) | Bukkit / Paper / Folia | `KingdomsXChecker` | Reflective (`Land.getLand(Location).isClaimed()`) | No | Best effort: written from the KingdomsX API wiki (no public source); not tested on a live server |
+| **UltimateClaims** | Bukkit / Paper / Folia | `UltimateClaimsChecker` | Reflective (`UltimateClaims.getInstance().getClaimManager().getClaim(String, int, int)`; `com.craftaro` or `com.songoda`) | No | Best effort: tested against stubs of the `2.4.0` source, not a live server |
 | **minePlots** (mineCodes) | Bukkit / Paper / Folia | `MinePlotsChecker` | Direct API (`PlotServiceApi.getPlot(Location)` from the ServicesManager) | No | Best effort: compiled and tested against the published `plugin-api` `4.6.2`, not yet a live minePlots server |
 | **FTB Chunks** | Fabric / NeoForge | `FTBChunksChecker` | Mod SPI (`FTBChunksAPI.isChunkClaimed`) | Planned | `2001.x` (1.20.x), `2100.x` (1.21.x) |
 | **OpenPartiesAndClaims** | Fabric / NeoForge | `OpenPartiesAndClaimsChecker` | Mod SPI (`IOpenPartiesAndClaimsAPI.isClaimed`) | No | `0.21.x+` |
@@ -34,9 +34,10 @@ Claim integrations are packaged in `addons/LeafRTPClaimAddon` (Bukkit/Paper/Foli
 ## 2. API Design & Safety Contracts
 
 ### Fail-Closed Execution
-All checkers implement a strict **fail-closed on error** policy:
-- If a claim plugin throws an unexpected runtime exception, reflection error, or threading exception during verification, the exception is caught, logged once, and the destination is rejected (`!isInClaim` returns `false`).
-- If an architectural incompatibility is detected, the integration disables itself cleanly for the session to prevent server log spam or crashes, and the player still gets a failure message instead of a silent no-op.
+All checkers implement a strict **fail-closed on error** policy ([ADR-118](../adr/ADR-118-claim-checkers-compile-against-published-apis.md)):
+- If the claim plugin is not installed or not enabled, the check reports "not claimed".
+- If the claim plugin is enabled and throws during verification, the destination is rejected and a warning is logged (throttled to one per minute per integration).
+- If the claim plugin is enabled but its API does not match what the addon expects (missing class or method), every destination is rejected and one error is logged per integration until `/rtp reload`. Update the claim plugin or the addon, or set the integration's `integrations.yml` flag to `false`, to resume teleports.
 
 ### Decoupled Reflection Architecture
 Integrations marked **Reflective** do not link compile-time classes into the LeafRTP jar. They dynamically inspect public API singletons at runtime:

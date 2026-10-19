@@ -1,11 +1,11 @@
 package net.william278.huskclaims.api;
 
+import net.william278.huskclaims.position.Position;
 import org.bukkit.Location;
-import java.util.function.Predicate;
 
-public class BukkitHuskClaimsAPI {
+/** Test stub of HuskClaims' Bukkit API: static {@code getInstance()}, {@code getPosition(Location)}. */
+public class BukkitHuskClaimsAPI extends HuskClaimsAPI {
   private static BukkitHuskClaimsAPI instance;
-  private Predicate<Location> claimPredicate = loc -> false;
 
   public static BukkitHuskClaimsAPI getInstance() {
     if (instance == null) {
@@ -18,18 +18,7 @@ public class BukkitHuskClaimsAPI {
     instance = inst;
   }
 
-  public void setClaimPredicate(Predicate<Location> predicate) {
-    this.claimPredicate = predicate != null ? predicate : loc -> false;
-  }
-
-  public Object getPosition(Location location) {
-    return location;
-  }
-
-  public Boolean isClaimAt(Object position) {
-    if (position instanceof Location loc) {
-      return claimPredicate.test(loc);
-    }
-    return false;
+  public Position getPosition(Location location) {
+    return new Position(location);
   }
 }

@@ -1,9 +1,16 @@
 package net.william278.husktowns.api;
 
-import org.bukkit.Location;
 import java.util.Optional;
 import java.util.function.Predicate;
+import net.william278.husktowns.claim.TownClaim;
+import org.bukkit.Chunk;
+import org.bukkit.Location;
 
+/**
+ * Test stub of HuskTowns 3.x {@code BukkitHuskTownsAPI}: static {@code getInstance()} and the
+ * Bukkit overloads {@code getClaimAt(Chunk)} / {@code getClaimAt(Location)}, both returning
+ * {@code Optional<TownClaim>}.
+ */
 public class BukkitHuskTownsAPI {
   private static BukkitHuskTownsAPI instance;
   private Predicate<Location> claimPredicate = loc -> false;
@@ -23,10 +30,11 @@ public class BukkitHuskTownsAPI {
     this.claimPredicate = predicate != null ? predicate : loc -> false;
   }
 
-  public Optional<?> getClaimAt(Location location) {
-    if (claimPredicate.test(location)) {
-      return Optional.of("ClaimedTown");
-    }
-    return Optional.empty();
+  public Optional<TownClaim> getClaimAt(Chunk chunk) {
+    throw new AssertionError("getClaimAt(Chunk) needs a loaded chunk; not expected");
+  }
+
+  public Optional<TownClaim> getClaimAt(Location location) {
+    return claimPredicate.test(location) ? Optional.of(new TownClaim()) : Optional.empty();
   }
 }

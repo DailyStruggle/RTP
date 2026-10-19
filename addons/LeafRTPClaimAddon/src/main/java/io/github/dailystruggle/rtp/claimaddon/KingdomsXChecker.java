@@ -6,39 +6,32 @@ import java.lang.reflect.Modifier;
 /**
  * Checker for KingdomsX (Kingdoms) claimed land.
  *
- * <p>KingdomsX ({@code org.kingdoms}) maps a Bukkit location to a chunk via
- * {@code SimpleChunkLocation.of(org.bukkit.Location)}; the resulting chunk's {@code getLand()}
- * returns the {@code Land} record for that chunk (never {@code null} for a loaded chunk), and a land
- * with a non-{@code null} owning kingdom is claimed. We resolve this reflectively (by name/arity, so
- * obfuscation-stable across builds) so RTP carries no compile-time dependency on KingdomsX. When
- * KingdomsX is absent the reflective lookup fails once, the integration disables itself for the
- * session, and the verifier becomes a no-op.
+ * <p>KingdomsX ({@code org.kingdoms}) maps a Bukkit location to its land record through static
+ * {@code org.kingdoms.constants.land.Land.getLand(org.bukkit.Location)}, as its API wiki shows. The
+ * result is {@code null} for a chunk with no data; a non-null land can still be unclaimed, so the
+ * verdict is {@code Land#isClaimed()}. {@code getLand} has other one-argument overloads, so it is
+ * resolved by exact signature. Resolved reflectively so RTP carries no compile-time dependency on
+ * KingdomsX.
+ *
+ * <p>Fails open (returns false) when Kingdoms is not enabled. Fails closed (returns true, per
+ * REQ-RTP-S-003) when it is enabled but this API chain cannot be resolved or the lookup throws.
  */
 public class KingdomsXChecker {
   private KingdomsXChecker() {}
-  private static boolean exists = true;
-  private static Boolean available = null;
 
-  private static boolean isAvailable() {
-    if (!exists) return false;
-    if (available != null) return available;
-    try {
-      Class.forName("org.kingdoms.constants.land.location.SimpleChunkLocation");
-      available = true;
-    } catch (Throwable t) {
-      available = false;
-    }
-    return available;
-  }
+  /** Bukkit plugin name from KingdomsX's {@code plugin.yml} (case-sensitive lookup). */
+  static final String PLUGIN_NAME = "Kingdoms";
+
+  private static final String INTEGRATION = "KingdomsX";
 
   /**
    * Check if a location is within KingdomsX claimed land.
    *
    * @param location the location to check
-   * @return true if in a claim, false otherwise
+   * @return true if in a claim, or if the lookup fails while Kingdoms is enabled
    */
   public static Boolean isInClaim(io.github.dailystruggle.rtp.api.world.RTPCoords location) {
-    if (!exists || location == null || !isAvailable()) return false;
+    if (location == null) return false;
     org.bukkit.Location loc = ClaimLocationResolver.toLocation(location);
     if (loc == null) return false;
     return isInClaim(loc);
@@ -48,42 +41,22 @@ public class KingdomsXChecker {
    * Check if a location is within KingdomsX claimed land.
    *
    * @param location the location to check
-   * @return true if in a claim, false otherwise
+   * @return true if in a claim, or if the lookup fails while Kingdoms is enabled
    */
   public static Boolean isInClaim(org.bukkit.Location location) {
-    if (!exists || location == null || !isAvailable()) return false;
+    if (location == null || location.getWorld() == null) return false;
+    if (!ClaimPlugins.isEnabled(PLUGIN_NAME)) return false;
     try {
-      Class<?> chunkClass =
-          Class.forName("org.kingdoms.constants.land.location.SimpleChunkLocation");
-      Method of = findMethod(chunkClass, "of", 1, true);
-      if (of == null) return false;
-      Object chunk = of.invoke(null, location);
-      if (chunk == null) return false;
-      Method getLand = findMethod(chunk.getClass(), "getLand", 0, false);
-      if (getLand == null) return false;
-      Object land = getLand.invoke(chunk);
+      Class<?> landClass = Class.forName("org.kingdoms.constants.land.Land");
+      Method getLand = landClass.getMethod("getLand", org.bukkit.Location.class);
+      if (!Modifier.isStatic(getLand.getModifiers())) {
+        throw new NoSuchMethodException("static Land.getLand(Location)");
+      }
+      Object land = getLand.invoke(null, location);
       if (land == null) return false;
-      // Prefer an explicit isClaimed() when present; otherwise a non-null owning kingdom claims it.
-      Method isClaimed = findMethod(land.getClass(), "isClaimed", 0, false);
-      if (isClaimed != null) {
-        return Boolean.TRUE.equals(isClaimed.invoke(land));
-      }
-      Method getKingdom = findMethod(land.getClass(), "getKingdom", 0, false);
-      if (getKingdom == null) return false;
-      return getKingdom.invoke(land) != null;
+      return Boolean.TRUE.equals(landClass.getMethod("isClaimed").invoke(land));
     } catch (Throwable t) {
-      return ClaimCheckFailure.handle("KingdomsX", t, () -> exists = false);
+      return ClaimCheckFailure.handle(INTEGRATION, t);
     }
-  }
-
-  private static Method findMethod(Class<?> type, String name, int paramCount, boolean isStatic) {
-    for (Method m : type.getMethods()) {
-      if (m.getName().equals(name)
-          && m.getParameterCount() == paramCount
-          && Modifier.isStatic(m.getModifiers()) == isStatic) {
-        return m;
-      }
-    }
-    return null;
   }
 }

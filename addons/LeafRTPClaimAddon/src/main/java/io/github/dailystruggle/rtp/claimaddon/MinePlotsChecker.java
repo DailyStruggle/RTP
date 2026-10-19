@@ -18,8 +18,8 @@ import pl.minecodes.plots.api.plot.PlotServiceApi;
  *
  * <p>minePlots absent or disabled: not claimed. Enabled but the service is not registered: the
  * location is rejected (REQ-RTP-S-003), warned once. Other failures follow
- * {@link ClaimCheckFailure}: an incompatible API disables the integration with a SEVERE log, any
- * other error rejects the location.
+ * {@link ClaimCheckFailure}: the location is rejected, with an incompatible API logged once at
+ * SEVERE and per-call errors throttled.
  */
 public class MinePlotsChecker {
   private MinePlotsChecker() {}
@@ -27,7 +27,6 @@ public class MinePlotsChecker {
   /** Bukkit plugin name from minePlots' {@code plugin.yml} (case-sensitive lookup). */
   static final String PLUGIN_NAME = "minePlots";
 
-  private static volatile boolean exists = true;
   private static volatile boolean warnedMissingService = false;
 
   /**
@@ -37,7 +36,7 @@ public class MinePlotsChecker {
    * @return true if in a plot or the lookup failed while minePlots is enabled; false otherwise
    */
   public static boolean isInClaim(RTPCoords location) {
-    if (!exists || location == null) return false;
+    if (location == null) return false;
     Location loc = ClaimLocationResolver.toLocation(location);
     if (loc == null) return false;
     return isInClaim(loc);
@@ -50,7 +49,7 @@ public class MinePlotsChecker {
    * @return true if in a plot or the lookup failed while minePlots is enabled; false otherwise
    */
   public static boolean isInClaim(Location location) {
-    if (!exists || location == null || location.getWorld() == null) return false;
+    if (location == null || location.getWorld() == null) return false;
     Server server = Bukkit.getServer();
     if (server == null) return false;
     PluginManager pluginManager = server.getPluginManager();
@@ -73,7 +72,7 @@ public class MinePlotsChecker {
       warnedMissingService = false;
       return service.getPlot(location) != null;
     } catch (Throwable t) {
-      return ClaimCheckFailure.handle("minePlots", t, () -> exists = false);
+      return ClaimCheckFailure.handle(PLUGIN_NAME, t);
     }
   }
 }

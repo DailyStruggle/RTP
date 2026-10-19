@@ -10,7 +10,6 @@ import org.bukkit.plugin.Plugin;
 public class LandsChecker {
   private LandsChecker() {}
   private static LandsIntegration landsIntegration = null;
-  private static boolean exists = true;
 
   /**
    * Setup Lands integration
@@ -27,7 +26,7 @@ public class LandsChecker {
   }
 
   public static Boolean isInClaim(io.github.dailystruggle.rtp.api.world.RTPCoords location) {
-    if (!exists || landsIntegration == null || location == null) return false;
+    if (landsIntegration == null || location == null) return false;
     org.bukkit.Location loc = ClaimLocationResolver.toLocation(location);
     if (loc == null) return false;
     return isInClaim(loc);
@@ -40,14 +39,14 @@ public class LandsChecker {
    * @return true if in a claim, false otherwise
    */
   public static Boolean isInClaim(org.bukkit.Location location) {
-    if (!exists || landsIntegration == null) return false;
+    if (landsIntegration == null) return false;
     try {
       int chunkX = location.getBlockX() >> 4;
       int chunkZ = location.getBlockZ() >> 4;
       if (location.getWorld() == null) return false;
       return landsIntegration.isClaimed(location.getWorld(), chunkX, chunkZ);
     } catch (Throwable t) {
-      return ClaimCheckFailure.handle("Lands", t, () -> exists = false);
+      return ClaimCheckFailure.handle("Lands", t);
     }
   }
 
@@ -56,7 +55,7 @@ public class LandsChecker {
    * Uses AdaptiveClaimProber against {@link #isInClaim(io.github.dailystruggle.rtp.api.world.RTPCoords)}.
    */
   public static java.util.Optional<io.github.dailystruggle.rtp.api.claim.ClaimBoundary> getBoundaryAt(String worldName, int x, int z) {
-    if (!exists || landsIntegration == null || worldName == null) {
+    if (landsIntegration == null || worldName == null) {
       return java.util.Optional.empty();
     }
     try {
