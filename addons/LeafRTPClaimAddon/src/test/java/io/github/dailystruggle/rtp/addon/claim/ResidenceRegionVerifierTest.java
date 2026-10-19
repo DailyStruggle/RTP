@@ -29,6 +29,7 @@ class ResidenceRegionVerifierTest {
   private RTPWorld<?> mockRtpWorld;
 
   private ResidenceManager mockResidenceManager;
+  private Residence mockResidence;
   private ResidenceRegionVerifier verifier;
 
   @BeforeEach
@@ -49,8 +50,9 @@ class ResidenceRegionVerifierTest {
     serverField.set(null, mockServer);
 
     mockResidenceManager = mock(ResidenceManager.class);
-    Residence.setResidenceManager(mockResidenceManager);
-    Residence.setInstance(new Residence());
+    mockResidence = mock(Residence.class);
+    when(mockResidence.getResidenceManager()).thenReturn(mockResidenceManager);
+    setResidenceInstance(mockResidence);
 
     verifier = new ResidenceRegionVerifier();
   }
@@ -61,8 +63,13 @@ class ResidenceRegionVerifierTest {
     serverField.setAccessible(true);
     serverField.set(null, null);
 
-    Residence.setResidenceManager(null);
-    Residence.setInstance(null);
+    setResidenceInstance(null);
+  }
+
+  private static void setResidenceInstance(Residence value) throws Exception {
+    Field instanceField = Residence.class.getDeclaredField("instance");
+    instanceField.setAccessible(true);
+    instanceField.set(null, value);
   }
 
   @Test
@@ -100,7 +107,7 @@ class ResidenceRegionVerifierTest {
   @Test
   @DisplayName("verify handles null residence manager gracefully")
   void testVerifyNullManagerFallback() {
-    Residence.setResidenceManager(null);
+    when(mockResidence.getResidenceManager()).thenReturn(null);
 
     RTPLocation loc = new RTPLocation(mockRtpWorld, 200, 64, 200);
     assertDoesNotThrow(() -> verifier.verify(loc));

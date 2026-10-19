@@ -66,7 +66,7 @@ Scope: `rtp-core` (`ScanTask` rate logic + the PRESCAN-only auto-scan trigger an
 
 ## References
 
-- `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/tasks/ScanTask.java` — PR-14 region-file bin-and-batch (`key = (x>>5)<<32 | (z>>5)`), per-bin dispatch loop.
+- `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/tasks/scan/ScanTask.java` — PR-14 region-file bin-and-batch (`key = (x>>5)<<32 | (z>>5)`), per-bin dispatch loop.
 - `api/anvil-api/src/main/java/io/github/dailystruggle/rtp/anvil/AnvilRegionByteCache.java` — cached raw `.mca` bytes (source of the sector-offset table).
 - `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/metrics/ChunkLoadProfile.java` — per-class (generated/ungenerated) floor + totals.
 - [ADR-016](ADR-016-anvil-subsystem.md) — anvil read-only subsystem (PRESCAN prefilter, S-005 safety).

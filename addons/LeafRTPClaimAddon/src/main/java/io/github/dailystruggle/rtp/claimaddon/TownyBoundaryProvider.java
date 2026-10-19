@@ -52,7 +52,7 @@ public class TownyBoundaryProvider implements ClaimBoundaryProvider {
     if (!exists || playerId == null || worldName == null) {
       return Optional.empty();
     }
-    if (Bukkit.getServer() == null || Bukkit.getPluginManager() == null || !Bukkit.getPluginManager().isPluginEnabled("Towny")) {
+    if (!ClaimPlugins.isEnabled("Towny")) {
       return Optional.empty();
     }
 
@@ -192,7 +192,7 @@ public class TownyBoundaryProvider implements ClaimBoundaryProvider {
     if (!exists || worldName == null) {
       return Optional.empty();
     }
-    if (Bukkit.getServer() == null || Bukkit.getPluginManager() == null || !Bukkit.getPluginManager().isPluginEnabled("Towny")) {
+    if (!ClaimPlugins.isEnabled("Towny")) {
       return Optional.empty();
     }
 

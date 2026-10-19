@@ -1,21 +1,21 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
-import java.lang.reflect.Method;
+import com.plotsquared.core.plot.Plot;
 
 /**
- * Checker for PlotSquared plots and plot roads.
+ * Checker for PlotSquared plots and plot roads, compiled against
+ * {@code com.intellectualsites.plotsquared:plotsquared-core}.
  *
- * <p>PlotSquared 6/7 ({@code com.plotsquared.core}) maps a block to its plot through static
- * {@code com.plotsquared.core.location.Location.at(String world, int x, int y, int z)}; that
- * location answers {@code isPlotRoad()} and {@code getPlot()} ({@code null} on roads and outside
- * plot areas). Inside a plot area an unclaimed plot is still a {@code Plot}, so ownership is
- * {@code Plot#hasOwner()}; {@code isBasePlot()} only describes merge structure. Several 4-argument
- * {@code at} overloads take a {@code String} first, so the method is resolved by exact signature.
- * Resolved reflectively so RTP carries no compile-time dependency on PlotSquared.
+ * <p>{@code com.plotsquared.core.location.Location.at(String world, int x, int y, int z)} answers
+ * {@code isPlotRoad()} and {@code getPlot()} ({@code null} on roads and outside plot areas).
+ * Inside a plot area an unclaimed plot is still a {@link Plot}, so ownership is
+ * {@link Plot#hasOwner()}; {@code isBasePlot()} only describes merge structure. API types are
+ * touched only in {@link Api}, after the enabled check (ADR-118).
  *
  * <p>Owned plots and plot roads are rejected; unowned plots and land outside plot areas are not.
  * Fails open (returns false) when PlotSquared is not enabled. Fails closed (returns true, per
- * REQ-RTP-S-003) when it is enabled but this API chain cannot be resolved or the lookup throws.
+ * REQ-RTP-S-003) through {@link ClaimCheckFailure} when it is enabled but the API is incompatible
+ * or the lookup throws.
  */
 public class PlotSquaredChecker {
   private PlotSquaredChecker() {}
@@ -48,23 +48,27 @@ public class PlotSquaredChecker {
     if (location == null || location.getWorld() == null) return false;
     if (!ClaimPlugins.isEnabled(PLUGIN_NAME)) return false;
     try {
-      Class<?> pLocClass = Class.forName("com.plotsquared.core.location.Location");
-      Method at = pLocClass.getMethod("at", String.class, int.class, int.class, int.class);
-      Object pLoc =
-          at.invoke(
-              null,
+      return Api.isInClaim(location);
+    } catch (Throwable t) {
+      return ClaimCheckFailure.handle(PLUGIN_NAME, t);
+    }
+  }
+
+  /** Loaded on first call, so PlotSquared classes link only while the plugin is enabled. */
+  private static final class Api {
+    private Api() {}
+
+    static boolean isInClaim(org.bukkit.Location location) {
+      com.plotsquared.core.location.Location pLoc =
+          com.plotsquared.core.location.Location.at(
               location.getWorld().getName(),
               location.getBlockX(),
               location.getBlockY(),
               location.getBlockZ());
       if (pLoc == null) throw new IllegalStateException("Location.at(...) is null");
-      if (Boolean.TRUE.equals(pLocClass.getMethod("isPlotRoad").invoke(pLoc))) return true;
-      Method getPlot = pLocClass.getMethod("getPlot");
-      Object plot = getPlot.invoke(pLoc);
-      if (plot == null) return false;
-      return Boolean.TRUE.equals(getPlot.getReturnType().getMethod("hasOwner").invoke(plot));
-    } catch (Throwable t) {
-      return ClaimCheckFailure.handle(PLUGIN_NAME, t);
+      if (pLoc.isPlotRoad()) return true;
+      Plot plot = pLoc.getPlot();
+      return plot != null && plot.hasOwner();
     }
   }
 }

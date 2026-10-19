@@ -364,8 +364,8 @@ class PlaceholderProviderTest {
                 new io.github.dailystruggle.rtp.common.selection.region.Region("regionA", settings);
         RTP.selectionAPI.permRegionLookup.put("regionA", regionA);
 
-        io.github.dailystruggle.rtp.common.tasks.ScanTask taskA =
-                new io.github.dailystruggle.rtp.common.tasks.ScanTask(regionA, 0L);
+        io.github.dailystruggle.rtp.common.tasks.scan.ScanTask taskA =
+                new io.github.dailystruggle.rtp.common.tasks.scan.ScanTask(regionA, 0L);
         taskA.latestAbsolutePos = 500;
         taskA.latestAbsoluteTotal = 1000;
         taskA.latestCps = 250;
@@ -404,11 +404,11 @@ class PlaceholderProviderTest {
                                 "landB", world, new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square(),
                                 vert, false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false));
 
-        io.github.dailystruggle.rtp.common.tasks.ScanTask taskA =
-                new io.github.dailystruggle.rtp.common.tasks.ScanTask(regionA, 0L);
+        io.github.dailystruggle.rtp.common.tasks.scan.ScanTask taskA =
+                new io.github.dailystruggle.rtp.common.tasks.scan.ScanTask(regionA, 0L);
         taskA.latestLandPercentage = 80.0;
-        io.github.dailystruggle.rtp.common.tasks.ScanTask taskB =
-                new io.github.dailystruggle.rtp.common.tasks.ScanTask(regionB, 0L);
+        io.github.dailystruggle.rtp.common.tasks.scan.ScanTask taskB =
+                new io.github.dailystruggle.rtp.common.tasks.scan.ScanTask(regionB, 0L);
         taskB.latestLandPercentage = 40.0;
         RTP.getInstance().scanTasks.put("landA", taskA);
         RTP.getInstance().scanTasks.put("landB", taskB);

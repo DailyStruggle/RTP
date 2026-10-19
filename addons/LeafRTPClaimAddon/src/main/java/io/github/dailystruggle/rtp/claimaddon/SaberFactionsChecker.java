@@ -1,21 +1,21 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
-import java.lang.reflect.Method;
+import com.massivecraft.factions.Board;
+import com.massivecraft.factions.FLocation;
+import com.massivecraft.factions.Faction;
 
 /**
- * Checker for SaberFactions territory.
+ * Checker for SaberFactions territory, compiled against {@code com.github.SaberLLC:Saber-Factions}.
  *
- * <p>SaberFactions is a maintained FactionsUUID fork that registers under the {@code Factions}
- * plugin name and exposes the modern {@code com.massivecraft.factions} API: static
- * {@code Board.getInstance()}, {@code Board#getFactionAt(FLocation)} with
- * {@code new FLocation(org.bukkit.Location)}, and {@code Faction#isWilderness()}. FactionsUUID has
- * the same shape. Methods are resolved on the declared API types, not on implementation classes.
- * We resolve that API reflectively to avoid a compile-time clash with the legacy
- * {@code com.massivecraft:Factions} artifact (both ship the {@code com.massivecraft.factions}
- * package with divergent method surfaces).
+ * <p>SaberFactions is a FactionsUUID fork registered under the {@code Factions} plugin name:
+ * {@link Board#getInstance()}, {@code getFactionAt(new FLocation(Location))} and
+ * {@link Faction#isWilderness()}. FactionsUUID has the same shape. Only the plugin's own packages
+ * of the shaded jar are on the compile classpath (see {@code build.gradle}). API types are touched
+ * only in {@link Api}, after the enabled check (ADR-118).
  *
  * <p>Fails open (returns false) when Factions is not enabled. Fails closed (returns true, per
- * REQ-RTP-S-003) when it is enabled but this API chain cannot be resolved or the lookup throws.
+ * REQ-RTP-S-003) through {@link ClaimCheckFailure} when it is enabled but the API is incompatible
+ * or the lookup throws.
  */
 public class SaberFactionsChecker {
   private SaberFactionsChecker() {}
@@ -48,21 +48,23 @@ public class SaberFactionsChecker {
     if (location == null || location.getWorld() == null) return false;
     if (!ClaimPlugins.isEnabled(PLUGIN_NAME)) return false;
     try {
-      Class<?> boardClass = Class.forName("com.massivecraft.factions.Board");
-      Class<?> flocationClass = Class.forName("com.massivecraft.factions.FLocation");
-      Object board = boardClass.getMethod("getInstance").invoke(null);
-      if (board == null) throw new IllegalStateException("Board.getInstance() is null");
-      Object flocation =
-          flocationClass.getConstructor(org.bukkit.Location.class).newInstance(location);
-      Method getFactionAt = boardClass.getMethod("getFactionAt", flocationClass);
-      Object faction = getFactionAt.invoke(board, flocation);
-      // Unclaimed land maps to the wilderness faction; null means no faction owns it.
-      if (faction == null) return false;
-      Object wilderness = getFactionAt.getReturnType().getMethod("isWilderness").invoke(faction);
-      // "in a claim" means the land belongs to a real (non-wilderness) faction.
-      return !Boolean.TRUE.equals(wilderness);
+      return Api.isInClaim(location);
     } catch (Throwable t) {
       return ClaimCheckFailure.handle(INTEGRATION, t);
+    }
+  }
+
+  /** Loaded on first call, so Factions classes link only while the plugin is enabled. */
+  private static final class Api {
+    private Api() {}
+
+    static boolean isInClaim(org.bukkit.Location location) {
+      Board board = Board.getInstance();
+      if (board == null) throw new IllegalStateException("Board.getInstance() is null");
+      Faction faction = board.getFactionAt(new FLocation(location));
+      // Unclaimed land maps to the wilderness faction; null means no faction owns it.
+      // "in a claim" means the land belongs to a real (non-wilderness) faction.
+      return faction != null && !faction.isWilderness();
     }
   }
 }

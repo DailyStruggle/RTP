@@ -32,7 +32,11 @@ import me.ryanhamshire.GriefPrevention.Claim;
 import me.ryanhamshire.GriefPrevention.DataStore;
 import me.ryanhamshire.GriefPrevention.GriefPrevention;
 import net.william278.huskclaims.api.BukkitHuskClaimsAPI;
+import net.william278.huskclaims.api.HuskClaimsAPI;
+import net.william278.huskclaims.position.Position;
 import net.william278.husktowns.api.BukkitHuskTownsAPI;
+import net.william278.husktowns.api.HuskTownsAPI;
+import net.william278.husktowns.claim.TownClaim;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Server;
@@ -50,6 +54,7 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -219,25 +224,26 @@ public class LeafRTPClaimAddonRuleS003IntegrationTest {
       return !inside;
     });
 
-    // Reflective checkers gate each call on their plugin being enabled.
+    // HuskClaims / HuskTowns checkers gate each call on their plugin being enabled.
     when(mockPluginManager.isPluginEnabled(HuskClaimsChecker.PLUGIN_NAME)).thenReturn(true);
     when(mockPluginManager.isPluginEnabled(HuskTownsChecker.PLUGIN_NAME)).thenReturn(true);
 
-    // Setup HuskClaims stub
-    BukkitHuskClaimsAPI.getInstance().setClaimPredicate(loc -> {
-      if (!claimedProviders.contains("huskclaims")) return false;
-      int x = loc.getBlockX();
-      int z = loc.getBlockZ();
-      return (x >= claimMinX && x <= claimMaxX && z >= claimMinZ && z <= claimMaxZ);
-    });
+    // HuskClaims API mock, installed in the singleton field getInstance() reads
+    BukkitHuskClaimsAPI huskClaims = mock(BukkitHuskClaimsAPI.class);
+    Position claimedPosition = mock(Position.class);
+    Position openPosition = mock(Position.class);
+    when(huskClaims.getPosition(any(Location.class))).thenAnswer(invocation ->
+        insideClaim("huskclaims", invocation.getArgument(0)) ? claimedPosition : openPosition);
+    when(huskClaims.isClaimAt(claimedPosition)).thenReturn(true);
+    when(huskClaims.isClaimAt(openPosition)).thenReturn(false);
+    setStaticField(HuskClaimsAPI.class, "instance", huskClaims);
 
-    // Setup HuskTowns stub
-    BukkitHuskTownsAPI.getInstance().setClaimPredicate(loc -> {
-      if (!claimedProviders.contains("husktowns")) return false;
-      int x = loc.getBlockX();
-      int z = loc.getBlockZ();
-      return (x >= claimMinX && x <= claimMaxX && z >= claimMinZ && z <= claimMaxZ);
-    });
+    // HuskTowns API mock
+    BukkitHuskTownsAPI huskTowns = mock(BukkitHuskTownsAPI.class);
+    TownClaim townClaim = mock(TownClaim.class);
+    when(huskTowns.getClaimAt(any(Location.class))).thenAnswer(invocation ->
+        insideClaim("husktowns", invocation.getArgument(0)) ? Optional.of(townClaim) : Optional.empty());
+    setStaticField(HuskTownsAPI.class, "instance", huskTowns);
 
     // Region & Player setup
     Square square = new Square();
@@ -297,10 +303,23 @@ public class LeafRTPClaimAddonRuleS003IntegrationTest {
     townyInstanceField.setAccessible(true);
     townyInstanceField.set(null, null);
 
-    BukkitHuskClaimsAPI.getInstance().setClaimPredicate(loc -> false);
-    BukkitHuskTownsAPI.getInstance().setClaimPredicate(loc -> false);
+    setStaticField(HuskClaimsAPI.class, "instance", null);
+    setStaticField(HuskTownsAPI.class, "instance", null);
 
     RTPTestSetup.cleanUp();
+  }
+
+  private boolean insideClaim(String provider, Location loc) {
+    if (!claimedProviders.contains(provider)) return false;
+    int x = loc.getBlockX();
+    int z = loc.getBlockZ();
+    return x >= claimMinX && x <= claimMaxX && z >= claimMinZ && z <= claimMaxZ;
+  }
+
+  private static void setStaticField(Class<?> owner, String name, Object value) throws Exception {
+    Field field = owner.getDeclaredField(name);
+    field.setAccessible(true);
+    field.set(null, value);
   }
 
   /**

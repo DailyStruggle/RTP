@@ -16,7 +16,7 @@ Call sites:
 
 - `rtp-core/.../selection/region/Region.java:718` — runtime save.
 - `rtp-core/.../selection/region/RegionConfigLoader.java:119` — startup load.
-- `rtp-core/.../tasks/ScanTask.java` — six save points during scans.
+- `rtp-core/.../tasks/scan/ScanTask.java` — six save points during scans.
 - `rtp-core/.../commands/scan/Scan{Start,Pause,Reset}Cmd.java` — operator-driven saves.
 
 Cached `RTPLocation` rows in the H2/SQLite database (see [ADR-002](ADR-002-h2-sqlite-over-flat-file-cache.md)) carry the world seed and are invalidated on mismatch in `Region.hydrateCacheFromDatabase` (`Region.java:238`).
@@ -94,5 +94,5 @@ When `Region.setSettings(...)` (`Region.java:209`) detects a `cfgHash` change re
 - [ADR-009](ADR-009-configurable-spatial-distributions.md) — configurable distributions; their parameters are part of the hash input set.
 - `rtp-core/.../selection/region/Region.java` (`hydrateCacheFromDatabase`, `setSettings`, runtime save call site).
 - `rtp-core/.../selection/region/RegionConfigLoader.java` — startup load call site.
-- `rtp-core/.../tasks/ScanTask.java`, `commands/scan/Scan*Cmd.java` — save call sites.
+- `rtp-core/.../tasks/scan/ScanTask.java`, `commands/scan/Scan*Cmd.java` — save call sites.
 - `docs/dev/POTENTIAL_BUGS.md` — backlog entry recording the latent hazard this ADR addresses.

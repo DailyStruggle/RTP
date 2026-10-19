@@ -330,7 +330,7 @@ public class MemoryShapeChunkToLocationsTest {
         long p2 = preimage[1];
         long rep = shape.xzToLocation(twoChunk[0], twoChunk[1]);
 
-        io.github.dailystruggle.rtp.common.tasks.ScanTask.recordBiomeForChunk(shape, p1, twoChunk[0], twoChunk[1], "minecraft:desert");
+        io.github.dailystruggle.rtp.common.tasks.scan.ScanTask.recordBiomeForChunk(shape, p1, twoChunk[0], twoChunk[1], "minecraft:desert");
         shape.flushAndRebuild(1L);
 
         assertEquals("DESERT", shape.biomeAt(p1));

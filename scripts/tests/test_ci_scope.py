@@ -201,6 +201,105 @@ class AffectedSetsTest(unittest.TestCase):
         self.assertTrue(all(result.values()))
 
 
+class SetTasksTest(unittest.TestCase):
+    def _tasks(self, changed):
+        result = ci_scope.affected_projects(changed, TREE, ALL_REFS, CONSUMERS)
+        return {k: v for k, v in ci_scope.set_tasks(TREE, result).items() if v}
+
+    def test_addon_change_builds_addon_and_plugin_only(self):
+        self.assertEqual(self._tasks(["addons/LeafRTPClaimAddon/src/A.java"]), {
+            "addons": [":addons:LeafRTPClaimAddon:build"],
+            "plugin": [":rtp-plugin:build"],
+        })
+
+    def test_core_test_consumer_runs_test_not_build(self):
+        self.assertEqual(self._tasks(["addons/LeafRTPActionAddon/src/main/resources/a.yml"]), {
+            "addons": [":addons:LeafRTPActionAddon:build"],
+            "core": [":rtp-core:test"],
+        })
+
+    def test_unscoped_builds_every_project(self):
+        tasks = ci_scope.set_tasks(TREE, None)
+        self.assertIn(":rtp-core:build", tasks["core"])
+        self.assertIn(":rtp-neoforge:rtp-neoforge-common:build", tasks["neoforge"])
+        self.assertIn(":helpers:MockItemPlugins:build", tasks["helpers"])
+
+    def test_unscoped_change_returns_none(self):
+        self.assertIsNone(ci_scope.affected_projects(["build.gradle"], TREE, ALL_REFS, CONSUMERS))
+
+
+WORKFLOW = """\
+name: x
+on: push
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+  core:
+    needs: changes
+  bukkit:
+    needs: [changes, core]
+  neoforge:
+    needs:
+      - changes
+      - core
+  helpers:
+    needs: changes
+  addons:
+    needs: [changes, core, helpers]
+  fabric:
+    needs: [changes, core]
+  proxy:
+    needs: [changes, core]
+  plugin:
+    needs: [changes, bukkit, neoforge, addons]
+"""
+
+
+class WorkflowCheckTest(unittest.TestCase):
+    GRAPH = ci_scope.set_graph(TREE, ALL_REFS)
+
+    def test_set_graph_edges(self):
+        self.assertEqual(self.GRAPH["bukkit"], {"core"})
+        self.assertEqual(self.GRAPH["plugin"], {"bukkit", "neoforge", "addons"})
+        self.assertEqual(self.GRAPH["addons"], {"core", "helpers"})
+
+    def test_needs_forms_parsed(self):
+        needs = ci_scope.workflow_needs(WORKFLOW)
+        self.assertEqual(needs["changes"], set())
+        self.assertEqual(needs["core"], {"changes"})
+        self.assertEqual(needs["neoforge"], {"changes", "core"})
+        self.assertEqual(needs["plugin"], {"changes", "bukkit", "neoforge", "addons"})
+
+    def test_matching_workflow_passes(self):
+        self.assertEqual(ci_scope.check_workflow(self.GRAPH, ci_scope.workflow_needs(WORKFLOW)), [])
+
+    def test_missing_edge_reported(self):
+        broken = WORKFLOW.replace("    needs: [changes, core, helpers]", "    needs: [changes, core]")
+        errors = ci_scope.check_workflow(self.GRAPH, ci_scope.workflow_needs(broken))
+        self.assertEqual(len(errors), 1)
+        self.assertIn("'addons'", errors[0])
+        self.assertIn("'helpers'", errors[0])
+
+    def test_missing_job_reported(self):
+        no_proxy = WORKFLOW.replace("  proxy:\n    needs: [changes, core]\n", "")
+        errors = ci_scope.check_workflow(self.GRAPH, ci_scope.workflow_needs(no_proxy))
+        self.assertEqual(errors, ["no job 'proxy' for project set 'proxy'"])
+
+    def test_cycle_met_by_either_direction(self):
+        graph = {name: set() for name in ci_scope.SETS}
+        graph["core"] = {"proxy"}
+        graph["proxy"] = {"core"}
+        self.assertEqual(ci_scope.check_workflow(graph, ci_scope.workflow_needs(WORKFLOW)), [])
+
+    def test_repo_workflow_matches_repo_graph(self):
+        root = Path(__file__).resolve().parent.parent.parent
+        tree = ci_scope.project_dirs((root / "settings.gradle").read_text(encoding="utf-8"), parents=True)
+        graph = ci_scope.set_graph(tree, ci_scope.all_refs(root, tree))
+        needs = ci_scope.workflow_needs(
+            (root / ".github" / "workflows" / "gradle.yml").read_text(encoding="utf-8"))
+        self.assertEqual(ci_scope.check_workflow(graph, needs), [])
+
+
 class ConsumerScanTest(unittest.TestCase):
     def test_path_literals_detected_prose_ignored(self):
         with tempfile.TemporaryDirectory() as tmp:

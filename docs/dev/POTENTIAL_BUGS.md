@@ -162,26 +162,26 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** Many simultaneous arrivals in one region with large platforms can still extend that region's tick.
 - **Suggested next step:** Measure with the stress harness; if it shows, split block writes across ticks per chunk or cap writes per tick.
 
-### 2026-10-16 — Package tangles: RTPLocation in selection.region couples caches, claims, and storage
+### 2026-10-16 — Package tangles: selection.region is mutually coupled with cache, claim, database, tools and shapes
 
 - **Severity:** Medium
 - **Status:** Open
 - **Discovered during:** SonarQube tangle audit on branch `v3.3.0` / PR #57 (ADR-115 Phase 2)
-- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/selection/region/RTPLocation.java`
-- **Symptom / hypothesis:** `RTPLocation` is declared inside `selection.region`. Any package caching locations (`RingCacheStage`), persisting them (`DatabaseAccessor`), filtering claims (`ClaimAnchoredRegionTracker`), or monitoring memory safety (`MemoryTracker`) must import `selection.region`. In turn, `selection.region` imports those packages, producing ~6 mutual package cycles.
-- **Impact:** Violates the Tier 1-4 package DAG in ADR-115, couples location data structures to execution and persistence, and impedes isolated unit testing.
-- **Suggested next step:** Relocate `RTPLocation` to a Tier 1 data model package (e.g. `io.github.dailystruggle.rtp.common.selection.region.model` or `rtp-api`) and update all call sites across `cache`, `claim`, `database`, and `tools`.
+- **Location:** `rtp-core/.../selection/region/` (`Region`, `LockFreeLocationBuffer`, `LocationGenerator`, `RegionSettings`, `RegionQueueManager`) and its importers in `selection.region.cache`, `selection.region.claim`, `selection.region.selectors.memory.shapes`, `database`, `tools`
+- **Symptom / hypothesis:** The original hypothesis (relocating `RTPLocation` breaks ~6 cycles) is wrong. Measured with `jdeps -verbose:class` on compiled `rtp-core` (2026-10-19): moving `RTPLocation` alone removes 0 of 45 mutual package pairs, because every importer also uses `Region`, `LockFreeLocationBuffer`, `LocationGenerator` or `RegionSettings`; `DatabaseAccessor` does not use `RTPLocation` at all (only `Region`). Moving `LockFreeLocationBuffer` too breaks only `region<->cache`, and the new package then depends on `common.RTP`. Moving to `rtp-api` would also collide with the existing `api.world.RTPLocation`. Reverse edges: `region -> cache` (`CacheStage`, `HotSink`, `KeyedCacheStage`, `RingCacheStage`), `region -> claim` (`ClaimAnchoredRegionTracker`), `region -> database` (`DatabaseAccessor`), `region -> tools` (`CfDiag`, `HeapPressureMonitor`, `MemoryTracker`, `ServerHealthGate`), `region -> shapes` (`MemoryShape` and subclasses).
+- **Impact:** Violates the Tier 1-4 package DAG in ADR-115; `selection.region` cannot be tested or reused apart from caches, storage and diagnostics.
+- **Suggested next step:** Break the reverse edges, not the data type: have `Region` depend on interfaces it owns for its cache stages, claim tracker, persistence and health gates, injected by the composition root. Dissolving the `common.RTP` hub (ADR-115 seam 4) is the larger lever: modelled alone it cuts mutual pairs from 45 to 16.
 - **Linear:** RTP-67
 
-### 2026-10-16 — Package tangles: Configs reload orchestration couples configuration to tasks and selection
+### 2026-10-16 — Package tangles: Region creates pipeline tasks that import Region
 
 - **Severity:** Medium
 - **Status:** Open
 - **Discovered during:** SonarQube tangle audit on branch `v3.3.0` / PR #57 (ADR-115 Phase 2)
-- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/configuration/Configs.java` (`reloadConfigs`, `reloadRegions`); `selection/region/Region.java`
-- **Symptom / hypothesis:** `Configs.java` acts as both a configuration store (Tier 1) and lifecycle coordinator (Tier 4), terminating tasks (`ScanTask.kill()`, `RTPTeleportCancel`), refreshing `TickBudget`, and recreating `Region` instances. Furthermore, `Region.java` directly instantiates `TeleportPipelineTask` and `ScanTask` while those tasks import `Region`. These cross-tier invocations cause ~11 package cycles between `configuration`, `tasks`, and `selection.region`.
-- **Impact:** Violates the Tier 1-4 package DAG in ADR-115, tangling configuration parsing with pipeline task dispatching and region lifecycle.
-- **Suggested next step:** Extract reload orchestration into a Tier 4 coordinator (`ConfigReloader` / `RTPConfigLifecycleCoordinator`), and invert pipeline task creation in `Region` using a task factory or dispatcher delegate.
+- **Location:** `rtp-core/.../selection/region/Region.java` (`new ScanTask`, `TeleportPipelineTask`, `RTPTeleportCancel`, `TeleportPipelineTask.ConfigCache`); `RegionCacheTask` (`RTPTaskPipe`, `CompletionPaced`)
+- **Symptom / hypothesis:** The `Configs` half is done: the reload steps on tasks and regions run in `lifecycle.ConfigReloadCoordinator` through `configuration.ConfigReloadLifecycle`, and `RTPArchitectureTest` rules 13-14 keep `configuration` off `tasks..` and `selection.region`. That removed `configuration<->tasks`, `<->tasks.teleport`, `<->tasks.tick` and `<->selection.region` (45 to 41 mutual package pairs). Still open: `Region` creates and calls pipeline tasks while those tasks import `Region`, so `selection.region<->tasks.teleport` and `selection.region<->tasks` remain.
+- **Impact:** Violates the Tier 1-4 package DAG in ADR-115, tangling region lifecycle with pipeline task dispatching.
+- **Suggested next step:** Invert task creation in `Region` through a dispatcher interface owned by `selection.region` and implemented in Tier 3/4 (modelled: removes `region<->tasks.teleport`); `region<->tasks` also needs `RTPTaskPipe` / `CompletionPaced` moved below `selection.region`.
 - **Linear:** RTP-68
 
 ### 2026-10-18 - Quarantine warning drops the YAML parse reason
@@ -194,15 +194,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** Operators who copy the inline-map trigger example from older docs lose the action with no hint why.
 - **Suggested next step:** Carry the parse exception from the file database to this warning and log its message key and line.
 
-### 2026-10-18 - Deleted effect group file is written back once on the next start
-
-- **Severity:** Low
-- **Status:** Open
-- **Discovered during:** GIF demo presets (`definitions/effects/rift.yml` removed while the server was stopped)
-- **Location:** effects `MultiConfigParser` save path (not traced); seen on Paper 26.2 with LeafRTP 3.3.0
-- **Symptom / hypothesis:** After a run that loaded `rift.yml`, stopping the server, deleting the file and removing the Rift addon jar, the next start recreates `rift.yml`. Deleting it again then stays deleted. Likely the group list persists (database or shutdown save) and is re-materialised once.
-- **Impact:** An operator deleting an effect group while the server is down can see it come back once.
-- **Suggested next step:** Reproduce with a plain group file (no addon), find where the group list is persisted, and drop groups whose file is gone at load.
 
 ### 2026-10-18 - `gif-preset.sh` exits silently when no LeafRTP-Pro jar is present
 

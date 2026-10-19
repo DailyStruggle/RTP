@@ -14,7 +14,6 @@ import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
-import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask.ConfigCache;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.factory.Factory;
@@ -25,10 +24,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
-import io.github.dailystruggle.rtp.common.tasks.ScanTask;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
-import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
-import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -39,6 +35,28 @@ import java.util.logging.Level;
 public class Region extends FactoryValue<RegionKeys> {
   public static final List<BiConsumer<Region, UUID>> onPlayerQueuePush = new ArrayList<>();
   public static final List<BiConsumer<Region, UUID>> onPlayerQueuePop = new ArrayList<>();
+
+  /** Scan, teleport and cancel tasks; installed by the composition root (ADR-115). */
+  private static volatile RegionTaskDispatcher taskDispatcher = RegionTaskDispatcher.NONE;
+
+  /**
+   * Installs the dispatcher regions use to start pipeline tasks.
+   *
+   * @param dispatcher the dispatcher; {@code null} restores {@link RegionTaskDispatcher#NONE}
+   */
+  public static void setTaskDispatcher(RegionTaskDispatcher dispatcher) {
+    taskDispatcher = (dispatcher != null) ? dispatcher : RegionTaskDispatcher.NONE;
+  }
+
+  /**
+   * Returns the installed task dispatcher.
+   *
+   * @return the dispatcher; never {@code null}
+   */
+  public static RegionTaskDispatcher getTaskDispatcher() {
+    return taskDispatcher;
+  }
+
   private final AtomicBoolean isScanningCache = new AtomicBoolean(false);
 
   // Constructed in the Region(...) constructor body, after this.settings is
@@ -85,7 +103,7 @@ public class Region extends FactoryValue<RegionKeys> {
   public volatile String configuredWorldName = null;
 
   /**
-   * Set true once this region's {@link ScanTask} has finished its full-load
+   * Set true once this region's scan task has finished its full-load
    * verification pass. Used to gate backlog drain.
    */
   public volatile boolean scanCompleted = false;
@@ -225,16 +243,7 @@ public class Region extends FactoryValue<RegionKeys> {
     // scan-task wiring happens implicitly when rebindWorld(...) swaps in freshly-loaded
     // settings produced by RegionConfigLoader.load against the now-loaded world.
     if (!this.worldFallbackBound && this.shape instanceof MemoryShape<?>) {
-      long[] progress = ScanTask.loadProgress(name, cacheKey());
-      if (progress != null) {
-        long iter = progress[0];
-        if (iter > 0 && iter < ((MemoryShape<?>) this.shape).getRange()) {
-          MemoryShape<?> ms = (MemoryShape<?>) this.shape;
-          ScanTask task = new ScanTask(this, iter);
-          RTP.getInstance().scanTasks.put(name, task);
-          ms.getLoadFuture().whenComplete((v, t) -> RTP.scheduler.runTaskAsynchronously(task));
-        }
-      }
+      taskDispatcher.resumeScan(this);
     }
 
     // Hydrate locations from database asynchronously. Skip for fallback-bound regions
@@ -299,16 +308,7 @@ public class Region extends FactoryValue<RegionKeys> {
     // the region was dormant. The new shape (from newSettings) has been loaded against the
     // now-available world, so getLoadFuture() has a real backing load.
     if (this.shape instanceof MemoryShape<?>) {
-      long[] progress = ScanTask.loadProgress(name, cacheKey());
-      if (progress != null) {
-        long iter = progress[0];
-        if (iter > 0 && iter < ((MemoryShape<?>) this.shape).getRange()) {
-          MemoryShape<?> ms = (MemoryShape<?>) this.shape;
-          ScanTask task = new ScanTask(this, iter);
-          RTP.getInstance().scanTasks.put(name, task);
-          ms.getLoadFuture().whenComplete((v, t) -> RTP.scheduler.runTaskAsynchronously(task));
-        }
-      }
+      taskDispatcher.resumeScan(this);
     }
 
     // See note in the constructor: hydration is async to keep DB I/O off the calling thread.
@@ -1011,18 +1011,8 @@ public class Region extends FactoryValue<RegionKeys> {
         RTP.getInstance().queuedPlayers.remove(playerId);
         RTP.getInstance().invulnerablePlayers.remove(playerId);
 
-        TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
-        if (data != null && !data.completed && data.nextTask instanceof TeleportPipelineTask task) {
-          task.setCancelled(true);
-          if (task.coords() != null) {
-            RTP.scheduler.runTask(
-                    task.region().getWorld(), task.coords().x() >> 4, task.coords().z() >> 4, task);
-          } else {
-            RTP.scheduler.runTask(task);
-          }
-        }
-
-        RTP.scheduler.runTask(new RTPTeleportCancel(playerId));
+        taskDispatcher.cancelTeleport(
+            playerId, RTP.getInstance().latestTeleportData.get(playerId), false);
         continue;
       }
 
@@ -1074,18 +1064,8 @@ public class Region extends FactoryValue<RegionKeys> {
         RTP.getInstance().queuedPlayers.remove(playerId);
         RTP.getInstance().invulnerablePlayers.remove(playerId);
 
-        TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
-        if (data != null && !data.completed && data.nextTask instanceof TeleportPipelineTask task) {
-          task.setCancelled(true);
-          if (task.coords() != null) {
-            RTP.scheduler.runTask(
-                    task.region().getWorld(), task.coords().x() >> 4, task.coords().z() >> 4, task);
-          } else {
-            RTP.scheduler.runTask(task);
-          }
-        }
-
-        new RTPTeleportCancel(playerId).run();
+        taskDispatcher.cancelTeleport(
+            playerId, RTP.getInstance().latestTeleportData.get(playerId), true);
         continue;
       }
 
@@ -1122,7 +1102,7 @@ public class Region extends FactoryValue<RegionKeys> {
             (pairCoords != null) ? RTP.serverAccessor.getRTPWorld(pairCoords.worldName()) : null;
         if (rtpWorld == null) rtpWorld = getWorld();
         if (rtpWorld != null && pairCoords != null) {
-          int radius = (int) ConfigCache.viewDistanceTeleport;
+          int radius = taskDispatcher.teleportViewDistance();
           int cx = pairCoords.x() >> 4;
           int cz = pairCoords.z() >> 4;
           java.util.List<CompletableFuture<Long>> chunks = new java.util.ArrayList<>();
@@ -1138,9 +1118,6 @@ public class Region extends FactoryValue<RegionKeys> {
         }
       }
 
-      TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(sender, player, null), this, pair.coords(), reservationForTask);
-      teleportData.nextTask = pipelineTask;
-      pipelineTask.setPhase(TeleportPipelineTask.Phase.LOAD);
       // Diagram 02 (WakePlayer): public/private queue produced a location and
       // the waiting player's pipeline is dispatched.
       RTP.log(Level.FINE,
@@ -1148,7 +1125,8 @@ public class Region extends FactoryValue<RegionKeys> {
               + " private=" + isPrivate
               + " coords=(" + pair.coords().x() + "," + pair.coords().y()
               + "," + pair.coords().z() + ")");
-      RTP.scheduler.runTaskAsynchronously(pipelineTask);
+      taskDispatcher.dispatchTeleport(teleportData,
+          new GenerationContext(sender, player, null), this, pair.coords(), reservationForTask);
 
       RTP.getInstance().latestTeleportData.put(playerId, teleportData);
       inFlightCalculations.incrementAndGet();

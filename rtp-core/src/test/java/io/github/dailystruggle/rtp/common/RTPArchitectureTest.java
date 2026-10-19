@@ -322,4 +322,75 @@ public class RTPArchitectureTest {
                     .matching("io.github.dailystruggle.rtp.common.commands.(*)..")
                     .should().beFreeOfCycles()
                     .because("ADR-115 Seam 2: Command feature sub-packages must not have cyclic dependencies.");
+
+    /**
+     * Rule 13 - Configuration Does Not Drive Tasks or Regions (ADR-115, RTP-68).
+     *
+     * <p>{@code configuration} loads parsers only. Task shutdown, teleport cancellation,
+     * tick-budget refresh and region rebuild on reload run in
+     * {@code lifecycle.ConfigReloadCoordinator}, reached through {@code ConfigReloadLifecycle}.
+     */
+    @ArchTest
+    static final ArchRule configuration_must_not_depend_on_tasks_or_regions =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.configuration..")
+                    .should().dependOnClassesThat()
+                    .resideInAnyPackage(
+                            "io.github.dailystruggle.rtp.common.tasks..",
+                            "io.github.dailystruggle.rtp.common.selection.region",
+                            "io.github.dailystruggle.rtp.common.lifecycle.."
+                    )
+                    .because("ADR-115: configuration is a lower tier than tasks and regions; reload "
+                            + "orchestration belongs to the Tier 4 ConfigReloadCoordinator.");
+
+    /**
+     * Rule 14 - Lifecycle Is Tier 4 (ADR-115).
+     *
+     * <p>Only the composition root ({@code common.RTP}) installs the reload coordinator.
+     */
+    @ArchTest
+    static final ArchRule only_composition_root_depends_on_lifecycle =
+            noClasses()
+                    .that().resideInAPackage(CORE_PACKAGE)
+                    .and().resideOutsideOfPackages(
+                            "io.github.dailystruggle.rtp.common",
+                            "io.github.dailystruggle.rtp.common.lifecycle..")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("io.github.dailystruggle.rtp.common.lifecycle..")
+                    .because("ADR-115 Invariant 2: no lower-tier package depends on Tier 4.");
+
+    /**
+     * Rule 15 - Regions Do Not Create Pipeline Tasks (ADR-115, RTP-68).
+     *
+     * <p>{@code selection.region} starts scans and teleports through the
+     * {@code RegionTaskDispatcher} it owns; the Tier 4 {@code lifecycle.RegionTaskCoordinator}
+     * creates the {@code ScanTask} and {@code TeleportPipelineTask} instances.
+     */
+    @ArchTest
+    static final ArchRule regions_must_not_depend_on_scan_or_teleport_tasks =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.selection.region..")
+                    .should().dependOnClassesThat()
+                    .resideInAnyPackage(
+                            "io.github.dailystruggle.rtp.common.tasks.scan..",
+                            "io.github.dailystruggle.rtp.common.tasks.teleport.."
+                    )
+                    .because("ADR-115 seam 3: scan and teleport tasks import Region, so Region "
+                            + "dispatches them through RegionTaskDispatcher.");
+
+    /**
+     * Rule 16 - Base Task Types Stay Below Regions (ADR-115, RTP-68).
+     *
+     * <p>{@code common.tasks} holds only the base types regions use ({@code RTPTaskPipe},
+     * {@code CompletionPaced}, {@code RTPRunnable}); tasks that read regions live in
+     * {@code tasks.scan} and {@code tasks.teleport}.
+     */
+    @ArchTest
+    static final ArchRule base_tasks_must_not_depend_on_selection =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.tasks")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("io.github.dailystruggle.rtp.common.selection..")
+                    .because("ADR-115 seam 3: selection.region depends on common.tasks, so the "
+                            + "base task package must not depend back on it.");
 }

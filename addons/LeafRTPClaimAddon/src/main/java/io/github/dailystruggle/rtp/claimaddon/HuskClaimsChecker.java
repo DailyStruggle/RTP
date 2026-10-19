@@ -1,19 +1,17 @@
 package io.github.dailystruggle.rtp.claimaddon;
 
-import java.lang.reflect.Method;
+import net.william278.huskclaims.api.BukkitHuskClaimsAPI;
 
 /**
- * Checker for HuskClaims claims.
+ * Checker for HuskClaims claims, compiled against {@code net.william278.huskclaims:huskclaims-bukkit}.
  *
- * <p>HuskClaims ({@code net.william278.huskclaims}) exposes a Bukkit API singleton via static
- * {@code BukkitHuskClaimsAPI.getInstance()}. {@code getPosition(org.bukkit.Location)} adapts a
- * Bukkit location into a HuskClaims {@code Position}, and {@code isClaimAt(Position)} returns
- * whether a claim covers it. {@code isClaimAt} also has an {@code (OnlineUser)} overload, so the
- * method is resolved by the declared {@code Position} type, never by name and arity. Resolved
- * reflectively so RTP carries no compile-time dependency on HuskClaims.
+ * <p>{@link BukkitHuskClaimsAPI#getInstance()} (throws while unregistered) adapts a Bukkit location
+ * with {@code getPosition(Location)}; {@code isClaimAt(Position)} says whether a claim covers it.
+ * API types are touched only in {@link Api}, after the enabled check (ADR-118).
  *
  * <p>Fails open (returns false) when HuskClaims is not enabled. Fails closed (returns true, per
- * REQ-RTP-S-003) when it is enabled but this API chain cannot be resolved or the lookup throws.
+ * REQ-RTP-S-003) through {@link ClaimCheckFailure} when it is enabled but the API is not
+ * registered, is incompatible, or the lookup throws.
  */
 public class HuskClaimsChecker {
   private HuskClaimsChecker() {}
@@ -44,21 +42,20 @@ public class HuskClaimsChecker {
     if (location == null || location.getWorld() == null) return false;
     if (!ClaimPlugins.isEnabled(PLUGIN_NAME)) return false;
     try {
-      Class<?> apiClass = Class.forName("net.william278.huskclaims.api.BukkitHuskClaimsAPI");
-      Object api = apiClass.getMethod("getInstance").invoke(null);
-      if (api == null) throw new IllegalStateException("BukkitHuskClaimsAPI.getInstance() is null");
-      Method getPosition = apiClass.getMethod("getPosition", org.bukkit.Location.class);
-      Object position = getPosition.invoke(api, location);
-      if (position == null) throw new IllegalStateException("getPosition(Location) is null");
-      Method isClaimAt = apiClass.getMethod("isClaimAt", getPosition.getReturnType());
-      Object result = isClaimAt.invoke(api, position);
-      if (!(result instanceof Boolean claimed)) {
-        throw new IllegalStateException("isClaimAt(Position) returned " + result);
-      }
-      // "in a claim" means a claim covers this position.
-      return claimed;
+      return Api.isClaimAt(location);
     } catch (Throwable t) {
       return ClaimCheckFailure.handle(PLUGIN_NAME, t);
+    }
+  }
+
+  /** Loaded on first call, so HuskClaims classes link only while the plugin is enabled. */
+  private static final class Api {
+    private Api() {}
+
+    static boolean isClaimAt(org.bukkit.Location location) {
+      BukkitHuskClaimsAPI api = BukkitHuskClaimsAPI.getInstance();
+      if (api == null) throw new IllegalStateException("BukkitHuskClaimsAPI.getInstance() is null");
+      return api.isClaimAt(api.getPosition(location));
     }
   }
 }

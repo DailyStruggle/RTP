@@ -313,8 +313,7 @@ public final class BukkitCustomItemResolver {
       Constructor<?> propConstructor = propertyClass.getConstructor(String.class, String.class);
       Object property = propConstructor.newInstance("textures", base64);
 
-      Method getProperties = profileClass.getMethod("getProperties");
-      Object propertyMap = getProperties.invoke(profile);
+      Object propertyMap = propertiesAccessor(profileClass).invoke(profile);
       Method put = propertyMap.getClass().getMethod("put", Object.class, Object.class);
       put.invoke(propertyMap, "textures", property);
 
@@ -336,6 +335,22 @@ public final class BukkitCustomItemResolver {
     } catch (Throwable t) {
       RTP.log(Level.WARNING, "[RTP-GUI] Failed to apply base64 texture to head via reflection: " + t.getMessage(), t);
     }
+  }
+
+  /**
+   * {@code GameProfile}'s property map: {@code getProperties()} on the legacy authlib this fallback
+   * targets, {@code properties()} on newer record-based authlib. Matched by name so neither
+   * shape is a compile-time reference.
+   */
+  private static Method propertiesAccessor(Class<?> profileClass) throws NoSuchMethodException {
+    for (Method method : profileClass.getMethods()) {
+      String name = method.getName();
+      if (method.getParameterCount() == 0
+          && (name.equals("getProperties") || name.equals("properties"))) {
+        return method;
+      }
+    }
+    throw new NoSuchMethodException(profileClass.getName() + ".getProperties()/properties()");
   }
 
   static boolean applyProfileApi(SkullMeta meta, String textureUrl) {
