@@ -53,6 +53,16 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Suggested next step:** Exempt the rift's own fall from the cancel check (origin recorded after the carve, or ignore movement inside an open rift), and on `RTPTeleportCancel.postActions` restore the rift with the player moved clear. Interim: `cancelDistance` above rift radius plus fall height.
 - **Linear:** RTP-71
 
+### 2026-10-19 - Reflective claim checkers built on guessed class and method names (UltimateClaims first)
+
+- **Severity:** High
+- **Status:** Open
+- **Discovered during:** 3.3.0 user review ("neural network code") of `MinePlotsChecker`, whose guessed API never detected a plot (fixed in `[Unreleased]`)
+- **Location:** `addons/LeafRTPClaimAddon/.../UltimateClaimsChecker.java` (two guessed main classes, `getClaimManager` / `getClaim` chain); the other reflective checkers in the same package (`Residence`, `CrashClaim`, `HuskClaims`, `HuskTowns`, `PlotSquared`, `KingdomsX`, `SaberFactions`, `FactionsBridge`)
+- **Symptom / hypothesis:** These checkers resolve classes and methods by name, and their tests (`ReflectiveClaimCheckersTest`) only cover "plugin absent" or call methods on the test's own mock classes, never the checker against the real API shape. A wrong name returns false ("not claimed") without a log line, as `MinePlotsChecker` did.
+- **Impact:** With a mismatched name, the claim check silently passes and players can be teleported into claimed land (S-003, S-004).
+- **Suggested next step:** For each checker, compare class names, plugin name (case-sensitive) and method chain to the plugin's published API or jar. Where the API is published, compile against it (`compileOnly`, as `MinePlotsChecker` now does with `pl.minecodes.plots:plugin-api`) so a wrong name fails the build; otherwise add a test that runs the checker against a stub of the real shape. Make "enabled but API not found" fail closed and log once.
+
 ### 2026-10-08 — Probe governor's probe time includes coalescer queue wait
 
 - **Severity:** Medium

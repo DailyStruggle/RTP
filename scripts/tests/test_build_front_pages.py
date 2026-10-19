@@ -171,6 +171,28 @@ class BBCodeTest(unittest.TestCase):
         self.assertEqual("[IMG]https://i/shot.png[/IMG]", inline_bbcode("![shot](https://i/shot.png)"))
         bfp.badge_width.assert_not_called()
 
+    def test_spigot_badges_are_plain_png_images(self):
+        bfp.badge_width.reset_mock()
+        self.assertEqual("[URL='https://l/'][IMG]https://raster.shields.io/badge/Java-17%2B-blue[/IMG][/URL]",
+                         inline_bbcode("[![j](https://img.shields.io/badge/Java-17%2B-blue)](https://l/)",
+                                       raster_badges=True))
+        self.assertEqual("[IMG]https://raster.shields.io/github/actions/workflow/status/O/R/gradle.yml[/IMG]",
+                         inline_bbcode("![ci](https://github.com/O/R/actions/workflows/gradle.yml/badge.svg)",
+                                       raster_badges=True))
+        self.assertEqual("[IMG]https://i/shot.png[/IMG]",
+                         inline_bbcode("![shot](https://i/shot.png)", raster_badges=True))
+        bfp.badge_width.assert_not_called()
+
+    def test_spigot_rejects_svg_without_png_equivalent(self):
+        with self.assertRaises(FrontPageError):
+            _render("![x](https://i/x.svg)\n", "spigot")
+
+    def test_spigot_drops_promo_and_is_denylisted(self):
+        body = "shared\n<!-- kind: promo -->\nsupport pitch\n<!-- /kind -->\n"
+        self.assertNotIn("support pitch", _render(body, "spigot"))
+        with self.assertRaises(FrontPageError):
+            _render("Now on BuiltByBit\n", "spigot")
+
     def test_svg_width_is_parsed_from_root_element(self):
         body = b'<svg xmlns="http://www.w3.org/2000/svg" width="186" height="20"><rect stroke-width="3"/>'
         resp = mock.MagicMock()

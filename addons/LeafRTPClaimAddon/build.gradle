@@ -26,6 +26,13 @@ repositories {
     maven { url = 'https://repo.spongepowered.org/maven/' }
     maven { url = 'https://ci.ender.zone/plugin/repository/everything/' }
     maven { url = 'https://repo.dmulloy2.net/repository/public/' }
+    maven {
+        url = 'https://maven.minecodes.pl/releases/'
+        content { includeGroup 'pl.minecodes.plots' }
+        // Its Gradle metadata pins org.gradle.jvm.version=21; this module targets 17. The API is
+        // only linked when minePlots (itself Java 21+) is enabled, so resolve from the POM.
+        metadataSources { mavenPom(); artifact() }
+    }
 }
 
 dependencies {
@@ -51,6 +58,7 @@ dependencies {
         exclude group: 'de.keyle', module: 'mypet'
         exclude group: 'net.ess3', module: 'EssentialsX'
     }
+    compileOnly 'pl.minecodes.plots:plugin-api:4.6.2'
 
     testImplementation project(':rtp-api')
     testImplementation project(':rtp-core')
@@ -61,6 +69,7 @@ dependencies {
     testImplementation 'com.sk89q.worldguard:worldguard-bukkit:7.0.12'
     testImplementation 'com.sk89q.worldedit:worldedit-bukkit:7.3.0'
     testImplementation 'net.kyori:adventure-api:4.17.0'
+    testImplementation 'pl.minecodes.plots:plugin-api:4.6.2'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }

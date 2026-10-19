@@ -129,7 +129,7 @@ public final class ClaimIntegrations {
     register(parser, verifiers, IntegrationsKeys.rerollTownyAdvanced, "Towny", TownyAdvancedChecker.class, () -> TownyAdvancedChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollWorldGuard, "WorldGuard", WorldGuardChecker.class, () -> WorldGuardChecker::isInClaim);
     register(parser, verifiers, IntegrationsKeys.rerollUltimateClaims, "UltimateClaims", UltimateClaimsChecker.class, () -> UltimateClaimsChecker::isInClaim);
-    register(parser, verifiers, IntegrationsKeys.rerollMinePlots, "MinePlots", MinePlotsChecker.class, () -> MinePlotsChecker::isInClaim);
+    register(parser, verifiers, IntegrationsKeys.rerollMinePlots, MinePlotsChecker.PLUGIN_NAME, MinePlotsChecker.class, () -> MinePlotsChecker::isInClaim);
   }
 
   /**

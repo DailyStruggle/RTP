@@ -2,195 +2,78 @@ package io.github.dailystruggle.rtp.claimaddon;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
-import java.lang.reflect.Method;
 import java.util.logging.Level;
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.Server;
+import org.bukkit.plugin.PluginManager;
+import org.bukkit.plugin.ServicesManager;
+import pl.minecodes.plots.api.plot.PlotServiceApi;
 
 /**
- * Checker for MinePlots plots (plot and land claim management).
+ * Checker for mineCodes minePlots plots, compiled against {@code pl.minecodes.plots:plugin-api}.
  *
- * <p>MinePlots manages plots and claims in dedicated worlds. We resolve the plugin singleton
- * and plot manager reflectively so RTP carries no compile-time dependency on MinePlots.
+ * <p>{@link PlotServiceApi} comes from the Bukkit {@link ServicesManager};
+ * {@code getPlot(Location)} returns the plot at a location or {@code null}.
  *
- * <p>When MinePlots is absent or disabled, the checker safely fails open (returns false).
- * When active, any reflection lookup failure or internal error fails closed (returns true,
- * treating the coordinate as claimed/protected per REQ-RTP-S-003).
+ * <p>minePlots absent or disabled: not claimed. Enabled but the service is not registered: the
+ * location is rejected (REQ-RTP-S-003), warned once. Other failures follow
+ * {@link ClaimCheckFailure}: an incompatible API disables the integration with a SEVERE log, any
+ * other error rejects the location.
  */
 public class MinePlotsChecker {
   private MinePlotsChecker() {}
 
-  private static boolean exists = true;
-  private static Boolean available = null;
+  /** Bukkit plugin name from minePlots' {@code plugin.yml} (case-sensitive lookup). */
+  static final String PLUGIN_NAME = "minePlots";
 
-  private static final String[] CANDIDATE_CLASSES = {
-    "pl.minecodes.plots.api.PlotServiceApi",
-    "pl.themolka.mineplots.MinePlots",
-    "net.mineplots.MinePlots",
-    "me.mineplots.MinePlots",
-    "com.mineplots.MinePlots"
-  };
-
-  private static boolean isAvailable() {
-    if (!exists) return false;
-    if (available != null) return available;
-    for (String cName : CANDIDATE_CLASSES) {
-      try {
-        Class.forName(cName);
-        available = true;
-        return true;
-      } catch (ClassNotFoundException ignored) {
-        // Ignored: probe next candidate class
-      }
-    }
-    available = false;
-    return false;
-  }
+  private static volatile boolean exists = true;
+  private static volatile boolean warnedMissingService = false;
 
   /**
-   * Check if an RTP coordinate is within a MinePlots plot or claim.
+   * Check if an RTP coordinate is within a minePlots plot.
    *
    * @param location the coordinate to check
-   * @return true if in a claim or lookup fails while plugin active, false otherwise
+   * @return true if in a plot or the lookup failed while minePlots is enabled; false otherwise
    */
-  public static Boolean isInClaim(RTPCoords location) {
-    if (!exists || location == null || !isAvailable()) return false;
-    org.bukkit.Location loc = ClaimLocationResolver.toLocation(location);
+  public static boolean isInClaim(RTPCoords location) {
+    if (!exists || location == null) return false;
+    Location loc = ClaimLocationResolver.toLocation(location);
     if (loc == null) return false;
     return isInClaim(loc);
   }
 
   /**
-   * Check if a Bukkit location is within a MinePlots plot or claim.
+   * Check if a Bukkit location is within a minePlots plot.
    *
    * @param location the location to check
-   * @return true if in a claim or lookup fails while plugin active, false otherwise
+   * @return true if in a plot or the lookup failed while minePlots is enabled; false otherwise
    */
-  public static Boolean isInClaim(org.bukkit.Location location) {
-    if (!exists || location == null || location.getWorld() == null || !isAvailable()) return false;
-    if (org.bukkit.Bukkit.getServer() == null) return false;
+  public static boolean isInClaim(Location location) {
+    if (!exists || location == null || location.getWorld() == null) return false;
+    Server server = Bukkit.getServer();
+    if (server == null) return false;
+    PluginManager pluginManager = server.getPluginManager();
+    if (pluginManager == null || !pluginManager.isPluginEnabled(PLUGIN_NAME)) return false;
+
     try {
-      Class<?> mainClass = null;
-      for (String cName : CANDIDATE_CLASSES) {
-        try {
-          mainClass = Class.forName(cName);
-          break;
-        } catch (ClassNotFoundException ignored) {
-          // Ignored: continue searching candidate main classes
+      ServicesManager servicesManager = server.getServicesManager();
+      PlotServiceApi service =
+          servicesManager == null ? null : servicesManager.load(PlotServiceApi.class);
+      if (service == null) {
+        if (!warnedMissingService) {
+          warnedMissingService = true;
+          RTP.log(
+              Level.WARNING,
+              "[RTP] minePlots is enabled but PlotServiceApi is not registered in the"
+                  + " ServicesManager; rejecting destinations per REQ-RTP-S-003 until it is.");
         }
+        return true;
       }
-
-      if (mainClass == null) return false;
-
-      Object serviceOrPlugin = null;
-      // First, try Bukkit ServicesManager for PlotServiceApi
-      try {
-        Class<?> serviceClass = Class.forName("pl.minecodes.plots.api.PlotServiceApi");
-        Method loadMethod = org.bukkit.plugin.ServicesManager.class.getMethod("load", Class.class);
-        serviceOrPlugin = loadMethod.invoke(org.bukkit.Bukkit.getServicesManager(), serviceClass);
-      } catch (Throwable ignored) {
-        // Ignored: ServicesManager lookup optional
-      }
-
-      if (serviceOrPlugin == null) {
-        try {
-          Method getInstance = mainClass.getMethod("getInstance");
-          serviceOrPlugin = getInstance.invoke(null);
-        } catch (NoSuchMethodException ignored) {
-          try {
-            Method getPlugin = mainClass.getMethod("getPlugin", Class.class);
-            serviceOrPlugin = getPlugin.invoke(null, mainClass);
-          } catch (NoSuchMethodException ignored2) {
-            org.bukkit.plugin.Plugin p = org.bukkit.Bukkit.getPluginManager().getPlugin("MinePlots");
-            if (p != null && mainClass.isInstance(p)) {
-              serviceOrPlugin = p;
-            }
-          }
-        }
-      }
-
-      if (serviceOrPlugin == null) return false;
-
-      // Probe plot manager / plot service from plugin instance if needed
-      Object plotManager = null;
-      for (Method m : serviceOrPlugin.getClass().getMethods()) {
-        if ((m.getName().equals("getPlotManager")
-                || m.getName().equals("getPlots")
-                || m.getName().equals("getPlotService"))
-            && m.getParameterCount() == 0) {
-          plotManager = m.invoke(serviceOrPlugin);
-          break;
-        }
-      }
-
-      Object target = (plotManager != null) ? plotManager : serviceOrPlugin;
-
-      // 1. Try getPlot(Location)
-      Method getPlotLoc = findMethod(target.getClass(), "getPlot", org.bukkit.Location.class);
-      if (getPlotLoc != null) {
-        Object plot = getPlotLoc.invoke(target, location);
-        if (plot != null) {
-          // If plot object exists, verify if it is claimed or whether plot presence implies protection
-          Method isClaimed = findZeroArgMethod(plot.getClass(), "isClaimed");
-          if (isClaimed != null) {
-            Object res = isClaimed.invoke(plot);
-            if (res instanceof Boolean b) return b;
-          }
-          return true;
-        }
-      }
-
-      // 2. Try getPlotAt(Location)
-      Method getPlotAtLoc = findMethod(target.getClass(), "getPlotAt", org.bukkit.Location.class);
-      if (getPlotAtLoc != null) {
-        Object plot = getPlotAtLoc.invoke(target, location);
-        if (plot != null) {
-          Method isClaimed = findZeroArgMethod(plot.getClass(), "isClaimed");
-          if (isClaimed != null) {
-            Object res = isClaimed.invoke(plot);
-            if (res instanceof Boolean b) return b;
-          }
-          return true;
-        }
-      }
-
-      // 3. Fallback: isPlot(Location) or isClaimed(Location)
-      for (Method m : target.getClass().getMethods()) {
-        if ((m.getName().equals("isPlot") || m.getName().equals("isClaimed"))
-            && m.getParameterCount() == 1
-            && m.getParameterTypes()[0].isAssignableFrom(org.bukkit.Location.class)) {
-          Object res = m.invoke(target, location);
-          if (res instanceof Boolean b) return b;
-        }
-      }
-
-      return false;
+      warnedMissingService = false;
+      return service.getPlot(location) != null;
     } catch (Throwable t) {
-      RTP.log(
-          Level.WARNING,
-          "[RTP] Error querying MinePlots plot status at "
-              + location.getWorld().getName() + " (" + location.getBlockX() + ", " + location.getBlockZ()
-              + "); failing closed per REQ-RTP-S-003.",
-          t);
-      return true; // Fail-closed
+      return ClaimCheckFailure.handle("minePlots", t, () -> exists = false);
     }
-  }
-
-  private static Method findMethod(Class<?> type, String name, Class<?> paramType) {
-    for (Method m : type.getMethods()) {
-      if (m.getName().equals(name)
-          && m.getParameterCount() == 1
-          && m.getParameterTypes()[0].isAssignableFrom(paramType)) {
-        return m;
-      }
-    }
-    return null;
-  }
-
-  private static Method findZeroArgMethod(Class<?> type, String name) {
-    for (Method m : type.getMethods()) {
-      if (m.getName().equals(name) && m.getParameterCount() == 0) {
-        return m;
-      }
-    }
-    return null;
   }
 }

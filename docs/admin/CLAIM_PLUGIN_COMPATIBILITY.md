@@ -25,7 +25,7 @@ Claim integrations are packaged in `addons/LeafRTPClaimAddon` (Bukkit/Paper/Foli
 | **PlotSquared** | Bukkit / Paper / Folia | `PlotSquaredChecker` | Reflective (`PlotAPI.wrapPlayer` / `PlotArea.getPlot`) | No | `v7.x`, `v6.x` |
 | **KingdomsX** | Bukkit / Paper / Folia | `KingdomsXChecker` | Reflective (`Kingdoms.getLand`) | No | `1.15.x+` |
 | **UltimateClaims** | Bukkit / Paper / Folia | `UltimateClaimsChecker` | Reflective (`ClaimManager.getClaim`) | No | `2.x`, `1.x` |
-| **MinePlots** | Bukkit / Paper / Folia | `MinePlotsChecker` | Reflective (`MinePlots.getPlotAt`) | No | `1.x` |
+| **minePlots** (mineCodes) | Bukkit / Paper / Folia | `MinePlotsChecker` | Direct API (`PlotServiceApi.getPlot(Location)` from the ServicesManager) | No | Best effort: compiled and tested against the published `plugin-api` `4.6.2`, not yet a live minePlots server |
 | **FTB Chunks** | Fabric / NeoForge | `FTBChunksChecker` | Mod SPI (`FTBChunksAPI.isChunkClaimed`) | Planned | `2001.x` (1.20.x), `2100.x` (1.21.x) |
 | **OpenPartiesAndClaims** | Fabric / NeoForge | `OpenPartiesAndClaimsChecker` | Mod SPI (`IOpenPartiesAndClaimsAPI.isClaimed`) | No | `0.21.x+` |
 
