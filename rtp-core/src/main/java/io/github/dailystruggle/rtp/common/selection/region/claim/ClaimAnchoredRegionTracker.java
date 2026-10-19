@@ -2,11 +2,11 @@ package io.github.dailystruggle.rtp.common.selection.region.claim;
 
 import io.github.dailystruggle.rtp.api.claim.ClaimBoundary;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
-import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SubspaceShape;
+import io.github.dailystruggle.rtp.common.selection.region.SubspaceShape;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
@@ -226,9 +226,9 @@ public class ClaimAnchoredRegionTracker {
         // Memory shapes are keyed in chunk units (PregenTask maps a selection to (c << 4) + 7).
         if (sourceShape.contains(cx, cz) && sourceShape.isKnownBad(cx, cz)) {
           int causeOrdinal = sourceShape.causeAt(cx, cz);
-          LocationGenerator.FailTypes cause = LocationGenerator.FailTypes.misc;
-          if (causeOrdinal >= 0 && causeOrdinal < LocationGenerator.FailTypes.values().length) {
-            cause = LocationGenerator.FailTypes.values()[causeOrdinal];
+          FailTypes cause = FailTypes.misc;
+          if (causeOrdinal >= 0 && causeOrdinal < FailTypes.values().length) {
+            cause = FailTypes.values()[causeOrdinal];
           }
 
           if (targetShape.contains(cx, cz) && !targetShape.isKnownBad(cx, cz)) {
@@ -286,7 +286,7 @@ public class ClaimAnchoredRegionTracker {
    *
    * <p>Queries {@link io.github.dailystruggle.rtp.api.hooks.ClaimBoundaryRegistry#resolveAt(String, int, int)}
    * to resolve the boundary envelope, converts the bounding box into key-space indices in {@code shape},
-   * and records them as {@link LocationGenerator.FailTypes#safetyExternal} hazard runs with the
+   * and records them as {@link FailTypes#safetyExternal} hazard runs with the
    * configured cause-based TTL (ADR-079). Subsequent candidate selections in this region skip the
    * claim envelope in $O(\log N)$ time.
    *
@@ -308,7 +308,7 @@ public class ClaimAnchoredRegionTracker {
     }
 
     long effectiveTtl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig
-        .resolveTtlSeconds(LocationGenerator.FailTypes.safetyExternal, failedVerifierClass);
+        .resolveTtlSeconds(FailTypes.safetyExternal, failedVerifierClass);
 
     ClaimBoundary boundary = null;
     try {
@@ -327,7 +327,7 @@ public class ClaimAnchoredRegionTracker {
       // Fallback: mark the hit's chunk; shape keys are chunk units, x/z are blocks.
       long loc = shape.xzToLocation(x >> 4, z >> 4);
       if (loc >= 0) {
-        return shape.addBadChunk(loc, LocationGenerator.FailTypes.safetyExternal, effectiveTtl);
+        return shape.addBadChunk(loc, FailTypes.safetyExternal, effectiveTtl);
       }
       return 0;
     }
@@ -355,14 +355,14 @@ public class ClaimAnchoredRegionTracker {
         long representative = shape.xzToLocation(cx, cz);
         if (representative >= 0 && representative < shape.getEffectiveRange()
             && !shape.isKnownBad(representative)) {
-          shape.addBadLocation(representative, LocationGenerator.FailTypes.safetyExternal, effectiveTtl);
+          shape.addBadLocation(representative, FailTypes.safetyExternal, effectiveTtl);
           marked++;
         }
         long[] preimages = shape.chunkToLocations(cx, cz);
         if (preimages != null && preimages.length > 0) {
           for (long p : preimages) {
             if (p >= 0 && p < shape.getEffectiveRange() && p != representative && !shape.isKnownBad(p)) {
-              shape.addBadLocation(p, LocationGenerator.FailTypes.safetyExternal, effectiveTtl);
+              shape.addBadLocation(p, FailTypes.safetyExternal, effectiveTtl);
               marked++;
             }
           }

@@ -583,7 +583,7 @@ public class PlaceholderProvider {
         placeholders.put(
                 "genFailureBreakdown",
                 uuid -> {
-                    Map<io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes, Long>
+                    Map<io.github.dailystruggle.rtp.common.selection.model.FailTypes, Long>
                             breakdown =
                             io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL.failureBreakdown();
                     // Comma-separated "cause=N" list, omitting zero buckets, busiest first.
@@ -597,7 +597,7 @@ public class PlaceholderProvider {
         placeholders.put(
                 "genTopRejectionCause",
                 uuid -> {
-                    Map<io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes, Long>
+                    Map<io.github.dailystruggle.rtp.common.selection.model.FailTypes, Long>
                             breakdown =
                             io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL.failureBreakdown();
                     return breakdown.entrySet().stream()
@@ -609,7 +609,7 @@ public class PlaceholderProvider {
         placeholders.put(
                 "genTopRejectionShare",
                 uuid -> {
-                    Map<io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes, Long>
+                    Map<io.github.dailystruggle.rtp.common.selection.model.FailTypes, Long>
                             breakdown =
                             io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats.GLOBAL.failureBreakdown();
                     long total = 0L;

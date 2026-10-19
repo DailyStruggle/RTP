@@ -981,7 +981,7 @@ public class ScanCmdTest {
         long pos = 50L;
 
         // Mark pos as bad without recording biome
-        shape.addBadLocation(pos, io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.misc);
+        shape.addBadLocation(pos, io.github.dailystruggle.rtp.common.selection.model.FailTypes.misc);
         assertTrue(shape.isKnownBad(pos));
         assertNull(shape.biomeAt(pos));
 

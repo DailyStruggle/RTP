@@ -4,10 +4,10 @@ import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Polygon;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -156,7 +156,7 @@ class EditorCurveModelBranchTest {
     @Test
     @DisplayName("encodeHazardRuns skips negative positions and runs swallowed by the previous run")
     void encodeSkipsNegativeAndSwallowed() {
-        int biome = LocationGenerator.FailTypes.biome.ordinal();
+        int biome = FailTypes.biome.ordinal();
         long[] keys = {-5, 10, 11, Long.MAX_VALUE - 1};
         long[] sums = {2, 12, 14, 16}; // lengths 2, 10, 2, 2
         byte[] causes = {(byte) biome, (byte) biome, (byte) biome, (byte) biome};

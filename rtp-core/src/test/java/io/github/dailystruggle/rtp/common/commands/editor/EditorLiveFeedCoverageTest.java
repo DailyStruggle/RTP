@@ -7,10 +7,10 @@ import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorKeys;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.InMemoryTransport;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.TrustedEditors;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -362,7 +362,7 @@ class EditorLiveFeedCoverageTest {
         openChannel();
         Map<String, MemoryShape<?>> shapes = new LinkedHashMap<>();
         Square sq = square(20, 0, 0);
-        sq.addBadLocation(sq.xzToLocation(2, 3), LocationGenerator.FailTypes.biome);
+        sq.addBadLocation(sq.xzToLocation(2, 3), FailTypes.biome);
         shapes.put("alpha", sq);
         EditorLiveFeed feed = new EditorLiveFeed(tempDir.resolve("live"), false, List.of(),
                 () -> new LinkedHashMap<>(shapes), null, () -> "{}", 3_600_000L, clock::get);

@@ -1,11 +1,11 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.CurveHash;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Polygon;
 import io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 
 import java.io.ByteArrayOutputStream;
 import java.util.*;
@@ -27,8 +27,8 @@ final class EditorCurveModel {
     static final String VERTICES = "vertices";
     static final String HAZARD_CAP = "hazard-cap";
 
-    private static final int UNIQUE_PLACEMENT = LocationGenerator.FailTypes.uniquePlacement.ordinal();
-    private static final int MISC = LocationGenerator.FailTypes.misc.ordinal();
+    private static final int UNIQUE_PLACEMENT = FailTypes.uniquePlacement.ordinal();
+    private static final int MISC = FailTypes.misc.ordinal();
     private static final Pattern WORD_BOUNDARY = Pattern.compile("\\b");
 
     private EditorCurveModel() {

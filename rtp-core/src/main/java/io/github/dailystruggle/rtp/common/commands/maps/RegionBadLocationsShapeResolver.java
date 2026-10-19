@@ -5,9 +5,9 @@ import io.github.dailystruggle.mapsapi.model.RegionBadLocations;
 import io.github.dailystruggle.mapsapi.render.RegionBadLocationsRenderer;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 
 /**
  * Resolver for {@link ChartSpec.Kind#REGION_BAD_LOCATIONS_SHAPE}.
@@ -146,9 +146,9 @@ public final class RegionBadLocationsShapeResolver implements ChartSpecResolver 
     }
 
     /**
-     * Maps a {@link LocationGenerator.FailTypes} ordinal to a logical {@link PaletteIndex} byte.
+     * Maps a {@link FailTypes} ordinal to a logical {@link PaletteIndex} byte.
      *
-     * @param causeOrdinal a {@link LocationGenerator.FailTypes} ordinal
+     * @param causeOrdinal a {@link FailTypes} ordinal
      * @return a logical palette byte for the cause
      */
     static byte causeColor(int causeOrdinal) {
@@ -160,7 +160,7 @@ public final class RegionBadLocationsShapeResolver implements ChartSpecResolver 
         final byte ORANGE = (byte) (PaletteIndex.RAMP_MIN + 17); // red -> yellow
         final byte YELLOW = (byte) (PaletteIndex.RAMP_MIN + 22); // ~ yellow
         final byte CREAM = (byte) (PaletteIndex.RAMP_MIN + 25);  // yellow -> white
-        LocationGenerator.FailTypes[] values = LocationGenerator.FailTypes.values();
+        FailTypes[] values = FailTypes.values();
         if (causeOrdinal < 0 || causeOrdinal >= values.length) {
             return PaletteIndex.RED;
         }

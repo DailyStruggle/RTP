@@ -1,10 +1,7 @@
-package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
+package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.selection.region.CandidateValidator;
-import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
-import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.selection.region.RegionFileCoord;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import java.util.ArrayList;
 import java.util.Collections;

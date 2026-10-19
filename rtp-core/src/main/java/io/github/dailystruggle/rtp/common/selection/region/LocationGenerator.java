@@ -54,41 +54,6 @@ public class LocationGenerator implements ILocationGenerator {
     /** Timeout for the sync-shim join-on-async-future. Tests run well under this. */
     private static final long SYNC_SHIM_TIMEOUT_SECONDS = 60L;
 
-    public enum FailTypes {
-        biome,
-        worldBorder,
-        timeout,
-        vert,
-        safety,
-        safetyExternal,
-        nullChunk,
-        /** Probe fast path rejected the candidate because the center-column biome
-         * didn't match the allow/deny filter. Accounts probe-driven biome misses
-         * separately from post-chunk-load {@link #biome} misses so operators can
-         * see how much work the fast path is saving. */
-        prefilterBiome,
-        /** Probe fast path rejected the candidate because the center-column block
-         * at the selected Y was unsafe (water / lava / caller-configured unsafe set). */
-        prefilterBlock,
-        /** Probe fast path rejected the candidate because the vertical adjustor
-         * found no acceptable Y within the probe's window (either the heightmap
-         * was outside {@code [minY, maxY]} or every Y-step failed the adjustor's
-         * placement test). */
-        prefilterRange,
-        /** Candidate chunk's column is not yet generated on disk and the
-         * configured {@code PerformanceKeys.pregeneratedPreference} weight
-         * drew a reject this attempt. Tracked separately so operators can see
-         * how often the pregenerated-area bias dropped a candidate vs. the
-         * other reject buckets. */
-        ungenerated,
-        /** Candidate location (and, for a {@code uniquePlacements} radius &gt; 1,
-         * the surrounding chunks) was marked bad to enforce unique placements:
-         * a successfully-used spot is consumed so the same area is not handed
-         * out again. Tracked separately from {@link #misc} so operators can see
-         * how much of the region the unique-placements knob has retired. */
-        uniquePlacement,
-        misc
-    }
 
     // ==========================================================================
     // ILocationGenerator async interface - primary entry points

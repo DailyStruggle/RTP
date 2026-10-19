@@ -18,6 +18,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdj
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.FakeChunkColumnProbe;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -181,7 +182,7 @@ class PregenTaskTest {
         assertTrue(result.isDone());
         assertNull(result.get().coords());
         assertTrue(state.worldBorderFails > 0);
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.worldBorder).containsKey("OUTSIDE_BORDER"));
+        assertTrue(state.failMap.get(FailTypes.worldBorder).containsKey("OUTSIDE_BORDER"));
     }
 
     @Test
@@ -223,7 +224,7 @@ class PregenTaskTest {
 
         assertTrue(result.isDone());
         assertNull(result.get().coords());
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.ungenerated).containsKey("UNGENERATED"));
+        assertTrue(state.failMap.get(FailTypes.ungenerated).containsKey("UNGENERATED"));
     }
 
     @Test
@@ -257,7 +258,7 @@ class PregenTaskTest {
         task.run();
 
         assertTrue(result.isDone());
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.prefilterBiome).containsKey("biome=DESERT"));
+        assertTrue(state.failMap.get(FailTypes.prefilterBiome).containsKey("biome=DESERT"));
     }
 
     @Test
@@ -323,7 +324,7 @@ class PregenTaskTest {
 
         assertTrue(result.isDone());
         assertNull(result.get().coords());
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.nullChunk).containsKey("reason=ticketFailed"));
+        assertTrue(state.failMap.get(FailTypes.nullChunk).containsKey("reason=ticketFailed"));
     }
 
     @Test
@@ -345,7 +346,7 @@ class PregenTaskTest {
 
         assertTrue(result.isDone());
         assertNull(result.get().coords());
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.nullChunk).containsKey("reason=asyncLoadNull"));
+        assertTrue(state.failMap.get(FailTypes.nullChunk).containsKey("reason=asyncLoadNull"));
     }
 
     @Test
@@ -437,7 +438,7 @@ class PregenTaskTest {
 
         assertTrue(result.isDone());
         assertNull(result.get().coords());
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.vert).containsKey("biome="));
+        assertTrue(state.failMap.get(FailTypes.vert).containsKey("biome="));
     }
 
     @Test
@@ -463,7 +464,7 @@ class PregenTaskTest {
 
         assertTrue(result.isDone());
         assertNull(result.get().coords());
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.biome).containsKey("biome=DESERT"));
+        assertTrue(state.failMap.get(FailTypes.biome).containsKey("biome=DESERT"));
     }
 
     @Test
@@ -520,8 +521,8 @@ class PregenTaskTest {
 
         assertTrue(result.isDone());
         assertNull(result.get().coords());
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.safety).size() > 0
-                || state.failMap.get(LocationGenerator.FailTypes.nullChunk).size() > 0);
+        assertTrue(state.failMap.get(FailTypes.safety).size() > 0
+                || state.failMap.get(FailTypes.nullChunk).size() > 0);
     }
 
     @Test
@@ -608,7 +609,7 @@ class PregenTaskTest {
 
         assertTrue(result.isDone());
         assertNull(result.get().coords());
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.nullChunk).size() > 0);
+        assertTrue(state.failMap.get(FailTypes.nullChunk).size() > 0);
     }
 
     @Test
@@ -635,7 +636,7 @@ class PregenTaskTest {
 
         assertTrue(result.isDone());
         assertNull(result.get().coords());
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.vert).size() > 0);
+        assertTrue(state.failMap.get(FailTypes.vert).size() > 0);
     }
 
     @Test
@@ -668,7 +669,7 @@ class PregenTaskTest {
 
             assertTrue(result.isDone());
             assertNull(result.get().coords());
-            assertTrue(state.failMap.get(LocationGenerator.FailTypes.safetyExternal).size() > 0);
+            assertTrue(state.failMap.get(FailTypes.safetyExternal).size() > 0);
         } finally {
             GlobalRegionVerifiers.clearGlobalRegionVerifiers();
         }
@@ -750,7 +751,7 @@ class PregenTaskTest {
         assertNotNull(gr);
         assertNotNull(gr.coords(), "Should succeed on second attempt after recovering from null chunk");
         assertEquals(2L, gr.attempts(), "Retry count should have incremented from attempt 1 to 2");
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.nullChunk).containsKey("reason=asyncLoadNull"));
+        assertTrue(state.failMap.get(FailTypes.nullChunk).containsKey("reason=asyncLoadNull"));
     }
 
     @Test
@@ -792,7 +793,7 @@ class PregenTaskTest {
         assertNotNull(gr);
         assertNotNull(gr.coords(), "Should succeed on second attempt after recovering from exception");
         assertEquals(2L, gr.attempts(), "Retry count should increment after exceptional failure");
-        assertTrue(state.failMap.get(LocationGenerator.FailTypes.nullChunk).containsKey("reason=ticketFailed"));
+        assertTrue(state.failMap.get(FailTypes.nullChunk).containsKey("reason=ticketFailed"));
     }
 
     @Test
@@ -835,7 +836,7 @@ class PregenTaskTest {
             assertNotNull(gr);
             assertNotNull(gr.coords());
             assertEquals(2L, gr.attempts());
-            assertTrue(state.failMap.get(LocationGenerator.FailTypes.safetyExternal).size() > 0);
+            assertTrue(state.failMap.get(FailTypes.safetyExternal).size() > 0);
         } finally {
             GlobalRegionVerifiers.clearGlobalRegionVerifiers();
         }

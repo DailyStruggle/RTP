@@ -3,8 +3,8 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -150,7 +150,7 @@ class CellSlotSpacingTest {
         if (key < 0) continue;
         int[] p = c.locationToXZ(key);
         if (terrainBad(p[0], p[1])) {
-          c.addBadLocation(key, LocationGenerator.FailTypes.safety, 0L);
+          c.addBadLocation(key, FailTypes.safety, 0L);
           continue;
         }
         if (prev != null) {

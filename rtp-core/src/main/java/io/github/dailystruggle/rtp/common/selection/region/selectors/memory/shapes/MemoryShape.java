@@ -3,10 +3,10 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 import io.github.dailystruggle.rtp.anvil.StorageLatencyProbe;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.residency.StrideGroupResidencyManager;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.HybridHazardTable;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -97,7 +97,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   protected volatile long[] badPrefixSumsCache = new long[0];
   /**
    * Per-run rejection cause, aligned 1:1 with {@link #badKeysCache} (one
-   * {@link LocationGenerator.FailTypes} ordinal, stored as a byte, per coalesced
+   * {@link FailTypes} ordinal, stored as a byte, per coalesced
    * bad-location run). When adjacent runs coalesce during rebuild the first run's
    * cause is kept (first-cause-wins; small-scale information loss is acceptable).
    * Legacy {@code .bin} files and untagged callers default to {@code misc}.
@@ -150,7 +150,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   /** {@code FailTypes.misc} ordinal as a byte: the default / unknown cause. */
-  protected static final byte MISC_CAUSE = (byte) LocationGenerator.FailTypes.misc.ordinal();
+  protected static final byte MISC_CAUSE = (byte) FailTypes.misc.ordinal();
 
   /**
    * First int of a {@code .bin} payload written with the cause-tagged format.
@@ -819,7 +819,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   private final AtomicLong totalBiomeCount = new AtomicLong(0L);
 
   /**
-   * Marks rejected by {@link #addBadLocation(long, LocationGenerator.FailTypes, long)} because
+   * Marks rejected by {@link #addBadLocation(long, FailTypes, long)} because
    * their 1D index falls outside this shape's addressable domain.
    *
    * <p>A ring-based parameterisation offsets its index by the inner radius
@@ -1226,7 +1226,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   public boolean isKnownHazard(int x, int z) {
     if (!isKnownBad(x, z)) return false;
     int cause = causeAt(x, z);
-    return cause != LocationGenerator.FailTypes.uniquePlacement.ordinal();
+    return cause != FailTypes.uniquePlacement.ordinal();
   }
 
   /**
@@ -1238,16 +1238,16 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   public boolean isKnownHazard(long location) {
     if (!isKnownBad(location)) return false;
     int cause = causeAt(location);
-    return cause != LocationGenerator.FailTypes.uniquePlacement.ordinal();
+    return cause != FailTypes.uniquePlacement.ordinal();
   }
 
   /**
    * Returns rejection cause for bad-location run containing {@code (x, z)}, or {@code -1}.
-   * Non-negative return is a {@link LocationGenerator.FailTypes} ordinal.
+   * Non-negative return is a {@link FailTypes} ordinal.
    *
    * @param x the x coordinate
    * @param z the z coordinate
-   * @return {@link LocationGenerator.FailTypes} ordinal, or {@code -1} if not known bad
+   * @return {@link FailTypes} ordinal, or {@code -1} if not known bad
    */
   public int causeAt(int x, int z) {
     return causeAt((long) xzToLocation(x, z));
@@ -1255,11 +1255,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
   /**
    * Returns rejection cause for bad-location run containing {@code location}, or {@code -1}.
-   * Non-negative return is a {@link LocationGenerator.FailTypes} ordinal. Pending/rebuilding
+   * Non-negative return is a {@link FailTypes} ordinal. Pending/rebuilding
    * entries with no resolved run cause read as {@code misc}.
    *
    * @param location the location value
-   * @return {@link LocationGenerator.FailTypes} ordinal, or {@code -1} if not known bad
+   * @return {@link FailTypes} ordinal, or {@code -1} if not known bad
    */
   public int causeAt(long location) {
     Long pVal = pendingBadLocations.get().get(location);
@@ -1335,7 +1335,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   /**
    * Returns an immutable snapshot of the per-run rejection-cause array, aligned
    * 1:1 with {@link #badKeysSnapshot()} (each element is a
-   * {@link LocationGenerator.FailTypes} ordinal stored as a byte). Runs with no
+   * {@link FailTypes} ordinal stored as a byte). Runs with no
    * recorded cause read as {@code misc}.
    *
    * @return a fresh array copy; never {@code null}, may be zero-length
@@ -1417,7 +1417,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       sProbExpiries = Arrays.copyOf(pSnap.expiries, pSnap.expiries.length);
 
       boolean persistUnique = Boolean.parseBoolean(String.valueOf(paramByName("uniqueplacementspermanent", Boolean.FALSE)));
-      byte uniqueCauseByte = (byte) LocationGenerator.FailTypes.uniquePlacement.ordinal();
+      byte uniqueCauseByte = (byte) FailTypes.uniquePlacement.ordinal();
 
       // Merge active and probation non-overlapping runs into a single sorted stream for disk
       totalRuns = sBadKeys.length + sProbKeys.length;
@@ -1844,7 +1844,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
     // 2. Convert Bad Location prefix sums back to discrete lengths, tagging each
     //    run with its rejection cause (one cause per run; `misc` when unknown).
-    LocationGenerator.FailTypes[] failTypes = LocationGenerator.FailTypes.values();
+    FailTypes[] failTypes = FailTypes.values();
     java.util.List<java.util.Map<String, Object>> badList = new java.util.ArrayList<>();
     long prev = 0L;
     for (int i = 0; i < sBadKeys.length; i++) {
@@ -1854,7 +1854,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       int causeOrd = (i < sBadCauses.length) ? (sBadCauses[i] & 0xFF) : (MISC_CAUSE & 0xFF);
       String causeName = (causeOrd >= 0 && causeOrd < failTypes.length)
           ? failTypes[causeOrd].name()
-          : LocationGenerator.FailTypes.misc.name();
+          : FailTypes.misc.name();
       entry.put("cause", causeName);
       badList.add(entry);
       prev = sBadSums[i];
@@ -2030,9 +2030,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                     activeCount++;
                   } else {
                     // Check if within probation window (1x TTL to 2x TTL)
-                    LocationGenerator.FailTypes[] values = LocationGenerator.FailTypes.values();
-                    LocationGenerator.FailTypes ft = (cause >= 0 && cause < values.length)
-                        ? values[cause] : LocationGenerator.FailTypes.misc;
+                    FailTypes[] values = FailTypes.values();
+                    FailTypes ft = (cause >= 0 && cause < values.length)
+                        ? values[cause] : FailTypes.misc;
                     long ttl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(ft, null);
                     long window = (ttl > 0L) ? ttl : 14L * 86400L;
                     if (now < exp + window) {
@@ -2068,9 +2068,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                     newBadExpiries[aIdx] = exp;
                     aIdx++;
                   } else {
-                    LocationGenerator.FailTypes[] values = LocationGenerator.FailTypes.values();
-                    LocationGenerator.FailTypes ft = (cause >= 0 && cause < values.length)
-                        ? values[cause] : LocationGenerator.FailTypes.misc;
+                    FailTypes[] values = FailTypes.values();
+                    FailTypes ft = (cause >= 0 && cause < values.length)
+                        ? values[cause] : FailTypes.misc;
                     long ttl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(ft, null);
                     long window = (ttl > 0L) ? ttl : 14L * 86400L;
                     if (now < exp + window) {
@@ -2113,17 +2113,17 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   }
 
   public void addBadLocation(long location) {
-    addBadLocation(location, LocationGenerator.FailTypes.misc);
+    addBadLocation(location, FailTypes.misc);
   }
 
   /**
    * Marks a single 1D index bad with cause and custom retention TTL in seconds (ADR-079).
    *
    * @param location   the 1D spiral index to mark bad
-   * @param cause      the rejection reason; {@code null} is treated as {@link LocationGenerator.FailTypes#misc}
+   * @param cause      the rejection reason; {@code null} is treated as {@link FailTypes#misc}
    * @param ttlSeconds retention duration in seconds; {@code <= 0} indicates infinite retention
    */
-  public void addBadLocation(long location, LocationGenerator.FailTypes cause, long ttlSeconds) {
+  public void addBadLocation(long location, FailTypes cause, long ttlSeconds) {
     if (location < 0L) {
       reportOutOfDomainMark(location, cause);
       return;
@@ -2170,7 +2170,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @param location the offending 1D index
    * @param cause    the rejection reason being dropped, may be {@code null}
    */
-  private void reportOutOfDomainMark(long location, LocationGenerator.FailTypes cause) {
+  private void reportOutOfDomainMark(long location, FailTypes cause) {
     long n = outOfDomainMarks.incrementAndGet();
     boolean report = false;
     for (long threshold = 1L; threshold <= n; threshold *= 10L) {
@@ -2187,7 +2187,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             + ": refused bad-location mark "
             + location
             + " (cause "
-            + ((cause == null) ? LocationGenerator.FailTypes.misc : cause)
+            + ((cause == null) ? FailTypes.misc : cause)
             + ") - index is outside the addressable domain [0,"
             + getEffectiveRange()
             + "); total refused: "
@@ -2217,9 +2217,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     if (location >= start && location < start + len) {
       // Re-promote the whole run
       byte causeByte = (idx < pCauses.length) ? pCauses[idx] : MISC_CAUSE;
-      LocationGenerator.FailTypes[] values = LocationGenerator.FailTypes.values();
-      LocationGenerator.FailTypes cause = (causeByte >= 0 && causeByte < values.length)
-          ? values[causeByte] : LocationGenerator.FailTypes.misc;
+      FailTypes[] values = FailTypes.values();
+      FailTypes cause = (causeByte >= 0 && causeByte < values.length)
+          ? values[causeByte] : FailTypes.misc;
       long ttl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(cause, null);
       long epochSec = (ttl <= 0) ? 0L : (java.time.Instant.now().getEpochSecond() + ttl);
       long pendingVal = (causeByte & 0xFFL) | (epochSec << 8);
@@ -2240,14 +2240,14 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
   /**
    * Marks a single 1D index bad and records the rejection {@code cause}. The cause
-   * is carried on the pending entry's value (its {@link LocationGenerator.FailTypes}
+   * is carried on the pending entry's value (its {@link FailTypes}
    * ordinal) and surfaces as the per-run cause after the next rebuild. Transient causes
    * ({@code TtlConfig.isTransient}) are discarded, never stored.
    *
    * @param location the 1D spiral index to mark bad
-   * @param cause    the rejection reason; {@code null} is treated as {@link LocationGenerator.FailTypes#misc}
+   * @param cause    the rejection reason; {@code null} is treated as {@link FailTypes#misc}
    */
-  public void addBadLocation(long location, LocationGenerator.FailTypes cause) {
+  public void addBadLocation(long location, FailTypes cause) {
     if (io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.isTransient(cause)) return;
     long ttl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(cause, null);
     addBadLocation(location, cause, ttl);
@@ -2453,7 +2453,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @return count of newly marked indices (0, 1, or 2)
    */
   public int addBadChunk(long location) {
-    return addBadChunk(location, LocationGenerator.FailTypes.misc);
+    return addBadChunk(location, FailTypes.misc);
   }
 
   /**
@@ -2464,7 +2464,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @param cause rejection cause attributed to marked indices
    * @return count of newly marked indices (0, 1, or 2)
    */
-  public int addBadChunk(long location, LocationGenerator.FailTypes cause) {
+  public int addBadChunk(long location, FailTypes cause) {
     if (io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.isTransient(cause)) return 0;
     long ttl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(cause, null);
     return addBadChunk(location, cause, ttl);
@@ -2478,7 +2478,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @param ttlSeconds retention duration in seconds; {@code <= 0} indicates infinite retention
    * @return count of newly marked indices (0, 1, or 2)
    */
-  public int addBadChunk(long location, LocationGenerator.FailTypes cause, long ttlSeconds) {
+  public int addBadChunk(long location, FailTypes cause, long ttlSeconds) {
     int[] xz = locationToXZ(location);
     long[] preimage = chunkToLocations(xz[0], xz[1]);
     if (preimage.length == 0) {
@@ -2546,7 +2546,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   public int addBadChunkRadius(long location, int chunkRadius) {
     if (chunkRadius <= 0) return 0;
     if (chunkRadius == 1) {
-      return addBadChunk(location, LocationGenerator.FailTypes.uniquePlacement);
+      return addBadChunk(location, FailTypes.uniquePlacement);
     }
     int[] center = locationToXZ(location);
     int reach = chunkRadius - 1;
@@ -2557,7 +2557,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         for (long p : preimage) {
           if (p < 0L) continue;
           if (!isKnownBad(p)) {
-            addBadLocation(p, LocationGenerator.FailTypes.uniquePlacement);
+            addBadLocation(p, FailTypes.uniquePlacement);
             marked++;
           }
         }
@@ -2570,7 +2570,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     // Canonicalise the biome key so that `FOREST` and `MINECRAFT:FOREST`
     // alias to the same per-biome bucket; the lookup side (PregenTask
     // biome-recall, getBiomeKeys / getBiomePrefixSums) does the same.
-    String key = io.github.dailystruggle.rtp.common.selection.region.BiomeNames.canonical(biome);
+    String key = io.github.dailystruggle.rtp.common.selection.model.BiomeNames.canonical(biome);
     pendingBiomeLocations
         .get()
         .computeIfAbsent(key, b -> new ConcurrentHashMap<>())
@@ -2745,7 +2745,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    */
   public BiomeUnionTable.BiomeView biomeRunView(String biome) {
     String canonical =
-        io.github.dailystruggle.rtp.common.selection.region.BiomeNames.canonical(biome);
+        io.github.dailystruggle.rtp.common.selection.model.BiomeNames.canonical(biome);
     BiomeUnionTable union = biomeUnion;
     int id = union.idOf(canonical);
     return (id < 0) ? null : union.viewOf(id);
@@ -2800,7 +2800,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
    * @param biome the biome name
    */
   public void removeBiomeLocation(Long location, String biome) {
-    String key = io.github.dailystruggle.rtp.common.selection.region.BiomeNames.canonical(biome);
+    String key = io.github.dailystruggle.rtp.common.selection.model.BiomeNames.canonical(biome);
     pendingBiomeRemovals
         .get()
         .computeIfAbsent(key, b -> new ConcurrentHashMap<>())
@@ -2877,7 +2877,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         range > 0 ? Math.min(100.0, 100.0 * learned / range) : Double.NaN;
     double badPercent = range > 0 ? 100.0 * badCount / range : Double.NaN;
 
-    LocationGenerator.FailTypes[] failTypes = LocationGenerator.FailTypes.values();
+    FailTypes[] failTypes = FailTypes.values();
     long[] perCause = new long[failTypes.length];
     long prev = 0L;
     long totalRunCells = 0L;
@@ -3569,9 +3569,9 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
           if (exp <= 0L || now < exp) {
             activeCount++;
           } else {
-            LocationGenerator.FailTypes[] values = LocationGenerator.FailTypes.values();
+            FailTypes[] values = FailTypes.values();
             byte c = mergedCauses[k];
-            LocationGenerator.FailTypes ft = (c >= 0 && c < values.length) ? values[c] : LocationGenerator.FailTypes.misc;
+            FailTypes ft = (c >= 0 && c < values.length) ? values[c] : FailTypes.misc;
             long ttl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(ft, null);
             long window = (ttl > 0L) ? ttl : 14L * 86400L;
             if (now < exp + window) {
@@ -3607,8 +3607,8 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
             newExpiries[aK] = exp;
             aK++;
           } else {
-            LocationGenerator.FailTypes[] values = LocationGenerator.FailTypes.values();
-            LocationGenerator.FailTypes ft = (c >= 0 && c < values.length) ? values[c] : LocationGenerator.FailTypes.misc;
+            FailTypes[] values = FailTypes.values();
+            FailTypes ft = (c >= 0 && c < values.length) ? values[c] : FailTypes.misc;
             long ttl = io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.resolveTtlSeconds(ft, null);
             long window = (ttl > 0L) ? ttl : 14L * 86400L;
             if (now < exp + window) {

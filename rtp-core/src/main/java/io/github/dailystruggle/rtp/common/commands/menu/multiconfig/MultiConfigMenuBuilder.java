@@ -151,7 +151,8 @@ public final class MultiConfigMenuBuilder {
     }
 
     /**
-     * Cart-aware entry builder delegating to {@link CommandTreeMenuBuilder} when wired.
+     * Cart-aware entry builder delegating to
+     * {@link io.github.dailystruggle.rtp.common.commands.menu.CommandTreeMenuBuilder} when wired.
      *
      * <p>Surfaces clickable keys, pagination, and pending cart changes under
      * synthetic filename {@code "<parserKind>/<entryName>"}. Falls back to display-only.

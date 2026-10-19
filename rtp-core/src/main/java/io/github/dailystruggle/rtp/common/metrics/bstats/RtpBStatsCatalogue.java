@@ -20,7 +20,7 @@ import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.metrics.RTPMetricsExtension;
 import io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats;
 import io.github.dailystruggle.rtp.common.metrics.RtpSchedulerProfile;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -422,12 +422,12 @@ public final class RtpBStatsCatalogue {
         }
     }
 
-    /** {@link LocationGenerator.FailTypes} with the most rejects, or {@code "none"}. */
+    /** {@link FailTypes} with the most rejects, or {@code "none"}. */
     public static String detectTopFailureCause() {
         try {
-            LocationGenerator.FailTypes top = null;
+            FailTypes top = null;
             long best = 0L;
-            for (Map.Entry<LocationGenerator.FailTypes, Long> e : RtpOutcomeStats.GLOBAL.failureBreakdown().entrySet()) {
+            for (Map.Entry<FailTypes, Long> e : RtpOutcomeStats.GLOBAL.failureBreakdown().entrySet()) {
                 long count = (e.getValue() == null) ? 0L : e.getValue();
                 if (count > best) {
                     best = count;

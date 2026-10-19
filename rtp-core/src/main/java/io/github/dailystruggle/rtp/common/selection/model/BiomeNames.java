@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.common.selection.region;
+package io.github.dailystruggle.rtp.common.selection.model;
 
 import java.util.Set;
 

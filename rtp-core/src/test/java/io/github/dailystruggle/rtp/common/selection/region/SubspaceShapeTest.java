@@ -1,16 +1,17 @@
-package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
+package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
-import io.github.dailystruggle.rtp.common.selection.region.CandidateValidator;
-import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
-import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.selection.region.RegionFileCoord;
-import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.CircleOptimizedDualLayer;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square_Normal;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -166,7 +167,7 @@ public class SubspaceShapeTest {
 
     // 2. Also mark an ACTUAL base hazard (safety) on a specific chunk (101, 100)
     long hazardChunkLoc = parentShape.xzToLocation(101, 100);
-    parentShape.addBadLocation(hazardChunkLoc, io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.safety);
+    parentShape.addBadLocation(hazardChunkLoc, io.github.dailystruggle.rtp.common.selection.model.FailTypes.safety);
 
     Region region = createDummyRegion(parentShape);
     SubspaceShape subspace = new SubspaceShape(anchor, 64, region); // 4-chunk radius

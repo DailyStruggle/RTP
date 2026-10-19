@@ -94,7 +94,7 @@ public class MemoryShapeRebuildCostTest {
         shape.addBiomeLocation(base, 1L, "BIOME_0");
         shape.addBadChunk(
             base + 4L,
-            io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes
+            io.github.dailystruggle.rtp.common.selection.model.FailTypes
                 .biome);
         base += 64L;
         if (amortized) {

@@ -25,6 +25,8 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
+import io.github.dailystruggle.rtp.common.selection.model.BiomeNames;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -125,11 +127,11 @@ public class Region extends FactoryValue<RegionKeys> {
 
   /** Records a backlog entry the region-file pre-filter denied and teaches its bad-chunk table. */
   void onBacklogReject(BacklogLocationBuffer.BacklogEntry e) {
-    RtpOutcomeStats.GLOBAL.recordFailure(LocationGenerator.FailTypes.prefilterBlock);
+    RtpOutcomeStats.GLOBAL.recordFailure(FailTypes.prefilterBlock);
     if (this.shape instanceof io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape ms) {
       long loc1D = ms.xzToLocation(e.location().coords().x() >> 4, e.location().coords().z() >> 4);
       if (loc1D >= 0) {
-        ms.addBadChunk(loc1D, LocationGenerator.FailTypes.prefilterBlock);
+        ms.addBadChunk(loc1D, FailTypes.prefilterBlock);
       }
     }
   }
@@ -654,7 +656,7 @@ public class Region extends FactoryValue<RegionKeys> {
    * Drops a cold location that failed promotion and records the cause. pollSilently skipped the
    * delete callback; offer+poll fires it so the DB row is purged.
    */
-  private void dropColdLocation(RTPLocation coldLoc, LocationGenerator.FailTypes cause) {
+  private void dropColdLocation(RTPLocation coldLoc, FailTypes cause) {
     RtpOutcomeStats.GLOBAL.recordFailure(cause);
     queueManager.unkeptLocations.offer(coldLoc);
     queueManager.unkeptLocations.poll();
@@ -669,16 +671,16 @@ public class Region extends FactoryValue<RegionKeys> {
    *
    * @return {@code null} on pass, else the failing check
    */
-  CompletableFuture<LocationGenerator.FailTypes> promotionChecks(
+  CompletableFuture<FailTypes> promotionChecks(
       RTPCoords resolved, io.github.dailystruggle.rtp.api.world.RTPChunk<?> center) {
     RTPWorld<?> world = getWorld();
-    if (world == null) return CompletableFuture.completedFuture(LocationGenerator.FailTypes.nullChunk);
+    if (world == null) return CompletableFuture.completedFuture(FailTypes.nullChunk);
 
     Object border = RTP.serverAccessor.getWorldBorder(world.name());
     if (border instanceof io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder wb
         && !wb.isInside().apply(new io.github.dailystruggle.rtp.api.world.RTPLocation(
             world, resolved.x(), resolved.y(), resolved.z()))) {
-      return CompletableFuture.completedFuture(LocationGenerator.FailTypes.worldBorder);
+      return CompletableFuture.completedFuture(FailTypes.worldBorder);
     }
 
     Object wl = RTP.configs.getConfigValue(
@@ -691,7 +693,7 @@ public class Region extends FactoryValue<RegionKeys> {
     }
     String biome = center.getBiome(resolved.x(), resolved.y(), resolved.z());
     if (BiomeNames.matches(biomes, (biome == null) ? "" : biome.toUpperCase()) != whitelist) {
-      return CompletableFuture.completedFuture(LocationGenerator.FailTypes.biome);
+      return CompletableFuture.completedFuture(FailTypes.biome);
     }
 
     int safe = 0;
@@ -733,14 +735,14 @@ public class Region extends FactoryValue<RegionKeys> {
       }
     }
     final Set<String> unsafeBlocks = unsafe;
-    java.util.function.Supplier<CompletableFuture<LocationGenerator.FailTypes>> scanThenClaims = () -> {
+    java.util.function.Supplier<CompletableFuture<FailTypes>> scanThenClaims = () -> {
       if (!SafetyScan.isColumnSafe(resolved, world, grid, L, ccx, ccz, r, unsafeBlocks)) {
-        return CompletableFuture.completedFuture(LocationGenerator.FailTypes.safety);
+        return CompletableFuture.completedFuture(FailTypes.safety);
       }
       CompletableFuture<Boolean> claims = GlobalRegionVerifiers.checkGlobalRegionVerifiers(resolved);
-      if (claims == null) return CompletableFuture.completedFuture(LocationGenerator.FailTypes.safetyExternal);
+      if (claims == null) return CompletableFuture.completedFuture(FailTypes.safetyExternal);
       return claims.handle((ok, ex) ->
-          (ex == null && Boolean.TRUE.equals(ok)) ? null : LocationGenerator.FailTypes.safetyExternal);
+          (ex == null && Boolean.TRUE.equals(ok)) ? null : FailTypes.safetyExternal);
     };
     // Same chunk only: still on the caller's (region) thread.
     if (pending.isEmpty()) return scanThenClaims.get();
@@ -749,7 +751,7 @@ public class Region extends FactoryValue<RegionKeys> {
         .thenCompose(v -> {
           if (!isFoliaPlatform()) return scanThenClaims.get();
           // Folia: live block reads belong on the chunk's region thread.
-          CompletableFuture<LocationGenerator.FailTypes> out = new CompletableFuture<>();
+          CompletableFuture<FailTypes> out = new CompletableFuture<>();
           RTP.scheduler.runTask(world, ccx, ccz, () -> scanThenClaims.get().whenComplete((f, e) -> {
             if (e != null) out.completeExceptionally(e);
             else out.complete(f);
@@ -851,13 +853,13 @@ public class Region extends FactoryValue<RegionKeys> {
               // ungenerated anvil view) is distinguishable from a genuinely
               // unsafe column.
               logPromotionDropDiag(coldLoc, rtpChunk, cx, cz);
-              dropColdLocation(coldLoc, LocationGenerator.FailTypes.vert);
+              dropColdLocation(coldLoc, FailTypes.vert);
               return;
             }
 
             ChunkReservation reservation = new ChunkReservation(chunkSet, getWorld());
             final RTPCoords checked = resolved;
-            CompletableFuture<LocationGenerator.FailTypes> checks;
+            CompletableFuture<FailTypes> checks;
             try {
               checks = promotionChecks(checked, rtpChunk);
             } catch (Throwable t) {
@@ -874,7 +876,7 @@ public class Region extends FactoryValue<RegionKeys> {
                 reservation.close();
                 RTP.log(Level.FINE, "[Region:" + name + "] promotion chunk=(" + cx + "," + cz
                     + ") dropped: " + (ex != null ? ex.toString() : cause.name()));
-                dropColdLocation(coldLoc, (ex != null) ? LocationGenerator.FailTypes.misc : cause);
+                dropColdLocation(coldLoc, (ex != null) ? FailTypes.misc : cause);
               } catch (Throwable t) {
                 reservation.close();
                 RTP.log(Level.WARNING, "[Region:" + name + "] promotion check failed: " + t, t);

@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -538,7 +539,7 @@ class GroupPlacementDispatcherTest {
             assertFalse(result.isSuccess());
             verify(mockMemShape, atLeastOnce()).addBadChunk(
                     anyLong(),
-                    eq(LocationGenerator.FailTypes.safetyExternal)
+                    eq(FailTypes.safetyExternal)
             );
         } finally {
             GlobalRegionVerifiers.clearGlobalRegionVerifiers();

@@ -11,6 +11,8 @@ import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -143,33 +145,84 @@ class RTPCmdBranchTest {
         assertTrue(sender.sentMessages.stream().noneMatch(msg -> msg.toLowerCase(Locale.ROOT).contains("cooldown")));
     }
 
+    private static Region putOverrideRegion(String name, boolean requirePermission, long cooldownMillis) {
+        // Explicit shape/vert: Region's null shape/vert self-heal rebuilds settings without the cooldown.
+        RegionSettings settings = new RegionSettings(
+                name, null,
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square(),
+                new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(new ArrayList<>()),
+                false, requirePermission, 0, 0, 0, 0, 0.0, 0, null, false, cooldownMillis, null);
+        Region region = new Region(name, settings);
+        RTP.selectionAPI.permRegionLookup.put(name, region);
+        return region;
+    }
+
+    private static MockRTPPlayer cooldownSubject(String name, long globalCooldownMillis) {
+        MockRTPPlayer sender = new MockRTPPlayer(UUID.randomUUID(), name, null);
+        sender.setCooldown(globalCooldownMillis);
+        sender.setPermission("rtp.nocooldown", false);
+        sender.setPermission("rtp.noCooldown", false);
+        return sender;
+    }
+
     @Test
-    @DisplayName("RTP-32: bare /rtp early guard honours a shorter region cooldown override")
-    void testOnCommandBareRtpHonoursShorterRegionCooldownOverride() {
-        MockRTPPlayer sender = new MockRTPPlayer(UUID.randomUUID(), "shortRegionCooldownUser", null) {
-            @Override
-            public long cooldown() {
-                return 60000L; // global 60s
-            }
-        };
+    @DisplayName("RTP-32: /rtp region:<r> early guard applies the requested region's cooldown override")
+    void testOnCommandRequestedRegionCooldownOverrideRejectsEarly() {
+        MockRTPPlayer sender = cooldownSubject("longRegionCooldownUser", 5000L);
         accessor.addPlayer(sender);
+        Region longRegion = putOverrideRegion("rtp32Long", false, 120000L);
+        try {
+            TeleportData data = new TeleportData();
+            data.time = System.currentTimeMillis() - 10000L;
+            data.completed = true;
+            data.targetRegion = longRegion;
+            RTP.getInstance().latestTeleportData.put(sender.uuid(), data);
 
-        TeleportData data = new TeleportData();
-        data.time = System.currentTimeMillis() - 10000L; // last teleport 10s ago
-        data.completed = true;
-        io.github.dailystruggle.rtp.common.selection.region.Region targetRegion =
-                org.mockito.Mockito.mock(io.github.dailystruggle.rtp.common.selection.region.Region.class);
-        io.github.dailystruggle.rtp.common.selection.region.RegionSettings settings =
-                new io.github.dailystruggle.rtp.common.selection.region.RegionSettings(
-                        "shortRegion", null, null, null, false, false, 0, 0, 0, 0, 0.0, 0, null, false, 5000L, null);
-        org.mockito.Mockito.when(targetRegion.getSettings()).thenReturn(settings);
-        data.targetRegion = targetRegion;
-        RTP.getInstance().latestTeleportData.put(sender.uuid(), data);
+            assertTrue(rtpCmd.onCommand(sender, rtpCmd, "rtp", new String[]{"region:rtp32Long"}));
 
-        boolean result = rtpCmd.onCommand(sender, rtpCmd, "rtp", new String[0]);
-        assertTrue(result);
-        assertTrue(sender.sentMessages.stream().noneMatch(msg -> msg.toLowerCase(Locale.ROOT).contains("cooldown")),
-                "a 10s-old teleport must not be blocked by the 60s global cooldown when the region's 5s override has elapsed");
+            String cooldownMsg = (String) RTP.configs.getConfigValue(
+                    io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.cooldownMessage, "");
+            assertTrue(sender.sentMessages.contains(cooldownMsg),
+                    "10s after the last teleport, the requested region's 120s override must reject (global is 5s)");
+            assertSame(data, RTP.getInstance().latestTeleportData.get(sender.uuid()),
+                    "the early guard must reject before compute() replaces the teleport data");
+        } finally {
+            RTP.selectionAPI.permRegionLookup.remove("rtp32Long");
+        }
+    }
+
+    @Test
+    @DisplayName("RTP-32: requested region cooldown applies only to a permitted local region with an override")
+    void testRequestedRegionWithOverrideResolution() {
+        MockRTPPlayer sender = cooldownSubject("regionPermUser", 0L);
+        Region open = putOverrideRegion("rtp32Open", false, 5000L);
+        Region gated = putOverrideRegion("rtp32Gated", true, 5000L);
+        putOverrideRegion("rtp32NoOverride", false, -1L);
+        try {
+            assertSame(open, RTPCmd.requestedRegionWithOverride(sender, new String[]{"region:rtp32Open"}));
+            assertSame(open, RTPCmd.requestedRegionWithOverride(sender, new String[]{"REGION=rtp32Open"}));
+            assertNull(RTPCmd.requestedRegionWithOverride(sender, new String[0]), "bare /rtp requests no region");
+            assertNull(RTPCmd.requestedRegionWithOverride(sender, null));
+            assertNull(RTPCmd.requestedRegionWithOverride(sender, new String[]{"world:rtp32Open"}));
+            assertNull(RTPCmd.requestedRegionWithOverride(sender, new String[]{"region:rtp32NoOverride"}));
+            assertNull(RTPCmd.requestedRegionWithOverride(sender, new String[]{"region:unknownRegion"}));
+            assertNull(RTPCmd.requestedRegionWithOverride(sender, new String[]{"region:peer:rtp32Open"}));
+
+            sender.setPermission("rtp.regions.rtp32Gated", false);
+            sender.setPermission("rtp.regions.*", false);
+            assertNull(RTPCmd.requestedRegionWithOverride(sender, new String[]{"region:rtp32Gated"}),
+                    "a gated region the sender may not use must not set the cooldown");
+            sender.setPermission("rtp.regions.rtp32Gated", true);
+            assertSame(gated, RTPCmd.requestedRegionWithOverride(sender, new String[]{"region:rtp32Gated"}));
+
+            sender.setPermission("rtp.region", false);
+            assertNull(RTPCmd.requestedRegionWithOverride(sender, new String[]{"region:rtp32Open"}),
+                    "without rtp.region the region parameter is not usable");
+        } finally {
+            RTP.selectionAPI.permRegionLookup.remove("rtp32Open");
+            RTP.selectionAPI.permRegionLookup.remove("rtp32Gated");
+            RTP.selectionAPI.permRegionLookup.remove("rtp32NoOverride");
+        }
     }
 
     @Test

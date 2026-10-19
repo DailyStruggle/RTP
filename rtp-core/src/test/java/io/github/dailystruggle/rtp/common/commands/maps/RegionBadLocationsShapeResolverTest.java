@@ -85,7 +85,7 @@ class RegionBadLocationsShapeResolverTest {
 
   /** Reflectively seeds the per-run rejection-cause cache, aligned 1:1 with
    *  the bad-keys cache, so {@link MemoryShape#causeAt(long)} resolves each
-   *  seeded key to its recorded {@link io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes}. */
+   *  seeded key to its recorded {@link io.github.dailystruggle.rtp.common.selection.model.FailTypes}. */
   private static void seedBadCauses(MemoryShape<?> shape, byte[] causes) throws Exception {
     Field causesField = MemoryShape.class.getDeclaredField("badCauseCache");
     causesField.setAccessible(true);
@@ -173,7 +173,7 @@ class RegionBadLocationsShapeResolverTest {
     seedBadKeys(shape, keys);
 
     byte biomeCause =
-        (byte) io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.biome.ordinal();
+        (byte) io.github.dailystruggle.rtp.common.selection.model.FailTypes.biome.ordinal();
     byte[] causes = new byte[keys.length];
     java.util.Arrays.fill(causes, biomeCause);
     seedBadCauses(shape, causes);
@@ -185,7 +185,7 @@ class RegionBadLocationsShapeResolverTest {
     byte[] palette = rbl.palette();
 
     byte expected = RegionBadLocationsShapeResolver.causeColor(
-        io.github.dailystruggle.rtp.common.selection.region.LocationGenerator.FailTypes.biome.ordinal());
+        io.github.dailystruggle.rtp.common.selection.model.FailTypes.biome.ordinal());
     assertTrue(expected != PaletteIndex.RED,
         "biome cause shall map to a non-RED shade so it is distinguishable");
     assertTrue(countPalette(palette, expected) > 0,

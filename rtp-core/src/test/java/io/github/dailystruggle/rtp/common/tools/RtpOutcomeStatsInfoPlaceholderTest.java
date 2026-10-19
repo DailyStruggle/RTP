@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.common.tools;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats;
-import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,9 +45,9 @@ class RtpOutcomeStatsInfoPlaceholderTest {
     RtpOutcomeStats.GLOBAL.recordSuccess();
     RtpOutcomeStats.GLOBAL.recordSuccess();
     RtpOutcomeStats.GLOBAL.recordSuccess();
-    RtpOutcomeStats.GLOBAL.recordFailure(LocationGenerator.FailTypes.biome);
-    RtpOutcomeStats.GLOBAL.recordFailure(LocationGenerator.FailTypes.biome);
-    RtpOutcomeStats.GLOBAL.recordFailure(LocationGenerator.FailTypes.safetyExternal);
+    RtpOutcomeStats.GLOBAL.recordFailure(FailTypes.biome);
+    RtpOutcomeStats.GLOBAL.recordFailure(FailTypes.biome);
+    RtpOutcomeStats.GLOBAL.recordFailure(FailTypes.safetyExternal);
 
     assertEquals("50.0%", PlaceholderProvider.fillPlaceholders("[genSuccessRate]", ANY));
     assertEquals("50.0%", PlaceholderProvider.fillPlaceholders("[genFailureRate]", ANY));

@@ -98,11 +98,12 @@ class TeleportPipelineTaskRegionCenterTest {
                 false, false, 10L, 100L, 0L, 5, 0.0, 1L, "", false);
     }
 
-    private Region regionWithShape(String name, Shape<?> shape) {
+    // Parameter must not be named `shape`: Region's inherited field would shadow it in the subclass.
+    private Region regionWithShape(String name, Shape<?> forcedShape) {
         return new Region(name, settings(name)) {
             @Override
             public Shape<?> getShape() {
-                return shape;
+                return forcedShape;
             }
         };
     }

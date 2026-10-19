@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.selection.region.claim.ClaimAnchoredRegionTracker;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
+import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
@@ -143,7 +144,7 @@ public final class SubspaceAnchorResolver {
       return null;
     }
 
-    final byte safetyExternalByte = (byte) LocationGenerator.FailTypes.safetyExternal.ordinal();
+    final byte safetyExternalByte = (byte) FailTypes.safetyExternal.ordinal();
     String worldName = (region.getWorld() != null) ? region.getWorld().name() : "";
 
     for (int i = 0; i < causes.length && i < keys.length; i++) {
