@@ -2,7 +2,6 @@ package io.github.dailystruggle.rtp.neoforge.v26_1_R1;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.neoforge.version.NeoForgeVersionAdapter;
-import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;

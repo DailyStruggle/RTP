@@ -1842,40 +1842,11 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       writeLock.unlock();
     }
 
-    // 2. Convert Bad Location prefix sums back to discrete lengths, tagging each
-    //    run with its rejection cause (one cause per run; `misc` when unknown).
-    FailTypes[] failTypes = FailTypes.values();
-    java.util.List<java.util.Map<String, Object>> badList = new java.util.ArrayList<>();
-    long prev = 0L;
-    for (int i = 0; i < sBadKeys.length; i++) {
-      java.util.Map<String, Object> entry = new java.util.LinkedHashMap<>();
-      entry.put("start", sBadKeys[i]);
-      entry.put("length", sBadSums[i] - prev);
-      int causeOrd = (i < sBadCauses.length) ? (sBadCauses[i] & 0xFF) : (MISC_CAUSE & 0xFF);
-      String causeName = (causeOrd >= 0 && causeOrd < failTypes.length)
-          ? failTypes[causeOrd].name()
-          : FailTypes.misc.name();
-      entry.put("cause", causeName);
-      badList.add(entry);
-      prev = sBadSums[i];
-    }
+    // 2. Bad-location runs, each tagged with its rejection cause.
+    java.util.List<java.util.Map<String, Object>> badList = debugBadRuns(sBadKeys, sBadSums, sBadCauses);
 
-    // 3. Emit the union's runs grouped by owning biome. Extents are attributed, so a cell claimed
-    //    by two biomes appears under exactly the one biomeAt() reports.
-    java.util.Map<String, java.util.List<java.util.Map<String, Long>>> biomeMap = new java.util.LinkedHashMap<>();
-    String[] unionNames = sUnion.names();
-    for (int id = 0; id < unionNames.length; id++) {
-      BiomeUnionTable.BiomeView view = sUnion.viewOf(id);
-      if (view == null) continue;
-      java.util.List<java.util.Map<String, Long>> bList = new java.util.ArrayList<>();
-      for (int i = 0; i < view.length(); i++) {
-        java.util.Map<String, Long> entry = new java.util.LinkedHashMap<>();
-        entry.put("start", view.keyAt(i));
-        entry.put("length", view.widthAt(i));
-        bList.add(entry);
-      }
-      biomeMap.put(unionNames[id], bList);
-    }
+    // 3. Union runs grouped by owning biome.
+    java.util.Map<String, java.util.List<java.util.Map<String, Long>>> biomeMap = debugBiomeRuns(sUnion);
 
     // 4. Construct Root JSON Object
     java.util.Map<String, Object> root = new java.util.LinkedHashMap<>();
@@ -1888,7 +1859,10 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     // 5. Write to File
     java.io.File pluginDir = io.github.dailystruggle.rtp.common.RTP.serverAccessor.getPluginDirectory();
     java.io.File outDir = new java.io.File(pluginDir, "database" + java.io.File.separator + "regionData" + java.io.File.separator + "debug");
-    if (!outDir.exists()) outDir.mkdirs();
+    if (!outDir.isDirectory() && !outDir.mkdirs()) {
+      io.github.dailystruggle.rtp.common.RTP.log(java.util.logging.Level.WARNING, "Failed to write debug JSON: could not create " + outDir);
+      return;
+    }
     java.io.File outFile = new java.io.File(outDir, fileName);
 
     try (java.io.FileWriter writer = new java.io.FileWriter(outFile)) {
@@ -1897,6 +1871,53 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     } catch (java.io.IOException ex) {
       io.github.dailystruggle.rtp.common.RTP.log(java.util.logging.Level.WARNING, "Failed to write debug JSON: " + ex.getMessage(), ex);
     }
+  }
+
+  /**
+   * Converts bad-location prefix sums back to discrete run lengths, tagging each run with its
+   * rejection cause (one cause per run; {@code misc} when unknown or out of range).
+   */
+  private static java.util.List<java.util.Map<String, Object>> debugBadRuns(
+      long[] badKeys, long[] badSums, byte[] badCauses) {
+    FailTypes[] failTypes = FailTypes.values();
+    java.util.List<java.util.Map<String, Object>> badList = new java.util.ArrayList<>();
+    long prev = 0L;
+    for (int i = 0; i < badKeys.length; i++) {
+      java.util.Map<String, Object> entry = new java.util.LinkedHashMap<>();
+      entry.put("start", badKeys[i]);
+      entry.put("length", badSums[i] - prev);
+      int causeOrd = (i < badCauses.length) ? (badCauses[i] & 0xFF) : (MISC_CAUSE & 0xFF);
+      String causeName = (causeOrd < failTypes.length)
+          ? failTypes[causeOrd].name()
+          : FailTypes.misc.name();
+      entry.put("cause", causeName);
+      badList.add(entry);
+      prev = badSums[i];
+    }
+    return badList;
+  }
+
+  /**
+   * Emits the union's runs grouped by owning biome. Extents are attributed, so a cell claimed by
+   * two biomes appears under exactly the one {@code biomeAt()} reports.
+   */
+  private static java.util.Map<String, java.util.List<java.util.Map<String, Long>>> debugBiomeRuns(
+      BiomeUnionTable union) {
+    java.util.Map<String, java.util.List<java.util.Map<String, Long>>> biomeMap = new java.util.LinkedHashMap<>();
+    String[] unionNames = union.names();
+    for (int id = 0; id < unionNames.length; id++) {
+      BiomeUnionTable.BiomeView view = union.viewOf(id);
+      if (view == null) continue;
+      java.util.List<java.util.Map<String, Long>> bList = new java.util.ArrayList<>();
+      for (int i = 0; i < view.length(); i++) {
+        java.util.Map<String, Long> entry = new java.util.LinkedHashMap<>();
+        entry.put("start", view.keyAt(i));
+        entry.put("length", view.widthAt(i));
+        bList.add(entry);
+      }
+      biomeMap.put(unionNames[id], bList);
+    }
+    return biomeMap;
   }
 
   public CompletableFuture<Void> getLoadFuture() {

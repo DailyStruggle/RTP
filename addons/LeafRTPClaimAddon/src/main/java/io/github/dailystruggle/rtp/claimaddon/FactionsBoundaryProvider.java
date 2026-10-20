@@ -304,6 +304,9 @@ public class FactionsBoundaryProvider implements ClaimBoundaryProvider {
   private static final class BoardApi {
     private BoardApi() {}
 
+    // Deprecated only in SaberFactions (FLocation.wrap); FactionsUUID has no wrap, so the
+    // constructor is the one call shape both forks link against.
+    @SuppressWarnings("deprecation")
     static Object factionAt(String worldName, int chunkX, int chunkZ) {
       com.massivecraft.factions.Board board = com.massivecraft.factions.Board.getInstance();
       if (board == null) return null;

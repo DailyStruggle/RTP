@@ -58,6 +58,9 @@ public class SaberFactionsChecker {
   private static final class Api {
     private Api() {}
 
+    // Deprecated only in SaberFactions (FLocation.wrap); FactionsUUID shares this checker and has
+    // no wrap, so the constructor is the one call shape both forks link against.
+    @SuppressWarnings("deprecation")
     static boolean isInClaim(org.bukkit.Location location) {
       Board board = Board.getInstance();
       if (board == null) throw new IllegalStateException("Board.getInstance() is null");

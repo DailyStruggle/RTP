@@ -11,7 +11,6 @@ import io.github.dailystruggle.rtp.common.world.BiomeOverride;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter;
-import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.core.BlockPos;
