@@ -106,8 +106,10 @@ dependencies {
     testImplementation 'com.sk89q.worldedit:worldedit-bukkit:7.3.0'
     testImplementation 'net.kyori:adventure-api:4.17.0'
     testImplementation 'pl.minecodes.plots:plugin-api:4.6.2'
-    testImplementation 'com.intellectualsites.plotsquared:plotsquared-core:7.6.0', { transitive = false }
-    testImplementation files(claimPluginApiClasses)
+    // HuskClaims, HuskTowns, Residence, SaberFactions, PlotSquared, GriefDefender, RedProtect,
+    // Lands, CrashClaim, KingdomsX, UltimateClaims and FactionsBridge run against test-source
+    // stand-ins with the API's class names and call shapes: the real classes need their plugin's
+    // runtime (CMILib, MiniMessage, a Bukkit plugin loader) to load or be mocked.
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
