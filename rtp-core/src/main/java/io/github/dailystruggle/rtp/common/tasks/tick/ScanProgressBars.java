@@ -4,7 +4,7 @@ import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.api.server.ProgressBar;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.tasks.scan.ScanTask;
-import io.github.dailystruggle.rtp.common.tools.PlaceholderProvider;
+import io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider;
 
 import java.util.HashMap;
 import java.util.Map;

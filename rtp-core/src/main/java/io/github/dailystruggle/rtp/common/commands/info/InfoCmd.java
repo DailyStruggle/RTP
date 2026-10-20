@@ -10,7 +10,7 @@ import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.tools.PlaceholderProvider;
+import io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider;
 import io.github.dailystruggle.rtp.api.DownloadInfo;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import java.util.*;
@@ -263,7 +263,7 @@ public class InfoCmd extends BaseRTPCmdImpl {
       // region runtimes), so this whole block is a no-op there. Empty templates
       // skip silently for locales that haven't merged the new keys.
       List<io.github.dailystruggle.metrics.api.FoliaRegionSample> foliaRegions =
-          io.github.dailystruggle.rtp.common.tools.PlaceholderProvider.currentSnapshot().foliaRegions;
+          io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider.currentSnapshot().foliaRegions;
       if (!foliaRegions.isEmpty()) {
         String infoFoliaRegionsHeader = RTP.configs.getConfigValue(CommandMessages.infoFoliaRegionsHeader, "").toString();
         String infoFoliaRegion = RTP.configs.getConfigValue(CommandMessages.infoFoliaRegion, "").toString();

@@ -6,7 +6,7 @@ import io.github.dailystruggle.rtp.bukkitplatform.tools.softdepends.PAPIChecker;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.tools.GradientExpander;
-import io.github.dailystruggle.rtp.common.tools.PlaceholderProvider;
+import io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;

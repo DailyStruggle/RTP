@@ -428,4 +428,20 @@ public class RTPArchitectureTest {
                                     JavaClass.Predicates.resideOutsideOfPackage(
                                             "io.github.dailystruggle.rtp.common.selection.model..")))
                     .because("ADR-115 Tier 1: shared selection value types have no core dependencies.");
+
+    /**
+     * Rule 19 - Tools Stay Below Regions (ADR-115, RTP-67).
+     *
+     * <p>Regions use the trackers, health gates and diagnostics in {@code tools}. The
+     * {@code MemoryTracker} census reads regions through {@code tools.TicketCensusRegion} views,
+     * and {@code PlaceholderProvider}, which renders region stats, lives in {@code placeholders}.
+     */
+    @ArchTest
+    static final ArchRule tools_must_not_depend_on_region_classes =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.tools..")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("io.github.dailystruggle.rtp.common.selection.region")
+                    .because("ADR-115: selection.region depends on tools, so tools must not "
+                            + "depend back on it.");
 }

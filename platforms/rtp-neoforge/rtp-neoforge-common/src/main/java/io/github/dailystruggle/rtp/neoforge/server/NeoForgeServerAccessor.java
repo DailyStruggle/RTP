@@ -18,7 +18,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shap
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
-import io.github.dailystruggle.rtp.common.tools.PlaceholderProvider;
+import io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider;
 import io.github.dailystruggle.rtp.neoforge.player.NeoForgeRTPPlayer;
 import io.github.dailystruggle.rtp.neoforge.scheduling.NeoForgeScheduler;
 import io.github.dailystruggle.rtp.neoforge.tools.NeoForgeAnsiText;

@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.common.tools;
+package io.github.dailystruggle.rtp.common.placeholders;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
