@@ -676,7 +676,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
           msg = msg.replace("[scan_totalChunks]", String.valueOf(this.latestAbsoluteTotal));
           msg = msg.replace("[scan_cps]", String.valueOf(windowCps));
           msg = msg.replace("[scan_landPercentage]", String.format(java.util.Locale.ROOT, "%.2f", landPercentage));
-          msg = msg.replace("[scan_eta]", io.github.dailystruggle.rtp.common.tools.PlaceholderProvider.formatEta(etaSeconds));
+          msg = msg.replace("[scan_eta]", io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider.formatEta(etaSeconds));
           RTP.serverAccessor.announce(msg, "rtp.scan", "");
         }
 

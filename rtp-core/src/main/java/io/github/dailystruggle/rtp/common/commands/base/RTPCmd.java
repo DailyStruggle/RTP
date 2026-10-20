@@ -110,6 +110,66 @@ public interface RTPCmd extends BaseRTPCmd {
   }
 
   /**
+   * Resolves the world-default region a bare {@code /rtp} would target (as {@code compute()} does
+   * without a {@code region}/{@code world} argument), or {@code null} when it cannot be resolved.
+   *
+   * @param sender the command sender; only an {@link RTPPlayer} with a location resolves
+   * @return the sender's world-default region, or {@code null}
+   */
+  static Region worldDefaultRegion(RTPCommandSender sender) {
+    if (!(sender instanceof RTPPlayer player) || RTP.configs == null || RTP.selectionAPI == null) {
+      return null;
+    }
+    var location = player.getLocation();
+    if (location == null || location.world() == null) return null;
+    ConfigParser<WorldKeys> worldParser = RTP.configs.getWorldParser(location.world().name());
+    if (worldParser == null) return null;
+    Object regionName = worldParser.getConfigValue(WorldKeys.region, "default");
+    return (regionName == null) ? null : RTP.selectionAPI.getRegion(regionName.toString());
+  }
+
+  /**
+   * Remaining cooldown (ms) before {@code playerId} may teleport into {@code region}; 0 = allowed.
+   * A requested region with a cooldown override uses that override alone. An unrequested
+   * (world-default) region with an override passes once either its override or the global
+   * cooldown has expired: the shorter wait wins (RTP-32). Without an override the global
+   * cooldown applies. Region time falls back to {@code prior} when no per-region time is recorded.
+   *
+   * @param subject   sender whose permissions and global cooldown apply
+   * @param playerId  the teleported player
+   * @param region    destination region, may be {@code null} (global cooldown only)
+   * @param requested whether the region was named explicitly ({@code region:<name>})
+   * @param prior     the player's previous teleport data, may be {@code null}
+   * @param now       current epoch millis
+   * @return remaining milliseconds, never negative
+   */
+  static long cooldownRemaining(RTPCommandSender subject, UUID playerId, Region region,
+      boolean requested, TeleportData prior, long now) {
+    if (subject == null) return 0L;
+    long globalLast = (prior != null && prior.time > 0L)
+        ? prior.time : RTP.getEffectiveLastTeleportTime(playerId);
+    long globalRemaining = remainingAfter(RTP.getCooldown(subject, null), globalLast, now);
+    RegionSettings settings = (region == null) ? null : region.getSettings();
+    if (settings == null || settings.cooldownMillis() == null || settings.cooldownMillis() < 0) {
+      return globalRemaining;
+    }
+    long regionLast = RTP.getLastRegionTeleportTime(playerId, region.name);
+    if (regionLast <= 0L && prior != null && prior.completed
+        && (prior.targetRegion == null || region.name.equalsIgnoreCase(prior.targetRegion.name))) {
+      regionLast = prior.time;
+    }
+    long regionRemaining = remainingAfter(RTP.getCooldown(subject, settings), regionLast, now);
+    return requested ? regionRemaining : Math.min(regionRemaining, globalRemaining);
+  }
+
+  private static long remainingAfter(long cooldown, long last, long now) {
+    if (cooldown <= 0L || last <= 0L) return 0L;
+    long elapsed = now - last;
+    if (elapsed < 0L) return 0L; // clock skew: treat as elapsed, as the dt overflow guard did
+    return Math.max(0L, cooldown - elapsed);
+  }
+
+  /**
    * Resolves relative coordinate tokens (~, ~n, -~, -~n) against a base coordinate.
    * Tokens without ~ are parsed as absolute numbers.
    *
@@ -273,26 +333,20 @@ public interface RTPCmd extends BaseRTPCmd {
         }
       }
 
-      // A permitted, explicitly requested region with a cooldown override is guarded by that
-      // override (same rules as compute()); other target args are left to compute().
+      // Same rules as compute() (cooldownRemaining): a permitted requested region with an override
+      // uses that override; bare /rtp uses the shorter of global and world-default override.
+      // Other target args are left to compute().
       Region requestedRegion = hasSubCommand ? null : requestedRegionWithOverride(sender, args);
       if (!hasSubCommand && (!hasTargetArg || requestedRegion != null)) {
-        long cd = sender.cooldown();
-        if (requestedRegion != null) {
-          cd = RTP.getCooldown(sender, requestedRegion.getSettings());
-          long lastRegionTp = RTP.getLastRegionTeleportTime(senderId, requestedRegion.name);
-          if (lastRegionTp <= 0L && senderData.completed && (senderData.targetRegion == null
-              || requestedRegion.name.equalsIgnoreCase(senderData.targetRegion.name))) {
-            lastRegionTp = senderData.time;
-          }
-          dt = (lastRegionTp > 0L) ? System.currentTimeMillis() - lastRegionTp : Long.MAX_VALUE;
-          if (dt < 0) dt = Long.MAX_VALUE + dt;
-        }
-        if (dt < cd) {
+        Region guardRegion = (requestedRegion != null) ? requestedRegion : worldDefaultRegion(sender);
+        long remaining = cooldownRemaining(sender, senderId, guardRegion, requestedRegion != null,
+            senderData, System.currentTimeMillis());
+        if (remaining > 0L) {
           String msg = (String) RTP.configs.getConfigValue(PlayerMessages.cooldownMessage, "");
           messageMethod.accept(msg);
           RTP.log(Level.FINE, "[ENQUEUE_TRACE] RTPCmd.onCommand REJECT cooldown senderId=" + senderId
-                  + " dtMs=" + dt + " cooldownMs=" + cd);
+                  + " dtMs=" + dt + " remainingMs=" + remaining
+                  + " region=" + (guardRegion == null ? "null" : guardRegion.name));
           return true;
         } else if (senderData.completed) { // resolve command bugs preemptively
           RTP.getInstance().processingPlayers.remove(senderId);
@@ -642,6 +696,7 @@ public interface RTPCmd extends BaseRTPCmd {
         RTP.getInstance().priorTeleportData.put(player.uuid(), data);
       }
 
+      TeleportData prior = data;
       data = new TeleportData();
       io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(data, "TeleportData-" + player.uuid().toString(), 120000L);
       data.sender = sender;
@@ -762,33 +817,17 @@ public interface RTPCmd extends BaseRTPCmd {
 
       // Cooldown guard:
       RTPCommandSender cooldownSubject = (toggleTargetPerms) ? player : sender;
-      RegionSettings regSettings = region.getSettings();
-      boolean hasRegionOverride = (regSettings != null && regSettings.cooldownMillis() != null && regSettings.cooldownMillis() >= 0);
-      long targetCooldown = RTP.getCooldown(cooldownSubject, regSettings);
-      if (targetCooldown > 0) {
-        long lastTpTime;
-        if (hasRegionOverride) {
-          lastTpTime = RTP.getLastRegionTeleportTime(player.uuid(), region.name);
-        } else if (data != null && data.time > 0) {
-          lastTpTime = data.time;
-        } else {
-          lastTpTime = RTP.getEffectiveLastTeleportTime(player.uuid());
-        }
-        if (hasRegionOverride && lastTpTime <= 0L && data != null && data.completed && (data.targetRegion == null || region.name.equalsIgnoreCase(data.targetRegion.name))) {
-          lastTpTime = data.time;
-        }
-        if (lastTpTime > 0L) {
-          long dtReg = System.currentTimeMillis() - lastTpTime;
-          if (dtReg < 0) dtReg = Long.MAX_VALUE + dtReg;
-          if (dtReg < targetCooldown) {
-            String msg = (String) RTP.configs.getConfigValue(PlayerMessages.cooldownMessage, "");
-            if (messageMethod != null) messageMethod.accept(msg);
-            else RTP.serverAccessor.sendMessage(senderId, player.uuid(), msg);
-            RTP.getInstance().processingPlayers.remove(senderId);
-            RTP.getInstance().latestTeleportData.remove(player.uuid());
-            return true;
-          }
-        }
+      // Requested region -> its override; world-default region -> shorter of override and global.
+      // Measured against the previous teleport (prior), not the TeleportData created above.
+      long remainingCooldown = RTPCmd.cooldownRemaining(cooldownSubject, player.uuid(), region,
+          rtpArgs.containsKey("region"), prior, System.currentTimeMillis());
+      if (remainingCooldown > 0L) {
+        String msg = (String) RTP.configs.getConfigValue(PlayerMessages.cooldownMessage, "");
+        if (messageMethod != null) messageMethod.accept(msg);
+        else RTP.serverAccessor.sendMessage(senderId, player.uuid(), msg);
+        RTP.getInstance().processingPlayers.remove(senderId);
+        RTP.getInstance().latestTeleportData.remove(player.uuid());
+        return true;
       }
 
       // Sender charge. Routes through the single EconomyGate so the price math,

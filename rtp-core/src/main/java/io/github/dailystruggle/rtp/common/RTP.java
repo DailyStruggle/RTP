@@ -300,6 +300,9 @@ public class RTP {
     // Same for the scan and teleport tasks a Region starts: every Region path reads RTP statics
     // before dispatching, so this class is initialised first.
     Region.setTaskDispatcher(new io.github.dailystruggle.rtp.common.lifecycle.RegionTaskCoordinator());
+    // MemoryTracker (tools) counts region queues through views it owns, not Region itself.
+    MemoryTracker.setRegionSource(
+        io.github.dailystruggle.rtp.common.selection.region.RegionTicketCensus::allRegions);
 
     // --- INJECT IMPLEMENTATIONS INTO THE API ---
     // Two-tier API model: custom Shape / VerticalAdjustor registration is an

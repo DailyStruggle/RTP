@@ -204,7 +204,7 @@ public class InfoCmdTest {
      * {@link MetricsSnapshot} round-trip (i.e. one call into the installed
      * {@link io.github.dailystruggle.metrics.api.MetricsBinding}), regardless
      * of how many metrics-backed placeholders the rendered messages contain.
-     * Anchored in {@link io.github.dailystruggle.rtp.common.tools.PlaceholderProvider#withSnapshot}.
+     * Anchored in {@link io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider#withSnapshot}.
      */
     @Test
     void onCommand_snapshotsMetricsExactlyOncePerInvocation() {

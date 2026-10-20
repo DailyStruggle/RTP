@@ -2,13 +2,13 @@ package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
-import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.text.MessageFormat;
@@ -21,6 +21,19 @@ public class MemoryTracker {
 
   /** Configurable memory ceiling / buffer quota in bytes. -1L indicates unlimited. */
   private static volatile long memoryCeilingBytes = -1L;
+
+  /** Regions the diagnostics sweep counts; installed by the composition root (ADR-115). */
+  private static volatile java.util.function.Supplier<? extends Collection<? extends TicketCensusRegion>>
+      regionSource = Collections::emptyList;
+
+  /**
+   * Installs the supplier of regions for the chunk-ticket census and orphan sweep. Called once
+   * from {@code RTP} static init; the supplier must not return {@code null}.
+   */
+  public static void setRegionSource(
+      java.util.function.Supplier<? extends Collection<? extends TicketCensusRegion>> source) {
+    regionSource = Objects.requireNonNull(source, "source");
+  }
 
   private static void log(Level level, String pattern, Object... args) {
     RTP.log(level, MessageFormat.format(pattern, args));
@@ -403,46 +416,14 @@ public class MemoryTracker {
       long totalActiveChunkCap = 0;
 
       // Combine permanent and temporary regions for full visibility
-      List<Region> allRegions = new ArrayList<>(RTP.selectionAPI.permRegionLookup.values());
-      allRegions.addAll(RTP.selectionAPI.tempRegions.values());
+      List<TicketCensusRegion> allRegions = new ArrayList<>(regionSource.get());
 
-      for (Region region : allRegions) {
-        RegionSettings settings = region.getSettings();
-        totalCacheCap += settings.cacheCap();
-        totalCacheCap += settings.activeChunkCap();
-        // Account for backlog capacity in the global cache budget (ADR-028).
-        totalCacheCap += settings.backlogCacheCap();
-        totalActiveChunkCap += settings.activeChunkCap();
-
-        totalLocationQueueSize += region.queueManager.keptLocations.size();
-        totalLocationQueueSize += region.queueManager.unkeptLocations.size();
-        if (region.queueManager.backlogLocations != null) {
-          totalLocationQueueSize += region.queueManager.backlogLocations.size();
-        }
-        for (java.util.concurrent.ConcurrentLinkedQueue<RTPLocation> queue : region.queueManager.getPerPlayerQueues()) {
-          totalPerPlayerLocationQueueSize += queue.size();
-        }
-
-        // 1. Count temporary in-flight generation chunks
-        // (Tracking removed)
-
-        // 2. Count chunks locked in the public hot queue
-        int keptSize = region.queueManager.keptLocations.size();
-        for (int i = 0; i < keptSize; i++) {
-          RTPLocation loc = region.queueManager.keptLocations.get(i);
-          if (loc != null && loc.reservation() != null && loc.reservation().getChunkSet() != null) {
-            trackedTickets += loc.reservation().getChunkSet().chunks().size();
-          }
-        }
-
-        // 3. Count chunks locked in private queues
-        for (java.util.concurrent.ConcurrentLinkedQueue<RTPLocation> queue : region.queueManager.getPerPlayerQueues()) {
-          for (RTPLocation loc : queue) {
-            if (loc != null && loc.reservation() != null && loc.reservation().getChunkSet() != null) {
-              trackedTickets += loc.reservation().getChunkSet().chunks().size();
-            }
-          }
-        }
+      for (TicketCensusRegion region : allRegions) {
+        totalCacheCap += region.cacheBudget();
+        totalActiveChunkCap += region.activeChunkCap();
+        totalLocationQueueSize += region.queuedLocations();
+        totalPerPlayerLocationQueueSize += region.perPlayerLocations();
+        trackedTickets += region.reservedChunkTickets();
       }
 
       long activeTickets = 0;
@@ -502,37 +483,17 @@ public class MemoryTracker {
           // Build a per-world map of keep-alive chunk keys across all regions
           java.util.Map<RTPWorld<?>, java.util.Set<Long>> keepAliveByWorld = new java.util.HashMap<>();
 
-          for (Region sweepRegion : allRegions) {
+          for (TicketCensusRegion sweepRegion : allRegions) {
             // Gate the sweep to prevent race conditions with asynchronous location generation
             // Pending kept promotions hold tickets not yet in keptLocations; sweeping would drop them.
-            if (sweepRegion.inFlightCalculations.get() > 0
-                || sweepRegion.pendingKeptPromotions.get() > 0) continue;
+            if (sweepRegion.generationInFlight()) continue;
 
-            RTPWorld<?> sweepWorld = sweepRegion.getWorld();
+            RTPWorld<?> sweepWorld = sweepRegion.world();
             if (sweepWorld == null) continue;
 
             java.util.Set<Long> keepAliveKeys = keepAliveByWorld.computeIfAbsent(sweepWorld, w -> new java.util.HashSet<>());
-
-            // 1. Map public fast queue coordinates
-            int keptSize = sweepRegion.queueManager.keptLocations.size();
-            for (int i = 0; i < keptSize; i++) {
-              RTPLocation loc = sweepRegion.queueManager.keptLocations.get(i);
-              if (loc != null && loc.coords() != null) keepAliveKeys.add(loc.coords().getChunkKey());
-            }
-
-            // 2. Map private fast queue coordinates
-            for (java.util.concurrent.ConcurrentLinkedQueue<RTPLocation> queue : sweepRegion.queueManager.getPerPlayerQueues()) {
-              for (RTPLocation loc : queue) {
-                if (loc != null && loc.coords() != null) keepAliveKeys.add(loc.coords().getChunkKey());
-              }
-            }
-
-            // 3. Map pipeline teleport destinations
-            for (io.github.dailystruggle.rtp.common.playerData.TeleportData data : RTP.getInstance().latestTeleportData.values()) {
-              if (data != null && data.selectedCoords != null && !data.completed && data.targetRegion == sweepRegion) {
-                keepAliveKeys.add(data.selectedCoords.getChunkKey());
-              }
-            }
+            // Queued locations and pipeline teleport destinations
+            sweepRegion.collectKeepAliveChunkKeys(keepAliveKeys);
           }
 
           // 3b. Keep chunks pinned by pending post-arrival holds (worlds already being swept)

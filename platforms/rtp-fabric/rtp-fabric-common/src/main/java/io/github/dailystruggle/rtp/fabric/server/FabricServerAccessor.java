@@ -20,7 +20,7 @@ import io.github.dailystruggle.rtp.fabric.player.FabricRTPPlayer;
 import io.github.dailystruggle.rtp.fabric.scheduling.FabricScheduler;
 import io.github.dailystruggle.rtp.fabric.tools.FabricAnsiText;
 import io.github.dailystruggle.rtp.fabric.world.FabricRTPWorld;
-import io.github.dailystruggle.rtp.common.tools.PlaceholderProvider;
+import io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import net.fabricmc.loader.api.FabricLoader;

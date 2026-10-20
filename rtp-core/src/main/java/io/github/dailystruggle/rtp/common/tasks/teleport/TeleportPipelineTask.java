@@ -471,7 +471,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
         text = text.replace(token, val);
       }
     }
-    return io.github.dailystruggle.rtp.common.tools.PlaceholderProvider.fillPlaceholders(text, playerId);
+    return io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider.fillPlaceholders(text, playerId);
   }
 
   public void setPhase(Phase phase) {

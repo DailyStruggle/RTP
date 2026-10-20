@@ -1,4 +1,4 @@
-package io.github.dailystruggle.rtp.common.tools;
+package io.github.dailystruggle.rtp.common.placeholders;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.PlaceholderMessages;
 import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
@@ -19,6 +19,9 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.tasks.ScanProgressView;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.TrackableTask;
+import io.github.dailystruggle.rtp.common.tools.ColourBands;
+import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
+import io.github.dailystruggle.rtp.common.tools.ParseString;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;

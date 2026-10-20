@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.common.commands.info;
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
-import io.github.dailystruggle.rtp.common.tools.PlaceholderProvider;
+import io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import java.util.List;

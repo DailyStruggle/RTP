@@ -225,6 +225,72 @@ class RTPCmdBranchTest {
         }
     }
 
+    private static TeleportData completedTeleport(Region target, long time) {
+        TeleportData data = new TeleportData();
+        data.time = time;
+        data.completed = true;
+        data.targetRegion = target;
+        return data;
+    }
+
+    @Test
+    @DisplayName("RTP-32: bare /rtp passes once the shorter of global and world-default region cooldown expires")
+    void testCooldownRemainingUnrequestedRegionUsesShorter() {
+        long now = System.currentTimeMillis();
+        Region shortRegion = putOverrideRegion("rtp32Short", false, 5000L);
+        Region longRegion = putOverrideRegion("rtp32LongDefault", false, 120000L);
+        Region midRegion = putOverrideRegion("rtp32Mid", false, 30000L);
+        try {
+            MockRTPPlayer globalLong = cooldownSubject("globalLongUser", 60000L);
+            assertEquals(0L, RTPCmd.cooldownRemaining(globalLong, globalLong.uuid(), shortRegion, false,
+                    completedTeleport(shortRegion, now - 10000L), now),
+                    "region 5s elapsed: global 60s must not hold bare /rtp");
+
+            MockRTPPlayer globalShort = cooldownSubject("globalShortUser", 5000L);
+            assertEquals(0L, RTPCmd.cooldownRemaining(globalShort, globalShort.uuid(), longRegion, false,
+                    completedTeleport(longRegion, now - 10000L), now),
+                    "global 5s elapsed: region 120s must not hold bare /rtp");
+
+            assertEquals(20000L, RTPCmd.cooldownRemaining(globalLong, globalLong.uuid(), midRegion, false,
+                    completedTeleport(midRegion, now - 10000L), now),
+                    "neither elapsed: the shorter (30s region) remainder applies");
+        } finally {
+            RTP.selectionAPI.permRegionLookup.remove("rtp32Short");
+            RTP.selectionAPI.permRegionLookup.remove("rtp32LongDefault");
+            RTP.selectionAPI.permRegionLookup.remove("rtp32Mid");
+        }
+    }
+
+    @Test
+    @DisplayName("RTP-32: a requested region uses its own cooldown override, longer or shorter than global")
+    void testCooldownRemainingRequestedRegionUsesItsOverride() {
+        long now = System.currentTimeMillis();
+        Region shortRegion = putOverrideRegion("rtp32ReqShort", false, 5000L);
+        Region longRegion = putOverrideRegion("rtp32ReqLong", false, 120000L);
+        Region plain = putOverrideRegion("rtp32ReqPlain", false, -1L);
+        try {
+            MockRTPPlayer globalLong = cooldownSubject("reqGlobalLongUser", 60000L);
+            assertEquals(0L, RTPCmd.cooldownRemaining(globalLong, globalLong.uuid(), shortRegion, true,
+                    completedTeleport(shortRegion, now - 10000L), now),
+                    "requested 5s region: global 60s must not apply");
+
+            MockRTPPlayer globalShort = cooldownSubject("reqGlobalShortUser", 5000L);
+            assertEquals(110000L, RTPCmd.cooldownRemaining(globalShort, globalShort.uuid(), longRegion, true,
+                    completedTeleport(longRegion, now - 10000L), now),
+                    "requested 120s region: an elapsed 5s global must not release it");
+
+            assertEquals(50000L, RTPCmd.cooldownRemaining(globalLong, globalLong.uuid(), plain, true,
+                    completedTeleport(plain, now - 10000L), now),
+                    "a region without an override falls back to the global cooldown");
+            assertEquals(0L, RTPCmd.cooldownRemaining(globalLong, globalLong.uuid(), null, false, null, now),
+                    "no prior teleport: nothing to wait for");
+        } finally {
+            RTP.selectionAPI.permRegionLookup.remove("rtp32ReqShort");
+            RTP.selectionAPI.permRegionLookup.remove("rtp32ReqLong");
+            RTP.selectionAPI.permRegionLookup.remove("rtp32ReqPlain");
+        }
+    }
+
     @Test
     void testOnCommandAlreadyTeleporting() {
         MockRTPPlayer sender = new MockRTPPlayer(UUID.randomUUID(), "busyUser", null);
