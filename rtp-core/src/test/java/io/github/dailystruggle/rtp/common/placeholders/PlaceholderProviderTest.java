@@ -15,7 +15,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.*;
-import io.github.dailystruggle.rtp.common.tools.ParseString;
 
 /**
  * Tests for {@link PlaceholderProvider} covering:

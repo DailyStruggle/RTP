@@ -26,7 +26,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import io.github.dailystruggle.rtp.common.configuration.Messages;
-import io.github.dailystruggle.rtp.common.selection.model.BiomeNames;
 public interface RTPCmd extends BaseRTPCmd {
 
   /**

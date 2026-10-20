@@ -1,6 +1,5 @@
 package io.github.dailystruggle.rtp.common.metrics.bstats;
 
-import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 
 /**
  * Centralised constants for the bStats chart IDs registered by RTP.

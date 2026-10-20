@@ -24,8 +24,6 @@ import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.selection.region.GroupPlacementDispatcher;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
-import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
-import io.github.dailystruggle.rtp.common.selection.region.SubspaceShape;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
