@@ -107,16 +107,13 @@ public class PlaceholderProvider {
 
     /**
      * Point-in-time pipeline-latency percentiles (ADR-053 section 1). Reads the
-     * {@code CoreMetrics}-owned {@link io.github.dailystruggle.rtp.common.metrics.PipelineHistogram}
-     * when the live {@code Metrics} is the core implementation; otherwise returns an all-{@code NaN}
-     * (zero-sample) snapshot. Never returns {@code null}.
+     * {@code CoreMetrics}-owned {@link io.github.dailystruggle.rtp.common.metrics.PipelineHistogram};
+     * if the read throws, returns an all-{@code NaN} (zero-sample) snapshot. Never returns
+     * {@code null}.
      */
     private static io.github.dailystruggle.rtp.common.metrics.PipelineHistogram.Percentiles currentPercentiles() {
         try {
-            if (RTP.metrics instanceof io.github.dailystruggle.rtp.common.metrics.CoreMetrics) {
-                return ((io.github.dailystruggle.rtp.common.metrics.CoreMetrics) RTP.metrics)
-                        .pipelineHistogram().percentiles();
-            }
+            return RTP.metrics.pipelineHistogram().percentiles();
         } catch (Throwable ignored) {
             // fall through to the empty readout
         }
@@ -400,10 +397,6 @@ public class PlaceholderProvider {
                     if (RTP.getInstance() == null) return "0";
                     return String.valueOf(RTP.getInstance().latestTeleportData.values().stream().filter(teleportData -> !teleportData.completed).count());
                 });
-
-        placeholders.put(
-                "mspt",
-                uuid -> String.format("%.4f", io.github.dailystruggle.rtp.common.tools.PerformanceTracker.pluginMSPT));
 
         placeholders.put(
                 "loads",
@@ -1243,7 +1236,6 @@ public class PlaceholderProvider {
         return null;
     }
 
-    /** Two-decimal percent with a trailing {@code %}; {@code "N/A"} when not sampled. */
     /**
      * Format seconds into a human-readable ETA string using configured time unit labels.
      *
@@ -1269,13 +1261,14 @@ public class PlaceholderProvider {
         if (minutes > 0) {
             sb.append(minutes).append(RTP.configs.getConfigValue(PlayerMessages.minutes, "m")).append(" ");
         }
-        if (seconds > 0 || sb.length() == 0) {
+        if (seconds > 0 || sb.isEmpty()) {
             sb.append(seconds).append(RTP.configs.getConfigValue(PlayerMessages.seconds, "s"));
         }
 
         return sb.toString().trim();
     }
 
+    /** Two-decimal percent with a trailing {@code %}; {@code "N/A"} when not sampled. */
     public static String formatPercent(double v) {
         if (Double.isNaN(v) || Double.isInfinite(v)) return "N/A";
         return String.format(java.util.Locale.ROOT, "%.2f%%", v);
@@ -1399,7 +1392,7 @@ public class PlaceholderProvider {
                 try {
                     index = Integer.parseInt(text, i + 2, j, 10);
                 } catch (NumberFormatException ignored) {
-                    index = -1;
+                    // overflow: keep the -1 sentinel
                 }
             }
             String replacement = replacer.apply(index);

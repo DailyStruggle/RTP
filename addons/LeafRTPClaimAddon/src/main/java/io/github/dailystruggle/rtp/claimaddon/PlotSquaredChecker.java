@@ -45,10 +45,12 @@ public class PlotSquaredChecker {
    *     enabled
    */
   public static Boolean isInClaim(org.bukkit.Location location) {
-    if (location == null || location.getWorld() == null) return false;
+    if (location == null) return false;
+    org.bukkit.World world = location.getWorld();
+    if (world == null) return false;
     if (!ClaimPlugins.isEnabled(PLUGIN_NAME)) return false;
     try {
-      return Api.isInClaim(location);
+      return Api.isInClaim(world.getName(), location);
     } catch (Throwable t) {
       return ClaimCheckFailure.handle(PLUGIN_NAME, t);
     }
@@ -58,14 +60,13 @@ public class PlotSquaredChecker {
   private static final class Api {
     private Api() {}
 
-    static boolean isInClaim(org.bukkit.Location location) {
+    static boolean isInClaim(String worldName, org.bukkit.Location location) {
       com.plotsquared.core.location.Location pLoc =
           com.plotsquared.core.location.Location.at(
-              location.getWorld().getName(),
+              worldName,
               location.getBlockX(),
               location.getBlockY(),
               location.getBlockZ());
-      if (pLoc == null) throw new IllegalStateException("Location.at(...) is null");
       if (pLoc.isPlotRoad()) return true;
       Plot plot = pLoc.getPlot();
       return plot != null && plot.hasOwner();

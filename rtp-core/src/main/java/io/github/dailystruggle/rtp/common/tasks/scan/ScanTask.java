@@ -205,7 +205,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
   // exceed finalPos1 and clamp land% to 0.00%.
   private final AtomicLong scanGoodCount = new AtomicLong(0L);
   private final AtomicLong scanBadCount = new AtomicLong(0L);
-  public volatile double latestLandPercentage = 0.0;
+  public volatile double latestLandPercentage;
 
   // Tracks whether the "prescan starting" announcement has been emitted for
   // this task instance. Symmetric with the existing "prescan complete; starting
@@ -944,12 +944,11 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
     // recover (shrink) once recent batches catch up to the cumulative average.
     long cumulativeAvg = cps_divisor.signum() > 0 ? cps_all.divide(cps_divisor).longValue() : 0L;
     long ewma = cps.get();
-    long batch = Math.max(1L, cpsLocal);
-    long minCps = batch;
+    // Every candidate is >= 1, so the minimum is a safe non-zero divisor.
+    long minCps = Math.max(1L, cpsLocal);
     if (cumulativeAvg > 0) minCps = Math.min(minCps, cumulativeAvg);
     if (ewma > 0) minCps = Math.min(minCps, ewma);
-    long currentPointsPerSecond = Math.max(1L, minCps);
-    return estimatedActivePointsRemaining / currentPointsPerSecond;
+    return estimatedActivePointsRemaining / minCps;
   }
 
   public void save() {
@@ -964,7 +963,10 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
             + " phase=" + scanPhase.get());
     File pluginDir = RTP.serverAccessor.getPluginDirectory();
     File dir = new File(pluginDir, "database" + File.separator + "regionData");
-    if (!dir.exists()) dir.mkdirs();
+    if (!dir.isDirectory() && !dir.mkdirs()) {
+      RTP.log(Level.WARNING, "[ScanTask] save() could not create " + dir + "; progress not saved for region=" + region.name);
+      return;
+    }
     File file = new File(dir, region.name + "_" + region.cacheKey() + ".scan");
 
     try (java.io.FileOutputStream out = new java.io.FileOutputStream(file)) {
@@ -1193,7 +1195,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
       // 1. Check if chunk is generated on disk.
       // 2. If generated, attempt off-tick region-file column probe first.
       // 3. If ungenerated or probe UNKNOWN / unreadable, route to full-load path.
-      boolean generated = true;
+      boolean generated;
       try {
         generated = world.isChunkGenerated(cx, cz);
         if (generated) {
@@ -1560,8 +1562,6 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                   RTPLocation targetLoc = new RTPLocation(world, blockX, 0, blockZ);
                   RTP.serverAccessor.getScheduler().runTask(targetLoc, () -> {
                     try {
-                      RTPChunk<?> chunk = resolvedChunk;
-
                       MutableRTPCoords localCursor = new MutableRTPCoords(blockX, blockZ);
                       localCursor.setWorldName(world.name());
 
@@ -1572,9 +1572,9 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                       // to happen on this region thread, so do it here before any
                       // reject path can short-circuit. Keyed by location, so
                       // re-recording the picked-Y biome below stays idempotent.
-                      if (!chunk.isSelfContained()) {
+                      if (!resolvedChunk.isSelfContained()) {
                         try {
-                          String midBiomeLive = chunk.getBiome(blockX, midY, blockZ);
+                          String midBiomeLive = resolvedChunk.getBiome(blockX, midY, blockZ);
                           if (midBiomeLive != null) {
                             recordBiomeForChunk(shape, pos, blockX >> 4, blockZ >> 4, midBiomeLive.toUpperCase());
                           }
@@ -1584,7 +1584,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                         }
                       }
 
-                      if (!vert.adjust(chunk, localCursor)) {
+                      if (!vert.adjust(resolvedChunk, localCursor)) {
                         // addBadChunk: chunk-uniform - within a chunk the per-column
                         // selection order is deterministic, so the twin spiral index picks
                         // the same column and vert.adjust fails identically.
@@ -1598,7 +1598,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                       // (ADR-016 section 13.1 follow-up, 2026-04-20). This bypasses
                       // `anvilProbeSupport.takeCached` so an evicted cache entry cannot
                       // cause a fallthrough to the seed-synth getter on a loaded chunk.
-                      String actualBiome = chunk.getBiome(localCursor.x, localCursor.y, localCursor.z);
+                      String actualBiome = resolvedChunk.getBiome(localCursor.x, localCursor.y, localCursor.z);
                       // Fill in biome data for every point whose biome we can
                       // read, regardless of accept/reject. Keyed by location,
                       // so re-recording is idempotent ("if it doesn't already").
@@ -1636,7 +1636,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                       for (int xx = minX; xx <= maxX && pass; xx++) {
                         for (int zz = minZ; zz <= maxZ && pass; zz++) {
                           for (int y = localCursor.y - finalSafetyRadius; y <= localCursor.y + finalSafetyRadius && pass; y++) {
-                            if (!chunk.isSafe(xx, y, zz, unsafeBlocks)) {
+                            if (!resolvedChunk.isSafe(xx, y, zz, unsafeBlocks)) {
                               pass = false;
                             }
                           }
@@ -1660,8 +1660,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                         if (verResult != null && !verResult.passed()) {
                           try {
                             io.github.dailystruggle.rtp.api.hooks.ClaimBoundaryRegistry claimRegistry =
-                                (io.github.dailystruggle.rtp.api.RTPAPI.hooks() != null)
-                                    ? io.github.dailystruggle.rtp.api.RTPAPI.hooks().claimBoundaries() : null;
+                                io.github.dailystruggle.rtp.api.RTPAPI.hooks().claimBoundaries();
                             if (claimRegistry != null) {
                               Optional<io.github.dailystruggle.rtp.api.claim.ClaimBoundary> claimOpt =
                                   claimRegistry.resolveAt(world.name(), localCursor.x, localCursor.z);

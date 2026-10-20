@@ -55,7 +55,7 @@ public class SubspaceShape {
   private final int chunkRadius;
   private final Region parentRegion;
   private final MemoryShape<?> parentShape;
-  private boolean floatingAnchorY = false;
+  private boolean floatingAnchorY;
   private java.util.Random rng = null;
 
   public void setRng(java.util.Random rng) {
@@ -526,8 +526,7 @@ public class SubspaceShape {
    * @return oversampled candidate world columns as {@code {x, z}}, anchor-first; never {@code null}
    */
   private List<int[]> footprintCandidateColumns(Shape<?> distributionShape, int minSeparation) {
-    List<int[]> cols = footprintCandidateColumns(distributionShape, minSeparation, true);
-    return cols;
+    return footprintCandidateColumns(distributionShape, minSeparation, true);
   }
 
   private List<int[]> footprintCandidateColumns(
@@ -582,8 +581,9 @@ public class SubspaceShape {
    */
   public static List<RTPLocation> selectBySeparation(
       List<RTPLocation> validated, int required, int minSeparation) {
+    // Guard before sizing: new ArrayList<>(negative) would throw instead of returning empty.
+    if (validated == null || required <= 0) return new ArrayList<>();
     List<RTPLocation> chosen = new ArrayList<>(required);
-    if (validated == null || required <= 0) return chosen;
     final long minSq = (long) minSeparation * minSeparation;
     for (RTPLocation cand : validated) {
       if (cand == null || cand.coords() == null) continue;

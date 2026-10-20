@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
@@ -87,11 +88,18 @@ public final class RegionTicketCensus implements TicketCensusRegion {
         return tickets;
     }
 
+    // Read-only census: the reservation is owned by the queued location and released by its
+    // consumer, so it must not be closed here.
+    @SuppressWarnings("resource")
     private static long reservedChunks(RTPLocation loc) {
-        if (loc == null || loc.reservation() == null || loc.reservation().getChunkSet() == null) {
+        if (loc == null) {
             return 0;
         }
-        return loc.reservation().getChunkSet().chunks().size();
+        ChunkReservation reservation = loc.reservation();
+        if (reservation == null || reservation.getChunkSet() == null) {
+            return 0;
+        }
+        return reservation.getChunkSet().chunks().size();
     }
 
     @Override
