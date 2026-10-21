@@ -6,13 +6,14 @@ import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockLocationGenerator;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.mock.TrackedMockWorld;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
@@ -78,7 +79,7 @@ class ReqRtpS002PipelineLeakAssertionTest {
         false);
 
     region = new Region("leak_test_region", settings);
-    RTP.selectionAPI.permRegionLookup.put(region.name, region);
+    ActiveSelection.get().permRegionLookup.put(region.name, region);
 
     player = new MockRTPPlayer(UUID.randomUUID(), "LeakTestPlayer", new RTPLocation(world, 0, 64, 0)) {
       @Override
@@ -95,8 +96,8 @@ class ReqRtpS002PipelineLeakAssertionTest {
   @AfterEach
   void tearDown() {
     MemoryTracker.reset();
-    RTP.getInstance().latestTeleportData.clear();
-    RTP.getInstance().processingPlayers.clear();
+    TeleportSessions.current().latestTeleportData.clear();
+    TeleportSessions.current().processingPlayers.clear();
     if (world != null) {
       world.resetTicketCount();
     }
@@ -140,7 +141,7 @@ class ReqRtpS002PipelineLeakAssertionTest {
         "Active chunk tickets must return to 0 after normal pipeline completion (S-002)");
     assertEquals(0, MemoryTracker.trackedCount(),
         "MemoryTracker entries (tasks and TeleportData) must return to 0 after completion");
-    TeleportData data = RTP.getInstance().latestTeleportData.get(player.uuid());
+    TeleportData data = TeleportSessions.current().latestTeleportData.get(player.uuid());
     assertNotNull(data, "latestTeleportData must be recorded on successful completion");
     assertTrue(data.completed, "TeleportData must be marked completed");
   }
@@ -207,8 +208,8 @@ class ReqRtpS002PipelineLeakAssertionTest {
     data.sender = player;
     data.completed = false;
     data.nextTask = task;
-    RTP.getInstance().latestTeleportData.put(player.uuid(), data);
-    RTP.getInstance().processingPlayers.add(player.uuid());
+    TeleportSessions.current().latestTeleportData.put(player.uuid(), data);
+    TeleportSessions.current().processingPlayers.add(player.uuid());
 
     new RTPTeleportCancel(player.uuid()).run();
     assertTrue(task.isCancelled(), "Task must be marked cancelled by RTPTeleportCancel");

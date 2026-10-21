@@ -19,6 +19,7 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.tools.ChartOutputHelper;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -181,7 +182,7 @@ class SampleActionPlacementChartTest {
         .thenReturn(false);
     org.mockito.Mockito.doReturn(memShape).when(region).getShape();
 
-    RTP.selectionAPI.permRegionLookup.put("default", region);
+    ActiveSelection.get().permRegionLookup.put("default", region);
 
     manager = new ActionManager();
     ActionConfigLoader.loadActions(shippedResourcesDir(), manager);
@@ -189,7 +190,7 @@ class SampleActionPlacementChartTest {
 
   @AfterEach
   void tearDown() {
-    RTP.selectionAPI.permRegionLookup.remove("default");
+    ActiveSelection.get().permRegionLookup.remove("default");
     RTP.groupPlacementService = originalGroupService;
     RTPTestSetup.cleanUp();
   }
@@ -253,7 +254,7 @@ class SampleActionPlacementChartTest {
       // claimHazard -> safetyExternal perimeter recall, entity/fixed -> supplied coordinate).
       GenerationResult anchorGr =
           io.github.dailystruggle.rtp.common.selection.region.SubspaceAnchorResolver.resolveAnchor(
-                  (Region) RTP.selectionAPI.getRegion(req.regionName()), req.anchorSource())
+                  (Region) ActiveSelection.get().getRegion(req.regionName()), req.anchorSource())
               .join();
       RTPCoords anchor = (anchorGr != null) ? anchorGr.coords() : null;
 

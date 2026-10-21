@@ -2,9 +2,10 @@ package io.github.dailystruggle.rtp.common.tasks.scan;
 
 import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
@@ -54,13 +55,13 @@ class ScanTaskCrawlerCoverageTest {
                 "crawler_test_region", world, square, vert,
                 false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
         region = new Region("crawler_test_region", settings);
-        RTP.selectionAPI.permRegionLookup.put("crawler_test_region", region);
-        RTP.getInstance().scanTasks.clear();
+        ActiveSelection.get().permRegionLookup.put("crawler_test_region", region);
+        ScanTasks.current().clear();
     }
 
     @AfterEach
     void tearDown() {
-        RTP.getInstance().scanTasks.clear();
+        ScanTasks.current().clear();
     }
 
     private void setField(Object target, String fieldName, Object val) throws Exception {
@@ -108,7 +109,7 @@ class ScanTaskCrawlerCoverageTest {
     @DisplayName("Run short-circuits and cleans up when cancelled")
     void testRunWhenCancelled() throws Exception {
         ScanTask task = new ScanTask(region, 0L);
-        RTP.getInstance().scanTasks.put(region.name, task);
+        ScanTasks.current().put(region.name, task);
 
         task.setCancelled(true);
         assertTrue(task.isCancelled());
@@ -117,7 +118,7 @@ class ScanTaskCrawlerCoverageTest {
 
         CompletableFuture<?> done = (CompletableFuture<?>) getField(task, "done");
         assertTrue(done.isDone());
-        assertNull(RTP.getInstance().scanTasks.get(region.name));
+        assertNull(ScanTasks.current().get(region.name));
     }
 
     @Test
@@ -138,7 +139,7 @@ class ScanTaskCrawlerCoverageTest {
     @DisplayName("Abort / setCancelled drains in-flight gate and cancels chunk futures")
     void testSetCancelledTransitions() throws Exception {
         ScanTask task = new ScanTask(region, 0L);
-        RTP.getInstance().scanTasks.put(region.name, task);
+        ScanTasks.current().put(region.name, task);
 
         @SuppressWarnings("unchecked")
         Set<CompletableFuture<?>> futures = (Set<CompletableFuture<?>>) getField(task, "inFlightChunkFutures");
@@ -159,7 +160,7 @@ class ScanTaskCrawlerCoverageTest {
         task.scanIncrement.set(100L);
         task.save();
 
-        File dir = new File(RTP.serverAccessor.getPluginDirectory(), "database" + File.separator + "regionData");
+        File dir = new File(RTPRuntime.serverAccessor().getPluginDirectory(), "database" + File.separator + "regionData");
         File scanFile = new File(dir, region.name + "_" + region.cacheKey() + ".scan");
         assertTrue(scanFile.exists(), "Progress file should be created");
 
@@ -174,7 +175,7 @@ class ScanTaskCrawlerCoverageTest {
     @Test
     @DisplayName("Corrupt scan progress file is handled safely without throwing")
     void testCorruptScanFileRecovery() throws Exception {
-        File dir = new File(RTP.serverAccessor.getPluginDirectory(), "database" + File.separator + "regionData");
+        File dir = new File(RTPRuntime.serverAccessor().getPluginDirectory(), "database" + File.separator + "regionData");
         dir.mkdirs();
         File scanFile = new File(dir, region.name + "_" + region.cacheKey() + ".scan");
         try (FileOutputStream out = new FileOutputStream(scanFile)) {

@@ -2,10 +2,10 @@ package io.github.dailystruggle.rtp.common.commands.config;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -58,12 +58,12 @@ public class ViewRawSubConfigCmd extends BaseRTPCmdImpl {
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
 
-    RTP.scheduler.runTaskAsynchronously(() -> {
+    RTPRuntime.scheduler().runTaskAsynchronously(() -> {
       File file = new File(configParser.pluginDirectory, configParser.name);
       if (!file.exists() || !file.isFile()) {
         String msg = "&c[RTP config/viewraw] file not found: " + file.getPath();
-        RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);
-        RTP.log(Level.WARNING, msg);
+        RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, msg);
+        RTPRuntime.log(Level.WARNING, msg);
         return;
       }
 
@@ -72,24 +72,24 @@ public class ViewRawSubConfigCmd extends BaseRTPCmdImpl {
         lines = Files.readAllLines(file.toPath(), StandardCharsets.UTF_8);
       } catch (IOException e) {
         String msg = "&c[RTP config/viewraw] failed to read " + configParser.name + ": " + e.getMessage();
-        RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);
-        RTP.log(Level.WARNING, msg, e);
+        RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, msg);
+        RTPRuntime.log(Level.WARNING, msg, e);
         return;
       }
 
       String header = "&e--- " + configParser.name + " (" + lines.size() + " lines) ---";
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, header);
+      RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, header);
 
       int emitted = 0;
       for (String line : lines) {
         if (emitted >= MAX_LINES) {
-          RTP.serverAccessor.sendMessage(
+          RTPRuntime.serverAccessor().sendMessage(
               RTPAPI.serverId,
               callerId,
               "&7... (truncated at " + MAX_LINES + " lines; open the file directly for the rest)");
           break;
         }
-        RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, line);
+        RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, line);
         emitted++;
       }
     });

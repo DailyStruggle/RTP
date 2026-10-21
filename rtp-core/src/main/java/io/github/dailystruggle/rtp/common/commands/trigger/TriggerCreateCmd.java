@@ -4,7 +4,8 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.trigger.PhysicalTriggerManager;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -37,7 +38,7 @@ public class TriggerCreateCmd extends BaseTriggerCmd {
 
     RTPLocation loc = player.getLocation();
     if (loc == null || loc.world() == null) {
-      RTP.serverAccessor.sendMessage(senderId, senderId, "[RTP] Could not resolve your current location.");
+      RTPRuntime.serverAccessor().sendMessage(senderId, senderId, "[RTP] Could not resolve your current location.");
       return true;
     }
 
@@ -57,8 +58,8 @@ public class TriggerCreateCmd extends BaseTriggerCmd {
         maxX, maxY, maxZ,
         actionId, 5L);
 
-    RTP.triggerManager.registerTrigger(spec);
-    RTP.serverAccessor.sendMessage(
+    PhysicalTriggerManager.instance().registerTrigger(spec);
+    RTPRuntime.serverAccessor().sendMessage(
         senderId, senderId, "[RTP] Physical trigger '" + id + "' created for action '" + actionId + "'! (["
             + minX + "," + minY + "," + minZ + "] to [" + maxX + "," + maxY + "," + maxZ + "])");
     return true;

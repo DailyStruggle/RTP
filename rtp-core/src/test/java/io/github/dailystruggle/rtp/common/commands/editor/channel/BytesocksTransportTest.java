@@ -202,7 +202,7 @@ class BytesocksTransportTest {
         }
     }
 
-    /** Hand-driven stand-in for the async {@code RTP.scheduler} timer. */
+    /** Hand-driven stand-in for the async {@code RTPRuntime.scheduler()} timer. */
     private static final class ManualTimer implements BytesocksTransport.Timer {
         final List<Runnable> tasks = new CopyOnWriteArrayList<>();
         final List<Object> cancelled = new CopyOnWriteArrayList<>();

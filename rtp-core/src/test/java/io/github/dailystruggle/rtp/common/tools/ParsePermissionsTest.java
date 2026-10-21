@@ -1,10 +1,10 @@
 package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPCommandSender;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -174,9 +174,9 @@ public class ParsePermissionsTest {
     void nullSenderReturnsDefaults() {
         UUID unknownId = UUID.randomUUID();
         // Return null sender by overriding getSender for this ID or checking unknown
-        io.github.dailystruggle.rtp.api.server.RTPServerAccessor original = RTP.serverAccessor;
+        io.github.dailystruggle.rtp.api.server.RTPServerAccessor original = RTPRuntime.serverAccessor();
         try {
-            RTP.serverAccessor = (io.github.dailystruggle.rtp.api.server.RTPServerAccessor)
+            RTPRuntime.setServerAccessor((io.github.dailystruggle.rtp.api.server.RTPServerAccessor)
                     java.lang.reflect.Proxy.newProxyInstance(
                             getClass().getClassLoader(),
                             new Class<?>[]{io.github.dailystruggle.rtp.api.server.RTPServerAccessor.class},
@@ -184,11 +184,11 @@ public class ParsePermissionsTest {
                                 if ("getSender".equals(method.getName())) return null;
                                 return null;
                             }
-                    );
+                    ));
             assertFalse(ParsePermissions.hasPerm(unknownId, "rtp.tp.", "use"));
             assertEquals(-1, ParsePermissions.getInt(unknownId, "rtp.tp.amount."));
         } finally {
-            RTP.serverAccessor = original;
+            RTPRuntime.setServerAccessor(original);
         }
     }
 

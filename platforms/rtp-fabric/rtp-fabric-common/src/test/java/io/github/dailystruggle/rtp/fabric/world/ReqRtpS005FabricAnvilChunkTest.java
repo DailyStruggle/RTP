@@ -96,7 +96,7 @@ class ReqRtpS005FabricAnvilChunkTest {
     @DisplayName("keep / unload are no-ops on anvil-backed instances (no S-002 ticket churn)")
     void keepAndUnloadAreNoOps() {
         FabricRTPChunk c = new FabricRTPChunk(emptyView(), 0, 0, WORLD_ID, null);
-        // No FabricRTPWorld registered against WORLD_ID and RTP.serverAccessor
+        // No FabricRTPWorld registered against WORLD_ID and RTPRuntime.serverAccessor()
         // is unset - if dispatch leaked into the live branch, the world lookup
         // would proceed (or NPE). The anvil branch returns immediately.
         assertDoesNotThrow(() -> c.keep(true));

@@ -1,5 +1,8 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear;
 
+import org.junit.jupiter.api.DisplayName;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.ProbeBackedMockChunk;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.FakeChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.mock.ConfigurableMockChunk;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
@@ -450,7 +453,7 @@ public class LinearAdjustorTest {
                 io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys>
                 safety = (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
                         io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys>)
-                io.github.dailystruggle.rtp.common.RTP.configs.getParser(
+                io.github.dailystruggle.rtp.common.configuration.ActiveConfigs.get().getParser(
                         io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.class);
         java.lang.reflect.Field dataField =
                 io.github.dailystruggle.rtp.common.factory.FactoryValue.class.getDeclaredField("data");
@@ -467,7 +470,7 @@ public class LinearAdjustorTest {
                 io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.safetyRadius, 2);
 
         // No static cache to reset - LinearAdjustor reads safety config directly
-        // from RTP.configs at the top of each adjust(...) call now.
+        // from ActiveConfigs.get() at the top of each adjust(...) call now.
 
         try {
         // Column layout: air above 64, safe crust at 63, UNSAFE at 62. Without the
@@ -630,7 +633,7 @@ public class LinearAdjustorTest {
     @Test
     void isGroundSafe_platformDepth_rejectsUnsafeUnderCrust() {
         // Configure safetyRadius = 3 (platformDepth in LinearAdjustor)
-        io.github.dailystruggle.rtp.common.RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.class)
+        io.github.dailystruggle.rtp.common.configuration.ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.class)
                 .set(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.safetyRadius, 3);
 
         ConfigurableMockChunk chunk = new ConfigurableMockChunk(0, 0, world);
@@ -653,7 +656,7 @@ public class LinearAdjustorTest {
     @Test
     void readSafetySnapshot_unsafeBlocksAndTagStripping() {
         java.util.List<String> list = java.util.Arrays.asList("minecraft:lava", "water", "#minecraft:beds", "stone[waterlogged=true]");
-        io.github.dailystruggle.rtp.common.RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys.class)
+        io.github.dailystruggle.rtp.common.configuration.ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys.class)
                 .set(io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys.unsafeBlocks, list);
 
         // Verify probe recognizes canonicalized names
@@ -832,5 +835,85 @@ public class LinearAdjustorTest {
         chunkBelow.setSolidSafe(-1);
         RTPCoords resBelow = adj.adjust(chunkBelow);
         assertNull(resBelow, "Feet at 0 with floor below worldMin should not be found");
+    }
+
+    // -----------------------------------------------------------------------
+    // REQ-RTP-F-015 / ADR-119 - landing-spot slope check
+    // -----------------------------------------------------------------------
+
+    /** Flat floor at 64 everywhere except a 6-block ledge two blocks east of (7,7). */
+    private static FakeChunkColumnProbe ledgeEastOfCenter() {
+        FakeChunkColumnProbe p = new FakeChunkColumnProbe(0, 0, 0, 255);
+        p.setSolidRange(0, 63);
+        p.setAirRange(64, 255);
+        for (int y = 64; y <= 69; y++) p.setColumnSolid(9, 7, y);
+        return p;
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-F-015: maxSlope skips the ledge column (7,7) and picks flat (2,2)")
+    void maxSlope_skipsLedgeColumnForNextStencilColumn() {
+        LinearAdjustor adj = buildAdjustor(0, 60, 80);
+        adj.set(GenericVerticalAdjustorKeys.maxSlope, 2);
+        RTPCoords r = adj.adjust(new ProbeBackedMockChunk(ledgeEastOfCenter(), world));
+        assertNotNull(r);
+        assertEquals(2, r.x());
+        assertEquals(2, r.z());
+        assertEquals(64, r.y());
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-F-015: without maxSlope the first stencil column (7,7) is kept")
+    void noMaxSlope_keepsFirstStencilColumn() {
+        LinearAdjustor adj = buildAdjustor(0, 60, 80);
+        RTPCoords r = adj.adjust(new ProbeBackedMockChunk(ledgeEastOfCenter(), world));
+        assertNotNull(r);
+        assertEquals(7, r.x());
+        assertEquals(7, r.z());
+        assertEquals(-1, adj.maxSlope());
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-F-015: a ledge step within maxSlope is accepted")
+    void maxSlope_atStepHeightAccepts() {
+        LinearAdjustor adj = buildAdjustor(0, 60, 80);
+        adj.set(GenericVerticalAdjustorKeys.maxSlope, 6);
+        RTPCoords r = adj.adjust(new ProbeBackedMockChunk(ledgeEastOfCenter(), world));
+        assertNotNull(r);
+        assertEquals(7, r.x());
+        assertEquals(7, r.z());
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-F-015: adjustColumn rejects a steep column only when maxSlope is set")
+    void adjustColumn_appliesSlopeCheck() {
+        ProbeBackedMockChunk chunk = new ProbeBackedMockChunk(ledgeEastOfCenter(), world);
+        LinearAdjustor off = buildAdjustor(0, 60, 80);
+        assertNotNull(off.adjustColumn(chunk, 7, 7));
+        LinearAdjustor on = buildAdjustor(0, 60, 80);
+        on.set(GenericVerticalAdjustorKeys.maxSlope, 2);
+        assertNull(on.adjustColumn(chunk, 7, 7));
+        assertNotNull(on.adjustColumn(chunk, 2, 2));
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-F-015: a rejected Y continues the sweep to a flat Y in the same column")
+    void maxSlope_rejectedYContinuesSweep() {
+        // Every column: floor at 64 and a second floor at 72 under a roof (ceiling 75..255).
+        FakeChunkColumnProbe p = new FakeChunkColumnProbe(0, 0, 0, 255);
+        p.setSolidRange(0, 63);
+        p.setAirRange(64, 255);
+        p.setSolidRange(70, 71);
+        p.setAirRange(72, 74);
+        p.setSolidRange(75, 255);
+        // East neighbour of (7,7) is solid from 64 to 69 so the low layer there is a wall.
+        for (int y = 64; y <= 69; y++) p.setColumnSolid(9, 7, y);
+        LinearAdjustor adj = buildAdjustor(0, 60, 80);
+        adj.set(GenericVerticalAdjustorKeys.maxSlope, 1);
+        RTPCoords r = adj.adjust(new ProbeBackedMockChunk(p, world));
+        assertNotNull(r);
+        assertEquals(7, r.x());
+        assertEquals(7, r.z());
+        assertEquals(72, r.y(), "low floor fails the slope check; the upper floor is flat");
     }
 }

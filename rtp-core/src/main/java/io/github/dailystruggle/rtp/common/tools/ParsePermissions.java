@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.AbstractMap;
 import java.util.Map;
 import java.util.Set;
@@ -17,7 +17,7 @@ public class ParsePermissions {
       new ConcurrentHashMap<>();
 
   public static boolean hasPerm(UUID senderId, String permissionPrefix, String... permissions) {
-    RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
+    RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(senderId);
     if (sender == null) return false;
     return hasPerm(sender, permissionPrefix, permissions);
   }
@@ -57,7 +57,7 @@ public class ParsePermissions {
   }
 
   public static int getInt(UUID senderId, String permissionPrefix) {
-    RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
+    RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(senderId);
     if (sender == null) return -1;
     return getInt(sender, permissionPrefix);
   }
@@ -87,7 +87,7 @@ public class ParsePermissions {
         try {
           number = Integer.parseInt(val[0]);
         } catch (NumberFormatException exception) {
-          RTP.log(Level.WARNING, "[rtp] invalid permission: " + perm);
+          RTPRuntime.log(Level.WARNING, "[rtp] invalid permission: " + perm);
           continue;
         }
         entryMap.put(permissionPrefix, new AbstractMap.SimpleEntry<>(current, number));

@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.folia.mock;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.folia.scheduling.FoliaSchedulerImpl;
 import org.bukkit.plugin.Plugin;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,7 +68,7 @@ class FoliaEconomyPipelineTest {
                 regionScheduler,
                 asyncScheduler,
                 globalScheduler);
-        RTP.scheduler = foliaScheduler;
+        RTPRuntime.setScheduler(foliaScheduler);
     }
 
     // -----------------------------------------------------------------------

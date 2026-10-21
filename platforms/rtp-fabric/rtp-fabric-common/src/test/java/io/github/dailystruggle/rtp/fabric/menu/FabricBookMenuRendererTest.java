@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code MenuModel} → {@link FabricBookSpec} conversion (page/line/fragment
  * shape, click-command mapping, decorative fragments) and the chat-fallback
  * dispatch when no live Fabric server / player is present. No live server is
- * required; {@code RTP.serverAccessor} is null in the test JVM, so
+ * required; {@code RTPRuntime.serverAccessor()} is null in the test JVM, so
  * {@code format(...)} degrades to passing the raw string through.
  */
 class FabricBookMenuRendererTest {
@@ -83,7 +83,7 @@ class FabricBookMenuRendererTest {
 
     @Test
     void rendersViaChatFallbackWhenNoServerPlayer() {
-        // RTP.serverAccessor is null in the test JVM, so resolveHandle yields
+        // RTPRuntime.serverAccessor() is null in the test JVM, so resolveHandle yields
         // no player and the renderer must delegate to the chat fallback.
         AtomicInteger calls = new AtomicInteger();
         MenuRenderer fallback = (id, m) -> calls.incrementAndGet();

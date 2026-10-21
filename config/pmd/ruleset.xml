@@ -12,7 +12,9 @@
     "prefer non-locking execution" rule below, which encodes the RTP scheduler
     contract from the project guidelines).
 
-    The analyzer is opt-in: run it locally with
+    The analyzer is opt-in for local builds and always on in CI: GitHub Actions
+    (.github/workflows/gradle-set.yml) and the Jenkinsfile `Static Analysis`
+    stage pass `-PstaticAnalysis` and fail on any violation. Run it locally with
     `.\gradlew.bat pmdMain pmdTest -PstaticAnalysis` (per module, e.g.
     `.\gradlew.bat :rtp-core:pmdMain -PstaticAnalysis`) or gate the whole build
     with `.\gradlew.bat build -PstaticAnalysis` (see the root build.gradle

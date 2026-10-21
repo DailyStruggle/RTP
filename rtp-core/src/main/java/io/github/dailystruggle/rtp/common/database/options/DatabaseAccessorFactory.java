@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.database.options;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.util.Locale;
 import java.util.logging.Level;
@@ -81,7 +81,7 @@ public final class DatabaseAccessorFactory {
 
         // Fall back to H2 unless H2 was already what we tried.
         if (!"h2".equals(requested) && !"yaml".equals(requested)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "DatabaseAccessorFactory: backend '" + requested + "' is unavailable "
                             + "(JDBC driver missing or construction failed). Falling back to H2. "
                             + "Drop the appropriate driver jar onto the server classpath, or set "
@@ -90,11 +90,11 @@ public final class DatabaseAccessorFactory {
             if (h2 != null) {
                 return new Result(h2, "h2");
             }
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "DatabaseAccessorFactory: H2 fallback unavailable as well. "
                             + "Falling back to flat-file (yaml) storage.");
         } else if ("h2".equals(requested)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "DatabaseAccessorFactory: H2 backend unavailable "
                             + "(driver missing or construction failed). Falling back to flat-file (yaml) storage.");
         }
@@ -159,11 +159,11 @@ public final class DatabaseAccessorFactory {
             return null;
         } catch (java.lang.reflect.InvocationTargetException e) {
             Throwable cause = e.getCause() != null ? e.getCause() : e;
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "DatabaseAccessorFactory: failed to construct '" + type + "' accessor: " + cause.getMessage(), cause);
             return null;
         } catch (Throwable t) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "DatabaseAccessorFactory: failed to construct '" + type + "' accessor: " + t.getMessage(), t);
             return null;
         }

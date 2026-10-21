@@ -1,7 +1,8 @@
 package io.github.dailystruggle.rtp.common.playerData;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -26,7 +27,7 @@ public final class LocalTeleportLimitStore implements TeleportLimitStore {
 
   public LocalTeleportLimitStore(UsageCapTracker tracker, boolean persist) {
     this(tracker, persist,
-        () -> RTP.getInstance() == null ? null : RTP.getInstance().databaseAccessor);
+        () -> TeleportSessions.current() == null ? null : ActiveDatabase.accessor());
   }
 
   /** Test/seam constructor allowing the backing accessor to be injected. */
@@ -89,7 +90,7 @@ public final class LocalTeleportLimitStore implements TeleportLimitStore {
       long start = Long.parseLong(s.substring(sep + 1).trim());
       tracker.restore(id, count, start);
     } catch (Throwable t) {
-      RTP.log(Level.WARNING,
+      RTPRuntime.log(Level.WARNING,
           "[ADR-068] failed to load persisted usage cap for " + id + ": " + t.getMessage(), t);
     }
   }
@@ -134,7 +135,7 @@ public final class LocalTeleportLimitStore implements TeleportLimitStore {
       String value = (snap == null) ? "0:0" : (snap[0] + ":" + snap[1]);
       db.setValue(TABLE, id.toString(), value);
     } catch (Throwable t) {
-      RTP.log(Level.WARNING,
+      RTPRuntime.log(Level.WARNING,
           "[ADR-068] failed to persist usage cap for " + id + ": " + t.getMessage(), t);
     }
   }

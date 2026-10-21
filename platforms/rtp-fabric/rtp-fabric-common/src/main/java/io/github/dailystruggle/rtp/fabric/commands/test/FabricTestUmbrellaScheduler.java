@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.fabric.commands.test;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaScheduler;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.fabric.server.FabricServerAccessor;
 import net.minecraft.server.MinecraftServer;
 
@@ -11,7 +12,7 @@ import java.util.logging.Level;
 
 /**
  * Fabric implementation of {@link TestUmbrellaScheduler}. Delegates
- * deferred dispatch to {@link RTP#scheduler} (e.g.
+ * deferred dispatch to {@link RTPRuntime#scheduler()} (e.g.
  * {@link io.github.dailystruggle.rtp.fabric.scheduling.FabricScheduler}) or
  * the server tick executor per S-005.
  *
@@ -41,12 +42,12 @@ public final class FabricTestUmbrellaScheduler implements TestUmbrellaScheduler 
 
     private RTPScheduler getScheduler() {
         if (this.scheduler != null) return this.scheduler;
-        return RTP.scheduler;
+        return RTPRuntime.scheduler();
     }
 
     private MinecraftServer getServer() {
         if (this.server != null) return this.server;
-        if (RTP.serverAccessor instanceof FabricServerAccessor fsa) {
+        if (RTPRuntime.serverAccessor() instanceof FabricServerAccessor fsa) {
             return fsa.getServer();
         }
         return null;

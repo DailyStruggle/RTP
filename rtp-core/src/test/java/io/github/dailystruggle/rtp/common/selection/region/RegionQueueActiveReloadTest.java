@@ -8,6 +8,8 @@ import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.mock.TrackedMockWorld;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
@@ -98,7 +100,7 @@ public class RegionQueueActiveReloadTest {
         // Initial reload to register region
         assertTrue(RTP.reload(), "Initial RTP.reload() must succeed");
 
-        Region region = RTP.selectionAPI.permRegionLookup.get("active_reg");
+        Region region = ActiveSelection.get().permRegionLookup.get("active_reg");
         assertNotNull(region, "Region active_reg should be registered");
 
         AtomicBoolean running = new AtomicBoolean(true);
@@ -109,7 +111,7 @@ public class RegionQueueActiveReloadTest {
         futures.add(executor.submit(() -> {
             while (running.get()) {
                 try {
-                    Region current = RTP.selectionAPI.permRegionLookup.get("active_reg");
+                    Region current = ActiveSelection.get().permRegionLookup.get("active_reg");
                     if (current != null) {
                         current.cachePipeline.add(new RegionCacheTask(current, 50_000_000L));
                         current.execute(10_000_000L);
@@ -127,7 +129,7 @@ public class RegionQueueActiveReloadTest {
         futures.add(executor.submit(() -> {
             while (running.get()) {
                 try {
-                    Region current = RTP.selectionAPI.permRegionLookup.get("active_reg");
+                    Region current = ActiveSelection.get().permRegionLookup.get("active_reg");
                     if (current != null && current.queueManager != null) {
                         current.queueManager.poll(UUID.randomUUID());
                     }
@@ -144,9 +146,9 @@ public class RegionQueueActiveReloadTest {
         futures.add(executor.submit(() -> {
             while (running.get()) {
                 try {
-                    Region current = RTP.selectionAPI.permRegionLookup.get("active_reg");
-                    if (current != null && RTP.serverAccessor != null && RTP.serverAccessor.getLocationGenerator() != null) {
-                        RTP.serverAccessor.getLocationGenerator().getLocation(current, (java.util.Set<String>) null);
+                    Region current = ActiveSelection.get().permRegionLookup.get("active_reg");
+                    if (current != null && RTPRuntime.serverAccessor() != null && RTPRuntime.serverAccessor().getLocationGenerator() != null) {
+                        RTPRuntime.serverAccessor().getLocationGenerator().getLocation(current, (java.util.Set<String>) null);
                     }
                     Thread.sleep(15);
                 } catch (InterruptedException e) {
@@ -173,7 +175,7 @@ public class RegionQueueActiveReloadTest {
         assertTrue(reloadSuccess, "RTP.reload() must return true while fill tasks were actively executing");
 
         // Verify that region was re-instantiated and is still accessible
-        Region reloaded = RTP.selectionAPI.permRegionLookup.get("active_reg");
+        Region reloaded = ActiveSelection.get().permRegionLookup.get("active_reg");
         assertNotNull(reloaded, "Region must be reloaded and present in permRegionLookup");
         assertNotNull(reloaded.queueManager, "Reloaded region must have an active RegionQueueManager");
     }
@@ -203,7 +205,7 @@ public class RegionQueueActiveReloadTest {
 
         assertTrue(RTP.reload(), "Initial RTP.reload() must succeed");
 
-        Region initialRegion = RTP.selectionAPI.permRegionLookup.get("boundary_reg");
+        Region initialRegion = ActiveSelection.get().permRegionLookup.get("boundary_reg");
         assertNotNull(initialRegion);
 
         // Pre-cache locations:
@@ -244,7 +246,7 @@ public class RegionQueueActiveReloadTest {
         assertTrue(RTP.reload(), "RTP.reload() must succeed");
 
         // The old region was shut down and all its candidates purged/closed
-        Region reloadedRegion = RTP.selectionAPI.permRegionLookup.get("boundary_reg");
+        Region reloadedRegion = ActiveSelection.get().permRegionLookup.get("boundary_reg");
         assertNotNull(reloadedRegion);
         assertEquals(200, ((Number) reloadedRegion.getShape().getData().get(GenericMemoryShapeParams.radius)).intValue(),
                 "Reloaded region must reflect the new radius of 200");
@@ -311,7 +313,7 @@ public class RegionQueueActiveReloadTest {
 
         assertTrue(RTP.reload());
 
-        Region region = RTP.selectionAPI.permRegionLookup.get("ticket_reg");
+        Region region = ActiveSelection.get().permRegionLookup.get("ticket_reg");
         assertNotNull(region);
 
         // Pre-cache 3 locations holding chunk reservations
@@ -382,7 +384,7 @@ public class RegionQueueActiveReloadTest {
 
         assertTrue(RTP.reload());
 
-        Region region = RTP.selectionAPI.permRegionLookup.get("refill_reg");
+        Region region = ActiveSelection.get().permRegionLookup.get("refill_reg");
         assertNotNull(region);
         assertTrue(region.getShape().name.equalsIgnoreCase("CIRCLE"), "Initial shape must be Circle");
 
@@ -404,7 +406,7 @@ public class RegionQueueActiveReloadTest {
         assertTrue(RTP.reload());
 
         // Validate new region configuration
-        Region reloaded = RTP.selectionAPI.permRegionLookup.get("refill_reg");
+        Region reloaded = ActiveSelection.get().permRegionLookup.get("refill_reg");
         assertNotNull(reloaded, "Reloaded region must be registered");
         assertTrue(reloaded.getShape().name.equalsIgnoreCase("SQUARE"),
                 "Reloaded region shape must resume as Square (was Circle)");

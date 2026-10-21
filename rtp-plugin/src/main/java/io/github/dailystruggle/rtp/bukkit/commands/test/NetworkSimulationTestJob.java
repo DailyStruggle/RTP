@@ -5,8 +5,10 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.test.ActiveTestJobs;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.database.options.AbstractSQLDatabaseAccessor;
 import io.github.dailystruggle.rtp.common.database.options.NetworkStateBinding;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
@@ -124,13 +126,13 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
   @Override
   void dispatchProbe(UUID callerId, ProbeKind kind,
           int peerCount, long observeWindowMs, long tokenTtlMs) {
-    RTPScheduler scheduler = RTP.scheduler;
+    RTPScheduler scheduler = RTPRuntime.scheduler();
     if (scheduler == null) {
       audit(callerId, "FAIL", "RTP.scheduler is null; core not yet loaded");
       return;
     }
     NetworkTransport transport = resolveTransportOrNull(
-            RTP.getInstance() == null ? null : RTP.getInstance().databaseAccessor);
+            RTP.getInstance() == null ? null : ActiveDatabase.accessor());
     if (transport == null) {
       audit(callerId, "NOT-CONFIGURED",
               "network mode disabled or no transport bound on this JVM");
@@ -594,7 +596,7 @@ public class NetworkSimulationTestJob extends NetworkProbeTarget {
   private void audit(UUID callerId, String verdict, String detail) {
     String msg = "[RTP test/network] " + verdict + ": " + detail;
     if (!callerId.equals(RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      RTPRuntime.serverAccessor().sendMessage(callerId, msg);
     }
     if ("PASS".equals(verdict) || "NOT-CONFIGURED".equals(verdict)) {
       RTP.log(Level.INFO, msg);

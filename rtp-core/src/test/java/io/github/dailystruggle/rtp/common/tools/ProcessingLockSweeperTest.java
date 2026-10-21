@@ -1,11 +1,13 @@
 package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.tasks.teleport.DeathTeleports;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,28 +48,28 @@ class ProcessingLockSweeperTest {
   }
 
   private static void clearState() {
-    RTP.getInstance().processingPlayers.clear();
-    RTP.getInstance().queuedPlayers.clear();
-    RTP.deathEffectInFlight.clear();
-    RTP.pendingDeathTeleports.clear();
+    TeleportSessions.current().processingPlayers.clear();
+    TeleportSessions.current().queuedPlayers.clear();
+    DeathTeleports.effectInFlight().clear();
+    DeathTeleports.pending().clear();
   }
 
   private static boolean locked(UUID id) {
-    return RTP.getInstance().processingPlayers.contains(id);
+    return TeleportSessions.current().processingPlayers.contains(id);
   }
 
   @Test
   @DisplayName("REQ-RTP-S-004: an unowned lock survives one sweep and is released, with a WARNING, on the next")
   void orphanLockReleasedOnSecondSweep() {
     UUID id = UUID.randomUUID();
-    RTP.getInstance().processingPlayers.add(id);
+    TeleportSessions.current().processingPlayers.add(id);
 
     MemoryTracker.runDiagnostics();
     assertTrue(locked(id), "first unowned sighting is a grace period");
 
     MemoryTracker.runDiagnostics();
     assertFalse(locked(id), "lock must be released on the second unowned sweep");
-    MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+    MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
     assertTrue(accessor.logMessages.stream()
             .anyMatch(m -> m.contains("released stale teleport lock") && m.contains(id.toString())),
         "release must be logged naming the player (S-004)");
@@ -77,8 +79,8 @@ class ProcessingLockSweeperTest {
   @DisplayName("REQ-RTP-S-004: a queued player's lock is never released by the sweep")
   void queuedLockKept() {
     UUID id = UUID.randomUUID();
-    RTP.getInstance().processingPlayers.add(id);
-    RTP.getInstance().queuedPlayers.add(id);
+    TeleportSessions.current().processingPlayers.add(id);
+    TeleportSessions.current().queuedPlayers.add(id);
 
     for (int i = 0; i < 3; i++) {
       MemoryTracker.runDiagnostics();
@@ -90,8 +92,8 @@ class ProcessingLockSweeperTest {
   @DisplayName("REQ-RTP-S-004: death hold keeps the lock")
   void deathHoldKeepsLock() {
     UUID id = UUID.randomUUID();
-    RTP.getInstance().processingPlayers.add(id);
-    RTP.deathEffectInFlight.add(id);
+    TeleportSessions.current().processingPlayers.add(id);
+    DeathTeleports.effectInFlight().add(id);
 
     for (int i = 0; i < 3; i++) {
       MemoryTracker.runDiagnostics();
@@ -104,8 +106,8 @@ class ProcessingLockSweeperTest {
   void livePipelineKeepsLock() {
     UUID id = UUID.randomUUID();
     MockRTPPlayer player = new MockRTPPlayer(id, "SweepPlayer", null);
-    ((MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
-    RTP.getInstance().processingPlayers.add(id);
+    ((MockRTPServerAccessor) RTPRuntime.serverAccessor()).addPlayer(player);
+    TeleportSessions.current().processingPlayers.add(id);
     TeleportPipelineTask task = new TeleportPipelineTask(new GenerationContext(player, player, null));
 
     MemoryTracker.runDiagnostics();
@@ -123,12 +125,12 @@ class ProcessingLockSweeperTest {
   @DisplayName("REQ-RTP-S-004: an owner seen on a sweep restarts the grace period")
   void ownerResetsGrace() {
     UUID id = UUID.randomUUID();
-    RTP.getInstance().processingPlayers.add(id);
+    TeleportSessions.current().processingPlayers.add(id);
 
     MemoryTracker.runDiagnostics(); // unowned: suspect
-    RTP.getInstance().queuedPlayers.add(id);
+    TeleportSessions.current().queuedPlayers.add(id);
     MemoryTracker.runDiagnostics(); // owned: cleared
-    RTP.getInstance().queuedPlayers.remove(id);
+    TeleportSessions.current().queuedPlayers.remove(id);
     MemoryTracker.runDiagnostics(); // unowned again: first sighting
     assertTrue(locked(id));
     MemoryTracker.runDiagnostics();
@@ -142,8 +144,8 @@ class ProcessingLockSweeperTest {
     TeleportData td = new TeleportData();
     td.completed = false;
     td.delay = 60_000L;
-    RTP.getInstance().processingPlayers.add(id);
-    RTP.getInstance().latestTeleportData.put(id, td);
+    TeleportSessions.current().processingPlayers.add(id);
+    TeleportSessions.current().latestTeleportData.put(id, td);
     MemoryTracker.track(td, "TeleportData-" + id, 0L);
     Thread.sleep(5L);
 
@@ -161,9 +163,9 @@ class ProcessingLockSweeperTest {
     UUID id = UUID.randomUUID();
     TeleportData td = new TeleportData();
     td.completed = false;
-    RTP.getInstance().processingPlayers.add(id);
-    RTP.getInstance().queuedPlayers.add(id);
-    RTP.getInstance().latestTeleportData.put(id, td);
+    TeleportSessions.current().processingPlayers.add(id);
+    TeleportSessions.current().queuedPlayers.add(id);
+    TeleportSessions.current().latestTeleportData.put(id, td);
     MemoryTracker.track(td, "TeleportData-" + id, 0L);
     Thread.sleep(5L);
 
@@ -174,7 +176,7 @@ class ProcessingLockSweeperTest {
     assertTrue(locked(id));
 
     // Once the wait ends without the record being cleaned up, the budget applies again.
-    RTP.getInstance().queuedPlayers.remove(id);
+    TeleportSessions.current().queuedPlayers.remove(id);
     MemoryTracker.runDiagnostics();
     assertTrue(td.completed, "stalled record is purged once nothing holds it");
     assertFalse(locked(id));

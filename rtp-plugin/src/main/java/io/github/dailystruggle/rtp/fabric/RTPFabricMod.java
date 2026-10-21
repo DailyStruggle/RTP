@@ -3,7 +3,12 @@ import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.CoreRtpRoot;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.network.NetworkHooks;
 import io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import io.github.dailystruggle.rtp.fabric.database.FabricDatabaseHandler;
 import io.github.dailystruggle.rtp.fabric.events.FabricEventBridge;
 import io.github.dailystruggle.rtp.fabric.server.FabricServerAccessor;
@@ -80,9 +85,11 @@ public final class RTPFabricMod implements ModInitializer {
             installVersionAdapter();
 
             FabricServerAccessor accessor = new FabricServerAccessor();
-            RTP.serverAccessor = accessor;
-            // Assign RTP.scheduler BEFORE RTP.getInstance().
-            RTP.scheduler = accessor.getScheduler();
+            // RTP's static init must see no accessor (ADR-115 invariant 3).
+            RTP.ensureInitialized();
+            RTPRuntime.setServerAccessor(accessor);
+            // Assign RTPRuntime.scheduler() BEFORE RTP.getInstance().
+            RTPRuntime.setScheduler(accessor.getScheduler());
             // Construct RTP explicitly - mirrors RTPBukkitPlugin.onEnable
             // (`new RTP()`). RTP.getInstance() is a plain field accessor and
             // does NOT lazy-construct; the constructor itself sets the static
@@ -98,9 +105,8 @@ public final class RTPFabricMod implements ModInitializer {
             // NetworkModeBootstrap.boot(...) can construct a backend heartbeat
             // sampler that reads live Fabric host state (TPS / MSPT / player
             // count / loaded worlds). Mirrors AbstractServerAccessor.start's
-            // RTP.backendStateSamplerFactory = BukkitBackendStateSampler::new.
-            RTP.backendStateSamplerFactory =
-                    io.github.dailystruggle.rtp.fabric.network.FabricBackendStateSampler::new;
+            // NetworkHooks.backendStateSamplerFactory() = BukkitBackendStateSampler::new.
+            NetworkHooks.setBackendStateSamplerFactory(io.github.dailystruggle.rtp.fabric.network.FabricBackendStateSampler::new);
 
             // Read routing.lobbyMode from network.yml early (before
             // the startupTasks drain constructs Region instances) so a pure
@@ -110,15 +116,15 @@ public final class RTPFabricMod implements ModInitializer {
             try {
                 java.io.File earlyNetworkYml = NetworkModeBootstrap.ensureNetworkYml(
                         accessor.getPluginDirectory(), RTPFabricMod.class);
-                RTP.lobbyMode = NetworkModeBootstrap.readLobbyModeEarly(earlyNetworkYml);
-                if (RTP.lobbyMode) {
+                NetworkHooks.setLobbyMode(NetworkModeBootstrap.readLobbyModeEarly(earlyNetworkYml));
+                if (NetworkHooks.lobbyMode()) {
                     RTP.log(Level.INFO,
                             "[RTP][fabric] routing.lobbyMode=true -- local region processing"
                                     + " will be skipped; this backend acts as a pure"
                                     + " cross-server dispatcher.");
                 }
             } catch (Throwable t) {
-                RTP.lobbyMode = false;
+                NetworkHooks.setLobbyMode(false);
                 RTP.log(Level.FINE,
                         "[RTP][fabric] lobbyMode early-read failed; defaulting to false: "
                                 + t.getMessage());
@@ -128,7 +134,7 @@ public final class RTPFabricMod implements ModInitializer {
             // BukkitDatabaseHandler.setupDatabase invoked from
             // RTPBukkitPlugin.onEnable. Selects the DatabaseAccessor from
             // configs (sqlite default, h2/mysql/postgresql/yaml supported)
-            // and schedules databaseAccessor.startup() via RTP.scheduler.
+            // and schedules databaseAccessor.startup() via RTPRuntime.scheduler().
             //
             // Deferred to SERVER_STARTED: setupDatabase() invokes
             // Configs.reloadConfigs() → SafetyTokenExpander, which walks
@@ -165,7 +171,7 @@ public final class RTPFabricMod implements ModInitializer {
                                 () -> reflectIntZeroArg(accessor.getServer(),
                                         new String[] { "getMaxPlayers", "method_3802" }),
                                 () -> reflectTickWorkNanos(accessor.getServer()));
-                io.github.dailystruggle.rtp.common.RTP.metrics.setBinding(fabricMetrics);
+                CoreMetrics.instance().setBinding(fabricMetrics);
                 io.github.dailystruggle.rtp.common.RTP.log(Level.INFO,
                         "[RTP] Fabric metrics binding installed (FabricMetricsBinding).");
             } catch (Throwable t) {
@@ -269,7 +275,7 @@ public final class RTPFabricMod implements ModInitializer {
                         // ------------------------------------------------
                         try {
                             java.io.File networkYml = NetworkModeBootstrap.ensureNetworkYml(
-                                    RTP.serverAccessor.getPluginDirectory(), RTPFabricMod.class);
+                                    RTPRuntime.serverAccessor().getPluginDirectory(), RTPFabricMod.class);
                             networkBootstrap.boot(networkYml);
                             networkBootstrap.registerJoinTriggerSource();
                             networkBootstrap.registerWaitlistQuitListener();
@@ -363,7 +369,7 @@ public final class RTPFabricMod implements ModInitializer {
             //
             // Resolution model:
             //   - Resolve config values up-front (cheap, thread-safe).
-            //   - Hop to RTP.scheduler.runTask before sending packets so
+            //   - Hop to RTPRuntime.scheduler().runTask before sending packets so
             //     the player connection is touched on the server tick
             //     thread (mirrors Bukkit's runTask hop, which is itself
             //     a Folia AsyncCatcher requirement).
@@ -406,12 +412,12 @@ public final class RTPFabricMod implements ModInitializer {
                     @SuppressWarnings("unchecked")
                     io.github.dailystruggle.rtp.common.configuration.ConfigParser<PlayerMessages> lang =
                             (io.github.dailystruggle.rtp.common.configuration.ConfigParser<PlayerMessages>)
-                                    RTP.configs.getParser(PlayerMessages.class);
+                                    ActiveConfigs.get().getParser(PlayerMessages.class);
                     if (lang == null) return;
 
-                    final String title = RTP.configs.getConfigValue(
+                    final String title = ActiveConfigs.get().getConfigValue(
                             io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.title, "").toString();
-                    final String subtitle = RTP.configs.getConfigValue(
+                    final String subtitle = ActiveConfigs.get().getConfigValue(
                             io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.subtitle, "").toString();
                     final int fadeIn = lang.getNumber(
                             io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.fadeIn, 0).intValue();
@@ -419,7 +425,7 @@ public final class RTPFabricMod implements ModInitializer {
                             io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.stay, 0).intValue();
                     final int fadeOut = lang.getNumber(
                             io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.fadeOut, 0).intValue();
-                    final String actionbar = RTP.configs.getConfigValue(
+                    final String actionbar = ActiveConfigs.get().getConfigValue(
                             io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.actionbar, "").toString();
 
                     if ((title == null || title.isEmpty())
@@ -428,7 +434,7 @@ public final class RTPFabricMod implements ModInitializer {
                         return;
                     }
 
-                    RTP.scheduler.runTask(() -> {
+                    RTPRuntime.scheduler().runTask(() -> {
                         try {
                             sendTitleM.invoke(rtpPlayer, title, subtitle, fadeIn, stay, fadeOut);
                             sendActionbarM.invoke(rtpPlayer, actionbar);
@@ -457,7 +463,7 @@ public final class RTPFabricMod implements ModInitializer {
             // blank entries. Console commands run as the server console
             // (op-level CommandSourceStack); player commands run as the
             // player (player.createCommandSourceStack via FabricRTPPlayer).
-            // Dispatch is deferred to the main thread via RTP.scheduler.runTask
+            // Dispatch is deferred to the main thread via RTPRuntime.scheduler().runTask
             // because Brigadier dispatch on Fabric must run on the server tick
             // thread (CommandSourceStack#performPrefixedCommand mutates server
             // state and is not thread-safe). Mirrors the Folia-aware Bukkit
@@ -477,7 +483,7 @@ public final class RTPFabricMod implements ModInitializer {
                             io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys> configParser =
                             (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
                                     io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys>)
-                                    RTP.configs.getParser(
+                                    ActiveConfigs.get().getParser(
                                             io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.class);
                     if (configParser == null) return;
 
@@ -516,10 +522,10 @@ public final class RTPFabricMod implements ModInitializer {
                     final java.util.List<String> consoleFinal = consoleCommandsToRun;
                     final java.util.List<String> playerFinal = playerCommandsToRun;
                     final io.github.dailystruggle.rtp.api.entity.RTPPlayer playerRef = rtpPlayer;
-                    RTP.scheduler.runTask(() -> {
+                    RTPRuntime.scheduler().runTask(() -> {
                         if (!consoleFinal.isEmpty()) {
                             io.github.dailystruggle.rtp.api.entity.RTPCommandSender console =
-                                    RTP.serverAccessor.getSender(
+                                    RTPRuntime.serverAccessor().getSender(
                                             io.github.dailystruggle.rtp.api.RTPAPI.serverId);
                             if (console != null) {
                                 for (String c : consoleFinal) {
@@ -600,7 +606,7 @@ public final class RTPFabricMod implements ModInitializer {
             // Delegate command registration to the platform accessor SPI (RTPServerAccessor).
             // On Fabric, FabricServerAccessor wraps the root command using BrigadierCommandAdapter
             // and registers it (and aliases) into CommandRegistrationCallback.EVENT.
-            RTP.serverAccessor.registerCommands(root, "rtp", "wild");
+            RTPRuntime.serverAccessor().registerCommands(root, "rtp", "wild");
 
             // ----------------------------------------------------------------
             // Non-Folia ChunkUnloadProcessor timer.
@@ -610,7 +616,7 @@ public final class RTPFabricMod implements ModInitializer {
             // teleport pipeline with keep(true) are never released and
             // MemoryTracker tickets accumulate (see ADR-022 section 4 / S-002).
             // ----------------------------------------------------------------
-            RTP.scheduler.runTaskTimer(
+            RTPRuntime.scheduler().runTaskTimer(
                     new io.github.dailystruggle.rtp.common.tasks.ChunkUnloadProcessor(),
                     1, 1);
 
@@ -622,7 +628,7 @@ public final class RTPFabricMod implements ModInitializer {
             // (200 = 10 s), so each held chunk always has ≥ 5 s remaining
             // lifetime even if a refresh is delayed by a tick or two.
             // ----------------------------------------------------------------
-            RTP.scheduler.runTaskTimer(() -> {
+            RTPRuntime.scheduler().runTaskTimer(() -> {
                 FabricVersionAdapter adapter = FabricVersionAdapterRegistry.peek();
                 if (adapter != null) {
                     try {
@@ -637,19 +643,19 @@ public final class RTPFabricMod implements ModInitializer {
 
             // Drain startup tasks synchronously and on next tick (matching Bukkit).
             if (rtp != null) {
-                while (rtp.startupTasks.size() > 0) {
-                    rtp.startupTasks.execute(Long.MAX_VALUE);
+                while (MiscTasks.startup().size() > 0) {
+                    MiscTasks.startup().execute(Long.MAX_VALUE);
                 }
-                RTP.scheduler.runTaskLater(() -> {
+                RTPRuntime.scheduler().runTaskLater(() -> {
                     RTP r2 = RTP.getInstance();
                     if (r2 != null) {
-                        while (r2.startupTasks.size() > 0) {
-                            r2.startupTasks.execute(Long.MAX_VALUE);
+                        while (MiscTasks.startup().size() > 0) {
+                            MiscTasks.startup().execute(Long.MAX_VALUE);
                         }
                     }
                 }, 1);
-                while (rtp.startupTasks.size() > 0) {
-                    rtp.startupTasks.execute(Long.MAX_VALUE);
+                while (MiscTasks.startup().size() > 0) {
+                    MiscTasks.startup().execute(Long.MAX_VALUE);
                 }
             }
 

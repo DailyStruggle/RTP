@@ -2,9 +2,9 @@ package io.github.dailystruggle.rtp.bukkit.commands;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -42,7 +42,7 @@ public final class BukkitHelpReplyRenderer implements Function<UUID, Consumer<St
   public Consumer<String> apply(UUID senderId) {
     final CommandSender sender =
         senderId.equals(RTPAPI.serverId) ? Bukkit.getConsoleSender() : Bukkit.getPlayer(senderId);
-    final RTPCommandSender rtpSender = RTP.serverAccessor.getSender(senderId);
+    final RTPCommandSender rtpSender = RTPRuntime.serverAccessor().getSender(senderId);
     return msg -> {
       if (msg != null && rtpSender != null) {
         Matcher m = HELP_SUBCOMMAND_LINE.matcher(msg);

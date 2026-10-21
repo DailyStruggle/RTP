@@ -10,6 +10,7 @@ import io.github.dailystruggle.mapsapi.model.ChartModel;
 import io.github.dailystruggle.mapsapi.render.ChartRenderer;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.neoforge.player.NeoForgeMapSink;
 import io.github.dailystruggle.rtp.neoforge.version.NeoForgeVersionAdapter;
 import io.github.dailystruggle.rtp.neoforge.version.NeoForgeVersionAdapterRegistry;
@@ -33,7 +34,7 @@ import java.util.logging.Level;
  * item delivery.
  *
  * <p>This class contains <b>no</b> {@code net.minecraft.*} reference (the viewer
- * is resolved through {@code RTP.serverAccessor} as a {@code NeoForgeRTPPlayer}
+ * is resolved through {@code RTPRuntime.serverAccessor()} as a {@code NeoForgeRTPPlayer}
  * and every NM touch is delegated to that player and the carrier). Carriers that
  * do not implement {@link NeoForgeVersionAdapter#supportsMapCharts()} are
  * filtered out at install time (see {@code RTPNeoForgeMod}), so a binding
@@ -42,7 +43,7 @@ import java.util.logging.Level;
  * <p>Threading: {@code allocate} / {@code renderEphemeral} run on the caller's
  * (async) thread and only mutate in-memory buffers. {@code deliverTo} and the
  * live-refresh loop hand off to the {@code NeoForgeRTPPlayer} map sink, which
- * hops to the server tick thread via {@code RTP.scheduler} before the carrier
+ * hops to the server tick thread via {@code RTPRuntime.scheduler()} before the carrier
  * touches map / inventory / connection state (REQ-RTP-MAP-002 / S-005).
  *
  * @see NeoForgeMapCanvas
@@ -124,7 +125,7 @@ public final class NeoForgeMapBinding implements MapBinding, MapBindingLifecycle
         // Cancel a stale loop on the same chart before installing a new one.
         cancelLiveTask(chartId);
 
-        Object task = RTP.scheduler.runTaskTimerAsynchronously(() -> {
+        Object task = RTPRuntime.scheduler().runTaskTimerAsynchronously(() -> {
             try {
                 if (disabled) return;
                 renderFrame(buf, renderer, modelSupplier);
@@ -196,15 +197,15 @@ public final class NeoForgeMapBinding implements MapBinding, MapBindingLifecycle
 
     /**
      * Resolve the viewer to a {@link NeoForgeMapSink} through
-     * {@code RTP.serverAccessor}. Returns {@code null} if the accessor is
+     * {@code RTPRuntime.serverAccessor()}. Returns {@code null} if the accessor is
      * unbound, the viewer is offline, or the active carrier does not support
      * map charts.
      */
     private static NeoForgeMapSink resolveNeoForgePlayer(UUID viewer) {
         NeoForgeVersionAdapter adapter = NeoForgeVersionAdapterRegistry.peek();
         if (adapter == null || !adapter.supportsMapCharts()) return null;
-        RTPPlayer rtpPlayer = RTP.serverAccessor == null ? null
-                : RTP.serverAccessor.getPlayer(viewer);
+        RTPPlayer rtpPlayer = RTPRuntime.serverAccessor() == null ? null
+                : RTPRuntime.serverAccessor().getPlayer(viewer);
         return (rtpPlayer instanceof NeoForgeMapSink sink) ? sink : null;
     }
 
@@ -212,7 +213,7 @@ public final class NeoForgeMapBinding implements MapBinding, MapBindingLifecycle
         Object task = liveTasks.remove(chartId);
         if (task != null) {
             try {
-                RTP.scheduler.cancelTask(task);
+                RTPRuntime.scheduler().cancelTask(task);
             } catch (Throwable ignored) {
                 // best-effort: a scheduler that already dropped the task is fine
             }

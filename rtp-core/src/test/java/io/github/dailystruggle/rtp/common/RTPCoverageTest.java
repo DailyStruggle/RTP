@@ -5,10 +5,18 @@ import io.github.dailystruggle.rtp.api.RTPResult;
 import io.github.dailystruggle.rtp.api.RtpTarget;
 import io.github.dailystruggle.rtp.api.RtpTargetStatus;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.network.NetworkHooks;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -39,25 +47,25 @@ class RTPCoverageTest {
     void setUp() {
         accessor = RTPTestSetup.install(tempDir.toFile());
         RTP rtp = RTP.getInstance();
-        rtp.databaseAccessor = null;
-        rtp.latestTeleportData.clear();
-        rtp.priorTeleportData.clear();
-        rtp.queuedPlayers.clear();
-        rtp.processingPlayers.clear();
+        ActiveDatabase.setAccessor(null);
+        TeleportSessions.current().latestTeleportData.clear();
+        TeleportSessions.current().priorTeleportData.clear();
+        TeleportSessions.current().queuedPlayers.clear();
+        TeleportSessions.current().processingPlayers.clear();
     }
 
     @AfterEach
     void tearDown() {
         RTP rtp = RTP.getInstance();
         if (rtp != null) {
-            rtp.latestTeleportData.clear();
-            rtp.priorTeleportData.clear();
-            rtp.queuedPlayers.clear();
-            rtp.processingPlayers.clear();
+            TeleportSessions.current().latestTeleportData.clear();
+            TeleportSessions.current().priorTeleportData.clear();
+            TeleportSessions.current().queuedPlayers.clear();
+            TeleportSessions.current().processingPlayers.clear();
         }
         RTP.reloading.set(false);
-        RTP.serverAccessor = null;
-        RTP.scheduler = null;
+        RTPRuntime.setServerAccessor(null);
+        RTPRuntime.setScheduler(null);
         RTPAPI.serverAccessor = null;
     }
 
@@ -119,7 +127,7 @@ class RTPCoverageTest {
     @DisplayName("cancel and warmup report true while a player is processing")
     void cancelAndWarmup_processingPlayer_true() {
         UUID id = UUID.randomUUID();
-        RTP.getInstance().processingPlayers.add(id);
+        TeleportSessions.current().processingPlayers.add(id);
         assertTrue(RTPAPI.isWarmingUp(id));
         assertTrue(RTPAPI.cancel(id));
     }
@@ -174,13 +182,13 @@ class RTPCoverageTest {
     @Test
     @DisplayName("status with an economy present evaluates funds for a broke player")
     void targetStatus_withEconomy_evaluatesFunds() {
-        io.github.dailystruggle.rtp.api.economy.RTPEconomy saved = RTP.economy;
+        io.github.dailystruggle.rtp.api.economy.RTPEconomy saved = RTPRuntime.economy();
         try {
-            RTP.economy = new io.github.dailystruggle.rtp.api.economy.RTPEconomy() {
+            RTPRuntime.setEconomy(new io.github.dailystruggle.rtp.api.economy.RTPEconomy() {
                 @Override public void give(UUID playerId, double money) {}
                 @Override public boolean take(UUID playerId, double money) { return false; }
                 @Override public double bal(UUID playerId) { return -1_000_000.0; }
-            };
+            });
             UUID id = UUID.randomUUID();
             MockRTPPlayer player = new MockRTPPlayer(
                     id, "Broke", new RTPLocation(new MockRTPWorld("default"), 0, 0, 0)) {
@@ -193,7 +201,7 @@ class RTPCoverageTest {
             assertNotNull(RTPAPI.getTargetStatus(id, RtpTarget.defaultRegion()));
             assertNotNull(RTPAPI.getTargetStatus(id, RtpTarget.biome("plains")));
         } finally {
-            RTP.economy = saved;
+            RTPRuntime.setEconomy(saved);
         }
     }
 
@@ -328,7 +336,7 @@ class RTPCoverageTest {
             assertEquals(0L, RTP.getEffectiveLastTeleportTime(id, (String) null));
             assertEquals(0L, RTP.getEffectiveLastTeleportTime(null, "arena"));
         } finally {
-            RTP.getInstance().regionTeleportTimes.remove(id);
+            TeleportSessions.current().regionTeleportTimes.remove(id);
         }
     }
 
@@ -345,7 +353,7 @@ class RTPCoverageTest {
             io.github.dailystruggle.rtp.common.playerData.TeleportData data =
                     new io.github.dailystruggle.rtp.common.playerData.TeleportData();
             data.time = 100L;
-            rtp.latestTeleportData.put(id, data);
+            TeleportSessions.current().latestTeleportData.put(id, data);
             assertEquals(100L, RTP.getEffectiveLastTeleportTime(id));
 
             io.github.dailystruggle.rtp.common.network.RTPNetworkManager net =
@@ -358,7 +366,7 @@ class RTPCoverageTest {
             assertEquals(100L, RTP.getEffectiveLastTeleportTime(id));
         } finally {
             rtp.networkManager = savedNet;
-            rtp.latestTeleportData.remove(id);
+            TeleportSessions.current().latestTeleportData.remove(id);
         }
     }
 
@@ -396,7 +404,7 @@ class RTPCoverageTest {
             rtp.updateRetentionWindow();
             io.github.dailystruggle.rtp.common.playerData.FileBinStore created = rtp.fileBinStore;
             assertNotNull(created);
-            assertTrue(rtp.latestTeleportData.getRetentionMs() >= 60_000L);
+            assertTrue(TeleportSessions.current().latestTeleportData.getRetentionMs() >= 60_000L);
             rtp.updateRetentionWindow();
             assertSame(created, rtp.fileBinStore);
         } finally {
@@ -408,26 +416,26 @@ class RTPCoverageTest {
     @DisplayName("shape registration recreates a missing factory and binds the selection API")
     @SuppressWarnings({"unchecked", "rawtypes"})
     void registerDefaultShapes_recreatesMissingFactory() {
-        Map map = RTP.factoryMap;
-        Object savedFactory = map.get(RTP.factoryNames.shape);
-        var savedSelectionFactory = RTP.selectionAPI.shapeFactory;
+        Map map = FactoryRegistry.map();
+        Object savedFactory = map.get(FactoryNames.shape);
+        var savedSelectionFactory = ActiveSelection.get().shapeFactory;
         try {
-            map.remove(RTP.factoryNames.shape);
-            RTP.selectionAPI.shapeFactory = null;
+            map.remove(FactoryNames.shape);
+            ActiveSelection.get().shapeFactory = null;
             RTP.registerDefaultShapes();
-            var rebuilt = RTP.factoryMap.get(RTP.factoryNames.shape);
+            var rebuilt = FactoryRegistry.get(FactoryNames.shape);
             assertNotNull(rebuilt);
             assertTrue(rebuilt.contains("circle"));
-            assertSame(rebuilt, RTP.selectionAPI.shapeFactory);
+            assertSame(rebuilt, ActiveSelection.get().shapeFactory);
 
-            map.remove(RTP.factoryNames.shape);
-            RTP.selectionAPI.shapeFactory = null;
+            map.remove(FactoryNames.shape);
+            ActiveSelection.get().shapeFactory = null;
             RTP.addShape(new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle());
-            assertNotNull(RTP.factoryMap.get(RTP.factoryNames.shape));
-            assertSame(RTP.factoryMap.get(RTP.factoryNames.shape), RTP.selectionAPI.shapeFactory);
+            assertNotNull(FactoryRegistry.get(FactoryNames.shape));
+            assertSame(FactoryRegistry.get(FactoryNames.shape), ActiveSelection.get().shapeFactory);
         } finally {
-            map.put(RTP.factoryNames.shape, savedFactory);
-            RTP.selectionAPI.shapeFactory = savedSelectionFactory;
+            map.put(FactoryNames.shape, savedFactory);
+            ActiveSelection.get().shapeFactory = savedSelectionFactory;
         }
     }
 
@@ -435,12 +443,12 @@ class RTPCoverageTest {
     @DisplayName("vertical adjustor registration recreates a missing factory")
     @SuppressWarnings({"unchecked", "rawtypes"})
     void registerDefaultVerticalAdjustors_recreatesMissingFactory() {
-        Map map = RTP.factoryMap;
-        Object savedFactory = map.get(RTP.factoryNames.vert);
+        Map map = FactoryRegistry.map();
+        Object savedFactory = map.get(FactoryNames.vert);
         try {
-            map.remove(RTP.factoryNames.vert);
+            map.remove(FactoryNames.vert);
             RTP.registerDefaultVerticalAdjustors();
-            var rebuilt = RTP.factoryMap.get(RTP.factoryNames.vert);
+            var rebuilt = FactoryRegistry.get(FactoryNames.vert);
             assertNotNull(rebuilt);
             assertTrue(rebuilt.contains("linear"));
             assertTrue(rebuilt.contains("jump"));
@@ -449,11 +457,11 @@ class RTPCoverageTest {
             // vert factory is absent, so the adjustor must be built before the entry is removed.
             var jump = new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.jump.JumpAdjustor(
                     new java.util.ArrayList<>());
-            map.remove(RTP.factoryNames.vert);
+            map.remove(FactoryNames.vert);
             RTP.addVerticalAdjustor(jump);
-            assertTrue(RTP.factoryMap.get(RTP.factoryNames.vert).contains("jump"));
+            assertTrue(FactoryRegistry.get(FactoryNames.vert).contains("jump"));
         } finally {
-            map.put(RTP.factoryNames.vert, savedFactory);
+            map.put(FactoryNames.vert, savedFactory);
         }
     }
 
@@ -467,16 +475,16 @@ class RTPCoverageTest {
     @Test
     @DisplayName("remote COORDINATE target without a network hook is INVALID_TARGET")
     void teleport_remoteCoordinateWithoutNetwork_isInvalid() throws Exception {
-        var savedHook = RTP.networkCommandHook;
+        var savedHook = NetworkHooks.commandHook();
         try {
-            RTP.networkCommandHook = null;
+            NetworkHooks.setCommandHook(null);
             MockRTPPlayer player = addPlayer("CoordRemote");
             RTPResult result = await(RTPAPI.teleport(player.uuid(),
                     RtpTarget.coordinate("remote-server-xyz", "world", 1, 64, 1)));
             assertFalse(result.isSuccess());
             assertEquals(RTPResult.Reason.INVALID_TARGET, result.reason());
         } finally {
-            RTP.networkCommandHook = savedHook;
+            NetworkHooks.setCommandHook(savedHook);
         }
     }
 
@@ -484,24 +492,24 @@ class RTPCoverageTest {
     @DisplayName("local COORDINATE target to a known world completes and clears processing state")
     void teleport_localCoordinateKnownWorld_completes() throws Exception {
         MockRTPPlayer player = addPlayer("CoordLocal");
-        String worldName = RTP.serverAccessor.getRTPWorlds().isEmpty()
-                ? "default" : RTP.serverAccessor.getRTPWorlds().get(0).name();
+        String worldName = RTPRuntime.serverAccessor().getRTPWorlds().isEmpty()
+                ? "default" : RTPRuntime.serverAccessor().getRTPWorlds().get(0).name();
         RTPResult result = await(RTPAPI.teleport(player.uuid(),
                 RtpTarget.coordinate(null, worldName, 1, 64, 1)));
         assertNotNull(result);
-        assertFalse(RTP.getInstance().processingPlayers.contains(player.uuid()));
+        assertFalse(TeleportSessions.current().processingPlayers.contains(player.uuid()));
     }
 
     @Test
     @DisplayName("reload returns false when no configs are installed")
     void reload_withoutConfigs_returnsFalse() {
-        var saved = RTP.configs;
+        var saved = ActiveConfigs.get();
         try {
-            RTP.configs = null;
+            ActiveConfigs.set(null);
             assertFalse(RTP.reload());
             assertFalse(RTP.reloading.get());
         } finally {
-            RTP.configs = saved;
+            ActiveConfigs.set(saved);
         }
     }
 }

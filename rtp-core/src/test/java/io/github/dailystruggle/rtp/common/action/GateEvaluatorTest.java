@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.action;
 
 import io.github.dailystruggle.rtp.api.action.ActionGateContext;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -149,7 +150,7 @@ class GateEvaluatorTest {
   void testCommandGate() {
     io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
         new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(new java.io.File("target/test"));
-    io.github.dailystruggle.rtp.common.RTP.serverAccessor = accessor;
+    io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(accessor);
 
     // Register a tree command
     accessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl(null) {
@@ -179,7 +180,7 @@ class GateEvaluatorTest {
   void testCommandGateMapSyntax() {
     io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
         new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(new java.io.File("target/test"));
-    io.github.dailystruggle.rtp.common.RTP.serverAccessor = accessor;
+    io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(accessor);
 
     accessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl(null) {
       @Override public String name() { return "test_pass_map"; }
@@ -219,8 +220,8 @@ class GateEvaluatorTest {
     org.mockito.Mockito.when(mockShape.contains(org.mockito.ArgumentMatchers.intThat(i -> i >= 30), org.mockito.ArgumentMatchers.intThat(i -> i >= 30))).thenReturn(false);
     org.mockito.Mockito.doReturn(mockShape).when(mockRegion).getShape();
 
-    io.github.dailystruggle.rtp.common.RTP.selectionAPI.permRegionLookup.put("HUB_REGION", mockRegion);
-    io.github.dailystruggle.rtp.common.RTP.selectionAPI.permRegionLookup.put("hub_region", mockRegion);
+    ActiveSelection.get().permRegionLookup.put("HUB_REGION", mockRegion);
+    ActiveSelection.get().permRegionLookup.put("hub_region", mockRegion);
 
     try {
       ActionGateContext inside = new ActionGateContext(
@@ -232,8 +233,8 @@ class GateEvaluatorTest {
       assertTrue(GateEvaluator.evaluate(regGate, inside, null));
       assertFalse(GateEvaluator.evaluate(regGate, outside, null));
     } finally {
-      io.github.dailystruggle.rtp.common.RTP.selectionAPI.permRegionLookup.remove("HUB_REGION");
-      io.github.dailystruggle.rtp.common.RTP.selectionAPI.permRegionLookup.remove("hub_region");
+      ActiveSelection.get().permRegionLookup.remove("HUB_REGION");
+      ActiveSelection.get().permRegionLookup.remove("hub_region");
     }
   }
 
@@ -242,7 +243,7 @@ class GateEvaluatorTest {
   void testSpatialShapeAndPlayerCountGate() {
     io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
         new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(new java.io.File("target/test"));
-    io.github.dailystruggle.rtp.common.RTP.serverAccessor = accessor;
+    io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(accessor);
     io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = accessor.getRTPWorld("world");
 
     // Add 2 mock players inside chunk (0, 0)
@@ -259,7 +260,7 @@ class GateEvaluatorTest {
     io.github.dailystruggle.rtp.common.factory.Factory<io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape<?>> shapeFactory =
         new io.github.dailystruggle.rtp.common.factory.Factory<>();
     shapeFactory.add("SQUARE", new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square());
-    io.github.dailystruggle.rtp.common.RTP.factoryMap.put(io.github.dailystruggle.rtp.common.RTP.factoryNames.shape, shapeFactory);
+    io.github.dailystruggle.rtp.common.factory.FactoryRegistry.map().put(io.github.dailystruggle.rtp.common.factory.FactoryNames.shape, shapeFactory);
 
     ActionGateContext ctxInside = new ActionGateContext(
         UUID.randomUUID(), "test", p1.uuid(), 10L, 290L, 0, true, 0.0, 5.0, 64.0, 5.0);
@@ -448,7 +449,7 @@ class GateEvaluatorTest {
   void testMultiGateAndMultiCommand() {
     io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
         new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(new java.io.File("target/test"));
-    io.github.dailystruggle.rtp.common.RTP.serverAccessor = accessor;
+    io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(accessor);
 
     accessor.registerCommands(new io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl(null) {
       @Override public String name() { return "cmd_one"; }
@@ -497,7 +498,7 @@ class GateEvaluatorTest {
   void testGateEvaluatorEdgeBranches() {
     io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
         new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(new java.io.File("target/test"));
-    io.github.dailystruggle.rtp.common.RTP.serverAccessor = accessor;
+    io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(accessor);
 
     UUID sId = UUID.randomUUID();
     UUID pId = UUID.randomUUID();

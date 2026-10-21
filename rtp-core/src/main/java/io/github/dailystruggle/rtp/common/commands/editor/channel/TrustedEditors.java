@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.editor.channel;
 
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
@@ -88,12 +88,12 @@ public final class TrustedEditors {
             }
         } catch (IOException | IllegalArgumentException e) {
             t.trusted.clear();
-            RTP.log(Level.WARNING, "[editor] trusted editor list " + file + " is unreadable; treating it as empty: "
+            RTPRuntime.log(Level.WARNING, "[editor] trusted editor list " + file + " is unreadable; treating it as empty: "
                     + e.getMessage());
             return t;
         }
         if (expired > 0) {
-            RTP.log(Level.INFO, "[editor] " + expired + " trusted editor key(s) in " + file + " passed the trust max age"
+            RTPRuntime.log(Level.INFO, "[editor] " + expired + " trusted editor key(s) in " + file + " passed the trust max age"
                     + " and must be trusted again");
         }
         return t;

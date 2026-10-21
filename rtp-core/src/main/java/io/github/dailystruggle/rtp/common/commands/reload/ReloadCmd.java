@@ -5,10 +5,14 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -29,7 +33,7 @@ public class ReloadCmd extends BaseRTPCmdImpl {
   }
 
   public void addCommands() {
-    final Configs configs = RTP.configs;
+    final Configs configs = ActiveConfigs.get();
     if (configs == null) {
       // Configs are not loaded yet (e.g. the command tree is being built before
       // the rtp-core singleton finished bootstrapping its Configs - this is the
@@ -37,9 +41,9 @@ public class ReloadCmd extends BaseRTPCmdImpl {
       // initial datapack load). Reschedule and bail; dereferencing `configs`
       // below would NPE. RTP.getInstance() can itself be null this early, so
       // guard it before queueing the retry.
-      RTP rtp = RTP.getInstance();
-      if (rtp != null) {
-        rtp.miscAsyncTasks.add(new RTPRunnable(this::addCommands, 1));
+      TeleportSessions sessions = TeleportSessions.current();
+      if (sessions != null) {
+        MiscTasks.async().add(new RTPRunnable(this::addCommands, 1));
       }
       return;
     }
@@ -83,11 +87,11 @@ public class ReloadCmd extends BaseRTPCmdImpl {
           filenamePattern
               .matcher(msg)
               .replaceAll("configs"); // msg = msg.replaceAll( "\\[filename]", "configs" );
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg);
+      RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, senderId, msg);
     }
 
-    RTP.scheduler.runTaskAsynchronously(() -> {
-      boolean b = RTP.configs.reload();
+    RTPRuntime.scheduler().runTaskAsynchronously(() -> {
+      boolean b = ActiveConfigs.get().reload();
       if (!b) throw new IllegalStateException("reload failed");
 
       // Drop the decoded-schematic cache so a swapped/edited <region>.schem file on disk is
@@ -96,7 +100,7 @@ public class ReloadCmd extends BaseRTPCmdImpl {
 
       // Re-index <dataFolder>/docs so edited shipped docs reach /rtp docs and the editor.
       io.github.dailystruggle.rtp.common.commands.docs.DocsRegistry.rebuildFromDataFolder(
-          RTP.serverAccessor.getPluginDirectory());
+          RTPRuntime.serverAccessor().getPluginDirectory());
 
       String msgReloaded = msg(SystemMessages.reloaded, "");
       if (!msgReloaded.isEmpty()) {
@@ -104,11 +108,10 @@ public class ReloadCmd extends BaseRTPCmdImpl {
             filenamePattern
                 .matcher(msgReloaded)
                 .replaceAll("configs"); // msg.replaceAll( "\\[filename]", "configs" );
-        RTP.serverAccessor.sendMessage(RTPAPI.serverId, senderId, msgReloaded);
+        RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, senderId, msgReloaded);
       }
 
-      RTP.getInstance()
-              .miscSyncTasks
+      MiscTasks.sync()
               .add(
                       new RTPRunnable(
                               () -> {

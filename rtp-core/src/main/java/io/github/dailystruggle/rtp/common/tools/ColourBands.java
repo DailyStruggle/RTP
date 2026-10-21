@@ -1,7 +1,8 @@
 package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 /**
  * Resolves {@code /rtp info} health colour bands (green, yellow, red).
  * Looks up thresholds from {@link CommandMessages} with documented fallbacks.
@@ -111,9 +112,9 @@ public final class ColourBands {
     @SuppressWarnings("unchecked")
     static double resolveDouble(Enum<?> key, double fallback) {
         try {
-            RTP rtp = RTP.getInstance();
-            if (rtp == null || RTP.configs == null) return fallback;
-            Object raw = RTP.configs.getConfigValue(key, null);
+            TeleportSessions sessions = TeleportSessions.current();
+            if (sessions == null || ActiveConfigs.get() == null) return fallback;
+            Object raw = ActiveConfigs.get().getConfigValue(key, null);
             return parseDouble(raw, fallback);
         } catch (Throwable t) {
             return fallback;

@@ -3,13 +3,14 @@ package io.github.dailystruggle.rtp.common.selection.region;
 import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import org.junit.jupiter.api.BeforeEach;
@@ -77,7 +78,7 @@ public class ReqRtpS004PerPlayerDeletionTest {
 
         // Setup database mock
         DatabaseAccessor db = mock(DatabaseAccessor.class);
-        RTP.getInstance().databaseAccessor = db;
+        ActiveDatabase.setAccessor(db);
 
         // Add to private queue. ADR-043: enqueuePlayerLocation creates the
         // personal bucket as a side effect (it's a write into
@@ -98,8 +99,8 @@ public class ReqRtpS004PerPlayerDeletionTest {
         TeleportData data = new TeleportData();
         data.completed = false;
         data.sender = player;
-        RTP.getInstance().latestTeleportData.put(playerId, data);
-        RTP.getInstance().processingPlayers.add(playerId);
+        TeleportSessions.current().latestTeleportData.put(playerId, data);
+        TeleportSessions.current().processingPlayers.add(playerId);
 
         // Run execute. It should poll and delete.
         region.execute(Long.MAX_VALUE);
@@ -125,7 +126,7 @@ public class ReqRtpS004PerPlayerDeletionTest {
 
         // Setup database mock
         DatabaseAccessor db = mock(DatabaseAccessor.class);
-        RTP.getInstance().databaseAccessor = db;
+        ActiveDatabase.setAccessor(db);
 
         // Add to public queue
         region.queueManager.keptLocations.offer(loc);
@@ -146,8 +147,8 @@ public class ReqRtpS004PerPlayerDeletionTest {
         TeleportData data = new TeleportData();
         data.completed = false;
         data.sender = player;
-        RTP.getInstance().latestTeleportData.put(playerId, data);
-        RTP.getInstance().processingPlayers.add(playerId);
+        TeleportSessions.current().latestTeleportData.put(playerId, data);
+        TeleportSessions.current().processingPlayers.add(playerId);
 
         // Run execute. It should poll and delete.
         region.execute(Long.MAX_VALUE);

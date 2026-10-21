@@ -6,8 +6,10 @@ import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.world.BiomeOverride;
 import io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter;
 import net.minecraft.core.BlockPos;
@@ -182,7 +184,7 @@ public final class V26_4_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
     private static volatile java.lang.reflect.Method GET_CHUNK_FUTURE_METHOD;
 
     private static final java.util.concurrent.Executor RTP_CONTINUATION_EXECUTOR =
-            r -> RTP.scheduler.runTaskAsynchronously(r);
+            r -> RTPRuntime.scheduler().runTaskAsynchronously(r);
 
     @SuppressWarnings("unchecked")
     private CompletableFuture<ChunkAccess> requestChunkFuture(ServerLevel level, int cx, int cz) {
@@ -414,8 +416,8 @@ public final class V26_4_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
                 if (err != null) throw err;
                 if (probe == null) return null;
                 return ChunkColumnProbe.of(new AnvilColumnProbeAdapter(probe, cx, cz,
-                        s -> (RTP.serverAccessor != null)
-                                ? RTP.serverAccessor.reconcilePaletteIdentifier(s)
+                        s -> (RTPRuntime.serverAccessor() != null)
+                                ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
                                 : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(s)));
             } catch (Throwable t) {
                 RTP.log(Level.FINE,
@@ -588,7 +590,7 @@ public final class V26_4_R1FabricRTPWorld extends RTPWorld<ServerLevel> {
         try {
             @SuppressWarnings("unchecked")
             ConfigParser<SafetyKeys> safety =
-                    (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+                    (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
             if (safety == null) return true;
             Object raw = safety.getConfigValue(SafetyKeys.anvilPrefilterEnabled, Boolean.TRUE);
             if (raw instanceof Boolean b) return b;

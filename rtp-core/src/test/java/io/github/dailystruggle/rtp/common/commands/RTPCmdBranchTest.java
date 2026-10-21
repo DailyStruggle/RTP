@@ -6,11 +6,13 @@ import io.github.dailystruggle.rtp.common.commands.base.RTPCmd;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import org.junit.jupiter.api.AfterEach;
@@ -65,8 +67,8 @@ class RTPCmdBranchTest {
     @AfterEach
     void tearDown() {
         RTPCmd.setRng(null);
-        RTP.getInstance().processingPlayers.clear();
-        RTP.getInstance().latestTeleportData.clear();
+        TeleportSessions.current().processingPlayers.clear();
+        TeleportSessions.current().latestTeleportData.clear();
     }
 
     @Test
@@ -111,7 +113,7 @@ class RTPCmdBranchTest {
         TeleportData data = new TeleportData();
         data.time = System.currentTimeMillis();
         data.completed = true;
-        RTP.getInstance().latestTeleportData.put(sender.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(sender.uuid(), data);
 
         boolean result = rtpCmd.onCommand(sender, rtpCmd, "rtp", new String[0]);
         assertTrue(result);
@@ -138,7 +140,7 @@ class RTPCmdBranchTest {
                         "testRegion", null, null, null, false, false, 0, 0, 0, 0, 0.0, 0, null, false, 3600000L, null);
         org.mockito.Mockito.when(targetRegion.getSettings()).thenReturn(settings);
         data.targetRegion = targetRegion;
-        RTP.getInstance().latestTeleportData.put(sender.uuid(), data);
+        TeleportSessions.current().latestTeleportData.put(sender.uuid(), data);
 
         boolean result = rtpCmd.onCommand(sender, rtpCmd, "rtp", new String[0]);
         assertTrue(result);
@@ -153,7 +155,7 @@ class RTPCmdBranchTest {
                 new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(new ArrayList<>()),
                 false, requirePermission, 0, 0, 0, 0, 0.0, 0, null, false, cooldownMillis, null);
         Region region = new Region(name, settings);
-        RTP.selectionAPI.permRegionLookup.put(name, region);
+        ActiveSelection.get().permRegionLookup.put(name, region);
         return region;
     }
 
@@ -176,18 +178,18 @@ class RTPCmdBranchTest {
             data.time = System.currentTimeMillis() - 10000L;
             data.completed = true;
             data.targetRegion = longRegion;
-            RTP.getInstance().latestTeleportData.put(sender.uuid(), data);
+            TeleportSessions.current().latestTeleportData.put(sender.uuid(), data);
 
             assertTrue(rtpCmd.onCommand(sender, rtpCmd, "rtp", new String[]{"region:rtp32Long"}));
 
-            String cooldownMsg = (String) RTP.configs.getConfigValue(
+            String cooldownMsg = (String) ActiveConfigs.get().getConfigValue(
                     io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.cooldownMessage, "");
             assertTrue(sender.sentMessages.contains(cooldownMsg),
                     "10s after the last teleport, the requested region's 120s override must reject (global is 5s)");
-            assertSame(data, RTP.getInstance().latestTeleportData.get(sender.uuid()),
+            assertSame(data, TeleportSessions.current().latestTeleportData.get(sender.uuid()),
                     "the early guard must reject before compute() replaces the teleport data");
         } finally {
-            RTP.selectionAPI.permRegionLookup.remove("rtp32Long");
+            ActiveSelection.get().permRegionLookup.remove("rtp32Long");
         }
     }
 
@@ -219,9 +221,9 @@ class RTPCmdBranchTest {
             assertNull(RTPCmd.requestedRegionWithOverride(sender, new String[]{"region:rtp32Open"}),
                     "without rtp.region the region parameter is not usable");
         } finally {
-            RTP.selectionAPI.permRegionLookup.remove("rtp32Open");
-            RTP.selectionAPI.permRegionLookup.remove("rtp32Gated");
-            RTP.selectionAPI.permRegionLookup.remove("rtp32NoOverride");
+            ActiveSelection.get().permRegionLookup.remove("rtp32Open");
+            ActiveSelection.get().permRegionLookup.remove("rtp32Gated");
+            ActiveSelection.get().permRegionLookup.remove("rtp32NoOverride");
         }
     }
 
@@ -255,9 +257,9 @@ class RTPCmdBranchTest {
                     completedTeleport(midRegion, now - 10000L), now),
                     "neither elapsed: the shorter (30s region) remainder applies");
         } finally {
-            RTP.selectionAPI.permRegionLookup.remove("rtp32Short");
-            RTP.selectionAPI.permRegionLookup.remove("rtp32LongDefault");
-            RTP.selectionAPI.permRegionLookup.remove("rtp32Mid");
+            ActiveSelection.get().permRegionLookup.remove("rtp32Short");
+            ActiveSelection.get().permRegionLookup.remove("rtp32LongDefault");
+            ActiveSelection.get().permRegionLookup.remove("rtp32Mid");
         }
     }
 
@@ -285,9 +287,9 @@ class RTPCmdBranchTest {
             assertEquals(0L, RTPCmd.cooldownRemaining(globalLong, globalLong.uuid(), null, false, null, now),
                     "no prior teleport: nothing to wait for");
         } finally {
-            RTP.selectionAPI.permRegionLookup.remove("rtp32ReqShort");
-            RTP.selectionAPI.permRegionLookup.remove("rtp32ReqLong");
-            RTP.selectionAPI.permRegionLookup.remove("rtp32ReqPlain");
+            ActiveSelection.get().permRegionLookup.remove("rtp32ReqShort");
+            ActiveSelection.get().permRegionLookup.remove("rtp32ReqLong");
+            ActiveSelection.get().permRegionLookup.remove("rtp32ReqPlain");
         }
     }
 
@@ -296,7 +298,7 @@ class RTPCmdBranchTest {
         MockRTPPlayer sender = new MockRTPPlayer(UUID.randomUUID(), "busyUser", null);
         accessor.addPlayer(sender);
 
-        RTP.getInstance().processingPlayers.add(sender.uuid());
+        TeleportSessions.current().processingPlayers.add(sender.uuid());
 
         boolean result = rtpCmd.onCommand(sender, rtpCmd, "rtp", new String[0]);
         assertTrue(result);
@@ -311,13 +313,13 @@ class RTPCmdBranchTest {
         TeleportData stale = new TeleportData();
         stale.time = System.currentTimeMillis();
         stale.completed = false;
-        RTP.getInstance().latestTeleportData.put(sender.uuid(), stale);
+        TeleportSessions.current().latestTeleportData.put(sender.uuid(), stale);
         // Acquired by the outer onCommand before compute runs.
-        RTP.getInstance().processingPlayers.add(sender.uuid());
+        TeleportSessions.current().processingPlayers.add(sender.uuid());
 
         assertTrue(rtpCmd.compute(sender.uuid(), new HashMap<>(), null, msg -> {}));
 
-        assertFalse(RTP.getInstance().processingPlayers.contains(sender.uuid()),
+        assertFalse(TeleportSessions.current().processingPlayers.contains(sender.uuid()),
                 "no pipeline was dispatched, so the sender must not stay 'already teleporting'");
     }
 
@@ -331,14 +333,14 @@ class RTPCmdBranchTest {
         TeleportData inFlight = new TeleportData();
         inFlight.time = System.currentTimeMillis();
         inFlight.completed = false;
-        RTP.getInstance().latestTeleportData.put(target.uuid(), inFlight);
-        RTP.getInstance().processingPlayers.add(admin.uuid());
+        TeleportSessions.current().latestTeleportData.put(target.uuid(), inFlight);
+        TeleportSessions.current().processingPlayers.add(admin.uuid());
 
         Map<String, List<String>> args = new HashMap<>();
         args.put("player", List.of("busyTarget"));
         assertTrue(rtpCmd.compute(admin.uuid(), args, null, msg -> {}));
 
-        assertFalse(RTP.getInstance().processingPlayers.contains(admin.uuid()),
+        assertFalse(TeleportSessions.current().processingPlayers.contains(admin.uuid()),
                 "the sender's lock is never owned by another player's pipeline");
     }
 

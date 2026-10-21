@@ -7,9 +7,9 @@ import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.menu.search.ConfigSearchResultsBuilder;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,7 +32,7 @@ public class ReqRtpMenuBuildersAndHandlersTest {
         tempDir = Files.createTempDirectory("rtp-menu-builders-cov-");
         pluginDir = tempDir.toFile();
         RTPTestSetup.install(pluginDir);
-        RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
+        ActiveSelection.set(new io.github.dailystruggle.rtp.common.selection.SelectionAPI());
     }
 
     @Test

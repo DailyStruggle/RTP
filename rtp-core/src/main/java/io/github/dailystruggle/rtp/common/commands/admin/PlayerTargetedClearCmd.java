@@ -4,9 +4,9 @@ import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -95,10 +95,10 @@ public abstract class PlayerTargetedClearCmd extends BaseRTPCmdImpl {
     } else {
       global = false;
       for (String n : names) {
-        RTPPlayer p = (RTP.serverAccessor != null) ? RTP.serverAccessor.getPlayer(n) : null;
+        RTPPlayer p = (RTPRuntime.serverAccessor() != null) ? RTPRuntime.serverAccessor().getPlayer(n) : null;
         if (p == null) {
           String msg = "RTP: unknown player - " + n;
-          RTP.log(Level.WARNING, "[RTP] clear " + name() + ": " + msg + " (by " + callerId + ")");
+          RTPRuntime.log(Level.WARNING, "[RTP] clear " + name() + ": " + msg + " (by " + callerId + ")");
           sendToCaller(callerId, msg);
           continue;
         }
@@ -118,7 +118,7 @@ public abstract class PlayerTargetedClearCmd extends BaseRTPCmdImpl {
 
     String scope = global ? "all players" : (cleared + " player(s)");
     String msg = "cleared " + label() + " for " + scope;
-    RTP.log(Level.INFO, "[RTP] clear " + name() + ": " + msg + " (by " + callerId + ")");
+    RTPRuntime.log(Level.INFO, "[RTP] clear " + name() + ": " + msg + " (by " + callerId + ")");
     sendToCaller(callerId, "RTP: " + msg);
     return true;
   }
@@ -151,9 +151,9 @@ public abstract class PlayerTargetedClearCmd extends BaseRTPCmdImpl {
    * @param message  the message to send
    */
   protected static void sendToCaller(@Nullable UUID callerId, String message) {
-    if (callerId == null || RTP.serverAccessor == null) return;
+    if (callerId == null || RTPRuntime.serverAccessor() == null) return;
     try {
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, message);
+      RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, message);
     } catch (RuntimeException ignored) {
       // serverAccessor failures (headless / test scaffolds) are not fatal.
     }

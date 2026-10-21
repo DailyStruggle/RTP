@@ -5,10 +5,12 @@ import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionTaskDispatcher;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.tasks.scan.ScanTask;
+import io.github.dailystruggle.rtp.common.tasks.scan.ScanTasks;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import java.util.UUID;
@@ -31,8 +33,8 @@ public final class RegionTaskCoordinator implements RegionTaskDispatcher {
     long iter = progress[0];
     if (iter <= 0 || iter >= ms.getRange()) return;
     ScanTask task = new ScanTask(region, iter);
-    RTP.getInstance().scanTasks.put(region.name, task);
-    ms.getLoadFuture().whenComplete((v, t) -> RTP.scheduler.runTaskAsynchronously(task));
+    ScanTasks.current().put(region.name, task);
+    ms.getLoadFuture().whenComplete((v, t) -> RTPRuntime.scheduler().runTaskAsynchronously(task));
   }
 
   @Override
@@ -41,7 +43,7 @@ public final class RegionTaskCoordinator implements RegionTaskDispatcher {
     TeleportPipelineTask pipelineTask = new TeleportPipelineTask(context, region, coords, reservation);
     data.nextTask = pipelineTask;
     pipelineTask.setPhase(TeleportPipelineTask.Phase.LOAD);
-    RTP.scheduler.runTaskAsynchronously(pipelineTask);
+    RTPRuntime.scheduler().runTaskAsynchronously(pipelineTask);
   }
 
   /**
@@ -54,17 +56,17 @@ public final class RegionTaskCoordinator implements RegionTaskDispatcher {
     if (data != null && !data.completed && data.nextTask instanceof TeleportPipelineTask task) {
       task.setCancelled(true);
       if (task.coords() != null) {
-        RTP.scheduler.runTask(
+        RTPRuntime.scheduler().runTask(
             task.region().getWorld(), task.coords().x() >> 4, task.coords().z() >> 4, task);
       } else {
-        RTP.scheduler.runTask(task);
+        RTPRuntime.scheduler().runTask(task);
       }
     }
 
     if (cancelNow) {
       new RTPTeleportCancel(playerId).run();
     } else {
-      RTP.scheduler.runTask(new RTPTeleportCancel(playerId));
+      RTPRuntime.scheduler().runTask(new RTPTeleportCancel(playerId));
     }
   }
 

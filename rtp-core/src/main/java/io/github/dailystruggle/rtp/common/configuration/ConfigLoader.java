@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.*;
 import java.net.URL;
 import java.net.URLConnection;
@@ -59,7 +59,7 @@ public interface ConfigLoader {
     // Short-circuit: if the file already exists and we are not replacing, nothing to do.
     File earlyCheck = new File(getMainDirectory(), resourcePath);
     if (earlyCheck.exists() && !replace) {
-      RTP.log(
+      RTPRuntime.log(
           java.util.logging.Level.WARNING,
           "Could not save " + earlyCheck.getName() + " to " + earlyCheck
               + " because " + earlyCheck.getName() + " already exists.");
@@ -90,10 +90,10 @@ public interface ConfigLoader {
             out.write(buf, 0, len);
           }
         } catch (IOException ex) {
-          RTP.log(Level.SEVERE, "Could not save " + outFile.getName() + " to " + outFile, ex);
+          RTPRuntime.log(Level.SEVERE, "Could not save " + outFile.getName() + " to " + outFile, ex);
         }
       } else {
-        RTP.log(
+        RTPRuntime.log(
             Level.WARNING,
             "Could not save "
                 + outFile.getName()
@@ -104,7 +104,7 @@ public interface ConfigLoader {
                 + " already exists.");
       }
     } catch (IOException ex) {
-      RTP.log(Level.SEVERE, "Could not save " + outFile.getName() + " to " + outFile, ex);
+      RTPRuntime.log(Level.SEVERE, "Could not save " + outFile.getName() + " to " + outFile, ex);
     }
   }
 }

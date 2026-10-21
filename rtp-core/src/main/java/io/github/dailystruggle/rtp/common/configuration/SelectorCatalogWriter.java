@@ -1,8 +1,10 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -37,13 +39,13 @@ public final class SelectorCatalogWriter {
   public static void write(File pluginDirectory) {
     if (pluginDirectory == null) return;
     File dir = new File(pluginDirectory, "definitions" + File.separator + "regions");
-    writeOne(dir, "SHAPES.md", "Shape catalog", "shape", RTP.factoryNames.shape);
-    writeOne(dir, "VERT.md", "Vertical adjustor catalog", "vert", RTP.factoryNames.vert);
+    writeOne(dir, "SHAPES.md", "Shape catalog", "shape", FactoryNames.shape);
+    writeOne(dir, "VERT.md", "Vertical adjustor catalog", "vert", FactoryNames.vert);
   }
 
   private static void writeOne(File dir, String fileName, String title, String settingKey,
-                               RTP.factoryNames factoryName) {
-    Factory<?> factory = RTP.factoryMap.get(factoryName);
+                               FactoryNames factoryName) {
+    Factory<?> factory = FactoryRegistry.get(factoryName);
     // Platform bootstrap registers the types; an empty factory means we are being
     // called before registration (or on a stripped assembly). Leave any prior file.
     if (factory == null || factory.map.isEmpty()) return;
@@ -53,7 +55,7 @@ public final class SelectorCatalogWriter {
       Files.write(new File(dir, fileName).toPath(),
           render(title, settingKey, factory).getBytes(StandardCharsets.UTF_8));
     } catch (IOException | RuntimeException e) {
-      RTP.log(Level.WARNING, "[RTP] failed to write " + fileName + " catalog", e);
+      RTPRuntime.log(Level.WARNING, "[RTP] failed to write " + fileName + " catalog", e);
     }
   }
 

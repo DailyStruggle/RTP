@@ -10,7 +10,7 @@ import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
  * {@link LocationGenerator} is a non-blocking state machine that releases the
  * async worker thread between every I/O-bearing stage (chunk load, reservation
  * ready, neighbour grid load, global-region-verifier). Because every scheduler
- * call is routed through {@code RTP.serverAccessor.getScheduler()}, the Folia
+ * call is routed through {@code RTPRuntime.serverAccessor().getScheduler()}, the Folia
  * adapter's Folia-specific {@code RTPScheduler} implementation automatically
  * picks up {@code runTaskAsynchronously} invocations from the core state
  * machine. No Folia-specific generator logic remains.

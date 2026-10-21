@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.tasks.tick;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.tasks.scan.ScanTask;
+import io.github.dailystruggle.rtp.common.tasks.scan.ScanTasks;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,12 +33,12 @@ class ScanTaskProcessingTest {
     @BeforeEach
     void setUp() {
         RTPTestSetup.install(tempDir);
-        RTP.getInstance().scanTasks.clear();
+        ScanTasks.current().clear();
     }
 
     @AfterEach
     void tearDown() {
-        RTP.getInstance().scanTasks.clear();
+        ScanTasks.current().clear();
     }
 
     // -----------------------------------------------------------------------
@@ -113,7 +113,7 @@ class ScanTaskProcessingTest {
     @Timeout(value = 1, unit = TimeUnit.SECONDS)
     void run_skips_already_running_scanTask() {
         AtomicBoolean ran = new AtomicBoolean(false);
-        RTP.getInstance().scanTasks.put("r1", stubScanTask(true, ran));
+        ScanTasks.current().put("r1", stubScanTask(true, ran));
 
         new ScanTaskProcessing().run();
 
@@ -124,7 +124,7 @@ class ScanTaskProcessingTest {
     @Timeout(value = 1, unit = TimeUnit.SECONDS)
     void run_executes_idle_scanTask() {
         AtomicBoolean ran = new AtomicBoolean(false);
-        RTP.getInstance().scanTasks.put("r1", stubScanTask(false, ran));
+        ScanTasks.current().put("r1", stubScanTask(false, ran));
 
         new ScanTaskProcessing().run();
 
@@ -137,7 +137,7 @@ class ScanTaskProcessingTest {
         AtomicInteger count = new AtomicInteger(0);
 
         for (int i = 0; i < 3; i++) {
-            RTP.getInstance().scanTasks.put("r" + i, stubScanTask(false, count::incrementAndGet));
+            ScanTasks.current().put("r" + i, stubScanTask(false, count::incrementAndGet));
         }
 
         new ScanTaskProcessing().run();
@@ -150,8 +150,8 @@ class ScanTaskProcessingTest {
     void run_mixes_running_and_idle_tasks_correctly() {
         AtomicInteger count = new AtomicInteger(0);
 
-        RTP.getInstance().scanTasks.put("running", stubScanTask(true,  count::incrementAndGet));
-        RTP.getInstance().scanTasks.put("idle",    stubScanTask(false, count::incrementAndGet));
+        ScanTasks.current().put("running", stubScanTask(true,  count::incrementAndGet));
+        ScanTasks.current().put("idle",    stubScanTask(false, count::incrementAndGet));
 
         new ScanTaskProcessing().run();
 
@@ -166,7 +166,7 @@ class ScanTaskProcessingTest {
     @Timeout(value = 1, unit = TimeUnit.SECONDS)
     void run_does_not_execute_when_cancelled_before_start() {
         AtomicBoolean ran = new AtomicBoolean(false);
-        RTP.getInstance().scanTasks.put("r1", stubScanTask(false, ran));
+        ScanTasks.current().put("r1", stubScanTask(false, ran));
 
         ScanTaskProcessing proc = new ScanTaskProcessing();
         proc.setCancelled(true);
@@ -182,7 +182,7 @@ class ScanTaskProcessingTest {
         ScanTaskProcessing proc = new ScanTaskProcessing();
 
         for (int i = 0; i < 4; i++) {
-            RTP.getInstance().scanTasks.put("r" + i, stubScanTask(false, () -> {
+            ScanTasks.current().put("r" + i, stubScanTask(false, () -> {
                 count.incrementAndGet();
                 proc.setCancelled(true);
             }));

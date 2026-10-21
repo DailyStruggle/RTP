@@ -6,8 +6,8 @@ import io.github.dailystruggle.commandsapi.common.parameters.EnumParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.FloatParameter;
 import io.github.dailystruggle.commandsapi.common.parameters.IntegerParameter;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.parameters.DistanceParameter;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.CircleOptimizedDualLayer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
@@ -80,7 +80,7 @@ public class EllipseOptimizedDualLayer extends MemoryShape<EllipseMemoryShapePar
       subParameters.put("uniqueplacements", new IntegerParameter(
           "rtp.params", "chunk radius cleared around each selection", (sender, s) -> true, 0, 1, 2, 4, 8));
     } catch (Exception e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
     }
   }
 

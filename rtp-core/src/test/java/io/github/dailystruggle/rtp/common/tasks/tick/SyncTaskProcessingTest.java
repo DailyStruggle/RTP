@@ -3,11 +3,13 @@ package io.github.dailystruggle.rtp.common.tasks.tick;
 import io.github.dailystruggle.commandsapi.common.CommandExecutor;
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.action.ActionServices;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -42,8 +44,8 @@ class SyncTaskProcessingTest {
     void tearDown() {
         CommandsAPI.commandPipeline.clear();
         SyncTaskProcessing.clearCachedConfig();
-        RTP.serverAccessor = null;
-        RTP.scheduler = null;
+        RTPRuntime.setServerAccessor(null);
+        RTPRuntime.setScheduler(null);
     }
 
     @Test
@@ -93,9 +95,9 @@ class SyncTaskProcessingTest {
     @DisplayName("syncAllottedTime: commands are charged first; an exhausted budget still runs one misc task")
     void commandsChargedAgainstBudget_miscKeepsProgress() {
         java.util.concurrent.atomic.AtomicInteger miscRan = new java.util.concurrent.atomic.AtomicInteger();
-        RTP.getInstance().miscSyncTasks.clear();
-        RTP.getInstance().miscSyncTasks.start();
-        for (int i = 0; i < 3; i++) RTP.getInstance().miscSyncTasks.add(miscRan::incrementAndGet);
+        MiscTasks.sync().clear();
+        MiscTasks.sync().start();
+        for (int i = 0; i < 3; i++) MiscTasks.sync().add(miscRan::incrementAndGet);
 
         AtomicBoolean ran = new AtomicBoolean(false);
         CommandsAPICommand slowCmd = new CommandsAPICommand() {
@@ -119,7 +121,7 @@ class SyncTaskProcessingTest {
         CommandsAPI.commandPipeline.add(new CommandExecutor(slowCmd, UUID.randomUUID(), Map.of(), null, s -> {}, new CompletableFuture<>()));
 
         @SuppressWarnings("unchecked")
-        ConfigParser<PerformanceKeys> parser = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> parser = (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         org.junit.jupiter.api.Assumptions.assumeTrue(parser != null, "harness has no performance parser");
         parser.set(PerformanceKeys.syncAllottedTime, 1);
         TickBudget.refresh();
@@ -141,10 +143,10 @@ class SyncTaskProcessingTest {
         assertDoesNotThrow(task::run);
 
         @SuppressWarnings("unchecked")
-        ConfigParser<PerformanceKeys> parser = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> parser = (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         if (parser != null) {
             parser.set(PerformanceKeys.syncAllottedTime, 10);
-            RTP.configs.putParser(parser);
+            ActiveConfigs.get().putParser(parser);
         }
 
         assertDoesNotThrow(task::run);
@@ -185,12 +187,12 @@ class SyncTaskProcessingTest {
     @DisplayName("SyncTaskProcessing ticks ActionManager when present")
     void testActionManagerTick() {
         io.github.dailystruggle.rtp.common.action.ActionManager normalManager = new io.github.dailystruggle.rtp.common.action.ActionManager();
-        RTP.actionManager = normalManager;
+        ActionServices.setActionManager(normalManager);
         try {
             SyncTaskProcessing task = new SyncTaskProcessing(50_000_000L);
             assertDoesNotThrow(task::run);
         } finally {
-            RTP.actionManager = null;
+            ActionServices.setActionManager(null);
         }
     }
 }

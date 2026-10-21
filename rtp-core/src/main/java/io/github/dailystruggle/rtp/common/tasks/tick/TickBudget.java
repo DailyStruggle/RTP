@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.tasks.tick;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 
@@ -90,9 +90,9 @@ public final class TickBudget {
 
   @SuppressWarnings("unchecked")
   private static ConfigParser<PerformanceKeys> parser() {
-    if (RTP.configs == null) return null;
+    if (ActiveConfigs.get() == null) return null;
     try {
-      return (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+      return (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
     } catch (Throwable t) {
       return null;
     }

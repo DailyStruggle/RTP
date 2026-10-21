@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.bukkit.configuration;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.CoreRtpRoot;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.RegionConfigLoader;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import org.junit.jupiter.api.AfterEach;
@@ -62,13 +63,13 @@ public class RegionConfigDefaultInheritanceTest {
     @SuppressWarnings("unchecked")
     void defaultRegionInheritsShapeAndVertFromConfigDefaults() {
         ConfigParser<ConfigKeys> config =
-                (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+                (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
         assertNotNull(config, "config.yml parser must be provisioned");
         assertNotNull(config.getData(ConfigKeys.defaults),
                 "config.yml#defaults block must be read into the parser data map");
 
         MultiConfigParser<RegionKeys> regions =
-                (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
+                (MultiConfigParser<RegionKeys>) ActiveConfigs.get().multiConfigParserMap.get(RegionKeys.class);
         assertNotNull(regions, "regions MultiConfigParser must be provisioned");
         ConfigParser<RegionKeys> def = regions.getParser("default");
         assertNotNull(def, "bundled regions/default.yml must be extracted and parsed");
@@ -98,12 +99,12 @@ public class RegionConfigDefaultInheritanceTest {
     @DisplayName("bundled default configs load and execute commands without unexpected warnings or errors")
     @SuppressWarnings("unchecked")
     void defaultConfigsAndCommandsEmitNoUnexpectedWarningsOrErrors() {
-        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
         assertNotNull(accessor, "Server accessor must be installed");
 
         // Force resolution of default region settings
         MultiConfigParser<RegionKeys> regions =
-                (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
+                (MultiConfigParser<RegionKeys>) ActiveConfigs.get().multiConfigParserMap.get(RegionKeys.class);
         assertNotNull(regions);
         ConfigParser<RegionKeys> def = regions.getParser("default");
         assertNotNull(def);
@@ -139,7 +140,7 @@ public class RegionConfigDefaultInheritanceTest {
     @Test
     @DisplayName("startup config loading warns on unrecognized properties in shape and vert")
     void startupConfigLoadingWarnsOnUnrecognizedProperties() throws Exception {
-        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
         accessor.logMessages.clear();
 
         Path regionDir = tempDir.resolve("definitions").resolve("regions");
@@ -158,7 +159,7 @@ public class RegionConfigDefaultInheritanceTest {
                 """;
         Files.writeString(badRegion, yaml);
 
-        RTP.configs.reloadAction();
+        ActiveConfigs.get().reloadAction();
 
         assertTrue(accessor.logMessages.stream().anyMatch(m ->
                 m.startsWith("WARNING:")
@@ -176,7 +177,7 @@ public class RegionConfigDefaultInheritanceTest {
     @Test
     @DisplayName("startup config loading warns and autocorrects perceptible typos in properties and names")
     void startupConfigLoadingWarnsOnTypos() throws Exception {
-        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
         accessor.logMessages.clear();
 
         Path regionDir = tempDir.resolve("definitions").resolve("regions");
@@ -193,7 +194,7 @@ public class RegionConfigDefaultInheritanceTest {
                 """;
         Files.writeString(typoRegion, yaml);
 
-        RTP.configs.reloadAction();
+        ActiveConfigs.get().reloadAction();
 
         assertTrue(accessor.logMessages.stream().anyMatch(m ->
                 m.startsWith("WARNING:")
@@ -217,7 +218,7 @@ public class RegionConfigDefaultInheritanceTest {
     @Test
     @DisplayName("startup config loading warns on invalid shape and vert names and falls back to defaults")
     void startupConfigLoadingWarnsOnInvalidShapeAndVert() throws Exception {
-        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
         accessor.logMessages.clear();
 
         Path regionDir = tempDir.resolve("definitions").resolve("regions");
@@ -233,7 +234,7 @@ public class RegionConfigDefaultInheritanceTest {
                 """;
         Files.writeString(invalidRegion, yaml);
 
-        RTP.configs.reloadAction();
+        ActiveConfigs.get().reloadAction();
 
         assertTrue(accessor.logMessages.stream().anyMatch(m ->
                 m.startsWith("WARNING:")
@@ -251,7 +252,7 @@ public class RegionConfigDefaultInheritanceTest {
     @Test
     @DisplayName("startup config loading warns on unknown config-default reference")
     void startupConfigLoadingWarnsOnUnknownReference() throws Exception {
-        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
         accessor.logMessages.clear();
 
         Path regionDir = tempDir.resolve("definitions").resolve("regions");
@@ -265,7 +266,7 @@ public class RegionConfigDefaultInheritanceTest {
                 """;
         Files.writeString(badRefRegion, yaml);
 
-        RTP.configs.reloadAction();
+        ActiveConfigs.get().reloadAction();
 
         assertTrue(accessor.logMessages.stream().anyMatch(m ->
                 m.startsWith("WARNING:")
@@ -276,7 +277,7 @@ public class RegionConfigDefaultInheritanceTest {
     @Test
     @DisplayName("startup config loading warns when region has unreadable shape or vert")
     void startupConfigLoadingWarnsOnUnreadableShapeAndVert() throws Exception {
-        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
         accessor.logMessages.clear();
 
         Path regionDir = tempDir.resolve("definitions").resolve("regions");
@@ -288,7 +289,7 @@ public class RegionConfigDefaultInheritanceTest {
                 """;
         Files.writeString(emptyRegion, yaml);
 
-        RTP.configs.reloadAction();
+        ActiveConfigs.get().reloadAction();
 
         assertTrue(accessor.logMessages.stream().anyMatch(m ->
                 m.startsWith("WARNING:")
@@ -322,7 +323,7 @@ public class RegionConfigDefaultInheritanceTest {
 
             MockRTPServerAccessor freshAccessor = RTPTestSetup.install(freshDir.toFile());
             freshAccessor.setPlatform("paper");
-            RTP.configs.reloadRegions();
+            ActiveConfigs.get().reloadRegions();
 
             assertTrue(freshAccessor.logMessages.stream().anyMatch(m ->
                     m.startsWith("WARNING:")

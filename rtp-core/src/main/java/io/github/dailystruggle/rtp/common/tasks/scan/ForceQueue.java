@@ -2,7 +2,8 @@ package io.github.dailystruggle.rtp.common.tasks.scan;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import java.util.Collection;
@@ -25,8 +26,8 @@ public final class ForceQueue extends RTPRunnable {
 
   /** Constructor for ForceQueue using console as sender and all regions */
   public ForceQueue() {
-    sender = RTP.serverAccessor.getSender(CommandsAPI.serverId);
-    regions = RTP.selectionAPI.permRegionLookup.values();
+    sender = RTPRuntime.serverAccessor().getSender(CommandsAPI.serverId);
+    regions = ActiveSelection.get().permRegionLookup.values();
   }
 
   /**
@@ -36,7 +37,7 @@ public final class ForceQueue extends RTPRunnable {
    */
   public ForceQueue(RTPCommandSender sender) {
     this.sender = sender;
-    regions = RTP.selectionAPI.permRegionLookup.values();
+    regions = ActiveSelection.get().permRegionLookup.values();
   }
 
   /**
@@ -47,7 +48,7 @@ public final class ForceQueue extends RTPRunnable {
    */
   public ForceQueue(RTPCommandSender sender, @Nullable Collection<Region> regions) {
     this.sender = sender;
-    if (regions == null || regions.isEmpty()) regions = RTP.selectionAPI.permRegionLookup.values();
+    if (regions == null || regions.isEmpty()) regions = ActiveSelection.get().permRegionLookup.values();
     this.regions = regions;
   }
 

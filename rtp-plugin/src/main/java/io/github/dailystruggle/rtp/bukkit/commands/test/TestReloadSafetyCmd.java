@@ -5,6 +5,8 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.parameters.IntegerParameter;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -78,10 +80,10 @@ public class TestReloadSafetyCmd extends BaseRTPCmdImpl {
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
 
-    if (RTP.scheduler == null) {
+    if (RTPRuntime.scheduler() == null) {
       String msg = "&c[RTP test/reload-safety] RTP.scheduler is null; core not yet loaded";
       if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, msg);
+        RTPRuntime.serverAccessor().sendMessage(callerId, msg);
       }
       RTP.log(Level.WARNING, msg);
       return false;
@@ -107,7 +109,7 @@ public class TestReloadSafetyCmd extends BaseRTPCmdImpl {
             + RELOAD_PERIOD_TICKS
             + " ticks";
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, startMsg);
+      RTPRuntime.serverAccessor().sendMessage(callerId, startMsg);
     }
     RTP.log(Level.INFO, startMsg);
 
@@ -116,11 +118,11 @@ public class TestReloadSafetyCmd extends BaseRTPCmdImpl {
           if (cancelled.get()) return;
           int current = reloadsAttempted.incrementAndGet();
           try {
-            // RTP.configs.reload() is itself safe to call from the async
+            // ActiveConfigs.get().reload() is itself safe to call from the async
             // scheduler; it schedules its own sync completion work via
             // miscSyncTasks. A `false` return value means at least one
             // parser failed to reload - that is a real S-004 signal.
-            boolean ok = RTP.configs.reload();
+            boolean ok = ActiveConfigs.get().reload();
             if (ok) {
               reloadsOk.incrementAndGet();
             } else {
@@ -146,13 +148,13 @@ public class TestReloadSafetyCmd extends BaseRTPCmdImpl {
                     + " failed="
                     + reloadsFailed.get();
             if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-              RTP.serverAccessor.sendMessage(callerId, summary);
+              RTPRuntime.serverAccessor().sendMessage(callerId, summary);
             }
             RTP.log(Level.INFO, summary);
             Object h = handleHolder[0];
             if (h != null) {
               try {
-                RTP.scheduler.cancelTask(h);
+                RTPRuntime.scheduler().cancelTask(h);
               } catch (Throwable ignored) {
                 // best-effort
               }
@@ -163,7 +165,7 @@ public class TestReloadSafetyCmd extends BaseRTPCmdImpl {
         };
 
     handleHolder[0] =
-        RTP.scheduler.runTaskTimerAsynchronously(
+        RTPRuntime.scheduler().runTaskTimerAsynchronously(
             () -> {
               if (cancelled.get()) return;
               if (reloadsAttempted.get() >= iterations) return;
@@ -178,7 +180,7 @@ public class TestReloadSafetyCmd extends BaseRTPCmdImpl {
           Object h = handleHolder[0];
           if (h != null) {
             try {
-              RTP.scheduler.cancelTask(h);
+              RTPRuntime.scheduler().cancelTask(h);
             } catch (Throwable ignored) {
               // best-effort
             }
@@ -194,7 +196,7 @@ public class TestReloadSafetyCmd extends BaseRTPCmdImpl {
                   + reloadsFailed.get()
                   + ")";
           if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-            RTP.serverAccessor.sendMessage(callerId, msg);
+            RTPRuntime.serverAccessor().sendMessage(callerId, msg);
           }
           RTP.log(Level.INFO, msg);
         };

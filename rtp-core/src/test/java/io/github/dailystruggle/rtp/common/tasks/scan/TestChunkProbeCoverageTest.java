@@ -2,9 +2,9 @@ package io.github.dailystruggle.rtp.common.tasks.scan;
 
 import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
@@ -54,12 +54,12 @@ class TestChunkProbeCoverageTest {
                 "probe_perf_region", world, square, vert,
                 false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
         region = new Region("probe_perf_region", settings);
-        RTP.selectionAPI.permRegionLookup.put("probe_perf_region", region);
+        ActiveSelection.get().permRegionLookup.put("probe_perf_region", region);
     }
 
     @AfterEach
     void tearDown() {
-        RTP.getInstance().scanTasks.clear();
+        ScanTasks.current().clear();
     }
 
     @Test

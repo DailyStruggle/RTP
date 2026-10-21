@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.BukkitServers;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import io.github.dailystruggle.rtp.bukkitplatform.entity.PersonalBossBars;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.folia.world.FoliaRTPWorld;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
@@ -224,7 +225,7 @@ public final class FoliaRTPPlayer implements RTPPlayer {
 
       // Bypass the 50ms RegionScheduler delay via the RTP scheduler, which runs inline
       // when the current thread already owns the target region.
-      RTP.serverAccessor.getScheduler().runTask(to.world(), chunkX, chunkZ, buildPlatformTask);
+      RTPRuntime.serverAccessor().getScheduler().runTask(to.world(), chunkX, chunkZ, buildPlatformTask);
       return completionFuture;
     });
   }
@@ -236,7 +237,7 @@ public final class FoliaRTPPlayer implements RTPPlayer {
     if (player == null) return null;
     Location location = player.getLocation();
     return new RTPLocation(
-        RTP.serverAccessor.getRTPWorld(player.getWorld().getUID()),
+        RTPRuntime.serverAccessor().getRTPWorld(player.getWorld().getUID()),
         location.getBlockX(),
         location.getBlockY(),
         location.getBlockZ());

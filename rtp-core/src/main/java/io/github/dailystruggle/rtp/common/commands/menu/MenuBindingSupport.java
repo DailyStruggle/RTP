@@ -3,10 +3,11 @@ package io.github.dailystruggle.rtp.common.commands.menu;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.api.menu.MenuRendererProvider;
 import io.github.dailystruggle.rtp.api.server.PlatformFamily;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -57,13 +58,13 @@ public final class MenuBindingSupport {
         // See discoverRenderer: a platform opener may link a runtime type absent
         // on this server (LinkageError / NoClassDefFoundError), which is not a
         // RuntimeException. Catch both so discovery degrades gracefully.
-        RTP.log(
+        RTPRuntime.log(
             Level.WARNING,
             "failed to instantiate menu anvil-input opener: " + ex,
             ex);
       }
     }
-    RTP.log(Level.INFO, "menu anvil-input unavailable on this platform");
+    RTPRuntime.log(Level.INFO, "menu anvil-input unavailable on this platform");
     return null;
   }
 
@@ -77,7 +78,7 @@ public final class MenuBindingSupport {
     try {
       @SuppressWarnings("unchecked")
       ConfigParser<ConfigKeys> menuConfig =
-          (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+          (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
       if (menuConfig != null) {
         Object menuBlock = menuConfig.getConfigValue(ConfigKeys.menu, null);
         if (menuBlock instanceof Map<?, ?> map) {
@@ -121,7 +122,7 @@ public final class MenuBindingSupport {
         // Unloadable on this platform (wrong-family provider in a universal
         // jar). The lazy iterator has already advanced past the bad entry, so
         // continue to surface any remaining valid providers.
-        RTP.log(
+        RTPRuntime.log(
             Level.FINE,
             "skipping unloadable " + what + ": " + err);
         continue;
@@ -138,8 +139,8 @@ public final class MenuBindingSupport {
    */
   private static @Nullable PlatformFamily currentPlatformFamily() {
     try {
-      if (RTP.serverAccessor == null) return null;
-      return RTP.serverAccessor.getPlatformFamily();
+      if (RTPRuntime.serverAccessor() == null) return null;
+      return RTPRuntime.serverAccessor().getPlatformFamily();
     } catch (RuntimeException ignored) {
       return null;
     }

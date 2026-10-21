@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,7 +40,7 @@ class PlayerTargetedClearCmdTest {
     @BeforeEach
     void setUp() {
         accessor = RTPTestSetup.install(tempDir.toFile());
-        RTP.getInstance().invulnerablePlayers.clear();
+        TeleportSessions.current().invulnerablePlayers.clear();
     }
 
     private static Map<String, List<String>> players(String csv) {
@@ -54,12 +55,12 @@ class PlayerTargetedClearCmdTest {
         UUID known = UUID.randomUUID();
         accessor.addPlayer(new MockRTPPlayer(known, "alice", null));
         RTP rtp = RTP.getInstance();
-        rtp.invulnerablePlayers.put(known, 1L);
+        TeleportSessions.current().invulnerablePlayers.put(known, 1L);
 
         boolean handled = cmd.onCommand(RTPAPI.serverId, players("ghost"), null);
 
         assertTrue(handled, "command still reports handled for an unknown target");
-        assertTrue(rtp.invulnerablePlayers.containsKey(known),
+        assertTrue(TeleportSessions.current().invulnerablePlayers.containsKey(known),
                 "unrelated player's marker must survive an unknown-target request");
     }
 
@@ -71,13 +72,13 @@ class PlayerTargetedClearCmdTest {
         accessor.addPlayer(new MockRTPPlayer(aId, "alice", null));
         accessor.addPlayer(new MockRTPPlayer(bId, "bob", null));
         RTP rtp = RTP.getInstance();
-        rtp.invulnerablePlayers.put(aId, 1L);
-        rtp.invulnerablePlayers.put(bId, 2L);
+        TeleportSessions.current().invulnerablePlayers.put(aId, 1L);
+        TeleportSessions.current().invulnerablePlayers.put(bId, 2L);
 
         cmd.onCommand(RTPAPI.serverId, players("alice,ghost"), null);
 
-        assertFalse(rtp.invulnerablePlayers.containsKey(aId), "known target alice cleared");
-        assertTrue(rtp.invulnerablePlayers.containsKey(bId),
+        assertFalse(TeleportSessions.current().invulnerablePlayers.containsKey(aId), "known target alice cleared");
+        assertTrue(TeleportSessions.current().invulnerablePlayers.containsKey(bId),
                 "bob not listed and must keep his marker");
     }
 
@@ -87,12 +88,12 @@ class PlayerTargetedClearCmdTest {
         UUID a = UUID.randomUUID();
         UUID b = UUID.randomUUID();
         RTP rtp = RTP.getInstance();
-        rtp.invulnerablePlayers.put(a, 1L);
-        rtp.invulnerablePlayers.put(b, 2L);
+        TeleportSessions.current().invulnerablePlayers.put(a, 1L);
+        TeleportSessions.current().invulnerablePlayers.put(b, 2L);
 
         cmd.onCommand(RTPAPI.serverId, players("  , "), null);
 
-        assertTrue(rtp.invulnerablePlayers.isEmpty(),
+        assertTrue(TeleportSessions.current().invulnerablePlayers.isEmpty(),
                 "blank player list from console clears all markers");
     }
 
@@ -101,7 +102,7 @@ class PlayerTargetedClearCmdTest {
     void delegatesToNextCommand() {
         UUID caller = UUID.randomUUID();
         RTP rtp = RTP.getInstance();
-        rtp.invulnerablePlayers.put(caller, 1L);
+        TeleportSessions.current().invulnerablePlayers.put(caller, 1L);
 
         AtomicBoolean delegated = new AtomicBoolean(false);
         CommandsAPICommand next = new ClearInvulnCmd(null) {
@@ -116,7 +117,7 @@ class PlayerTargetedClearCmdTest {
         cmd.onCommand(caller, new HashMap<>(), next);
 
         assertTrue(delegated.get(), "nextCommand must be invoked");
-        assertTrue(rtp.invulnerablePlayers.containsKey(caller),
+        assertTrue(TeleportSessions.current().invulnerablePlayers.containsKey(caller),
                 "delegation short-circuits before clearing the caller's marker");
     }
 }

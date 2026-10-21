@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.menu.MenuAction;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.menu.MenuRedeemSubcommand;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -35,7 +36,7 @@ import java.util.logging.Level;
  *       entry, and submits the assembled command via the viewer's
  *       {@link RTPCommandSender#performCommand}.</li>
  *   <li>A reaper task runs every {@link #REAP_PERIOD_TICKS} ticks via
- *       {@code RTP.scheduler.runTaskTimerAsynchronously} (AGENTS.md
+ *       {@code RTPRuntime.scheduler().runTaskTimerAsynchronously} (AGENTS.md
  *       <i>Scheduler Usage</i> - no raw {@code Executors.*}) and drops any
  *       entry older than {@link #TTL_MILLIS}.</li>
  * </ul>
@@ -51,7 +52,7 @@ import java.util.logging.Level;
  * <p><b>Thread-safety.</b> {@link #pending} is a {@link ConcurrentHashMap};
  * the chat callback may be invoked from any server-thread context. The
  * dispatch back into rtp-core (the reopen / RUN command submit) is wrapped
- * in {@code RTP.scheduler.runTask(...)} so it lands on the server tick
+ * in {@code RTPRuntime.scheduler().runTask(...)} so it lands on the server tick
  * thread regardless of which thread fired the chat event.
  */
 public final class FabricChatPromptCallback implements MenuRedeemSubcommand.AnvilInputOpener {
@@ -84,11 +85,11 @@ public final class FabricChatPromptCallback implements MenuRedeemSubcommand.Anvi
         }
         this.listenerInstalled = installed;
         if (installed) {
-            // Schedule the reaper. RTP.scheduler is wired before the command
+            // Schedule the reaper. RTPRuntime.scheduler() is wired before the command
             // tree is built (RTPFabricMod.onInitialize ordering), so this is
             // safe at construction time.
             try {
-                RTP.scheduler.runTaskTimerAsynchronously(
+                RTPRuntime.scheduler().runTaskTimerAsynchronously(
                         this::reap, REAP_PERIOD_TICKS, REAP_PERIOD_TICKS);
             } catch (Throwable t) {
                 RTP.log(Level.WARNING,
@@ -121,7 +122,7 @@ public final class FabricChatPromptCallback implements MenuRedeemSubcommand.Anvi
                         @Nullable MenuRedeemSubcommand.CartSink sink) {
         if (!listenerInstalled) return false;
         if (viewer == null || paramName == null || paramName.isEmpty()) return false;
-        RTPCommandSender target = RTP.serverAccessor.getSender(viewer);
+        RTPCommandSender target = RTPRuntime.serverAccessor().getSender(viewer);
         if (target == null) return false;
         // Replace any earlier pending prompt for the same viewer; the latest
         // menu interaction is the one the player is actually looking at.
@@ -147,7 +148,7 @@ public final class FabricChatPromptCallback implements MenuRedeemSubcommand.Anvi
         PendingPrompt prompt = pending.remove(viewer);
         if (prompt == null) return;
         if (typed != null && typed.equalsIgnoreCase("cancel")) {
-            RTPCommandSender sender = RTP.serverAccessor.getSender(viewer);
+            RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(viewer);
             if (sender != null) sender.sendMessage("&7menu prompt cancelled.");
             return;
         }
@@ -195,9 +196,9 @@ public final class FabricChatPromptCallback implements MenuRedeemSubcommand.Anvi
     }
 
     private static void submitCommand(UUID viewer, String command) {
-        RTPCommandSender sender = RTP.serverAccessor.getSender(viewer);
+        RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(viewer);
         if (sender == null) return;
-        RTPPlayer player = RTP.serverAccessor.getPlayer(viewer);
+        RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(viewer);
         sender.performCommand(player, command);
     }
 
@@ -310,7 +311,7 @@ public final class FabricChatPromptCallback implements MenuRedeemSubcommand.Anvi
                 if (typed == null) return Boolean.TRUE;
                 // Dispatch the completion on the server tick thread to
                 // satisfy S-005 and match the Paper AnvilInputSession path.
-                RTP.scheduler.runTask(() -> completePromptOnServerThread(viewer, typed));
+                RTPRuntime.scheduler().runTask(() -> completePromptOnServerThread(viewer, typed));
                 // Cancel the broadcast - typed value should not appear in chat.
                 return Boolean.FALSE;
             } catch (Throwable t) {

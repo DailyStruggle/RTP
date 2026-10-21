@@ -3,13 +3,14 @@ package io.github.dailystruggle.rtp.common.selection.region;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,13 +47,13 @@ class RegionCandidateValidatorTest {
     @BeforeEach
     void setUp() {
         RTPTestSetup.install(tempDir);
-        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
         world = new MockRTPWorld("world");
         accessor.addWorld(world);
         mockVert = mock(VerticalAdjustor.class);
 
         @SuppressWarnings("unchecked")
-        ConfigParser<SafetyKeys> safetyParser = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        ConfigParser<SafetyKeys> safetyParser = (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
         if (safetyParser != null) {
             safetyParser.set(SafetyKeys.safetyRadius, 0);
             safetyParser.set(SafetyKeys.platformRadius, 0);
@@ -61,8 +62,8 @@ class RegionCandidateValidatorTest {
 
     @AfterEach
     void tearDown() {
-        RTP.serverAccessor = null;
-        RTP.scheduler = null;
+        RTPRuntime.setServerAccessor(null);
+        RTPRuntime.setScheduler(null);
     }
 
     @Test
@@ -140,7 +141,7 @@ class RegionCandidateValidatorTest {
 
         // Configure a safety radius > 0 so neighbour chunks are queried
         @SuppressWarnings("unchecked")
-        ConfigParser<SafetyKeys> safetyParser = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        ConfigParser<SafetyKeys> safetyParser = (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
         if (safetyParser != null) {
             safetyParser.set(SafetyKeys.safetyRadius, 2);
         }
@@ -177,7 +178,7 @@ class RegionCandidateValidatorTest {
 
         // Configure unsafeBlocks to include LAVA
         @SuppressWarnings("unchecked")
-        ConfigParser<BlocksKeys> blocksParser = (ConfigParser<BlocksKeys>) RTP.configs.getParser(BlocksKeys.class);
+        ConfigParser<BlocksKeys> blocksParser = (ConfigParser<BlocksKeys>) ActiveConfigs.get().getParser(BlocksKeys.class);
         if (blocksParser != null) {
             blocksParser.set(BlocksKeys.unsafeBlocks, List.of("LAVA"));
         }
@@ -209,7 +210,7 @@ class RegionCandidateValidatorTest {
 
         // Safety radius 0 for minimal footprint
         @SuppressWarnings("unchecked")
-        ConfigParser<SafetyKeys> safetyParser = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        ConfigParser<SafetyKeys> safetyParser = (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
         if (safetyParser != null) {
             safetyParser.set(SafetyKeys.safetyRadius, 0);
         }
@@ -380,7 +381,7 @@ class RegionCandidateValidatorTest {
         doReturn(true).when(mockChunk).isSafe(eq(2), anyInt(), eq(2), any(Set.class));
 
         @SuppressWarnings("unchecked")
-        ConfigParser<BlocksKeys> blocksParser = (ConfigParser<BlocksKeys>) RTP.configs.getParser(BlocksKeys.class);
+        ConfigParser<BlocksKeys> blocksParser = (ConfigParser<BlocksKeys>) ActiveConfigs.get().getParser(BlocksKeys.class);
         if (blocksParser != null) {
             blocksParser.set(BlocksKeys.unsafeBlocks, List.of("WATER", "LAVA"));
         }

@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.tasks.tick;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -34,21 +34,21 @@ class TickBudgetTest {
 
     @SuppressWarnings("unchecked")
     private static ConfigParser<PerformanceKeys> perf() {
-        return RTP.configs == null ? null : (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        return ActiveConfigs.get() == null ? null : (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
     }
 
     @Test
     @DisplayName("without a performance parser the code fallbacks equal the shipped yml defaults")
     void defaultsWithoutConfig() {
-        Object saved = RTP.configs;
-        RTP.configs = null;
+        Object saved = ActiveConfigs.get();
+        ActiveConfigs.set(null);
         try {
             TickBudget.clear();
             assertEquals(TimeUnit.MILLISECONDS.toNanos(5), TickBudget.syncNanos());
             assertEquals(TimeUnit.MILLISECONDS.toNanos(25), TickBudget.asyncNanos());
             assertEquals(20L, TickBudget.periodTicks());
         } finally {
-            RTP.configs = (io.github.dailystruggle.rtp.common.configuration.Configs) saved;
+            ActiveConfigs.set((io.github.dailystruggle.rtp.common.configuration.Configs) saved);
         }
     }
 

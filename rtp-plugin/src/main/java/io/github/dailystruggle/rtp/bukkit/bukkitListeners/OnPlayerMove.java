@@ -3,8 +3,10 @@ package io.github.dailystruggle.rtp.bukkit.bukkitListeners;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import java.util.UUID;
 import org.bukkit.event.EventHandler;
@@ -43,12 +45,12 @@ public final class OnPlayerMove implements Listener {
     RTP rtp = RTP.getInstance();
     if (rtp == null) return;
 
-    if (rtp.queuedPlayers.contains(id)) return;
+    if (TeleportSessions.current().queuedPlayers.contains(id)) return;
 
-    TeleportData data = rtp.latestTeleportData.get(id);
+    TeleportData data = TeleportSessions.current().latestTeleportData.get(id);
     if (data == null || data.completed) return;
 
-    double cancelDistanceSquared = Math.pow(RTP.configs.getParser(ConfigKeys.class).getNumber(ConfigKeys.cancelDistance, 2).doubleValue(), 2);
+    double cancelDistanceSquared = Math.pow(ActiveConfigs.get().getParser(ConfigKeys.class).getNumber(ConfigKeys.cancelDistance, 2).doubleValue(), 2);
 
     RTPCoords originalCoords = data.originalCoords;
     if (originalCoords == null) {

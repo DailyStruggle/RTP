@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.api;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionQueueManager;
 
@@ -25,17 +26,17 @@ public final class RtpCoreIntrospection {
      * loaded yet. Never {@code null}.
      */
     public static List<RegionQueueDepths> queueDepths() {
-        RTP rtp = RTP.getInstance();
-        if (rtp == null || RTP.selectionAPI == null) {
+        TeleportSessions sessions = TeleportSessions.current();
+        if (sessions == null || ActiveSelection.get() == null) {
             return Collections.emptyList();
         }
         List<RegionQueueDepths> out = new ArrayList<>();
         try {
-            for (Region region : RTP.selectionAPI.permRegionLookup.values()) {
+            for (Region region : ActiveSelection.get().permRegionLookup.values()) {
                 RegionQueueDepths d = depthsOf(region);
                 if (d != null) out.add(d);
             }
-            for (Region region : RTP.selectionAPI.tempRegions.values()) {
+            for (Region region : ActiveSelection.get().tempRegions.values()) {
                 RegionQueueDepths d = depthsOf(region);
                 if (d != null) out.add(d);
             }
@@ -53,12 +54,12 @@ public final class RtpCoreIntrospection {
      */
     public static RegionQueueDepths queueDepths(String regionName) {
         if (regionName == null) return null;
-        RTP rtp = RTP.getInstance();
-        if (rtp == null || RTP.selectionAPI == null) return null;
+        TeleportSessions sessions = TeleportSessions.current();
+        if (sessions == null || ActiveSelection.get() == null) return null;
         try {
-            Region region = RTP.selectionAPI.permRegionLookup.get(regionName);
+            Region region = ActiveSelection.get().permRegionLookup.get(regionName);
             if (region != null) return depthsOf(region);
-            for (Region temp : RTP.selectionAPI.tempRegions.values()) {
+            for (Region temp : ActiveSelection.get().tempRegions.values()) {
                 if (temp != null && regionName.equals(temp.name)) {
                     return depthsOf(temp);
                 }
@@ -79,12 +80,12 @@ public final class RtpCoreIntrospection {
      */
     public static boolean hasFastLocation(String regionName, UUID player) {
         if (regionName == null || player == null) return false;
-        RTP rtp = RTP.getInstance();
-        if (rtp == null || RTP.selectionAPI == null) return false;
+        TeleportSessions sessions = TeleportSessions.current();
+        if (sessions == null || ActiveSelection.get() == null) return false;
         try {
-            Region region = RTP.selectionAPI.permRegionLookup.get(regionName);
+            Region region = ActiveSelection.get().permRegionLookup.get(regionName);
             if (region == null) {
-                for (Region temp : RTP.selectionAPI.tempRegions.values()) {
+                for (Region temp : ActiveSelection.get().tempRegions.values()) {
                     if (temp != null && regionName.equals(temp.name)) {
                         region = temp;
                         break;

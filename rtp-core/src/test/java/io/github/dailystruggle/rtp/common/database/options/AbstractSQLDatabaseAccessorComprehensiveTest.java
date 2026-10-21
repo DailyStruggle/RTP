@@ -1,10 +1,11 @@
 package io.github.dailystruggle.rtp.common.database.options;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -123,7 +124,7 @@ class AbstractSQLDatabaseAccessorComprehensiveTest {
                 accessor.disconnect(accessor.getConnection());
             } catch (Throwable ignored) {}
         }
-        RTP.serverAccessor = null;
+        RTPRuntime.setServerAccessor(null);
     }
 
     @Test
@@ -464,7 +465,7 @@ class AbstractSQLDatabaseAccessorComprehensiveTest {
         }
 
         realAccessor.startup();
-        TeleportData td = RTP.getInstance().latestTeleportData.get(testSender);
+        TeleportData td = TeleportSessions.current().latestTeleportData.get(testSender);
         assertNotNull(td);
         assertEquals(12345L, td.time);
         assertEquals(10.5, td.cost);

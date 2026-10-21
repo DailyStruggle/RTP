@@ -8,11 +8,14 @@ import io.github.dailystruggle.rtp.api.safety.SafetyCompilationCache;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.*;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 import org.jetbrains.annotations.Nullable;
 
@@ -53,7 +56,7 @@ final class QueueTask {
     void start() {
         try {
             region.getShape();
-            RTP.log(Level.FINE, "[ENQUEUE_TRACE] LocationGenerator.getLocation ENTER playerId=" + playerId
+            RTPRuntime.log(Level.FINE, "[ENQUEUE_TRACE] LocationGenerator.getLocation ENTER playerId=" + playerId
                     + " region=" + region.name
                     + " custom=" + custom
                     + " biomeNames=" + biomeNames
@@ -65,7 +68,7 @@ final class QueueTask {
             }
             pollNext();
         } catch (Throwable t) {
-            RTP.log(Level.WARNING, "[RTP] QueueTask.start failed: " + t, t);
+            RTPRuntime.log(Level.WARNING, "[RTP] QueueTask.start failed: " + t, t);
             result.complete(null);
         }
     }
@@ -86,7 +89,7 @@ final class QueueTask {
             try {
                 pair = poll.getNow(null);
             } catch (Throwable ex) {
-                RTP.log(Level.WARNING, ex.getMessage(), ex);
+                RTPRuntime.log(Level.WARNING, ex.getMessage(), ex);
                 pollNext();
                 return;
             }
@@ -95,7 +98,7 @@ final class QueueTask {
         }
         poll.whenComplete((pair, ex) -> {
             if (ex != null) {
-                RTP.log(Level.WARNING, ex.getMessage(), ex);
+                RTPRuntime.log(Level.WARNING, ex.getMessage(), ex);
                 // Match prior semantics: exception on poll → treat as null pair, try next poll.
                 reenterAsync(this::pollNext);
                 return;
@@ -106,9 +109,9 @@ final class QueueTask {
 
     private void reenterAsync(Runnable r) {
         try {
-            RTP.serverAccessor.getScheduler().runTaskAsynchronously(r);
+            RTPRuntime.serverAccessor().getScheduler().runTaskAsynchronously(r);
         } catch (Throwable t) {
-            RTP.log(Level.WARNING, "[RTP] QueueTask reenter failed: " + t, t);
+            RTPRuntime.log(Level.WARNING, "[RTP] QueueTask reenter failed: " + t, t);
             result.complete(null);
         }
     }
@@ -209,7 +212,7 @@ final class QueueTask {
             // standing-surface y-1 read doesn't trivially reject.
             fut = world.probeChunkColumn(cx, cz, minY - 1, maxY);
         } catch (Throwable t) {
-            RTP.log(Level.FINE,
+            RTPRuntime.log(Level.FINE,
                     "[RTP] QueueTask probeChunkColumn threw for world=" + world.name()
                             + " chunk=(" + cx + "," + cz + "): " + t);
             return false;
@@ -236,7 +239,7 @@ final class QueueTask {
             long effectiveNanos = (drain > 0L) ? Math.min(drain, probeNanos) : probeNanos;
             gov.recordProbe(effectiveNanos, (probe != null) ? probe.groupSize() : 0, false);
             if (ex != null) {
-                RTP.log(Level.FINE,
+                RTPRuntime.log(Level.FINE,
                         "[RTP] QueueTask probeChunkColumn failed for world=" + world.name()
                                 + " chunk=(" + cx + "," + cz + "): "
                                 + ex.getClass().getSimpleName() + ": " + ex.getMessage());
@@ -260,7 +263,7 @@ final class QueueTask {
                     if (ex == null) gov.recordLoad(afterProbe, System.nanoTime() - loadStart);
                     if (ex != null || chunk == null) {
                         if (ex != null) {
-                            RTP.log(Level.WARNING,
+                            RTPRuntime.log(Level.WARNING,
                                     "[RTP] QueueTask getOrLoadChunk failed for world=" + world.name()
                                             + " chunk=(" + cx + "," + cz + "): "
                                             + ex.getClass().getSimpleName() + ": " + ex.getMessage());
@@ -282,7 +285,7 @@ final class QueueTask {
                     ChunkReservation reservation = new ChunkReservation(ticket, world);
                     reservation.readyFuture().orTimeout(2, TimeUnit.SECONDS).whenComplete((v, tex) -> {
                         if (tex != null) {
-                            RTP.log(Level.WARNING,
+                            RTPRuntime.log(Level.WARNING,
                                     "[RTP] QueueTask ticket apply did not complete within 2s ("
                                             + world.name() + " " + cx + "," + cz + ")");
                             reservation.close();
@@ -293,10 +296,10 @@ final class QueueTask {
                                 new io.github.dailystruggle.rtp.api.world.RTPLocation(
                                         world, (cx << 4) + 7, 0, (cz << 4) + 7);
                         try {
-                            RTP.serverAccessor.getScheduler().runTask(targetLoc, () -> {
+                            RTPRuntime.serverAccessor().getScheduler().runTask(targetLoc, () -> {
                                 try {
                                     if (!world.isChunkLoaded(cx, cz)) {
-                                        RTP.log(Level.FINE,
+                                        RTPRuntime.log(Level.FINE,
                                                 "[RTP] Stale chunk on QueueTask region-thread dispatch ("
                                                         + world.name() + " " + cx + "," + cz + "); rejecting.");
                                         reservation.close();
@@ -305,14 +308,14 @@ final class QueueTask {
                                     }
                                     afterChunkResolved(pair, left, world, cx, cz, chunk, reservation);
                                 } catch (Throwable t) {
-                                    RTP.log(Level.WARNING,
+                                    RTPRuntime.log(Level.WARNING,
                                             "[RTP] QueueTask region-thread evaluation threw: " + t, t);
                                     reservation.close();
                                     finishRejected(null);
                                 }
                             });
                         } catch (Throwable t) {
-                            RTP.log(Level.WARNING,
+                            RTPRuntime.log(Level.WARNING,
                                     "[RTP] QueueTask failed to dispatch region-thread evaluation: " + t, t);
                             reservation.close();
                             finishRejected(null);
@@ -342,7 +345,7 @@ final class QueueTask {
             long centerKey = ((long) cx & 0xffffffffL) | ((long) cz << 32);
             RTPChunk<?> live = world.getCachedChunk(centerKey);
             if (live == null || !world.isChunkLoaded(cx, cz)) {
-                RTP.log(Level.FINE,
+                RTPRuntime.log(Level.FINE,
                         "[RTP] QueueTask center chunk went stale before evaluateSafety ("
                                 + world.name() + " " + cx + "," + cz + "); rejecting.");
                 finishRejected(reservation);
@@ -360,8 +363,8 @@ final class QueueTask {
         int safetyRadiusVal = LocationGenerator.safetyRadiusCache.get();
         if (dt > 5000 || dt < 0) {
             ConfigParser<SafetyKeys> safety =
-                    (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
-            Object value = RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>());
+                    (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
+            Object value = ActiveConfigs.get().getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>());
             if (value instanceof Collection<?> collection) {
                 unsafeBlocks.clear();
                 unsafeBlocks.addAll(
@@ -376,7 +379,7 @@ final class QueueTask {
                         unsafeBlocks,
                         tagSnapshot,
                         rejection ->
-                                RTP.log(
+                                RTPRuntime.log(
                                         Level.WARNING,
                                         "[safety.yml] rejected unsafe-blocks token '"
                                                 + rejection.rawToken()
@@ -484,7 +487,7 @@ final class QueueTask {
 
         // Safety scan must run on the centre chunk's owning region thread on
         // Folia - live-backed RTPChunk.isSafe reads Level.getBlockState, which
-        // is thread-local. On Spigot/Paper, RTP.scheduler.runTask(world,cx,cz,..)
+        // is thread-local. On Spigot/Paper, RTPRuntime.scheduler().runTask(world,cx,cz,..)
         // hops to the MAIN server thread, which would dump a region-hop onto
         // the tick loop per candidate (unacceptable). Only Folia needs the
         // region-thread hop - dispatch inline on other platforms where the
@@ -492,7 +495,7 @@ final class QueueTask {
         Runnable scan = () -> runSafetyScan(pair, left, world, localChunks, L,
             centerChunkX, centerChunkZ, safe, unsafeBlocks, reservation);
         if (isFoliaPlatform()) {
-            RTP.scheduler.runTask(world, centerChunkX, centerChunkZ, scan);
+            RTPRuntime.scheduler().runTask(world, centerChunkX, centerChunkZ, scan);
         } else {
             scan.run();
         }
@@ -500,7 +503,7 @@ final class QueueTask {
 
     private static boolean isFoliaPlatform() {
         try {
-            return "Folia".equals(RTP.serverAccessor.getPlatform());
+            return "Folia".equals(RTPRuntime.serverAccessor().getPlatform());
         } catch (Throwable ignored) {
             return false;
         }
@@ -592,7 +595,7 @@ final class QueueTask {
      * Synthetic temp regions are not pumped and do not drain their waitlist.
      */
     private boolean isRegionPumped() {
-        for (Region r : RTP.selectionAPI.permRegionLookup.values()) {
+        for (Region r : ActiveSelection.get().permRegionLookup.values()) {
             if (r == region) return true;
         }
         return false;
@@ -608,14 +611,14 @@ final class QueueTask {
                 || !isRegionPumped()
                 || (sender != null && sender.hasPermission("rtp.unqueued"));
         if (unqueuedFast) {
-            RTP.log(Level.FINE,
+            RTPRuntime.log(Level.FINE,
                     "[ENQUEUE_TRACE] LocationGenerator taking UNQUEUED fast-path playerId=" + playerId);
             LocationGenerator.getLocationFuture(region, biomeNames).whenComplete((res, ex) -> {
-                RTP.log(Level.FINE,
+                RTPRuntime.log(Level.FINE,
                         "[ENQUEUE_TRACE] LocationGenerator UNQUEUED fast-path result playerId="
                                 + playerId + " resNull=" + (res == null));
                 if (ex != null) {
-                    RTP.log(Level.WARNING, ex.getMessage(), ex);
+                    RTPRuntime.log(Level.WARNING, ex.getMessage(), ex);
                     result.complete(null);
                     return;
                 }
@@ -624,7 +627,7 @@ final class QueueTask {
                     return;
                 }
                 long attempts = res.attempts();
-                TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
+                TeleportData data = TeleportSessions.current().latestTeleportData.get(playerId);
                 if (data != null && !data.completed) {
                     data.attempts = attempts;
                 }
@@ -635,11 +638,11 @@ final class QueueTask {
 
         // Normal enqueue branch: no I/O, runs inline on the async worker.
         try {
-            RTP.log(Level.FINE,
+            RTPRuntime.log(Level.FINE,
                     "[ENQUEUE_TRACE] LocationGenerator taking ENQUEUE branch playerId=" + playerId
                             + " region=" + region.name);
-            RTP.getInstance().processingPlayers.add(playerId);
-            TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
+            TeleportSessions.current().processingPlayers.add(playerId);
+            TeleportData data = TeleportSessions.current().latestTeleportData.get(playerId);
             if (data == null) {
                 data = new TeleportData();
                 MemoryTracker.track(data, "TeleportData-" + playerId.toString(), 120000L);
@@ -653,23 +656,23 @@ final class QueueTask {
                         player.getLocation().x(),
                         player.getLocation().y(),
                         player.getLocation().z());
-                RTP.getInstance().latestTeleportData.put(playerId, data);
+                TeleportSessions.current().latestTeleportData.put(playerId, data);
             }
             for (int j = 0; j < Region.onPlayerQueuePush.size(); j++) {
                 Region.onPlayerQueuePush.get(j).accept(region, playerId);
             }
             region.queueManager.playerQueue.add(playerId);
-            RTP.getInstance().queuedPlayers.add(playerId);
+            TeleportSessions.current().queuedPlayers.add(playerId);
             data.queueLocation = region.queueManager.playerQueue.size();
-            RTP.log(Level.FINE,
+            RTPRuntime.log(Level.FINE,
                     "[ENQUEUE_TRACE] LocationGenerator ENQUEUED playerId=" + playerId
                             + " queueSize=" + data.queueLocation
                             + " -> calling sendMessage(queueUpdate)");
-            RTP.serverAccessor.sendMessage(playerId, PlayerMessages.queueUpdate);
-            RTP.log(Level.FINE,
+            RTPRuntime.serverAccessor().sendMessage(playerId, PlayerMessages.queueUpdate);
+            RTPRuntime.log(Level.FINE,
                     "[ENQUEUE_TRACE] LocationGenerator sendMessage(queueUpdate) RETURNED playerId=" + playerId);
         } catch (Throwable t) {
-            RTP.log(Level.WARNING, "[RTP] QueueTask enqueue branch failed: " + t, t);
+            RTPRuntime.log(Level.WARNING, "[RTP] QueueTask enqueue branch failed: " + t, t);
         }
         result.complete(null);
     }

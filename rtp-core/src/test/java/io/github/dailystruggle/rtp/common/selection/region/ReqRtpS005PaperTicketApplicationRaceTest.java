@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
@@ -64,7 +64,7 @@ public class ReqRtpS005PaperTicketApplicationRaceTest {
         // Force safetyCheck loop to run.
         @SuppressWarnings("unchecked")
         ConfigParser<SafetyKeys> safety =
-                (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+                (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
         try {
             java.lang.reflect.Field dataField = FactoryValue.class.getDeclaredField("data");
             dataField.setAccessible(true);

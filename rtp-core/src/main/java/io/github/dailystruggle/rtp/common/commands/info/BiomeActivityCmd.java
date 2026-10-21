@@ -3,9 +3,11 @@ package io.github.dailystruggle.rtp.common.commands.info;
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -49,7 +51,7 @@ public class BiomeActivityCmd extends BaseRTPCmdImpl {
       tap.accept(PlaceholderProvider.fillPlaceholders(line, callerId));
       return;
     }
-    RTP.serverAccessor.sendMessage(callerId, line);
+    RTPRuntime.serverAccessor().sendMessage(callerId, line);
   }
 
   /** Builds an ASCII share bar of {@link #BAR_WIDTH} characters for {@code share} in [0,1]. */
@@ -70,11 +72,11 @@ public class BiomeActivityCmd extends BaseRTPCmdImpl {
     long total = RTP.biomeActivity.totalSamples();
 
     if (snapshot.isEmpty() || total <= 0L) {
-      emit(callerId, RTP.configs.getConfigValue(CommandMessages.infoBiomeActivityEmpty, "").toString());
+      emit(callerId, ActiveConfigs.get().getConfigValue(CommandMessages.infoBiomeActivityEmpty, "").toString());
       return true;
     }
 
-    String header = RTP.configs.getConfigValue(CommandMessages.infoBiomeActivityHeader, "").toString();
+    String header = ActiveConfigs.get().getConfigValue(CommandMessages.infoBiomeActivityHeader, "").toString();
     if (!header.isEmpty()) {
       header =
           header
@@ -83,7 +85,7 @@ public class BiomeActivityCmd extends BaseRTPCmdImpl {
       emit(callerId, header);
     }
 
-    String rowTemplate = RTP.configs.getConfigValue(CommandMessages.infoBiomeActivityRow, "").toString();
+    String rowTemplate = ActiveConfigs.get().getConfigValue(CommandMessages.infoBiomeActivityRow, "").toString();
     if (rowTemplate.isEmpty()) return true;
 
     int rank = 0;

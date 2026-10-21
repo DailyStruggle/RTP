@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -347,6 +348,55 @@ class MainFallbackTest(unittest.TestCase):
 
     def test_unresolvable_baseline_is_full(self):
         self.assertIn("scope=full\n", self._run(["--base", "no-such-ref-ci-scope-test"]))
+
+    def test_working_tree_requires_head(self):
+        with self.assertRaises(SystemExit):
+            ci_scope.main(["ci-scope.py", "--base", "HEAD", "--head", "HEAD~1", "--working-tree"])
+
+
+class WorkingTreeChangesTest(unittest.TestCase):
+    """changed_files(..., working_tree=True) sees edits that are not committed yet."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self._cwd = os.getcwd()
+        os.chdir(self.root)
+        self._git("init", "-q")
+        self._git("config", "user.email", "test@example.invalid")
+        self._git("config", "user.name", "test")
+        (self.root / ".gitignore").write_text("build/\n", encoding="utf-8")
+        (self.root / "committed.txt").write_text("a\n", encoding="utf-8")
+        (self.root / "staged.txt").write_text("a\n", encoding="utf-8")
+        self._git("add", ".")
+        self._git("commit", "-q", "-m", "base")
+        self.base = self._git("rev-parse", "HEAD")
+        (self.root / "committed.txt").write_text("b\n", encoding="utf-8")
+        self._git("commit", "-q", "-am", "head")
+        (self.root / "staged.txt").write_text("b\n", encoding="utf-8")
+        self._git("add", "staged.txt")
+        (self.root / "rtp-core").mkdir()
+        (self.root / "rtp-core" / "New.java").write_text("class New {}\n", encoding="utf-8")
+        (self.root / "build").mkdir()
+        (self.root / "build" / "ignored.txt").write_text("x\n", encoding="utf-8")
+
+    def tearDown(self):
+        os.chdir(self._cwd)
+        self._tmp.cleanup()
+
+    def _git(self, *args):
+        out = subprocess.run(["git", *args], cwd=self.root, capture_output=True, text=True, check=True)
+        return out.stdout.strip()
+
+    def test_commit_diff_only_by_default(self):
+        self.assertEqual(ci_scope.changed_files(self.base, "HEAD"), ["committed.txt"])
+
+    def test_working_tree_adds_staged_and_untracked_not_ignored(self):
+        self.assertEqual(ci_scope.changed_files(self.base, "HEAD", working_tree=True),
+                         ["committed.txt", "rtp-core/New.java", "staged.txt"])
+
+    def test_working_tree_bad_base_is_none(self):
+        self.assertIsNone(ci_scope.changed_files("no-such-ref", "HEAD", working_tree=True))
 
 
 if __name__ == "__main__":

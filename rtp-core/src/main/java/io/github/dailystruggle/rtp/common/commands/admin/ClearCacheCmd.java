@@ -2,8 +2,9 @@ package io.github.dailystruggle.rtp.common.commands.admin;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 
 import java.util.ArrayList;
@@ -58,9 +59,9 @@ public class ClearCacheCmd extends BaseRTPCmdImpl {
     if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
 
     final List<Region> regions = new ArrayList<>();
-    if (RTP.selectionAPI != null) {
-      regions.addAll(RTP.selectionAPI.permRegionLookup.values());
-      regions.addAll(RTP.selectionAPI.tempRegions.values());
+    if (ActiveSelection.get() != null) {
+      regions.addAll(ActiveSelection.get().permRegionLookup.values());
+      regions.addAll(ActiveSelection.get().tempRegions.values());
     }
 
     int cleared = 0;
@@ -71,10 +72,10 @@ public class ClearCacheCmd extends BaseRTPCmdImpl {
     }
 
     String msg = "cleared hot/cold/backlog caches for " + cleared + " region(s)";
-    RTP.log(Level.INFO, "[RTP] clearcache: " + msg + " (by " + callerId + ")");
-    if (callerId != null && RTP.serverAccessor != null) {
+    RTPRuntime.log(Level.INFO, "[RTP] clearcache: " + msg + " (by " + callerId + ")");
+    if (callerId != null && RTPRuntime.serverAccessor() != null) {
       try {
-        RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, "RTP: " + msg);
+        RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, "RTP: " + msg);
       } catch (RuntimeException ignored) {
         // serverAccessor failures (headless / test scaffolds) are not fatal.
       }

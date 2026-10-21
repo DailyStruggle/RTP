@@ -4,12 +4,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.util.HashMap;
 import java.util.List;
@@ -46,7 +47,7 @@ class TestConfigSetCmdTest {
     accessor.addPlayer(player);
 
     ConfigParser<PerformanceKeys> parser =
-        (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
     long before = ((Number) parser.getConfigValue(PerformanceKeys.viewDistanceSelect, 5L)).longValue();
 
     // MockRTPScheduler runs the async probe inline, so results are ready on return.
@@ -69,11 +70,11 @@ class TestConfigSetCmdTest {
   void nullScheduler_reportsCoreNotLoaded() {
     MockRTPPlayer player = new MockRTPPlayer(UUID.randomUUID(), "p", null);
     accessor.addPlayer(player);
-    RTP.scheduler = null;
+    RTPRuntime.setScheduler(null);
     try {
       new TestConfigSetCmd(null).onCommand(player.uuid(), noArgs(), null);
     } finally {
-      RTP.scheduler = accessor.getMockScheduler();
+      RTPRuntime.setScheduler(accessor.getMockScheduler());
     }
     assertTrue(
         player.sentMessages.stream().anyMatch(m -> m.contains("core not yet loaded")),

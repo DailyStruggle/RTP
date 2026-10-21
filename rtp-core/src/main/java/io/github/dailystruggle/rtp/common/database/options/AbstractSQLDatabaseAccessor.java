@@ -1,9 +1,11 @@
 package io.github.dailystruggle.rtp.common.database.options;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -115,7 +117,7 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
         else if (data.containsKey("UUID")) senderIdStr = data.get("UUID").toString();
 
         if (senderIdStr != null) {
-          teleportData.sender = RTP.serverAccessor.getSender(UUID.fromString(senderIdStr));
+          teleportData.sender = RTPRuntime.serverAccessor().getSender(UUID.fromString(senderIdStr));
         }
 
         if (data.containsKey("time")) {
@@ -131,7 +133,7 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
           teleportData.attempts = ((Number) data.get("attempts")).longValue();
         }
         if (data.containsKey("region")) {
-          teleportData.targetRegion = RTP.selectionAPI.getRegion(data.get("region").toString());
+          teleportData.targetRegion = ActiveSelection.get().getRegion(data.get("region").toString());
         }
 
         Object selectedX = data.get(COL_SELECTED_X);
@@ -243,9 +245,9 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
               connection.rollback();
             }
           } catch (SQLException rollbackEx) {
-            RTP.log(Level.WARNING, "Failed to rollback after flush error", rollbackEx);
+            RTPRuntime.log(Level.WARNING, "Failed to rollback after flush error", rollbackEx);
           }
-          RTP.log(Level.WARNING, "Failed to flush teleport data batch", e);
+          RTPRuntime.log(Level.WARNING, "Failed to flush teleport data batch", e);
         } finally {
           if (autoCommitToggled) {
             try {
@@ -254,7 +256,7 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
           }
         }
       } catch (SQLException e) {
-        RTP.log(Level.WARNING, "Database connection error during flush", e);
+        RTPRuntime.log(Level.WARNING, "Database connection error during flush", e);
       } finally {
         // Pooled backends (MySQL/PostgreSQL) recycle on close; shared SQLite/H2 no-op.
         disconnect(connection);
@@ -277,7 +279,7 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
       statement.setObject(1, lookup.getValue());
       statement.executeUpdate();
     } catch (SQLException e) {
-      RTP.log(Level.WARNING, "Failed to execute delete query: " + sql, e);
+      RTPRuntime.log(Level.WARNING, "Failed to execute delete query: " + sql, e);
     }
   }
 
@@ -368,7 +370,7 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
         statement.setLong(1, threshold);
         int deleted = statement.executeUpdate();
         if (deleted > 0 && isSystemDatabaseLoggingEnabled()) {
-          RTP.log(Level.INFO, "Purged " + deleted + " stale cached locations from the database.");
+          RTPRuntime.log(Level.INFO, "Purged " + deleted + " stale cached locations from the database.");
         }
       }
     } catch (SQLException e) {
@@ -394,7 +396,7 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
         statement.setLong(1, threshold);
         int deleted = statement.executeUpdate();
         if (deleted > 0 && isSystemDatabaseLoggingEnabled()) {
-          RTP.log(Level.INFO, "Purged " + deleted + " stale teleport records from the database.");
+          RTPRuntime.log(Level.INFO, "Purged " + deleted + " stale teleport records from the database.");
         }
       }
     } catch (SQLException e) {
@@ -410,7 +412,7 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
     try {
       return getConnection();
     } catch (SQLException e) {
-      RTP.log(Level.WARNING, "Failed to connect to database", e);
+      RTPRuntime.log(Level.WARNING, "Failed to connect to database", e);
       return null;
     }
   }
@@ -422,7 +424,7 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
         connection.close();
       }
     } catch (SQLException e) {
-      RTP.log(Level.WARNING, "Failed to close database connection", e);
+      RTPRuntime.log(Level.WARNING, "Failed to close database connection", e);
     }
   }
 
@@ -462,14 +464,14 @@ public abstract class AbstractSQLDatabaseAccessor extends DatabaseAccessor<Conne
             teleportData.originWorldName = resultSet.getString(COL_ORIGINAL_WORLD_NAME);
             teleportData.cost = resultSet.getDouble("cost");
 
-            if (RTP.getInstance() != null && RTP.getInstance().latestTeleportData != null) {
-              RTP.getInstance().latestTeleportData.put(uuid, teleportData, teleportData.time);
+            if (TeleportSessions.current() != null && TeleportSessions.current().latestTeleportData != null) {
+              TeleportSessions.current().latestTeleportData.put(uuid, teleportData, teleportData.time);
             }
           }
         }
       }
     } catch (SQLException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
     } catch (IllegalArgumentException ignored) {
       // Ignore corrupted or malformed UUID strings in database rows
     } finally {

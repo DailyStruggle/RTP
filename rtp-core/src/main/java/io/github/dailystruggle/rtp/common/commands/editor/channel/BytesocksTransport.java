@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.editor.channel;
 
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
  * {@link HttpClient} - no new dependency, no own threads, no inbound listener. A lost connection is
  * retried with backoff ({@link #INITIAL_BACKOFF_MILLIS}, doubling, at most {@link #MAX_BACKOFF_MILLIS});
  * the transport expires {@code ttlMillis} after it started. Reconnects and expiry are driven by one
- * async {@code RTP.scheduler} timer calling {@link #tick()}. Every create / connect failure, loss,
+ * async {@code RTPRuntime.scheduler()} timer calling {@link #tick()}. Every create / connect failure, loss,
  * reconnect and the expiry is logged with its reason (S-004).
  *
  * <p>bytesocks counts sent frames per IP over fixed 2-minute windows (30 by default, all channels
@@ -162,18 +162,18 @@ public final class BytesocksTransport implements ChannelTransport {
         return i >= 0 ? s.substring(i + 1) : s;
     }
 
-    /** Async {@code RTP.scheduler} timer (S-005: the socket work never touches the main thread). */
+    /** Async {@code RTPRuntime.scheduler()} timer (S-005: the socket work never touches the main thread). */
     public static Timer schedulerTimer() {
         return new Timer() {
             @Override
             public Object every(Runnable task, long periodTicks) {
-                if (RTP.scheduler == null) throw new IllegalStateException("RTP scheduler not initialized yet (S-006 fail-closed)");
-                return RTP.scheduler.runTaskTimerAsynchronously(task, periodTicks, periodTicks);
+                if (RTPRuntime.scheduler() == null) throw new IllegalStateException("RTP scheduler not initialized yet (S-006 fail-closed)");
+                return RTPRuntime.scheduler().runTaskTimerAsynchronously(task, periodTicks, periodTicks);
             }
 
             @Override
             public void cancel(Object handle) {
-                if (handle != null && RTP.scheduler != null) RTP.scheduler.cancelTask(handle);
+                if (handle != null && RTPRuntime.scheduler() != null) RTPRuntime.scheduler().cancelTask(handle);
             }
         };
     }
@@ -210,7 +210,7 @@ public final class BytesocksTransport implements ChannelTransport {
                         close("relay timer unavailable: " + e.getMessage());
                         throw new CompletionException(new IOException("relay timer unavailable: " + e.getMessage(), e));
                     }
-                    RTP.log(Level.INFO, "[editor] relay channel " + id + " joined at " + socketUri.getHost());
+                    RTPRuntime.log(Level.INFO, "[editor] relay channel " + id + " joined at " + socketUri.getHost());
                     return null;
                 });
     }
@@ -220,7 +220,7 @@ public final class BytesocksTransport implements ChannelTransport {
         WebSocket s = socket;
         socket = null;
         if (s != null) s.abort();
-        RTP.log(Level.WARNING, "[editor] " + reason);
+        RTPRuntime.log(Level.WARNING, "[editor] " + reason);
     }
 
     private CompletableFuture<WebSocket> connect() {
@@ -261,7 +261,7 @@ public final class BytesocksTransport implements ChannelTransport {
                 failures = 0;
                 nextAttemptAt = 0;
             }
-            if (reconnect) RTP.log(Level.INFO, "[editor] relay channel " + id + " reconnected");
+            if (reconnect) RTPRuntime.log(Level.INFO, "[editor] relay channel " + id + " reconnected");
         });
     }
 
@@ -269,7 +269,7 @@ public final class BytesocksTransport implements ChannelTransport {
     private void scheduleRetry(String reason) {
         failures++;
         nextAttemptAt = clock.getAsLong() + backoff;
-        RTP.log(Level.WARNING, "[editor] relay channel " + id + ": " + reason + "; retrying in " + (backoff / 1000L) + " s");
+        RTPRuntime.log(Level.WARNING, "[editor] relay channel " + id + ": " + reason + "; retrying in " + (backoff / 1000L) + " s");
         backoff = Math.min(MAX_BACKOFF_MILLIS, backoff * 2);
     }
 
@@ -298,14 +298,14 @@ public final class BytesocksTransport implements ChannelTransport {
                 WebSocket s = socket;
                 // Behind queued text frames: one outstanding send at a time
                 sendChain = sendChain.thenCompose(v -> s.sendPing(ByteBuffer.allocate(0))).handle((ws, t) -> {
-                    if (t != null) RTP.log(Level.FINE, "[editor] relay channel " + id + ": ping failed: " + rootMessage(t));
+                    if (t != null) RTPRuntime.log(Level.FINE, "[editor] relay channel " + id + ": ping failed: " + rootMessage(t));
                     return null;
                 });
             }
         }
         if (expire) {
             String reason = "expired after " + (ttlMillis / 60_000L) + " minutes";
-            RTP.log(Level.INFO, "[editor] relay channel " + id + " " + reason);
+            RTPRuntime.log(Level.INFO, "[editor] relay channel " + id + " " + reason);
             Listener l = listener;
             try {
                 if (l != null) l.onExpired(reason);
@@ -324,7 +324,7 @@ public final class BytesocksTransport implements ChannelTransport {
             WebSocket s = socket;
             if (closed.get() || s == null) return false;
             if (pendingSends >= MAX_PENDING_SENDS) {
-                RTP.log(Level.FINE, "[editor] relay channel " + id + ": send queue full; frame refused");
+                RTPRuntime.log(Level.FINE, "[editor] relay channel " + id + ": send queue full; frame refused");
                 return false;
             }
             pendingSends++;
@@ -333,7 +333,7 @@ public final class BytesocksTransport implements ChannelTransport {
                 synchronized (lock) {
                     pendingSends--;
                 }
-                if (t != null) RTP.log(Level.FINE, "[editor] relay channel " + id + ": send failed: " + rootMessage(t));
+                if (t != null) RTPRuntime.log(Level.FINE, "[editor] relay channel " + id + ": send failed: " + rootMessage(t));
                 return null;
             });
             return true;
@@ -389,7 +389,7 @@ public final class BytesocksTransport implements ChannelTransport {
         try {
             timer.cancel(handle);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING, "[editor] failed to cancel relay timer: " + e.getMessage(), e);
+            RTPRuntime.log(Level.WARNING, "[editor] failed to cancel relay timer: " + e.getMessage(), e);
         }
         if (s != null) {
             // Queued frames (a signed bye) go out before the close frame
@@ -399,7 +399,7 @@ public final class BytesocksTransport implements ChannelTransport {
                         if (t != null) s.abort();
                     });
         }
-        RTP.log(Level.INFO, "[editor] relay channel " + id + " closed: " + reason);
+        RTPRuntime.log(Level.INFO, "[editor] relay channel " + id + " closed: " + reason);
         Listener l = listener;
         if (l != null) l.onClosed(reason);
     }
@@ -452,7 +452,7 @@ public final class BytesocksTransport implements ChannelTransport {
                 String text = oversized ? null : partial.toString();
                 partial.setLength(0);
                 if (oversized) {
-                    RTP.log(Level.FINE, "[editor] relay channel " + id + ": inbound frame over the frame cap dropped");
+                    RTPRuntime.log(Level.FINE, "[editor] relay channel " + id + ": inbound frame over the frame cap dropped");
                 }
                 oversized = false;
                 Listener l = listener;
@@ -460,7 +460,7 @@ public final class BytesocksTransport implements ChannelTransport {
                     try {
                         l.onFrame(text);
                     } catch (RuntimeException e) {
-                        RTP.log(Level.WARNING, "[editor] relay frame handler failed: " + e.getMessage(), e);
+                        RTPRuntime.log(Level.WARNING, "[editor] relay frame handler failed: " + e.getMessage(), e);
                     }
                 }
             }

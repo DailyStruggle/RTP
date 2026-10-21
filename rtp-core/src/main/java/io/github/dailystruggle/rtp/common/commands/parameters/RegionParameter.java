@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.parameters;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -32,7 +32,7 @@ public class RegionParameter extends CommandParameter {
 
   @Override
   public Set<String> values() {
-    Set<String> local = RTP.selectionAPI.regionNames();
+    Set<String> local = ActiveSelection.get().regionNames();
     Set<String> extras;
     try {
       extras = extraValues.get();

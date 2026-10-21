@@ -46,6 +46,17 @@ Always run targeted unit tests during implementation to verify bugfixes or new b
     3. Final pre-release verification or when explicitly requested by the user.
 - **Exemptions:** Pure documentation or markdown changes (no compiled source or resource files touched) require no Gradle build or test execution.
 
+#### CI-Parity Gate (hand-off check)
+Before handing off a change, run the same gates a pull request would hit, scoped to the change set including **uncommitted and untracked** files:
+
+```bash
+python3 scripts/agent-gate.py            # vs merge-base with origin/V3 (else V3)
+python3 scripts/agent-gate.py --dry-run  # print the scope and commands only
+python3 scripts/agent-gate.py --base origin/V2
+```
+
+It runs `scripts/ci-scope.py --working-tree`, then the `checks` job (traceability, mojibake, front pages, `spotlessCheck`) and every affected set's tasks with `-Pcoverage -PstaticAnalysis` (tests, PMD, JaCoCo floors, SpotBugs). In `full` scope it adds `checkBinaryCompatibility`, the plugin set, the reduced JDK 21 graph and the 80% changed-line coverage gate. Any change under `scripts/`, `gradle/`, `.github/` or root Gradle files is `full`, as in CI. Not covered: SonarCloud and devstack acceptance.
+
 ### Tier 2: Coverage & Mutation Verification
 When modifying core safety or high-assurance logic:
 * **Coverage Verification:** Enforces module and package JaCoCo minimums.

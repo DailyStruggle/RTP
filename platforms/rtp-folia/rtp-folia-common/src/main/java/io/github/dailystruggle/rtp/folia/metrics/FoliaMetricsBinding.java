@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.folia.metrics;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.MetricsKeys;
 import io.github.dailystruggle.metrics.api.FoliaRegionSample;
@@ -8,6 +9,8 @@ import io.github.dailystruggle.metrics.api.MetricsBinding;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.folia.tasks.RegionKey;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
@@ -109,7 +112,7 @@ public final class FoliaMetricsBinding implements MetricsBinding {
      */
     static final double OVERRUN_INTERVAL_MS = 52.5;
 
-    /** Starts and cancels the 1-tick region probes; test seam over {@link RTP#scheduler}. */
+    /** Starts and cancels the 1-tick region probes; test seam over {@link RTPRuntime#scheduler()}. */
     interface RegionTimers {
         Object start(RTPWorld<?> world, int cx, int cz, Runnable tick);
 
@@ -119,13 +122,13 @@ public final class FoliaMetricsBinding implements MetricsBinding {
     static final RegionTimers SCHEDULER_TIMERS = new RegionTimers() {
         @Override
         public Object start(RTPWorld<?> world, int cx, int cz, Runnable tick) {
-            RTPScheduler s = RTP.scheduler;
+            RTPScheduler s = RTPRuntime.scheduler();
             return s == null ? null : s.runTaskTimer(world, cx, cz, tick, 1L, 1L);
         }
 
         @Override
         public void cancel(Object handle) {
-            RTPScheduler s = RTP.scheduler;
+            RTPScheduler s = RTPRuntime.scheduler();
             if (s != null && handle != null) s.cancelTask(handle);
         }
     };
@@ -177,15 +180,15 @@ public final class FoliaMetricsBinding implements MetricsBinding {
 
     /**
      * Schedule the steady global heartbeat sampler on the Folia global region
-     * scheduler (1-tick period). Best-effort: if {@link RTP#scheduler} is not
+     * scheduler (1-tick period). Best-effort: if {@link RTPRuntime#scheduler()} is not
      * yet installed, the binding silently degrades to the legacy
      * {@code FoliaRegionProcessor}-driven per-region sampling (scalars may then
      * report UNSAMPLED on an idle server, as before).
      */
     private void scheduleGlobalSampler() {
         try {
-            if (RTP.scheduler == null) return;
-            globalTaskHandle = RTP.scheduler.runTaskTimer(this::globalTick, 1L, 1L);
+            if (RTPRuntime.scheduler() == null) return;
+            globalTaskHandle = RTPRuntime.scheduler().runTaskTimer(this::globalTick, 1L, 1L);
         } catch (Throwable t) {
             RTP.log(java.util.logging.Level.FINER,
                     "FoliaMetricsBinding global sampler schedule failed: "
@@ -201,7 +204,7 @@ public final class FoliaMetricsBinding implements MetricsBinding {
     private void globalTick() {
         try {
             // wraps(): a spark decorator around this binding still counts as installed.
-            if (RTP.metrics == null || !RTP.metrics.getBinding().wraps(this)) {
+            if (CoreMetrics.instance() == null || !CoreMetrics.instance().getBinding().wraps(this)) {
                 cancelGlobalSampler();
                 return;
             }
@@ -269,8 +272,8 @@ public final class FoliaMetricsBinding implements MetricsBinding {
     public void observeRegion(Object world, int cx, int cz) {
         if (world instanceof RTPWorld<?> rtpWorld) {
             observeRegion(rtpWorld, cx, cz);
-        } else if (world instanceof org.bukkit.World bukkitWorld && RTP.serverAccessor != null) {
-            RTPWorld<?> rtpWorld = RTP.serverAccessor.getRTPWorld(bukkitWorld.getUID());
+        } else if (world instanceof org.bukkit.World bukkitWorld && RTPRuntime.serverAccessor() != null) {
+            RTPWorld<?> rtpWorld = RTPRuntime.serverAccessor().getRTPWorld(bukkitWorld.getUID());
             if (rtpWorld != null) {
                 observeRegion(rtpWorld, cx, cz);
             }
@@ -581,7 +584,7 @@ public final class FoliaMetricsBinding implements MetricsBinding {
             if (RTP.getInstance() == null) return true;
             @SuppressWarnings("unchecked")
             ConfigParser<MetricsKeys> parser =
-                    (ConfigParser<MetricsKeys>) RTP.configs.getParser(MetricsKeys.class);
+                    (ConfigParser<MetricsKeys>) ActiveConfigs.get().getParser(MetricsKeys.class);
             if (parser == null) return true;
             Object v = parser.getConfigValue(MetricsKeys.foliaIncludeRegions, Boolean.TRUE);
             if (v instanceof Boolean) return (Boolean) v;
@@ -597,7 +600,7 @@ public final class FoliaMetricsBinding implements MetricsBinding {
             if (RTP.getInstance() == null) return defaultMode;
             @SuppressWarnings("unchecked")
             ConfigParser<MetricsKeys> parser =
-                    (ConfigParser<MetricsKeys>) RTP.configs.getParser(MetricsKeys.class);
+                    (ConfigParser<MetricsKeys>) ActiveConfigs.get().getParser(MetricsKeys.class);
             if (parser == null) return defaultMode;
             Object v = parser.getConfigValue(key, defaultMode);
             if (v == null) return defaultMode;
@@ -640,7 +643,7 @@ public final class FoliaMetricsBinding implements MetricsBinding {
     /**
      * Test seam: drive the steady global heartbeat sampler one tick, as the
      * scheduled {@link #globalTick()} would in production. Used to exercise the
-     * traffic-independent scalar sampling without a live {@code RTP.scheduler}.
+     * traffic-independent scalar sampling without a live {@code RTPRuntime.scheduler()}.
      */
     void tickGlobalSamplerForTest() {
         globalSampler.tick();

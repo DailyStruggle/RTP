@@ -1,9 +1,9 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopbackChannel;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopbackJson;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -154,25 +154,25 @@ public final class EditorLoopbackApply implements EditorLoopbackChannel.ApplyHan
             applied = Objects.requireNonNull(applier.apply(payloadJson(files, timestamp)), "apply pipeline returned null");
         } catch (RuntimeException e) {
             inFlight.set(false);
-            RTP.log(Level.WARNING, "[editor] loopback hot-apply for region '" + region + "' failed: " + e.getMessage(), e);
+            RTPRuntime.log(Level.WARNING, "[editor] loopback hot-apply for region '" + region + "' failed: " + e.getMessage(), e);
             return CompletableFuture.completedFuture(ack(false, e.getMessage(), timestamp));
         }
         return applied.handle((ok, t) -> {
             inFlight.set(false);
             if (t == null) {
-                RTP.log(Level.INFO, "[editor] loopback hot-apply for region '" + region + "' applied "
+                RTPRuntime.log(Level.INFO, "[editor] loopback hot-apply for region '" + region + "' applied "
                         + files.size() + " file(s)");
                 return ack(true, null, timestamp);
             }
             Throwable cause = unwrap(t);
-            RTP.log(Level.WARNING, "[editor] loopback hot-apply for region '" + region + "' failed: "
+            RTPRuntime.log(Level.WARNING, "[editor] loopback hot-apply for region '" + region + "' failed: "
                     + cause.getMessage(), cause);
             return ack(false, cause.getMessage(), timestamp);
         });
     }
 
     private static CompletableFuture<String> reject(String region, Long timestamp, String error) {
-        RTP.log(Level.WARNING, "[editor] loopback hot-apply for region '" + region + "' rejected: " + error);
+        RTPRuntime.log(Level.WARNING, "[editor] loopback hot-apply for region '" + region + "' rejected: " + error);
         return CompletableFuture.completedFuture(ack(false, error, timestamp));
     }
 

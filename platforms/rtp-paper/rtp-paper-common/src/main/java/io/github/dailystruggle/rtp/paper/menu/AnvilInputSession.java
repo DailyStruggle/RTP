@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.paper.menu;
 import io.github.dailystruggle.rtp.api.menu.MenuAction;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.menu.MenuRedeemSubcommand;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -474,7 +475,7 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
 
     /**
      * Schedule {@code task} on the next tick on a thread that legally owns
-     * {@code player}. Routes through {@link RTP#scheduler}'s
+     * {@code player}. Routes through {@link RTPRuntime#scheduler()}'s
      * {@code runTaskForPlayer} entry point, which on Folia dispatches via the
      * player's per-entity scheduler and on Paper/Spigot falls through to the
      * global / main-thread scheduler. The name is a historical artifact - the
@@ -487,11 +488,11 @@ public final class AnvilInputSession implements MenuRedeemSubcommand.AnvilInputO
     private static void scheduleForPlayer(Plugin plugin, Player player, Runnable task) {
         try {
             io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer =
-                    (RTP.serverAccessor != null)
-                            ? RTP.serverAccessor.getPlayer(player.getUniqueId())
+                    (RTPRuntime.serverAccessor() != null)
+                            ? RTPRuntime.serverAccessor().getPlayer(player.getUniqueId())
                             : null;
-            if (RTP.scheduler != null && rtpPlayer != null) {
-                RTP.scheduler.runTaskForPlayer(
+            if (RTPRuntime.scheduler() != null && rtpPlayer != null) {
+                RTPRuntime.scheduler().runTaskForPlayer(
                         rtpPlayer,
                         new io.github.dailystruggle.rtp.common.tasks.RTPRunnable(task),
                         1L);

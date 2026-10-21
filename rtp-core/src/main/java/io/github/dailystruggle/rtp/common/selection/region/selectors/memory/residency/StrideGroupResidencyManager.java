@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.residency;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.anvil.StorageLatencyProbe;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.HybridHazardTable;
 
 import java.io.BufferedOutputStream;
@@ -35,7 +35,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * exact form) derived from a persistent shard (its {@code .bin} form); paging out
  * drops the resident table but keeps the shard, so it is lossless.
  *
- * <p>All group load / scan work happens off-tick via {@link RTP#scheduler} - never
+ * <p>All group load / scan work happens off-tick via {@link RTPRuntime#scheduler()} - never
  * a synchronous chunk load on the main thread (S-005). A mark is never dropped on
  * eviction or devolution (S-004 direction).
  */
@@ -206,7 +206,7 @@ public final class StrideGroupResidencyManager {
   }
 
   // ---------------------------------------------------------------------------
-  // Residency transitions (all heavy work off-tick via RTP.scheduler - S-005)
+  // Residency transitions (all heavy work off-tick via RTPRuntime.scheduler() - S-005)
   // ---------------------------------------------------------------------------
 
   /**
@@ -336,8 +336,8 @@ public final class StrideGroupResidencyManager {
   }
 
   private void scheduleOffTick(Runnable task) {
-    if (RTP.scheduler != null) {
-      RTP.scheduler.runTaskAsynchronously(task);
+    if (RTPRuntime.scheduler() != null) {
+      RTPRuntime.scheduler().runTaskAsynchronously(task);
     } else {
       // No scheduler wired (e.g. very early init) - run inline; still off the
       // main-thread chunk path since this touches no chunk I/O.

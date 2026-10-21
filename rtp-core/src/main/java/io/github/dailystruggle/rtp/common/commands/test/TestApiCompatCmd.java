@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.commands.test;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -104,12 +104,12 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
             + " errors="
             + report.errors.size();
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, summary);
+      RTPRuntime.serverAccessor().sendMessage(callerId, summary);
     }
     if (report.failures() == 0) {
-      RTP.log(Level.INFO, summary);
+      RTPRuntime.log(Level.INFO, summary);
     } else {
-      RTP.log(Level.WARNING, summary);
+      RTPRuntime.log(Level.WARNING, summary);
     }
 
     emitDetail(callerId, "skipped (class not on classpath)", report.skipped, Level.INFO);
@@ -123,9 +123,9 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
     for (String line : items) {
       String msg = "[RTP test/api-compat] " + tag + ": " + line;
       if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, msg);
+        RTPRuntime.serverAccessor().sendMessage(callerId, msg);
       }
-      RTP.log(level, msg);
+      RTPRuntime.log(level, msg);
     }
   }
 
@@ -247,8 +247,8 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
             "fallback teleport path on platforms without teleportAsync"));
 
     // --- Paper (optional on Spigot) ----------------------------------
-    if (RTP.serverAccessor.getPlatform().equalsIgnoreCase("Paper")
-        || RTP.serverAccessor.getPlatform().equalsIgnoreCase("Folia")) {
+    if (RTPRuntime.serverAccessor().getPlatform().equalsIgnoreCase("Paper")
+        || RTPRuntime.serverAccessor().getPlatform().equalsIgnoreCase("Folia")) {
       p.add(
           new ApiProbe(
               "org.bukkit.entity.Player",
@@ -258,7 +258,7 @@ public class TestApiCompatCmd extends BaseRTPCmdImpl {
     }
 
     // --- Folia (optional on Paper/Spigot) ----------------------------
-    if (RTP.serverAccessor.getPlatform().equalsIgnoreCase("Folia")) {
+    if (RTPRuntime.serverAccessor().getPlatform().equalsIgnoreCase("Folia")) {
       p.add(
           new ApiProbe(
               "org.bukkit.Bukkit",

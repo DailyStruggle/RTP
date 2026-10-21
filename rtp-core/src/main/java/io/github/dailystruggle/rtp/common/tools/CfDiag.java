@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.tools;
 
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.LongAdder;
@@ -96,7 +96,7 @@ public final class CfDiag {
     public static void ensureStarted() {
         if (!STARTED.compareAndSet(false, true)) return;
         try {
-            RTP.serverAccessor.getScheduler().runTaskTimerAsynchronously(
+            RTPRuntime.serverAccessor().getScheduler().runTaskTimerAsynchronously(
                     CfDiag::dumpOnce, DUMP_PERIOD_TICKS, DUMP_PERIOD_TICKS);
         } catch (Throwable t) {
             // Fall back: scheduler not ready (early init). Reset so a later
@@ -240,7 +240,7 @@ public final class CfDiag {
           .append(" regionExecute=").append(n_regionExecute)
           .append(" regionDeficitDispatch=").append(n_regionDeficitDispatch)
           .append("}");
-        RTP.log(Level.FINER, sb.toString());
+        RTPRuntime.log(Level.FINER, sb.toString());
     }
 
     private static String rate(long delta, double elapsedSec) {

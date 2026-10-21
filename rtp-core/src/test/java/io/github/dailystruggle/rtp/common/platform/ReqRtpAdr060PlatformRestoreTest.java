@@ -5,11 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.api.platform.BlockDelta;
 import io.github.dailystruggle.rtp.api.platform.PendingPlatformRestore;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.options.H2DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPScheduler;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -39,14 +39,14 @@ class ReqRtpAdr060PlatformRestoreTest {
     world = new MockRTPWorld("restore_world");
     accessor.addWorld(world);
     scheduler = new MockRTPScheduler();
-    RTP.serverAccessor = accessor;
-    RTP.scheduler = scheduler;
+    RTPRuntime.setServerAccessor(accessor);
+    RTPRuntime.setScheduler(scheduler);
   }
 
   @AfterEach
   void tearDown() {
-    RTP.serverAccessor = null;
-    RTP.scheduler = null;
+    RTPRuntime.setServerAccessor(null);
+    RTPRuntime.setScheduler(null);
   }
 
   private PendingPlatformRestore job(int remainingSeconds) {

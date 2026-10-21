@@ -2,9 +2,10 @@ package io.github.dailystruggle.rtp.common.commands.menu;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.common.commands.maps.MapDispatch;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
@@ -38,11 +39,11 @@ final class VisualizationDispatch {
     boolean paintBadLocations(UUID viewer,
                               String regionName,
                               @Nullable Consumer<String> messageMethod) {
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
                 "[viz/bad-locations] dispatch entry: viewer=" + viewer
                         + " region=" + regionName);
         if (viewer == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "visualization bad-locations rejected: null viewer");
             return false;
         }
@@ -52,7 +53,7 @@ final class VisualizationDispatch {
             return false;
         }
         if (!permissionGates.hasAdminMenu(viewer)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "visualization bad-locations denied: " + viewer
                             + " lacks " + MenuPermissionGates.ADMIN_MENU_PERMISSION);
             reject(viewer, "visualization bad-locations rejected: permission denied",
@@ -63,7 +64,7 @@ final class VisualizationDispatch {
         try {
             spec = ChartSpec.of(ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE, regionName);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "visualization bad-locations rejected: invalid ChartSpec (region='"
                             + regionName + "') for " + viewer + ": " + e.getMessage(), e);
             reject(viewer, "visualization bad-locations rejected: invalid ChartSpec",
@@ -73,16 +74,16 @@ final class VisualizationDispatch {
         try {
             // MapDispatch.paint owns the configurable viewer-facing failure
             // surfaces; do not double-message on its false return.
-            RTP.log(Level.FINE,
+            RTPRuntime.log(Level.FINE,
                     "[viz/bad-locations] handing off to MapDispatch.paint for "
                             + viewer + " region=" + regionName);
             boolean ok = MapDispatch.paint(spec, viewer);
-            RTP.log(Level.FINE,
+            RTPRuntime.log(Level.FINE,
                     "[viz/bad-locations] MapDispatch.paint returned " + ok
                             + " for viewer=" + viewer);
             return ok;
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "visualization bad-locations MapDispatch.paint threw for " + viewer
                             + ": " + e.getMessage(), e);
             reject(viewer, "visualization bad-locations rejected: dispatch failure",
@@ -101,11 +102,11 @@ final class VisualizationDispatch {
     boolean paintBiomes(UUID viewer,
                         String regionName,
                         @Nullable Consumer<String> messageMethod) {
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
                 "[viz/biomes] dispatch entry: viewer=" + viewer
                         + " region=" + regionName);
         if (viewer == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "visualization biomes rejected: null viewer");
             return false;
         }
@@ -115,7 +116,7 @@ final class VisualizationDispatch {
             return false;
         }
         if (!permissionGates.hasAdminMenu(viewer)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "visualization biomes denied: " + viewer
                             + " lacks " + MenuPermissionGates.ADMIN_MENU_PERMISSION);
             reject(viewer, "visualization biomes rejected: permission denied",
@@ -126,7 +127,7 @@ final class VisualizationDispatch {
         try {
             spec = ChartSpec.of(ChartSpec.Kind.REGION_BIOMES, regionName);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "visualization biomes rejected: invalid ChartSpec (region='"
                             + regionName + "') for " + viewer + ": " + e.getMessage(), e);
             reject(viewer, "visualization biomes rejected: invalid ChartSpec",
@@ -134,16 +135,16 @@ final class VisualizationDispatch {
             return false;
         }
         try {
-            RTP.log(Level.FINE,
+            RTPRuntime.log(Level.FINE,
                     "[viz/biomes] handing off to MapDispatch.paint for "
                             + viewer + " region=" + regionName);
             boolean ok = MapDispatch.paint(spec, viewer);
-            RTP.log(Level.FINE,
+            RTPRuntime.log(Level.FINE,
                     "[viz/biomes] MapDispatch.paint returned " + ok
                             + " for viewer=" + viewer);
             return ok;
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "visualization biomes MapDispatch.paint threw for " + viewer
                             + ": " + e.getMessage(), e);
             reject(viewer, "visualization biomes rejected: dispatch failure",
@@ -159,14 +160,14 @@ final class VisualizationDispatch {
      * {@code ChartSpec#regionName}.
      */
     boolean paintSparkline(UUID viewer, @Nullable Consumer<String> messageMethod) {
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
                 "[viz/sparkline] dispatch entry: viewer=" + viewer);
         if (viewer == null) {
-            RTP.log(Level.WARNING, "visualization sparkline rejected: null viewer");
+            RTPRuntime.log(Level.WARNING, "visualization sparkline rejected: null viewer");
             return false;
         }
         if (!permissionGates.hasAdminMenu(viewer)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "visualization sparkline denied: " + viewer
                             + " lacks " + MenuPermissionGates.ADMIN_MENU_PERMISSION);
             reject(viewer, "visualization sparkline rejected: permission denied",
@@ -179,7 +180,7 @@ final class VisualizationDispatch {
             // string since the resolver ignores it.
             spec = ChartSpec.of(ChartSpec.Kind.METRIC_SPARKLINE, "");
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "visualization sparkline rejected: invalid ChartSpec for "
                             + viewer + ": " + e.getMessage(), e);
             reject(viewer, "visualization sparkline rejected: invalid ChartSpec",
@@ -187,15 +188,15 @@ final class VisualizationDispatch {
             return false;
         }
         try {
-            RTP.log(Level.FINE,
+            RTPRuntime.log(Level.FINE,
                     "[viz/sparkline] handing off to MapDispatch.paint for " + viewer);
             boolean ok = MapDispatch.paint(spec, viewer);
-            RTP.log(Level.FINE,
+            RTPRuntime.log(Level.FINE,
                     "[viz/sparkline] MapDispatch.paint returned " + ok
                             + " for viewer=" + viewer);
             return ok;
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "visualization sparkline MapDispatch.paint threw for " + viewer
                             + ": " + e.getMessage(), e);
             reject(viewer, "visualization sparkline rejected: dispatch failure",
@@ -211,11 +212,11 @@ final class VisualizationDispatch {
     boolean paintPipeline(UUID viewer,
                           String regionName,
                           @Nullable Consumer<String> messageMethod) {
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
                 "[viz/pipeline] dispatch entry: viewer=" + viewer
                         + " region=" + regionName);
         if (viewer == null) {
-            RTP.log(Level.WARNING, "visualization pipeline rejected: null viewer");
+            RTPRuntime.log(Level.WARNING, "visualization pipeline rejected: null viewer");
             return false;
         }
         if (regionName == null || regionName.isEmpty()) {
@@ -224,7 +225,7 @@ final class VisualizationDispatch {
             return false;
         }
         if (!permissionGates.hasAdminMenu(viewer)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "visualization pipeline denied: " + viewer
                             + " lacks " + MenuPermissionGates.ADMIN_MENU_PERMISSION);
             reject(viewer, "visualization pipeline rejected: permission denied",
@@ -235,7 +236,7 @@ final class VisualizationDispatch {
         try {
             spec = ChartSpec.of(ChartSpec.Kind.REGION_COMPOSITE, regionName);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "visualization pipeline rejected: invalid ChartSpec for "
                             + viewer + ": " + e.getMessage(), e);
             reject(viewer, "visualization pipeline rejected: invalid ChartSpec",
@@ -245,7 +246,7 @@ final class VisualizationDispatch {
         try {
             return MapDispatch.paint(spec, viewer);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "visualization pipeline MapDispatch.paint threw for " + viewer
                             + ": " + e.getMessage(), e);
             reject(viewer, "visualization pipeline rejected: dispatch failure",
@@ -261,11 +262,11 @@ final class VisualizationDispatch {
     boolean paintHeatmap(UUID viewer,
                          String regionName,
                          @Nullable Consumer<String> messageMethod) {
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
                 "[viz/heatmap] dispatch entry: viewer=" + viewer
                         + " region=" + regionName);
         if (viewer == null) {
-            RTP.log(Level.WARNING, "visualization heatmap rejected: null viewer");
+            RTPRuntime.log(Level.WARNING, "visualization heatmap rejected: null viewer");
             return false;
         }
         if (regionName == null || regionName.isEmpty()) {
@@ -274,7 +275,7 @@ final class VisualizationDispatch {
             return false;
         }
         if (!permissionGates.hasAdminMenu(viewer)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "visualization heatmap denied: " + viewer
                             + " lacks " + MenuPermissionGates.ADMIN_MENU_PERMISSION);
             reject(viewer, "visualization heatmap rejected: permission denied",
@@ -285,7 +286,7 @@ final class VisualizationDispatch {
         try {
             spec = ChartSpec.of(ChartSpec.Kind.SELECTION_HEATMAP, regionName);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "visualization heatmap rejected: invalid ChartSpec for "
                             + viewer + ": " + e.getMessage(), e);
             reject(viewer, "visualization heatmap rejected: invalid ChartSpec",
@@ -295,7 +296,7 @@ final class VisualizationDispatch {
         try {
             return MapDispatch.paint(spec, viewer);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "visualization heatmap MapDispatch.paint threw for " + viewer
                             + ": " + e.getMessage(), e);
             reject(viewer, "visualization heatmap rejected: dispatch failure",
@@ -308,18 +309,18 @@ final class VisualizationDispatch {
      * S-004 reject through {@link CommandMessages#menuInvalid}. Logs WARN
      * unconditionally; the viewer-facing message goes through the supplied
      * {@code messageMethod} when present, falling back to
-     * {@link RTP#serverAccessor}. Mirrors {@code MenuRedeemSubcommand#reject}
+     * {@link RTPRuntime#serverAccessor()}. Mirrors {@code MenuRedeemSubcommand#reject}
      * but does not depend on it.
      */
     private static void reject(UUID viewer,
                                String logMessage,
                                @Nullable Consumer<String> messageMethod) {
-        RTP.log(Level.WARNING, logMessage);
+        RTPRuntime.log(Level.WARNING, logMessage);
         String userMsg = resolveMessage(CommandMessages.menuInvalid, "Invalid menu command.");
         if (messageMethod != null) {
             messageMethod.accept(userMsg);
-        } else if (RTP.serverAccessor != null) {
-            RTP.serverAccessor.sendMessage(RTPAPI.serverId, viewer, userMsg, null);
+        } else if (RTPRuntime.serverAccessor() != null) {
+            RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, viewer, userMsg, null);
         }
     }
 
@@ -332,8 +333,8 @@ final class VisualizationDispatch {
     @SuppressWarnings("unchecked")
     private static String resolveMessage(Enum<?> key, String defaultValue) {
         try {
-            if (RTP.configs == null) return defaultValue;
-            Object value = RTP.configs.getConfigValue(key, defaultValue);
+            if (ActiveConfigs.get() == null) return defaultValue;
+            Object value = ActiveConfigs.get().getConfigValue(key, defaultValue);
             return value == null ? defaultValue : value.toString();
         } catch (RuntimeException e) {
             return defaultValue;

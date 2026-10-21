@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.network;
 
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
@@ -115,7 +115,7 @@ public final class NetworkStatusCache {
         // The non-state-transition INFO surface for network mode is the
         // bootstrap banner in NetworkModeBootstrap; per-player traces
         // live here at FINE.
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
                 "[RTP][state] " + (firstSeed ? "seeded" : "re-seeded")
                         + " local QUEUED row: playerId=" + playerId
                         + " ttlMs=" + seededTimeoutMs);
@@ -149,7 +149,7 @@ public final class NetworkStatusCache {
         seededAtMs.remove(playerId);
         QueueStatus prev = byPlayer.remove(playerId);
         if (prev != null) {
-            RTP.log(Level.FINE,
+            RTPRuntime.log(Level.FINE,
                     "[RTP][state] evictLocal: playerId=" + playerId
                             + " priorState=" + prev.state().name());
         }
@@ -164,19 +164,19 @@ public final class NetworkStatusCache {
     }
 
     /**
-     * Start the periodic poll timer on {@link RTP#scheduler}'s async tier.
+     * Start the periodic poll timer on {@link RTPRuntime#scheduler()}'s async tier.
      * Idempotent.
      */
     public void start(long periodTicks) {
         synchronized (this) {
             if (timerTaskHandle != null) return;
-            if (RTP.scheduler == null) {
-                RTP.log(Level.WARNING,
+            if (RTPRuntime.scheduler() == null) {
+                RTPRuntime.log(Level.WARNING,
                         "[RTP] NetworkStatusCache.start called before scheduler available; "
                                 + "poll timer not started.");
                 return;
             }
-            timerTaskHandle = RTP.scheduler.runTaskTimerAsynchronously(this::pollOnce, periodTicks, periodTicks);
+            timerTaskHandle = RTPRuntime.scheduler().runTaskTimerAsynchronously(this::pollOnce, periodTicks, periodTicks);
         }
     }
 
@@ -193,7 +193,7 @@ public final class NetworkStatusCache {
         } catch (Throwable t) {
             // S-004: never silently swallow. We keep the previous cache so
             // readers still see the last-known state until the next pulse.
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[RTP] status poll failed: " + t.getMessage(), t);
             return;
         }
@@ -227,7 +227,7 @@ public final class NetworkStatusCache {
                 QueueStatus.State prevState = (prev == null) ? null : prev.state();
                 int prevPos = (prev == null) ? -1 : prev.positionInQueue();
                 if (prevState != s.state() || prevPos != s.positionInQueue()) {
-                    RTP.log(Level.FINE,
+                    RTPRuntime.log(Level.FINE,
                             "[RTP][state] supplier: playerId=" + s.playerId()
                                     + " " + (prevState == null ? "NEW" : prevState.name())
                                     + "(pos=" + prevPos + ") -> "
@@ -288,14 +288,14 @@ public final class NetworkStatusCache {
         // State-transition log: non-terminal -> terminal (or supplier
         // eviction when newState==null, sticky-TTL FAILED, etc.). One
         // line per UUID per transition; bounded by exactly-once firing.
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
                 "[RTP][state] terminal: playerId=" + playerId
                         + " newState=" + (newState == null ? "EVICTED" : newState.name()));
         try {
             terminalListener.accept(playerId, newState);
         } catch (Throwable t) {
             // S-004: log, never swallow.
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[RTP] terminal listener threw for " + playerId
                             + " (state=" + newState + "): " + t.getMessage(), t);
         }
@@ -304,8 +304,8 @@ public final class NetworkStatusCache {
     /** Idempotent. */
     public void shutdown() {
         synchronized (this) {
-            if (timerTaskHandle != null && RTP.scheduler != null) {
-                try { RTP.scheduler.cancelTask(timerTaskHandle); } catch (Throwable ignored) { /* best-effort */ }
+            if (timerTaskHandle != null && RTPRuntime.scheduler() != null) {
+                try { RTPRuntime.scheduler().cancelTask(timerTaskHandle); } catch (Throwable ignored) { /* best-effort */ }
             }
             timerTaskHandle = null;
             byPlayer.clear();

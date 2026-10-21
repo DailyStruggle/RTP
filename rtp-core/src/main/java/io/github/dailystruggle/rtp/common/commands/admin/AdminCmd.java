@@ -3,9 +3,9 @@ package io.github.dailystruggle.rtp.common.commands.admin;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -82,7 +82,7 @@ public class AdminCmd extends BaseRTPCmdImpl {
             return true;
         }
         if (openAdminPanel == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "/rtp admin invoked by " + callerId
                             + " with no admin-panel opener wired; rejecting");
             rejectMenuInvalid(callerId);
@@ -92,7 +92,7 @@ public class AdminCmd extends BaseRTPCmdImpl {
             openAdminPanel.accept(callerId);
             return true;
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "/rtp admin opener threw for " + callerId + ": " + e.getMessage(), e);
             rejectMenuInvalid(callerId);
             return false;
@@ -100,9 +100,9 @@ public class AdminCmd extends BaseRTPCmdImpl {
     }
 
     private static void rejectMenuInvalid(UUID callerId) {
-        if (callerId == null || RTP.serverAccessor == null) return;
+        if (callerId == null || RTPRuntime.serverAccessor() == null) return;
         try {
-            RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, CommandMessages.menuInvalid);
+            RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, CommandMessages.menuInvalid);
         } catch (RuntimeException ignored) {
             // serverAccessor failures (test scaffolds without a sender) are not fatal.
         }

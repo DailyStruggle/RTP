@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.GenericVerticalAdjustorKeys;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
@@ -58,7 +59,7 @@ public class RegionCacheKeyTest {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static <T extends Enum<T>> Map<Enum<?>, Object> dataMapOf(Class<T> cls)
             throws ReflectiveOperationException {
-        ConfigParser<T> parser = (ConfigParser<T>) RTP.configs.getParser(cls);
+        ConfigParser<T> parser = (ConfigParser<T>) ActiveConfigs.get().getParser(cls);
         java.lang.reflect.Field dataField = FactoryValue.class.getDeclaredField("data");
         dataField.setAccessible(true);
         return (Map) dataField.get(parser);
@@ -248,5 +249,21 @@ public class RegionCacheKeyTest {
                 data.put(key, previous);
             }
         }
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-F-015: unset slope keys keep the cache key; setting them changes it")
+    void slopeKeys_changeCacheKeyOnlyWhenSet() {
+        String base = currentKey();
+        assertEquals(base, RegionCacheKey.cacheKey(world, shape, new LinearAdjustor(new ArrayList<>())));
+        assertEquals(-1, vert.maxSlope());
+        assertEquals(2, vert.slopeRadius());
+        assertEquals(base, currentKey(), "reading absent slope keys must not populate vert data");
+
+        vert.set(GenericVerticalAdjustorKeys.maxSlope, 2);
+        String withSlope = currentKey();
+        assertNotEquals(base, withSlope);
+        vert.set(GenericVerticalAdjustorKeys.slopeRadius, 4);
+        assertNotEquals(withSlope, currentKey());
     }
 }

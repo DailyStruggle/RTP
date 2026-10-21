@@ -38,6 +38,20 @@ pipeline {
       }
     }
 
+    // PMD gate (config/pmd/ruleset.xml), same rules GitHub Actions enforces in
+    // gradle-set.yml. Fails on any violation; pmdRegexMain stays advisory.
+    stage('Static Analysis') {
+      steps {
+        sh './gradlew pmdMain pmdTest pmdRegexMain -PstaticAnalysis'
+      }
+      post {
+        always {
+          archiveArtifacts artifacts: '**/build/reports/pmd/*',
+                           allowEmptyArchive: true
+        }
+      }
+    }
+
     stage('Test') {
       steps {
         sh './gradlew test'

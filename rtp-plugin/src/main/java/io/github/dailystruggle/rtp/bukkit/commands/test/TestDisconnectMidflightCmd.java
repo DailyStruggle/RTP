@@ -4,6 +4,8 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import java.util.List;
@@ -55,11 +57,11 @@ public class TestDisconnectMidflightCmd extends BaseRTPCmdImpl {
     if (nextCommand != null) return true;
 
     State live = new State(
-        RTP.getInstance().processingPlayers,
-        RTP.getInstance().invulnerablePlayers.keySet(),
-        RTP.getInstance().invulnerablePlayers,
-        RTP.getInstance().latestTeleportData,
-        RTP.getInstance().priorTeleportData);
+        TeleportSessions.current().processingPlayers,
+        TeleportSessions.current().invulnerablePlayers.keySet(),
+        TeleportSessions.current().invulnerablePlayers,
+        TeleportSessions.current().latestTeleportData,
+        TeleportSessions.current().priorTeleportData);
 
     // Production cancel path exercises the real RTPTeleportCancel so a
     // regression in its singleton-dependent logic is caught at runtime.
@@ -208,7 +210,7 @@ public class TestDisconnectMidflightCmd extends BaseRTPCmdImpl {
             + (r.threw == null ? "" : " threw=" + r.threw);
 
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, summary);
+      RTPRuntime.serverAccessor().sendMessage(callerId, summary);
     }
     // S-004: a failing run logs at WARNING; a clean run logs at INFO.
     RTP.log(r.pass ? Level.INFO : Level.WARNING, summary);

@@ -1,12 +1,13 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -64,7 +65,7 @@ public class ReqRtpObservationalCacheTaskTest {
         @SuppressWarnings("unchecked")
         io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
                 (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
-                        RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
+                        ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
         if (perf != null) {
             perf.set(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.maxHeapPercent, 0.0);
         }
@@ -168,6 +169,6 @@ public class ReqRtpObservationalCacheTaskTest {
     /** One async region pulse plus the sync pulse that runs tick-thread promotion verify. */
     private void pulse() {
         region.execute(Long.MAX_VALUE);
-        RTP.getInstance().miscSyncTasks.execute(Long.MAX_VALUE);
+        MiscTasks.sync().execute(Long.MAX_VALUE);
     }
 }

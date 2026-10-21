@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.bukkit.tools.softdepends;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.UUID;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
@@ -41,7 +41,7 @@ public class VaultChecker implements RTPEconomy {
   public void give(UUID playerId, double money) {
     if (playerId.equals(CommandsAPI.serverId)) return;
     if (econ == null) {
-      RTP.economy = null;
+      RTPRuntime.setEconomy(null);
       return;
     }
     OfflinePlayer player = Bukkit.getOfflinePlayer(playerId);
@@ -55,7 +55,7 @@ public class VaultChecker implements RTPEconomy {
     if (playerId.equals(CommandsAPI.serverId)) return true;
 
     if (econ == null) {
-      RTP.economy = null;
+      RTPRuntime.setEconomy(null);
       return true;
     }
     OfflinePlayer player = Bukkit.getOfflinePlayer(playerId);
@@ -68,7 +68,7 @@ public class VaultChecker implements RTPEconomy {
   public double bal(UUID playerId) {
     if (playerId.equals(CommandsAPI.serverId)) return Double.MAX_VALUE;
     if (econ == null) {
-      RTP.economy = null;
+      RTPRuntime.setEconomy(null);
       return 0;
     }
     OfflinePlayer player = Bukkit.getOfflinePlayer(playerId);

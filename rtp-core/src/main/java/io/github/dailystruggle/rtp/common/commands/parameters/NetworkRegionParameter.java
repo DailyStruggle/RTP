@@ -1,9 +1,9 @@
 package io.github.dailystruggle.rtp.common.commands.parameters;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.network.RegionAvailabilityProvider;
 
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -36,7 +36,7 @@ public class NetworkRegionParameter extends CommandParameter {
     public Set<String> values() {
         Set<String> local;
         try {
-            local = RTP.selectionAPI.regionNames();
+            local = ActiveSelection.get().regionNames();
         } catch (Throwable ignored) {
             local = Set.of();
         }
@@ -68,7 +68,7 @@ public class NetworkRegionParameter extends CommandParameter {
             // Bare local region name: defer to the local region set, but accept
             // if the local set cannot be read (degrade like RegionParameter).
             try {
-                Set<String> local = RTP.selectionAPI.regionNames();
+                Set<String> local = ActiveSelection.get().regionNames();
                 return local == null || local.isEmpty() || local.contains(value);
             } catch (Throwable ignored) {
                 return true;

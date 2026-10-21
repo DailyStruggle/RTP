@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -132,7 +132,7 @@ public class GlobalRegionVerifiers {
             } catch (Throwable throwable) {
                 // Fail safe: a throwing verifier is logged at WARNING and the location is
                 // rejected (treated as false), never silently accepted (REQ-RTP-S-004).
-                RTP.log(Level.WARNING, "Global region verifier threw an exception", throwable);
+                RTPRuntime.log(Level.WARNING, "Global region verifier threw an exception", throwable);
                 return CompletableFuture.completedFuture(new VerifierCheckResult(false, verifier.source()));
             }
         }
@@ -148,7 +148,7 @@ public class GlobalRegionVerifiers {
                 try {
                     return verifier.check().apply(location).handle((pass, ex) -> {
                         if (ex != null) {
-                            RTP.log(Level.WARNING, "Async global region verifier threw an exception", ex);
+                            RTPRuntime.log(Level.WARNING, "Async global region verifier threw an exception", ex);
                             return new VerifierCheckResult(false, verifier.source());
                         }
                         if (!Boolean.TRUE.equals(pass)) {
@@ -157,7 +157,7 @@ public class GlobalRegionVerifiers {
                         return VerifierCheckResult.PASS;
                     });
                 } catch (Throwable throwable) {
-                    RTP.log(Level.WARNING, "Async global region verifier threw an exception", throwable);
+                    RTPRuntime.log(Level.WARNING, "Async global region verifier threw an exception", throwable);
                     return CompletableFuture.completedFuture(new VerifierCheckResult(false, verifier.source()));
                 }
             });

@@ -4,10 +4,11 @@ import io.github.dailystruggle.rtp.anvil.AnvilPrefilter;
 import io.github.dailystruggle.rtp.anvil.ChunkCoord;
 import io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
@@ -38,7 +39,7 @@ public final class AnvilBatchPrefilterProvider implements AnvilPrefilterRegistry
     if (registry == null || !Boolean.getBoolean(ENABLE_PROPERTY)) return;
     if (registry.current() != null) return;
     registry.bind(new AnvilBatchPrefilterProvider());
-    RTP.log(java.util.logging.Level.INFO,
+    RTPRuntime.log(java.util.logging.Level.INFO,
         "[RTP] Anvil backlog batch prefilter bound (" + ENABLE_PROPERTY + "=true)");
   }
 
@@ -68,16 +69,16 @@ public final class AnvilBatchPrefilterProvider implements AnvilPrefilterRegistry
   }
 
   private static UnaryOperator<String> reconciler() {
-    return s -> (RTP.serverAccessor != null)
-        ? RTP.serverAccessor.reconcilePaletteIdentifier(s)
+    return s -> (RTPRuntime.serverAccessor() != null)
+        ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
         : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(s);
   }
 
   @SuppressWarnings("unchecked")
   private static boolean enabled() {
     try {
-      if (RTP.configs == null) return true;
-      ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+      if (ActiveConfigs.get() == null) return true;
+      ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
       if (safety == null) return true;
       Object raw = safety.getConfigValue(SafetyKeys.anvilPrefilterEnabled, Boolean.TRUE);
       if (raw instanceof Boolean b) return b;
@@ -90,8 +91,8 @@ public final class AnvilBatchPrefilterProvider implements AnvilPrefilterRegistry
   /** {@code BlocksKeys.unsafeBlocks} snapshot; empty (never reject) on lookup failure. */
   private static Set<String> unsafeBlocks() {
     try {
-      if (RTP.configs == null) return Collections.emptySet();
-      Object raw = RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new java.util.ArrayList<>());
+      if (ActiveConfigs.get() == null) return Collections.emptySet();
+      Object raw = ActiveConfigs.get().getConfigValue(BlocksKeys.unsafeBlocks, new java.util.ArrayList<>());
       if (raw instanceof Collection<?> c) {
         return c.stream()
             .filter(java.util.Objects::nonNull)

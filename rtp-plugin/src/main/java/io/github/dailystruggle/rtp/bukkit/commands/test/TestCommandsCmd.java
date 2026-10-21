@@ -4,6 +4,7 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -185,7 +186,7 @@ public class TestCommandsCmd extends BaseRTPCmdImpl {
             + report.traversalErrors.size()
             + ")";
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, summary);
+        RTPRuntime.serverAccessor().sendMessage(callerId, summary);
     }
     if (issues == 0) {
       RTP.log(Level.INFO, summary);
@@ -203,7 +204,7 @@ public class TestCommandsCmd extends BaseRTPCmdImpl {
     for (String item : items) {
       String line = "[RTP test/commands] " + tag + ": " + item;
       if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-          RTP.serverAccessor.sendMessage(callerId, line);
+          RTPRuntime.serverAccessor().sendMessage(callerId, line);
       }
       RTP.log(Level.WARNING, line);
     }

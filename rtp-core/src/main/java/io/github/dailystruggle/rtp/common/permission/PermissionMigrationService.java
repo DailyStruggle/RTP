@@ -1,12 +1,13 @@
 package io.github.dailystruggle.rtp.common.permission;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporter;
 import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporterRegistry;
 import io.github.dailystruggle.rtp.common.importer.schema.GenericSchemaImporter;
 import io.github.dailystruggle.rtp.common.importer.schema.PluginImportSchema;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -59,10 +60,10 @@ public class PermissionMigrationService {
      */
     public void loadTemplatesFromConfig() {
         File pluginDir = null;
-        if (RTP.configs != null && RTP.configs.pluginDirectory != null) {
-            pluginDir = RTP.configs.pluginDirectory;
-        } else if (RTP.serverAccessor != null) {
-            pluginDir = RTP.serverAccessor.getPluginDirectory();
+        if (ActiveConfigs.get() != null && ActiveConfigs.get().pluginDirectory != null) {
+            pluginDir = ActiveConfigs.get().pluginDirectory;
+        } else if (RTPRuntime.serverAccessor() != null) {
+            pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
         }
 
         if (pluginDir == null) return;
@@ -96,7 +97,7 @@ public class PermissionMigrationService {
                     if (uu != null && !uu.isBlank()) this.userUnsetTemplate = uu;
                     break;
                 } catch (Exception e) {
-                    RTP.log(Level.WARNING, "[RTP] Failed to load permissions templates from " + candidate, e);
+                    RTPRuntime.log(Level.WARNING, "[RTP] Failed to load permissions templates from " + candidate, e);
                 }
             }
         }
@@ -767,8 +768,8 @@ public class PermissionMigrationService {
             UUID consoleId = RTPAPI.serverId;
             for (String cmd : plan.getGeneratedCommands()) {
                 boolean ok = false;
-                if (RTP.serverAccessor != null) {
-                    ok = RTP.serverAccessor.executeCommand(consoleId, cmd);
+                if (RTPRuntime.serverAccessor() != null) {
+                    ok = RTPRuntime.serverAccessor().executeCommand(consoleId, cmd);
                 }
                 if (ok) {
                     plan.executedCommands.add(cmd);

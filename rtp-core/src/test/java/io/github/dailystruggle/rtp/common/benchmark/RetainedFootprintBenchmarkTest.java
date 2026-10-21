@@ -3,9 +3,9 @@ package io.github.dailystruggle.rtp.common.benchmark;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.benchmark.SimulationReport.Provenance;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.BacklogLocationBuffer;
 import io.github.dailystruggle.rtp.common.selection.region.LockFreeLocationBuffer;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
@@ -86,7 +86,7 @@ class RetainedFootprintBenchmarkTest {
   @BeforeAll
   static void setupServer() {
     MockRTPServerAccessor accessor = new MockRTPServerAccessor(new java.io.File("target/test-data"));
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
   }
 

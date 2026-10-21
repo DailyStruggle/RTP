@@ -4,6 +4,7 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -54,7 +55,7 @@ public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
 
-    List<RTPWorld<?>> worlds = RTP.serverAccessor.getRTPWorlds();
+    List<RTPWorld<?>> worlds = RTPRuntime.serverAccessor().getRTPWorlds();
     if (worlds == null || worlds.isEmpty()) {
       Result r = Result.skipped("no RTPWorlds registered on the server accessor");
       emit(callerId, r);
@@ -192,7 +193,7 @@ public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
             + " maxMs=" + s.maxMs
             + " meanMs=" + s.meanMs
             + (s.firstNote.isEmpty() ? "" : " firstNote=" + s.firstNote);
-    RTP.serverAccessor.sendMessage(callerId, summary);
+    RTPRuntime.serverAccessor().sendMessage(callerId, summary);
     RTP.log(s.fail == 0 ? Level.INFO : Level.WARNING, summary);
   }
 
@@ -350,7 +351,7 @@ public class TestAsyncChunkLoadCmd extends BaseRTPCmdImpl {
             + (r.notes.isEmpty() ? "" : " notes=" + r.notes);
 
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, summary);
+      RTPRuntime.serverAccessor().sendMessage(callerId, summary);
     }
     // S-004: failing / skipped runs log at WARNING; a clean run at INFO.
     RTP.log(r.pass ? Level.INFO : Level.WARNING, summary);

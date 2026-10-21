@@ -5,7 +5,7 @@ import io.github.dailystruggle.effectsapi.common.volumetric.Vector3d;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Server;
@@ -43,8 +43,8 @@ class BukkitTextDisplayHologramThreadingTest {
 
     @BeforeEach
     void setUp() {
-        previousAccessor = RTP.serverAccessor;
-        previousScheduler = RTP.scheduler;
+        previousAccessor = RTPRuntime.serverAccessor();
+        previousScheduler = RTPRuntime.scheduler();
 
         world = mock(World.class);
         display = mock(TextDisplay.class);
@@ -61,21 +61,21 @@ class BukkitTextDisplayHologramThreadingTest {
         RTPServerAccessor accessor = mock(RTPServerAccessor.class);
         RTPWorld<?> rtpWorld = mock(RTPWorld.class);
         doReturn(rtpWorld).when(accessor).getRTPWorld(anyString());
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
 
         RTPScheduler scheduler = mock(RTPScheduler.class);
         doAnswer(inv -> {
             regionQueue.add(inv.getArgument(3));
             return null;
         }).when(scheduler).runTask(any(RTPWorld.class), anyInt(), anyInt(), any(Runnable.class));
-        RTP.scheduler = scheduler;
+        RTPRuntime.setScheduler(scheduler);
     }
 
     @AfterEach
     void tearDown() {
         bukkit.close();
-        RTP.serverAccessor = previousAccessor;
-        RTP.scheduler = previousScheduler;
+        RTPRuntime.setServerAccessor(previousAccessor);
+        RTPRuntime.setScheduler(previousScheduler);
     }
 
     private void drainRegion() {
@@ -92,7 +92,7 @@ class BukkitTextDisplayHologramThreadingTest {
         assertNotNull(handle);
 
         verify(world, never()).spawnEntity(any(Location.class), any(EntityType.class));
-        verify(RTP.scheduler).runTask(any(RTPWorld.class), eq(2), eq(-2), any(Runnable.class));
+        verify(RTPRuntime.scheduler()).runTask(any(RTPWorld.class), eq(2), eq(-2), any(Runnable.class));
         drainRegion();
         verify(world).spawnEntity(any(Location.class), any(EntityType.class));
 

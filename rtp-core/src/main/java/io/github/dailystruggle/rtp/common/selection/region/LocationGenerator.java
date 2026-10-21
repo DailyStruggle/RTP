@@ -6,7 +6,7 @@ import io.github.dailystruggle.rtp.api.selection.GenerationContext;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.selection.ILocationGenerator;
 import io.github.dailystruggle.rtp.api.world.*;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tools.CfDiag;
 import org.jetbrains.annotations.Nullable;
 
@@ -168,14 +168,14 @@ public class LocationGenerator implements ILocationGenerator {
             return f.get(SYNC_SHIM_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
-            RTP.log(Level.WARNING, "[RTP] LocationGenerator sync shim interrupted");
+            RTPRuntime.log(Level.WARNING, "[RTP] LocationGenerator sync shim interrupted");
             return null;
         } catch (ExecutionException ee) {
             Throwable cause = ee.getCause() != null ? ee.getCause() : ee;
-            RTP.log(Level.WARNING, "[RTP] LocationGenerator async task failed: " + cause, cause);
+            RTPRuntime.log(Level.WARNING, "[RTP] LocationGenerator async task failed: " + cause, cause);
             return null;
         } catch (TimeoutException te) {
-            RTP.log(Level.WARNING, "[RTP] LocationGenerator sync shim timed out after " + SYNC_SHIM_TIMEOUT_SECONDS + "s");
+            RTPRuntime.log(Level.WARNING, "[RTP] LocationGenerator sync shim timed out after " + SYNC_SHIM_TIMEOUT_SECONDS + "s");
             return null;
         }
     }
@@ -225,9 +225,9 @@ public class LocationGenerator implements ILocationGenerator {
             state.purpose = (purpose == null) ? LoadPurpose.IMMEDIATE : purpose;
             state.backlog = backlog;
             PregenTask task = new PregenTask(state, result, 1L);
-            RTP.serverAccessor.getScheduler().runTaskAsynchronously(task);
+            RTPRuntime.serverAccessor().getScheduler().runTaskAsynchronously(task);
         } catch (Throwable t) {
-            RTP.log(Level.WARNING, "[RTP] LocationGenerator pregen dispatch failed: " + t, t);
+            RTPRuntime.log(Level.WARNING, "[RTP] LocationGenerator pregen dispatch failed: " + t, t);
             result.complete(null);
         }
         return result;
@@ -245,7 +245,7 @@ public class LocationGenerator implements ILocationGenerator {
         try {
             new QueueTask(region, sender, player, biomeNames, result).start();
         } catch (Throwable t) {
-            RTP.log(Level.WARNING, "[RTP] LocationGenerator queue dispatch failed: " + t, t);
+            RTPRuntime.log(Level.WARNING, "[RTP] LocationGenerator queue dispatch failed: " + t, t);
             result.complete(null);
         }
         return result;

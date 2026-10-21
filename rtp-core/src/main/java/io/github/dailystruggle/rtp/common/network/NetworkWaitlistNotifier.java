@@ -1,8 +1,9 @@
 package io.github.dailystruggle.rtp.common.network;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages;
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -15,7 +16,7 @@ import java.util.logging.Level;
 public class NetworkWaitlistNotifier {
 
     /**
-     * Hardcoded fallback used only when {@code RTP.configs} has not been
+     * Hardcoded fallback used only when {@code ActiveConfigs.get()} has not been
      * initialised (test contexts, very early bootstrap). Production
      * rendering reads {@link NetworkMessages#networkQueued} from
      * {@code messages.yml} per REQ-RTP-F-013.
@@ -47,14 +48,14 @@ public class NetworkWaitlistNotifier {
     public void start(long periodTicks) {
         synchronized (this) {
             if (timerTaskHandle != null) return;
-            if (RTP.scheduler == null) {
-                RTP.log(Level.WARNING,
+            if (RTPRuntime.scheduler() == null) {
+                RTPRuntime.log(Level.WARNING,
                         "[RTP] NetworkWaitlistNotifier.start called before scheduler available; "
                                 + "notifier not started.");
                 return;
             }
             long ticks = Math.max(1L, periodTicks);
-            timerTaskHandle = RTP.scheduler.runTaskTimerAsynchronously(this::pulse, ticks, ticks);
+            timerTaskHandle = RTPRuntime.scheduler().runTaskTimerAsynchronously(this::pulse, ticks, ticks);
         }
     }
 
@@ -68,7 +69,7 @@ public class NetworkWaitlistNotifier {
             doPulse(System.currentTimeMillis());
         } catch (Throwable t) {
             // S-004: never silently swallow.
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[RTP] NetworkWaitlistNotifier pulse failed: " + t.getMessage(), t);
         }
     }
@@ -117,8 +118,8 @@ public class NetworkWaitlistNotifier {
     @SuppressWarnings("unchecked")
     private static String resolveTemplate() {
         try {
-            if (RTP.configs != null) {
-                Object v = RTP.configs.getConfigValue(
+            if (ActiveConfigs.get() != null) {
+                Object v = ActiveConfigs.get().getConfigValue(
                         NetworkMessages.networkQueued, DEFAULT_NETWORK_QUEUED);
                 if (v != null) return v.toString();
             }
@@ -136,14 +137,14 @@ public class NetworkWaitlistNotifier {
      */
     boolean emit(UUID uuid, String body) {
         io.github.dailystruggle.rtp.api.entity.RTPPlayer p =
-                RTP.serverAccessor == null ? null : RTP.serverAccessor.getPlayer(uuid);
+                RTPRuntime.serverAccessor() == null ? null : RTPRuntime.serverAccessor().getPlayer(uuid);
         if (p == null || !p.isOnline()) return false;
         try {
             p.sendMessage(body);
             return true;
         } catch (Throwable t) {
             // S-004: never silently swallow.
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[RTP] NetworkWaitlistNotifier emit failed for "
                             + uuid + ": " + t.getMessage(), t);
             return false;
@@ -153,8 +154,8 @@ public class NetworkWaitlistNotifier {
     /** Idempotent. */
     public void shutdown() {
         synchronized (this) {
-            if (timerTaskHandle != null && RTP.scheduler != null) {
-                try { RTP.scheduler.cancelTask(timerTaskHandle); } catch (Throwable ignored) { /* best-effort */ }
+            if (timerTaskHandle != null && RTPRuntime.scheduler() != null) {
+                try { RTPRuntime.scheduler().cancelTask(timerTaskHandle); } catch (Throwable ignored) { /* best-effort */ }
             }
             timerTaskHandle = null;
             lastEmitted.clear();

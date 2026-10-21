@@ -13,6 +13,7 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.folia.world.FoliaRTPWorld;
 import io.papermc.paper.threadedregions.scheduler.EntityScheduler;
 import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
@@ -59,8 +60,10 @@ class FoliaRTPPlayerSetLocationTest {
     }).when(scheduler).runTask(any(RTPWorld.class), anyInt(), anyInt(), any(Runnable.class));
     RTPServerAccessor accessor = mock(RTPServerAccessor.class);
     when(accessor.getScheduler()).thenReturn(scheduler);
-    previousAccessor = RTP.serverAccessor;
-    RTP.serverAccessor = accessor;
+    // Mirror platform bootstrap: RTP's static init runs before any accessor is installed.
+    RTP.ensureInitialized();
+    previousAccessor = RTPRuntime.serverAccessor();
+    RTPRuntime.setServerAccessor(accessor);
 
     RTP rtp = mock(RTP.class);
     when(rtp.getPlugin()).thenReturn(mock(Plugin.class));
@@ -69,7 +72,7 @@ class FoliaRTPPlayerSetLocationTest {
 
   @AfterEach
   void tearDown() throws Exception {
-    RTP.serverAccessor = previousAccessor;
+    RTPRuntime.setServerAccessor(previousAccessor);
     swapInstance(previousInstance);
   }
 

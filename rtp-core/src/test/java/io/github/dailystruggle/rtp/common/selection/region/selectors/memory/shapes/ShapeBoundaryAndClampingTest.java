@@ -2,10 +2,10 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.EllipseMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
@@ -18,7 +18,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
-import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
@@ -34,13 +33,13 @@ class ShapeBoundaryAndClampingTest {
     @BeforeAll
     static void setUp() {
         MockRTPServerAccessor accessor = new MockRTPServerAccessor(new File("target/test-data"));
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
     }
 
     @org.junit.jupiter.api.AfterAll
     static void tearDown() {
-        RTP.serverAccessor = null;
+        RTPRuntime.setServerAccessor(null);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
     }
 
@@ -231,7 +230,7 @@ class ShapeBoundaryAndClampingTest {
         borderSquare.set(GenericMemoryShapeParams.centerZ, 0L);
         WorldBorder border = new WorldBorder(() -> borderSquare, loc -> true);
 
-        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
         accessor.setWorldBorderFunction(s -> border);
 
         RTPWorld<?> world = mock(RTPWorld.class);
@@ -256,7 +255,7 @@ class ShapeBoundaryAndClampingTest {
         borderSquare.set(GenericMemoryShapeParams.centerZ, 0L);
         WorldBorder border = new WorldBorder(() -> borderSquare, loc -> true);
 
-        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
         accessor.setWorldBorderFunction(s -> border);
 
         RTPWorld<?> world = mock(RTPWorld.class);
@@ -342,9 +341,7 @@ class ShapeBoundaryAndClampingTest {
         RTPTestSetup.install(testDir);
 
         YamlFileDatabase db = new YamlFileDatabase(testDir);
-        Field daField = RTP.class.getDeclaredField("databaseAccessor");
-        daField.setAccessible(true);
-        daField.set(RTP.getInstance(), db);
+        io.github.dailystruggle.rtp.common.database.ActiveDatabase.setAccessor(db);
 
         Square original = new Square();
         original.set(GenericMemoryShapeParams.radius, 500L);
@@ -411,7 +408,7 @@ class ShapeBoundaryAndClampingTest {
     void exportDebugJson_validStructure(@TempDir Path tempDir) throws Exception {
         File testDir = tempDir.toFile();
         MockRTPServerAccessor accessor = new MockRTPServerAccessor(testDir);
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
 
         Circle circle = new Circle();

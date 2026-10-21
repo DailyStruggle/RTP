@@ -3,9 +3,9 @@ package io.github.dailystruggle.rtp.common.selection.region;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -33,14 +33,14 @@ class SafetyScanTest {
     @BeforeEach
     void setUp() {
         RTPTestSetup.install(tempDir);
-        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
         world = accessor.getRTPWorld("world");
     }
 
     @AfterEach
     void tearDown() {
-        RTP.serverAccessor = null;
-        RTP.scheduler = null;
+        RTPRuntime.setServerAccessor(null);
+        RTPRuntime.setScheduler(null);
     }
 
     @Test

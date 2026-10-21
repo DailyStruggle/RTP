@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.EllipseMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.NormalDistributionParams;
@@ -31,7 +31,7 @@ public class MemoryShapeSelectionParityTest {
   static void setupServer() {
     MockRTPServerAccessor accessor =
         new MockRTPServerAccessor(new java.io.File("target/test-data"));
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
   }
 

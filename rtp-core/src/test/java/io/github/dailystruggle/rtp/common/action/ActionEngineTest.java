@@ -11,6 +11,7 @@ import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.trigger.PhysicalTriggerManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,14 +37,14 @@ class ActionEngineTest {
   void setUp(@TempDir Path tempDir) {
     serverAccessor = RTPTestSetup.install(tempDir.toFile());
     actionManager = new ActionManager();
-    RTP.actionManager = actionManager;
+    ActionServices.setActionManager(actionManager);
     originalGroupService = RTP.groupPlacementService;
   }
 
   @AfterEach
   void tearDown() {
     RTP.groupPlacementService = originalGroupService;
-    RTP.actionManager = null;
+    ActionServices.setActionManager(null);
   }
 
   @Test
@@ -150,10 +151,10 @@ class ActionEngineTest {
     actionManager.registerAction(def);
 
     for (PhysicalTriggerSpec trigger : def.triggers()) {
-      RTP.triggerManager.registerTrigger(trigger);
+      PhysicalTriggerManager.instance().registerTrigger(trigger);
     }
 
-    PhysicalTriggerSpec registered = RTP.triggerManager.getTrigger("pad_trigger");
+    PhysicalTriggerSpec registered = PhysicalTriggerManager.instance().getTrigger("pad_trigger");
     assertNotNull(registered);
     assertEquals(PhysicalTriggerSpec.TriggerType.PRESSURE_PLATE, registered.type());
     assertEquals(10L, registered.batchIntervalSeconds());

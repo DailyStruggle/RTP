@@ -1,7 +1,9 @@
 package io.github.dailystruggle.rtp.common.tools;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
 import java.util.ArrayList;
@@ -36,7 +38,7 @@ public class MemoryTracker {
   }
 
   private static void log(Level level, String pattern, Object... args) {
-    RTP.log(level, MessageFormat.format(pattern, args));
+    RTPRuntime.log(level, MessageFormat.format(pattern, args));
   }
 
   static {
@@ -53,10 +55,10 @@ public class MemoryTracker {
   }
 
   private static boolean isSystemLoggingEnabled() {
-    if (RTP.configs != null) {
+    if (ActiveConfigs.get() != null) {
       io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys> logging =
           (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys>)
-              RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.class);
+              ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.class);
       if (logging != null) {
         Object o = logging.getConfigValue(io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.system_memory_tracker, true);
         if (o instanceof Boolean) {
@@ -164,8 +166,8 @@ public class MemoryTracker {
    */
   public static long activeTickets() {
     long activeTickets = 0;
-    if (RTP.serverAccessor != null) {
-      List<RTPWorld<?>> worlds = RTP.serverAccessor.getRTPWorlds();
+    if (RTPRuntime.serverAccessor() != null) {
+      List<RTPWorld<?>> worlds = RTPRuntime.serverAccessor().getRTPWorlds();
       if (worlds != null) {
         for (RTPWorld<?> world : worlds) {
           if (world != null && world.activeChunkTickets != null) {
@@ -349,8 +351,8 @@ public class MemoryTracker {
                           trackableTask.setCancelled(true);
 
                           // Schedule it on the primary thread to safely release chunks
-                          if (RTP.scheduler != null) {
-                            RTP.scheduler.runTask(trackableTask);
+                          if (RTPRuntime.scheduler() != null) {
+                            RTPRuntime.scheduler().runTask(trackableTask);
                           }
 
                           // Return true to instantly purge it from the tracker
@@ -379,9 +381,9 @@ public class MemoryTracker {
                                   "[RTP][GC] Purging stalled TeleportData label={0} ageOverBudgetMs={1}",
                                   label, leakDuration);
                           teleportData.completed = true;
-                          if (targetPlayerId != null && RTP.getInstance() != null) {
-                            RTP.getInstance().processingPlayers.remove(targetPlayerId);
-                            RTP.getInstance().latestTeleportData.remove(targetPlayerId, teleportData);
+                          if (targetPlayerId != null && TeleportSessions.current() != null) {
+                            TeleportSessions.current().processingPlayers.remove(targetPlayerId);
+                            TeleportSessions.current().latestTeleportData.remove(targetPlayerId, teleportData);
                           }
                           return true;
                         }
@@ -404,11 +406,11 @@ public class MemoryTracker {
       collectLiveOwners(livePipelines, liveData);
       ProcessingLockSweeper.sweep(livePipelines, liveData);
     } catch (RuntimeException e) {
-      RTP.log(Level.WARNING, "[RTP][GC] stale teleport lock sweep failed", e);
+      RTPRuntime.log(Level.WARNING, "[RTP][GC] stale teleport lock sweep failed", e);
     }
 
-    RTP rtp = RTP.getInstance();
-    if (rtp != null) {
+    TeleportSessions sessions = TeleportSessions.current();
+    if (sessions != null) {
       long totalLocationQueueSize = 0;
       long totalPerPlayerLocationQueueSize = 0;
       long trackedTickets = 0;
@@ -430,7 +432,7 @@ public class MemoryTracker {
       long totalLoads = 0;
       long pluginForced = 0;
       List<java.util.concurrent.CompletableFuture<Integer>> serverForcedFutures = new ArrayList<>();
-      for (RTPWorld<?> world : RTP.serverAccessor.getRTPWorlds()) {
+      for (RTPWorld<?> world : RTPRuntime.serverAccessor().getRTPWorlds()) {
         activeTickets += world.activeChunkTickets.get();
         totalLoads += world.totalChunkLoads.get();
         serverForcedFutures.add(world.getServerForceLoadedCount());
@@ -472,7 +474,7 @@ public class MemoryTracker {
         }
 
         // Focus leak detection on the positive discrepancy (orphaned tickets + cap overflows)
-        if (discrepancy > 0 && rtp.processingPlayers.isEmpty()) {
+        if (discrepancy > 0 && TeleportSessions.current().processingPlayers.isEmpty()) {
           double leakRate = (finalTotalLoads > 0) ? ((double) discrepancy / finalTotalLoads) * 100.0 : 0.0;
           if (isSystemLoggingEnabled()) {
             log(Level.SEVERE,

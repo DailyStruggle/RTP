@@ -26,7 +26,7 @@ public class RedisManager implements RTPNetworkManager {
             String key = "rtp:lastTp:" + playerId.toString();
             jedis.set(key, String.valueOf(epochMillis));
         } catch (Exception e) {
-            io.github.dailystruggle.rtp.common.RTP.log(
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.log(
                     java.util.logging.Level.WARNING, "Failed to setLastTeleportTime in Redis: " + e.getMessage(), e);
         }
     }
@@ -43,7 +43,7 @@ public class RedisManager implements RTPNetworkManager {
                 return 0L;
             }
         } catch (Exception e) {
-            io.github.dailystruggle.rtp.common.RTP.log(
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.log(
                     java.util.logging.Level.WARNING, "Failed to getLastTeleportTime from Redis: " + e.getMessage(), e);
             return 0L;
         }
@@ -56,7 +56,7 @@ public class RedisManager implements RTPNetworkManager {
             String key = "rtp:cooldown:" + playerId.toString();
             jedis.setex(key, expirationTimeSeconds, "true");
         } catch (Exception e) {
-            io.github.dailystruggle.rtp.common.RTP.log(
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.log(
                     java.util.logging.Level.WARNING, "Failed to setCooldown in Redis: " + e.getMessage(), e);
         }
     }
@@ -68,7 +68,7 @@ public class RedisManager implements RTPNetworkManager {
             String key = "rtp:cooldown:" + playerId.toString();
             return jedis.ttl(key);
         } catch (Exception e) {
-            io.github.dailystruggle.rtp.common.RTP.log(
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.log(
                     java.util.logging.Level.WARNING, "Failed to getCooldown from Redis: " + e.getMessage(), e);
             return -2L;
         }
@@ -79,7 +79,7 @@ public class RedisManager implements RTPNetworkManager {
         try (RespConnection jedis = pool.getResource()) {
             jedis.publish(channel, jsonPayload);
         } catch (Exception e) {
-            io.github.dailystruggle.rtp.common.RTP.log(
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.log(
                     java.util.logging.Level.WARNING, "Failed to publish in Redis: " + e.getMessage(), e);
         }
     }
@@ -96,7 +96,7 @@ public class RedisManager implements RTPNetworkManager {
                 };
                 pubSub.proceed(jedis, rpcChannel);
             } catch (Exception e) {
-                io.github.dailystruggle.rtp.common.RTP.log(
+                io.github.dailystruggle.rtp.common.runtime.RTPRuntime.log(
                         java.util.logging.Level.WARNING, "Exception during Redis subscription to " + rpcChannel, e);
             }
         });

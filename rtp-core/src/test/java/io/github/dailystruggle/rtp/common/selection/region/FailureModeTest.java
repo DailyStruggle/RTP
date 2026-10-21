@@ -97,7 +97,7 @@ class FailureModeTest {
         qm.requestTeleport(player); // player deferred on waitlist (ADR-043)
         // Personal-bucket opt-in for the replenishment path is a separate
         // concern post-ADR-043. The full openPersonalQueue() path schedules
-        // a RegionCacheTask via RTP.scheduler against the mock region,
+        // a RegionCacheTask via RTPRuntime.scheduler() against the mock region,
         // which is out of scope for this failure-mode test - bypass the
         // scheduling and just install the empty bucket directly so the
         // replenishment cycle has somewhere to deliver into.

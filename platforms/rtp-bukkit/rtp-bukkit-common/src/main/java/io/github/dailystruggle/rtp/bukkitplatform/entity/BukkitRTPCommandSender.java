@@ -4,7 +4,7 @@ import io.github.dailystruggle.rtp.bukkitplatform.tools.BukkitServers;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
@@ -198,8 +198,8 @@ public class BukkitRTPCommandSender implements RTPCommandSender {
       if (s.hasPermission("rtp.nocooldown") || s.hasPermission("rtp.noCooldown")) return 0;
       int cooldown = ParsePermissions.getInt(senderWrapper, "rtp.cooldown.");
       if (cooldown < 0) {
-        if (RTP.configs == null) return 0;
-        ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+        if (ActiveConfigs.get() == null) return 0;
+        ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
         Object val = (configParser != null) ? configParser.getConfigValue(ConfigKeys.teleportCooldown, 0) : 0;
         return ConfigParser.parseSecondsDurationMillis(val, 0L);
       }
@@ -215,8 +215,8 @@ public class BukkitRTPCommandSender implements RTPCommandSender {
       if (s.hasPermission("rtp.nodelay") || s.hasPermission("rtp.noDelay")) return 0;
       int delay = ParsePermissions.getInt(senderWrapper, "rtp.delay.");
       if (delay < 0) {
-        if (RTP.configs == null) return 0;
-        ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+        if (ActiveConfigs.get() == null) return 0;
+        ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
         Object val = (configParser != null) ? configParser.getConfigValue(ConfigKeys.teleportDelay, 0) : 0;
         return ConfigParser.parseSecondsDurationMillis(val, 0L);
       }

@@ -2,6 +2,9 @@ package io.github.dailystruggle.rtp.bukkit.bukkitListeners;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import java.util.UUID;
 import org.bukkit.entity.Player;
@@ -16,10 +19,10 @@ public final class OnPlayerJoin implements Listener {
     Player player = event.getPlayer();
     UUID uuid = player.getUniqueId();
 
-    if (RTP.getInstance().fileBinStore != null && !RTP.getInstance().latestTeleportData.containsKey(uuid)) {
+    if (RTP.getInstance().fileBinStore != null && !TeleportSessions.current().latestTeleportData.containsKey(uuid)) {
       TeleportData restored = RTP.getInstance().fileBinStore.load(uuid);
       if (restored != null) {
-        RTP.getInstance().latestTeleportData.put(uuid, restored);
+        TeleportSessions.current().latestTeleportData.put(uuid, restored);
         if (restored.targetRegionName != null) {
           RTP.setLastRegionTeleportTime(uuid, restored.targetRegionName, restored.time);
         }
@@ -28,7 +31,7 @@ public final class OnPlayerJoin implements Listener {
 
     if (player.hasPermission("rtp.personalqueue")) {
       Region region =
-          RTP.selectionAPI.getRegion(RTP.serverAccessor.getPlayer(player.getUniqueId()));
+          ActiveSelection.get().getRegion(RTPRuntime.serverAccessor().getPlayer(player.getUniqueId()));
       if (region == null) return;
       // ADR-043: bucket-only opt-in. Open the personal coordinate bucket
       // and schedule the push-on-open pregen fill. Does NOT enroll the

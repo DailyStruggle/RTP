@@ -6,10 +6,13 @@ import io.github.dailystruggle.effectsapi.fabric_unobf.FabricEffectRuntimeUnobf;
 import io.github.dailystruggle.effectsapi.fabric_unobf.FabricEffectsInitializer;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.tasks.teleport.DeathTeleports;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import net.minecraft.server.MinecraftServer;
@@ -75,7 +78,7 @@ public final class FabricEffectsHandlerUnobf {
         }
         RTP.log(Level.FINE, "[RTP][FX-trace] setupEffects: attaching lifecycle hooks");
 
-        Configs configs = RTP.configs;
+        Configs configs = ActiveConfigs.get();
         FactoryValue<PerformanceKeys> parser = configs.getParser(PerformanceKeys.class);
         FabricEffectRuntimeUnobf runtime = new FabricEffectRuntimeUnobf();
 
@@ -150,8 +153,8 @@ public final class FabricEffectsHandlerUnobf {
     /** UUID-resolving variant for cancel / queue-push / queue-pop hooks. */
     private static void dispatchByUuid(String prefix, UUID uuid, FabricEffectRuntimeUnobf runtime) {
         try {
-            if (RTP.serverAccessor == null) return;
-            RTPPlayer rp = RTP.serverAccessor.getPlayer(uuid);
+            if (RTPRuntime.serverAccessor() == null) return;
+            RTPPlayer rp = RTPRuntime.serverAccessor().getPlayer(uuid);
             if (rp == null) return;
             dispatch(prefix, rp, runtime);
         } catch (Throwable t) {
@@ -264,7 +267,7 @@ public final class FabricEffectsHandlerUnobf {
             for (Effect<?> effect : effects) {
                 effect.setTarget(target);
                 if (effect instanceof io.github.dailystruggle.effectsapi.common.effects.DeathEffect) {
-                    RTP.deathEffectInFlight.add(handle.getUUID());
+                    DeathTeleports.effectInFlight().add(handle.getUUID());
                     if (pipelineTask != null) {
                         pipelineTask.deathEffectTriggered = true;
                     }

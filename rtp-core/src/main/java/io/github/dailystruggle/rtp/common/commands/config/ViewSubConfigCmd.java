@@ -2,10 +2,10 @@ package io.github.dailystruggle.rtp.common.commands.config;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -80,7 +80,7 @@ public class ViewSubConfigCmd extends BaseRTPCmdImpl {
           return true;
         }
       } catch (RuntimeException e) {
-        RTP.log(
+        RTPRuntime.log(
             Level.WARNING,
             "[RTP config/view] book opener threw for "
                 + configParser.name
@@ -97,7 +97,7 @@ public class ViewSubConfigCmd extends BaseRTPCmdImpl {
             + "Use &f/rtp config "
             + configParser.name
             + " viewraw&7 for this view directly.";
-    RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, hint);
+    RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, hint);
     return new ViewRawSubConfigCmd(null, configParser).onCommand(callerId, parameterValues, null);
   }
 }

@@ -5,8 +5,10 @@ import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
 import java.util.ArrayList;
 import java.util.List;
@@ -61,7 +63,7 @@ public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
 
-    if (RTP.serverAccessor == null) {
+    if (RTPRuntime.serverAccessor() == null) {
       String msg = "&c[RTP test/safety-verifier] serverAccessor is null; core not yet loaded";
       RTP.log(Level.WARNING, msg);
       return false;
@@ -85,7 +87,7 @@ public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
     // We deliberately do not force a chunk load (S-005). Using spawn-relative
     // coordinates mirrors what the queue would serve for a freshly-loaded
     // world.
-    List<? extends RTPWorld> worlds = RTP.serverAccessor.getRTPWorlds();
+    List<? extends RTPWorld> worlds = RTPRuntime.serverAccessor().getRTPWorlds();
     if (worlds == null || worlds.isEmpty()) {
       r.notes = "no RTPWorlds registered";
       return r;
@@ -104,7 +106,7 @@ public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
     // the job spec).
     @SuppressWarnings("unchecked")
     ConfigParser<BlocksKeys> blocksParser =
-        (ConfigParser<BlocksKeys>) RTP.configs.getParser(BlocksKeys.class);
+        (ConfigParser<BlocksKeys>) ActiveConfigs.get().getParser(BlocksKeys.class);
     if (blocksParser == null) {
       r.notes = "BlocksKeys parser missing";
       return r;
@@ -234,7 +236,7 @@ public class SafetyVerifierTestJob extends BaseRTPCmdImpl {
             + (r.notes.isEmpty() ? "" : " notes=" + r.notes);
 
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, summary);
+        RTPRuntime.serverAccessor().sendMessage(callerId, summary);
     }
     // S-004: failing run logs at WARNING; clean run at INFO.
     RTP.log(r.pass ? Level.INFO : Level.WARNING, summary);

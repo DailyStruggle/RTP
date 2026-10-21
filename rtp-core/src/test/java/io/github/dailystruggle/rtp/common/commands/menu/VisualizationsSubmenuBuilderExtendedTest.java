@@ -6,8 +6,9 @@ import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,14 +37,14 @@ final class VisualizationsSubmenuBuilderExtendedTest {
     @BeforeEach
     void setUp() {
         RTPTestSetup.install(tempDir.toFile());
-        RTP.selectionAPI = new SelectionAPI();
+        ActiveSelection.set(new SelectionAPI());
     }
 
     @AfterEach
     void tearDown() {
-        if (RTP.selectionAPI != null) RTP.selectionAPI.permRegionLookup.clear();
-        RTP.serverAccessor = null;
-        RTP.scheduler = null;
+        if (ActiveSelection.get() != null) ActiveSelection.get().permRegionLookup.clear();
+        RTPRuntime.setServerAccessor(null);
+        RTPRuntime.setScheduler(null);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
     }
 
@@ -86,7 +87,7 @@ final class VisualizationsSubmenuBuilderExtendedTest {
                 new io.github.dailystruggle.rtp.common.selection.region.RegionSettings(
                         name, world, shape, vert,
                         false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
-        RTP.selectionAPI.permRegionLookup.put(name,
+        ActiveSelection.get().permRegionLookup.put(name,
                 new io.github.dailystruggle.rtp.common.selection.region.Region(name, settings));
     }
 
@@ -182,7 +183,7 @@ final class VisualizationsSubmenuBuilderExtendedTest {
     @Test
     @DisplayName("collectRegionNames handles null selectionAPI or runtime exception")
     void collectRegionNames_safeException() {
-        RTP.selectionAPI = null;
+        ActiveSelection.set(null);
         VisualizationsSubmenuBuilder builder = new VisualizationsSubmenuBuilder();
         MenuModel model = builder.buildRegionList(UUID.randomUUID(), ChartSpec.Kind.REGION_BAD_LOCATIONS_SHAPE);
         assertNotNull(model);

@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.bukkit.configuration;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -38,7 +38,7 @@ public class DatabaseYmlDuplicationTest {
         System.out.println("[DEBUG_LOG] after first boot: " + databaseSiblings(dir));
 
         for (int i = 0; i < 3; i++) {
-            RTP.configs.reloadConfigs();
+            ActiveConfigs.get().reloadConfigs();
         }
         List<String> after = databaseSiblings(dir);
         System.out.println("[DEBUG_LOG] after reboots: " + after);
@@ -60,7 +60,7 @@ public class DatabaseYmlDuplicationTest {
 
         RTPTestSetup.install(dir);
         for (int i = 0; i < 3; i++) {
-            RTP.configs.reloadConfigs();
+            ActiveConfigs.get().reloadConfigs();
         }
 
         List<String> after = databaseSiblings(dir);

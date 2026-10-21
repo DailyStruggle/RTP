@@ -1,15 +1,17 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.jump;
 
+import org.junit.jupiter.api.DisplayName;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.FakeChunkColumnProbe;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -215,7 +217,7 @@ public class JumpAdjustorProbeTest {
     // is not materialised in unit tests). Same reflection approach as
     // ReqRtpS004NullChunkAttributionTest / ReqRtpS005StaleChunkGuardTest.
     ConfigParser<BlocksKeys> blocks =
-        (ConfigParser<BlocksKeys>) RTP.configs.getParser(BlocksKeys.class);
+        (ConfigParser<BlocksKeys>) ActiveConfigs.get().getParser(BlocksKeys.class);
     java.lang.reflect.Field dataField = FactoryValue.class.getDeclaredField("data");
     dataField.setAccessible(true);
     EnumMap<BlocksKeys, Object> blocksData = (EnumMap<BlocksKeys, Object>) dataField.get(blocks);
@@ -243,7 +245,7 @@ public class JumpAdjustorProbeTest {
   void airBlocksFromConfig_expandsMinecraftTagToFlowerHeadSpace() throws Exception {
     // Seed the config with a tag token.
     ConfigParser<BlocksKeys> blocks =
-        (ConfigParser<BlocksKeys>) RTP.configs.getParser(BlocksKeys.class);
+        (ConfigParser<BlocksKeys>) ActiveConfigs.get().getParser(BlocksKeys.class);
     java.lang.reflect.Field dataField = FactoryValue.class.getDeclaredField("data");
     dataField.setAccessible(true);
     EnumMap<BlocksKeys, Object> blocksData = (EnumMap<BlocksKeys, Object>) dataField.get(blocks);
@@ -252,15 +254,14 @@ public class JumpAdjustorProbeTest {
     // No static cache to reset - readSafetySnapshot() reads the parser per call.
 
     // Install a tag-snapshot-aware accessor that publishes minecraft:flowers → {POPPY}.
-    io.github.dailystruggle.rtp.api.server.RTPServerAccessor prev = RTP.serverAccessor;
-    RTP.serverAccessor =
-        new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(tempDir.toFile()) {
+    io.github.dailystruggle.rtp.api.server.RTPServerAccessor prev = RTPRuntime.serverAccessor();
+    RTPRuntime.setServerAccessor(new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(tempDir.toFile()) {
           @Override
           public java.util.Map<String, java.util.Set<String>> blockTagSnapshot() {
             return java.util.Map.of(
                 "minecraft:flowers", java.util.Set.of("POPPY", "DANDELION"));
           }
-        };
+        });
 
     try {
       FakeChunkColumnProbe probe = new FakeChunkColumnProbe(0, 0, 0, 128);
@@ -291,7 +292,7 @@ public class JumpAdjustorProbeTest {
               + " airBlocks contains the #minecraft:flowers tag token");
       assertEquals(64, r2.y());
     } finally {
-      RTP.serverAccessor = prev;
+      RTPRuntime.setServerAccessor(prev);
     }
   }
 
@@ -306,7 +307,7 @@ public class JumpAdjustorProbeTest {
   @Test
   void statePredicatedTokens_preservedInReappliedConfig() throws Exception {
     ConfigParser<BlocksKeys> blocks =
-        (ConfigParser<BlocksKeys>) RTP.configs.getParser(BlocksKeys.class);
+        (ConfigParser<BlocksKeys>) ActiveConfigs.get().getParser(BlocksKeys.class);
     java.lang.reflect.Field dataField = FactoryValue.class.getDeclaredField("data");
     dataField.setAccessible(true);
     EnumMap<BlocksKeys, Object> blocksData = (EnumMap<BlocksKeys, Object>) dataField.get(blocks);
@@ -497,5 +498,36 @@ public class JumpAdjustorProbeTest {
         r.reason(),
         "air-column rejection must surface as SCAN_MISS so ScanTask short-circuits"
             + " instead of paying for a full chunk load");
+  }
+
+  @Test
+  @DisplayName("REQ-RTP-F-015: jump probe path skips a steep column and reports SCAN_MISS when all are steep")
+  void slopeCheck_probePath() {
+    FakeChunkColumnProbe probe = new FakeChunkColumnProbe(0, 0, 0, 128);
+    probe.setSolidRange(0, 63);
+    probe.setAirRange(64, 128);
+    for (int y = 64; y <= 70; y++) probe.setColumnSolid(9, 7, y); // wall east of (7,7)
+
+    JumpAdjustor a = adj(60, 80);
+    a.set(JumpAdjustorKeys.maxSlope, 3);
+    RTPCoords r = a.adjustFromProbe(probe, "world");
+    assertNotNull(r);
+    assertEquals(2, r.x());
+    assertEquals(2, r.z());
+
+    int[][] rest = {{2, 2}, {12, 12}, {2, 12}, {12, 2}};
+    for (int[] c : rest) {
+      for (int y = 64; y <= 70; y++) probe.setColumnSolid(c[0] + 2, c[1], y);
+    }
+    io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors
+        .VerticalAdjustor.AdjustResult miss = a.adjustFromProbeWithReason(probe, "world");
+    assertNull(miss.picked());
+    assertEquals(
+        io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors
+            .VerticalAdjustor.ProbeRejectReason.SCAN_MISS,
+        miss.reason());
+
+    JumpAdjustor off = adj(60, 80);
+    assertNotNull(off.adjustFromProbe(probe, "world"), "slope check off: unchanged selection");
   }
 }

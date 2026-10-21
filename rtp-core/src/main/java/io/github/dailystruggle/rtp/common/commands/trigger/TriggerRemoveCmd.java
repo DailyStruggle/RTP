@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.trigger;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -26,7 +26,7 @@ public class TriggerRemoveCmd extends BaseTriggerCmd {
 
   @Override
   protected boolean execute(UUID senderId, Map<String, List<String>> parameterValues) {
-    RTP.serverAccessor.sendMessage(
+    RTPRuntime.serverAccessor().sendMessage(
         senderId, senderId, "[RTP] Use /rtp trigger remove <id> to delete a physical trigger.");
     return true;
   }

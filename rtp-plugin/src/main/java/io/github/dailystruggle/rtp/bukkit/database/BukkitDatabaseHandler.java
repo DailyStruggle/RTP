@@ -1,8 +1,11 @@
 package io.github.dailystruggle.rtp.bukkit.database;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.database.options.*;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
@@ -14,16 +17,16 @@ public class BukkitDatabaseHandler {
     }
 
     public static void setupDatabase(RTP rtp) throws FileSystemException {
-        File databaseDirectory = RTP.configs.pluginDirectory;
+        File databaseDirectory = ActiveConfigs.get().pluginDirectory;
         databaseDirectory = new File(databaseDirectory.getAbsolutePath() + File.separator + "database");
         boolean mkdirs = databaseDirectory.mkdirs();
         if (!mkdirs && !databaseDirectory.exists()) {
             throw new FileSystemException("unable to make directories: " + databaseDirectory.getAbsolutePath());
         }
 
-        RTP.configs.reloadConfigs();
+        ActiveConfigs.get().reloadConfigs();
 
-        Map<String, Object> databaseMap = RTP.configs.getDatabaseConfig();
+        Map<String, Object> databaseMap = ActiveConfigs.get().getDatabaseConfig();
 
         String type = String.valueOf(databaseMap.getOrDefault("type", "sqlite"));
         String host = String.valueOf(databaseMap.getOrDefault("host", "127.0.0.1"));
@@ -54,7 +57,7 @@ public class BukkitDatabaseHandler {
         // every backend) falls back through H2 → flat-file instead of crashing startup.
         DatabaseAccessorFactory.Result dbResult = DatabaseAccessorFactory.create(
                 type, databaseDirectory, host, port, name, username, password);
-        rtp.databaseAccessor = dbResult.accessor;
+        ActiveDatabase.setAccessor(dbResult.accessor);
         String effectiveType = dbResult.effectiveType;
 
         RTP.handleMigration(previousType, effectiveType);
@@ -64,11 +67,11 @@ public class BukkitDatabaseHandler {
             RTP.log(Level.WARNING, "Failed to write database state file", e);
         }
 
-        RTP.configs.reloadRegions();
-        RTP.scheduler.runTaskLater(() -> RTP.getInstance().databaseAccessor.startup(), 1);
+        ActiveConfigs.get().reloadRegions();
+        RTPRuntime.scheduler().runTaskLater(() -> ActiveDatabase.accessor().startup(), 1);
         // ADR-060: start the emergency-platform restore reaper once the DB is up so any
         // persisted restore jobs resume across the restart.
-        RTP.scheduler.runTaskLater(
+        RTPRuntime.scheduler().runTaskLater(
                 io.github.dailystruggle.rtp.common.platform.PlatformRestoreManager::startGlobal, 2);
     }
 }

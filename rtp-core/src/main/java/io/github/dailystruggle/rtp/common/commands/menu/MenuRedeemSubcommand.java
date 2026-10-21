@@ -12,6 +12,12 @@ import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.maps.MapDispatch;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.LinkedHashMap;
@@ -705,7 +711,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         // the root sibling per ADR-050.
         rtpRoot.addSubCommand(new MenuConcreteCommandLeaves.VisualizationRootCmd(rtpRoot, this));
 
-        RTP.getInstance().miscAsyncTasks.add(
+        MiscTasks.async().add(
                 new io.github.dailystruggle.rtp.common.tasks.RTPRunnable(this::seedMirrorTree, 10));
     }
 
@@ -851,7 +857,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             // OpenMenu reached redeem but no renderer/builder is wired. Treat
             // as a protocol error (renderer minted it without us having one
             // to dispatch through) and refuse rather than silently no-op.
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu open-action received with open-page disabled for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
                     "menu open rejected: open-page disabled", messageMethod);
@@ -877,7 +883,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                         .get(segment.toUpperCase(java.util.Locale.ROOT) + ".YML");
             }
             if (!(next instanceof TreeCommand tc)) {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "menu open-action path segment '" + segment
                                 + "' did not resolve to a TreeCommand under "
                                 + target.name() + " for " + senderId);
@@ -901,7 +907,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                                             MenuAction.OpenParamPicker picker,
                                             @Nullable Consumer<String> messageMethod) {
         if (renderer == null || paramPickerBuilder == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu param-picker received with picker-page disabled for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
                     "menu param-picker rejected: picker-page disabled", messageMethod);
@@ -926,7 +932,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                         .get(segment.toUpperCase(java.util.Locale.ROOT) + ".YML");
             }
             if (!(next instanceof TreeCommand tc)) {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "menu param-picker path segment '" + segment
                                 + "' did not resolve to a TreeCommand under "
                                 + target.name() + " for " + senderId);
@@ -948,7 +954,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             else if (paramLookup.containsKey(paramName.toUpperCase(java.util.Locale.ROOT))) known = true;
         }
         if (!known) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu param-picker unknown parameter '" + paramName
                             + "' on " + target.name() + " for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
@@ -961,7 +967,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             model = paramPickerBuilder.build(target, senderId,
                     java.util.List.of(parentPath), paramName);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu param-picker failed for " + senderId
                             + " node=" + target.name() + " param=" + paramName
                             + ": " + e.getMessage(), e);
@@ -1014,7 +1020,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                                   @Nullable MenuAction backAction,
                                   @Nullable Consumer<String> messageMethod) {
         if (renderer == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu selection received with menu disabled for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
                     "menu selection rejected: menu disabled", messageMethod);
@@ -1032,7 +1038,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                         .get(segment.toUpperCase(java.util.Locale.ROOT) + ".YML");
             }
             if (!(next instanceof TreeCommand tc)) {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "menu selection path segment '" + segment
                                 + "' did not resolve to a TreeCommand under "
                                 + target.name() + " for " + senderId);
@@ -1051,7 +1057,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             if (param == null) param = paramLookup.get(paramName.toUpperCase(java.util.Locale.ROOT));
         }
         if (param == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu selection unknown parameter '" + paramName
                             + "' on " + target.name() + " for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
@@ -1076,7 +1082,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                     java.util.List.of(parentPath), paramName, displayName, entries,
                     colorSupplier, executeOnClick, backAction);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu selection failed for " + senderId
                             + " node=" + target.name() + " param=" + paramName
                             + ": " + e.getMessage(), e);
@@ -1104,7 +1110,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                                              MenuAction.PromptAnvilInput prompt,
                                              @Nullable Consumer<String> messageMethod) {
         if (anvilInputOpener == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu anvil-input received with anvil-input disabled for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
                     "menu anvil-input rejected: anvil-input disabled", messageMethod);
@@ -1125,7 +1131,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                 next = target.getCommandLookup().get(suffixed);
             }
             if (!(next instanceof TreeCommand tc)) {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "menu anvil-input path segment '" + segment
                                 + "' did not resolve to a TreeCommand under "
                                 + target.name() + " for " + senderId);
@@ -1150,7 +1156,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                     java.util.List.of(parentPath), paramName, prompt.prefill(),
                     prompt.mode(), cartSink());
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu anvil-input opener failed for " + senderId
                             + " node=" + target.name() + " param=" + paramName
                             + ": " + e.getMessage(), e);
@@ -1159,7 +1165,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             return false;
         }
         if (!opened) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu anvil-input opener refused for " + senderId
                             + " node=" + target.name() + " param=" + paramName);
             reject(senderId, CommandMessages.menuInvalid,
@@ -1221,14 +1227,14 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         // permission revocation should not leak a stale cart either.
         clearCart(senderId);
         if (renderer == null || configSubtreeBuilder == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-selector received with config-subtree disabled for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
                     "menu config-selector rejected: config-subtree disabled", messageMethod);
             return false;
         }
         if (!hasConfigViewPermission(senderId)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-selector denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
             reject(senderId, CommandMessages.menuInvalid,
@@ -1239,7 +1245,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         try {
             model = configSubtreeBuilder.buildSelector(senderId, subDir);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-selector builder failed for " + senderId
                             + " dir='" + subDir + "': " + e.getMessage(), e);
             reject(senderId, CommandMessages.menuInvalid,
@@ -1268,14 +1274,14 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                                            MenuAction.OpenConfigFile open,
                                            @Nullable Consumer<String> messageMethod) {
         if (renderer == null || configSubtreeBuilder == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-file received with config-subtree disabled for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
                     "menu config-file rejected: config-subtree disabled", messageMethod);
             return false;
         }
         if (!hasConfigViewPermission(senderId)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-file denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
             reject(senderId, CommandMessages.menuInvalid,
@@ -1307,7 +1313,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             LinkedHashMap<String, String> cartSnap = snapshotCart(senderId, fileName);
             model = configSubtreeBuilder.buildFile(senderId, fileName, cartSnap);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-file builder failed for " + senderId
                             + " file=" + fileName + ": " + e.getMessage(), e);
             reject(senderId, CommandMessages.menuInvalid,
@@ -1315,7 +1321,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             return false;
         }
         if (model == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-file unknown file '" + fileName
                             + "' for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
@@ -1339,13 +1345,13 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             String bareFileName, String paramName) {
         if (paramName == null || paramName.isEmpty()) return "";
         if (bareFileName == null || bareFileName.isEmpty()) return "";
-        if (RTP.configs == null) return "";
+        if (ActiveConfigs.get() == null) return "";
         String target = bareFileName.toLowerCase(java.util.Locale.ROOT);
         if (target.endsWith(".yml")) target = target.substring(0, target.length() - 4);
         io.github.dailystruggle.rtp.common.factory.FactoryValue<?> match = null;
         try {
             for (io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> p
-                    : RTP.configs.configParserMap.values()) {
+                    : ActiveConfigs.get().configParserMap.values()) {
                 if (p == null || p.name == null) continue;
                 String pn = p.name.toLowerCase(java.util.Locale.ROOT);
                 if (pn.endsWith(".yml")) pn = pn.substring(0, pn.length() - 4);
@@ -1493,14 +1499,14 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                                           MenuAction.OpenConfigKey open,
                                           @Nullable Consumer<String> messageMethod) {
         if (anvilInputOpener == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-key received with anvil-input disabled for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
                     "menu config-key rejected: anvil-input disabled", messageMethod);
             return false;
         }
         if (!hasConfigViewPermission(senderId)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-key denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
             reject(senderId, CommandMessages.menuInvalid,
@@ -1552,7 +1558,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         CommandsAPICommand configCmd = rtpRoot.getCommandLookup()
                 .get("CONFIG");
         if (!(configCmd instanceof TreeCommand configTree)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-key cannot resolve 'config' subcommand for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
                     "menu config-key rejected: config subcommand unavailable",
@@ -1575,7 +1581,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             }
         }
         if (!(subCmd instanceof TreeCommand)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-key unknown file=" + fileName
                             + " for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
@@ -1655,14 +1661,14 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             switch (s) {
                 case "shape" ->
                         keys = stripYmlSuffix(
-                                RTP.factoryMap.get(RTP.factoryNames.shape).map.keySet());
+                                FactoryRegistry.get(FactoryNames.shape).map.keySet());
                 case "vert" ->
                         keys = stripYmlSuffix(
-                                RTP.factoryMap.get(RTP.factoryNames.vert).map.keySet());
-                case "world" -> keys = RTP.serverAccessor.getRTPWorlds().stream()
+                                FactoryRegistry.get(FactoryNames.vert).map.keySet());
+                case "world" -> keys = RTPRuntime.serverAccessor().getRTPWorlds().stream()
                         .map(io.github.dailystruggle.rtp.api.world.RTPWorld::name)
                         .collect(java.util.stream.Collectors.toList());
-                case "region" -> keys = RTP.selectionAPI.regionNames();
+                case "region" -> keys = ActiveSelection.get().regionNames();
                 default -> { /* unknown source - no finite domain */ }
             }
         } catch (RuntimeException ignored) {
@@ -1795,7 +1801,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
     /**
      * Resolve the loaded in-memory YAML root for {@code fileName}, accepting
      * both a bare single-config file name (matched against
-     * {@link RTP#configs} {@code configParserMap}, {@code .yml}-tolerant) and a
+     * {@link ActiveConfigs#get()} {@code configParserMap}, {@code .yml}-tolerant) and a
      * {@code kind/entryName} multiconfig form (matched against the multiconfig
      * sub-parsers by entry name). Returns {@code null} when configs are not
      * loaded or no parser matches.
@@ -1803,13 +1809,13 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
     private static io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection
             resolveYamlRootForFile(String fileName) {
         if (fileName == null || fileName.isEmpty()) return null;
-        if (RTP.configs == null) return null;
+        if (ActiveConfigs.get() == null) return null;
         try {
             int slash = fileName.indexOf('/');
             if (slash > 0 && slash < fileName.length() - 1) {
                 String entry = stripYmlLower(fileName.substring(slash + 1));
                 for (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> mcp
-                        : RTP.configs.multiConfigParserMap.values()) {
+                        : ActiveConfigs.get().multiConfigParserMap.values()) {
                     if (mcp == null) continue;
                     for (String name : mcp.listParsers()) {
                         io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> sub =
@@ -1824,7 +1830,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             }
             String target = stripYmlLower(fileName);
             for (io.github.dailystruggle.rtp.common.configuration.ConfigParser<?> p
-                    : RTP.configs.configParserMap.values()) {
+                    : ActiveConfigs.get().configParserMap.values()) {
                 if (p == null || p.name == null) continue;
                 if (stripYmlLower(p.name).equals(target)) {
                     return p.getYamlRoot();
@@ -1855,7 +1861,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
     boolean dispatchOpenConfigSearchPrompt(UUID senderId,
                                                    @Nullable Consumer<String> messageMethod) {
         if (!hasConfigViewPermission(senderId)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-search prompt denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
             reject(senderId, CommandMessages.menuInvalid,
@@ -1888,7 +1894,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                                                     MenuAction.OpenConfigSearchResults search,
                                                     @Nullable Consumer<String> messageMethod) {
         if (renderer == null || configSearchBuilder == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-search received with config-search builder disabled for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
                     "menu config-search rejected: config-search builder disabled",
@@ -1896,7 +1902,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             return false;
         }
         if (!hasConfigViewPermission(senderId)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-search denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
             reject(senderId, CommandMessages.menuInvalid,
@@ -1909,7 +1915,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         try {
             model = configSearchBuilder.buildResults(senderId, query, page);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-search builder failed for " + senderId
                             + " query=" + query + " page=" + page
                             + ": " + e.getMessage(), e);
@@ -1918,7 +1924,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             return false;
         }
         if (model == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-search unresolved (query=" + query
                             + ", page=" + page + ") for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
@@ -1961,7 +1967,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
     boolean dispatchOpenAdminPanel(UUID senderId,
                                            @Nullable Consumer<String> messageMethod) {
         if (renderer == null || curatedPageBuilder == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu admin-panel received with curated-page builder disabled for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
                     "menu admin-panel rejected: curated-page builder disabled",
@@ -1969,7 +1975,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             return false;
         }
         if (!hasAdminMenuPermission(senderId)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu admin-panel denied: " + senderId
                             + " lacks " + ADMIN_MENU_PERMISSION);
             reject(senderId, CommandMessages.menuInvalid,
@@ -1980,7 +1986,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         try {
             model = curatedPageBuilder.buildAdminPanel(senderId);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu admin-panel builder failed for " + senderId
                             + ": " + e.getMessage(), e);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2010,7 +2016,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
     boolean dispatchOpenVisualizations(UUID senderId,
                                                @Nullable Consumer<String> messageMethod) {
         if (renderer == null || curatedPageBuilder == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu visualizations received with curated-page builder disabled for "
                             + senderId);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2019,7 +2025,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             return false;
         }
         if (!hasAdminMenuPermission(senderId)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu visualizations denied: " + senderId
                             + " lacks " + ADMIN_MENU_PERMISSION);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2030,7 +2036,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         try {
             model = curatedPageBuilder.buildVisualizations(senderId);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu visualizations builder failed for " + senderId
                             + ": " + e.getMessage(), e);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2056,14 +2062,14 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                                              ChartSpec.Kind kind,
                                              @Nullable Consumer<String> messageMethod) {
         if (kind == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu visualization-regions rejected: null kind for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
                     "menu visualization-regions rejected: null kind", messageMethod);
             return false;
         }
         if (renderer == null || curatedPageBuilder == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu visualization-regions received with curated-page builder disabled for "
                             + senderId);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2072,7 +2078,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             return false;
         }
         if (!hasAdminMenuPermission(senderId)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu visualization-regions denied: " + senderId
                             + " lacks " + ADMIN_MENU_PERMISSION);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2083,7 +2089,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         try {
             model = curatedPageBuilder.buildVisualizationRegions(senderId, kind);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu visualization-regions builder failed for " + senderId
                             + " kind=" + kind + ": " + e.getMessage(), e);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2110,7 +2116,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
     boolean dispatchOpenFrontPage(UUID senderId,
                                           @Nullable Consumer<String> messageMethod) {
         if (renderer == null || curatedPageBuilder == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu front-page received with curated-page builder disabled for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
                     "menu front-page rejected: curated-page builder disabled",
@@ -2121,7 +2127,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         try {
             model = curatedPageBuilder.buildFrontPage(senderId);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu front-page builder failed for " + senderId
                             + ": " + e.getMessage(), e);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2161,7 +2167,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                                      MenuAction.OpenInfo action,
                                      @Nullable Consumer<String> messageMethod) {
         if (renderer == null || infoBookBuilder == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu info-book received with info-book builder disabled for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
                     "menu info-book rejected: info-book builder disabled",
@@ -2169,7 +2175,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             return false;
         }
         if (!hasInfoPermission(senderId)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu info-book denied: " + senderId + " lacks rtp.info");
             reject(senderId, CommandMessages.menuInvalid,
                     "menu info-book rejected: permission denied", messageMethod);
@@ -2179,7 +2185,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         try {
             model = infoBookBuilder.build(senderId, action.scope());
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu info-book builder failed for " + senderId
                             + ": " + e.getMessage(), e);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2209,7 +2215,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                                              MenuAction.SwitchInfoToText action,
                                              @Nullable Consumer<String> messageMethod) {
         if (!hasInfoPermission(senderId)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu info-switch-to-text denied: " + senderId + " lacks rtp.info");
             reject(senderId, CommandMessages.menuInvalid,
                     "menu info-switch-to-text rejected: permission denied",
@@ -2226,7 +2232,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             case WORLD  -> args = new String[]{"info", "world=" + action.scope().name()};
             case REGION -> args = new String[]{"info", "region=" + action.scope().name()};
             default     -> {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "menu info-switch-to-text: unknown scope kind "
                                 + action.scope().kind() + " for " + senderId);
                 reject(senderId, CommandMessages.menuInvalid,
@@ -2248,7 +2254,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                                     MenuAction.OpenMap action,
                                     @Nullable Consumer<String> messageMethod) {
         if (!hasAdminMenuPermission(senderId)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu open-map denied: " + senderId
                             + " lacks " + ADMIN_MENU_PERMISSION);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2261,7 +2267,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         try {
             spec = ChartSpec.of(action.kind(), action.regionName());
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu open-map rejected: invalid ChartSpec (kind=" + action.kind()
                             + ", regionName='" + action.regionName() + "') for " + senderId
                             + ": " + e.getMessage(), e);
@@ -2281,7 +2287,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             // Defensive S-004: MapDispatch.paint is supposed to catch its
             // own RuntimeExceptions, but if a downstream binding leaks one
             // we still surface it through the configurable channel.
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu open-map MapDispatch.paint threw for " + senderId
                             + ": " + e.getMessage(), e);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2397,7 +2403,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         try {
             model = pageBuilder.build(target, open, assembledPath);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu open-page failed for " + senderId
                             + " node=" + target.name() + ": " + e.getMessage(), e);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2422,7 +2428,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                                              MenuAction.StageConfigValue stage,
                                              @Nullable Consumer<String> messageMethod) {
         if (!hasConfigViewPermission(senderId)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-stage denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2432,7 +2438,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         try {
             stageInCart(senderId, stage.fileName(), stage.paramName(), stage.value());
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-stage failed for " + senderId
                             + " file=" + stage.fileName()
                             + " key=" + stage.paramName()
@@ -2461,7 +2467,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                                                MenuAction.UnstageConfigValue unstage,
                                                @Nullable Consumer<String> messageMethod) {
         if (!hasConfigViewPermission(senderId)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-unstage denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2471,7 +2477,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         try {
             unstageInCart(senderId, unstage.fileName(), unstage.paramName());
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-unstage failed for " + senderId
                             + " file=" + unstage.fileName()
                             + " key=" + unstage.paramName()
@@ -2492,7 +2498,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                                               MenuAction.ApplyStagedConfig apply,
                                               @Nullable Consumer<String> messageMethod) {
         if (!hasConfigViewPermission(senderId)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-apply denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2501,7 +2507,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         }
         LinkedHashMap<String, String> entries = applyCart(senderId, apply.fileName());
         if (entries.isEmpty()) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-apply: empty cart for " + senderId
                             + " file=" + apply.fileName());
             reject(senderId, CommandMessages.menuInvalid,
@@ -2554,7 +2560,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                                                 MenuAction.DiscardStagedConfig discard,
                                                 @Nullable Consumer<String> messageMethod) {
         if (!hasConfigViewPermission(senderId)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config-discard denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2594,11 +2600,11 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
     private static @Nullable io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> resolveMultiConfigParser(
             String parserKind) {
         if (parserKind == null || parserKind.isEmpty()) return null;
-        if (RTP.configs == null) return null;
+        if (ActiveConfigs.get() == null) return null;
         String target = parserKind.toLowerCase(java.util.Locale.ROOT);
         try {
             for (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> p
-                    : RTP.configs.multiConfigParserMap.values()) {
+                    : ActiveConfigs.get().multiConfigParserMap.values()) {
                 if (p == null || p.name == null) continue;
                 if (p.name.toLowerCase(java.util.Locale.ROOT).equals(target)) {
                     return p;
@@ -2624,14 +2630,14 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                                                     MenuAction.OpenMultiConfigSelector open,
                                                     @Nullable Consumer<String> messageMethod) {
         if (renderer == null || multiConfigBuilder == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu multiconfig-selector received with multiconfig disabled for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
                     "menu multiconfig-selector rejected: multiconfig disabled", messageMethod);
             return false;
         }
         if (!hasConfigViewPermission(senderId)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu multiconfig-selector denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2648,7 +2654,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> parser =
                 resolveMultiConfigParser(effectiveKind);
         if (parser == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu multiconfig-selector unknown parserKind '"
                             + effectiveKind + "' for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2677,7 +2683,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                     removeMode, senderId);
             model = m;
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu multiconfig-selector builder failed for " + senderId
                             + " kind=" + effectiveKind + ": " + e.getMessage(), e);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2718,14 +2724,14 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                                                  MenuAction.OpenMultiConfigEntry open,
                                                  @Nullable Consumer<String> messageMethod) {
         if (renderer == null || multiConfigBuilder == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu multiconfig-entry received with multiconfig disabled for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
                     "menu multiconfig-entry rejected: multiconfig disabled", messageMethod);
             return false;
         }
         if (!hasConfigViewPermission(senderId)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu multiconfig-entry denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2737,7 +2743,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> parser =
                 resolveMultiConfigParser(kind);
         if (parser == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu multiconfig-entry unknown parserKind '" + kind + "' for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
                     "menu multiconfig-entry rejected: unknown parser kind", messageMethod);
@@ -2761,7 +2767,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                     cartSnap);
             model = m;
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu multiconfig-entry builder failed for " + senderId
                             + " kind=" + kind + " entry=" + entry + ": " + e.getMessage(), e);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2789,14 +2795,14 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                                               MenuAction.MultiConfigMutate mutate,
                                               @Nullable Consumer<String> messageMethod) {
         if (renderer == null || multiConfigBuilder == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu multiconfig-mutate received with multiconfig disabled for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
                     "menu multiconfig-mutate rejected: multiconfig disabled", messageMethod);
             return false;
         }
         if (!hasConfigViewPermission(senderId)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu multiconfig-mutate denied: " + senderId
                             + " lacks " + CONFIG_VIEW_PERMISSION);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2805,7 +2811,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         }
         // View-only staff may browse entries but never create or delete them.
         if (!permissionGates.hasConfigEdit(senderId)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu multiconfig-mutate denied: " + senderId
                             + " lacks " + MenuPermissionGates.CONFIG_EDIT_PERMISSION);
             reject(senderId, CommandMessages.menuInvalid,
@@ -2818,7 +2824,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<?> parser =
                 resolveMultiConfigParser(kind);
         if (parser == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu multiconfig-mutate unknown parserKind '" + kind + "' for " + senderId);
             reject(senderId, CommandMessages.menuInvalid,
                     "menu multiconfig-mutate rejected: unknown parser kind", messageMethod);
@@ -2830,7 +2836,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             io.github.dailystruggle.rtp.common.commands.menu.multiconfig.MultiConfigRemovalGuard guard =
                     io.github.dailystruggle.rtp.common.commands.menu.multiconfig.MultiConfigRemovalGuards.get(kind);
             if (guard.isLocked(entry)) {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "menu multiconfig-mutate REMOVE rejected: '" + entry
                                 + "' is locked under kind '" + kind + "' for " + senderId
                                 + " (reason: " + guard.reason(entry) + ")");
@@ -2841,7 +2847,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             try {
                 parser.removeParser(entry);
             } catch (RuntimeException e) {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "menu multiconfig-mutate REMOVE failed for " + senderId
                                 + " kind=" + kind + " entry=" + entry + ": " + e.getMessage(), e);
                 reject(senderId, CommandMessages.menuInvalid,
@@ -2869,7 +2875,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             try {
                 parser.addParser(entry);
             } catch (RuntimeException e) {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "menu multiconfig-mutate ADD failed for " + senderId
                                 + " kind=" + kind + " entry=" + entry + ": " + e.getMessage(), e);
                 reject(senderId, CommandMessages.menuInvalid,
@@ -2918,7 +2924,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             if (region == null) return;
             io.github.dailystruggle.rtp.api.world.RTPWorld world = null;
             try {
-                world = RTP.serverAccessor.getRTPWorld(entry);
+                world = RTPRuntime.serverAccessor().getRTPWorld(entry);
             } catch (RuntimeException ignored) {
                 // serverAccessor null in tests; amender tolerates null world
             }
@@ -2927,7 +2933,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             io.github.dailystruggle.rtp.common.commands.base.NetherEndConfigAmender
                     .amend(new java.util.HashMap<>(), raw, world);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu multiconfig-mutate ADD post-amend failed for entry="
                             + entry + ": " + e.getMessage(), e);
         }
@@ -2975,7 +2981,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                 registrar.registerChildParser(child);
             }
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu multiconfig-mutate ADD tree-sync failed for kind="
                             + kind + " entry=" + entry + ": " + e.getMessage(), e);
         }
@@ -3035,7 +3041,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                         new MenuMirrorSubcommand(this, mirrorParent, realChildTree, childPath));
             }
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu multiconfig-mutate ADD mirror-sync failed for kind="
                             + kind + " entry=" + entry + ": " + e.getMessage(), e);
         }
@@ -3056,7 +3062,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             lookup.remove(bare + ".yml");
             lookup.remove((bare + ".yml").toUpperCase(java.util.Locale.ROOT));
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu multiconfig-mutate REMOVE mirror-sync failed for kind="
                             + kind + " entry=" + entry + ": " + e.getMessage(), e);
         }
@@ -3078,7 +3084,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
             lookup.remove(bare + ".yml");
             lookup.remove((bare + ".yml").toUpperCase(java.util.Locale.ROOT));
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu multiconfig-mutate REMOVE tree-sync failed for kind="
                             + kind + " entry=" + entry + ": " + e.getMessage(), e);
         }
@@ -3089,7 +3095,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
         String[] args = run.args();
         Consumer<String> sink = messageMethod != null
                 ? messageMethod
-                : msg -> RTP.serverAccessor.sendMessage(RTPAPI.serverId, senderId, msg, null);
+                : msg -> RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, senderId, msg, null);
         Predicate<String> permissionProbe = permissionProbeFactory.apply(senderId);
         if (permissionProbe == null) permissionProbe = perm -> false;
         try {
@@ -3101,7 +3107,7 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                     null);
             return true;
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu redeem dispatch failed for " + senderId
                             + " args=" + java.util.Arrays.toString(args) + ": " + e.getMessage(), e);
             reject(senderId, CommandMessages.menuInvalid,
@@ -3133,13 +3139,13 @@ public class MenuRedeemSubcommand extends MenuDispatchTarget {
                         @Nullable Consumer<String> messageMethod) {
         // S-004: never silently swallow. The log is unconditional; the user
         // message goes through the standard route.
-        RTP.log(Level.WARNING, logMessage);
+        RTPRuntime.log(Level.WARNING, logMessage);
         if (senderId == null) return;
         String userMsg = msg(key, defaultFor(key));
         if (messageMethod != null) {
             messageMethod.accept(userMsg);
         } else {
-            RTP.serverAccessor.sendMessage(RTPAPI.serverId, senderId, userMsg, null);
+            RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, senderId, userMsg, null);
         }
     }
 

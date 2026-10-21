@@ -3,8 +3,9 @@ package io.github.dailystruggle.rtp.common.commands.editor;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Polygon;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
@@ -164,10 +165,10 @@ class EditorShapeSwitchPageTest {
     @BeforeAll
     @SuppressWarnings("unchecked")
     static void startEngine() throws IOException {
-        Factory<Shape<?>> shapes = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+        Factory<Shape<?>> shapes = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
         if (shapes == null) {
             shapes = new Factory<>();
-            RTP.factoryMap.put(RTP.factoryNames.shape, shapes);
+            FactoryRegistry.map().put(FactoryNames.shape, shapes);
         }
         boolean addCircle = !shapes.contains("CIRCLE");
         boolean addPolygon = !shapes.contains("POLYGON");

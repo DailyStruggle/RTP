@@ -6,9 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd.ApiProbe;
 import io.github.dailystruggle.rtp.common.commands.test.TestApiCompatCmd.ProbeReport;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
@@ -112,7 +112,7 @@ class TestApiCompatCmdTest {
   @Test
   @DisplayName("defaultProbes() list is non-empty and every entry has a hint")
   void defaultProbesWellFormed() {
-    ((MockRTPServerAccessor) RTP.serverAccessor).setPlatform("Folia");
+    ((MockRTPServerAccessor) RTPRuntime.serverAccessor()).setPlatform("Folia");
     List<ApiProbe> probes = TestApiCompatCmd.defaultProbes();
     assertTrue(probes.size() >= 10, "Folia list suspiciously small: " + probes.size());
     for (ApiProbe p : probes) {

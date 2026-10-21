@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.menu;
 
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
@@ -50,7 +50,7 @@ final class MenuPermissionGates {
         try {
             return probe.test(perm);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu " + label + " permission probe threw for " + senderId
                             + ": " + e.getMessage(), e);
             return false;

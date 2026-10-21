@@ -1,10 +1,12 @@
 package io.github.dailystruggle.rtp.common.database.options;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,7 +34,7 @@ class DatabaseOptionsSerializationAndSchemaTest {
 
     @AfterEach
     void tearDown() {
-        RTP.serverAccessor = null;
+        RTPRuntime.setServerAccessor(null);
     }
 
     @Test
@@ -46,7 +48,7 @@ class DatabaseOptionsSerializationAndSchemaTest {
         YamlFileDatabase db = new YamlFileDatabase(tempDir.toFile());
         TeleportData data = new TeleportData();
         UUID playerUuid = UUID.randomUUID();
-        data.sender = RTP.serverAccessor.getSender(playerUuid);
+        data.sender = RTPRuntime.serverAccessor().getSender(playerUuid);
         data.time = 9999L;
         data.delay = 15L;
         data.cost = 42.5;
@@ -118,15 +120,15 @@ class DatabaseOptionsSerializationAndSchemaTest {
                 + "  originalZ: 0\n";
         Files.writeString(tempDir.resolve("teleportData.yml"), yamlContent);
 
-        // Ensure "default" region exists in RTP.selectionAPI
+        // Ensure "default" region exists in ActiveSelection.get()
         io.github.dailystruggle.rtp.common.selection.region.Region region = mock(io.github.dailystruggle.rtp.common.selection.region.Region.class);
         region.name = "default";
-        RTP.selectionAPI.permRegionLookup.put("default", region);
+        ActiveSelection.get().permRegionLookup.put("default", region);
 
         db.connect();
         db.startup();
 
-        TeleportData loaded = RTP.getInstance().latestTeleportData.get(senderUuid);
+        TeleportData loaded = TeleportSessions.current().latestTeleportData.get(senderUuid);
         assertNotNull(loaded);
         assertEquals(50.0, loaded.cost);
         assertNotNull(loaded.selectedCoords);

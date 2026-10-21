@@ -2,10 +2,11 @@ package io.github.dailystruggle.rtp.common.permission;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.CoreCommandTreeBuilder;
 import io.github.dailystruggle.rtp.common.commands.config.ConfigImportPermissionsCmd;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -29,20 +30,20 @@ public class PermissionMigrationTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        // loadTemplatesFromConfig prefers RTP.configs.pluginDirectory over the accessor;
+        // loadTemplatesFromConfig prefers ActiveConfigs.get().pluginDirectory over the accessor;
         // a leftover static Configs from another class would mask the per-test integrations.yml.
-        savedConfigs = RTP.configs;
-        savedAccessor = RTP.serverAccessor;
-        RTP.configs = null;
-        RTP.serverAccessor = null;
+        savedConfigs = ActiveConfigs.get();
+        savedAccessor = RTPRuntime.serverAccessor();
+        ActiveConfigs.set(null);
+        RTPRuntime.setServerAccessor(null);
         tempDir = Files.createTempDirectory("rtp-perm-test");
         service = new PermissionMigrationService();
     }
 
     @AfterEach
     void tearDown() {
-        RTP.configs = savedConfigs;
-        RTP.serverAccessor = savedAccessor;
+        ActiveConfigs.set(savedConfigs);
+        RTPRuntime.setServerAccessor(savedAccessor);
         if (tempDir != null) {
             try {
                 Files.walk(tempDir)
@@ -90,7 +91,7 @@ public class PermissionMigrationTest {
 
         // Mock RTP serverAccessor directory
         RTPServerAccessor mockAccessor = new MockRTPServerAccessor(tempDir.toFile());
-        RTP.serverAccessor = mockAccessor;
+        RTPRuntime.setServerAccessor(mockAccessor);
 
         service.loadTemplatesFromConfig();
 
@@ -330,7 +331,7 @@ public class PermissionMigrationTest {
                 "+ betterrtp.world.nether (true) [world=world_nether]",
                 "+ betterrtp.bypass.cooldown (true)"
         ));
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
 
         ConfigImportPermissionsCmd cmd = new ConfigImportPermissionsCmd(null);
 
@@ -380,7 +381,7 @@ public class PermissionMigrationTest {
         accessor.registerCommandOutput("lp group admin permission info", List.of(
                 "+ betterrtp.admin (true)"
         ));
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
 
         Path customDir = tempDir.resolve("external_plugins_unified");
         Path extBetter = customDir.resolve("BetterRTP");

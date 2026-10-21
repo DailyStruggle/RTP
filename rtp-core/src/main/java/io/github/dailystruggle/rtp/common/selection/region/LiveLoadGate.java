@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Collections;
 import java.util.Map;
 import java.util.TreeMap;
@@ -203,6 +203,6 @@ public final class LiveLoadGate {
     }
 
     private void logSummary(String tag) {
-        RTP.log(Level.INFO, summaryLine(tag));
+        RTPRuntime.log(Level.INFO, summaryLine(tag));
     }
 }

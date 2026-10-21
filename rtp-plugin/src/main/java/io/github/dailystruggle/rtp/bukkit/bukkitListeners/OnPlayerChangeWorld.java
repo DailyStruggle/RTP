@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.bukkit.bukkitListeners;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import org.bukkit.entity.Player;
@@ -18,7 +19,7 @@ public final class OnPlayerChangeWorld implements Listener {
 
     if (player.hasPermission("rtp.personalqueue")) {
       Region region =
-          RTP.selectionAPI.getRegion(RTP.serverAccessor.getPlayer(player.getUniqueId()));
+          ActiveSelection.get().getRegion(RTPRuntime.serverAccessor().getPlayer(player.getUniqueId()));
       if (region == null) return;
       // ADR-043: bucket-only opt-in (see OnPlayerJoin for the contract).
       region.openPersonalQueue(player.getUniqueId());

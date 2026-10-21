@@ -5,6 +5,8 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import java.util.List;
 import java.util.Map;
@@ -69,9 +71,9 @@ public class DisconnectTestJob extends BaseRTPCmdImpl {
 
     State live =
         new State(
-            RTP.getInstance().processingPlayers,
-            RTP.getInstance().latestTeleportData,
-            RTP.getInstance().priorTeleportData);
+            TeleportSessions.current().processingPlayers,
+            TeleportSessions.current().latestTeleportData,
+            TeleportSessions.current().priorTeleportData);
 
     AtomicBoolean cancelFlag = new AtomicBoolean(false);
     Runnable unregister =
@@ -288,7 +290,7 @@ public class DisconnectTestJob extends BaseRTPCmdImpl {
             + (r.threw == null ? "" : " threw=" + r.threw);
 
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, summary);
+      RTPRuntime.serverAccessor().sendMessage(callerId, summary);
     }
     // S-004: a failing run logs at WARNING; a clean run at INFO.
     RTP.log(r.pass ? Level.INFO : Level.WARNING, summary);

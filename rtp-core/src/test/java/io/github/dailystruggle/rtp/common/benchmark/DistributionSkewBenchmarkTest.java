@@ -4,9 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.benchmark.SimulationReport.Provenance;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import java.nio.file.Path;
 import java.util.*;
@@ -42,7 +42,7 @@ public class DistributionSkewBenchmarkTest {
 
   @BeforeAll
   public static void setup() {
-    RTP.serverAccessor = new MockRTPServerAccessor(new java.io.File("target/test-data"));
+    RTPRuntime.setServerAccessor(new MockRTPServerAccessor(new java.io.File("target/test-data")));
     if (System.getProperty("rtp.simulation.reportDir") == null) {
       System.setProperty("rtp.simulation.reportDir", "build/reports/rtp-simulation");
     }

@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.bukkit.commands.test;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaSender;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -12,7 +13,7 @@ import java.util.logging.Level;
  * caller-facing log lines through {@link SendMessage#log(Level, String)}
  * so existing color, interceptor, and minimum-level handling is reused
  * unchanged, and resolves a caller {@link UUID} to a display name via
- * {@link RTP#serverAccessor} (the same path
+ * {@link RTPRuntime#serverAccessor()} (the same path
  * {@code TestFullCmd#resolveName(UUID)} used before the Phase 1 SPI
  * extraction).
  *
@@ -32,7 +33,7 @@ public final class BukkitTestUmbrellaSender implements TestUmbrellaSender {
       return RTP.serverId.toString();
     }
     try {
-      var player = RTP.serverAccessor.getPlayer(callerId);
+      var player = RTPRuntime.serverAccessor().getPlayer(callerId);
       if (player != null) {
         String name = player.name();
         if (name != null) return name;

@@ -13,7 +13,7 @@ import static org.mockito.Mockito.when;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.bukkitplatform.world.BukkitRTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.bukkit.Location;
@@ -60,15 +60,15 @@ class BukkitRTPPlayerSetLocationTest {
     destination = new RTPLocation(rtpWorld, 100, 70, -50);
 
     scheduler = mock(RTPScheduler.class);
-    previousScheduler = RTP.scheduler;
-    RTP.scheduler = scheduler;
+    previousScheduler = RTPRuntime.scheduler();
+    RTPRuntime.setScheduler(scheduler);
   }
 
   @AfterEach
   void tearDown() {
     BukkitRTPPlayer.resetTeleportAsyncResolutionForTesting();
     TeleportPathSelector.resetForTesting();
-    RTP.scheduler = previousScheduler;
+    RTPRuntime.setScheduler(previousScheduler);
   }
 
   @Test

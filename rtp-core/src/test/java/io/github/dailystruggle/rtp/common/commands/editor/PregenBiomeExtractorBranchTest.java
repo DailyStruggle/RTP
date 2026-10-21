@@ -6,7 +6,7 @@ import io.github.dailystruggle.rtp.anvil.RegionFileReader;
 import io.github.dailystruggle.rtp.anvil.RegionFormatRegistry;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import org.junit.jupiter.api.AfterEach;
@@ -51,13 +51,13 @@ class PregenBiomeExtractorBranchTest {
 
     @BeforeEach
     void saveAccessor() {
-        previousAccessor = RTP.serverAccessor;
-        RTP.serverAccessor = null;
+        previousAccessor = RTPRuntime.serverAccessor();
+        RTPRuntime.setServerAccessor(null);
     }
 
     @AfterEach
     void restore() {
-        RTP.serverAccessor = previousAccessor;
+        RTPRuntime.setServerAccessor(previousAccessor);
         RegionFormatRegistry.reset();
     }
 
@@ -204,7 +204,7 @@ class PregenBiomeExtractorBranchTest {
         when(accessor.getRTPWorld("pbx_bare")).thenAnswer(inv -> world("pbx_bare", new FolderWorld(bareWorld.toFile())));
         when(accessor.getRTPWorld("pbx_ok")).thenAnswer(inv -> world("pbx_ok", new FolderWorld(okWorld.toFile())));
         when(accessor.getRTPWorld("pbx_throws")).thenThrow(new IllegalStateException("accessor down"));
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
 
         assertNull(PregenBiomeExtractor.resolveRegionFolder(null));
         assertEquals(okRegion, PregenBiomeExtractor.resolveRegionFolder(region(world("pbx_ok", null), null)));
@@ -316,7 +316,7 @@ class PregenBiomeExtractorBranchTest {
 
         RTPServerAccessor accessor = mock(RTPServerAccessor.class);
         when(accessor.getRTPWorld("pbx_disk")).thenAnswer(inv -> world("pbx_disk", new FolderWorld(worldDir.toFile())));
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
 
         Region r = region(world("pbx_disk", null), null);
         r.shape = shapeAt(0, 0, "minecraft:taiga");

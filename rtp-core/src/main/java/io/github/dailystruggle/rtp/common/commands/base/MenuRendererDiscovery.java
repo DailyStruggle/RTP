@@ -3,9 +3,10 @@ package io.github.dailystruggle.rtp.common.commands.base;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.api.menu.MenuRendererProvider;
 import io.github.dailystruggle.rtp.api.server.PlatformFamily;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -38,7 +39,7 @@ public final class MenuRendererDiscovery {
         for (String id : ids) {
             MenuRendererProvider provider = byId.get(id);
             if (provider == null) {
-                RTP.log(
+                RTPRuntime.log(
                         Level.WARNING,
                         "menu.renderer '" + id + "' has no provider on this platform");
                 continue;
@@ -47,13 +48,13 @@ public final class MenuRendererDiscovery {
                 MenuRenderer r = provider.create();
                 if (r != null) return r;
             } catch (RuntimeException | LinkageError ex) {
-                RTP.log(
+                RTPRuntime.log(
                         Level.WARNING,
                         "failed to instantiate menu.renderer '" + id + "': " + ex,
                         ex);
             }
         }
-        RTP.log(
+        RTPRuntime.log(
                 Level.WARNING,
                 "menu.renderer list exhausted (" + ids + "); /rtp menu open-page disabled");
         return null;
@@ -64,7 +65,7 @@ public final class MenuRendererDiscovery {
         try {
             @SuppressWarnings("unchecked")
             ConfigParser<ConfigKeys> menuConfig =
-                    (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+                    (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
             if (menuConfig != null) {
                 Object menuBlock = menuConfig.getConfigValue(ConfigKeys.menu, null);
                 if (menuBlock instanceof Map<?, ?> map) {
@@ -109,7 +110,7 @@ public final class MenuRendererDiscovery {
         try {
             return provider.id();
         } catch (RuntimeException ex) {
-            RTP.log(Level.WARNING, "menu renderer provider id() threw: " + ex.getMessage(), ex);
+            RTPRuntime.log(Level.WARNING, "menu renderer provider id() threw: " + ex.getMessage(), ex);
             return null;
         }
     }
@@ -123,7 +124,7 @@ public final class MenuRendererDiscovery {
                 more = it.hasNext();
                 if (more) providers.add(it.next());
             } catch (java.util.ServiceConfigurationError | LinkageError err) {
-                RTP.log(
+                RTPRuntime.log(
                         Level.FINE,
                         "skipping unloadable " + what + ": " + err);
             }
@@ -133,8 +134,8 @@ public final class MenuRendererDiscovery {
 
     public static @Nullable PlatformFamily currentPlatformFamily() {
         try {
-            if (RTP.serverAccessor == null) return null;
-            return RTP.serverAccessor.getPlatformFamily();
+            if (RTPRuntime.serverAccessor() == null) return null;
+            return RTPRuntime.serverAccessor().getPlatformFamily();
         } catch (RuntimeException ignored) {
             return null;
         }

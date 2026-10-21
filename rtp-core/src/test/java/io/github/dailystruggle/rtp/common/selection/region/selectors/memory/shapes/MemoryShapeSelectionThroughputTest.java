@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -63,7 +63,7 @@ public class MemoryShapeSelectionThroughputTest {
   @BeforeAll
   static void setupServer() {
     MockRTPServerAccessor accessor = new MockRTPServerAccessor(new java.io.File("target/test-data"));
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
   }
 

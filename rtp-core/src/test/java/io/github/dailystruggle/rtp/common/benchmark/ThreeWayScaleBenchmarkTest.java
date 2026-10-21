@@ -2,9 +2,9 @@ package io.github.dailystruggle.rtp.common.benchmark;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.benchmark.SimulationReport.Provenance;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.SegmentedKeyRunTable;
@@ -48,7 +48,7 @@ public class ThreeWayScaleBenchmarkTest {
 
   @BeforeAll
   public static void setup() {
-    RTP.serverAccessor = new MockRTPServerAccessor(new java.io.File("target/test-data"));
+    RTPRuntime.setServerAccessor(new MockRTPServerAccessor(new java.io.File("target/test-data")));
     Path root = Path.of(System.getProperty("rtp.test.save.root", "C:\\GameServers"));
     List<Path> dirs = RealWorldVerdictMask.discoverRegionDirectories(root, 6);
     if (!dirs.isEmpty()) {

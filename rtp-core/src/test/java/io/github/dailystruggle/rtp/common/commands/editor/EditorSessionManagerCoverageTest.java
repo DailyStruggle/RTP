@@ -64,7 +64,7 @@ public class EditorSessionManagerCoverageTest {
     void testVisualizationPayload(@TempDir Path tempDir) {
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
                 new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(tempDir.toFile());
-        io.github.dailystruggle.rtp.common.RTP.serverAccessor = accessor;
+        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(accessor);
         try {
             EditorSessionManager manager = EditorSessionManager.getInstance();
             assertNotNull(manager);
@@ -82,7 +82,7 @@ public class EditorSessionManagerCoverageTest {
             assertNotNull(fallbackPayload);
             assertEquals("dummyRegion", fallbackPayload.get("region"));
         } finally {
-            io.github.dailystruggle.rtp.common.RTP.serverAccessor = null;
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(null);
         }
     }
 

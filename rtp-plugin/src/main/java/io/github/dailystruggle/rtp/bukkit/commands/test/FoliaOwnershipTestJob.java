@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
@@ -60,8 +61,8 @@ public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
       Map<String, List<String>> parameterValues,
       CommandsAPICommand nextCommand,
       java.util.function.Consumer<String> messageMethod) {
-    if (RTP.serverAccessor != null && (RTP.serverAccessor.getPlatform().equalsIgnoreCase("Fabric")
-        || RTP.serverAccessor.getPlatformFamily() == io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC)) {
+    if (RTPRuntime.serverAccessor() != null && (RTPRuntime.serverAccessor().getPlatform().equalsIgnoreCase("Fabric")
+        || RTPRuntime.serverAccessor().getPlatformFamily() == io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC)) {
       msgInvalidCommand(callerId, name(), messageMethod);
       return true;
     }
@@ -73,13 +74,13 @@ public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
 
-    if (RTP.serverAccessor != null && (RTP.serverAccessor.getPlatform().equalsIgnoreCase("Fabric")
-        || RTP.serverAccessor.getPlatformFamily() == io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC)) {
+    if (RTPRuntime.serverAccessor() != null && (RTPRuntime.serverAccessor().getPlatform().equalsIgnoreCase("Fabric")
+        || RTPRuntime.serverAccessor().getPlatformFamily() == io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC)) {
       msgInvalidCommand(callerId, name());
       return false;
     }
 
-    RTPScheduler scheduler = RTP.scheduler;
+    RTPScheduler scheduler = RTPRuntime.scheduler();
     if (scheduler == null) {
       fail(callerId, "RTP.scheduler is null; core not yet loaded");
       return false;
@@ -92,7 +93,7 @@ public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
     final UUID syntheticId = UUID.randomUUID();
     RTPLocation callerLoc = null;
     try {
-      RTPPlayer caller = RTP.serverAccessor.getPlayer(callerId);
+      RTPPlayer caller = RTPRuntime.serverAccessor().getPlayer(callerId);
       if (caller != null) callerLoc = caller.getLocation();
     } catch (Throwable ignored) {
       // handled below
@@ -307,7 +308,7 @@ public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
 
   private void report(UUID callerId, String msg) {
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      RTPRuntime.serverAccessor().sendMessage(callerId, msg);
     }
     RTP.log(Level.INFO, msg);
   }
@@ -315,7 +316,7 @@ public class FoliaOwnershipTestJob extends BaseRTPCmdImpl {
   private void fail(UUID callerId, String msg) {
     String line = "[RTP test/folia-ownership] " + msg;
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, line);
+      RTPRuntime.serverAccessor().sendMessage(callerId, line);
     }
     RTP.log(Level.WARNING, line);
   }

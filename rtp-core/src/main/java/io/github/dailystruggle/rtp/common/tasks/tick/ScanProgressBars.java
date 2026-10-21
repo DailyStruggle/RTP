@@ -2,16 +2,19 @@ package io.github.dailystruggle.rtp.common.tasks.tick;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.api.server.ProgressBar;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.scan.ScanTask;
 import io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider;
 
+import io.github.dailystruggle.rtp.common.tasks.scan.ScanTasks;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
  * Platform-neutral driver for the world-scan on-screen progress bar.
- * Aggregates active {@link RTP#scanTasks} metrics and updates progress bars.
+ * Aggregates active {@link ScanTasks#current()} metrics and updates progress bars.
  */
 public final class ScanProgressBars {
   /** Permission a player must hold to see a scan progress bar. */
@@ -25,20 +28,20 @@ public final class ScanProgressBars {
    */
   @SuppressWarnings("unchecked")
   public static void update() {
-    if (RTP.getInstance() == null || RTP.serverAccessor == null) return;
+    if (TeleportSessions.current() == null || RTPRuntime.serverAccessor() == null) return;
 
-    if (RTP.configs == null) return;
+    if (ActiveConfigs.get() == null) return;
 
-    String template = RTP.configs.getConfigValue(CommandMessages.scanBossBar, "").toString();
+    String template = ActiveConfigs.get().getConfigValue(CommandMessages.scanBossBar, "").toString();
     // Empty template = progress bar disabled.
     if (template == null || template.isEmpty()) {
-      RTP.serverAccessor.clearProgressBars();
+      RTPRuntime.serverAccessor().clearProgressBars();
       return;
     }
 
-    Map<String, ScanTask> scanTasks = RTP.getInstance().scanTasks;
+    Map<String, ScanTask> scanTasks = ScanTasks.current();
     if (scanTasks.isEmpty()) {
-      RTP.serverAccessor.clearProgressBars();
+      RTPRuntime.serverAccessor().clearProgressBars();
       return;
     }
 
@@ -84,11 +87,11 @@ public final class ScanProgressBars {
     for (String regionName : scanTasks.keySet()) {
       bars.put(regionName, spec);
     }
-    RTP.serverAccessor.updateProgressBars(bars);
+    RTPRuntime.serverAccessor().updateProgressBars(bars);
   }
 
   /** Hides and discards every scan progress bar. */
   public static void clear() {
-    if (RTP.serverAccessor != null) RTP.serverAccessor.clearProgressBars();
+    if (RTPRuntime.serverAccessor() != null) RTPRuntime.serverAccessor().clearProgressBars();
   }
 }

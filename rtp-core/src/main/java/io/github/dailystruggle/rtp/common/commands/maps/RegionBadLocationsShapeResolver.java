@@ -4,7 +4,8 @@ import io.github.dailystruggle.mapsapi.PaletteIndex;
 import io.github.dailystruggle.mapsapi.model.RegionBadLocations;
 import io.github.dailystruggle.mapsapi.render.RegionBadLocationsRenderer;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
@@ -24,7 +25,7 @@ public final class RegionBadLocationsShapeResolver implements ChartSpecResolver 
 
     @Override
     public Resolution resolve(ChartSpec spec) throws UnresolvableChartSpecException {
-        RTP.log(java.util.logging.Level.FINE,
+        RTPRuntime.log(java.util.logging.Level.FINE,
                 "[viz/bad-locations] resolver entry: spec="
                         + (spec == null ? "null"
                                 : (spec.kind() + " region=" + spec.regionName())));
@@ -39,7 +40,7 @@ public final class RegionBadLocationsShapeResolver implements ChartSpecResolver 
 
         Region region;
         try {
-            region = RTP.selectionAPI.getRegionOrDefault(spec.regionName());
+            region = ActiveSelection.get().getRegionOrDefault(spec.regionName());
         } catch (RuntimeException e) {
             throw new UnresolvableChartSpecException(
                     "no region resolved for '" + spec.regionName() + "'", e);
@@ -110,7 +111,7 @@ public final class RegionBadLocationsShapeResolver implements ChartSpecResolver 
         if (boundW <= 0L) boundW = 1L;
         if (boundH <= 0L) boundH = 1L;
 
-        RTP.log(java.util.logging.Level.FINE,
+        RTPRuntime.log(java.util.logging.Level.FINE,
                 "[viz/bad-locations] resolver bbox: region=" + region.name
                         + " range=" + range + " step=" + step
                         + " samples=" + samples

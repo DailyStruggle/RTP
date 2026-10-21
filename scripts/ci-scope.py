@@ -27,6 +27,10 @@ Usage (CI passes the event's base and head):
     python scripts/ci-scope.py --base <sha> [--head HEAD]
     python scripts/ci-scope.py --force-full
 
+`--working-tree` (head must be HEAD) also counts staged, unstaged and
+untracked (non-ignored) files, so uncommitted local or agent edits scope the
+same way they will once pushed. scripts/agent-gate.py builds on it.
+
 Writes `scope=`, `tasks=`, one `<set>=true|false` per set, `full=true|false`
 (every set affected) and one `<set>_tasks=` per set (`:<p>:build` for each
 affected project of the set, `:<p>:test` for test-only consumers; every
@@ -400,15 +404,34 @@ def classify(
     return "leaf", tasks
 
 
-def changed_files(base: str, head: str) -> list[str] | None:
+def _git_lines(args: list[str]) -> list[str] | None:
     out = subprocess.run(
-        ["git", "diff", "--name-only", "--no-renames", f"{base}...{head}"],
+        ["git", *args],
         capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
     )
     if out.returncode != 0:
-        print(f"warning: git diff {base}...{head} failed:\n{out.stderr}", file=sys.stderr)
+        print(f"warning: git {' '.join(args)} failed:\n{out.stderr}", file=sys.stderr)
         return None
     return [line.strip() for line in out.stdout.splitlines() if line.strip()]
+
+
+def changed_files(base: str, head: str, working_tree: bool = False) -> list[str] | None:
+    """Paths changed in base...head; with working_tree, plus uncommitted and untracked.
+
+    None when any git call fails, so the caller falls back to a full build.
+    """
+    commands = [["diff", "--name-only", "--no-renames", f"{base}...{head}"]]
+    if working_tree:
+        # Staged + unstaged vs HEAD, then untracked files .gitignore does not hide.
+        commands.append(["diff", "--name-only", "--no-renames", "HEAD"])
+        commands.append(["ls-files", "--others", "--exclude-standard"])
+    paths: set[str] = set()
+    for command in commands:
+        lines = _git_lines(command)
+        if lines is None:
+            return None
+        paths.update(lines)
+    return sorted(paths)
 
 
 def emit(
@@ -435,10 +458,14 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--base", default="", help="git ref/sha the change set starts from")
     parser.add_argument("--head", default="HEAD", help="git ref/sha the change set ends at")
     parser.add_argument("--force-full", action="store_true", help="skip detection and build everything")
+    parser.add_argument("--working-tree", action="store_true",
+                        help="also count staged, unstaged and untracked files (requires --head HEAD)")
     parser.add_argument("--check-workflow", metavar="PATH",
                         help="only verify that the workflow's set jobs `needs:` follow the "
                              "project dependency graph; exit 1 on a missing edge")
     args = parser.parse_args(argv[1:])
+    if args.working_tree and args.head != "HEAD":
+        parser.error("--working-tree compares against the checkout; --head must be HEAD")
 
     root = Path.cwd()
     settings = (root / "settings.gradle").read_text(encoding="utf-8")
@@ -461,7 +488,7 @@ def main(argv: list[str]) -> int:
         emit("full", [], every, set_tasks(tree, None))
         return 0
 
-    changed = changed_files(args.base, args.head)
+    changed = changed_files(args.base, args.head, args.working_tree)
     if changed is None:
         print("Full build: change set could not be determined.")
         emit("full", [], every, set_tasks(tree, None))

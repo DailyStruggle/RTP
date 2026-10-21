@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.action;
 
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -180,7 +180,7 @@ public final class ActionPlaceholderSanitizer {
 
     if (val instanceof UUID uuid) {
       if (preferNameOnly) {
-        RTPServerAccessor accessor = RTP.serverAccessor;
+        RTPServerAccessor accessor = RTPRuntime.serverAccessor();
         if (accessor != null) {
           RTPCommandSender sender = accessor.getPlayer(uuid);
           if (sender != null) {

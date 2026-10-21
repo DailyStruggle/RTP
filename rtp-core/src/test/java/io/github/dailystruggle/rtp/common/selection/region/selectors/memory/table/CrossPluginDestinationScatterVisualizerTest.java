@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
@@ -24,7 +25,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.stream.Stream;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.benchmark.LosslessChunkOutcomeMap;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
@@ -228,9 +228,9 @@ public class CrossPluginDestinationScatterVisualizerTest {
       }
     }
 
-    Object previousAccessor = RTP.serverAccessor;
-    if (RTP.serverAccessor == null) {
-      RTP.serverAccessor = new MockRTPServerAccessor(new File("target/test-data"));
+    Object previousAccessor = RTPRuntime.serverAccessor();
+    if (RTPRuntime.serverAccessor() == null) {
+      RTPRuntime.setServerAccessor(new MockRTPServerAccessor(new File("target/test-data")));
     }
     List<Stats> stats = new ArrayList<>();
     try {
@@ -238,7 +238,7 @@ public class CrossPluginDestinationScatterVisualizerTest {
         stats.add(computeStats(spec, landings.get(spec.label()), outcomeMap));
       }
     } finally {
-      if (previousAccessor == null) RTP.serverAccessor = null;
+      if (previousAccessor == null) RTPRuntime.setServerAccessor(null);
     }
 
     boolean previewOnly = !missing.isEmpty() || Boolean.getBoolean("rtp.scatter.preview");

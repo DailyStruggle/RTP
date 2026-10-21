@@ -5,6 +5,7 @@ import io.github.dailystruggle.effectsapi.common.hologram.HologramProvider;
 import io.github.dailystruggle.effectsapi.common.volumetric.Vector3d;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -20,7 +21,7 @@ import java.util.logging.Level;
  * Renders floating billboard text displays using vanilla entity packets.
  *
  * <p>Callers may be on any thread (global region, async timer). Every entity mutation is
- * routed through {@code RTP.scheduler} onto the thread owning the hologram's chunk; spawning
+ * routed through {@code RTPRuntime.scheduler()} onto the thread owning the hologram's chunk; spawning
  * from a non-owning Folia thread NPEs inside {@code ServerLevel#addEntity}. The scheduler runs
  * inline when the caller already owns the chunk.
  */
@@ -80,8 +81,8 @@ public final class BukkitTextDisplayHologramProvider implements HologramProvider
         };
         RTPWorld<?> rtpWorld = null;
         try {
-            if (RTP.scheduler != null && RTP.serverAccessor != null) {
-                rtpWorld = RTP.serverAccessor.getRTPWorld(worldName);
+            if (RTPRuntime.scheduler() != null && RTPRuntime.serverAccessor() != null) {
+                rtpWorld = RTPRuntime.serverAccessor().getRTPWorld(worldName);
             }
         } catch (Throwable ignored) {
             rtpWorld = null;
@@ -92,7 +93,7 @@ public final class BukkitTextDisplayHologramProvider implements HologramProvider
         }
         int cx = (int) Math.floor(position.x()) >> 4;
         int cz = (int) Math.floor(position.z()) >> 4;
-        RTP.scheduler.runTask(rtpWorld, cx, cz, guarded);
+        RTPRuntime.scheduler().runTask(rtpWorld, cx, cz, guarded);
     }
 
     private static String formatLines(List<String> lines) {

@@ -13,6 +13,7 @@ import io.github.dailystruggle.rtp.common.commands.test.TestChunkTicketCmd;
 import io.github.dailystruggle.rtp.common.commands.test.TestConfigSetCmd;
 import io.github.dailystruggle.rtp.common.commands.test.TestSchedulerCmd;
 import io.github.dailystruggle.rtp.common.commands.test.TestSemaphore;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -280,7 +281,7 @@ public class TestCmd extends BaseRTPCmdImpl {
                       else result.complete(ok);
                     });
     try {
-      RTP.scheduler.runTaskLater(retry, DISPATCH_RETRY_DELAY_TICKS);
+      RTPRuntime.scheduler().runTaskLater(retry, DISPATCH_RETRY_DELAY_TICKS);
     } catch (Throwable t) {
       // Scheduler unavailable (e.g. headless tests). Run inline so we
       // don't silently drop the command.

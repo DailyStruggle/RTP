@@ -11,6 +11,7 @@ import io.github.dailystruggle.rtp.api.platform.BlockDelta;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
@@ -128,11 +129,11 @@ public final class RiftEffect extends Effect<RiftEffect.Key> {
       return;
     }
 
-    if (RTP.serverAccessor == null) {
+    if (RTPRuntime.serverAccessor() == null) {
       RTP.log(Level.WARNING, "[LeafRTPRiftAddon] RIFT aborted: RTP.serverAccessor is null");
       return;
     }
-    RTPPlayer player = RTP.serverAccessor.getPlayer(ph.uuid());
+    RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(ph.uuid());
     if (player == null || !player.isOnline()) {
       RTP.log(Level.WARNING, "[LeafRTPRiftAddon] RIFT aborted: player " + ph.uuid()
           + " is null or offline (player=" + player + ")");
@@ -247,17 +248,17 @@ public final class RiftEffect extends Effect<RiftEffect.Key> {
       final Map<RTPLocation, String> toShow = fakes;
       final RTPWorld<?> fakeWorld = world;
       Runnable sendFakes = () -> {
-        if (RTP.serverAccessor == null) return;
-        RTPPlayer viewer = RTP.serverAccessor.getPlayer(fakeViewerId);
+        if (RTPRuntime.serverAccessor() == null) return;
+        RTPPlayer viewer = RTPRuntime.serverAccessor().getPlayer(fakeViewerId);
         if (viewer == null || !viewer.isOnline()) return;
         viewer.sendClientBlockChanges(toShow);
         RTP.log(Level.FINE, "[LeafRTPRiftAddon] RIFT sent " + toShow.size()
             + " client-side fake block change(s) (dark rim + vanished gravity blocks)");
       };
       boolean scheduled = false;
-      if (RTP.scheduler != null) {
+      if (RTPRuntime.scheduler() != null) {
         try {
-          RTP.scheduler.runTaskLater(
+          RTPRuntime.scheduler().runTaskLater(
               fakeWorld, center.x() >> 4, center.z() >> 4, sendFakes, 1L);
           scheduled = true;
         } catch (Throwable t) {
@@ -298,15 +299,15 @@ public final class RiftEffect extends Effect<RiftEffect.Key> {
       RTP.log(Level.FINE, "[LeafRTPRiftAddon] RIFT restored " + back + " block(s)");
       // Clear the client-only fake air over the gravity blocks (their real block never changed,
       // so setBlocks did not touch them). Only meaningful while the player is online.
-      if (!clientRestore.isEmpty() && RTP.serverAccessor != null) {
-        RTPPlayer viewer = RTP.serverAccessor.getPlayer(viewerId);
+      if (!clientRestore.isEmpty() && RTPRuntime.serverAccessor() != null) {
+        RTPPlayer viewer = RTPRuntime.serverAccessor().getPlayer(viewerId);
         if (viewer != null && viewer.isOnline()) viewer.sendClientBlockChanges(clientRestore);
       }
     };
 
-    if (RTP.scheduler != null) {
+    if (RTPRuntime.scheduler() != null) {
       try {
-        RTP.scheduler.runTaskLater(world, center.x() >> 4, center.z() >> 4, restore, seconds * 20L);
+        RTPRuntime.scheduler().runTaskLater(world, center.x() >> 4, center.z() >> 4, restore, seconds * 20L);
         return;
       } catch (Throwable t) {
         RTP.log(Level.WARNING,
@@ -410,7 +411,7 @@ public final class RiftEffect extends Effect<RiftEffect.Key> {
   private static long resolveTeleportDelayMillis(UUID uuid) {
     try {
       RTPCommandSender sender =
-          (RTP.serverAccessor != null) ? RTP.serverAccessor.getSender(uuid) : null;
+          (RTPRuntime.serverAccessor() != null) ? RTPRuntime.serverAccessor().getSender(uuid) : null;
       return (sender != null) ? sender.delay() : 0L;
     } catch (Throwable t) {
       RTP.log(Level.FINE, "[LeafRTPRiftAddon] RIFT delay resolution failed: " + t.getMessage());

@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.network;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPScheduler;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat.PluginState;
 import io.github.dailystruggle.rtp.proxy.common.transport.memory.InMemoryNetworkStateBinding;
@@ -87,7 +87,7 @@ class BackendStatePublisherTest {
         // spinning up a real ScheduledExecutorService (Folia-safe path per
         // .junie/AGENTS.md "Scheduler Usage").
         MockRTPScheduler scheduler = new MockRTPScheduler();
-        RTP.scheduler = scheduler;
+        RTPRuntime.setScheduler(scheduler);
         try {
             AtomicInteger calls = new AtomicInteger();
             BackendStateSampler sampler = sid -> {
@@ -114,7 +114,7 @@ class BackendStatePublisherTest {
             assertEquals(afterStop, calls.get(), "no further ticks after stop()");
             pub.stop(); // idempotent
         } finally {
-            RTP.scheduler = null;
+            RTPRuntime.setScheduler(null);
         }
     }
 }

@@ -9,7 +9,10 @@ import io.github.dailystruggle.rtp.bukkit.commands.BukkitMessageSink;
 import io.github.dailystruggle.rtp.bukkit.commands.test.BukkitTestCmd;
 import io.github.dailystruggle.rtp.bukkit.server.BukkitServerProvider;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.action.ActionServices;
 import io.github.dailystruggle.rtp.common.commands.CoreRtpRoot;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.logging.Level;
@@ -45,20 +48,22 @@ public final class BootstrapSupport {
     public static boolean wireServerAccessorAndScheduler(JavaPlugin plugin, String logTag) {
         try {
             BukkitServerProvider.ServerModel serverModel = BukkitServerProvider.resolveServerModel(plugin);
-            RTP.serverAccessor = (RTPServerAccessor)
+            // RTP's static init must see no accessor (ADR-115 invariant 3).
+            RTP.ensureInitialized();
+            RTPRuntime.setServerAccessor((RTPServerAccessor)
                     Class.forName(serverModel.accessorClassName)
-                            .getDeclaredConstructor().newInstance();
+                            .getDeclaredConstructor().newInstance());
             // Adopt the server type decided at the entrypoint instead of having the
             // accessor re-detect it via independent class lookups. The Folia adapter's
             // accessor reports a constant "Folia" already; the Bukkit-family accessor
             // (also used for the free Folia build) takes the resolved value here.
-            if (RTP.serverAccessor instanceof io.github.dailystruggle.rtp.bukkitplatform.server.AbstractServerAccessor abstractAccessor
+            if (RTPRuntime.serverAccessor() instanceof io.github.dailystruggle.rtp.bukkitplatform.server.AbstractServerAccessor abstractAccessor
                     && serverModel.platform != null) {
                 abstractAccessor.setPlatform(serverModel.platform);
             }
-            RTP.scheduler = (RTPScheduler)
+            RTPRuntime.setScheduler((RTPScheduler)
                     Class.forName(serverModel.schedulerClassName)
-                            .getDeclaredConstructor(JavaPlugin.class).newInstance(plugin);
+                            .getDeclaredConstructor(JavaPlugin.class).newInstance(plugin));
             return true;
         } catch (Exception e) {
             RTP.log(Level.WARNING,
@@ -97,8 +102,8 @@ public final class BootstrapSupport {
         RTP.baseCommand = mainCommand;
 
         // Synchronize and register action commands now that baseCommand is bound
-        if (RTP.actionManager != null) {
-            RTP.actionManager.registerAllCommands();
+        if (ActionServices.actionManager() != null) {
+            ActionServices.actionManager().registerAllCommands();
         }
 
         // commands-api owns the Bukkit registration concern (commands-api-ADR-003):
@@ -106,7 +111,7 @@ public final class BootstrapSupport {
         // binds /rtp and /wild and delegates the legacy String[] command path back
         // to CoreRtpRoot#dispatchString (sender checks + the RTPCmd guard);
         // tab-completion routes through the root's onTabComplete.
-        RTP.serverAccessor.registerCommands(mainCommand, "rtp", "wild");
+        RTPRuntime.serverAccessor().registerCommands(mainCommand, "rtp", "wild");
     }
 
     /**
@@ -116,8 +121,8 @@ public final class BootstrapSupport {
     public static void drainStartupTasks() {
         RTP rtp = RTP.getInstance();
         if (rtp == null) return;
-        while (rtp.startupTasks.size() > 0) {
-            rtp.startupTasks.execute(Long.MAX_VALUE);
+        while (MiscTasks.startup().size() > 0) {
+            MiscTasks.startup().execute(Long.MAX_VALUE);
         }
     }
 }

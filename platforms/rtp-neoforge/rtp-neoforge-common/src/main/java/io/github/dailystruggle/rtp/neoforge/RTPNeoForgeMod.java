@@ -4,9 +4,14 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaContext;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.network.NetworkHooks;
 import io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.server.DatabaseProcessing;
 import io.github.dailystruggle.rtp.common.tasks.ChunkUnloadProcessor;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import io.github.dailystruggle.rtp.neoforge.commands.NeoForgeCommandRegistrar;
 import io.github.dailystruggle.rtp.neoforge.commands.test.NeoForgeTestUmbrellaScheduler;
 import io.github.dailystruggle.rtp.neoforge.commands.test.NeoForgeTestUmbrellaSender;
@@ -46,7 +51,7 @@ import java.util.logging.Level;
  * <h2>Status (read me)</h2>
  * <p>At server-start this entry point selects the per-MC version adapter,
  * constructs the {@code NeoForgeServerAccessor}, binds it into
- * {@code RTP.serverAccessor} + {@code RTP.scheduler}, constructs the rtp-core
+ * {@code RTPRuntime.serverAccessor()} + {@code RTPRuntime.scheduler()}, constructs the rtp-core
  * {@code RTP} singleton, schedules the {@code ChunkUnloadProcessor}, and drains
  * the startup tasks. The per-tick {@code onServerTick} drains the
  * accessor's scheduler and refreshes any version-adapter chunk tickets.</p>
@@ -74,8 +79,8 @@ public final class RTPNeoForgeMod {
 
   /**
    * The platform accessor for this runtime. Constructed at server-start
-   * ({@link #onServerStarted}) and bound into {@code RTP.serverAccessor} /
-   * {@code RTP.scheduler}; {@code null} until then so any API entry before
+   * ({@link #onServerStarted}) and bound into {@code RTPRuntime.serverAccessor()} /
+   * {@code RTPRuntime.scheduler()}; {@code null} until then so any API entry before
    * core load fails loud per S-006 rather than silently no-opping.
    */
   private NeoForgeServerAccessor accessor;
@@ -163,8 +168,8 @@ public final class RTPNeoForgeMod {
 
   /**
    * Construct the <b>server-independent</b> core exactly once: the
-   * {@link NeoForgeServerAccessor}, the {@code RTP.serverAccessor} /
-   * {@code RTP.scheduler} bindings, and the rtp-core {@link RTP} singleton
+   * {@link NeoForgeServerAccessor}, the {@code RTPRuntime.serverAccessor()} /
+   * {@code RTPRuntime.scheduler()} bindings, and the rtp-core {@link RTP} singleton
    * (which builds {@code Configs} from {@code accessor.getPluginDirectory()},
    * backed by {@code FMLPaths.CONFIGDIR} - no {@link MinecraftServer} needed).
    *
@@ -173,14 +178,14 @@ public final class RTPNeoForgeMod {
    * <b>before</b> the server object exists and before {@link ServerStartedEvent}
    * - in {@code Main.main}'s initial datapack/{@code ReloadableServerResources}
    * load, on a worker thread. Building the command tree dereferences
-   * {@code RTP.getInstance()} and {@code RTP.configs} (e.g. {@code ReloadCmd}),
+   * {@code RTP.getInstance()} and {@code ActiveConfigs.get()} (e.g. {@code ReloadCmd}),
    * so the core must already exist at that point. {@link #onRegisterCommands}
    * calls this first; {@link #bootCore} calls it again (no-op) before binding
    * the live server.</p>
    *
-   * <p>Ordering note: {@code RTP.scheduler} must be assigned <b>before</b>
+   * <p>Ordering note: {@code RTPRuntime.scheduler()} must be assigned <b>before</b>
    * {@code new RTP()} because the rtp-core constructor self-schedules its
-   * pipeline / DB-flush timers via {@code RTP.scheduler}; the
+   * pipeline / DB-flush timers via {@code RTPRuntime.scheduler()}; the
    * {@code io.github.dailystruggle.rtp.neoforge.server.NeoForgeScheduler} merely queues those timers into its tick map
    * (drained once the server starts), so it is safe to use before bind.</p>
    */
@@ -194,8 +199,10 @@ public final class RTPNeoForgeMod {
         acc = new NeoForgeServerAccessor();
         this.accessor = acc;
       }
-      RTP.serverAccessor = acc;
-      RTP.scheduler = acc.getScheduler();
+      // RTP's static init must see no accessor (ADR-115 invariant 3).
+      RTP.ensureInitialized();
+      RTPRuntime.setServerAccessor(acc);
+      RTPRuntime.setScheduler(acc.getScheduler());
       wireTestUmbrellaContext();
       if (RTP.getInstance() == null) {
         new RTP();
@@ -209,15 +216,15 @@ public final class RTPNeoForgeMod {
       try {
         java.io.File earlyNetworkYml = NetworkModeBootstrap.ensureNetworkYml(
             acc.getPluginDirectory(), RTPNeoForgeMod.class);
-        RTP.lobbyMode = NetworkModeBootstrap.readLobbyModeEarly(earlyNetworkYml);
-        if (RTP.lobbyMode) {
+        NetworkHooks.setLobbyMode(NetworkModeBootstrap.readLobbyModeEarly(earlyNetworkYml));
+        if (NetworkHooks.lobbyMode()) {
           RTP.log(Level.INFO,
               "[RTP][NeoForge] routing.lobbyMode=true -- local region processing"
                   + " will be skipped; this backend acts as a pure"
                   + " cross-server dispatcher.");
         }
       } catch (Throwable t) {
-        RTP.lobbyMode = false;
+        NetworkHooks.setLobbyMode(false);
         RTP.log(Level.FINE,
             "[RTP][NeoForge] lobbyMode early-read failed; defaulting to false: "
                 + t.getMessage());
@@ -243,9 +250,8 @@ public final class RTPNeoForgeMod {
     // N2.6 / ADR-049 step 4 - install the platform sampler factory so
     // NetworkModeBootstrap.boot(...) can construct a backend heartbeat sampler
     // that reads live NeoForge host state. Mirrors RTPFabricMod /
-    // AbstractServerAccessor's RTP.backendStateSamplerFactory assignment.
-    RTP.backendStateSamplerFactory =
-        io.github.dailystruggle.rtp.neoforge.network.NeoForgeBackendStateSampler::new;
+    // AbstractServerAccessor's NetworkHooks.backendStateSamplerFactory() assignment.
+    NetworkHooks.setBackendStateSamplerFactory(io.github.dailystruggle.rtp.neoforge.network.NeoForgeBackendStateSampler::new);
 
     // N2.6 - install the NeoForge metrics binding (single-region EMA sampler),
     // driven once per server tick from onServerTick via an instanceof probe.
@@ -262,7 +268,7 @@ public final class RTPNeoForgeMod {
               // server. getAverageTickTimeNanos is Mojang's own work mean.
               // -1 keeps MSPT unsampled until the server is bound.
               () -> { MinecraftServer s = acc.getServer(); return s == null ? -1L : s.getAverageTickTimeNanos(); });
-      RTP.metrics.setBinding(metrics);
+      CoreMetrics.instance().setBinding(metrics);
       RTP.log(Level.INFO, "[RTP][NeoForge] metrics binding installed (NeoForgeMetricsBinding).");
     } catch (Throwable t) {
       RTP.log(Level.WARNING, "[RTP][NeoForge] NeoForgeMetricsBinding install failed: "
@@ -273,7 +279,7 @@ public final class RTPNeoForgeMod {
     // region threading, so the non-Folia branch always applies. Without this,
     // chunks loaded by the teleport pipeline with keep(true) are never released
     // and MemoryTracker tickets accumulate. Mirrors RTPBukkitPlugin / Fabric.
-    RTP.scheduler.runTaskTimer(new ChunkUnloadProcessor(), 1, 1);
+    RTPRuntime.scheduler().runTaskTimer(new ChunkUnloadProcessor(), 1, 1);
 
     // Drain RTP.startupTasks the same way Bukkit / Fabric do. The RTP()
     // constructor enqueues region parsing, world rebind, and scan-task seeding
@@ -281,19 +287,19 @@ public final class RTPNeoForgeMod {
     // the region prefill never starts and /rtp falls through to "no location
     // available". Empty drains are no-ops.
     if (rtp != null) {
-      while (rtp.startupTasks.size() > 0) {
-        rtp.startupTasks.execute(Long.MAX_VALUE);
+      while (MiscTasks.startup().size() > 0) {
+        MiscTasks.startup().execute(Long.MAX_VALUE);
       }
-      RTP.scheduler.runTaskLater(() -> {
+      RTPRuntime.scheduler().runTaskLater(() -> {
         RTP r2 = RTP.getInstance();
         if (r2 != null) {
-          while (r2.startupTasks.size() > 0) {
-            r2.startupTasks.execute(Long.MAX_VALUE);
+          while (MiscTasks.startup().size() > 0) {
+            MiscTasks.startup().execute(Long.MAX_VALUE);
           }
         }
       }, 1);
-      while (rtp.startupTasks.size() > 0) {
-        rtp.startupTasks.execute(Long.MAX_VALUE);
+      while (MiscTasks.startup().size() > 0) {
+        MiscTasks.startup().execute(Long.MAX_VALUE);
       }
     }
 
@@ -589,8 +595,8 @@ public final class RTPNeoForgeMod {
     // N2.6 - drive the metrics sampler EMA once per tick if a
     // NeoForgeMetricsBinding is installed. Best-effort; never break the tick.
     try {
-      if (RTP.getInstance() != null && RTP.metrics != null) {
-        Object binding = RTP.metrics.getBinding();
+      if (RTP.getInstance() != null && CoreMetrics.instance() != null) {
+        Object binding = CoreMetrics.instance().getBinding();
         if (binding instanceof io.github.dailystruggle.rtp.neoforge.metrics.NeoForgeMetricsBinding nmb) {
           nmb.tick();
         }
@@ -607,7 +613,7 @@ public final class RTPNeoForgeMod {
     // ReloadableServerResources load in Main.main -- BEFORE the MinecraftServer
     // object exists and before ServerStartedEvent (where bootCore binds the
     // live server). Building the /rtp tree dereferences RTP.getInstance() and
-    // RTP.configs (e.g. ReloadCmd), so the server-independent core must already
+    // ActiveConfigs.get() (e.g. ReloadCmd), so the server-independent core must already
     // exist here, otherwise NeoForgeCommandRegistrar.register NPEs while
     // constructing the shared CoreRtpRoot. prepareCore() needs no server, so it
     // is safe to run on this worker thread; bootCore() re-runs it as a no-op.

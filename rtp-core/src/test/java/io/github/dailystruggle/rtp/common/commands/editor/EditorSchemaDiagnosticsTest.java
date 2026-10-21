@@ -1,7 +1,8 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
@@ -25,15 +26,15 @@ class EditorSchemaDiagnosticsTest {
     @DisplayName("Payload schema lists registered shapes and vertical adjustors with typed parameters")
     @SuppressWarnings("unchecked")
     void payloadSchemaListsRegistries() {
-        Factory<Shape<?>> shapes = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+        Factory<Shape<?>> shapes = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
         if (shapes == null) {
             shapes = new Factory<>();
-            RTP.factoryMap.put(RTP.factoryNames.shape, shapes);
+            FactoryRegistry.map().put(FactoryNames.shape, shapes);
         }
-        Factory<VerticalAdjustor<?>> verts = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
+        Factory<VerticalAdjustor<?>> verts = (Factory<VerticalAdjustor<?>>) FactoryRegistry.get(FactoryNames.vert);
         if (verts == null) {
             verts = new Factory<>();
-            RTP.factoryMap.put(RTP.factoryNames.vert, verts);
+            FactoryRegistry.map().put(FactoryNames.vert, verts);
         }
         // Stand-in for an add-on / Chunky shape registered under its own name
         shapes.add("chunky_schema_test", new Square());

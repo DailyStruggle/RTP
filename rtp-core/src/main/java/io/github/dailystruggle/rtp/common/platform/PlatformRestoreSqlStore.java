@@ -2,9 +2,9 @@ package io.github.dailystruggle.rtp.common.platform;
 
 import io.github.dailystruggle.rtp.api.platform.BlockDelta;
 import io.github.dailystruggle.rtp.api.platform.PendingPlatformRestore;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.options.AbstractSQLDatabaseAccessor;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -96,7 +96,7 @@ public final class PlatformRestoreSqlStore {
         ps.executeUpdate();
       }
     } catch (SQLException e) {
-      RTP.log(Level.WARNING, "[RTP] failed to persist platform-restore row", e);
+      RTPRuntime.log(Level.WARNING, "[RTP] failed to persist platform-restore row", e);
     } finally {
       if (c != null) accessor.disconnect(c);
     }
@@ -116,7 +116,7 @@ public final class PlatformRestoreSqlStore {
         ps.executeUpdate();
       }
     } catch (SQLException e) {
-      RTP.log(Level.WARNING, "[RTP] failed to update platform-restore countdown", e);
+      RTPRuntime.log(Level.WARNING, "[RTP] failed to update platform-restore countdown", e);
     } finally {
       if (c != null) accessor.disconnect(c);
     }
@@ -133,7 +133,7 @@ public final class PlatformRestoreSqlStore {
         ps.executeUpdate();
       }
     } catch (SQLException e) {
-      RTP.log(Level.WARNING, "[RTP] failed to delete platform-restore row", e);
+      RTPRuntime.log(Level.WARNING, "[RTP] failed to delete platform-restore row", e);
     } finally {
       if (c != null) accessor.disconnect(c);
     }
@@ -166,7 +166,7 @@ public final class PlatformRestoreSqlStore {
         }
       }
     } catch (SQLException e) {
-      RTP.log(Level.WARNING, "[RTP] failed to load platform-restore rows", e);
+      RTPRuntime.log(Level.WARNING, "[RTP] failed to load platform-restore rows", e);
     } finally {
       if (c != null) accessor.disconnect(c);
     }

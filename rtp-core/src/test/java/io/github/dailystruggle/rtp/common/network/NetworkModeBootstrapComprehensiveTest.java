@@ -2,11 +2,11 @@ package io.github.dailystruggle.rtp.common.network;
 
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.network.NetworkCommandHook;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPScheduler;
 import io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
@@ -48,9 +48,9 @@ class NetworkModeBootstrapComprehensiveTest {
     @BeforeEach
     void setUp() {
         scheduler = new MockRTPScheduler();
-        RTP.scheduler = scheduler;
+        RTPRuntime.setScheduler(scheduler);
         serverAccessor = new MockRTPServerAccessor(tempDir);
-        RTP.serverAccessor = serverAccessor;
+        RTPRuntime.setServerAccessor(serverAccessor);
     }
 
     @AfterEach
@@ -58,11 +58,11 @@ class NetworkModeBootstrapComprehensiveTest {
         if (NetworkModeBootstrap.LIVE != null) {
             NetworkModeBootstrap.LIVE.shutdown();
         }
-        RTP.scheduler = null;
-        RTP.serverAccessor = null;
-        RTP.backendStateSamplerFactory = null;
-        RTP.networkBridgeFactory = null;
-        RTP.networkCommandHook = NetworkCommandHook.LOCAL_ONLY;
+        RTPRuntime.setScheduler(null);
+        RTPRuntime.setServerAccessor(null);
+        NetworkHooks.setBackendStateSamplerFactory(null);
+        NetworkHooks.setBridgeFactory(null);
+        NetworkHooks.setCommandHook(NetworkCommandHook.LOCAL_ONLY);
     }
 
     @Test
@@ -128,7 +128,7 @@ class NetworkModeBootstrapComprehensiveTest {
     void bootWithoutSamplerFactory() throws IOException {
         File file = new File(tempDir, "inmemory.yml");
         Files.writeString(file.toPath(), "network:\n  enabled: true\n  serverId: backend1\ntransport:\n  type: in-memory\n");
-        RTP.backendStateSamplerFactory = null;
+        NetworkHooks.setBackendStateSamplerFactory(null);
 
         NetworkModeBootstrap bootstrap = new NetworkModeBootstrap();
         bootstrap.boot(file);
@@ -166,10 +166,10 @@ class NetworkModeBootstrapComprehensiveTest {
                 + "  strategy: most_kept\n";
         Files.writeString(file.toPath(), yaml);
 
-        RTP.backendStateSamplerFactory = lobby -> sid -> new BackendHeartbeat(
+        NetworkHooks.setBackendStateSamplerFactory(lobby -> sid -> new BackendHeartbeat(
                 sid, 1, BackendHeartbeat.PluginState.READY, true, System.currentTimeMillis(),
                 20.0, 0, 100, 0L, 1L, 0, List.of(), List.of(), false
-        );
+        ));
 
         NetworkModeBootstrap bootstrap = new NetworkModeBootstrap();
         bootstrap.boot(file);
@@ -184,7 +184,7 @@ class NetworkModeBootstrapComprehensiveTest {
         assertNotNull(bootstrap.peerRegionRegistry());
         assertNotNull(bootstrap.commandHook());
         assertSame(bootstrap, NetworkModeBootstrap.LIVE);
-        assertSame(bootstrap.commandHook(), RTP.networkCommandHook);
+        assertSame(bootstrap.commandHook(), NetworkHooks.commandHook());
 
         Predicate<RTPCommandSender> guard = bootstrap.waitlistCommandGuard();
         assertNotNull(guard);
@@ -198,7 +198,7 @@ class NetworkModeBootstrapComprehensiveTest {
         // Shutdown
         bootstrap.shutdown();
         assertNull(NetworkModeBootstrap.LIVE);
-        assertEquals(NetworkCommandHook.LOCAL_ONLY, RTP.networkCommandHook);
+        assertEquals(NetworkCommandHook.LOCAL_ONLY, NetworkHooks.commandHook());
         assertNull(bootstrap.transport());
         assertNull(bootstrap.publisher());
 
@@ -296,7 +296,7 @@ class NetworkModeBootstrapComprehensiveTest {
         File file = new File(tempDir, "pluginmsg.yml");
         Files.writeString(file.toPath(), "network:\n  enabled: true\n  serverId: s1\n  allowUnsigned: true\ntransport:\n  type: plugin-message\n");
 
-        RTP.networkBridgeFactory = null;
+        NetworkHooks.setBridgeFactory(null);
         NetworkModeBootstrap bootstrap = new NetworkModeBootstrap();
         bootstrap.boot(file);
 
@@ -309,7 +309,7 @@ class NetworkModeBootstrapComprehensiveTest {
         File file = new File(tempDir, "proxycache.yml");
         Files.writeString(file.toPath(), "network:\n  enabled: true\n  serverId: s1\n  allowUnsigned: true\ntransport:\n  type: proxy-cache\n");
 
-        RTP.networkBridgeFactory = null;
+        NetworkHooks.setBridgeFactory(null);
         NetworkModeBootstrap bootstrap = new NetworkModeBootstrap();
         bootstrap.boot(file);
 
@@ -322,7 +322,7 @@ class NetworkModeBootstrapComprehensiveTest {
         File file = new File(tempDir, "auto.yml");
         Files.writeString(file.toPath(), "network:\n  enabled: true\n  serverId: s1\n  allowUnsigned: true\ntransport:\n  type: auto\n");
 
-        RTP.networkBridgeFactory = null;
+        NetworkHooks.setBridgeFactory(null);
         NetworkModeBootstrap bootstrap = new NetworkModeBootstrap();
         bootstrap.boot(file);
         assertNull(bootstrap.transport());
@@ -336,7 +336,7 @@ class NetworkModeBootstrapComprehensiveTest {
             @Override public void registerInbound(Consumer<byte[]> heartbeatSink) {}
             @Override public ProxyProbe passiveProbe() { return ProxyProbe.DISARMED; }
         };
-        RTP.networkBridgeFactory = () -> bridgeDisarmed;
+        NetworkHooks.setBridgeFactory(() -> bridgeDisarmed);
 
         NetworkModeBootstrap bootstrap2 = new NetworkModeBootstrap();
         bootstrap2.boot(file);
@@ -355,11 +355,11 @@ class NetworkModeBootstrapComprehensiveTest {
             @Override public void registerInbound(Consumer<byte[]> heartbeatSink) { inboundRegistrations.incrementAndGet(); }
             @Override public ProxyProbe passiveProbe() { return ProxyProbe.ARMED; }
         };
-        RTP.networkBridgeFactory = () -> bridge;
-        RTP.backendStateSamplerFactory = lobby -> sid -> new BackendHeartbeat(
+        NetworkHooks.setBridgeFactory(() -> bridge);
+        NetworkHooks.setBackendStateSamplerFactory(lobby -> sid -> new BackendHeartbeat(
                 sid, 1, BackendHeartbeat.PluginState.READY, true, System.currentTimeMillis(),
                 20.0, 0, 100, 0L, 1L, 0, List.of(), List.of(), false
-        );
+        ));
         String base = "network:\n  enabled: true\n  serverId: s1\n  secretEnv: RTP_TEST_SECRET_THAT_IS_NEVER_SET\n";
 
         for (String type : List.of("plugin-message", "proxy-cache", "auto")) {

@@ -3,10 +3,10 @@ package io.github.dailystruggle.rtp.common.network;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.network.RtpTriggerSource;
 import io.github.dailystruggle.rtp.api.server.PlayerLifecycleHook;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue.CancelReason;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,7 +96,7 @@ class NetworkWaitlistGuardAndQuitListenerTest {
 
         NetworkWaitlistGuard guard = new NetworkWaitlistGuard(cache);
         MockRTPPlayer player = new MockRTPPlayer(pid, "P1", null);
-        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
         accessor.addPlayer(player);
 
         assertFalse(guard.test(player));
@@ -113,9 +113,9 @@ class NetworkWaitlistGuardAndQuitListenerTest {
                 pid, NetworkStatusCache.QueueStatus.State.QUEUED, 1, Optional.empty(), Optional.empty(), 0L);
         when(cache.get(pid)).thenReturn(Optional.of(waitlisted));
 
-        MockRTPServerAccessor accessor = Mockito.spy((MockRTPServerAccessor) RTP.serverAccessor);
+        MockRTPServerAccessor accessor = Mockito.spy((MockRTPServerAccessor) RTPRuntime.serverAccessor());
         doThrow(new RuntimeException("network error")).when(accessor).sendMessage(eq(pid), any(String.class));
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
 
         NetworkWaitlistGuard guard = new NetworkWaitlistGuard(cache);
         MockRTPPlayer player = new MockRTPPlayer(pid, "P1", null);

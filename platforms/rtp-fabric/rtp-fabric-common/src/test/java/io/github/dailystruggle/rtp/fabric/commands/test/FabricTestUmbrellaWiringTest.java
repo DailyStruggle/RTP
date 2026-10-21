@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaContext;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.fabric.FabricRTPCommonEntry;
 import io.github.dailystruggle.rtp.fabric.server.FabricServerAccessor;
@@ -34,16 +35,16 @@ class FabricTestUmbrellaWiringTest {
   @BeforeEach
   void setUp() {
     previousContext = RTP.testUmbrellaContext;
-    previousAccessor = RTP.serverAccessor;
-    previousScheduler = RTP.scheduler;
+    previousAccessor = RTPRuntime.serverAccessor();
+    previousScheduler = RTPRuntime.scheduler();
     RTP.testUmbrellaContext = null;
   }
 
   @AfterEach
   void tearDown() {
     RTP.testUmbrellaContext = previousContext;
-    RTP.serverAccessor = previousAccessor;
-    RTP.scheduler = previousScheduler;
+    RTPRuntime.setServerAccessor(previousAccessor);
+    RTPRuntime.setScheduler(previousScheduler);
   }
 
   @Test
@@ -81,7 +82,7 @@ class FabricTestUmbrellaWiringTest {
     assertNotNull(serverName);
 
     // 2. Fallback when accessor is null
-    RTP.serverAccessor = null;
+    RTPRuntime.setServerAccessor(null);
     assertEquals(unknownId.toString(), sender.resolveCallerName(unknownId));
   }
 

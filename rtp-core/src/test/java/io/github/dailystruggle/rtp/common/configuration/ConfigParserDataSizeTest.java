@@ -3,9 +3,9 @@ package io.github.dailystruggle.rtp.common.configuration;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 import java.io.File;
 import org.junit.jupiter.api.BeforeAll;
@@ -19,7 +19,7 @@ class ConfigParserDataSizeTest {
   static void setup() {
     RTPServerAccessor accessor = Mockito.mock(RTPServerAccessor.class);
     Mockito.when(accessor.getPluginDirectory()).thenReturn(new File("target/test-data/config-parser-datasize"));
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
   }
 
   @Test

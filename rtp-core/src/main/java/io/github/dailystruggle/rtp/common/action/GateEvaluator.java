@@ -2,7 +2,8 @@ package io.github.dailystruggle.rtp.common.action;
 
 import io.github.dailystruggle.rtp.api.action.ActionGateContext;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -165,7 +166,7 @@ public final class GateEvaluator {
             }
           } else if ("rtp_alive".equalsIgnoreCase(objStr)) {
             // Count alive session participants via server accessor if available
-            RTPServerAccessor accessor = RTP.serverAccessor;
+            RTPServerAccessor accessor = RTPRuntime.serverAccessor();
             if (accessor != null && io.github.dailystruggle.rtp.api.RTPAPI.actionService != null) {
               scoreValue = io.github.dailystruggle.rtp.api.RTPAPI.actionService.getSession(context.sessionId())
                   .map(s -> {
@@ -180,7 +181,7 @@ public final class GateEvaluator {
               scoreValue = 1.0;
             }
           } else {
-            RTPServerAccessor accessor = RTP.serverAccessor;
+            RTPServerAccessor accessor = RTPRuntime.serverAccessor();
             UUID pid = context.participantId();
             Integer realScore = (accessor != null && pid != null)
                 ? accessor.getScoreboardScore(pid, objStr)
@@ -245,7 +246,7 @@ public final class GateEvaluator {
             } else if (map.containsKey("region")) {
               String rName = String.valueOf(map.get("region"));
               io.github.dailystruggle.rtp.common.selection.region.Region r =
-                  (RTP.selectionAPI != null) ? RTP.selectionAPI.getRegion(rName) : null;
+                  (ActiveSelection.get() != null) ? ActiveSelection.get().getRegion(rName) : null;
               if (r != null) {
                 shape = r.getShape();
               }
@@ -267,7 +268,7 @@ public final class GateEvaluator {
                 String reqCount = String.valueOf(map.get("playerCount"));
                 int matchingPlayers = 0;
                 String targetWorld = map.containsKey("world") ? String.valueOf(map.get("world")) : null;
-                RTPServerAccessor accessor = RTP.serverAccessor;
+                RTPServerAccessor accessor = RTPRuntime.serverAccessor();
                 if (accessor != null) {
                   for (io.github.dailystruggle.rtp.api.entity.RTPPlayer p : accessor.getOnlinePlayers()) {
                     if (p != null) {
@@ -345,7 +346,7 @@ public final class GateEvaluator {
           }
           if (rawCommands.isEmpty()) return false;
 
-          RTPServerAccessor accessor = RTP.serverAccessor;
+          RTPServerAccessor accessor = RTPRuntime.serverAccessor();
           if (accessor == null) return false;
 
           Map<String, Object> tokens = new HashMap<>();

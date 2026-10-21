@@ -2,8 +2,8 @@ package io.github.dailystruggle.rtp.bukkit.bukkitListeners;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.event.PlayerMoveEvent;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -26,7 +26,7 @@ class OnPlayerMoveBridgeTest {
   @BeforeEach
   void setUp() {
     serverAccessor = new MockRTPServerAccessor(new File("."));
-    RTP.serverAccessor = serverAccessor;
+    RTPRuntime.setServerAccessor(serverAccessor);
   }
 
   @Test

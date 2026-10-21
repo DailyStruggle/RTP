@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
 import net.minecraft.server.MinecraftServer;
@@ -108,7 +109,7 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
         io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter adapter =
                 io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry.peek();
         if (adapter == null || !adapter.supportsMapCharts()) return false;
-        RTP.scheduler.runTask(() -> {
+        RTPRuntime.scheduler().runTask(() -> {
             ServerPlayer p = handleRef.get();
             if (p == null) return; // viewer went offline before the hop
             adapter.renderMapChart(p, chartKey, argb, locked, deliverItem);
@@ -502,9 +503,9 @@ public final class V26_1_R1FabricRTPPlayer implements RTPPlayer,
         } catch (Throwable t) {
             return null;
         }
-        RTPWorld<?> rtpWorld = RTP.serverAccessor == null
+        RTPWorld<?> rtpWorld = RTPRuntime.serverAccessor() == null
                 ? null
-                : RTP.serverAccessor.getRTPWorld(worldName);
+                : RTPRuntime.serverAccessor().getRTPWorld(worldName);
         if (rtpWorld == null) return null;
         return new RTPLocation(rtpWorld, p.getBlockX(), p.getBlockY(), p.getBlockZ());
     }

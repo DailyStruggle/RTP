@@ -4,7 +4,7 @@ import io.github.dailystruggle.rtp.anvil.AnvilChunkView;
 import io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.server.level.ServerLevel;
@@ -120,8 +120,8 @@ public final class NeoForgeRTPChunk extends RTPChunk<ChunkAccess> {
 
     @Override
     public RTPWorld<?> getWorld() {
-        if (RTP.serverAccessor == null) return null;
-        return RTP.serverAccessor.getRTPWorld(worldId);
+        if (RTPRuntime.serverAccessor() == null) return null;
+        return RTPRuntime.serverAccessor().getRTPWorld(worldId);
     }
 
     @Override

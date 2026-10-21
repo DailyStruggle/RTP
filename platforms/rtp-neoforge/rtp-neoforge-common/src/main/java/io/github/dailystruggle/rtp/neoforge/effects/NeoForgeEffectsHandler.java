@@ -5,10 +5,13 @@ import io.github.dailystruggle.effectsapi.common.Effect;
 import io.github.dailystruggle.effectsapi.common.EffectFactory;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.tasks.teleport.DeathTeleports;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import io.github.dailystruggle.rtp.effects.EffectsResolver;
@@ -71,7 +74,7 @@ public final class NeoForgeEffectsHandler {
 
         if (!AlreadyHooked.flip()) return; // already attached on a previous start
 
-        Configs configs = RTP.configs;
+        Configs configs = ActiveConfigs.get();
         FactoryValue<PerformanceKeys> parser = configs.getParser(PerformanceKeys.class);
 
         TeleportPipelineTask.setupPreActions.add(task -> {
@@ -130,7 +133,7 @@ public final class NeoForgeEffectsHandler {
         // baseline "successfully teleported" splash that admins configure
         // on Bukkit. Without this hook those keys are silent no-ops on
         // NeoForge. Packets are sent on the server tick thread via
-        // RTP.scheduler.runTask; sendTitle / sendActionbar handle empty
+        // RTPRuntime.scheduler().runTask; sendTitle / sendActionbar handle empty
         // values internally so a partially-configured messages.yml works.
         // ----------------------------------------------------------------
         TeleportPipelineTask.teleportPostActions.add(NeoForgeEffectsHandler::sendConfiguredTitle);
@@ -138,13 +141,13 @@ public final class NeoForgeEffectsHandler {
 
     public static void onPlayerDeath(ServerPlayer player) {
         if (player == null) return;
-        Configs configs = RTP.configs;
+        Configs configs = ActiveConfigs.get();
         if (configs == null) return;
         FactoryValue<PerformanceKeys> parser = configs.getParser(PerformanceKeys.class);
         if (!effectParsingEnabled(parser)) return;
 
-        if (RTP.serverAccessor == null) return;
-        RTPPlayer rp = RTP.serverAccessor.getPlayer(player.getUUID());
+        if (RTPRuntime.serverAccessor() == null) return;
+        RTPPlayer rp = RTPRuntime.serverAccessor().getPlayer(player.getUUID());
         if (rp == null) return;
 
         dispatch("rtp.effect.death", rp);
@@ -158,12 +161,12 @@ public final class NeoForgeEffectsHandler {
             @SuppressWarnings("unchecked")
             io.github.dailystruggle.rtp.common.configuration.ConfigParser<PlayerMessages> lang =
                     (io.github.dailystruggle.rtp.common.configuration.ConfigParser<PlayerMessages>)
-                            RTP.configs.getParser(PlayerMessages.class);
+                            ActiveConfigs.get().getParser(PlayerMessages.class);
             if (lang == null) return;
 
-            final String title = RTP.configs.getConfigValue(
+            final String title = ActiveConfigs.get().getConfigValue(
                     io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.title, "").toString();
-            final String subtitle = RTP.configs.getConfigValue(
+            final String subtitle = ActiveConfigs.get().getConfigValue(
                     io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.subtitle, "").toString();
             final int fadeIn = lang.getNumber(
                     io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.fadeIn, 0).intValue();
@@ -171,7 +174,7 @@ public final class NeoForgeEffectsHandler {
                     io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.stay, 0).intValue();
             final int fadeOut = lang.getNumber(
                     io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.fadeOut, 0).intValue();
-            final String actionbar = RTP.configs.getConfigValue(
+            final String actionbar = ActiveConfigs.get().getConfigValue(
                     io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.actionbar, "").toString();
 
             if ((title == null || title.isEmpty())
@@ -180,7 +183,7 @@ public final class NeoForgeEffectsHandler {
                 return;
             }
 
-            RTP.scheduler.runTask(() -> {
+            RTPRuntime.scheduler().runTask(() -> {
                 try {
                     np.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
                     np.sendActionbar(actionbar);
@@ -207,8 +210,8 @@ public final class NeoForgeEffectsHandler {
     /** UUID-resolving variant for cancel / queue-push / queue-pop hooks. */
     private static void dispatchByUuid(String prefix, UUID uuid) {
         try {
-            if (RTP.serverAccessor == null) return;
-            RTPPlayer rp = RTP.serverAccessor.getPlayer(uuid);
+            if (RTPRuntime.serverAccessor() == null) return;
+            RTPPlayer rp = RTPRuntime.serverAccessor().getPlayer(uuid);
             if (rp == null) return;
             dispatch(prefix, rp);
         } catch (Throwable t) {
@@ -258,7 +261,7 @@ public final class NeoForgeEffectsHandler {
             for (Effect<?> effect : effects) {
                 effect.setTarget(target);
                 if (effect instanceof io.github.dailystruggle.effectsapi.common.effects.DeathEffect) {
-                    RTP.deathEffectInFlight.add(handle.getUUID());
+                    DeathTeleports.effectInFlight().add(handle.getUUID());
                     if (pipelineTask != null) {
                         pipelineTask.deathEffectTriggered = true;
                     }

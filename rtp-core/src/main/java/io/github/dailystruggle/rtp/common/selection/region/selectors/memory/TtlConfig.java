@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.TtlKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import java.util.EnumMap;
 import java.util.EnumSet;
@@ -130,7 +130,7 @@ public final class TtlConfig {
         try {
           FailTypes cause = FailTypes.valueOf(keyStr);
           if (isTransient(cause)) {
-            RTP.log(Level.WARNING, "[TtlConfig] ttl.yml causes." + keyStr
+            RTPRuntime.log(Level.WARNING, "[TtlConfig] ttl.yml causes." + keyStr
                 + " ignored: transient causes are never retained");
             continue;
           }
@@ -158,7 +158,7 @@ public final class TtlConfig {
     try {
       load(parser.getMap(TtlKeys.causes), parser.getMap(TtlKeys.verifiers));
     } catch (Exception e) {
-      RTP.log(Level.WARNING, "[TtlConfig] Error parsing ttl.yml: " + e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, "[TtlConfig] Error parsing ttl.yml: " + e.getMessage(), e);
     }
   }
 }

@@ -5,6 +5,8 @@ import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.lang.ref.WeakReference;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -239,8 +241,8 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       String dim = dimensionRegionSubpath(world);
       return anvilProbeSupport
           .probeAndPublish(worldFolder, dim, cx, cz, key, rawUnsafe,
-              s -> (RTP.serverAccessor != null)
-                  ? RTP.serverAccessor.reconcilePaletteIdentifier(s)
+              s -> (RTPRuntime.serverAccessor() != null)
+                  ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
                   : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(s))
           .thenCompose(result -> {
             io.github.dailystruggle.rtp.anvil.AnvilChunkView view = result.view();
@@ -321,8 +323,8 @@ public class BukkitRTPWorld extends RTPWorld<World> {
         if (probe == null) return null;
         return io.github.dailystruggle.rtp.api.world.ChunkColumnProbe.of(
             new io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter(probe, cx, cz,
-                s -> (RTP.serverAccessor != null)
-                    ? RTP.serverAccessor.reconcilePaletteIdentifier(s)
+                s -> (RTPRuntime.serverAccessor() != null)
+                    ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
                     : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(s)));
       } catch (Throwable t) {
         RTP.log(java.util.logging.Level.FINE,
@@ -476,7 +478,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     }
     try {
       ConfigParser<SafetyKeys> safety =
-          (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+          (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
       if (safety == null) return true; // Config not available yet - default-on.
       Object raw = safety.getConfigValue(SafetyKeys.anvilPrefilterEnabled, Boolean.TRUE);
       boolean enabled;
@@ -568,8 +570,8 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   @SuppressWarnings("unchecked")
   private static java.util.Set<String> currentUnsafeBlocks() {
     try {
-      if (RTP.configs == null) return java.util.Collections.emptySet();
-      Object raw = RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new java.util.ArrayList<>());
+      if (ActiveConfigs.get() == null) return java.util.Collections.emptySet();
+      Object raw = ActiveConfigs.get().getConfigValue(BlocksKeys.unsafeBlocks, new java.util.ArrayList<>());
       if (raw instanceof java.util.Collection<?> c) {
         java.util.Set<String> out = new java.util.HashSet<>(c.size());
         for (Object o : c) if (o != null) out.add(o.toString());
@@ -813,7 +815,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       }
     };
     io.github.dailystruggle.rtp.api.scheduling.RTPScheduler scheduler =
-        RTP.serverAccessor == null ? null : RTP.serverAccessor.getScheduler();
+        RTPRuntime.serverAccessor() == null ? null : RTPRuntime.serverAccessor().getScheduler();
     if (scheduler != null) {
       scheduler.runTask(this, cx, cz, applyTicket);
     } else {
@@ -825,7 +827,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   @Override
   public java.util.concurrent.CompletableFuture<Integer> getServerForceLoadedCount() {
     java.util.concurrent.CompletableFuture<Integer> future = new java.util.concurrent.CompletableFuture<>();
-    io.github.dailystruggle.rtp.common.RTP.serverAccessor.getScheduler().runTask(() -> {
+    io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor().getScheduler().runTask(() -> {
       org.bukkit.plugin.Plugin plugin = org.bukkit.Bukkit.getPluginManager().getPlugin("RTP");
       if (plugin == null) {
         future.complete(0);
@@ -877,8 +879,8 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     if (view != null) {
       int cx = (int) (key & 0xffffffffL);
       int cz = (int) (key >> 32);
-      java.util.Set<String> reconciled = (RTP.serverAccessor != null)
-          ? RTP.serverAccessor.reconcilePaletteIdentifiers(currentUnsafeBlocks())
+      java.util.Set<String> reconciled = (RTPRuntime.serverAccessor() != null)
+          ? RTPRuntime.serverAccessor().reconcilePaletteIdentifiers(currentUnsafeBlocks())
           : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(currentUnsafeBlocks());
       return new BukkitRTPChunk(view, cx, cz, id, reconciled);
     }
@@ -890,8 +892,8 @@ public class BukkitRTPWorld extends RTPWorld<World> {
     if (preformedData instanceof io.github.dailystruggle.rtp.anvil.AnvilChunkView view) {
       java.util.Set<String> reconciled = (reconciledUnsafe != null)
           ? reconciledUnsafe
-          : ((RTP.serverAccessor != null)
-              ? RTP.serverAccessor.reconcilePaletteIdentifiers(currentUnsafeBlocks())
+          : ((RTPRuntime.serverAccessor() != null)
+              ? RTPRuntime.serverAccessor().reconcilePaletteIdentifiers(currentUnsafeBlocks())
               : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(currentUnsafeBlocks()));
       return new BukkitRTPChunk(view, cx, cz, id, reconciled);
     }
@@ -928,7 +930,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
 
   @Override
   public void forgetChunkAt(int cx, int cz) {
-    RTP.scheduler.runTask(this, cx, cz, () -> {
+    RTPRuntime.scheduler().runTask(this, cx, cz, () -> {
       setForceLoaded(cx, cz, false);
       chunkCache.remove(((long) cx & 0xffffffffL | ((long) cz << 32)));
     });
@@ -1107,7 +1109,7 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   public void platform(RTPLocation location) {
     try {
       if (world == null) return;
-      ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+      ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
       if (safety == null) return;
       int radius = safety.getNumber(SafetyKeys.platformRadius, 0).intValue();
       // Honour the documented "disable platforms" contract from safety.yml (platformRadius: -1).
@@ -1196,9 +1198,9 @@ public class BukkitRTPWorld extends RTPWorld<World> {
   @Override
   public void save() {
     // World.save() is main-thread only on Spigot/Paper (AsyncCatcher will throw otherwise).
-    // ScanTask.wrapUpBatch invokes us from an async worker; RTP.scheduler.runTask
+    // ScanTask.wrapUpBatch invokes us from an async worker; RTPRuntime.scheduler().runTask
     // executes inline when already on the primary thread, otherwise schedules to it.
-    RTP.scheduler.runTask(() -> world.save());
+    RTPRuntime.scheduler().runTask(() -> world.save());
   }
 
   @Override

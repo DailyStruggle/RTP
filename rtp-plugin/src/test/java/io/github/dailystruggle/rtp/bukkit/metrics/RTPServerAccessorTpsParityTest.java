@@ -1,14 +1,12 @@
 package io.github.dailystruggle.rtp.bukkit.metrics;
 
 import io.github.dailystruggle.rtp.bukkitplatform.server.AbstractServerAccessor;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.metrics.api.MetricsBinding;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -23,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>This is a routing test, not a sampler test: the binding stub returns
  * a fixed sentinel TPS so the assertion is a direct equality on the value
- * propagated through {@code RTP.metrics.snapshot().tps1m}. The companion
+ * propagated through {@code CoreMetrics.instance().snapshot().tps1m}. The companion
  * {@link MetricsConsolidationArchTest} pins the structural rule that only
  * {@code *MetricsBinding} classes may probe raw {@code Server#getTPS()}.
  *
@@ -69,17 +67,9 @@ class RTPServerAccessorTpsParityTest {
         coreMetrics().setBinding(MetricsBinding.NOOP);
     }
 
-    /** Reach the singleton {@link CoreMetrics} via the public static. */
+    /** The process-wide {@link CoreMetrics} the accessor reads. */
     private static CoreMetrics coreMetrics() {
-        // RTP.metrics is package-public final static (see rtp-core). Use a
-        // tolerant reflective read so this test survives a future visibility
-        // tightening without silent breakage.
-        try {
-            Field f = RTP.class.getField("metrics");
-            return (CoreMetrics) f.get(null);
-        } catch (ReflectiveOperationException e) {
-            throw new AssertionError("RTP.metrics is no longer accessible from tests", e);
-        }
+        return CoreMetrics.instance();
     }
 
     @Test

@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.base.RTPCmd;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -27,7 +28,7 @@ import org.jetbrains.annotations.Nullable;
  * {@code rtp test async-reply player:<name>} &mdash; records which thread the
  * {@code /rtp} pipeline uses to deliver its first player-facing reply
  * ({@code Teleporting/Searching/Loading}) and asserts it is permitted by the
- * active platform's messaging rules. Wraps {@link RTP#serverAccessor} in a JDK
+ * active platform's messaging rules. Wraps {@link RTPRuntime#serverAccessor()} in a JDK
  * dynamic proxy that captures {@link Thread#currentThread()} on matching
  * {@code sendMessage*} calls; the proxy is always restored in {@code finally}.
  * Covers REQ-RTP-S-004/005/006.
@@ -74,8 +75,8 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
     if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
 
     // --- S-006: guard against being invoked before rtp-core finishes loading. ---
-    final RTPServerAccessor realAccessor = RTP.serverAccessor;
-    if (realAccessor == null || RTP.scheduler == null) {
+    final RTPServerAccessor realAccessor = RTPRuntime.serverAccessor();
+    if (realAccessor == null || RTPRuntime.scheduler() == null) {
       RTP.log(
           Level.WARNING,
           "[RTP test/async-reply] rejected: rtp-core not loaded (serverAccessor/scheduler null)");
@@ -125,7 +126,7 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
     };
     hookHolder[0] = ActiveTestJobs.register(
         callerId, new ActiveTestJobs.Job("async-reply", cancelHook));
-    RTP.scheduler.runTaskAsynchronously(() -> {
+    RTPRuntime.scheduler().runTaskAsynchronously(() -> {
       try {
         runProbe(callerId, realAccessor, targetId, targetName, rootCmd, parameterValues);
       } finally {
@@ -143,14 +144,14 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
    * disambiguate from concurrent player chatter), then unregisters the
    * interceptor. Called from the async scheduler.
    *
-   * <p>This intentionally does <b>not</b> swap {@code RTP.serverAccessor}
+   * <p>This intentionally does <b>not</b> swap {@code RTPRuntime.serverAccessor()}
    * &mdash; an earlier iteration installed a {@link
    * java.lang.reflect.Proxy} wrapping the real accessor, but doing so
    * leaves a sharp edge: if the {@code finally} restoration is skipped
    * for any reason, every subsequent message dispatch would silently
    * route through a stale proxy. The interceptor pattern (the same
    * mechanism used by {@code TestFullCmd} and
-   * {@code LiveCommandDispatcherTestJob}) keeps {@code RTP.serverAccessor}
+   * {@code LiveCommandDispatcherTestJob}) keeps {@code RTPRuntime.serverAccessor()}
    * untouched and is symmetric with how the rest of the test harness
    * captures messages.
    */
@@ -273,7 +274,7 @@ public class AsyncReplyTestJob extends BaseRTPCmdImpl {
               || lower.contains("tick")
               || lower.contains("server thread")
               // ForkJoinPool.commonPool-worker-* is a legitimate completion
-              // tier on Folia: RTP.scheduler.runTaskAsynchronously and the
+              // tier on Folia: RTPRuntime.scheduler().runTaskAsynchronously and the
               // async chunk-load CompletableFuture chain frequently complete
               // there. The hard rule from REQUIREMENTS.md section 3 is "no blocking
               // on a region/main thread" - FJP satisfies that.

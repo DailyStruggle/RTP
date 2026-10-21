@@ -1,13 +1,14 @@
 package io.github.dailystruggle.rtp.common.server;
 
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Platform-agnostic periodic async flush of {@link RTP#databaseAccessor}'s pending query queue.
- * Runs on {@link RTP#scheduler} to drain pending mutations to the database.
+ * Platform-agnostic periodic async flush of {@link ActiveDatabase#accessor()}'s pending query queue.
+ * Runs on {@link RTPRuntime#scheduler()} to drain pending mutations to the database.
  */
 public final class DatabaseProcessing {
     private static final AtomicBoolean killed = new AtomicBoolean(false);
@@ -24,7 +25,7 @@ public final class DatabaseProcessing {
     public static void clear() {
         Object scheduledTask = task.getAndSet(null);
         if (scheduledTask != null) {
-            RTP.scheduler.cancelTask(scheduledTask);
+            RTPRuntime.scheduler().cancelTask(scheduledTask);
         }
     }
 
@@ -32,13 +33,13 @@ public final class DatabaseProcessing {
     public static void start() {
         killed.set(false);
         clear();
-        Object scheduledTask = RTP.scheduler.runTaskTimerAsynchronously(
+        Object scheduledTask = RTPRuntime.scheduler().runTaskTimerAsynchronously(
                 () -> {
                     if (killed.get()) return;
                     if (processing.getAndSet(true)) return;
                     try {
-                        if (RTP.getInstance().databaseAccessor != null) {
-                            RTP.getInstance().databaseAccessor.processQueries(Long.MAX_VALUE);
+                        if (ActiveDatabase.accessor() != null) {
+                            ActiveDatabase.accessor().processQueries(Long.MAX_VALUE);
                         }
                     } finally {
                         processing.set(false);

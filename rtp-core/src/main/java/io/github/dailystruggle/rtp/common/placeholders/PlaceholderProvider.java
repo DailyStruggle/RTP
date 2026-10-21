@@ -5,8 +5,10 @@ import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.metrics.RTPMetricsExtension;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
@@ -14,11 +16,16 @@ import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.selection.region.RegionContext;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.tasks.ScanProgressView;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.TrackableTask;
+import io.github.dailystruggle.rtp.common.tasks.scan.ScanTasks;
 import io.github.dailystruggle.rtp.common.tools.ColourBands;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
 import io.github.dailystruggle.rtp.common.tools.ParseString;
@@ -51,12 +58,12 @@ public class PlaceholderProvider {
 
     /**
      * Return the snapshot in scope for the current thread, or a fresh
-     * {@code RTP.metrics.snapshot()} if none. Never returns {@code null}.
+     * {@code CoreMetrics.instance().snapshot()} if none. Never returns {@code null}.
      */
     public static MetricsSnapshot currentSnapshot() {
         MetricsSnapshot snap = METRICS_SNAPSHOT_CACHE.get();
         if (snap != null) return snap;
-        return RTP.metrics.snapshot();
+        return CoreMetrics.instance().snapshot();
     }
 
     /**
@@ -113,7 +120,7 @@ public class PlaceholderProvider {
      */
     private static io.github.dailystruggle.rtp.common.metrics.PipelineHistogram.Percentiles currentPercentiles() {
         try {
-            return RTP.metrics.pipelineHistogram().percentiles();
+            return CoreMetrics.instance().pipelineHistogram().percentiles();
         } catch (Throwable ignored) {
             // fall through to the empty readout
         }
@@ -129,12 +136,12 @@ public class PlaceholderProvider {
 
     /**
      * Run {@code body} with one freshly-captured snapshot installed for the current thread.
-     * Snapshot is captured by {@code RTP.metrics.snapshot()} exactly once at entry and
+     * Snapshot is captured by {@code CoreMetrics.instance().snapshot()} exactly once at entry and
      * is cleared on exit (even on exception).
      */
     public static void withSnapshot(Runnable body) {
         MetricsSnapshot prior = METRICS_SNAPSHOT_CACHE.get();
-        METRICS_SNAPSHOT_CACHE.set(RTP.metrics.snapshot());
+        METRICS_SNAPSHOT_CACHE.set(CoreMetrics.instance().snapshot());
         try {
             body.run();
         } finally {
@@ -147,11 +154,11 @@ public class PlaceholderProvider {
         placeholders.put(
                 "delay",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "0";
-                    if (RTP.serverAccessor == null) return "0";
-                    RTPCommandSender commandSender = RTP.serverAccessor.getSender(uuid);
+                    if (TeleportSessions.current() == null) return "0";
+                    if (RTPRuntime.serverAccessor() == null) return "0";
+                    RTPCommandSender commandSender = RTPRuntime.serverAccessor().getSender(uuid);
                     Number n = ConfigParser.parseSecondsDurationMillis(
-                            RTP.configs.getConfigValue(ConfigKeys.teleportDelay, 0), 0L) / 1000L;
+                            ActiveConfigs.get().getConfigValue(ConfigKeys.teleportDelay, 0), 0L) / 1000L;
                     int n2 = ParsePermissions.getInt(commandSender, "rtp.delay.");
                     if (n2 >= 0) n = n2;
                     if (n.longValue() == 0) return "0";
@@ -164,25 +171,25 @@ public class PlaceholderProvider {
 
                     String replacement = "";
                     if (days > 0)
-                        replacement += days + RTP.configs.getConfigValue(PlayerMessages.days, "").toString() + " ";
+                        replacement += days + ActiveConfigs.get().getConfigValue(PlayerMessages.days, "").toString() + " ";
                     if (hours > 0)
                         replacement +=
-                                hours + RTP.configs.getConfigValue(PlayerMessages.hours, "").toString() + " ";
+                                hours + ActiveConfigs.get().getConfigValue(PlayerMessages.hours, "").toString() + " ";
                     if (minutes > 0)
                         replacement +=
-                                minutes + RTP.configs.getConfigValue(PlayerMessages.minutes, "").toString() + " ";
+                                minutes + ActiveConfigs.get().getConfigValue(PlayerMessages.minutes, "").toString() + " ";
                     if (seconds > 0)
-                        replacement += seconds + RTP.configs.getConfigValue(PlayerMessages.seconds, "").toString();
+                        replacement += seconds + ActiveConfigs.get().getConfigValue(PlayerMessages.seconds, "").toString();
                     return replacement;
                 });
         placeholders.put(
                 "cooldown",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "A";
-                    if (RTP.serverAccessor == null) return "B";
-                    RTPCommandSender commandSender = RTP.serverAccessor.getSender(uuid);
+                    if (TeleportSessions.current() == null) return "A";
+                    if (RTPRuntime.serverAccessor() == null) return "B";
+                    RTPCommandSender commandSender = RTPRuntime.serverAccessor().getSender(uuid);
                     Number n = ConfigParser.parseSecondsDurationMillis(
-                            RTP.configs.getConfigValue(ConfigKeys.teleportCooldown, 0), 0L) / 1000L;
+                            ActiveConfigs.get().getConfigValue(ConfigKeys.teleportCooldown, 0), 0L) / 1000L;
                     int n2 = ParsePermissions.getInt(commandSender, "rtp.cooldown.");
                     if (n2 >= 0) n = n2;
 
@@ -195,28 +202,28 @@ public class PlaceholderProvider {
 
                     String replacement = "";
                     if (days > 0)
-                        replacement += days + RTP.configs.getConfigValue(PlayerMessages.days, "").toString() + " ";
+                        replacement += days + ActiveConfigs.get().getConfigValue(PlayerMessages.days, "").toString() + " ";
                     if (hours > 0)
                         replacement +=
-                                hours + RTP.configs.getConfigValue(PlayerMessages.hours, "").toString() + " ";
+                                hours + ActiveConfigs.get().getConfigValue(PlayerMessages.hours, "").toString() + " ";
                     if (minutes > 0)
                         replacement +=
-                                minutes + RTP.configs.getConfigValue(PlayerMessages.minutes, "").toString() + " ";
+                                minutes + ActiveConfigs.get().getConfigValue(PlayerMessages.minutes, "").toString() + " ";
                     if (seconds > 0)
-                        replacement += seconds + RTP.configs.getConfigValue(PlayerMessages.seconds, "").toString();
+                        replacement += seconds + ActiveConfigs.get().getConfigValue(PlayerMessages.seconds, "").toString();
                     return replacement;
                 });
         placeholders.put(
                 "remainingCooldown",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "A";
-                    if (RTP.serverAccessor == null) return "B";
+                    if (TeleportSessions.current() == null) return "A";
+                    if (RTPRuntime.serverAccessor() == null) return "B";
 
                     long start = System.currentTimeMillis();
 
-                    RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
+                    RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(uuid);
                     if (sender != null) {
-                        TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
+                        TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(uuid);
                         long lastTime = start;
                         if (teleportData != null) lastTime = teleportData.time;
 
@@ -239,20 +246,20 @@ public class PlaceholderProvider {
                         String replacement = "";
                         if (days > 0)
                             replacement +=
-                                    days + RTP.configs.getConfigValue(PlayerMessages.days, "").toString() + " ";
+                                    days + ActiveConfigs.get().getConfigValue(PlayerMessages.days, "").toString() + " ";
                         if (hours > 0)
                             replacement +=
-                                    hours + RTP.configs.getConfigValue(PlayerMessages.hours, "").toString() + " ";
+                                    hours + ActiveConfigs.get().getConfigValue(PlayerMessages.hours, "").toString() + " ";
                         if (minutes > 0)
                             replacement +=
-                                    minutes + RTP.configs.getConfigValue(PlayerMessages.minutes, "").toString() + " ";
+                                    minutes + ActiveConfigs.get().getConfigValue(PlayerMessages.minutes, "").toString() + " ";
                         if (seconds > 0) {
 
                             replacement +=
-                                    seconds + RTP.configs.getConfigValue(PlayerMessages.seconds, "").toString();
+                                    seconds + ActiveConfigs.get().getConfigValue(PlayerMessages.seconds, "").toString();
                         }
                         if (seconds < 2) {
-                            replacement += millis + RTP.configs.getConfigValue(PlayerMessages.millis, "").toString();
+                            replacement += millis + ActiveConfigs.get().getConfigValue(PlayerMessages.millis, "").toString();
                         }
                         return replacement;
                     }
@@ -261,14 +268,14 @@ public class PlaceholderProvider {
         placeholders.put(
                 "remainingLockTime",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "";
+                    if (TeleportSessions.current() == null) return "";
                     ConfigParser<ConfigKeys> cfg =
-                            (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+                            (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
                     if (cfg == null) return "";
                     long cap = cfg.getNumber(ConfigKeys.lockAfterUses, 0L).longValue();
                     long resetMillis =
                             cfg.getNumber(ConfigKeys.lockAfterResetSeconds, 0L).longValue() * 1000L;
-                    long remainingTime = RTP.getInstance().teleportLimitStore.millisUntilReset(
+                    long remainingTime = ActiveDatabase.teleportLimitStore().millisUntilReset(
                             uuid, cap, resetMillis, System.currentTimeMillis());
                     if (remainingTime <= 0) return "";
 
@@ -280,20 +287,20 @@ public class PlaceholderProvider {
                     String replacement = "";
                     if (days > 0)
                         replacement +=
-                                days + RTP.configs.getConfigValue(PlayerMessages.days, "").toString() + " ";
+                                days + ActiveConfigs.get().getConfigValue(PlayerMessages.days, "").toString() + " ";
                     if (hours > 0)
                         replacement +=
-                                hours + RTP.configs.getConfigValue(PlayerMessages.hours, "").toString() + " ";
+                                hours + ActiveConfigs.get().getConfigValue(PlayerMessages.hours, "").toString() + " ";
                     if (minutes > 0)
                         replacement +=
-                                minutes + RTP.configs.getConfigValue(PlayerMessages.minutes, "").toString() + " ";
+                                minutes + ActiveConfigs.get().getConfigValue(PlayerMessages.minutes, "").toString() + " ";
                     if (seconds > 0)
                         replacement +=
-                                seconds + RTP.configs.getConfigValue(PlayerMessages.seconds, "").toString();
+                                seconds + ActiveConfigs.get().getConfigValue(PlayerMessages.seconds, "").toString();
                     // Sub-second remainder: show at least "1s" so the clock is never blank
                     // while the player is still locked.
                     if (replacement.isEmpty())
-                        replacement = "1" + RTP.configs.getConfigValue(PlayerMessages.seconds, "").toString();
+                        replacement = "1" + ActiveConfigs.get().getConfigValue(PlayerMessages.seconds, "").toString();
                     return replacement.trim();
                 });
         placeholders.put(
@@ -302,13 +309,13 @@ public class PlaceholderProvider {
         placeholders.put(
                 "lockUses",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "0";
+                    if (TeleportSessions.current() == null) return "0";
                     ConfigParser<ConfigKeys> cfg =
-                            (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+                            (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
                     if (cfg == null) return "0";
                     long resetMillis =
                             cfg.getNumber(ConfigKeys.lockAfterResetSeconds, 0L).longValue() * 1000L;
-                    long uses = RTP.getInstance().teleportLimitStore.uses(
+                    long uses = ActiveDatabase.teleportLimitStore().uses(
                             uuid, resetMillis, System.currentTimeMillis());
                     return String.valueOf(uses);
                 });
@@ -318,15 +325,15 @@ public class PlaceholderProvider {
         placeholders.put(
                 "remainingLockUses",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "0";
+                    if (TeleportSessions.current() == null) return "0";
                     ConfigParser<ConfigKeys> cfg =
-                            (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+                            (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
                     if (cfg == null) return "0";
                     long cap = cfg.getNumber(ConfigKeys.lockAfterUses, 0L).longValue();
                     if (cap <= 0) return "0";
                     long resetMillis =
                             cfg.getNumber(ConfigKeys.lockAfterResetSeconds, 0L).longValue() * 1000L;
-                    long uses = RTP.getInstance().teleportLimitStore.uses(
+                    long uses = ActiveDatabase.teleportLimitStore().uses(
                             uuid, resetMillis, System.currentTimeMillis());
                     long remaining = cap - uses;
                     return String.valueOf(Math.max(0L, remaining));
@@ -337,9 +344,9 @@ public class PlaceholderProvider {
         placeholders.put(
                 "lockLimit",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "0";
+                    if (TeleportSessions.current() == null) return "0";
                     ConfigParser<ConfigKeys> cfg =
-                            (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+                            (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
                     if (cfg == null) return "0";
                     long cap = cfg.getNumber(ConfigKeys.lockAfterUses, 0L).longValue();
                     return String.valueOf(Math.max(0L, cap));
@@ -356,8 +363,8 @@ public class PlaceholderProvider {
         placeholders.put(
                 "queueLocation",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "0";
-                    TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
+                    if (TeleportSessions.current() == null) return "0";
+                    TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(uuid);
                     if (teleportData == null) return "0";
                     return String.valueOf(teleportData.queueLocation);
                 });
@@ -365,7 +372,7 @@ public class PlaceholderProvider {
                 "tickets",
                 uuid ->{
                     long res = 0;
-                    for (RTPWorld<?> world : RTP.serverAccessor.getRTPWorlds()) {
+                    for (RTPWorld<?> world : RTPRuntime.serverAccessor().getRTPWorlds()) {
                         res += world.activeChunkTickets.get();
                     }
                     return String.valueOf(res);
@@ -375,7 +382,7 @@ public class PlaceholderProvider {
                 "plugin_forced",
                 uuid -> {
                     long res = 0;
-                    for (RTPWorld<?> world : RTP.serverAccessor.getRTPWorlds()) {
+                    for (RTPWorld<?> world : RTPRuntime.serverAccessor().getRTPWorlds()) {
                         res += world.numForceLoaded();
                     }
                     return String.valueOf(res);
@@ -385,7 +392,7 @@ public class PlaceholderProvider {
                 "server_forced",
                 uuid -> {
                     long res = 0;
-                    for (RTPWorld<?> world : RTP.serverAccessor.getRTPWorlds()) {
+                    for (RTPWorld<?> world : RTPRuntime.serverAccessor().getRTPWorlds()) {
                         res += world.getServerForceLoadedCount().join();
                     }
                     return String.valueOf(res);
@@ -394,15 +401,15 @@ public class PlaceholderProvider {
         placeholders.put(
                 "teleports",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "0";
-                    return String.valueOf(RTP.getInstance().latestTeleportData.values().stream().filter(teleportData -> !teleportData.completed).count());
+                    if (TeleportSessions.current() == null) return "0";
+                    return String.valueOf(TeleportSessions.current().latestTeleportData.values().stream().filter(teleportData -> !teleportData.completed).count());
                 });
 
         placeholders.put(
                 "loads",
                 uuid -> {
                     long totalLoads = 0;
-                    for (RTPWorld<?> world : RTP.serverAccessor.getRTPWorlds()) {
+                    for (RTPWorld<?> world : RTPRuntime.serverAccessor().getRTPWorlds()) {
                         totalLoads += world.totalChunkLoads.get();
                     }
                     return String.valueOf(totalLoads);
@@ -419,7 +426,7 @@ public class PlaceholderProvider {
                     // descending so the noisiest origin sits first. Empty when no
                     // origin has been recorded yet (e.g. fresh server, no loads).
                     java.util.Map<String, Long> totals = new java.util.HashMap<>();
-                    for (RTPWorld<?> world : RTP.serverAccessor.getRTPWorlds()) {
+                    for (RTPWorld<?> world : RTPRuntime.serverAccessor().getRTPWorlds()) {
                         world.chunkLoadsByOrigin.forEach((tag, ctr) ->
                                 totals.merge(tag, ctr.get(), Long::sum));
                     }
@@ -437,7 +444,7 @@ public class PlaceholderProvider {
                     // Uses lifetimeTicketsIssued as denominator to account for all ticket acquisitions.
                     long lifetimeOrphaned = 0;
                     long ticketsIssued = 0;
-                    for (RTPWorld<?> world : RTP.serverAccessor.getRTPWorlds()) {
+                    for (RTPWorld<?> world : RTPRuntime.serverAccessor().getRTPWorlds()) {
                         lifetimeOrphaned += world.lifetimeOrphanedTicketsScanned.get();
                         ticketsIssued += world.lifetimeTicketsIssued.get();
                     }
@@ -673,16 +680,16 @@ public class PlaceholderProvider {
         placeholders.put(
                 "attempts",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "A";
-                    TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
+                    if (TeleportSessions.current() == null) return "A";
+                    TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(uuid);
                     if (teleportData == null) return "B";
                     return String.valueOf(teleportData.attempts);
                 });
         placeholders.put(
                 "processingTime",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "0";
-                    TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
+                    if (TeleportSessions.current() == null) return "0";
+                    TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(uuid);
 
                     long time = (teleportData != null) ? teleportData.processingTime : 0L;
 
@@ -698,57 +705,57 @@ public class PlaceholderProvider {
 
                     String replacement = "";
                     if (days > 0)
-                        replacement += days + RTP.configs.getConfigValue(PlayerMessages.days, "").toString() + " ";
+                        replacement += days + ActiveConfigs.get().getConfigValue(PlayerMessages.days, "").toString() + " ";
                     if (hours > 0)
                         replacement +=
-                                hours + RTP.configs.getConfigValue(PlayerMessages.hours, "").toString() + " ";
+                                hours + ActiveConfigs.get().getConfigValue(PlayerMessages.hours, "").toString() + " ";
                     if (minutes > 0)
                         replacement +=
-                                minutes + RTP.configs.getConfigValue(PlayerMessages.minutes, "").toString() + " ";
+                                minutes + ActiveConfigs.get().getConfigValue(PlayerMessages.minutes, "").toString() + " ";
                     if (seconds > 0)
-                        replacement += seconds + RTP.configs.getConfigValue(PlayerMessages.seconds, "").toString();
+                        replacement += seconds + ActiveConfigs.get().getConfigValue(PlayerMessages.seconds, "").toString();
                     if (seconds < 2) {
-                        replacement += millis + RTP.configs.getConfigValue(PlayerMessages.millis, "").toString();
+                        replacement += millis + ActiveConfigs.get().getConfigValue(PlayerMessages.millis, "").toString();
                     }
                     return replacement;
                 });
         placeholders.put(
                 "distance",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "0.0";
-                    TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
+                    if (TeleportSessions.current() == null) return "0.0";
+                    TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(uuid);
                     if (teleportData == null) return "0.0";
                     return String.format(java.util.Locale.US, "%.1f", teleportData.distance);
                 });
         placeholders.put(
                 "distance_blocks",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "0";
-                    TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
+                    if (TeleportSessions.current() == null) return "0";
+                    TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(uuid);
                     if (teleportData == null) return "0";
                     return String.valueOf(Math.round(teleportData.distance));
                 });
         placeholders.put(
                 "distance_center",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "0.0";
-                    TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
+                    if (TeleportSessions.current() == null) return "0.0";
+                    TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(uuid);
                     if (teleportData == null) return "0.0";
                     return String.format(java.util.Locale.US, "%.1f", teleportData.distanceFromCenter);
                 });
         placeholders.put(
                 "distance_center_blocks",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "0";
-                    TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
+                    if (TeleportSessions.current() == null) return "0";
+                    TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(uuid);
                     if (teleportData == null) return "0";
                     return String.valueOf(Math.round(teleportData.distanceFromCenter));
                 });
         placeholders.put(
                 "spot",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "0";
-                    TeleportData teleportData = RTP.getInstance().latestTeleportData.get(uuid);
+                    if (TeleportSessions.current() == null) return "0";
+                    TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(uuid);
                     if (teleportData == null) return "0";
 
                     long spot = teleportData.queueLocation;
@@ -757,7 +764,7 @@ public class PlaceholderProvider {
         placeholders.put(
                 "player",
                 uuid -> {
-                    RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
+                    RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(uuid);
                     if (sender == null) {
                         return "";
                     }
@@ -766,7 +773,7 @@ public class PlaceholderProvider {
         placeholders.put(
                 "player_name",
                 uuid -> {
-                    RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
+                    RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(uuid);
                     if (sender == null) {
                         return "";
                     }
@@ -775,34 +782,34 @@ public class PlaceholderProvider {
         placeholders.put(
                 "player_status",
                 uuid -> {
-                    RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
+                    RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(uuid);
                     if (sender == null) {
                         return "";
                     }
 
-                    TeleportData data = RTP.getInstance().latestTeleportData.get(uuid);
+                    TeleportData data = TeleportSessions.current().latestTeleportData.get(uuid);
 
                     if (data == null)
-                        return RTP.configs.getConfigValue(PlayerMessages.PLAYER_AVAILABLE, "").toString();
+                        return ActiveConfigs.get().getConfigValue(PlayerMessages.PLAYER_AVAILABLE, "").toString();
                     if (data.completed) {
                         long dt = System.currentTimeMillis() - data.time;
                         if (dt < 0) dt = Long.MAX_VALUE + dt;
                         if (dt < sender.cooldown()) {
-                            return RTP.configs.getConfigValue(PlayerMessages.PLAYER_COOLDOWN, "").toString();
+                            return ActiveConfigs.get().getConfigValue(PlayerMessages.PLAYER_COOLDOWN, "").toString();
                         }
 
-                        return RTP.configs.getConfigValue(PlayerMessages.PLAYER_AVAILABLE, "").toString();
+                        return ActiveConfigs.get().getConfigValue(PlayerMessages.PLAYER_AVAILABLE, "").toString();
                     }
 
                     RTPRunnable nextTask = data.nextTask;
                     if (nextTask instanceof TrackableTask task) {
                         switch (task.phaseName()) {
                             case "TELEPORT":
-                                return RTP.configs.getConfigValue(PlayerMessages.PLAYER_TELEPORTING, "").toString();
+                                return ActiveConfigs.get().getConfigValue(PlayerMessages.PLAYER_TELEPORTING, "").toString();
                             case "LOAD":
-                                return RTP.configs.getConfigValue(PlayerMessages.PLAYER_LOADING, "").toString();
+                                return ActiveConfigs.get().getConfigValue(PlayerMessages.PLAYER_LOADING, "").toString();
                             case "SETUP":
-                                return RTP.configs.getConfigValue(PlayerMessages.PLAYER_SETUP, "").toString();
+                                return ActiveConfigs.get().getConfigValue(PlayerMessages.PLAYER_SETUP, "").toString();
                             default:
                                 break;
                         }
@@ -813,13 +820,13 @@ public class PlaceholderProvider {
         placeholders.put(
                 "total_queue_length",
                 uuid -> {
-                    RTPPlayer player = RTP.serverAccessor.getPlayer(uuid);
+                    RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(uuid);
                     if (player == null) {
                         return "";
                     }
 
                     Region region =
-                            RTP.selectionAPI.getRegion(player);
+                            ActiveSelection.get().getRegion(player);
                     if (region == null) return "0";
                     return String.valueOf(region.queueManager.getTotalQueueLength(uuid));
                 });
@@ -827,13 +834,13 @@ public class PlaceholderProvider {
         placeholders.put(
                 "public_queue_length",
                 uuid -> {
-                    RTPPlayer player = RTP.serverAccessor.getPlayer(uuid);
+                    RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(uuid);
                     if (player == null) {
                         return "";
                     }
 
                     Region region =
-                            RTP.selectionAPI.getRegion(player);
+                            ActiveSelection.get().getRegion(player);
                     if (region == null) return "0";
                     return String.valueOf(region.queueManager.getPublicQueueLength());
                 });
@@ -841,13 +848,13 @@ public class PlaceholderProvider {
         placeholders.put(
                 "personal_queue_length",
                 uuid -> {
-                    RTPPlayer player = RTP.serverAccessor.getPlayer(uuid);
+                    RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(uuid);
                     if (player == null) {
                         return "";
                     }
 
                     Region region =
-                            RTP.selectionAPI.getRegion(player);
+                            ActiveSelection.get().getRegion(player);
                     if (region == null) return "0";
                     return String.valueOf(region.queueManager.getPersonalQueueLength(uuid));
                 });
@@ -855,7 +862,7 @@ public class PlaceholderProvider {
         placeholders.put(
                 "teleport_world",
                 uuid -> {
-                    TeleportData data = RTP.getInstance().latestTeleportData.get(uuid);
+                    TeleportData data = TeleportSessions.current().latestTeleportData.get(uuid);
                     if (data == null || data.selectedCoords == null) return "";
                     return data.selectedCoords.worldName();
                 });
@@ -863,7 +870,7 @@ public class PlaceholderProvider {
         placeholders.put(
                 "teleport_x",
                 uuid -> {
-                    TeleportData data = RTP.getInstance().latestTeleportData.get(uuid);
+                    TeleportData data = TeleportSessions.current().latestTeleportData.get(uuid);
                     if (data == null || data.selectedCoords == null) return "";
                     return String.valueOf(data.selectedCoords.x());
                 });
@@ -871,7 +878,7 @@ public class PlaceholderProvider {
         placeholders.put(
                 "teleport_y",
                 uuid -> {
-                    TeleportData data = RTP.getInstance().latestTeleportData.get(uuid);
+                    TeleportData data = TeleportSessions.current().latestTeleportData.get(uuid);
                     if (data == null || data.selectedCoords == null) return "";
                     return String.valueOf(data.selectedCoords.y());
                 });
@@ -879,7 +886,7 @@ public class PlaceholderProvider {
         placeholders.put(
                 "teleport_z",
                 uuid -> {
-                    TeleportData data = RTP.getInstance().latestTeleportData.get(uuid);
+                    TeleportData data = TeleportSessions.current().latestTeleportData.get(uuid);
                     if (data == null || data.selectedCoords == null) return "";
                     return String.valueOf(data.selectedCoords.z());
                 });
@@ -887,10 +894,10 @@ public class PlaceholderProvider {
         placeholders.put(
                 "teleport_biome",
                 uuid -> {
-                    TeleportData data = RTP.getInstance().latestTeleportData.get(uuid);
+                    TeleportData data = TeleportSessions.current().latestTeleportData.get(uuid);
                     if (data == null || data.selectedCoords == null) return "";
                     RTPWorld<?> world =
-                            RTP.serverAccessor.getRTPWorld(data.selectedCoords.worldName());
+                            RTPRuntime.serverAccessor().getRTPWorld(data.selectedCoords.worldName());
                     if (world == null) return "";
                     // ADR-016 section 13.1 follow-up (2026-04-20): route the biome read
                     // through the resolved chunk so anvil-cached data is used
@@ -919,14 +926,14 @@ public class PlaceholderProvider {
         placeholders.put(
                 "scan_chunks",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "0";
-                    Region region = RTP.regionContext.get();
+                    if (TeleportSessions.current() == null) return "0";
+                    Region region = RegionContext.region().get();
                     if (region != null) {
-                        ScanProgressView task = RTP.getInstance().scanTasks.get(region.name);
+                        ScanProgressView task = ScanTasks.current().get(region.name);
                         return (task != null) ? String.valueOf(task.absolutePos()) : "0";
                     }
                     long total = 0;
-                    for (ScanProgressView task : RTP.getInstance().scanTasks.values()) {
+                    for (ScanProgressView task : ScanTasks.current().values()) {
                         if (task != null) total += task.absolutePos();
                     }
                     return String.valueOf(total);
@@ -934,14 +941,14 @@ public class PlaceholderProvider {
         placeholders.put(
                 "scan_totalChunks",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "0";
-                    Region region = RTP.regionContext.get();
+                    if (TeleportSessions.current() == null) return "0";
+                    Region region = RegionContext.region().get();
                     if (region != null) {
-                        ScanProgressView task = RTP.getInstance().scanTasks.get(region.name);
+                        ScanProgressView task = ScanTasks.current().get(region.name);
                         return (task != null) ? String.valueOf(task.absoluteTotal()) : "0";
                     }
                     long total = 0;
-                    for (ScanProgressView task : RTP.getInstance().scanTasks.values()) {
+                    for (ScanProgressView task : ScanTasks.current().values()) {
                         if (task != null) total += task.absoluteTotal();
                     }
                     return String.valueOf(total);
@@ -949,14 +956,14 @@ public class PlaceholderProvider {
         placeholders.put(
                 "scan_cps",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "0";
-                    Region region = RTP.regionContext.get();
+                    if (TeleportSessions.current() == null) return "0";
+                    Region region = RegionContext.region().get();
                     if (region != null) {
-                        ScanProgressView task = RTP.getInstance().scanTasks.get(region.name);
+                        ScanProgressView task = ScanTasks.current().get(region.name);
                         return (task != null) ? String.valueOf(task.cps()) : "0";
                     }
                     long total = 0;
-                    for (ScanProgressView task : RTP.getInstance().scanTasks.values()) {
+                    for (ScanProgressView task : ScanTasks.current().values()) {
                         if (task != null) total += task.cps();
                     }
                     return String.valueOf(total);
@@ -964,25 +971,25 @@ public class PlaceholderProvider {
         placeholders.put(
                 "scan_regions",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "";
-                    Region region = RTP.regionContext.get();
+                    if (TeleportSessions.current() == null) return "";
+                    Region region = RegionContext.region().get();
                     if (region != null) return region.name;
-                    return String.join(", ", RTP.getInstance().scanTasks.keySet());
+                    return String.join(", ", ScanTasks.current().keySet());
                 });
         placeholders.put(
                 "scan_landPercentage",
                 uuid -> {
-                    if (RTP.getInstance() == null) return "0.00";
+                    if (TeleportSessions.current() == null) return "0.00";
                     // Read ScanProgressView's good/(good+bad) tally; MemoryShape bad counts include
                     // gap-bridged runs and outer-ring preimages, so a shape-derived ratio
                     // drifts or clamps to 0 mid-scan.
-                    Region r = RTP.regionContext.get();
+                    Region r = RegionContext.region().get();
                     double pct;
                     if (r != null) {
-                        ScanProgressView task = RTP.getInstance().scanTasks.get(r.name);
+                        ScanProgressView task = ScanTasks.current().get(r.name);
                         pct = (task != null) ? task.landPercentage() : 0.0;
                     } else {
-                        pct = averageLandPercentage(RTP.getInstance().scanTasks.values());
+                        pct = averageLandPercentage(ScanTasks.current().values());
                     }
                     return String.format(java.util.Locale.ROOT, "%.2f", pct);
                 });
@@ -990,34 +997,34 @@ public class PlaceholderProvider {
                 "scan_eta",
                 uuid -> {
                     try {
-                        if (RTP.getInstance() == null) return "0s";
-                        Region region = RTP.regionContext.get();
+                        if (TeleportSessions.current() == null) return "0s";
+                        Region region = RegionContext.region().get();
                         if (region != null) {
-                            ScanProgressView task = RTP.getInstance().scanTasks.get(region.name);
+                            ScanProgressView task = ScanTasks.current().get(region.name);
                             long eta = (task != null) ? task.etaSeconds() : 0L;
                             return formatEta(eta);
                         }
 
                         long maxEta = 0;
-                        for (ScanProgressView task : RTP.getInstance().scanTasks.values()) {
+                        for (ScanProgressView task : ScanTasks.current().values()) {
                             if (task != null && task.etaSeconds() > maxEta) maxEta = task.etaSeconds();
                         }
 
                         return formatEta(maxEta);
                     } catch (Exception e) {
-                        RTP.log(java.util.logging.Level.WARNING, "Placeholder resolution failed for scan_eta", e);
+                        RTPRuntime.log(java.util.logging.Level.WARNING, "Placeholder resolution failed for scan_eta", e);
                         return "0s";
                     }
                 });
 
         placeholders.put("world", uuid -> {
-            RTPWorld world = RTP.worldContext.get();
+            RTPWorld world = RegionContext.world().get();
             if (world != null) return world.name();
-            Region region = RTP.regionContext.get();
+            Region region = RegionContext.region().get();
             if (region != null) return region.getWorld().name();
-            RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
+            RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(uuid);
             if (sender != null) {
-                RTPWorld senderWorld = RTP.serverAccessor.getRTPWorld(sender.uuid()); // This is wrong, sender uuid is player uuid.
+                RTPWorld senderWorld = RTPRuntime.serverAccessor().getRTPWorld(sender.uuid()); // This is wrong, sender uuid is player uuid.
                 // Wait, RTPWorld getRTPWorld(UUID) might be world UID or player UID depending on implementation.
                 // Usually it's world UID.
                 // Let's use a better way if possible.
@@ -1026,18 +1033,18 @@ public class PlaceholderProvider {
         });
 
         placeholders.put("name", uuid -> {
-            RTPWorld world = RTP.worldContext.get();
+            RTPWorld world = RegionContext.world().get();
             if (world != null) return world.name();
-            Region region = RTP.regionContext.get();
+            Region region = RegionContext.region().get();
             if (region != null) return region.getWorld().name();
             return "";
         });
 
         placeholders.put("region", uuid -> {
-            Region region = RTP.regionContext.get();
+            Region region = RegionContext.region().get();
             if (region != null) return region.name;
-            RTPWorld world = RTP.worldContext.get();
-            if (world != null) return RTP.selectionAPI.getRegion(world).name;
+            RTPWorld world = RegionContext.world().get();
+            if (world != null) return ActiveSelection.get().getRegion(world).name;
             return "";
         });
 
@@ -1046,15 +1053,15 @@ public class PlaceholderProvider {
         // when unset. Available in any region-context message (e.g. regionInfo) as
         // [displayName]; identity-bearing [region] is unchanged.
         placeholders.put("displayName", uuid -> {
-            Region region = RTP.regionContext.get();
+            Region region = RegionContext.region().get();
             if (region != null) return region.displayName();
-            RTPWorld world = RTP.worldContext.get();
-            if (world != null) return RTP.selectionAPI.getRegion(world).displayName();
+            RTPWorld world = RegionContext.world().get();
+            if (world != null) return ActiveSelection.get().getRegion(world).displayName();
             return "";
         });
 
         placeholders.put("requirePermission", uuid -> {
-            Region region = RTP.regionContext.get();
+            Region region = RegionContext.region().get();
             if (region != null) {
                 boolean req = false;
                 EnumMap<RegionKeys, Object> data = region.getData();
@@ -1066,27 +1073,27 @@ public class PlaceholderProvider {
                 }
                 return String.valueOf(req);
             }
-            RTPWorld world = RTP.worldContext.get();
+            RTPWorld world = RegionContext.world().get();
             if (world != null) {
                 MultiConfigParser<WorldKeys> worlds =
-                        (MultiConfigParser<WorldKeys>) RTP.configs.getParser(WorldKeys.class);
+                        (MultiConfigParser<WorldKeys>) ActiveConfigs.get().getParser(WorldKeys.class);
                 ConfigParser<WorldKeys> parser = worlds.getParser(world.name());
-                return RTP.configs.getConfigValue(WorldKeys.requirePermission, false).toString();
+                return ActiveConfigs.get().getConfigValue(WorldKeys.requirePermission, false).toString();
             }
             return "false";
         });
 
         placeholders.put("override", uuid -> {
-            RTPWorld world = RTP.worldContext.get();
+            RTPWorld world = RegionContext.world().get();
             if (world != null) {
                 MultiConfigParser<WorldKeys> worlds =
-                        (MultiConfigParser<WorldKeys>) RTP.configs.getParser(WorldKeys.class);
+                        (MultiConfigParser<WorldKeys>) ActiveConfigs.get().getParser(WorldKeys.class);
                 ConfigParser<WorldKeys> parser = worlds.getParser(world.name());
-                String override = RTP.configs.getConfigValue(WorldKeys.override, "[0]").toString();
+                String override = ActiveConfigs.get().getConfigValue(WorldKeys.override, "[0]").toString();
                 if (override.startsWith("[") && override.endsWith("]")) {
                     try {
                         int num = Integer.parseInt(override.substring(1, override.length() - 1));
-                        List<RTPWorld<?>> rtpWorlds = RTP.serverAccessor.getRTPWorlds();
+                        List<RTPWorld<?>> rtpWorlds = RTPRuntime.serverAccessor().getRTPWorlds();
                         if (num >= 0 && num < rtpWorlds.size()) {
                             return rtpWorlds.get(num).name();
                         }
@@ -1099,44 +1106,44 @@ public class PlaceholderProvider {
         });
 
         placeholders.put("pluginForced", uuid -> {
-            RTPWorld world = RTP.worldContext.get();
+            RTPWorld world = RegionContext.world().get();
             if (world != null) return String.valueOf(world.numForceLoaded());
             return "0";
         });
 
         placeholders.put("serverForced", uuid -> {
-            RTPWorld world = RTP.worldContext.get();
+            RTPWorld world = RegionContext.world().get();
             if (world != null) return String.valueOf(world.getServerForceLoadedCount().join());
             return "0";
         });
 
         placeholders.put("shape", uuid -> {
-            Region region = RTP.regionContext.get();
+            Region region = RegionContext.region().get();
             if (region != null) return region.getShape().name;
             return "none";
         });
 
         placeholders.put("cacheCap", uuid -> {
-            Region region = RTP.regionContext.get();
+            Region region = RegionContext.region().get();
             if (region != null) return String.valueOf(region.getSettings().cacheCap());
             return "0";
         });
 
         placeholders.put("cached", uuid -> {
-            Region region = RTP.regionContext.get();
+            Region region = RegionContext.region().get();
             if (region != null) return String.valueOf(region.queueManager.getPublicQueueLength());
             return "0";
         });
 
         placeholders.put("keptCache", uuid -> {
-            Region region = RTP.regionContext.get();
+            Region region = RegionContext.region().get();
             if (region != null) return String.valueOf(region.queueManager.keptLocations.size());
             return "0";
         });
 
         // Cold - pre-verified locations whose chunks have been released ("unkept").
         placeholders.put("unkeptCache", uuid -> {
-            Region region = RTP.regionContext.get();
+            Region region = RegionContext.region().get();
             if (region != null) return String.valueOf(region.queueManager.unkeptLocations.size());
             return "0";
         });
@@ -1150,7 +1157,7 @@ public class PlaceholderProvider {
         // when the backlog is disabled (backlogCacheCap == 0, lite default;
         // backlogLocations is null).
         placeholders.put("backlogCache", uuid -> {
-            Region region = RTP.regionContext.get();
+            Region region = RegionContext.region().get();
             if (region != null && region.queueManager.backlogLocations != null) {
                 return String.valueOf(region.queueManager.backlogLocations.validatedSize());
             }
@@ -1159,25 +1166,25 @@ public class PlaceholderProvider {
 
         // Backlog capacity (ADR-028). Mirrors %rtp_cacheCap%; 0 indicates the backlog is disabled.
         placeholders.put("backlogCacheCap", uuid -> {
-            Region region = RTP.regionContext.get();
+            Region region = RegionContext.region().get();
             if (region != null) return String.valueOf(region.getSettings().backlogCacheCap());
             return "0";
         });
 
         placeholders.put("locationQueue", uuid -> {
-            Region region = RTP.regionContext.get();
+            Region region = RegionContext.region().get();
             if (region != null) return String.valueOf(region.queueManager.keptLocations.size());
             return "0";
         });
 
         placeholders.put("inFlightCalculations", uuid -> {
-            Region region = RTP.regionContext.get();
+            Region region = RegionContext.region().get();
             if (region != null) return String.valueOf(region.inFlightCalculations.get());
             return "0";
         });
 
         placeholders.put("worldBorderOverride", uuid -> {
-            Region region = RTP.regionContext.get();
+            Region region = RegionContext.region().get();
             if (region != null) {
                 boolean wbo = false;
                 EnumMap<RegionKeys, Object> data = region.getData();
@@ -1198,27 +1205,27 @@ public class PlaceholderProvider {
         // Resolve to "N/A" when the region's selector is not a MemoryShape or
         // has not been scanned yet. No chunk I/O, no scan is triggered.
         placeholders.put("memCoveragePct", uuid -> {
-            MemoryShape.LearnedStateSummary s = memSummary(RTP.regionContext.get());
+            MemoryShape.LearnedStateSummary s = memSummary(RegionContext.region().get());
             return s == null ? "N/A" : formatPercent(s.coveragePercent());
         });
 
         placeholders.put("memBadPct", uuid -> {
-            MemoryShape.LearnedStateSummary s = memSummary(RTP.regionContext.get());
+            MemoryShape.LearnedStateSummary s = memSummary(RegionContext.region().get());
             return s == null ? "N/A" : formatPercent(s.badPercent());
         });
 
         placeholders.put("memBadCount", uuid -> {
-            MemoryShape.LearnedStateSummary s = memSummary(RTP.regionContext.get());
+            MemoryShape.LearnedStateSummary s = memSummary(RegionContext.region().get());
             return s == null ? "N/A" : String.valueOf(s.badCount());
         });
 
         placeholders.put("memTopCause", uuid -> {
-            MemoryShape.LearnedStateSummary s = memSummary(RTP.regionContext.get());
+            MemoryShape.LearnedStateSummary s = memSummary(RegionContext.region().get());
             return s == null ? "N/A" : s.topCause();
         });
 
         placeholders.put("memTopCausePct", uuid -> {
-            MemoryShape.LearnedStateSummary s = memSummary(RTP.regionContext.get());
+            MemoryShape.LearnedStateSummary s = memSummary(RegionContext.region().get());
             return s == null ? "N/A" : formatPercent(s.topCausePercent());
         });
     }
@@ -1244,7 +1251,7 @@ public class PlaceholderProvider {
      */
     public static String formatEta(long totalSeconds) {
         if (totalSeconds < 0) totalSeconds = 0;
-        if (RTP.configs == null) return totalSeconds + "s";
+        if (ActiveConfigs.get() == null) return totalSeconds + "s";
 
         long days = TimeUnit.SECONDS.toDays(totalSeconds);
         long hours = TimeUnit.SECONDS.toHours(totalSeconds) % 24;
@@ -1253,16 +1260,16 @@ public class PlaceholderProvider {
 
         StringBuilder sb = new StringBuilder();
         if (days > 0) {
-            sb.append(days).append(RTP.configs.getConfigValue(PlayerMessages.days, "d")).append(" ");
+            sb.append(days).append(ActiveConfigs.get().getConfigValue(PlayerMessages.days, "d")).append(" ");
         }
         if (hours > 0) {
-            sb.append(hours).append(RTP.configs.getConfigValue(PlayerMessages.hours, "h")).append(" ");
+            sb.append(hours).append(ActiveConfigs.get().getConfigValue(PlayerMessages.hours, "h")).append(" ");
         }
         if (minutes > 0) {
-            sb.append(minutes).append(RTP.configs.getConfigValue(PlayerMessages.minutes, "m")).append(" ");
+            sb.append(minutes).append(ActiveConfigs.get().getConfigValue(PlayerMessages.minutes, "m")).append(" ");
         }
         if (seconds > 0 || sb.isEmpty()) {
-            sb.append(seconds).append(RTP.configs.getConfigValue(PlayerMessages.seconds, "s"));
+            sb.append(seconds).append(ActiveConfigs.get().getConfigValue(PlayerMessages.seconds, "s"));
         }
 
         return sb.toString().trim();
@@ -1337,11 +1344,11 @@ public class PlaceholderProvider {
     }
 
     public static String fillNumericPlaceholders(String text) {
-        if (RTP.configs == null) return text;
+        if (ActiveConfigs.get() == null) return text;
         List<?>[] list = new List<?>[1];
         IntFunction<String> lookup = index -> {
             if (list[0] == null) {
-                Object o = RTP.configs.getConfigValue(PlaceholderMessages.placeholders, new ArrayList<>());
+                Object o = ActiveConfigs.get().getConfigValue(PlaceholderMessages.placeholders, new ArrayList<>());
                 list[0] = o instanceof List<?> pList ? pList : Collections.emptyList();
             }
             return list[0].size() > index ? String.valueOf(list[0].get(index)) : "[invalid]";

@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -30,16 +31,16 @@ class RegionCooldownAndDelayTest {
     void setUp() {
         RTPTestSetup.install(tempDir);
         if (RTP.getInstance() != null) {
-            RTP.getInstance().regionTeleportTimes.clear();
-            RTP.getInstance().latestTeleportData.clear();
+            TeleportSessions.current().regionTeleportTimes.clear();
+            TeleportSessions.current().latestTeleportData.clear();
         }
     }
 
     @AfterEach
     void tearDown() {
         if (RTP.getInstance() != null) {
-            RTP.getInstance().regionTeleportTimes.clear();
-            RTP.getInstance().latestTeleportData.clear();
+            TeleportSessions.current().regionTeleportTimes.clear();
+            TeleportSessions.current().latestTeleportData.clear();
         }
     }
 
@@ -276,7 +277,7 @@ class RegionCooldownAndDelayTest {
         io.github.dailystruggle.rtp.common.playerData.TeleportData tpData = new io.github.dailystruggle.rtp.common.playerData.TeleportData();
         tpData.time = now - 10_000L;
         tpData.completed = true;
-        RTP.getInstance().latestTeleportData.put(playerId, tpData);
+        TeleportSessions.current().latestTeleportData.put(playerId, tpData);
 
         // Region without override checks against global last teleport: 10s < 60s -> on cooldown
         long globalCooldown = RTP.getCooldown(player, defaultRegion);

@@ -6,6 +6,7 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -57,8 +58,8 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
       Map<String, List<String>> parameterValues,
       CommandsAPICommand nextCommand,
       java.util.function.Consumer<String> messageMethod) {
-    if (RTP.serverAccessor != null && (RTP.serverAccessor.getPlatform().equalsIgnoreCase("Fabric")
-        || RTP.serverAccessor.getPlatformFamily() == io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC)) {
+    if (RTPRuntime.serverAccessor() != null && (RTPRuntime.serverAccessor().getPlatform().equalsIgnoreCase("Fabric")
+        || RTPRuntime.serverAccessor().getPlatformFamily() == io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC)) {
       msgInvalidCommand(callerId, name(), messageMethod);
       return true;
     }
@@ -70,16 +71,16 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
       UUID callerId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
 
-    if (RTP.serverAccessor != null && (RTP.serverAccessor.getPlatform().equalsIgnoreCase("Fabric")
-        || RTP.serverAccessor.getPlatformFamily() == io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC)) {
+    if (RTPRuntime.serverAccessor() != null && (RTPRuntime.serverAccessor().getPlatform().equalsIgnoreCase("Fabric")
+        || RTPRuntime.serverAccessor().getPlatformFamily() == io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC)) {
       msgInvalidCommand(callerId, name());
       return false;
     }
 
-    RTPScheduler scheduler = RTP.scheduler;
+    RTPScheduler scheduler = RTPRuntime.scheduler();
     if (scheduler == null) {
       String msg = "&c[RTP test/economy-isolation] RTP.scheduler is null; core not yet loaded";
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      RTPRuntime.serverAccessor().sendMessage(callerId, msg);
       RTP.log(Level.WARNING, msg);
       return false;
     }
@@ -157,7 +158,7 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
                 + Thread.currentThread().getName()
                 + "' &mdash; Vault call leaked onto a Region Tick Thread";
         if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-          RTP.serverAccessor.sendMessage(callerId, msg);
+          RTPRuntime.serverAccessor().sendMessage(callerId, msg);
         }
         RTP.log(Level.WARNING, msg, t);
       } else {
@@ -182,7 +183,7 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
               + PROBE_TIMEOUT_MS
               + "ms &mdash; debit never reached a scheduler tier";
       if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, msg);
+        RTPRuntime.serverAccessor().sendMessage(callerId, msg);
       }
       RTP.log(Level.WARNING, msg);
       return;
@@ -224,7 +225,7 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
               + micros
               + "us)";
       if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, msg);
+        RTPRuntime.serverAccessor().sendMessage(callerId, msg);
       }
       RTP.log(Level.WARNING, msg);
       return;
@@ -242,7 +243,7 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
               + runnerName
               + "' &mdash; expected Global Region Scheduler or Async Scheduler";
       if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, msg);
+        RTPRuntime.serverAccessor().sendMessage(callerId, msg);
       }
       RTP.log(Level.WARNING, msg);
       return;
@@ -255,7 +256,7 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
             + micros
             + "us";
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, ok);
+      RTPRuntime.serverAccessor().sendMessage(callerId, ok);
     }
     RTP.log(Level.INFO, ok);
   }
@@ -270,7 +271,7 @@ public class EconomyIsolationTestJob extends BaseRTPCmdImpl {
             + t.getMessage()
             + ")";
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      RTPRuntime.serverAccessor().sendMessage(callerId, msg);
     }
     RTP.log(Level.WARNING, msg, t);
   }

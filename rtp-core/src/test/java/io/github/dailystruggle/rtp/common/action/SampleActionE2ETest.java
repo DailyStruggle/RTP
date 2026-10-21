@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.api.group.GroupPlacementResult;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -99,12 +100,12 @@ class SampleActionE2ETest {
         accessor.addWorld(mw);
       }
     }
-    RTP.serverAccessor = accessor;
-    RTP.scheduler = accessor.getMockScheduler();
+    RTPRuntime.setServerAccessor(accessor);
+    RTPRuntime.setScheduler(accessor.getMockScheduler());
     originalGroupService = RTP.groupPlacementService;
     manager = new ActionManager();
-    // Production has one manager: subcommands resolve the caller's session through RTP.actionManager.
-    RTP.actionManager = manager;
+    // Production has one manager: subcommands resolve the caller's session through ActionServices.actionManager().
+    ActionServices.setActionManager(manager);
     io.github.dailystruggle.rtp.api.RTPAPI.actionService = manager;
 
     // Deterministic placement stub: every participant lands at a fixed safe slot.
@@ -141,7 +142,7 @@ class SampleActionE2ETest {
   @AfterEach
   void tearDown() {
     RTP.groupPlacementService = originalGroupService;
-    RTP.actionManager = null;
+    ActionServices.setActionManager(null);
   }
 
   @Test
@@ -476,23 +477,23 @@ class SampleActionE2ETest {
   void testFullPluginBootstrapCommandRegistrationLifecycle(@org.junit.jupiter.api.io.TempDir java.nio.file.Path tempDir) {
     // 1. Setup server accessor and mock directories
     RecordingServerAccessor bootAccessor = new RecordingServerAccessor(tempDir.toFile());
-    RTP.serverAccessor = bootAccessor;
-    RTP.scheduler = bootAccessor.getMockScheduler();
+    RTPRuntime.setServerAccessor(bootAccessor);
+    RTPRuntime.setScheduler(bootAccessor.getMockScheduler());
     io.github.dailystruggle.rtp.common.mock.RTPTestSetup.install(tempDir.toFile());
-    RTP.serverAccessor = bootAccessor;
+    RTPRuntime.setServerAccessor(bootAccessor);
 
-    // 2. Load actions into RTP.actionManager
-    RTP.actionManager = new io.github.dailystruggle.rtp.common.action.ActionManager();
+    // 2. Load actions into ActionServices.actionManager()
+    ActionServices.setActionManager(new io.github.dailystruggle.rtp.common.action.ActionManager());
     File actionsDir = shippedResourcesDir();
-    io.github.dailystruggle.rtp.common.action.ActionConfigLoader.loadActions(actionsDir, RTP.actionManager);
+    io.github.dailystruggle.rtp.common.action.ActionConfigLoader.loadActions(actionsDir, ActionServices.actionManager());
 
     // 3. Simulate BootstrapSupport.registerRtpAndWildCommands:
     // CoreRtpRoot is created, baseCommand is set, and registerAllCommands is invoked
-    io.github.dailystruggle.rtp.api.RTPAPI.actionService = RTP.actionManager;
+    io.github.dailystruggle.rtp.api.RTPAPI.actionService = ActionServices.actionManager();
     io.github.dailystruggle.rtp.common.commands.CoreRtpRoot root =
         new io.github.dailystruggle.rtp.common.commands.CoreRtpRoot();
     RTP.baseCommand = root;
-    RTP.actionManager.registerAllCommands();
+    ActionServices.actionManager().registerAllCommands();
 
     // 4. Verify boot registration
     Map<String, Object> bootCommands = bootAccessor.getRegisteredCommands();
@@ -510,9 +511,9 @@ class SampleActionE2ETest {
     assertTrue(actionSubCmd.getCommandLookup().containsKey("CHALLENGE"));
 
     // 5. Simulate Configs.reloadConfigs()
-    RTP.actionManager.clearDefinitions();
-    io.github.dailystruggle.rtp.common.action.ActionConfigLoader.loadActions(actionsDir, RTP.actionManager);
-    RTP.actionManager.registerAllCommands();
+    ActionServices.actionManager().clearDefinitions();
+    io.github.dailystruggle.rtp.common.action.ActionConfigLoader.loadActions(actionsDir, ActionServices.actionManager());
+    ActionServices.actionManager().registerAllCommands();
 
     // 6. Verify commands remain fully registered and operational after reload
     Map<String, Object> reloadedCommands = bootAccessor.getRegisteredCommands();

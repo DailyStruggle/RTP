@@ -3,7 +3,6 @@ package io.github.dailystruggle.rtp.common.selection.region;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
 import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.lifecycle.RegionTaskCoordinator;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -11,6 +10,7 @@ import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
+import io.github.dailystruggle.rtp.common.tasks.scan.ScanTasks;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,7 +41,7 @@ class RegionTaskDispatcherTest {
     @AfterEach
     void tearDown() {
         Region.setTaskDispatcher(installed);
-        RTP.getInstance().scanTasks.clear();
+        ScanTasks.current().clear();
     }
 
     private static RegionSettings settings(String name) {
@@ -87,11 +87,11 @@ class RegionTaskDispatcherTest {
     @DisplayName("ADR-115 RTP-68: coordinator registers no scan task when no scan progress is stored")
     void coordinatorSkipsResumeWithoutProgress() {
         Region region = new Region("no_progress", settings("no_progress"));
-        RTP.getInstance().scanTasks.clear();
+        ScanTasks.current().clear();
 
         new RegionTaskCoordinator().resumeScan(region);
 
-        assertFalse(RTP.getInstance().scanTasks.containsKey("no_progress"));
+        assertFalse(ScanTasks.current().containsKey("no_progress"));
     }
 
     @Test

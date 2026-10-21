@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
@@ -115,7 +115,7 @@ public class ReqRtpWorldFallbackRebindTest {
     void normalRegion_hydratesAtConstruction() {
         DatabaseAccessor<?> db = mock(DatabaseAccessor.class);
         doReturn(Collections.emptyList()).when(db).loadCachedLocations(anyString());
-        RTP.getInstance().databaseAccessor = db;
+        ActiveDatabase.setAccessor(db);
 
         RegionSettings settings = settings("normal_region", fallbackWorld);
         Region region = new Region("normal_region", settings);
@@ -130,7 +130,7 @@ public class ReqRtpWorldFallbackRebindTest {
     void dormantRegion_skipsHydrate() {
         DatabaseAccessor<?> db = mock(DatabaseAccessor.class);
         doReturn(Collections.emptyList()).when(db).loadCachedLocations(anyString());
-        RTP.getInstance().databaseAccessor = db;
+        ActiveDatabase.setAccessor(db);
 
         // A dormant region is constructed with a null world: there is no fallback substitute.
         RegionSettings settings = settings("dormant_region", null);
@@ -149,7 +149,7 @@ public class ReqRtpWorldFallbackRebindTest {
     void dormantRegion_executeIsNoop() {
         DatabaseAccessor<?> db = mock(DatabaseAccessor.class);
         doReturn(Collections.emptyList()).when(db).loadCachedLocations(anyString());
-        RTP.getInstance().databaseAccessor = db;
+        ActiveDatabase.setAccessor(db);
 
         RegionSettings settings = settings("dormant_exec", null);
         Region region = new Region("dormant_exec", settings, true, "test");
@@ -168,7 +168,7 @@ public class ReqRtpWorldFallbackRebindTest {
     void rebindWorld_hydratesAndClearsFallback() {
         DatabaseAccessor<?> db = mock(DatabaseAccessor.class);
         doReturn(Collections.emptyList()).when(db).loadCachedLocations(anyString());
-        RTP.getInstance().databaseAccessor = db;
+        ActiveDatabase.setAccessor(db);
 
         // Dormant initial settings: null world until WorldLoadEvent fires.
         RegionSettings initial = settings("deferred_region", null);
@@ -199,7 +199,7 @@ public class ReqRtpWorldFallbackRebindTest {
         @SuppressWarnings("unchecked")
         DatabaseAccessor<Object> db = mock(DatabaseAccessor.class);
         doReturn(Collections.emptyList()).when(db).loadCachedLocations(anyString());
-        RTP.getInstance().databaseAccessor = db;
+        ActiveDatabase.setAccessor(db);
 
         // Construct a live region bound to a real world so hydrate's getWorld().getSeed() works.
         RegionSettings s = settings("flush_region", fallbackWorld);
@@ -242,7 +242,7 @@ public class ReqRtpWorldFallbackRebindTest {
         @SuppressWarnings("unchecked")
         DatabaseAccessor<Object> db = mock(DatabaseAccessor.class);
         doReturn(Collections.emptyList()).when(db).loadCachedLocations(anyString());
-        RTP.getInstance().databaseAccessor = db;
+        ActiveDatabase.setAccessor(db);
 
         RegionSettings s = settings("stats_region", fallbackWorld);
         Region region = new Region("stats_region", s);

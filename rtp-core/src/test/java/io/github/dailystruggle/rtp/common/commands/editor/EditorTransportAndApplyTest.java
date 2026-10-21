@@ -1,9 +1,10 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.mock.MockRTPScheduler;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -181,7 +182,7 @@ class EditorTransportAndApplyTest {
     @Test
     @DisplayName("Atomic apply creates .bak backup of dirty files before writing")
     void atomicApplyCreatesDirtyFileBackup() throws IOException {
-        Path pluginPath = RTP.serverAccessor.getPluginDirectory().toPath();
+        Path pluginPath = RTPRuntime.serverAccessor().getPluginDirectory().toPath();
         Path configFile = pluginPath.resolve("config.yml");
         Files.writeString(configFile, "original: true\n");
 
@@ -204,8 +205,8 @@ class EditorTransportAndApplyTest {
     @Test
     @DisplayName("S-006: Pre-init fail-closed guards in EditorCmd and ApplyCmd")
     void preInitFailClosed() {
-        RTP.configs = null;
-        RTP.serverAccessor = null;
+        ActiveConfigs.set(null);
+        RTPRuntime.setServerAccessor(null);
 
         EditorCmd editorCmd = new EditorCmd(null);
         ApplyCmd applyCmd = new ApplyCmd(null);
@@ -301,8 +302,8 @@ class EditorTransportAndApplyTest {
         } catch (IOException ignored) {}
 
         io.github.dailystruggle.rtp.common.mock.MockRTPCommandSender sender =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPCommandSender) RTP.serverAccessor.getSender(caller);
-        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPCommandSender) RTPRuntime.serverAccessor().getSender(caller);
+        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
 
         boolean result = editorCmd.onCommand(caller, Map.of(), null);
         assertTrue(result);
@@ -424,7 +425,7 @@ class EditorTransportAndApplyTest {
     @Test
     @DisplayName("AGGRESSIVE: Local ephemeral session allows air-gap token apply without remote transport")
     void localEphemeralSessionAirGapApply() throws IOException {
-        Path pluginPath = RTP.serverAccessor.getPluginDirectory().toPath();
+        Path pluginPath = RTPRuntime.serverAccessor().getPluginDirectory().toPath();
         Path configFile = pluginPath.resolve("config.yml");
         Files.writeString(configFile, "radius: 500\n");
 
@@ -465,7 +466,7 @@ class EditorTransportAndApplyTest {
     @Test
     @DisplayName("REPRODUCER: Two-way transmission cycle (modified client payload POST and apply)")
     void twoWayTransmissionCycleWithClientModifications() throws IOException {
-        Path pluginPath = RTP.serverAccessor.getPluginDirectory().toPath();
+        Path pluginPath = RTPRuntime.serverAccessor().getPluginDirectory().toPath();
         Path configFile = pluginPath.resolve("config.yml");
         Files.writeString(configFile, "radius: 1000\n");
 
@@ -509,7 +510,7 @@ class EditorTransportAndApplyTest {
     @Test
     @DisplayName("AGGRESSIVE: Exclude hidden files and directories from collected configurations")
     void collectCurrentConfigsExcludesHiddenFilesAndDirectories() throws IOException {
-        Path pluginPath = RTP.serverAccessor.getPluginDirectory().toPath();
+        Path pluginPath = RTPRuntime.serverAccessor().getPluginDirectory().toPath();
 
         // Create normal config file
         Path normalConfig = pluginPath.resolve("regions").resolve("survival.yml");
@@ -558,7 +559,7 @@ class EditorTransportAndApplyTest {
         assertTrue(payloadJson.contains("\"queueDepth\":"), "Telemetry must contain queueDepth");
 
         // Validate standalone HTML export embeds region profiles and live telemetry
-        Path targetHtml = RTP.serverAccessor.getPluginDirectory().toPath().resolve("editor").resolve("index.html");
+        Path targetHtml = RTPRuntime.serverAccessor().getPluginDirectory().toPath().resolve("editor").resolve("index.html");
         manager.exportLocalEditorHtml(targetHtml, manager.collectCurrentConfigs());
         assertTrue(Files.exists(targetHtml));
 
@@ -584,7 +585,7 @@ class EditorTransportAndApplyTest {
     @Test
     @DisplayName("AGGRESSIVE: Local offline file-drop token apply via apply.json or <token>.json")
     void localFileDropApplySucceedsWithoutNetwork() throws IOException {
-        Path pluginPath = RTP.serverAccessor.getPluginDirectory().toPath();
+        Path pluginPath = RTPRuntime.serverAccessor().getPluginDirectory().toPath();
         Path editorDir = pluginPath.resolve("editor");
         Files.createDirectories(editorDir);
 
@@ -611,7 +612,7 @@ class EditorTransportAndApplyTest {
     @Test
     @DisplayName("S-005: offline drop lookup and read run on the async pool, not the calling main thread")
     void offlineDropReadRunsOffMainThread() throws Exception {
-        Path pluginPath = RTP.serverAccessor.getPluginDirectory().toPath();
+        Path pluginPath = RTPRuntime.serverAccessor().getPluginDirectory().toPath();
         Path editorDir = pluginPath.resolve("editor");
         Files.createDirectories(editorDir);
         Path configFile = pluginPath.resolve("config.yml");
@@ -619,16 +620,16 @@ class EditorTransportAndApplyTest {
         String dropPayload = EditorSessionManager.getInstance().createPayloadJson(Map.of("config.yml", "radius: 7777\n"));
         Files.writeString(editorDir.resolve("apply.json"), dropPayload);
 
-        MockRTPScheduler scheduler = ((MockRTPServerAccessor) RTP.serverAccessor).getMockScheduler().enableServerThreads();
+        MockRTPScheduler scheduler = ((MockRTPServerAccessor) RTPRuntime.serverAccessor()).getMockScheduler().enableServerThreads();
         // The drop lookup is the pipeline's first plugin-directory access; record the lane of every access
         List<Optional<MockRTPScheduler.Lane>> lanes = new CopyOnWriteArrayList<>();
-        RTP.serverAccessor = new MockRTPServerAccessor(pluginPath.toFile()) {
+        RTPRuntime.setServerAccessor(new MockRTPServerAccessor(pluginPath.toFile()) {
             @Override
             public File getPluginDirectory() {
                 lanes.add(Optional.ofNullable(scheduler.currentLane()));
                 return super.getPluginDirectory();
             }
-        };
+        });
         try {
             HttpClient errorClient = new MockErrorHttpClient(500, "Should not hit bytebin for local file drop");
             ApplyCmd applyCmd = new ApplyCmd(null, new EditorHttpTransport(errorClient, "https://mock.bytebin", "https://editor.rtp"));
@@ -662,7 +663,7 @@ class EditorTransportAndApplyTest {
         io.github.dailystruggle.commandsapi.common.CommandsAPI.execute();
         assertTrue(applyFuture.join());
 
-        io.github.dailystruggle.rtp.api.entity.RTPCommandSender sender = RTP.serverAccessor.getSender(caller);
+        io.github.dailystruggle.rtp.api.entity.RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(caller);
         assertNotNull(sender);
         io.github.dailystruggle.rtp.common.mock.MockRTPCommandSender mockSender =
                 (io.github.dailystruggle.rtp.common.mock.MockRTPCommandSender) sender;

@@ -2,12 +2,14 @@ package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.network.NetworkHooks;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -40,11 +42,11 @@ public class RegionPipelineTest {
     void setUp() throws Exception {
         accessor = RTPTestSetup.install(tempDir.toFile());
         accessor.setLocationGenerator(new LocationGenerator());
-        RTP.lobbyMode = false;
+        NetworkHooks.setLobbyMode(false);
         @SuppressWarnings("unchecked")
         io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
                 (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
-                        RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
+                        ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
         if (perf != null) {
             perf.set(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.maxHeapPercent, 0.0);
         }
@@ -130,7 +132,7 @@ public class RegionPipelineTest {
 
         region.execute(Long.MAX_VALUE);
         // Tick-thread chunk callbacks queue verify on the budgeted sync pipe; drain it.
-        RTP.getInstance().miscSyncTasks.execute(Long.MAX_VALUE);
+        MiscTasks.sync().execute(Long.MAX_VALUE);
 
         assertFalse(region.queueManager.keptLocations.isEmpty(),
                 "execute() must promote the unkept location to keptLocations");
@@ -154,7 +156,7 @@ public class RegionPipelineTest {
         region.queueManager.unkeptLocations.offer(new RTPLocation(midairCoords, 1L, null));
 
         region.execute(Long.MAX_VALUE);
-        RTP.getInstance().miscSyncTasks.execute(Long.MAX_VALUE);
+        MiscTasks.sync().execute(Long.MAX_VALUE);
 
         assertFalse(region.queueManager.keptLocations.isEmpty(),
                 "promotion must succeed when ground exists in the vert window");

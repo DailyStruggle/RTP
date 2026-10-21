@@ -4,7 +4,9 @@ import io.github.dailystruggle.effectsapi.common.EffectFactory;
 import io.github.dailystruggle.effectsapi.common.EffectsGroupKeys;
 import io.github.dailystruggle.rtp.api.addon.RTPAddon;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.io.InputStream;
 import java.util.logging.Level;
@@ -63,8 +65,8 @@ public final class RTPRiftAddon implements RTPAddon {
    */
   private void seedDemoGroup() {
     try {
-      if (RTP.serverAccessor == null || RTP.configs == null) return;
-      Object raw = RTP.configs.multiConfigParserMap.get(EffectsGroupKeys.class);
+      if (RTPRuntime.serverAccessor() == null || ActiveConfigs.get() == null) return;
+      Object raw = ActiveConfigs.get().multiConfigParserMap.get(EffectsGroupKeys.class);
       if (!(raw instanceof MultiConfigParser)) return;
       @SuppressWarnings("unchecked")
       MultiConfigParser<EffectsGroupKeys> effectsGroups = (MultiConfigParser<EffectsGroupKeys>) raw;

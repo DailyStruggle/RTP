@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.guiaddon.common;
 import io.github.dailystruggle.rtp.api.server.PlatformFamily;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -53,7 +54,7 @@ public final class GuiRenderers {
    * <p>The decision is delegated entirely to the general RTP API
    * ({@link RTPServerAccessor#isCompatible(PlatformFamily, int, int)}) - this addon does
    * not perform its own platform probing or version parsing. When core is not yet loaded
-   * ({@code RTP.serverAccessor == null}) the compatibility cannot be confirmed and the
+   * ({@code RTPRuntime.serverAccessor() == null}) the compatibility cannot be confirmed and the
    * renderer is skipped rather than registered blindly.
    *
    * @param renderer the renderer to register; ignored when {@code null}
@@ -72,7 +73,7 @@ public final class GuiRenderers {
     if (renderer == null) {
       return false;
     }
-    RTPServerAccessor accessor = RTP.serverAccessor;
+    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
     if (accessor == null) {
       RTP.log(
           Level.FINE,

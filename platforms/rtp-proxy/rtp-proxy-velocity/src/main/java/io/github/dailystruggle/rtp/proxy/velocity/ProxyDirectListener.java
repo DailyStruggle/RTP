@@ -53,7 +53,7 @@ import java.util.regex.Pattern;
  * actually populate.</p>
  *
  * <p>Raw {@link ServerSocket} + thread pool are used deliberately: this is a
- * proxy JVM, which has no {@code RTP.scheduler} and is an explicit carve-out
+ * proxy JVM, which has no {@code RTPRuntime.scheduler()} and is an explicit carve-out
  * from the backend "no raw threads" rule (transport bindings own their own
  * executors on the proxy by design - see {@code .junie/AGENTS.md} "Scheduler
  * Usage"). Each RPC handler may block on the transport/queue future on its own

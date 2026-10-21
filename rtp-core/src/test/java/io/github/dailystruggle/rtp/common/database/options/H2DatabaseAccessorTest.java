@@ -13,12 +13,12 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Tests for H2DatabaseAccessor using an in-memory H2 database.
  *
- * A package-private subclass bypasses the RTP.serverAccessor dependency in the
+ * A package-private subclass bypasses the RTPRuntime.serverAccessor() dependency in the
  * default constructor by accepting a JDBC URL directly.
  */
 class H2DatabaseAccessorTest {
 
-    /** Testable subclass that accepts a URL instead of calling RTP.serverAccessor */
+    /** Testable subclass that accepts a URL instead of calling RTPRuntime.serverAccessor() */
     static class TestableH2Accessor extends AbstractSQLDatabaseAccessor {
         private final String url;
         private Connection connection;

@@ -6,10 +6,13 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.action.ActionCacheWarmTask;
 import io.github.dailystruggle.rtp.common.action.ActionConfigLoader;
 import io.github.dailystruggle.rtp.common.action.ActionManager;
+import io.github.dailystruggle.rtp.common.action.ActionServices;
 import io.github.dailystruggle.rtp.common.commands.action.ActionSubCmd;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.util.logging.Level;
 
@@ -36,7 +39,7 @@ public final class RTPActionAddon implements RTPAddon {
     RTP.log(Level.INFO, "[LeafRTPActionAddon] Initializing declarative action subsystem (ADR-093)...");
 
     actionManager = new ActionManager();
-    RTP.actionManager = actionManager;
+    ActionServices.setActionManager(actionManager);
     RTPAPI.actionService = actionManager;
 
     // Load definitions
@@ -58,10 +61,10 @@ public final class RTPActionAddon implements RTPAddon {
 
     // Start background pre-warming task (ADR-097)
     cacheWarmTask = new ActionCacheWarmTask(actionManager);
-    RTP.actionCacheWarmTask = cacheWarmTask;
-    if (RTP.scheduler != null) {
+    ActionServices.setCacheWarmTask(cacheWarmTask);
+    if (RTPRuntime.scheduler() != null) {
       // Periodic pre-warm task every 5 seconds (100 ticks)
-      RTP.scheduler.runTaskTimerAsynchronously(cacheWarmTask, 100L, 100L);
+      RTPRuntime.scheduler().runTaskTimerAsynchronously(cacheWarmTask, 100L, 100L);
     }
 
     RTP.log(Level.INFO, "[LeafRTPActionAddon] Subsystem loaded with " + actionManager.getActionIds().size() + " action definitions.");
@@ -69,9 +72,9 @@ public final class RTPActionAddon implements RTPAddon {
 
   private void loadActionConfigurations() {
     try {
-      File pluginDir = RTP.serverAccessor.getPluginDirectory();
+      File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
       String locale = "en";
-      if (RTP.configs != null) {
+      if (ActiveConfigs.get() != null) {
         MultiConfigParser<ActionKeys> actionsParser =
             new MultiConfigParser<>(
                 ActionKeys.class,
@@ -81,7 +84,7 @@ public final class RTPActionAddon implements RTPAddon {
                 RTPActionAddon.class.getClassLoader(),
                 "definitions/actions",
                 locale);
-        RTP.configs.putParser(actionsParser);
+        ActiveConfigs.get().putParser(actionsParser);
         actionManager.clearDefinitions();
         ActionConfigLoader.loadActions(actionsParser, actionManager);
       } else {
@@ -109,14 +112,14 @@ public final class RTPActionAddon implements RTPAddon {
       RTP.baseCommand.getCommandLookup().remove("TRIGGER");
     }
 
-    if (RTP.actionManager == actionManager) {
-      RTP.actionManager = null;
+    if (ActionServices.actionManager() == actionManager) {
+      ActionServices.setActionManager(null);
     }
     if (RTPAPI.actionService == actionManager) {
       RTPAPI.actionService = null;
     }
-    if (RTP.actionCacheWarmTask == cacheWarmTask) {
-      RTP.actionCacheWarmTask = null;
+    if (ActionServices.cacheWarmTask() == cacheWarmTask) {
+      ActionServices.setCacheWarmTask(null);
     }
 
     actionManager = null;

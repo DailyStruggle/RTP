@@ -2,10 +2,10 @@ package io.github.dailystruggle.rtp.common.commands;
 
 import io.github.dailystruggle.rtp.common.commands.base.RTPCommandEvents;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -31,7 +31,7 @@ class CoreRtpRootTest {
     @BeforeEach
     void setUp() {
         accessor = RTPTestSetup.install(tempDir);
-        RTP.selectionAPI = new SelectionAPI();
+        ActiveSelection.set(new SelectionAPI());
     }
 
     @Test

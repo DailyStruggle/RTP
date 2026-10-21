@@ -268,8 +268,8 @@ class SQLiteDatabaseAccessorTest {
     @AfterEach
     void tearDown() {
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
-        io.github.dailystruggle.rtp.common.RTP.serverAccessor = null;
-        io.github.dailystruggle.rtp.common.RTP.scheduler = null;
+        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(null);
+        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setScheduler(null);
     }
 
     // -------------------------------------------------------------------------

@@ -12,6 +12,8 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.GroupPlacementDispatcher;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
@@ -45,7 +47,7 @@ class ActionCacheWarmTaskTest {
   @BeforeEach
   void setUp() {
     serverAccessor = new MockRTPServerAccessor(new File("."));
-    RTP.serverAccessor = serverAccessor;
+    RTPRuntime.setServerAccessor(serverAccessor);
     originalGroupService = RTP.groupPlacementService;
     actionManager = new ActionManager();
     warmTask = new ActionCacheWarmTask(actionManager);
@@ -198,7 +200,7 @@ class ActionCacheWarmTaskTest {
       return new io.github.dailystruggle.rtp.common.selection.region.RTPLocation(
           new RTPCoords("world", x, 64, z), 1);
     });
-    RTP.selectionAPI.permRegionLookup.put("default", mockRegion);
+    ActiveSelection.get().permRegionLookup.put("default", mockRegion);
 
     AtomicBoolean firstReservationClosed = new AtomicBoolean(false);
     AtomicBoolean secondReservationClosed = new AtomicBoolean(false);
@@ -236,7 +238,7 @@ class ActionCacheWarmTaskTest {
     Mockito.verify(mockShape).addBadChunk(any(long.class), any());
 
     actionManager.disarm(result.sessionId());
-    RTP.selectionAPI.permRegionLookup.remove("default");
+    ActiveSelection.get().permRegionLookup.remove("default");
   }
 
   @Test
@@ -282,7 +284,7 @@ class ActionCacheWarmTaskTest {
     // 1. Landmark action with memoryRegion specified
     Region customRegion = mock(Region.class);
     customRegion.name = "custom_region";
-    RTP.selectionAPI.permRegionLookup.put("custom_region", customRegion);
+    ActiveSelection.get().permRegionLookup.put("custom_region", customRegion);
 
     ActionDefinition.PlacementSpec landmarkSpec =
         new ActionDefinition.PlacementSpec(
@@ -324,6 +326,6 @@ class ActionCacheWarmTaskTest {
     assertEquals(600, capturedAnchorZ.get());
 
     actionManager.disarm(res.sessionId());
-    RTP.selectionAPI.permRegionLookup.remove("custom_region");
+    ActiveSelection.get().permRegionLookup.remove("custom_region");
   }
 }

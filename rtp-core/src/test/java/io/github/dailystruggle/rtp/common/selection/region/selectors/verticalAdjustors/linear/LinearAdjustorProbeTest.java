@@ -1,5 +1,9 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear;
 
+import org.junit.jupiter.api.DisplayName;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
+import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.ProbeBackedMockChunk;
+import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -391,5 +395,69 @@ public class LinearAdjustorProbeTest {
         io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors
             .VerticalAdjustor.ProbeRejectReason.NONE,
         r.reason());
+  }
+
+  /** REQ-RTP-F-015 / ADR-016: live and probe paths pick the same spot with the slope check on. */
+  @Test
+  @DisplayName("REQ-RTP-F-015: live and probe slope verdicts match for the same blocks")
+  void slopeCheck_liveProbeParity() {
+    MockRTPWorld world = new MockRTPWorld("parity_world");
+    java.util.List<FakeChunkColumnProbe> layouts = new java.util.ArrayList<>();
+
+    FakeChunkColumnProbe flat = new FakeChunkColumnProbe(1, 2, 0, 255);
+    flat.setSolidRange(0, 63);
+    flat.setAirRange(64, 255);
+    layouts.add(flat);
+
+    FakeChunkColumnProbe ledge = new FakeChunkColumnProbe(1, 2, 0, 255);
+    ledge.setSolidRange(0, 63);
+    ledge.setAirRange(64, 255);
+    for (int y = 64; y <= 69; y++) ledge.setColumnSolid(9, 7, y);
+    layouts.add(ledge);
+
+    FakeChunkColumnProbe cliff = new FakeChunkColumnProbe(1, 2, 0, 255);
+    cliff.setSolidRange(0, 63);
+    cliff.setAirRange(64, 255);
+    for (int y = 0; y <= 63; y++) cliff.setColumnAir(5, 7, y);
+    for (int y = 0; y <= 63; y++) cliff.setColumnAir(4, 2, y);
+    layouts.add(cliff);
+
+    for (FakeChunkColumnProbe probe : layouts) {
+      for (int dir = 0; dir <= 3; dir++) {
+        for (int maxSlope : new int[] {-1, 0, 2, 6}) {
+          LinearAdjustor a = adj(dir, 60, 80);
+          a.set(GenericVerticalAdjustorKeys.maxSlope, maxSlope);
+          RTPCoords probePick = a.adjustFromProbe(probe, "parity_world");
+          RTPCoords livePick = a.adjust(new ProbeBackedMockChunk(probe, world));
+          String ctx = "dir=" + dir + " maxSlope=" + maxSlope;
+          if (livePick == null) {
+            assertNull(probePick, ctx);
+          } else {
+            assertNotNull(probePick, ctx);
+            assertEquals(livePick.x(), probePick.x(), ctx);
+            assertEquals(livePick.y(), probePick.y(), ctx);
+            assertEquals(livePick.z(), probePick.z(), ctx);
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  @DisplayName("REQ-RTP-F-015: probe path reports SCAN_MISS when every column is too steep")
+  void slopeCheck_allSteepIsScanMiss() {
+    FakeChunkColumnProbe probe = new FakeChunkColumnProbe(0, 0, 0, 128);
+    probe.setSolidRange(0, 63);
+    probe.setAirRange(64, 128);
+    // Wall two blocks east of every stencil column.
+    int[][] stencil = {{7, 7}, {2, 2}, {12, 12}, {2, 12}, {12, 2}};
+    for (int[] c : stencil) {
+      for (int y = 64; y <= 70; y++) probe.setColumnSolid(c[0] + 2, c[1], y);
+    }
+    LinearAdjustor a = adj(0, 60, 80);
+    a.set(GenericVerticalAdjustorKeys.maxSlope, 3);
+    VerticalAdjustor.AdjustResult r = a.adjustFromProbeWithReason(probe, "world");
+    assertNull(r.picked());
+    assertEquals(VerticalAdjustor.ProbeRejectReason.SCAN_MISS, r.reason());
   }
 }

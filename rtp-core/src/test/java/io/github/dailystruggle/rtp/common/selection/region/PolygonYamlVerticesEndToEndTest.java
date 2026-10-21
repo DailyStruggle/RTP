@@ -1,10 +1,12 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Polygon;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import org.junit.jupiter.api.AfterEach;
@@ -42,23 +44,23 @@ public class PolygonYamlVerticesEndToEndTest {
   static void setupServer() {
     MockRTPServerAccessor accessor =
         new MockRTPServerAccessor(new java.io.File("target/test-data"));
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
   }
 
   @BeforeEach
   void registerPolygon() {
-    previousShapeFactory = RTP.factoryMap.get(RTP.factoryNames.shape);
+    previousShapeFactory = FactoryRegistry.get(FactoryNames.shape);
     Factory<Shape<?>> shapeFactory = new Factory<>();
     shapeFactory.add("POLYGON", new Polygon());
-    RTP.factoryMap.put(RTP.factoryNames.shape, shapeFactory);
+    FactoryRegistry.map().put(FactoryNames.shape, shapeFactory);
   }
 
   @AfterEach
   @SuppressWarnings({"unchecked", "rawtypes"})
   void restoreFactory() {
     if (previousShapeFactory != null) {
-      RTP.factoryMap.put(RTP.factoryNames.shape, (Factory) previousShapeFactory);
+      FactoryRegistry.map().put(FactoryNames.shape, (Factory) previousShapeFactory);
     }
   }
 

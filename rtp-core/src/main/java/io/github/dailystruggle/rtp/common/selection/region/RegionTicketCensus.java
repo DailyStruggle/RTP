@@ -2,8 +2,9 @@ package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.tools.TicketCensusRegion;
 
 import java.util.ArrayList;
@@ -26,17 +27,17 @@ public final class RegionTicketCensus implements TicketCensusRegion {
     }
 
     /**
-     * Views of every permanent and temporary region; empty before {@code RTP.selectionAPI} exists.
+     * Views of every permanent and temporary region; empty before {@code ActiveSelection.get()} exists.
      */
     public static List<TicketCensusRegion> allRegions() {
         List<TicketCensusRegion> out = new ArrayList<>();
-        if (RTP.selectionAPI == null) {
+        if (ActiveSelection.get() == null) {
             return out;
         }
-        for (Region r : RTP.selectionAPI.permRegionLookup.values()) {
+        for (Region r : ActiveSelection.get().permRegionLookup.values()) {
             out.add(new RegionTicketCensus(r));
         }
-        for (Region r : RTP.selectionAPI.tempRegions.values()) {
+        for (Region r : ActiveSelection.get().tempRegions.values()) {
             out.add(new RegionTicketCensus(r));
         }
         return out;
@@ -125,11 +126,11 @@ public final class RegionTicketCensus implements TicketCensusRegion {
                 if (loc != null && loc.coords() != null) out.add(loc.coords().getChunkKey());
             }
         }
-        RTP rtp = RTP.getInstance();
-        if (rtp == null) {
+        TeleportSessions sessions = TeleportSessions.current();
+        if (sessions == null) {
             return;
         }
-        Collection<TeleportData> pipelines = rtp.latestTeleportData.values();
+        Collection<TeleportData> pipelines = TeleportSessions.current().latestTeleportData.values();
         for (TeleportData data : pipelines) {
             if (data != null && data.selectedCoords != null && !data.completed && data.targetRegion == region) {
                 out.add(data.selectedCoords.getChunkKey());

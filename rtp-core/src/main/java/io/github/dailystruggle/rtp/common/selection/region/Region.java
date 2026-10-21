@@ -11,15 +11,22 @@ import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.network.NetworkHooks;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.predict.BudgetPacer;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
@@ -27,6 +34,7 @@ import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import io.github.dailystruggle.rtp.common.selection.model.BiomeNames;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -161,8 +169,8 @@ public class Region extends FactoryValue<RegionKeys> {
     // backlogLocations when backlogCacheCap > 0 (ADR-028).
     this.queueManager = new RegionQueueManager(this);
     this.set(RegionKeys.spatialResolution, settings.spatialResolution());
-    this.cachePipeline = (RTPTaskPipe) RTP.serverAccessor.createCachePipe();
-    this.miscPipeline = (RTPTaskPipe) RTP.serverAccessor.createTaskPipe();
+    this.cachePipeline = (RTPTaskPipe) RTPRuntime.serverAccessor().createCachePipe();
+    this.miscPipeline = (RTPTaskPipe) RTPRuntime.serverAccessor().createTaskPipe();
 
     this.shape = settings.shape();
     VerticalAdjustor<?> vert = settings.vert();
@@ -176,10 +184,10 @@ public class Region extends FactoryValue<RegionKeys> {
     boolean shapeRecovered = false;
     boolean vertRecovered = false;
     if (this.shape == null) {
-      Factory<Shape<?>> sf = (RTP.selectionAPI != null) ? RTP.selectionAPI.getShapeFactory() : null;
-      if (sf == null && RTP.factoryMap != null) {
+      Factory<Shape<?>> sf = (ActiveSelection.get() != null) ? ActiveSelection.get().getShapeFactory() : null;
+      if (sf == null && FactoryRegistry.map() != null) {
         @SuppressWarnings("unchecked")
-        Factory<Shape<?>> casted = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+        Factory<Shape<?>> casted = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
         sf = casted;
       }
       if (sf != null) {
@@ -188,14 +196,14 @@ public class Region extends FactoryValue<RegionKeys> {
       if (this.shape == null) {
         this.shape = new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square();
       }
-      RTP.log(Level.WARNING, "Shape for region " + name + " was invalid. Falling back to SQUARE.");
+      RTPRuntime.log(Level.WARNING, "Shape for region " + name + " was invalid. Falling back to SQUARE.");
       shapeRecovered = true;
     }
     if (vert == null) {
       Factory<VerticalAdjustor<?>> vf = null;
-      if (RTP.factoryMap != null) {
+      if (FactoryRegistry.map() != null) {
         @SuppressWarnings("unchecked")
-        Factory<VerticalAdjustor<?>> casted = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
+        Factory<VerticalAdjustor<?>> casted = (Factory<VerticalAdjustor<?>>) FactoryRegistry.get(FactoryNames.vert);
         vf = casted;
       }
       if (vf != null) {
@@ -204,7 +212,7 @@ public class Region extends FactoryValue<RegionKeys> {
       if (vert == null) {
         vert = new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(new ArrayList<>());
       }
-      RTP.log(Level.WARNING, "Vert for region " + name + " was invalid. Falling back to LINEAR.");
+      RTPRuntime.log(Level.WARNING, "Vert for region " + name + " was invalid. Falling back to LINEAR.");
       vertRecovered = true;
     }
     if (shapeRecovered || vertRecovered) {
@@ -236,7 +244,7 @@ public class Region extends FactoryValue<RegionKeys> {
     // the DB hydrate entirely; both are pure waste on a lobby. Region objects
     // are still constructed so /rtp info, config menus, and tab-completion
     // keep working.
-    if (RTP.lobbyMode) {
+    if (NetworkHooks.lobbyMode()) {
       return;
     }
 
@@ -251,7 +259,7 @@ public class Region extends FactoryValue<RegionKeys> {
     // Hydrate locations from database asynchronously. Skip for fallback-bound regions
     // until rebindWorld() is called.
     if (!this.worldFallbackBound) {
-      RTP.scheduler.runTaskAsynchronously(this::hydrateFromDatabaseIfAvailable);
+      RTPRuntime.scheduler().runTaskAsynchronously(this::hydrateFromDatabaseIfAvailable);
     }
   }
 
@@ -260,16 +268,16 @@ public class Region extends FactoryValue<RegionKeys> {
    * local queues.
    */
   private void hydrateFromDatabaseIfAvailable() {
-    if (RTP.getInstance().databaseAccessor == null) return;
+    if (ActiveDatabase.accessor() == null) return;
     List<DatabaseAccessor.StoredLocation> storedLocations =
-        RTP.getInstance().databaseAccessor.loadCachedLocations(name);
+        ActiveDatabase.accessor().loadCachedLocations(name);
     if (storedLocations.isEmpty()) return;
     hydrateCacheFromDatabase(storedLocations);
-    String msg = RTP.configs.getConfigValue(SystemMessages.locationLoaded, "").toString();
+    String msg = ActiveConfigs.get().getConfigValue(SystemMessages.locationLoaded, "").toString();
     if (!msg.isEmpty()) {
       msg = msg.replace("[amount]", String.valueOf(storedLocations.size()));
       msg = msg.replace("[region]", name);
-      RTP.log(Level.INFO, msg);
+      RTPRuntime.log(Level.INFO, msg);
     }
   }
 
@@ -302,7 +310,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
     // Lobby backends skip local region processing - no scan-task
     // bootstrap, no DB hydrate. Same rationale as the constructor gate above.
-    if (RTP.lobbyMode) {
+    if (NetworkHooks.lobbyMode()) {
       return;
     }
 
@@ -314,7 +322,7 @@ public class Region extends FactoryValue<RegionKeys> {
     }
 
     // See note in the constructor: hydration is async to keep DB I/O off the calling thread.
-    RTP.scheduler.runTaskAsynchronously(this::hydrateFromDatabaseIfAvailable);
+    RTPRuntime.scheduler().runTaskAsynchronously(this::hydrateFromDatabaseIfAvailable);
   }
 
   public RegionSettings getSettings() {
@@ -368,28 +376,28 @@ public class Region extends FactoryValue<RegionKeys> {
       RTPWorld<?> world = getWorld();
       if (world != null) {
         try {
-          java.io.File pluginDir = RTP.serverAccessor.getPluginDirectory();
+          java.io.File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
           java.io.File regionDataDir = new java.io.File(pluginDir,
               "database" + java.io.File.separator + "regionData");
           // Stale .bin under the old key. The new shape is a fresh MemoryShape; nothing
           // currently references the old file, so deleting it is safe.
           java.io.File staleBin = new java.io.File(regionDataDir, name + "_" + oldCacheKey + ".bin");
           if (staleBin.exists() && !staleBin.delete()) {
-            RTP.log(Level.WARNING, "[Region:" + name + "] could not delete stale shape cache "
+            RTPRuntime.log(Level.WARNING, "[Region:" + name + "] could not delete stale shape cache "
                 + staleBin.getName() + " after config change");
           }
           // Stale .scan progress under the old key.
           java.io.File staleScan = new java.io.File(regionDataDir, name + "_" + oldCacheKey + ".scan");
           if (staleScan.exists() && !staleScan.delete()) {
-            RTP.log(Level.WARNING, "[Region:" + name + "] could not delete stale scan progress "
+            RTPRuntime.log(Level.WARNING, "[Region:" + name + "] could not delete stale scan progress "
                 + staleScan.getName() + " after config change");
           }
         } catch (RuntimeException e) {
-          RTP.log(Level.WARNING, "[Region:" + name + "] failed to clean stale cache files: "
+          RTPRuntime.log(Level.WARNING, "[Region:" + name + "] failed to clean stale cache files: "
               + e.getMessage(), e);
         }
       }
-      RTP.log(Level.INFO, "[Region:" + name + "] cache key changed (" + oldCacheKey
+      RTPRuntime.log(Level.INFO, "[Region:" + name + "] cache key changed (" + oldCacheKey
           + " -> " + newCacheKey + "); shape data invalidated, fresh scan required.");
       if (this.queueManager != null) {
         this.queueManager.purgeOutsideBounds();
@@ -434,7 +442,7 @@ public class Region extends FactoryValue<RegionKeys> {
     this.queueManager.keptLocations.setCallbacks(null, null);
     this.queueManager.unkeptLocations.setCallbacks(null, null);
     try {
-      DatabaseAccessor db = RTP.getInstance().databaseAccessor;
+      DatabaseAccessor db = ActiveDatabase.accessor();
       for (DatabaseAccessor.StoredLocation stored : storedLocations) {
         if ((stored.getSeed() != 0L && stored.getSeed() != currentCacheKey)
             || (getShape() != null && !getShape().contains(stored.getX() >> 4, stored.getZ() >> 4))) {
@@ -474,7 +482,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
       if (rtpChunk == null) {
         // Transient null: returned to unkept queue for retry.
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
             "[RTP][PROMOTE_DIAG] region=" + name + " cold=(" + (coords != null ? coords.x() : ((cx << 4) + lx)) + ","
                 + chosenY + "," + (coords != null ? coords.z() : ((cz << 4) + lz)) + ") chunk=(" + cx + "," + cz
                 + ") col=(" + lx + "," + lz + ")"
@@ -515,14 +523,14 @@ public class Region extends FactoryValue<RegionKeys> {
         airAt = rtpChunk.isAir(lx, chosenY, lz);
         airAbove = rtpChunk.isAir(lx, chosenY + 1, lz);
       } catch (IllegalArgumentException yOutOfRange) {
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
             "[RTP][PROMOTE_DIAG] region=" + name + " chunk=(" + cx + "," + cz
                 + ") col=(" + lx + "," + lz + ") chosenY=" + chosenY
                 + " DROPPED vert.adjust=null; chosen Y is out of range: "
                 + yOutOfRange.getMessage());
         return;
       } catch (Throwable t) {
-        RTP.log(Level.INFO,
+        RTPRuntime.log(Level.INFO,
             "[RTP][PROMOTE_DIAG] region=" + name + " chunk=(" + cx + "," + cz
                 + ") col=(" + lx + "," + lz + ") chosenY=" + chosenY
                 + " DROPPED vert.adjust=null but isAir read THREW "
@@ -538,7 +546,7 @@ public class Region extends FactoryValue<RegionKeys> {
         // best-effort
       }
 
-      RTP.log(Level.FINE,
+      RTPRuntime.log(Level.FINE,
           "[RTP][PROMOTE_DIAG] region=" + name + " chunk=(" + cx + "," + cz
               + ") cold=(" + (coords != null ? coords.x() : ((cx << 4) + lx)) + ","
               + chosenY + "," + (coords != null ? coords.z() : ((cz << 4) + lz)) + ")"
@@ -555,7 +563,7 @@ public class Region extends FactoryValue<RegionKeys> {
               + " (live+generated -> vertical adjustor found no safe standing column;"
               + " anvilBacked or columnSurfaceY==all-air -> ungenerated/empty chunk).");
     } catch (Throwable diagEx) {
-      RTP.log(Level.INFO,
+      RTPRuntime.log(Level.INFO,
           "[RTP][PROMOTE_DIAG] diagnostic itself failed for region=" + name
               + " chunk=(" + cx + "," + cz + "): "
               + diagEx.getClass().getSimpleName() + ": " + diagEx.getMessage());
@@ -584,7 +592,7 @@ public class Region extends FactoryValue<RegionKeys> {
       shed++;
     }
     if (shed > 0) {
-      RTP.log(Level.FINE,
+      RTPRuntime.log(Level.FINE,
           "[Region:" + name + "] shed " + shed + " hot chunk ticket(s) under heap pressure; kept="
               + queueManager.keptLocations.size());
     }
@@ -620,7 +628,7 @@ public class Region extends FactoryValue<RegionKeys> {
         if (!resident) {
           reservation.close();
           queueManager.unkeptLocations.offer(coldLoc);
-          RTP.log(Level.FINE,
+          RTPRuntime.log(Level.FINE,
               "[Region:" + name + "] kept promotion chunk=(" + cx + "," + cz + ") not resident ("
                   + (ex != null ? ex.getClass().getSimpleName() : "unloaded")
                   + "); returned to unkept");
@@ -628,24 +636,24 @@ public class Region extends FactoryValue<RegionKeys> {
         }
         boolean added = queueManager.keptLocations.offer(
             new RTPLocation(resolved, coldLoc.attempts(), reservation));
-        RTP.log(Level.FINER,
+        RTPRuntime.log(Level.FINER,
             "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
                 + ") keptLocations.offer added=" + added
                 + " keptSize=" + queueManager.keptLocations.size());
         if (!added) {
           reservation.close();
           queueManager.unkeptLocations.offer(coldLoc);
-          RTP.log(Level.FINE,
+          RTPRuntime.log(Level.FINE,
               "[Region:" + name + "] PushQueue rejected (cache full); returned to unkept");
         } else {
           // Diagram 02 (PushQueue): cache successfully grew.
-          RTP.log(Level.FINE,
+          RTPRuntime.log(Level.FINE,
               "[Region:" + name + "] PushQueue: kept-cache size="
                   + queueManager.keptLocations.size());
         }
       } catch (Throwable t) {
         reservation.close();
-        RTP.log(Level.WARNING, "[Region:" + name + "] kept promotion failed: " + t, t);
+        RTPRuntime.log(Level.WARNING, "[Region:" + name + "] kept promotion failed: " + t, t);
       } finally {
         pendingKeptPromotions.decrementAndGet();
       }
@@ -676,18 +684,18 @@ public class Region extends FactoryValue<RegionKeys> {
     RTPWorld<?> world = getWorld();
     if (world == null) return CompletableFuture.completedFuture(FailTypes.nullChunk);
 
-    Object border = RTP.serverAccessor.getWorldBorder(world.name());
+    Object border = RTPRuntime.serverAccessor().getWorldBorder(world.name());
     if (border instanceof io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder wb
         && !wb.isInside().apply(new io.github.dailystruggle.rtp.api.world.RTPLocation(
             world, resolved.x(), resolved.y(), resolved.z()))) {
       return CompletableFuture.completedFuture(FailTypes.worldBorder);
     }
 
-    Object wl = RTP.configs.getConfigValue(
+    Object wl = ActiveConfigs.get().getConfigValue(
         io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys.biomeWhitelist, false);
     boolean whitelist = (wl instanceof Boolean b) ? b : Boolean.parseBoolean(String.valueOf(wl));
     Set<String> biomes = new HashSet<>();
-    if (RTP.configs.getConfigValue(
+    if (ActiveConfigs.get().getConfigValue(
         io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys.biomes, null) instanceof List<?> list) {
       for (Object o : list) if (o != null) biomes.add(o.toString().toUpperCase());
     }
@@ -701,12 +709,12 @@ public class Region extends FactoryValue<RegionKeys> {
     @SuppressWarnings("unchecked")
     io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys> safety =
         (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys>)
-            RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.class);
+            ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.class);
     if (safety != null) {
       safe = Math.max(0, safety.getNumber(
           io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys.safetyRadius, 0).intValue());
     }
-    if (RTP.configs.getConfigValue(
+    if (ActiveConfigs.get().getConfigValue(
         io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys.unsafeBlocks,
         new ArrayList<>()) instanceof java.util.Collection<?> c) {
       for (Object o : c) if (o != null) unsafe.add(o.toString().toUpperCase());
@@ -752,7 +760,7 @@ public class Region extends FactoryValue<RegionKeys> {
           if (!isFoliaPlatform()) return scanThenClaims.get();
           // Folia: live block reads belong on the chunk's region thread.
           CompletableFuture<FailTypes> out = new CompletableFuture<>();
-          RTP.scheduler.runTask(world, ccx, ccz, () -> scanThenClaims.get().whenComplete((f, e) -> {
+          RTPRuntime.scheduler().runTask(world, ccx, ccz, () -> scanThenClaims.get().whenComplete((f, e) -> {
             if (e != null) out.completeExceptionally(e);
             else out.complete(f);
           }));
@@ -767,30 +775,30 @@ public class Region extends FactoryValue<RegionKeys> {
    */
   private void promoteCold(RTPLocation coldLoc, int cx, int cz) {
     inFlightCalculations.incrementAndGet();
-    RTP.log(Level.FINER,
+    RTPRuntime.log(Level.FINER,
         "[Region:" + name + "] SpawnWorker for cold (" + coldLoc.coords().x()
             + "," + coldLoc.coords().y() + "," + coldLoc.coords().z() + ")");
 
     getWorld().recordChunkLoadOrigin("Region.coldPromote");
     io.github.dailystruggle.rtp.common.tools.CfDiag.regionDeficitDispatch.increment();
-    RTP.log(Level.FINER,
+    RTPRuntime.log(Level.FINER,
         "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
             + ") getChunkAtAsync DISPATCHED inFlight=" + inFlightCalculations.get());
     getWorld().getChunkAtAsync(cx, cz).thenAccept(chunkSet -> {
-      RTP.log(Level.FINER,
+      RTPRuntime.log(Level.FINER,
           "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
               + ") thenAccept FIRED chunkSet=" + (chunkSet == null ? "null" : "present")
               + " complete()=" + (chunkSet == null || chunkSet.complete() == null
                   ? "null" : "done=" + chunkSet.complete().isDone()));
       chunkSet.complete().whenComplete((success, throwable) -> {
-        RTP.log(Level.FINER,
+        RTPRuntime.log(Level.FINER,
             "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
                 + ") complete.whenComplete success=" + success
                 + (throwable == null ? "" : " throwable=" + throwable.getClass().getSimpleName()
                     + ":" + throwable.getMessage()));
         if (success == null || !success) {
           try {
-            RTP.log(Level.FINER,
+            RTPRuntime.log(Level.FINER,
                 "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
                     + ") DROPPED success-false; returned to unkept");
             queueManager.unkeptLocations.offer(coldLoc);
@@ -805,7 +813,7 @@ public class Region extends FactoryValue<RegionKeys> {
         Runnable verify = () -> {
           boolean handedOff = false;
           try {
-            RTP.log(Level.FINER,
+            RTPRuntime.log(Level.FINER,
                 "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
                     + ") verify ENTER");
             RTPCoords resolved = null;
@@ -814,7 +822,7 @@ public class Region extends FactoryValue<RegionKeys> {
               long key = ((long) cx & 0xffffffffL) | ((long) cz << 32);
               rtpChunk = getWorld().getCachedChunk(key);
               VerticalAdjustor<?> v = getVert();
-              RTP.log(Level.FINER,
+              RTPRuntime.log(Level.FINER,
                   "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
                       + ") verify cachedChunk=" + (rtpChunk == null ? "null" : "present")
                       + " vert=" + (v == null ? "null" : v.getClass().getSimpleName()));
@@ -825,12 +833,12 @@ public class Region extends FactoryValue<RegionKeys> {
                   resolved = v.adjust(rtpChunk);
                 }
               }
-              RTP.log(Level.FINER,
+              RTPRuntime.log(Level.FINER,
                   "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
                       + ") verify adjust resolved=" + (resolved == null ? "null" : "present"));
             } catch (Throwable verifyEx) {
               resolved = null;
-              RTP.log(
+              RTPRuntime.log(
                   Level.FINE,
                   "[Region] unkept→kept safety re-verification failed: "
                       + verifyEx.getClass().getSimpleName() + ": " + verifyEx.getMessage());
@@ -874,12 +882,12 @@ public class Region extends FactoryValue<RegionKeys> {
                   return;
                 }
                 reservation.close();
-                RTP.log(Level.FINE, "[Region:" + name + "] promotion chunk=(" + cx + "," + cz
+                RTPRuntime.log(Level.FINE, "[Region:" + name + "] promotion chunk=(" + cx + "," + cz
                     + ") dropped: " + (ex != null ? ex.toString() : cause.name()));
                 dropColdLocation(coldLoc, (ex != null) ? FailTypes.misc : cause);
               } catch (Throwable t) {
                 reservation.close();
-                RTP.log(Level.WARNING, "[Region:" + name + "] promotion check failed: " + t, t);
+                RTPRuntime.log(Level.WARNING, "[Region:" + name + "] promotion check failed: " + t, t);
               } finally {
                 inFlightCalculations.decrementAndGet();
               }
@@ -889,17 +897,17 @@ public class Region extends FactoryValue<RegionKeys> {
           }
         };
         if (isFoliaPlatform()) {
-          RTP.scheduler.runTask(getWorld(), cx, cz, verify);
+          RTPRuntime.scheduler().runTask(getWorld(), cx, cz, verify);
         } else if (isOnTickThread()) {
           // Paper completes chunk futures on the main thread: queue the column re-check and
           // promotion checks on the budgeted sync pipe instead of running them in the callback.
-          RTP.getInstance().miscSyncTasks.add(verify);
+          MiscTasks.sync().add(verify);
         } else {
           verify.run();
         }
       });
     }).exceptionally(throwable -> {
-      RTP.log(Level.FINER,
+      RTPRuntime.log(Level.FINER,
           "[RTP][PROMOTE_TRACE] region=" + name + " chunk=(" + cx + "," + cz
               + ") getChunkAtAsync EXCEPTIONALLY "
               + (throwable == null ? "null" : throwable.getClass().getSimpleName()
@@ -918,7 +926,7 @@ public class Region extends FactoryValue<RegionKeys> {
     // I/O - is pure waste on a lobby. Region objects are still constructed so
     // /rtp info, config menus, and tab-completion keep working, but their
     // queues stay empty.
-    if (RTP.lobbyMode) return;
+    if (NetworkHooks.lobbyMode()) return;
     // Dormant regions (configured world not yet loaded) must not attempt chunk I/O,
     // ticket validation, or cache generation - they activate via rebindWorld once
     // WorldLoadEvent delivers the configured world.
@@ -952,7 +960,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
     // Diagram 02 (ExecuteRegion -> SpawnWorker): per-region budget enforcement.
     if (deficit > 0) {
-      RTP.log(Level.FINE,
+      RTPRuntime.log(Level.FINE,
           "[Region:" + name + "] hot deficit=" + deficit + " (activeCap=" + activeCap
               + ", kept=" + currentHot + ", inFlight=" + inFlightCalculations.get()
               + ", pendingKept=" + pendingKept + ")");
@@ -968,7 +976,7 @@ public class Region extends FactoryValue<RegionKeys> {
         io.github.dailystruggle.rtp.common.tools.HeapPressureMonitor.underPressure();
     long fillDeficit = (heapUnderPressure || tickUnhealthy) ? 0 : Math.min(deficit, MAX_PROMOTIONS_PER_PULSE);
     if ((heapUnderPressure || tickUnhealthy) && deficit > 0) {
-      RTP.log(Level.FINE,
+      RTPRuntime.log(Level.FINE,
           "[Region:" + name + "] hot-cache fill paused ("
               + (heapUnderPressure ? "heap pressure" : "tick health") + "); deficit=" + deficit);
     }
@@ -994,7 +1002,7 @@ public class Region extends FactoryValue<RegionKeys> {
       int cz = coldLoc.coords().z() >> 4;
       // ADR-087 regional circuit breaker: a backlogged or slow region keeps its candidate cold;
       // the next candidate (usually another region) takes this slot, so load is divided, not stacked.
-      if (RTP.scheduler != null && RTP.scheduler.isRegionSaturated(getWorld(), cx, cz)) {
+      if (RTPRuntime.scheduler() != null && RTPRuntime.scheduler().isRegionSaturated(getWorld(), cx, cz)) {
         queueManager.unkeptLocations.offerSilently(coldLoc); // silent: the poll kept its DB row
       } else {
         promoteCold(coldLoc, cx, cz);
@@ -1006,15 +1014,15 @@ public class Region extends FactoryValue<RegionKeys> {
       if (playerId == null) break;
 
       // Hoist the offline check here to purge dead requests instantly
-      RTPPlayer player = RTP.serverAccessor.getPlayer(playerId);
+      RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(playerId);
       if (player == null) {
         queueManager.playerQueue.poll();
-        RTP.getInstance().processingPlayers.remove(playerId);
-        RTP.getInstance().queuedPlayers.remove(playerId);
-        RTP.getInstance().invulnerablePlayers.remove(playerId);
+        TeleportSessions.current().processingPlayers.remove(playerId);
+        TeleportSessions.current().queuedPlayers.remove(playerId);
+        TeleportSessions.current().invulnerablePlayers.remove(playerId);
 
         taskDispatcher.cancelTeleport(
-            playerId, RTP.getInstance().latestTeleportData.get(playerId), false);
+            playerId, TeleportSessions.current().latestTeleportData.get(playerId), false);
         continue;
       }
 
@@ -1059,15 +1067,15 @@ public class Region extends FactoryValue<RegionKeys> {
         continue;
       }
 
-      TeleportData teleportData = RTP.getInstance().latestTeleportData.get(playerId);
+      TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(playerId);
       if (teleportData == null || teleportData.completed) {
         queueManager.playerQueue.poll(); // Discard invalid player
-        RTP.getInstance().processingPlayers.remove(playerId);
-        RTP.getInstance().queuedPlayers.remove(playerId);
-        RTP.getInstance().invulnerablePlayers.remove(playerId);
+        TeleportSessions.current().processingPlayers.remove(playerId);
+        TeleportSessions.current().queuedPlayers.remove(playerId);
+        TeleportSessions.current().invulnerablePlayers.remove(playerId);
 
         taskDispatcher.cancelTeleport(
-            playerId, RTP.getInstance().latestTeleportData.get(playerId), true);
+            playerId, TeleportSessions.current().latestTeleportData.get(playerId), true);
         continue;
       }
 
@@ -1079,7 +1087,7 @@ public class Region extends FactoryValue<RegionKeys> {
       // single hoisted invocation cannot over-delete a private row from the public branch.
       // Cache the accessor in a local to avoid a second RTP.getInstance() and the TOCTOU
       // null-window between the null check and the deleteCachedLocation call.
-      DatabaseAccessor databaseAccessor = RTP.getInstance().databaseAccessor;
+      DatabaseAccessor databaseAccessor = ActiveDatabase.accessor();
       if (databaseAccessor != null) {
         databaseAccessor.deleteCachedLocation(name, pair);
       }
@@ -1088,7 +1096,7 @@ public class Region extends FactoryValue<RegionKeys> {
       teleportData.attempts = pair.attempts();
       teleportData.selectedCoords = pair.coords();
 
-      RTPCommandSender sender = RTP.serverAccessor.getSender(CommandsAPI.serverId);
+      RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(CommandsAPI.serverId);
 
       // Kept-queue entries generated asynchronously (e.g. FoliaLocationGenerator) are always
       // constructed with a null ChunkReservation, and the DB-rehydrated path never carries one.
@@ -1101,7 +1109,7 @@ public class Region extends FactoryValue<RegionKeys> {
       if (reservationForTask == null) {
         RTPCoords pairCoords = pair.coords();
         RTPWorld<?> rtpWorld =
-            (pairCoords != null) ? RTP.serverAccessor.getRTPWorld(pairCoords.worldName()) : null;
+            (pairCoords != null) ? RTPRuntime.serverAccessor().getRTPWorld(pairCoords.worldName()) : null;
         if (rtpWorld == null) rtpWorld = getWorld();
         if (rtpWorld != null && pairCoords != null) {
           int radius = taskDispatcher.teleportViewDistance();
@@ -1122,7 +1130,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
       // Diagram 02 (WakePlayer): public/private queue produced a location and
       // the waiting player's pipeline is dispatched.
-      RTP.log(Level.FINE,
+      RTPRuntime.log(Level.FINE,
           "[Region:" + name + "] WakePlayer uuid=" + playerId
               + " private=" + isPrivate
               + " coords=(" + pair.coords().x() + "," + pair.coords().y()
@@ -1130,7 +1138,7 @@ public class Region extends FactoryValue<RegionKeys> {
       taskDispatcher.dispatchTeleport(teleportData,
           new GenerationContext(sender, player, null), this, pair.coords(), reservationForTask);
 
-      RTP.getInstance().latestTeleportData.put(playerId, teleportData);
+      TeleportSessions.current().latestTeleportData.put(playerId, teleportData);
       inFlightCalculations.incrementAndGet();
       for (int i = 0; i < onPlayerQueuePop.size(); i++) {
         onPlayerQueuePop.get(i).accept(this, playerId);
@@ -1144,22 +1152,22 @@ public class Region extends FactoryValue<RegionKeys> {
       while (iterator.hasNext()) {
         UUID id = iterator.next();
         ++i;
-        TeleportData data = RTP.getInstance().latestTeleportData.get(id);
-        RTP.getInstance().processingPlayers.add(id);
+        TeleportData data = TeleportSessions.current().latestTeleportData.get(id);
+        TeleportSessions.current().processingPlayers.add(id);
         if (data == null) {
           data = new TeleportData();
           io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(data, "TeleportData-" + id.toString(), 120000L);
           data.completed = false;
-          data.sender = RTP.serverAccessor.getSender(CommandsAPI.serverId);
+          data.sender = RTPRuntime.serverAccessor().getSender(CommandsAPI.serverId);
           data.time = System.currentTimeMillis();
           data.delay = 0;
           data.targetRegion = this;
-          RTP.getInstance().latestTeleportData.put(id, data);
+          TeleportSessions.current().latestTeleportData.put(id, data);
         }
         long previousSpot = data.queueLocation;
         data.queueLocation = i;
         if (previousSpot != i) {
-          RTP.serverAccessor.sendMessage(id, PlayerMessages.queueUpdate);
+          RTPRuntime.serverAccessor().sendMessage(id, PlayerMessages.queueUpdate);
         }
       }
     }
@@ -1380,7 +1388,7 @@ public class Region extends FactoryValue<RegionKeys> {
       @SuppressWarnings("unchecked")
       io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
           (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
-              RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
+              ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
       if (perf == null) return 0.5d;
       Object o = perf.getConfigValue(
           io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.backlogRefillThreshold,
@@ -1399,7 +1407,7 @@ public class Region extends FactoryValue<RegionKeys> {
       @SuppressWarnings("unchecked")
       io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
           (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
-              RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
+              ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
       if (perf == null) return "FLAT_STRIDE";
       Object o = perf.getConfigValue(
           io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.backlogGenerationStrategy,
@@ -1417,7 +1425,7 @@ public class Region extends FactoryValue<RegionKeys> {
       @SuppressWarnings("unchecked")
       io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
           (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
-              RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
+              ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
       if (perf == null) return false;
       Object o = perf.getConfigValue(
           io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.pregeneratedPreference,
@@ -1448,7 +1456,7 @@ public class Region extends FactoryValue<RegionKeys> {
       @SuppressWarnings("unchecked")
       io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> p =
           (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
-              RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
+              ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
       perf = p;
     } catch (Throwable t) {
       return false;
@@ -1478,7 +1486,7 @@ public class Region extends FactoryValue<RegionKeys> {
    * @return location and number of attempts
    */
   public CompletableFuture<GenerationResult> getLocation(Set<String> biomeNames) {
-    return RTP.serverAccessor.getLocationGenerator().generateLocation(this, new GenerationContext(null, null, biomeNames));
+    return RTPRuntime.serverAccessor().getLocationGenerator().generateLocation(this, new GenerationContext(null, null, biomeNames));
   }
 
   /** shutDown - save and clear data */
@@ -1616,7 +1624,7 @@ public class Region extends FactoryValue<RegionKeys> {
     Shape<?> current = this.shape;
 
     if (wbo && world != null) {
-      Shape<?> worldShape = ((WorldBorder) RTP.serverAccessor.getWorldBorder(world.name())).getShape().get();
+      Shape<?> worldShape = ((WorldBorder) RTPRuntime.serverAccessor().getWorldBorder(world.name())).getShape().get();
       if (!worldShape.equals(current)) {
         this.shape = worldShape;
         current = worldShape;
@@ -1700,7 +1708,7 @@ public class Region extends FactoryValue<RegionKeys> {
   public String displayName() {
     try {
       MultiConfigParser<RegionKeys> regions =
-          (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
+          (MultiConfigParser<RegionKeys>) ActiveConfigs.get().multiConfigParserMap.get(RegionKeys.class);
       if (regions != null) {
         ConfigParser<RegionKeys> parser = regions.getParser(name);
         if (parser != null) {
@@ -1719,8 +1727,8 @@ public class Region extends FactoryValue<RegionKeys> {
 
   private static boolean isOnTickThread() {
     try {
-      return RTP.serverAccessor != null && RTP.serverAccessor.isPrimaryThread()
-          && RTP.getInstance() != null && RTP.getInstance().miscSyncTasks != null;
+      return RTPRuntime.serverAccessor() != null && RTPRuntime.serverAccessor().isPrimaryThread()
+          && TeleportSessions.current() != null && MiscTasks.sync() != null;
     } catch (Throwable t) {
       return false;
     }
@@ -1728,7 +1736,7 @@ public class Region extends FactoryValue<RegionKeys> {
 
   private static boolean isFoliaPlatform() {
     try {
-      return "Folia".equals(RTP.serverAccessor.getPlatform());
+      return "Folia".equals(RTPRuntime.serverAccessor().getPlatform());
     } catch (Throwable ignored) {
       return false;
     }

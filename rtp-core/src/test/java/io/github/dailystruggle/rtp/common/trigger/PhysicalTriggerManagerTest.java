@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.action.ActionManager;
+import io.github.dailystruggle.rtp.common.action.ActionServices;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -220,7 +221,7 @@ class PhysicalTriggerManagerTest {
   @DisplayName("Batch trigger wave dispatch integrates with ActionManager and handles result ingestion")
   void testWaveDispatchActionManagerResultIngestion() {
     ActionManager actionManager = new ActionManager();
-    RTP.actionManager = actionManager;
+    ActionServices.setActionManager(actionManager);
 
     RTPWorld<?> world = serverAccessor.getRTPWorld("world");
     UUID p1 = UUID.randomUUID();
@@ -378,7 +379,7 @@ class PhysicalTriggerManagerTest {
     serverAccessor.addPlayer(player1);
 
     ActionManager actionManager = new ActionManager();
-    RTP.actionManager = actionManager;
+    ActionServices.setActionManager(actionManager);
 
     io.github.dailystruggle.rtp.api.action.ActionDefinition.CommandAction cmdMsg =
         new io.github.dailystruggle.rtp.api.action.ActionDefinition.CommandAction(

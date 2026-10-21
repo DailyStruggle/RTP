@@ -1,8 +1,9 @@
 package io.github.dailystruggle.rtp.common.commands.parameters;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import java.util.Map;
 import java.util.Set;
@@ -16,7 +17,7 @@ public class VertParameter extends CommandParameter {
       String permission, String description, BiFunction<UUID, String, Boolean> isRelevant) {
     super(permission, description, isRelevant);
     Factory<VerticalAdjustor<?>> factory =
-        (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
+        (Factory<VerticalAdjustor<?>>) FactoryRegistry.get(FactoryNames.vert);
     factory.map.forEach(
         (s, verticalAdjustor) -> {
           put(verticalAdjustor.name, verticalAdjustor.getParameters());
@@ -27,20 +28,20 @@ public class VertParameter extends CommandParameter {
   @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the vert Factory under a raw value type
   public Set<String> values() {
     Factory<VerticalAdjustor<?>> factory =
-        (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
+        (Factory<VerticalAdjustor<?>>) FactoryRegistry.get(FactoryNames.vert);
     factory.map.forEach(
         (s, verticalAdjustor) -> {
           if (!subParamMap.containsKey(s.toLowerCase())) {
             put(verticalAdjustor.name, verticalAdjustor.getParameters());
           }
         });
-    return RTP.factoryMap.get(RTP.factoryNames.vert).map.keySet();
+    return FactoryRegistry.get(FactoryNames.vert).map.keySet();
   }
 
   @Override
   public Map<String, CommandParameter> subParams(String parameter) {
     parameter = parameter.toLowerCase();
-    Factory<?> factory = RTP.factoryMap.get(RTP.factoryNames.vert);
+    Factory<?> factory = FactoryRegistry.get(FactoryNames.vert);
     Map<String, CommandParameter> map = subParamMap.get(parameter);
     if (map != null) {
       return map;

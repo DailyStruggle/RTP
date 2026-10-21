@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.paper.metrics;
 
 import io.github.dailystruggle.metrics.api.MetricsBinding;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
 
@@ -10,7 +11,7 @@ import java.util.function.IntSupplier;
 
 /**
  * Paper-flavoured {@link MetricsBinding} that publishes server-wide tick metrics
- * (TPS 1m/5m/15m, average MSPT, online player count) into {@code RTP.metrics}.
+ * (TPS 1m/5m/15m, average MSPT, online player count) into {@code CoreMetrics.instance()}.
  *
  * <p>Paper exposes {@code Server#getTPS()} (since 1.16+) and
  * {@code Server#getAverageTickTime()}, so {@code rtp-core} no longer needs a
@@ -32,7 +33,7 @@ import java.util.function.IntSupplier;
  * which binds to {@link Bukkit#getServer()}.
  *
  * <p>Wiring: the platform plugin
- * installs an instance via {@code RTP.metrics.setBinding(new PaperMetricsBinding())}
+ * installs an instance via {@code CoreMetrics.instance().setBinding(new PaperMetricsBinding())}
  * during plugin enable, after {@code Bukkit.getServer()} is non-null. All calls
  * are non-blocking and never throw on the calling thread.
  */

@@ -20,6 +20,7 @@ source Gradle uses), so the website stays in sync with the jar and neither has
 to be hand-edited on a version bump.
 """
 
+import gzip
 import re
 from pathlib import Path
 
@@ -66,6 +67,21 @@ _STAMP_RE = re.compile(
     r"^\*\*Current Plugin Version:\*\*.*$\n?(?:\n)?",
     re.MULTILINE,
 )
+
+
+# Internal engineering trees stay published (deep links from GitHub, issues and
+# the jar docs keep working) but are kept out of search results: every page
+# under these prefixes gets a robots noindex meta tag and is dropped from
+# sitemap.xml, so crawlers summarise the operator docs, not the internals.
+# `follow` keeps link discovery intact. Do not also Disallow these paths in a
+# robots.txt: a crawler that cannot fetch a page never sees its noindex tag.
+_NOINDEX_PREFIXES = ("dev/", "adr/", "architecture/")
+_NOINDEX_META = '<meta name="robots" content="noindex, follow">'
+_SITEMAP_URL_RE = re.compile(r"\s*<url>\s*<loc>([^<]*)</loc>.*?</url>", re.DOTALL)
+
+
+def _is_noindex(src_uri: str) -> bool:
+    return src_uri.startswith(_NOINDEX_PREFIXES)
 
 
 def _read_version() -> str:
@@ -207,3 +223,35 @@ def on_page_markdown(markdown, page, config, files):
     )
     markdown = _rewrite_external_links(markdown, page, config)
     return markdown
+
+
+def on_post_page(output, page, config):
+    """Tag internal engineering pages noindex (see _NOINDEX_PREFIXES)."""
+    if not _is_noindex(page.file.src_uri):
+        return output
+    head_end = output.find("</head>")
+    if head_end < 0:
+        raise ValueError(f"no </head> in {page.file.src_uri}; cannot add noindex")
+    return output[:head_end] + _NOINDEX_META + "\n" + output[head_end:]
+
+
+def on_post_build(config):
+    """Drop noindex pages from sitemap.xml and its .gz twin.
+
+    Listing a noindex page in the sitemap sends crawlers contradictory signals.
+    """
+    site_dir = Path(config["site_dir"])
+    sitemap = site_dir / "sitemap.xml"
+    if not sitemap.is_file():
+        return
+    base = (config.get("site_url") or "").rstrip("/") + "/"
+    noindex_locs = tuple(base + prefix for prefix in _NOINDEX_PREFIXES)
+
+    def keep(match: "re.Match") -> str:
+        return "" if match.group(1).strip().startswith(noindex_locs) else match.group(0)
+
+    text = _SITEMAP_URL_RE.sub(keep, sitemap.read_text(encoding="utf-8"))
+    sitemap.write_text(text, encoding="utf-8")
+    gz = site_dir / "sitemap.xml.gz"
+    if gz.is_file():
+        gz.write_bytes(gzip.compress(text.encode("utf-8"), mtime=0))

@@ -10,6 +10,7 @@ import io.github.dailystruggle.mapsapi.model.ChartModel;
 import io.github.dailystruggle.mapsapi.render.ChartRenderer;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.fabric.player.FabricMapSink;
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapter;
 import io.github.dailystruggle.rtp.fabric.version.FabricVersionAdapterRegistry;
@@ -32,7 +33,7 @@ import java.util.logging.Level;
  * {@code FILLED_MAP} item delivery.
  *
  * <p>This class contains <b>no</b> {@code net.minecraft.*} reference (the
- * viewer is resolved through {@code RTP.serverAccessor} as a
+ * viewer is resolved through {@code RTPRuntime.serverAccessor()} as a
  * {@code FabricRTPPlayer} and every NM touch is delegated to that player and
  * the carrier), so its bytecode links cleanly on every supported runtime
  * (1.20.x through the deobf 26.x line). Carriers that do not implement
@@ -43,7 +44,7 @@ import java.util.logging.Level;
  * <p>Threading: {@code allocate} / {@code renderEphemeral} run on the caller's
  * (async) thread and only mutate in-memory buffers. {@code deliverTo} and the
  * live-refresh loop hand off to the {@code FabricRTPPlayer} map sink, which
- * hops to the server tick thread via {@code RTP.scheduler} before the carrier
+ * hops to the server tick thread via {@code RTPRuntime.scheduler()} before the carrier
  * touches map / inventory / connection state
  * (REQ-RTP-MAP-002 / S-005: no chunk I/O, no blocking on this class's paths).
  *
@@ -138,7 +139,7 @@ public final class FabricMapBinding implements MapBinding, MapBindingLifecycle {
         // Cancel a stale loop on the same chart before installing a new one.
         cancelLiveTask(chartId);
 
-        Object task = RTP.scheduler.runTaskTimerAsynchronously(() -> {
+        Object task = RTPRuntime.scheduler().runTaskTimerAsynchronously(() -> {
             try {
                 if (disabled) return;
                 renderFrame(buf, renderer, modelSupplier);
@@ -215,15 +216,15 @@ public final class FabricMapBinding implements MapBinding, MapBindingLifecycle {
 
     /**
      * Resolve the viewer to a {@link FabricMapSink} through
-     * {@code RTP.serverAccessor} (the maps path never touches the NM player
+     * {@code RTPRuntime.serverAccessor()} (the maps path never touches the NM player
      * list directly). Returns {@code null} if the accessor is unbound, the
      * viewer is offline, or the active carrier does not support map charts.
      */
     private static FabricMapSink resolveFabricPlayer(UUID viewer) {
         FabricVersionAdapter adapter = FabricVersionAdapterRegistry.peek();
         if (adapter == null || !adapter.supportsMapCharts()) return null;
-        RTPPlayer rtpPlayer = RTP.serverAccessor == null ? null
-                : RTP.serverAccessor.getPlayer(viewer);
+        RTPPlayer rtpPlayer = RTPRuntime.serverAccessor() == null ? null
+                : RTPRuntime.serverAccessor().getPlayer(viewer);
         // Resolve through the FabricMapSink capability rather than the concrete
         // common FabricRTPPlayer: on the deobf MC 26.x runtime the online player
         // is a per-version sink (V26_x_R1FabricRTPPlayer / FabricRTPPlayerUnobf)
@@ -236,7 +237,7 @@ public final class FabricMapBinding implements MapBinding, MapBindingLifecycle {
         Object task = liveTasks.remove(chartId);
         if (task != null) {
             try {
-                RTP.scheduler.cancelTask(task);
+                RTPRuntime.scheduler().cancelTask(task);
             } catch (Throwable ignored) {
                 // best-effort: a scheduler that already dropped the task is fine
             }

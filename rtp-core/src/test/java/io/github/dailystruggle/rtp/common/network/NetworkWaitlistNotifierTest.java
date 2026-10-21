@@ -1,9 +1,9 @@
 package io.github.dailystruggle.rtp.common.network;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPScheduler;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,15 +32,15 @@ class NetworkWaitlistNotifierTest {
     @BeforeEach
     void setUp() {
         serverAccessor = new MockRTPServerAccessor(tempDir);
-        RTP.serverAccessor = serverAccessor;
+        RTPRuntime.setServerAccessor(serverAccessor);
         scheduler = new MockRTPScheduler();
-        RTP.scheduler = scheduler;
+        RTPRuntime.setScheduler(scheduler);
     }
 
     @AfterEach
     void tearDown() {
-        RTP.serverAccessor = null;
-        RTP.scheduler = null;
+        RTPRuntime.setServerAccessor(null);
+        RTPRuntime.setScheduler(null);
     }
 
     @Test
@@ -50,10 +50,10 @@ class NetworkWaitlistNotifierTest {
         NetworkWaitlistNotifier notifier = new NetworkWaitlistNotifier(cache, 1000L);
 
         // start when scheduler is null logs warning and returns
-        RTP.scheduler = null;
+        RTPRuntime.setScheduler(null);
         notifier.start(20L);
 
-        RTP.scheduler = scheduler;
+        RTPRuntime.setScheduler(scheduler);
         notifier.start(20L);
         // idempotent start
         notifier.start(20L);
@@ -104,7 +104,7 @@ class NetworkWaitlistNotifierTest {
         assertFalse(notifier.emit(UUID.randomUUID(), "nonexistent"));
 
         // When serverAccessor is null
-        RTP.serverAccessor = null;
+        RTPRuntime.setServerAccessor(null);
         assertFalse(notifier.emit(onlineId, "no server accessor"));
     }
 

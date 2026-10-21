@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -41,8 +42,8 @@ public class ConfigParserLocaleSwitchTest {
         when(serverAccessor.getPluginDirectory()).thenReturn(tempDir.toFile());
         when(serverAccessor.createTaskPipe()).thenReturn(
                 mock(io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe.class));
-        RTP.serverAccessor = serverAccessor;
-        RTP.scheduler = scheduler;
+        RTPRuntime.setServerAccessor(serverAccessor);
+        RTPRuntime.setScheduler(scheduler);
 
         RTPAPI.serverAccessor = null;
 

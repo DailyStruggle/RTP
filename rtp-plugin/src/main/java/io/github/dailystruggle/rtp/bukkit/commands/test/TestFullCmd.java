@@ -8,6 +8,8 @@ import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandSuccessEvent;
 import io.github.dailystruggle.rtp.bukkit.events.TeleportCommandFailEvent;
@@ -67,7 +69,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
    * invokes. Mirrors the sequence dispatched by {@link #runStep(UUID, int, FullAudit)}.
    * Exposed package-private so unit tests can assert parity with
    * {@link TestCmd}'s registration set without having to initialise
-   * {@link RTP#serverAccessor}.
+   * {@link RTPRuntime#serverAccessor()}.
    *
    * <p>Deliberately excluded: {@code cancel} (would abort the sweep itself)
    * and {@code reload-safety} (admin-only, intentionally noisy).
@@ -181,12 +183,12 @@ public class TestFullCmd extends BaseRTPCmdImpl {
 
     String header = "[RTP test/full] begin (shipped subcommands only)";
     if (!callerId.equals(RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, header);
+      RTPRuntime.serverAccessor().sendMessage(callerId, header);
     }
     RTP.log(Level.INFO, header);
 
     try {
-      RTP.scheduler.runTaskAsynchronously(() -> runStep(callerId, 0, audit));
+      RTPRuntime.scheduler().runTaskAsynchronously(() -> runStep(callerId, 0, audit));
     } catch (Throwable t) {
       // Async scheduler unavailable (e.g. headless tests). Run the chain
       // inline so we don't silently no-op (S-004). In headless contexts
@@ -234,7 +236,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       if (skipReason != null) {
         String msg = "[RTP test/full] " + subName + " skipped: " + skipReason;
         if (!callerId.equals(RTPAPI.serverId)) {
-          RTP.serverAccessor.sendMessage(callerId, msg);
+          RTPRuntime.serverAccessor().sendMessage(callerId, msg);
         }
         RTP.log(Level.INFO, msg);
         scheduleNext(callerId, index + 1, audit);
@@ -246,7 +248,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       String notice = noticeFor(subName);
       if (notice != null && !notice.isEmpty()) {
         if (!callerId.equals(RTPAPI.serverId)) {
-          RTP.serverAccessor.sendMessage(callerId, notice);
+          RTPRuntime.serverAccessor().sendMessage(callerId, notice);
         }
         RTP.log(Level.INFO, notice);
       }
@@ -338,7 +340,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
    */
   private void scheduleNext(UUID callerId, int nextIndex, FullAudit audit) {
     try {
-      RTP.scheduler.runTaskAsynchronously(() -> runStep(callerId, nextIndex, audit));
+      RTPRuntime.scheduler().runTaskAsynchronously(() -> runStep(callerId, nextIndex, audit));
     } catch (Throwable t) {
       runStep(callerId, nextIndex, audit);
     }
@@ -356,7 +358,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
     if (sub == null) {
       String msg = "[RTP test/full] " + subName + " subcommand not registered; skipping";
       if (!callerId.equals(RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, msg);
+        RTPRuntime.serverAccessor().sendMessage(callerId, msg);
       }
       RTP.log(Level.WARNING, msg);
       return;
@@ -405,7 +407,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
           Object wd = watchdogHolder[0];
           if (wd != null) {
             try {
-              RTP.scheduler.cancelTask(wd);
+              RTPRuntime.scheduler().cancelTask(wd);
             } catch (Throwable ignored) {
               // best-effort: a stale cancel can't double-advance because
               // of the `advanced` guard.
@@ -438,7 +440,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
             Object self = selfHolder[0];
             if (self != null) {
               try {
-                RTP.scheduler.cancelTask(self);
+                RTPRuntime.scheduler().cancelTask(self);
               } catch (Throwable ignored) {
                 // best-effort
               }
@@ -458,7 +460,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
             onAdvance.run();
           };
       Object task =
-          RTP.scheduler.runTaskTimerAsynchronously(
+          RTPRuntime.scheduler().runTaskTimerAsynchronously(
               watchdogBody, DRAIN_TIMEOUT_TICKS, DRAIN_TIMEOUT_TICKS);
       selfHolder[0] = task;
       watchdogHolder[0] = task;
@@ -531,7 +533,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
 
       // Snapshot server metrics once for inclusion in the diagnostic dump.
       // Read-only and cheap per Metrics SPI contract.
-      MetricsSnapshot snap = RTP.metrics.snapshot();
+      MetricsSnapshot snap = CoreMetrics.instance().snapshot();
       String metricsLine = "[RTP test/full] metrics: " + snap;
 
       String footer = "[RTP test/full] end (total-audited-warnings=" + audit.warnCount + ")";
@@ -552,12 +554,12 @@ public class TestFullCmd extends BaseRTPCmdImpl {
       for (String line : lines) {
         if (line.isEmpty()) continue;
         if (!callerId.equals(RTPAPI.serverId)) {
-          RTP.serverAccessor.sendMessage(callerId, line);
+          RTPRuntime.serverAccessor().sendMessage(callerId, line);
         }
         RTP.log(Level.INFO, line);
       }
       if (!callerId.equals(RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, resultLine);
+        RTPRuntime.serverAccessor().sendMessage(callerId, resultLine);
       }
       sender().log(resultLine);
     } finally {
@@ -629,13 +631,13 @@ public class TestFullCmd extends BaseRTPCmdImpl {
     boolean isConsole = callerId.equals(RTPAPI.serverId);
     switch (subName) {
       case "folia-ownership":
-        return (RTP.serverAccessor != null && RTP.serverAccessor.getPlatform().equalsIgnoreCase("Folia"))
+        return (RTPRuntime.serverAccessor() != null && RTPRuntime.serverAccessor().getPlatform().equalsIgnoreCase("Folia"))
             ? null
             : "only meaningful on Folia";
       case "economy-isolation":
-        if (RTP.serverAccessor != null && (RTP.serverAccessor.getPlatform().equalsIgnoreCase("Fabric")
-            || RTP.serverAccessor.getPlatformFamily() == io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC
-            || RTP.economy == null)) {
+        if (RTPRuntime.serverAccessor() != null && (RTPRuntime.serverAccessor().getPlatform().equalsIgnoreCase("Fabric")
+            || RTPRuntime.serverAccessor().getPlatformFamily() == io.github.dailystruggle.rtp.api.server.PlatformFamily.FABRIC
+            || RTPRuntime.economy() == null)) {
           return "Vault is Bukkit-only";
         }
         return null;
@@ -711,7 +713,7 @@ public class TestFullCmd extends BaseRTPCmdImpl {
   private String resolveName(UUID callerId) {
     if (callerId == null) return "CONSOLE";
     try {
-      var player = RTP.serverAccessor.getPlayer(callerId);
+      var player = RTPRuntime.serverAccessor().getPlayer(callerId);
       if (player != null) return player.name();
     } catch (Throwable ignored) {
       // fall through

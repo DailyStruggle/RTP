@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.factory;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.search.FuzzySearchEngine;
 import java.io.File;
 import java.io.IOException;
@@ -171,7 +172,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
                 this.name = String.valueOf(value);
               }
             } else if (lookup.isPerceptible()) {
-              RTP.log(
+              RTPRuntime.log(
                   Level.WARNING,
                   "[RTP] Property '"
                       + keyStr
@@ -190,7 +191,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
                 this.name = String.valueOf(value);
               }
             } else {
-              RTP.log(
+              RTPRuntime.log(
                   Level.WARNING,
                   "[RTP] Unrecognized property '"
                       + keyStr
@@ -263,7 +264,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
       }
       return clone;
     } catch (CloneNotSupportedException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
       throw new IllegalStateException("Failed to clone FactoryValue", e);
     }
   }
@@ -309,7 +310,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
         try {
           res = Double.parseDouble(coerced);
         } catch (NumberFormatException e) {
-          RTP.log(
+          RTPRuntime.log(
               Level.SEVERE,
               "expected floating point value for " + key.name() + ", received - " + coerced, e);
           res = def;
@@ -319,7 +320,7 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
       try {
         res = Integer.parseInt(c.toString());
       } catch (NumberFormatException e) {
-        RTP.log(Level.SEVERE, "expected integer for " + key.name() + ", received - " + resObj, e);
+        RTPRuntime.log(Level.SEVERE, "expected integer for " + key.name() + ", received - " + resObj, e);
         res = def;
       }
     } else {
@@ -406,13 +407,13 @@ public abstract class FactoryValue<E extends Enum<E>> implements Cloneable {
     String fileName = this.name;
     if (!fileName.endsWith(".yml")) fileName = fileName + ".yml";
     File langFile;
-    if (RTP.serverAccessor == null) return;
+    if (RTPRuntime.serverAccessor() == null) return;
     // ADR-076: the shared catalog rename map is a co-located dotfile sibling under the
     // catalog directory itself (e.g. definitions/regions/.shape/.CIRCLE.lang.yml), not
     // lang/<subDir>/<name>.lang.yml.
     String subPart = subDir.replace('/', File.separatorChar);
     String langDirStr =
-        RTP.serverAccessor.getPluginDirectory().getAbsolutePath()
+        RTPRuntime.serverAccessor().getPluginDirectory().getAbsolutePath()
             + File.separator
             + subPart;
     File langDir = new File(langDirStr);

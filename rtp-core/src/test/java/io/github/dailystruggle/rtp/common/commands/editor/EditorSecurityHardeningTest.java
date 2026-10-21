@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,7 +67,7 @@ class EditorSecurityHardeningTest {
         File dir = tempDir.resolve("plugins/RTP").toFile();
         dir.mkdirs();
         RTPTestSetup.install(dir);
-        pluginDir = RTP.serverAccessor.getPluginDirectory().toPath();
+        pluginDir = RTPRuntime.serverAccessor().getPluginDirectory().toPath();
         Files.createDirectories(pluginDir.resolve("advanced"));
         Files.writeString(pluginDir.resolve("advanced/vault.yml"), VAULT, StandardCharsets.UTF_8);
         TrustCmd.resetFailures();

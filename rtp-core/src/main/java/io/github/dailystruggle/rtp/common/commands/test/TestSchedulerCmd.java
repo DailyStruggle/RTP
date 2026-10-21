@@ -4,8 +4,8 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -54,13 +54,13 @@ public class TestSchedulerCmd extends BaseRTPCmdImpl {
     if (isProcessing.get()) return false;
     isProcessing.set(true);
     try {
-      RTPScheduler scheduler = RTP.scheduler;
+      RTPScheduler scheduler = RTPRuntime.scheduler();
       if (scheduler == null) {
         String msg = "&c[RTP test/scheduler] RTP.scheduler is null; core not yet loaded";
         if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-          RTP.serverAccessor.sendMessage(callerId, msg);
+          RTPRuntime.serverAccessor().sendMessage(callerId, msg);
         }
-        RTP.log(Level.WARNING, msg);
+        RTPRuntime.log(Level.WARNING, msg);
         return false;
       }
 
@@ -70,7 +70,7 @@ public class TestSchedulerCmd extends BaseRTPCmdImpl {
       // this is null and the region tier is skipped.
       RTPLocation callerLoc = null;
       try {
-        RTPPlayer caller = RTP.serverAccessor.getPlayer(callerId);
+        RTPPlayer caller = RTPRuntime.serverAccessor().getPlayer(callerId);
         if (caller != null) callerLoc = caller.getLocation();
       } catch (Throwable ignored) {
         // region probe skipped below
@@ -158,9 +158,9 @@ public class TestSchedulerCmd extends BaseRTPCmdImpl {
       String msg =
           "[RTP test/scheduler] " + tier + ": TIMEOUT after " + PROBE_TIMEOUT_MS + "ms";
       if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, msg);
+        RTPRuntime.serverAccessor().sendMessage(callerId, msg);
       }
-      RTP.log(Level.WARNING, msg);
+      RTPRuntime.log(Level.WARNING, msg);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       reportTierFailure(callerId, tier, e);
@@ -173,15 +173,15 @@ public class TestSchedulerCmd extends BaseRTPCmdImpl {
     String msg =
         "[RTP test/scheduler] " + tier + ": FAILED (" + t.getClass().getSimpleName() + ": " + t.getMessage() + ")";
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      RTPRuntime.serverAccessor().sendMessage(callerId, msg);
     }
-    RTP.log(Level.WARNING, msg, t);
+    RTPRuntime.log(Level.WARNING, msg, t);
   }
 
   private void report(UUID callerId, String msg) {
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      RTPRuntime.serverAccessor().sendMessage(callerId, msg);
     }
-    RTP.log(Level.INFO, msg);
+    RTPRuntime.log(Level.INFO, msg);
   }
 }

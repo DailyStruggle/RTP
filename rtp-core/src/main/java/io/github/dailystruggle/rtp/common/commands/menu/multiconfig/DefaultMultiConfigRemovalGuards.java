@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.menu.multiconfig;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 
 /**
  * Factory for default {@link MultiConfigRemovalGuard} bodies (regions and worlds).
@@ -41,9 +41,9 @@ public final class DefaultMultiConfigRemovalGuards {
             @Override
             public boolean isLocked(String entryName) {
                 if (entryName == null) return false;
-                if (RTP.serverAccessor == null) return false;
+                if (RTPRuntime.serverAccessor() == null) return false;
                 try {
-                    return RTP.serverAccessor.getRTPWorld(entryName) != null;
+                    return RTPRuntime.serverAccessor().getRTPWorld(entryName) != null;
                 } catch (RuntimeException ignored) {
                     return false;
                 }

@@ -32,7 +32,7 @@ import java.util.concurrent.CompletableFuture;
  *
  * <p><b>Threading:</b> implementations shall not load chunks (S-005), block on
  * tick threads, or hold locks. Server-thread-affine calls must be dispatched by
- * the caller (typically via {@code MinecraftServer#submit} / {@code RTP.scheduler}).</p>
+ * the caller (typically via {@code MinecraftServer#submit} / {@code RTPRuntime.scheduler()}).</p>
  */
 public interface NeoForgeVersionAdapter {
 

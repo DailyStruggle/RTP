@@ -1,14 +1,13 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
-import java.lang.reflect.Field;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -38,9 +37,7 @@ class MemoryShapeLoadedUnionTest {
 
     private YamlFileDatabase wireDatabaseAccessor() throws Exception {
         YamlFileDatabase db = new YamlFileDatabase(tempDir.toFile());
-        Field daField = RTP.class.getDeclaredField("databaseAccessor");
-        daField.setAccessible(true);
-        daField.set(RTP.getInstance(), db);
+        io.github.dailystruggle.rtp.common.database.ActiveDatabase.setAccessor(db);
         return db;
     }
 
@@ -167,7 +164,7 @@ class MemoryShapeLoadedUnionTest {
         buf.putInt(1);
         buf.putLong(5000L).putLong(7L);
 
-        File pluginDir = RTP.serverAccessor.getPluginDirectory();
+        File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
         Path out =
                 pluginDir
                         .toPath()

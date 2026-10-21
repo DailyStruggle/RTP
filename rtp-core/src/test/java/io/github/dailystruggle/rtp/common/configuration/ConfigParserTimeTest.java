@@ -3,9 +3,9 @@ package io.github.dailystruggle.rtp.common.configuration;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -18,7 +18,7 @@ class ConfigParserTimeTest {
   static void setup() {
     RTPServerAccessor accessor = Mockito.mock(RTPServerAccessor.class);
     Mockito.when(accessor.getPluginDirectory()).thenReturn(new File("target/test-data/config-parser-time"));
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
   }
 
   @Test

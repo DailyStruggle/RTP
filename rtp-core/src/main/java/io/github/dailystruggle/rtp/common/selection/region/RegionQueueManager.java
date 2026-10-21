@@ -1,6 +1,8 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.cache.CacheStage;
 import io.github.dailystruggle.rtp.common.selection.region.cache.HotSink;
 import io.github.dailystruggle.rtp.common.selection.region.cache.KeyedCacheStage;
@@ -124,7 +126,7 @@ public class RegionQueueManager {
                 try {
                     loc.reservation().close();
                 } catch (Throwable t) {
-                    RTP.log(Level.WARNING, "[RTP] reservation close failed at " + loc.coords() + ": " + t, t);
+                    RTPRuntime.log(Level.WARNING, "[RTP] reservation close failed at " + loc.coords() + ": " + t, t);
                 }
             }
         };
@@ -133,7 +135,7 @@ public class RegionQueueManager {
                 try {
                     loc.reservation().close();
                 } catch (Throwable t) {
-                    RTP.log(Level.WARNING, "[RTP] cold disposal: unexpected reservation closed at " + loc.coords() + ": " + t, t);
+                    RTPRuntime.log(Level.WARNING, "[RTP] cold disposal: unexpected reservation closed at " + loc.coords() + ": " + t, t);
                 }
             }
         };
@@ -240,13 +242,13 @@ public class RegionQueueManager {
      */
     public void installDatabaseCallbacks() {
         java.util.function.Consumer<RTPLocation> saveCallback = location -> {
-            if (RTP.getInstance().databaseAccessor != null) {
-                RTP.getInstance().databaseAccessor.saveCachedLocation(region.name, location, null);
+            if (ActiveDatabase.accessor() != null) {
+                ActiveDatabase.accessor().saveCachedLocation(region.name, location, null);
             }
         };
         java.util.function.Consumer<RTPLocation> deleteCallback = location -> {
-            if (RTP.getInstance().databaseAccessor != null) {
-                RTP.getInstance().databaseAccessor.deleteCachedLocation(region.name, location);
+            if (ActiveDatabase.accessor() != null) {
+                ActiveDatabase.accessor().deleteCachedLocation(region.name, location);
             }
         };
         this.keptLocations.setCallbacks(saveCallback, deleteCallback);
@@ -342,7 +344,7 @@ public class RegionQueueManager {
             try {
                 loc.reservation().close();
             } catch (Throwable t) {
-                RTP.log(java.util.logging.Level.WARNING,
+                RTPRuntime.log(java.util.logging.Level.WARNING,
                         "[RTP] demoteToUnkept: reservation close failed at "
                                 + loc.coords() + ": " + t, t);
             }
@@ -410,7 +412,7 @@ public class RegionQueueManager {
                     try {
                         loc.reservation().close();
                     } catch (Throwable t) {
-                        RTP.log(Level.WARNING, "[RTP] reservation close failed at " + loc.coords() + ": " + t, t);
+                        RTPRuntime.log(Level.WARNING, "[RTP] reservation close failed at " + loc.coords() + ": " + t, t);
                     }
                 }
             };
@@ -493,11 +495,11 @@ public class RegionQueueManager {
         try {
             // One selection attempt on an async worker; no tick-thread budget to apply.
             RegionCacheTask fill = new RegionCacheTask(region, uuid, 0L);
-            RTP.scheduler.runTaskAsynchronously(fill);
+            RTPRuntime.scheduler().runTaskAsynchronously(fill);
         } catch (Throwable t) {
             // Never let listener wiring throw: release the guard and log.
             perPlayerInFlight.remove(uuid);
-            RTP.log(java.util.logging.Level.WARNING,
+            RTPRuntime.log(java.util.logging.Level.WARNING,
                     "[RTP] openPersonalQueue: failed to schedule personal fill for "
                             + uuid + ": " + t, t);
         }
@@ -534,7 +536,7 @@ public class RegionQueueManager {
     public void requestTeleport(UUID uuid) {
         if (uuid == null) return;
         playerQueue.add(uuid);
-        RTP.getInstance().queuedPlayers.add(uuid);
+        TeleportSessions.current().queuedPlayers.add(uuid);
     }
 
     /**
@@ -565,8 +567,8 @@ public class RegionQueueManager {
                 // so aborts the very teleport this poll is serving. The shared
                 // keptLocations branch below likewise just returns the location and
                 // lets the pipeline carry it through to completion.
-                if (RTP.getInstance().databaseAccessor != null) {
-                    RTP.getInstance().databaseAccessor.deleteCachedLocation(region.name, loc);
+                if (ActiveDatabase.accessor() != null) {
+                    ActiveDatabase.accessor().deleteCachedLocation(region.name, loc);
                 }
                 return CompletableFuture.completedFuture(loc);
             }
@@ -673,7 +675,7 @@ public class RegionQueueManager {
         });
         fastLocations.clear();
         playerQueue.clear();
-        RTP.getInstance().queuedPlayers.clear();
+        TeleportSessions.current().queuedPlayers.clear();
     }
 
     /**
@@ -718,8 +720,8 @@ public class RegionQueueManager {
         }
 
         queue.add(location);
-        if (RTP.getInstance().databaseAccessor != null) {
-            RTP.getInstance().databaseAccessor.saveCachedLocation(region.name, location, uuid);
+        if (ActiveDatabase.accessor() != null) {
+            ActiveDatabase.accessor().saveCachedLocation(region.name, location, uuid);
         }
     }
 
@@ -797,7 +799,7 @@ public class RegionQueueManager {
                 try {
                     loc.reservation().refresh();
                 } catch (Exception e) {
-                    io.github.dailystruggle.rtp.common.RTP.log(java.util.logging.Level.WARNING, "Failed to recover chunk ticket: " + e.getMessage(), e);
+                    io.github.dailystruggle.rtp.common.runtime.RTPRuntime.log(java.util.logging.Level.WARNING, "Failed to recover chunk ticket: " + e.getMessage(), e);
                 }
             });
         }
@@ -843,14 +845,14 @@ public class RegionQueueManager {
                     try {
                         loc.reservation().close();
                     } catch (Throwable t) {
-                        io.github.dailystruggle.rtp.common.RTP.log(
+                        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.log(
                                 java.util.logging.Level.WARNING,
                                 "Failed to close chunk reservation during purge: " + t.getMessage(), t);
                     }
                 }
-                if (io.github.dailystruggle.rtp.common.RTP.getInstance() != null
-                        && io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor != null) {
-                    io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor
+                if (TeleportSessions.current() != null
+                        && ActiveDatabase.accessor() != null) {
+                    ActiveDatabase.accessor()
                             .deleteCachedLocation(region.name, loc);
                 }
             }
@@ -873,14 +875,14 @@ public class RegionQueueManager {
                     try {
                         loc.reservation().close();
                     } catch (Throwable t) {
-                        io.github.dailystruggle.rtp.common.RTP.log(
+                        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.log(
                                 java.util.logging.Level.WARNING,
                                 "Failed to close chunk reservation during purge: " + t.getMessage(), t);
                     }
                 }
-                if (io.github.dailystruggle.rtp.common.RTP.getInstance() != null
-                        && io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor != null) {
-                    io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor
+                if (TeleportSessions.current() != null
+                        && ActiveDatabase.accessor() != null) {
+                    ActiveDatabase.accessor()
                             .deleteCachedLocation(region.name, loc);
                 }
             }
@@ -901,14 +903,14 @@ public class RegionQueueManager {
                         try {
                             loc.reservation().close();
                         } catch (Throwable t) {
-                            io.github.dailystruggle.rtp.common.RTP.log(
+                            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.log(
                                     java.util.logging.Level.WARNING,
                                     "Failed to close chunk reservation during purge: " + t.getMessage(), t);
                         }
                     }
-                    if (io.github.dailystruggle.rtp.common.RTP.getInstance() != null
-                            && io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor != null) {
-                        io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor
+                    if (TeleportSessions.current() != null
+                            && ActiveDatabase.accessor() != null) {
+                        ActiveDatabase.accessor()
                                 .deleteCachedLocation(region.name, loc);
                     }
                 }

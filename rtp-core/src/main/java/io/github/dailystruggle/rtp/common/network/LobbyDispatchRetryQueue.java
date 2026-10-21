@@ -1,8 +1,10 @@
 package io.github.dailystruggle.rtp.common.network;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages;
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -92,11 +94,11 @@ public final class LobbyDispatchRetryQueue {
         Entry entry = new Entry(playerId, args, now, messageMethod);
         Entry existing = parked.putIfAbsent(playerId, entry);
         if (existing != null) {
-            RTP.log(Level.FINER,
+            RTPRuntime.log(Level.FINER,
                     "[RTP][lobbyRetry] duplicate enqueue ignored: playerId=" + playerId);
             return;
         }
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
                 "[RTP][state] lobbyRetry parked: playerId=" + playerId
                         + " firstReason=" + firstReason
                         + " maxAttempts=" + maxAttempts
@@ -120,7 +122,7 @@ public final class LobbyDispatchRetryQueue {
         long now = System.currentTimeMillis();
         boolean firstRecord = enrolled.put(playerId, new Entry(playerId, args, now, messageMethod)) == null;
         if (firstRecord) {
-            RTP.log(Level.FINE,
+            RTPRuntime.log(Level.FINE,
                     "[RTP][state] lobbyRetry recorded enrolment: playerId=" + playerId);
         }
     }
@@ -138,7 +140,7 @@ public final class LobbyDispatchRetryQueue {
         // Skip if the player is already parked (e.g. the retry pulse
         // re-enrolled them and a stale terminal listener race fired).
         if (parked.containsKey(playerId)) {
-            RTP.log(Level.FINER,
+            RTPRuntime.log(Level.FINER,
                     "[RTP][lobbyRetry] onTerminalFailure: already parked, skip re-park: playerId="
                             + playerId);
             return true;
@@ -146,7 +148,7 @@ public final class LobbyDispatchRetryQueue {
         long now = System.currentTimeMillis();
         Entry entry = new Entry(playerId, prev.args, now, prev.messageMethod);
         parked.put(playerId, entry);
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
                 "[RTP][state] lobbyRetry re-parked after enrolment timeout: playerId="
                         + playerId);
         return true;
@@ -183,20 +185,20 @@ public final class LobbyDispatchRetryQueue {
     }
 
     /**
-     * Start the periodic retry pulse on {@link RTP#scheduler}'s async
+     * Start the periodic retry pulse on {@link RTPRuntime#scheduler()}'s async
      * tier. Idempotent: a second call is a no-op.
      */
     public void start() {
         synchronized (this) {
             if (timerHandle != null) return;
-            if (RTP.scheduler == null) {
-                RTP.log(Level.WARNING,
+            if (RTPRuntime.scheduler() == null) {
+                RTPRuntime.log(Level.WARNING,
                         "[RTP][lobbyRetry] start called before scheduler available; "
                                 + "retry pulse not started.");
                 return;
             }
             long periodTicks = Math.max(1L, pulseIntervalMs / 50L);
-            timerHandle = RTP.scheduler.runTaskTimerAsynchronously(
+            timerHandle = RTPRuntime.scheduler().runTaskTimerAsynchronously(
                     this::pulse, periodTicks, periodTicks);
         }
     }
@@ -204,8 +206,8 @@ public final class LobbyDispatchRetryQueue {
     /** Idempotent. Cancels every parked retry with a terminal message. */
     public void shutdown() {
         synchronized (this) {
-            if (timerHandle != null && RTP.scheduler != null) {
-                try { RTP.scheduler.cancelTask(timerHandle); } catch (Throwable ignored) { /* best-effort */ }
+            if (timerHandle != null && RTPRuntime.scheduler() != null) {
+                try { RTPRuntime.scheduler().cancelTask(timerHandle); } catch (Throwable ignored) { /* best-effort */ }
             }
             timerHandle = null;
             // Drain: send a terminal message to anyone still parked. We use
@@ -234,7 +236,7 @@ public final class LobbyDispatchRetryQueue {
                 // parked so the next pulse retries. If the next pulse
                 // also throws past the TTL, the TTL check in advance()
                 // will eventually time it out and release the lock.
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "[RTP][lobbyRetry] advance threw for playerId="
                                 + entry.playerId + ": " + t.getMessage(), t);
             }
@@ -292,7 +294,7 @@ public final class LobbyDispatchRetryQueue {
                     cs.serverHint(),
                     now));
             parked.remove(entry.playerId);
-            RTP.log(Level.FINE,
+            RTPRuntime.log(Level.FINE,
                     "[RTP][state] lobbyRetry enrolled after " + entry.attempts
                             + " attempts: playerId=" + entry.playerId
                             + " correlationId=" + correlationId
@@ -314,7 +316,7 @@ public final class LobbyDispatchRetryQueue {
             }
             // Transient gate still tripped. Leave the entry parked; the
             // next pulse will retry. attempts++ already happened above.
-            RTP.log(Level.FINEST,
+            RTPRuntime.log(Level.FINEST,
                     "[RTP][lobbyRetry] still transient (" + reason
                             + ") for playerId=" + entry.playerId
                             + " attempt=" + entry.attempts);
@@ -337,7 +339,7 @@ public final class LobbyDispatchRetryQueue {
         parked.remove(entry.playerId);
         sendLocalized(entry, key, reasonDetail);
         releaseLock(entry.playerId);
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
                 "[RTP][state] lobbyRetry terminated: playerId=" + entry.playerId
                         + " reason=" + reasonDetail
                         + " attempts=" + entry.attempts);
@@ -347,7 +349,7 @@ public final class LobbyDispatchRetryQueue {
     private static void sendLocalized(Entry entry, Enum<?> key, String placeholder) {
         String tmpl;
         try {
-            tmpl = (String) RTP.configs.getConfigValue(key, "");
+            tmpl = (String) ActiveConfigs.get().getConfigValue(key, "");
         } catch (Throwable t) {
             tmpl = "";
         }
@@ -363,15 +365,15 @@ public final class LobbyDispatchRetryQueue {
         if (entry.messageMethod != null) {
             try { entry.messageMethod.accept(msg); }
             catch (Throwable t) { /* best-effort */ }
-        } else if (RTP.serverAccessor != null) {
-            try { RTP.serverAccessor.sendMessage(entry.playerId, msg); }
+        } else if (RTPRuntime.serverAccessor() != null) {
+            try { RTPRuntime.serverAccessor().sendMessage(entry.playerId, msg); }
             catch (Throwable t) { /* best-effort */ }
         }
     }
 
     private static void releaseLock(UUID playerId) {
         try {
-            RTP.getInstance().processingPlayers.remove(playerId);
+            TeleportSessions.current().processingPlayers.remove(playerId);
         } catch (Throwable t) {
             // Best-effort: RTP may be mid-shutdown.
         }

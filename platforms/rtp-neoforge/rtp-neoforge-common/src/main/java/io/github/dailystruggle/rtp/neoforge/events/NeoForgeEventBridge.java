@@ -1,10 +1,15 @@
 package io.github.dailystruggle.rtp.neoforge.events;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.LoginCacheTask;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.tasks.teleport.DeathTeleports;
 import io.github.dailystruggle.rtp.neoforge.server.NeoForgePlayerLifecycleHook;
 import io.github.dailystruggle.rtp.neoforge.server.NeoForgeServerAccessor;
 import net.minecraft.server.MinecraftServer;
@@ -83,9 +88,9 @@ public final class NeoForgeEventBridge {
             // AFTER placeNewPlayer finishes, off the critical login path, while
             // still guaranteeing /rtp is visible on first join.
             final MinecraftServer server = accessor.getServer();
-            if (server != null && RTP.scheduler != null) {
+            if (server != null && RTPRuntime.scheduler() != null) {
                 final UUID joinedId = player.getUUID();
-                RTP.scheduler.runTaskLater(() -> {
+                RTPRuntime.scheduler().runTaskLater(() -> {
                     try {
                         ServerPlayer online = server.getPlayerList().getPlayer(joinedId);
                         if (online != null) {
@@ -152,7 +157,7 @@ public final class NeoForgeEventBridge {
             if (event.getEntity() instanceof ServerPlayer player) {
                 UUID uuid = player.getUUID();
                 io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask pending =
-                        RTP.pendingDeathTeleports.remove(uuid);
+                        DeathTeleports.pending().remove(uuid);
                 if (pending != null) {
                     pending.completeDeathTeleport(true);
                 }
@@ -216,7 +221,7 @@ public final class NeoForgeEventBridge {
         if (server == null) return;
         try {
             ConfigParser<PerformanceKeys> perf =
-                    (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+                    (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
             if (perf == null) return;
             Object enabledObj = perf.getConfigValue(PerformanceKeys.loginCacheEnabled, false);
             boolean enabled = (enabledObj instanceof Boolean)
@@ -231,7 +236,7 @@ public final class NeoForgeEventBridge {
             } else {
                 int snapCap = 0;
                 try {
-                    snapCap = RTP.metrics.snapshot().softCap;
+                    snapCap = CoreMetrics.instance().snapshot().softCap;
                 } catch (Throwable ignored) {
                     // snapshot() is non-throwing by contract; defensive.
                 }
@@ -249,7 +254,7 @@ public final class NeoForgeEventBridge {
                 return;
             }
 
-            Region region = RTP.selectionAPI.permRegionLookup.values().stream()
+            Region region = ActiveSelection.get().permRegionLookup.values().stream()
                     .filter(r -> r.getWorld() != null && defaultWorldName.equals(r.getWorld().name()))
                     .findFirst()
                     .orElse(null);
@@ -267,7 +272,7 @@ public final class NeoForgeEventBridge {
 
             int online;
             try {
-                int snapOnline = RTP.metrics.snapshot().playerCount;
+                int snapOnline = CoreMetrics.instance().snapshot().playerCount;
                 online = (snapOnline > 0) ? snapOnline : server.getPlayerCount();
             } catch (Throwable ignored) {
                 online = server.getPlayerCount();
@@ -291,8 +296,8 @@ public final class NeoForgeEventBridge {
      */
     private static void refillLoginReserveOnQuit() {
         try {
-            if (RTP.getInstance() == null || RTP.selectionAPI == null) return;
-            for (Region region : RTP.selectionAPI.permRegionLookup.values()) {
+            if (RTP.getInstance() == null || ActiveSelection.get() == null) return;
+            for (Region region : ActiveSelection.get().permRegionLookup.values()) {
                 try {
                     if (region == null || region.queueManager == null) continue;
                     if (region.queueManager.loginLocations == null) continue;

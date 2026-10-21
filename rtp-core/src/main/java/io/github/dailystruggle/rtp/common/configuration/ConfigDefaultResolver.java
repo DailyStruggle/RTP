@@ -1,12 +1,12 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Locale;
 import java.util.Map;
 import java.util.logging.Level;
@@ -56,7 +56,7 @@ public final class ConfigDefaultResolver {
       case "safety":
         return fromParser(SafetyKeys.class, settingName, fallback);
       default:
-        RTP.log(Level.WARNING,
+        RTPRuntime.log(Level.WARNING,
             "[RTP] ADR-073: unknown config-default reference '@" + file + "' for setting '"
                 + settingName + "'; using fallback " + fallback);
         return fallback;
@@ -65,8 +65,8 @@ public final class ConfigDefaultResolver {
 
   @SuppressWarnings("unchecked")
   private static Object fromConfigDefaults(String settingName, Object fallback) {
-    if (RTP.configs == null) return fallback;
-    FactoryValue<ConfigKeys> fv = RTP.configs.getParser(ConfigKeys.class);
+    if (ActiveConfigs.get() == null) return fallback;
+    FactoryValue<ConfigKeys> fv = ActiveConfigs.get().getParser(ConfigKeys.class);
     if (!(fv instanceof ConfigParser)) return fallback;
     ConfigParser<ConfigKeys> cp = (ConfigParser<ConfigKeys>) fv;
     Object defaultsObj = cp.getData(ConfigKeys.defaults);
@@ -81,7 +81,7 @@ public final class ConfigDefaultResolver {
       Object dl = cp.getData(ConfigKeys.teleportDelay);
       if (dl != null) return dl;
     }
-    RTP.log(Level.WARNING,
+    RTPRuntime.log(Level.WARNING,
         "[RTP] ADR-073: config.yml#defaults." + settingName
             + " is missing; using fallback " + fallback);
     return fallback;
@@ -89,15 +89,15 @@ public final class ConfigDefaultResolver {
 
   private static <T extends Enum<T>> Object fromParser(Class<T> enumClass, String settingName,
                                                        Object fallback) {
-    if (RTP.configs == null) return fallback;
-    FactoryValue<T> fv = RTP.configs.getParser(enumClass);
+    if (ActiveConfigs.get() == null) return fallback;
+    FactoryValue<T> fv = ActiveConfigs.get().getParser(enumClass);
     if (!(fv instanceof ConfigParser)) return fallback;
     ConfigParser<T> cp = (ConfigParser<T>) fv;
     T key;
     try {
       key = Enum.valueOf(enumClass, settingName);
     } catch (IllegalArgumentException e) {
-      RTP.log(Level.WARNING,
+      RTPRuntime.log(Level.WARNING,
           "[RTP] ADR-073: " + enumClass.getSimpleName() + " has no default for setting '"
               + settingName + "'; using fallback " + fallback);
       return fallback;

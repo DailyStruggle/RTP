@@ -1,8 +1,9 @@
 package io.github.dailystruggle.rtp.neoforge.commands.test;
 
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaScheduler;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,12 +22,14 @@ class NeoForgeTestUmbrellaSchedulerTest {
 
   @BeforeEach
   void setUp() {
-    previousScheduler = RTP.scheduler;
+    // Mirror platform bootstrap: RTP's static init runs before any accessor is installed.
+    RTP.ensureInitialized();
+    previousScheduler = RTPRuntime.scheduler();
   }
 
   @AfterEach
   void tearDown() {
-    RTP.scheduler = previousScheduler;
+    RTPRuntime.setScheduler(previousScheduler);
   }
 
   @Test
@@ -47,7 +50,7 @@ class NeoForgeTestUmbrellaSchedulerTest {
   @DisplayName("runLater delegates to RTP.scheduler.runTaskTimerAsynchronously and cancels handle on fire")
   void runLaterWithScheduler() {
     RTPScheduler mockScheduler = mock(RTPScheduler.class);
-    RTP.scheduler = mockScheduler;
+    RTPRuntime.setScheduler(mockScheduler);
 
     Object handleToken = new Object();
     ArgumentCaptor<Runnable> runnableCaptor = ArgumentCaptor.forClass(Runnable.class);
@@ -72,7 +75,7 @@ class NeoForgeTestUmbrellaSchedulerTest {
   @Test
   @DisplayName("runLater fallback executes inline when RTP.scheduler is null")
   void runLaterFallbackNullScheduler() {
-    RTP.scheduler = null;
+    RTPRuntime.setScheduler(null);
     NeoForgeTestUmbrellaScheduler scheduler = new NeoForgeTestUmbrellaScheduler();
     AtomicBoolean executed = new AtomicBoolean(false);
 
@@ -86,7 +89,7 @@ class NeoForgeTestUmbrellaSchedulerTest {
     RTPScheduler mockScheduler = mock(RTPScheduler.class);
     when(mockScheduler.runTaskTimerAsynchronously(any(), anyLong(), anyLong()))
         .thenThrow(new RuntimeException("scheduler error"));
-    RTP.scheduler = mockScheduler;
+    RTPRuntime.setScheduler(mockScheduler);
 
     NeoForgeTestUmbrellaScheduler scheduler = new NeoForgeTestUmbrellaScheduler();
     AtomicBoolean executed = new AtomicBoolean(false);
@@ -98,7 +101,7 @@ class NeoForgeTestUmbrellaSchedulerTest {
   @Test
   @DisplayName("runLater swallows task exceptions safely (S-004 log warning, no throw)")
   void runLaterSafeTaskException() {
-    RTP.scheduler = null;
+    RTPRuntime.setScheduler(null);
     NeoForgeTestUmbrellaScheduler scheduler = new NeoForgeTestUmbrellaScheduler();
 
     assertDoesNotThrow(() -> scheduler.runLater(0L, () -> {

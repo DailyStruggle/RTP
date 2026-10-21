@@ -2,9 +2,9 @@ package io.github.dailystruggle.rtp.common.commands.config;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.base.SearchCommandHandlerAware;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
@@ -107,14 +107,14 @@ public class ConfigSearchSubCmd extends BaseRTPCmdImpl implements SearchCommandH
         List<String> qArgs = parameterValues.get(PARAM_QUERY);
         String query = (qArgs == null || qArgs.isEmpty()) ? "" : qArgs.get(0);
         if (handler == null) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "config search invoked without a wired handler (renderer disabled?) for " + callerId);
             return false;
         }
         try {
             handler.onSearch(callerId, query);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "config search handler failed for " + callerId
                             + " query='" + query + "': " + e.getMessage(), e);
             return false;

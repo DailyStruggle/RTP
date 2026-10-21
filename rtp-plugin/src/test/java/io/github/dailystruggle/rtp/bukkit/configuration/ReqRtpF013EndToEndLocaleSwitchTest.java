@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import java.io.File;
@@ -42,7 +42,7 @@ public class ReqRtpF013EndToEndLocaleSwitchTest {
     File languageFile = new File(dir, LanguageBootstrap.FILE_NAME);
     Files.writeString(languageFile.toPath(), "language: fr\n");
 
-    RTP.configs.reloadConfigs();
+    ActiveConfigs.get().reloadConfigs();
 
     String afterSwitch = Files.readString(playerFile.toPath());
     assertNotEquals(
@@ -80,7 +80,7 @@ public class ReqRtpF013EndToEndLocaleSwitchTest {
     File languageFile = new File(dir, LanguageBootstrap.FILE_NAME);
     Files.writeString(languageFile.toPath(), "language: fr\n");
 
-    RTP.configs.reloadConfigs();
+    ActiveConfigs.get().reloadConfigs();
 
     String afterSwitch = Files.readString(playerFile.toPath());
     assertNotEquals(
@@ -109,13 +109,13 @@ public class ReqRtpF013EndToEndLocaleSwitchTest {
 
     File languageFile = new File(dir, LanguageBootstrap.FILE_NAME);
     Files.writeString(languageFile.toPath(), "language: fr\n");
-    RTP.configs.reloadConfigs();
+    ActiveConfigs.get().reloadConfigs();
     String french = Files.readString(playerFile.toPath());
     assertNotEquals(english, french, "precondition: fr switch did not localize player.yml");
 
     // Switch back to English.
     Files.writeString(languageFile.toPath(), "language: en\n");
-    RTP.configs.reloadConfigs();
+    ActiveConfigs.get().reloadConfigs();
     String back = Files.readString(playerFile.toPath());
     assertEquals(
         english,
@@ -135,12 +135,12 @@ public class ReqRtpF013EndToEndLocaleSwitchTest {
     RTPTestSetup.install(dir);
     File languageFile = new File(dir, LanguageBootstrap.FILE_NAME);
     Files.writeString(languageFile.toPath(), "language: fr\n");
-    RTP.configs.reloadConfigs();
+    ActiveConfigs.get().reloadConfigs();
 
     // A second and third reload with the SAME locale (no change) must not create *.old2 for any
     // migrated file - the migration is idempotent once the file is already in the active locale.
-    RTP.configs.reloadConfigs();
-    RTP.configs.reloadConfigs();
+    ActiveConfigs.get().reloadConfigs();
+    ActiveConfigs.get().reloadConfigs();
 
     for (String rel :
         new String[] {
@@ -170,7 +170,7 @@ public class ReqRtpF013EndToEndLocaleSwitchTest {
 
     File languageFile = new File(dir, LanguageBootstrap.FILE_NAME);
     Files.writeString(languageFile.toPath(), "language: fr\n");
-    RTP.configs.reloadConfigs();
+    ActiveConfigs.get().reloadConfigs();
 
     String french = Files.readString(biomes.toPath());
     assertNotEquals(
@@ -193,7 +193,7 @@ public class ReqRtpF013EndToEndLocaleSwitchTest {
     RTPTestSetup.install(dir);
     File languageFile = new File(dir, LanguageBootstrap.FILE_NAME);
     Files.writeString(languageFile.toPath(), "language: fr\n");
-    RTP.configs.reloadConfigs();
+    ActiveConfigs.get().reloadConfigs();
 
     File langMirror = new File(dir, "lang");
     assertFalse(
@@ -221,7 +221,7 @@ public class ReqRtpF013EndToEndLocaleSwitchTest {
     RTPTestSetup.install(dir);
     File languageFile = new File(dir, LanguageBootstrap.FILE_NAME);
     Files.writeString(languageFile.toPath(), "language: fr\n");
-    RTP.configs.reloadConfigs();
+    ActiveConfigs.get().reloadConfigs();
 
     // Simulate the old on-disk layout: a stray lang/fr mirror with a rename-map dotfile.
     File stray = new File(dir, "lang/fr/advanced/messages/.player.lang.yml");
@@ -229,7 +229,7 @@ public class ReqRtpF013EndToEndLocaleSwitchTest {
     Files.writeString(stray.toPath(), "teleportMessage: teleportMessage\n");
     assertTrue(stray.exists(), "precondition: could not seed the legacy mirror");
 
-    RTP.configs.reloadConfigs();
+    ActiveConfigs.get().reloadConfigs();
 
     assertFalse(new File(dir, "lang").exists(), "legacy data-dir lang/ mirror was not purged");
   }

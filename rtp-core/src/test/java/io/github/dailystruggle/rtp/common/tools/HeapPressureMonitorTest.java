@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.tools;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -58,7 +58,7 @@ public class HeapPressureMonitorTest {
     void disabledWhenMaxHeapPercentZeroOrNegative() throws Exception {
         @SuppressWarnings("unchecked")
         ConfigParser<PerformanceKeys> perf =
-                (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+                (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         assertNotNull(perf);
         perf.set(PerformanceKeys.maxHeapPercent, 0.0);
 
@@ -79,7 +79,7 @@ public class HeapPressureMonitorTest {
     void disabledWhenMaxHeapPercentGreaterOrEqualTo100() throws Exception {
         @SuppressWarnings("unchecked")
         ConfigParser<PerformanceKeys> perf =
-                (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+                (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         assertNotNull(perf);
         perf.set(PerformanceKeys.maxHeapPercent, 100.0);
 
@@ -111,7 +111,7 @@ public class HeapPressureMonitorTest {
     void tripsPressureWhenThresholdIsExtremelyLow() throws Exception {
         @SuppressWarnings("unchecked")
         ConfigParser<PerformanceKeys> perf =
-                (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+                (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         assertNotNull(perf);
         try {
             // Setting threshold to 0.0001% ensures it trips unless gate logic prevents it
@@ -151,7 +151,7 @@ public class HeapPressureMonitorTest {
     void resumesWhenPressureSubsides() throws Exception {
         @SuppressWarnings("unchecked")
         ConfigParser<PerformanceKeys> perf =
-                (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+                (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         assertNotNull(perf);
         try {
             // First trip pressure with an extremely low threshold

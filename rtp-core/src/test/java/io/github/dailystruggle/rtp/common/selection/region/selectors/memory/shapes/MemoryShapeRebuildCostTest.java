@@ -2,8 +2,8 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.lang.management.ManagementFactory;
 import java.util.Random;
 import org.junit.jupiter.api.BeforeAll;
@@ -31,7 +31,7 @@ public class MemoryShapeRebuildCostTest {
 
   @BeforeAll
   public static void setup() {
-    RTP.serverAccessor = new MockRTPServerAccessor(new java.io.File("target/test-data"));
+    RTPRuntime.setServerAccessor(new MockRTPServerAccessor(new java.io.File("target/test-data")));
   }
 
   private static long allocatedBytes() {

@@ -2,12 +2,13 @@ package io.github.dailystruggle.rtp.bukkit.commands.test;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaScheduler;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 /**
  * Bukkit-family implementation of {@link TestUmbrellaScheduler}. Delegates
- * deferred dispatch to {@link RTP#scheduler}: the same
+ * deferred dispatch to {@link RTPRuntime#scheduler()}: the same
  * {@code RTPScheduler} abstraction already used by
  * {@code TestFullCmd#runStep} (async on Spigot/Paper, async-timer on
  * Folia per existing platform pattern).
@@ -36,7 +37,7 @@ public final class BukkitTestUmbrellaScheduler implements TestUmbrellaScheduler 
       }
     };
     try {
-      if (RTP.scheduler != null) {
+      if (RTPRuntime.scheduler() != null) {
         // Single-shot via the async timer scheduler: schedule a
         // self-cancelling timer that fires once after `delay` ms. The
         // delay is converted to server ticks (20 Hz) per
@@ -46,11 +47,11 @@ public final class BukkitTestUmbrellaScheduler implements TestUmbrellaScheduler 
         // pattern).
         long delayTicks = Math.max(1L, (delay + 49L) / 50L);
         final Object[] handle = new Object[1];
-        handle[0] = RTP.scheduler.runTaskTimerAsynchronously(
+        handle[0] = RTPRuntime.scheduler().runTaskTimerAsynchronously(
             () -> {
               try {
                 if (handle[0] != null) {
-                  RTP.scheduler.cancelTask(handle[0]);
+                  RTPRuntime.scheduler().cancelTask(handle[0]);
                   handle[0] = null;
                 }
               } catch (Throwable ignored) {

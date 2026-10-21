@@ -4,6 +4,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.CircleOptimizedDualLayer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
@@ -19,11 +22,11 @@ class OptimizedShapesRegistrationTest {
   @Test
   @DisplayName("ShapeFactory contains new dual-layer shapes and deprecated pure-spiral aliases")
   void testShapeFactoryRegistration() {
-    Factory<Shape<?>> shapeFactory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+    Factory<Shape<?>> shapeFactory = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
     if (shapeFactory == null) {
       shapeFactory = new Factory<>();
-      RTP.factoryMap.put(RTP.factoryNames.shape, shapeFactory);
-      RTP.selectionAPI.shapeFactory = shapeFactory;
+      FactoryRegistry.map().put(FactoryNames.shape, shapeFactory);
+      ActiveSelection.get().shapeFactory = shapeFactory;
     }
 
     // Register test shapes if not already present

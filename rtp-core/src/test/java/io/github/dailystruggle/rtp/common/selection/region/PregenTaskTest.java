@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.common.selection.region;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
@@ -12,6 +12,7 @@ import io.github.dailystruggle.rtp.common.mock.MockRTPChunk;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
@@ -52,7 +53,7 @@ class PregenTaskTest {
         world = new MockRTPWorld("pregen_world");
         accessor.addWorld(world);
 
-        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
+        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) ActiveConfigs.get().getParser(LoggingKeys.class);
         logging.set(LoggingKeys.selection_failure, true);
 
         square = new Square();
@@ -80,8 +81,8 @@ class PregenTaskTest {
 
     @AfterEach
     void tearDown() {
-        RTP.serverAccessor = null;
-        RTP.scheduler = null;
+        RTPRuntime.setServerAccessor(null);
+        RTPRuntime.setScheduler(null);
         LocationGenerator.setRng(null);
     }
 
@@ -107,10 +108,10 @@ class PregenTaskTest {
     }
 
     private PregenState createState(long maxAttempts, boolean verbose) {
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         perf.set(PerformanceKeys.maxAttempts, maxAttempts);
 
-        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
+        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) ActiveConfigs.get().getParser(LoggingKeys.class);
         logging.set(LoggingKeys.selection_failure, verbose);
 
         return PregenState.build(region, Set.of("PLAINS"));
@@ -147,7 +148,7 @@ class PregenTaskTest {
     @Test
     @DisplayName("Forced biome recall with unrecorded biomes aborts immediately")
     void testForcedBiomeRecallUnrecorded() throws ExecutionException, InterruptedException {
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         perf.set(PerformanceKeys.biomeRecall, true);
         perf.set(PerformanceKeys.biomeRecallForced, true);
 
@@ -208,7 +209,7 @@ class PregenTaskTest {
     @DisplayName("Probabilistic pregenerated rejection rejects candidate chunk")
     void testPregeneratedPreferenceRejection() throws ExecutionException, InterruptedException {
         createState(1L, true);
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         perf.set(PerformanceKeys.pregeneratedPreference, 1.0); // 100% rejection if ungenerated
 
         MockRTPWorld spyWorld = spy(world);
@@ -352,7 +353,7 @@ class PregenTaskTest {
     @Test
     @DisplayName("Self-contained chunk (Anvil) bypasses live reservation and succeeds")
     void testSelfContainedChunkSuccess() throws ExecutionException, InterruptedException {
-        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
         safety.set(SafetyKeys.safetyRadius, 0);
 
         MockRTPChunk chunk = spy(new MockRTPChunk(0, 0, world));
@@ -380,7 +381,7 @@ class PregenTaskTest {
     @Test
     @DisplayName("Live-backed chunk dispatch evaluates on region thread and succeeds")
     void testLiveChunkSuccess() throws ExecutionException, InterruptedException {
-        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
         safety.set(SafetyKeys.safetyRadius, 0);
 
         MockRTPChunk chunk = spy(new MockRTPChunk(0, 0, world));
@@ -410,7 +411,7 @@ class PregenTaskTest {
     @Test
     @DisplayName("vert.adjust returning null marks bad chunk and records vert fail")
     void testVertAdjustFails() throws ExecutionException, InterruptedException {
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         perf.set(PerformanceKeys.biomeRecall, true);
         perf.set(PerformanceKeys.maxAttempts, 1L);
 
@@ -444,7 +445,7 @@ class PregenTaskTest {
     @Test
     @DisplayName("Biome mismatch marks bad chunk and records biome fail")
     void testBiomeMismatchFails() throws ExecutionException, InterruptedException {
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         perf.set(PerformanceKeys.maxAttempts, 1L);
 
         MockRTPChunk chunk = spy(new MockRTPChunk(0, 0, world));
@@ -470,7 +471,7 @@ class PregenTaskTest {
     @Test
     @DisplayName("Safety check failure records safety fail")
     void testSafetyCheckBlockReject() throws ExecutionException, InterruptedException {
-        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
         safety.set(SafetyKeys.safetyRadius, 0);
 
         MockRTPWorld spyWorld = spy(world);
@@ -845,7 +846,7 @@ class PregenTaskTest {
     @Test
     @DisplayName("Biome draw tables: multiple biomes with configured weight ratios and limits")
     void testBiomeDrawTablesWithWeightsAndLimits() throws Exception {
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         perf.set(PerformanceKeys.biomeRecall, true);
         perf.set(PerformanceKeys.biomeRecallForced, false);
 

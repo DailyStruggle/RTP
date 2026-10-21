@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
@@ -94,11 +94,11 @@ public final class RegionCacheKey {
    * Serializes active safety config keys into the canonical hash buffer.
    */
   private static void appendSafetySnapshot(StringBuilder sb) {
-    if (RTP.configs == null) return;
+    if (ActiveConfigs.get() == null) return;
     for (Enum<?> key : SAFETY_HASH_KEYS) {
       Object value;
       try {
-        value = RTP.configs.getConfigValue(key, null);
+        value = ActiveConfigs.get().getConfigValue(key, null);
       } catch (RuntimeException e) {
         return;
       }

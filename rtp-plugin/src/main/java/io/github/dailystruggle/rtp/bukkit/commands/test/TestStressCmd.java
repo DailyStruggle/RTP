@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.base.RTPCmd;
 import io.github.dailystruggle.rtp.common.commands.parameters.IntegerParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -101,7 +102,7 @@ public class TestStressCmd extends BaseRTPCmdImpl {
 
     List<String> playerNames = parameterValues.get("player");
     if (playerNames == null || playerNames.isEmpty()) {
-      RTP.serverAccessor.sendMessage(
+      RTPRuntime.serverAccessor().sendMessage(
           callerId, "&c[RTP test/stress] missing required player:<name> argument");
       RTP.log(
           Level.WARNING,
@@ -112,11 +113,11 @@ public class TestStressCmd extends BaseRTPCmdImpl {
     // Resolve players up-front so typos fail loud (S-004).
     List<RTPPlayer> targets = new ArrayList<>(playerNames.size());
     for (String name : playerNames) {
-      RTPPlayer p = RTP.serverAccessor.getPlayer(name);
+      RTPPlayer p = RTPRuntime.serverAccessor().getPlayer(name);
       if (p == null) {
         String msg = "&c[RTP test/stress] unknown player: " + name;
         if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-          RTP.serverAccessor.sendMessage(callerId, msg);
+          RTPRuntime.serverAccessor().sendMessage(callerId, msg);
         }
         RTP.log(Level.WARNING, msg);
         continue;
@@ -144,7 +145,7 @@ public class TestStressCmd extends BaseRTPCmdImpl {
     if (rootCmd == null) {
       String msg = "&c[RTP test/stress] root rtp command not found; aborting";
       if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, msg);
+        RTPRuntime.serverAccessor().sendMessage(callerId, msg);
       }
       RTP.log(Level.WARNING, msg);
       return true;
@@ -165,7 +166,7 @@ public class TestStressCmd extends BaseRTPCmdImpl {
             + intervalTicks
             + " ticks";
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, startMsg);
+      RTPRuntime.serverAccessor().sendMessage(callerId, startMsg);
     }
     RTP.log(Level.INFO, startMsg);
 
@@ -205,13 +206,13 @@ public class TestStressCmd extends BaseRTPCmdImpl {
                     + " failures="
                     + failures.get();
             if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-              RTP.serverAccessor.sendMessage(callerId, summary);
+              RTPRuntime.serverAccessor().sendMessage(callerId, summary);
             }
             RTP.log(Level.INFO, summary);
             Object h = handleHolder[0];
             if (h != null) {
               try {
-                RTP.scheduler.cancelTask(h);
+                RTPRuntime.scheduler().cancelTask(h);
               } catch (Throwable ignored) {
                 // Schedulers without a public cancel API will let the timer
                 // decay naturally; we stop rescheduling below.
@@ -223,7 +224,7 @@ public class TestStressCmd extends BaseRTPCmdImpl {
         };
 
     handleHolder[0] =
-        RTP.scheduler.runTaskTimerAsynchronously(
+        RTPRuntime.scheduler().runTaskTimerAsynchronously(
             new Runnable() {
               @Override
               public void run() {
@@ -245,7 +246,7 @@ public class TestStressCmd extends BaseRTPCmdImpl {
           Object h = handleHolder[0];
           if (h != null) {
             try {
-              RTP.scheduler.cancelTask(h);
+              RTPRuntime.scheduler().cancelTask(h);
             } catch (Throwable ignored) {
               // best-effort; see ActiveTestJobs.cancelOwned
             }
@@ -258,7 +259,7 @@ public class TestStressCmd extends BaseRTPCmdImpl {
                   + " iterations (failures="
                   + failures.get()
                   + ")";
-          RTP.serverAccessor.sendMessage(callerId, msg);
+          RTPRuntime.serverAccessor().sendMessage(callerId, msg);
           RTP.log(Level.INFO, msg);
         };
     unregisterHolder[0] =

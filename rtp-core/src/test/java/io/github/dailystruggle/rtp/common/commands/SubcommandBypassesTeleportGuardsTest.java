@@ -7,11 +7,12 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -66,13 +67,13 @@ public class SubcommandBypassesTeleportGuardsTest {
         data.put(PlayerMessages.alreadyTeleporting, "you're already teleporting!");
         data.put(PlayerMessages.cooldownMessage, "cooldown active");
         data.forEach((k, v) -> {
-            Object fv = RTP.configs.getParser((Class) k.getDeclaringClass());
+            Object fv = ActiveConfigs.get().getParser((Class) k.getDeclaringClass());
             if (fv instanceof io.github.dailystruggle.rtp.common.configuration.ConfigParser) {
                 ((io.github.dailystruggle.rtp.common.configuration.ConfigParser) fv).set((Enum) k, v);
             }
         });
 
-        RTP.getInstance().processingPlayers.clear();
+        TeleportSessions.current().processingPlayers.clear();
     }
 
     @Test
@@ -81,7 +82,7 @@ public class SubcommandBypassesTeleportGuardsTest {
         accessor.addPlayer(sender);
 
         // Simulate an in-flight teleport: sender is in processingPlayers.
-        RTP.getInstance().processingPlayers.add(sender.uuid());
+        TeleportSessions.current().processingPlayers.add(sender.uuid());
 
         TestRTPCmd rtpCmd = new TestRTPCmd();
         rtpCmd.addSubCommand(new InfoCmd(rtpCmd));
@@ -103,7 +104,7 @@ public class SubcommandBypassesTeleportGuardsTest {
         accessor.addPlayer(sender);
 
         // Simulate an in-flight teleport: sender is in processingPlayers.
-        RTP.getInstance().processingPlayers.add(sender.uuid());
+        TeleportSessions.current().processingPlayers.add(sender.uuid());
 
         TestRTPCmd rtpCmd = new TestRTPCmd();
         rtpCmd.addSubCommand(new InfoCmd(rtpCmd));
@@ -124,7 +125,7 @@ public class SubcommandBypassesTeleportGuardsTest {
         MockRTPPlayer sender = new MockRTPPlayer(UUID.randomUUID(), "test", null);
         accessor.addPlayer(sender);
 
-        RTP.getInstance().processingPlayers.add(sender.uuid());
+        TeleportSessions.current().processingPlayers.add(sender.uuid());
 
         TestRTPCmd rtpCmd = new TestRTPCmd();
         rtpCmd.addSubCommand(new InfoCmd(rtpCmd));

@@ -6,7 +6,7 @@ import io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry.Provider;
 import io.github.dailystruggle.rtp.api.hooks.AnvilPrefilterRegistry.Provider.Decision;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -143,7 +143,7 @@ final class BacklogBinVerifier {
       } else if (now - b.submittedNanos() > TIMEOUT_NANOS) {
         b.future().cancel(false);
         TIMED_OUT.incrementAndGet();
-        RTP.log(Level.WARNING, "[RTP] Backlog batch for region file " + b.key() + " exceeded "
+        RTPRuntime.log(Level.WARNING, "[RTP] Backlog batch for region file " + b.key() + " exceeded "
             + (TIMEOUT_NANOS / 1_000_000L) + " ms; " + b.entries().size()
             + " candidate(s) left to the cold fill's chunk-load check");
         results = Collections.emptyMap();
@@ -176,7 +176,7 @@ final class BacklogBinVerifier {
       CHUNKS.addAndGet(chunks.size());
       return (out == null) ? Collections.emptyMap() : out;
     } catch (Throwable t) {
-      RTP.log(Level.FINE, "[RTP] Backlog classifyBatch failed; batch left to the cold fill's check: " + t);
+      RTPRuntime.log(Level.FINE, "[RTP] Backlog classifyBatch failed; batch left to the cold fill's check: " + t);
       return Collections.emptyMap();
     }
   }

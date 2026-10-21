@@ -1,15 +1,15 @@
 package io.github.dailystruggle.rtp.common.commands.admin;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
 
 /**
  * {@code /rtp clear invuln} child verb. Drops post-teleport invulnerability grace markers
- * ({@link RTP#invulnerablePlayers}). Permission: {@code rtp.admin}.
+ * ({@link TeleportSessions#invulnerablePlayers}). Permission: {@code rtp.admin}.
  */
 public class ClearInvulnCmd extends PlayerTargetedClearCmd {
 
@@ -39,18 +39,18 @@ public class ClearInvulnCmd extends PlayerTargetedClearCmd {
 
   @Override
   protected int clearAll() {
-    RTP rtp = RTP.getInstance();
-    if (rtp == null) return 0;
-    int size = rtp.invulnerablePlayers.size();
-    rtp.invulnerablePlayers.clear();
+    TeleportSessions sessions = TeleportSessions.current();
+    if (sessions == null) return 0;
+    int size = TeleportSessions.current().invulnerablePlayers.size();
+    TeleportSessions.current().invulnerablePlayers.clear();
     return size;
   }
 
   @Override
   protected boolean clearOne(UUID uuid) {
     if (uuid == null) return false;
-    RTP rtp = RTP.getInstance();
-    if (rtp == null) return false;
-    return rtp.invulnerablePlayers.remove(uuid) != null;
+    TeleportSessions sessions = TeleportSessions.current();
+    if (sessions == null) return false;
+    return TeleportSessions.current().invulnerablePlayers.remove(uuid) != null;
   }
 }

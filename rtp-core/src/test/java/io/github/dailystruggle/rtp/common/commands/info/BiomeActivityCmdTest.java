@@ -4,6 +4,7 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.AfterEach;
@@ -61,7 +62,7 @@ class BiomeActivityCmdTest {
     @SuppressWarnings("unchecked")
     private static void installTemplates(String empty, String header, String row) {
         ConfigParser<CommandMessages> lang =
-                (ConfigParser<CommandMessages>) RTP.configs.getParser(CommandMessages.class);
+                (ConfigParser<CommandMessages>) ActiveConfigs.get().getParser(CommandMessages.class);
         lang.setData(Map.of(
                 "infoBiomeActivityEmpty", empty,
                 "infoBiomeActivityHeader", header,

@@ -13,6 +13,7 @@ import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
 import io.github.dailystruggle.rtp.common.commands.maps.MapDispatch;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -52,8 +53,8 @@ class InfoBookBuilderTest {
 
     @AfterEach
     void tearDown() {
-        RTP.serverAccessor = null;
-        RTP.scheduler = null;
+        RTPRuntime.setServerAccessor(null);
+        RTPRuntime.setScheduler(null);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
         MapDispatch.setMapBinding(new NoopMapBinding());
     }

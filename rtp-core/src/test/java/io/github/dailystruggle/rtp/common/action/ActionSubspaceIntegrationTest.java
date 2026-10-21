@@ -16,6 +16,8 @@ import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.GroupPlacementDispatcher;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import org.junit.jupiter.api.AfterEach;
@@ -74,8 +76,8 @@ class ActionSubspaceIntegrationTest {
   @BeforeEach
   void setUp() {
     serverAccessor = RTPTestSetup.install(tempDir);
-    RTP.serverAccessor = serverAccessor;
-    RTP.scheduler = serverAccessor.getMockScheduler();
+    RTPRuntime.setServerAccessor(serverAccessor);
+    RTPRuntime.setScheduler(serverAccessor.getMockScheduler());
     originalGroupService = RTP.groupPlacementService;
 
     world = (MockRTPWorld) serverAccessor.getRTPWorld("world");
@@ -88,12 +90,7 @@ class ActionSubspaceIntegrationTest {
     // Initialize real Action Engine Manager
     actionManager = new ActionManager();
     io.github.dailystruggle.rtp.api.RTPAPI.actionService = actionManager;
-    try {
-      java.lang.reflect.Field f = RTP.class.getDeclaredField("actionManager");
-      f.setAccessible(true);
-      f.set(null, actionManager);
-    } catch (Exception ignored) {
-    }
+    io.github.dailystruggle.rtp.common.action.ActionServices.setActionManager(actionManager);
 
     // Set up root command tree
     rootCommand = new CoreRtpRoot();
@@ -120,14 +117,14 @@ class ActionSubspaceIntegrationTest {
         .thenReturn(false);
     org.mockito.Mockito.doReturn(memShape).when(mockRegion).getShape();
 
-    RTP.selectionAPI.permRegionLookup.put("arena_region", mockRegion);
-    RTP.selectionAPI.permRegionLookup.put("default", mockRegion);
+    ActiveSelection.get().permRegionLookup.put("arena_region", mockRegion);
+    ActiveSelection.get().permRegionLookup.put("default", mockRegion);
   }
 
   @AfterEach
   void tearDown() {
-    RTP.selectionAPI.permRegionLookup.remove("arena_region");
-    RTP.selectionAPI.permRegionLookup.remove("default");
+    ActiveSelection.get().permRegionLookup.remove("arena_region");
+    ActiveSelection.get().permRegionLookup.remove("default");
     RTP.groupPlacementService = originalGroupService;
     RTPTestSetup.cleanUp();
   }

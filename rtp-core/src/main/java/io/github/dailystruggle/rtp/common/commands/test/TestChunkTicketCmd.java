@@ -3,8 +3,8 @@ package io.github.dailystruggle.rtp.common.commands.test;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 import java.util.List;
 import java.util.Map;
@@ -64,19 +64,19 @@ public class TestChunkTicketCmd extends BaseRTPCmdImpl {
     if (nextCommand != null) return true;
 
     RTPWorld<?> world = null;
-    if (RTP.serverAccessor != null) {
-      RTPPlayer player = RTP.serverAccessor.getPlayer(callerId);
+    if (RTPRuntime.serverAccessor() != null) {
+      RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(callerId);
       if (player != null && player.getLocation() != null) {
         world = player.getLocation().world();
       }
       if (world == null) {
-        List<RTPWorld<?>> worlds = RTP.serverAccessor.getRTPWorlds();
+        List<RTPWorld<?>> worlds = RTPRuntime.serverAccessor().getRTPWorlds();
         if (worlds != null && !worlds.isEmpty()) {
           world = worlds.get(0);
         }
       }
       if (world == null) {
-        world = RTP.serverAccessor.getRTPWorld("world");
+        world = RTPRuntime.serverAccessor().getRTPWorld("world");
       }
     }
 
@@ -88,13 +88,13 @@ public class TestChunkTicketCmd extends BaseRTPCmdImpl {
   /** Core probe without target world; resolves default world if available or falls back. */
   public static Result runProbe() {
     RTPWorld<?> world = null;
-    if (RTP.serverAccessor != null) {
-      List<RTPWorld<?>> worlds = RTP.serverAccessor.getRTPWorlds();
+    if (RTPRuntime.serverAccessor() != null) {
+      List<RTPWorld<?>> worlds = RTPRuntime.serverAccessor().getRTPWorlds();
       if (worlds != null && !worlds.isEmpty()) {
         world = worlds.get(0);
       }
       if (world == null) {
-        world = RTP.serverAccessor.getRTPWorld("world");
+        world = RTPRuntime.serverAccessor().getRTPWorld("world");
       }
     }
     return runProbe(world);
@@ -358,16 +358,16 @@ public class TestChunkTicketCmd extends BaseRTPCmdImpl {
     }
 
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, summary);
+      RTPRuntime.serverAccessor().sendMessage(callerId, summary);
     }
     // S-004: failing run logs at WARNING; clean run at INFO.
-    RTP.log(r.pass ? Level.INFO : Level.WARNING, summary);
+    RTPRuntime.log(r.pass ? Level.INFO : Level.WARNING, summary);
 
     if (r.staleBaseline != 0) {
       // Advisory, not a failure in itself: a previous aborted probe left
       // sentinels behind. Flag loudly because it implies the previous run
       // was interrupted (cancelled, exception) without a cleanup path.
-      RTP.log(
+      RTPRuntime.log(
           Level.WARNING,
           "[RTP test/chunk-ticket] stale sentinels from a previous run detected; count="
               + r.staleBaseline);

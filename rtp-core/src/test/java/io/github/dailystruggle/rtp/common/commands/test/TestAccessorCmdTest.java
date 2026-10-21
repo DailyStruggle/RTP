@@ -6,10 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -68,7 +68,7 @@ class TestAccessorCmdTest {
 
   @Test
   void runProbe_nullServerAccessor_failsGracefully() {
-    RTP.serverAccessor = null;
+    RTPRuntime.setServerAccessor(null);
     TestAccessorCmd.Result r = TestAccessorCmd.runProbe(RTPAPI.serverId);
     assertFalse(r.pass);
     assertTrue(r.message.contains("RTPServerAccessor is null"));
@@ -82,7 +82,7 @@ class TestAccessorCmdTest {
         return new HashSet<>();
       }
     };
-    RTP.serverAccessor = emptyMatsAccessor;
+    RTPRuntime.setServerAccessor(emptyMatsAccessor);
     RTPAPI.serverAccessor = emptyMatsAccessor;
 
     TestAccessorCmd.Result r = TestAccessorCmd.runProbe(RTPAPI.serverId);
@@ -103,7 +103,7 @@ class TestAccessorCmdTest {
         return out;
       }
     };
-    RTP.serverAccessor = namespacedAccessor;
+    RTPRuntime.setServerAccessor(namespacedAccessor);
     RTPAPI.serverAccessor = namespacedAccessor;
 
     TestAccessorCmd.Result r = TestAccessorCmd.runProbe(RTPAPI.serverId);
@@ -120,7 +120,7 @@ class TestAccessorCmdTest {
         return out;
       }
     };
-    RTP.serverAccessor = unknownMatsAccessor;
+    RTPRuntime.setServerAccessor(unknownMatsAccessor);
     RTPAPI.serverAccessor = unknownMatsAccessor;
 
     TestAccessorCmd.Result r = TestAccessorCmd.runProbe(RTPAPI.serverId);

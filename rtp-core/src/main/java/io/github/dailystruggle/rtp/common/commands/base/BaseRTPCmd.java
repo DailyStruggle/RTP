@@ -6,6 +6,8 @@ import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -23,7 +25,7 @@ public interface BaseRTPCmd extends TreeCommand {
    * @return the message string
    */
   default String msg(Enum<?> key, Object defaultValue) {
-    Object configValue = RTP.configs.getConfigValue(key, defaultValue);
+    Object configValue = ActiveConfigs.get().getConfigValue(key, defaultValue);
     return configValue != null ? configValue.toString() : String.valueOf(defaultValue);
   }
 
@@ -39,15 +41,15 @@ public interface BaseRTPCmd extends TreeCommand {
     // When a platform MessageSink is installed it owns formatting AND audit
     // (its delivery path fires the REQ-RTP-S-004 interceptor), so pre-format
     // the template and deliver through the supplied consumer without an extra
-    // RTP.log -- a second log here would duplicate the console line. This
+    // RTPRuntime.log -- a second log here would duplicate the console line. This
     // replaces the per-platform msg override (formerly BukkitBaseRTPCmd).
     if (messageMethod != null && CommandsAPI.getMessageSink() != null) {
-      messageMethod.accept(RTP.serverAccessor.format(callerId, msg));
+      messageMethod.accept(RTPRuntime.serverAccessor().format(callerId, msg));
       return;
     }
     if(messageMethod != null) messageMethod.accept(msg);
-    else RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg, null);
-    RTP.log(Level.WARNING, msg);
+    else RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, msg, null);
+    RTPRuntime.log(Level.WARNING, msg);
   }
 
   @Override
@@ -60,17 +62,17 @@ public interface BaseRTPCmd extends TreeCommand {
     String msg = msg(PlayerMessages.invalidCommand, "[P0] invalid command - [arg]");
     msg = msg.replace("[arg]", argument);
     // See msgBadParameter: a platform MessageSink owns formatting + audit, so
-    // pre-format and deliver via the consumer without a duplicate RTP.log.
+    // pre-format and deliver via the consumer without a duplicate RTPRuntime.log.
     if (messageMethod != null && CommandsAPI.getMessageSink() != null) {
-      messageMethod.accept(RTP.serverAccessor.format(callerId, msg));
+      messageMethod.accept(RTPRuntime.serverAccessor().format(callerId, msg));
       return;
     }
     if(messageMethod != null) {
         messageMethod.accept(msg);
     } else {
-        RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg, null);
+        RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, msg, null);
     }
-    RTP.log(Level.WARNING, msg);
+    RTPRuntime.log(Level.WARNING, msg);
   }
 
   @Override
@@ -82,15 +84,15 @@ public interface BaseRTPCmd extends TreeCommand {
   default void msgNoPermission(UUID callerId, String permission, java.util.function.Consumer<String> messageMethod) {
     String msg = msg(PlayerMessages.noPerms, "&c[P0] you do not have permission to use that command");
     if (messageMethod != null && CommandsAPI.getMessageSink() != null) {
-      messageMethod.accept(RTP.serverAccessor.format(callerId, msg));
+      messageMethod.accept(RTPRuntime.serverAccessor().format(callerId, msg));
       return;
     }
     if (messageMethod != null) {
       messageMethod.accept(msg);
     } else {
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg, null);
+      RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, msg, null);
     }
-    RTP.log(Level.WARNING, msg);
+    RTPRuntime.log(Level.WARNING, msg);
   }
 
   /**
@@ -104,8 +106,8 @@ public interface BaseRTPCmd extends TreeCommand {
   default void msgBadParameter(UUID callerId, String parameterName, String parameterValue, String tag) {
     String msg = msg(PlayerMessages.badArg, "[P0] bad parameter - [arg]");
     msg = msg.replace("[arg]", parameterName + "=" + parameterValue);
-    RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg, tag);
-    RTP.log(Level.WARNING, msg);
+    RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, msg, tag);
+    RTPRuntime.log(Level.WARNING, msg);
   }
 
   @Override
@@ -139,8 +141,8 @@ public interface BaseRTPCmd extends TreeCommand {
         return;
       }
     }
-    if (RTP.configs != null) {
-      RTP.configs.reload();
+    if (ActiveConfigs.get() != null) {
+      ActiveConfigs.get().reload();
     }
   }
 

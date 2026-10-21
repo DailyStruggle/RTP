@@ -1,8 +1,14 @@
 package io.github.dailystruggle.rtp.common.placeholders;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
+import io.github.dailystruggle.rtp.common.selection.region.RegionContext;
+import io.github.dailystruggle.rtp.common.tasks.scan.ScanTasks;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,7 +49,7 @@ class PlaceholderProviderTest {
     @AfterEach
     void tearDown() {
         PlaceholderProvider.placeholders.remove(TEST_KEY);
-        RTP.configs = null;
+        ActiveConfigs.set(null);
     }
 
     // -------------------------------------------------------------------------
@@ -171,7 +177,7 @@ class PlaceholderProviderTest {
 
     @Test
     void fillNumericPlaceholders_noConfigs_returnsTextUnchanged() {
-        // RTP.configs is null by default in a plain unit test - method should return text as-is
+        // ActiveConfigs.get() is null by default in a plain unit test - method should return text as-is
         String input = "some text [p0] more";
         // If configs is null the method returns early
         String result = PlaceholderProvider.fillNumericPlaceholders(input);
@@ -362,7 +368,7 @@ class PlaceholderProviderTest {
                         "regionA", world, square, vert, false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
         io.github.dailystruggle.rtp.common.selection.region.Region regionA =
                 new io.github.dailystruggle.rtp.common.selection.region.Region("regionA", settings);
-        RTP.selectionAPI.permRegionLookup.put("regionA", regionA);
+        ActiveSelection.get().permRegionLookup.put("regionA", regionA);
 
         io.github.dailystruggle.rtp.common.tasks.scan.ScanTask taskA =
                 new io.github.dailystruggle.rtp.common.tasks.scan.ScanTask(regionA, 0L);
@@ -370,10 +376,10 @@ class PlaceholderProviderTest {
         taskA.latestAbsoluteTotal = 1000;
         taskA.latestCps = 250;
         taskA.latestEtaSeconds = 60;
-        RTP.getInstance().scanTasks.put("regionA", taskA);
+        ScanTasks.current().put("regionA", taskA);
 
         try {
-            RTP.regionContext.set(regionA);
+            RegionContext.region().set(regionA);
 
             assertEquals("regionA", PlaceholderProvider.fillPlaceholders("[scan_regions]", DUMMY_UUID));
             assertEquals("500", PlaceholderProvider.fillPlaceholders("[scan_chunks]", DUMMY_UUID));
@@ -381,8 +387,8 @@ class PlaceholderProviderTest {
             assertEquals("250", PlaceholderProvider.fillPlaceholders("[scan_cps]", DUMMY_UUID));
             assertEquals("1m", PlaceholderProvider.fillPlaceholders("[scan_eta]", DUMMY_UUID));
         } finally {
-            RTP.regionContext.remove();
-            RTP.getInstance().scanTasks.clear();
+            RegionContext.region().remove();
+            ScanTasks.current().clear();
         }
     }
 
@@ -410,24 +416,24 @@ class PlaceholderProviderTest {
         io.github.dailystruggle.rtp.common.tasks.scan.ScanTask taskB =
                 new io.github.dailystruggle.rtp.common.tasks.scan.ScanTask(regionB, 0L);
         taskB.latestLandPercentage = 40.0;
-        RTP.getInstance().scanTasks.put("landA", taskA);
-        RTP.getInstance().scanTasks.put("landB", taskB);
+        ScanTasks.current().put("landA", taskA);
+        ScanTasks.current().put("landB", taskB);
 
         try {
             assertEquals("60.00", PlaceholderProvider.fillPlaceholders("[scan_landPercentage]", DUMMY_UUID));
-            RTP.regionContext.set(regionA);
+            RegionContext.region().set(regionA);
             assertEquals("80.00", PlaceholderProvider.fillPlaceholders("[scan_landPercentage]", DUMMY_UUID));
-            RTP.getInstance().scanTasks.remove("landA");
+            ScanTasks.current().remove("landA");
             assertEquals("0.00", PlaceholderProvider.fillPlaceholders("[scan_landPercentage]", DUMMY_UUID));
         } finally {
-            RTP.regionContext.remove();
-            RTP.getInstance().scanTasks.clear();
+            RegionContext.region().remove();
+            ScanTasks.current().clear();
         }
     }
 
     @Test
     void allBuiltInPlaceholders_resolvedWithoutExceptions() {
-        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
         io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = accessor.getRTPWorld("world");
         assertNotNull(world, "Expected world 'world' to be pre-registered");
 
@@ -440,12 +446,12 @@ class PlaceholderProviderTest {
                         "default", world, square, vert, false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
         io.github.dailystruggle.rtp.common.selection.region.Region region =
                 new io.github.dailystruggle.rtp.common.selection.region.Region("default", settings);
-        RTP.selectionAPI.permRegionLookup.put("default", region);
+        ActiveSelection.get().permRegionLookup.put("default", region);
 
         // Put world parser for "world" in WorldKeys MultiConfigParser
         io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys> worldParsers =
                 (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys>)
-                        RTP.configs.multiConfigParserMap.get(io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.class);
+                        ActiveConfigs.get().multiConfigParserMap.get(io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.class);
         io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys> worldConfig =
                 new io.github.dailystruggle.rtp.common.configuration.ConfigParser<>(
                         io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.class,
@@ -460,7 +466,7 @@ class PlaceholderProviderTest {
         // Put region parser for "default" in RegionKeys MultiConfigParser
         io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys> regionParsers =
                 (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys>)
-                        RTP.configs.multiConfigParserMap.get(io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class);
+                        ActiveConfigs.get().multiConfigParserMap.get(io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class);
         io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys> regionConfig =
                 new io.github.dailystruggle.rtp.common.configuration.ConfigParser<>(
                         io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class,
@@ -484,10 +490,10 @@ class PlaceholderProviderTest {
         tData.time = System.currentTimeMillis();
         tData.selectedCoords = new io.github.dailystruggle.rtp.api.world.RTPCoords(world.name(), 100, 64, 200);
         tData.queueLocation = 3;
-        RTP.getInstance().latestTeleportData.put(DUMMY_UUID, tData);
+        TeleportSessions.current().latestTeleportData.put(DUMMY_UUID, tData);
 
-        RTP.regionContext.set(region);
-        RTP.worldContext.set(world);
+        RegionContext.region().set(region);
+        RegionContext.world().set(world);
 
         try {
             for (String key : PlaceholderProvider.placeholders.keySet()) {
@@ -495,10 +501,10 @@ class PlaceholderProviderTest {
                 assertNotNull(result, "Placeholder [" + key + "] resolved to null");
             }
         } finally {
-            RTP.regionContext.remove();
-            RTP.worldContext.remove();
-            RTP.selectionAPI.permRegionLookup.remove("default");
-            RTP.getInstance().latestTeleportData.remove(DUMMY_UUID);
+            RegionContext.region().remove();
+            RegionContext.world().remove();
+            ActiveSelection.get().permRegionLookup.remove("default");
+            TeleportSessions.current().latestTeleportData.remove(DUMMY_UUID);
             worldParsers.removeParser("world");
             regionParsers.removeParser("default");
         }
@@ -506,7 +512,7 @@ class PlaceholderProviderTest {
 
     @Test
     void specificPlaceholders_detailedOutputValidation() {
-        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
         io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = accessor.getRTPWorld("world");
         assertNotNull(world);
 
@@ -519,11 +525,11 @@ class PlaceholderProviderTest {
                         "default", world, square, vert, false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
         io.github.dailystruggle.rtp.common.selection.region.Region region =
                 new io.github.dailystruggle.rtp.common.selection.region.Region("default", settings);
-        RTP.selectionAPI.permRegionLookup.put("default", region);
+        ActiveSelection.get().permRegionLookup.put("default", region);
 
         io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys> worldParsers =
                 (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys>)
-                        RTP.configs.multiConfigParserMap.get(io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.class);
+                        ActiveConfigs.get().multiConfigParserMap.get(io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.class);
         io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys> worldConfig =
                 new io.github.dailystruggle.rtp.common.configuration.ConfigParser<>(
                         io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys.class,
@@ -537,7 +543,7 @@ class PlaceholderProviderTest {
 
         io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys> regionParsers =
                 (io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys>)
-                        RTP.configs.multiConfigParserMap.get(io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class);
+                        ActiveConfigs.get().multiConfigParserMap.get(io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class);
         io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys> regionConfig =
                 new io.github.dailystruggle.rtp.common.configuration.ConfigParser<>(
                         io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class,
@@ -561,10 +567,10 @@ class PlaceholderProviderTest {
         tData.time = System.currentTimeMillis();
         tData.selectedCoords = new io.github.dailystruggle.rtp.api.world.RTPCoords(world.name(), 123, 80, 456);
         tData.queueLocation = 5;
-        RTP.getInstance().latestTeleportData.put(DUMMY_UUID, tData);
+        TeleportSessions.current().latestTeleportData.put(DUMMY_UUID, tData);
 
-        RTP.regionContext.set(region);
-        RTP.worldContext.set(world);
+        RegionContext.region().set(region);
+        RegionContext.world().set(world);
 
         try {
             assertEquals("world", PlaceholderProvider.fillPlaceholders("[teleport_world]", DUMMY_UUID));
@@ -608,10 +614,10 @@ class PlaceholderProviderTest {
             assertNotNull(PlaceholderProvider.fillPlaceholders("[msptColoured]", DUMMY_UUID));
             assertNotNull(PlaceholderProvider.fillPlaceholders("[tickBudgetUtilisationColoured]", DUMMY_UUID));
         } finally {
-            RTP.regionContext.remove();
-            RTP.worldContext.remove();
-            RTP.selectionAPI.permRegionLookup.remove("default");
-            RTP.getInstance().latestTeleportData.remove(DUMMY_UUID);
+            RegionContext.region().remove();
+            RegionContext.world().remove();
+            ActiveSelection.get().permRegionLookup.remove("default");
+            TeleportSessions.current().latestTeleportData.remove(DUMMY_UUID);
             worldParsers.removeParser("world");
             regionParsers.removeParser("default");
         }
@@ -684,7 +690,7 @@ class PlaceholderProviderTest {
     void usageLimitPlaceholders_whenCapDisabled_returnsExpectedDefaults() {
         io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys> configParser =
                 (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys>)
-                        RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.class);
+                        ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.class);
         assertNotNull(configParser);
         configParser.set(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.lockAfterUses, 0L);
         configParser.set(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.lockAfterResetSeconds, 0L);
@@ -705,7 +711,7 @@ class PlaceholderProviderTest {
     void usageLimitPlaceholders_underCapAndAtCapAndExpired() {
         io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys> configParser =
                 (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys>)
-                        RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.class);
+                        ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.class);
         assertNotNull(configParser);
         configParser.set(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.lockAfterUses, 5L);
         configParser.set(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.lockAfterResetSeconds, 300L); // 5 minutes
@@ -725,8 +731,8 @@ class PlaceholderProviderTest {
         // 2. Partial usage (record 2 uses at current time)
         long now = System.currentTimeMillis();
         long resetMillis = 300_000L;
-        RTP.getInstance().teleportLimitStore.recordSuccess(testUser, 5L, resetMillis, now);
-        RTP.getInstance().teleportLimitStore.recordSuccess(testUser, 5L, resetMillis, now);
+        ActiveDatabase.teleportLimitStore().recordSuccess(testUser, 5L, resetMillis, now);
+        ActiveDatabase.teleportLimitStore().recordSuccess(testUser, 5L, resetMillis, now);
 
         assertEquals("2", PlaceholderProvider.fillPlaceholders("[lockUses]", testUser));
         assertEquals("2", PlaceholderProvider.fillPlaceholders("%lock_uses%", testUser));
@@ -735,9 +741,9 @@ class PlaceholderProviderTest {
         assertFalse(PlaceholderProvider.fillPlaceholders("[remainingLockTime]", testUser).isEmpty());
 
         // 3. Reached cap (record 3 more uses to hit 5)
-        RTP.getInstance().teleportLimitStore.recordSuccess(testUser, 5L, resetMillis, now);
-        RTP.getInstance().teleportLimitStore.recordSuccess(testUser, 5L, resetMillis, now);
-        RTP.getInstance().teleportLimitStore.recordSuccess(testUser, 5L, resetMillis, now);
+        ActiveDatabase.teleportLimitStore().recordSuccess(testUser, 5L, resetMillis, now);
+        ActiveDatabase.teleportLimitStore().recordSuccess(testUser, 5L, resetMillis, now);
+        ActiveDatabase.teleportLimitStore().recordSuccess(testUser, 5L, resetMillis, now);
 
         assertEquals("5", PlaceholderProvider.fillPlaceholders("[lockUses]", testUser));
         assertEquals("0", PlaceholderProvider.fillPlaceholders("[remainingLockUses]", testUser));
@@ -745,7 +751,7 @@ class PlaceholderProviderTest {
         assertFalse(remainingTimeStr.isEmpty(), "Expected remainingLockTime to be formatted when cap reached");
 
         // 4. Over cap (record 1 more use, total 6)
-        RTP.getInstance().teleportLimitStore.recordSuccess(testUser, 5L, resetMillis, now);
+        ActiveDatabase.teleportLimitStore().recordSuccess(testUser, 5L, resetMillis, now);
         assertEquals("6", PlaceholderProvider.fillPlaceholders("[lockUses]", testUser));
         // remainingLockUses should not be negative, clamped to 0
         assertEquals("0", PlaceholderProvider.fillPlaceholders("[remainingLockUses]", testUser));
@@ -754,11 +760,11 @@ class PlaceholderProviderTest {
         // With UsageCapTracker, timestamps older than now - resetMillis are purged on uses() / millisUntilReset()
         UUID oldUser = UUID.randomUUID();
         long oldTime = now - 400_000L; // 400 seconds ago
-        RTP.getInstance().teleportLimitStore.recordSuccess(oldUser, 5L, resetMillis, oldTime);
-        RTP.getInstance().teleportLimitStore.recordSuccess(oldUser, 5L, resetMillis, oldTime);
-        RTP.getInstance().teleportLimitStore.recordSuccess(oldUser, 5L, resetMillis, oldTime);
-        RTP.getInstance().teleportLimitStore.recordSuccess(oldUser, 5L, resetMillis, oldTime);
-        RTP.getInstance().teleportLimitStore.recordSuccess(oldUser, 5L, resetMillis, oldTime);
+        ActiveDatabase.teleportLimitStore().recordSuccess(oldUser, 5L, resetMillis, oldTime);
+        ActiveDatabase.teleportLimitStore().recordSuccess(oldUser, 5L, resetMillis, oldTime);
+        ActiveDatabase.teleportLimitStore().recordSuccess(oldUser, 5L, resetMillis, oldTime);
+        ActiveDatabase.teleportLimitStore().recordSuccess(oldUser, 5L, resetMillis, oldTime);
+        ActiveDatabase.teleportLimitStore().recordSuccess(oldUser, 5L, resetMillis, oldTime);
 
         // Since the 5 uses were 400s ago (> 300s reset), window has reset
         assertEquals("0", PlaceholderProvider.fillPlaceholders("[lockUses]", oldUser));
@@ -768,7 +774,7 @@ class PlaceholderProviderTest {
 
     @Test
     void metricsHelpers_withAndWithoutSnapshot() throws Exception {
-        // Without snapshot installed (defaults to RTP.metrics.snapshot())
+        // Without snapshot installed (defaults to CoreMetrics.instance().snapshot())
         assertDoesNotThrow(PlaceholderProvider::hasLiveTps);
         assertDoesNotThrow(PlaceholderProvider::hasLiveMspt);
         assertDoesNotThrow(PlaceholderProvider::hasDatabaseLatency);
@@ -819,8 +825,8 @@ class PlaceholderProviderTest {
     @Test
     void regionAndWorldPlaceholders_withAndWithoutContext() {
         // Without region or world context
-        RTP.regionContext.remove();
-        RTP.worldContext.remove();
+        RegionContext.region().remove();
+        RegionContext.world().remove();
 
         assertEquals("", PlaceholderProvider.fillPlaceholders("[displayName]", DUMMY_UUID));
         assertEquals("false", PlaceholderProvider.fillPlaceholders("[requirePermission]", DUMMY_UUID));
@@ -836,13 +842,13 @@ class PlaceholderProviderTest {
         assertEquals("0", PlaceholderProvider.fillPlaceholders("[backlogCacheCap]", DUMMY_UUID));
 
         // With mock world context
-        io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = RTP.serverAccessor.getRTPWorlds().get(0);
-        RTP.worldContext.set(world);
+        io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = RTPRuntime.serverAccessor().getRTPWorlds().get(0);
+        RegionContext.world().set(world);
         try {
             assertEquals("0", PlaceholderProvider.fillPlaceholders("[pluginForced]", DUMMY_UUID));
             assertEquals("0", PlaceholderProvider.fillPlaceholders("[serverForced]", DUMMY_UUID));
         } finally {
-            RTP.worldContext.remove();
+            RegionContext.world().remove();
         }
     }
 }

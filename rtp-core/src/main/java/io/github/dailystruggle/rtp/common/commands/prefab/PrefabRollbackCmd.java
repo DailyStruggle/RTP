@@ -1,9 +1,10 @@
 package io.github.dailystruggle.rtp.common.commands.prefab;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -54,7 +55,7 @@ public class PrefabRollbackCmd extends BaseRTPCmdImpl {
                              @Nullable CommandsAPICommand nextCommand) {
         if (nextCommand != null) return true;
         if (callerId == null) {
-            RTP.log(Level.WARNING, "/rtp admin prefab rollback rejected: no caller UUID");
+            RTPRuntime.log(Level.WARNING, "/rtp admin prefab rollback rejected: no caller UUID");
             return false;
         }
         List<String> idValues = parameterValues == null ? null : parameterValues.get("id");
@@ -93,7 +94,7 @@ public class PrefabRollbackCmd extends BaseRTPCmdImpl {
                 }
             } catch (IOException ioe) {
                 failed.add(fileId + ": " + ioe.getMessage());
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "[prefab] rollback restore FAILED: caller=" + callerId
                                 + " prefab=" + prefabId
                                 + " file=" + fileId + " - " + ioe.getMessage(), ioe);
@@ -101,7 +102,7 @@ public class PrefabRollbackCmd extends BaseRTPCmdImpl {
         }
 
         if (restored.isEmpty() && failed.isEmpty()) {
-            RTP.log(Level.INFO,
+            RTPRuntime.log(Level.INFO,
                     "[prefab] rollback no-op (no backups present): caller=" + callerId
                             + " prefab=" + prefabId
                             + " filesChecked=" + fileIds.size());
@@ -113,12 +114,12 @@ public class PrefabRollbackCmd extends BaseRTPCmdImpl {
         boolean reloaded = false;
         Throwable reloadFailure = null;
         try {
-            if (RTP.configs != null) reloaded = RTP.configs.reload();
+            if (ActiveConfigs.get() != null) reloaded = ActiveConfigs.get().reload();
         } catch (RuntimeException re) {
             reloadFailure = re;
         }
 
-        RTP.log(Level.INFO,
+        RTPRuntime.log(Level.INFO,
                 "[prefab] rollback OK: caller=" + callerId
                         + " prefab=" + prefabId
                         + " restored=" + restored.size()
