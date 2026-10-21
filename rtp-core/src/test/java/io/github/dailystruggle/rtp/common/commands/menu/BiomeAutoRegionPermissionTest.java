@@ -6,6 +6,8 @@ import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.BiomeMenuSource;
@@ -45,7 +47,7 @@ class BiomeAutoRegionPermissionTest {
   @BeforeEach
   void setUp() {
     accessor = RTPTestSetup.install(tempDir.toFile());
-    RTP.selectionAPI = new SelectionAPI();
+    ActiveSelection.set(new SelectionAPI());
     defaultShape = newRegion("default", false);
     vipShape = newRegion("vip", true);
     player = new MockRTPPlayer(UUID.randomUUID(), "leaf26",
@@ -55,9 +57,9 @@ class BiomeAutoRegionPermissionTest {
 
   @AfterEach
   void tearDown() {
-    if (RTP.selectionAPI != null) RTP.selectionAPI.permRegionLookup.clear();
-    RTP.serverAccessor = null;
-    RTP.scheduler = null;
+    if (ActiveSelection.get() != null) ActiveSelection.get().permRegionLookup.clear();
+    RTPRuntime.setServerAccessor(null);
+    RTPRuntime.setScheduler(null);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
   }
 
@@ -69,7 +71,7 @@ class BiomeAutoRegionPermissionTest {
         name, world, shape, vert,
         false, requirePermission,
         10L, 1000L, 0L, 5, 0.0, 1L, "", false);
-    RTP.selectionAPI.permRegionLookup.put(name, new Region(name, settings));
+    ActiveSelection.get().permRegionLookup.put(name, new Region(name, settings));
     return shape;
   }
 
@@ -132,10 +134,10 @@ class BiomeAutoRegionPermissionTest {
   void firstBiomeOnly_fallbackCrossesWorlds() throws Exception {
     newRegion("wild", false);
     seedBiome(defaultShape, "PLAINS", 100L);
-    seedBiome((Square) RTP.selectionAPI.getRegion("wild").shape, "MEADOW", 10L);
+    seedBiome((Square) ActiveSelection.get().getRegion("wild").shape, "MEADOW", 10L);
 
     // RTPCmd passes biomeList.get(0) only: MEADOW, not PLAINS.
     assertEquals("wild", BiomeMenuSource.bestRegionForBiome(player.uuid(), "MEADOW", "default"));
-    assertEquals("wild_world", RTP.selectionAPI.getRegion("wild").getWorld().name());
+    assertEquals("wild_world", ActiveSelection.get().getRegion("wild").getWorld().name());
   }
 }

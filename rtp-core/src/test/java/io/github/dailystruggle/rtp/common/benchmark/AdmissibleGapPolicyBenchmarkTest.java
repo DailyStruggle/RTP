@@ -3,8 +3,8 @@ package io.github.dailystruggle.rtp.common.benchmark;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
@@ -69,7 +69,7 @@ public class AdmissibleGapPolicyBenchmarkTest {
 
   @BeforeAll
   public static void setup() {
-    RTP.serverAccessor = new MockRTPServerAccessor(new File("target/test-data"));
+    RTPRuntime.setServerAccessor(new MockRTPServerAccessor(new File("target/test-data")));
   }
 
   /** One candidate rule for the gap admitted between two adjacent bad runs. */

@@ -128,7 +128,7 @@ public class RTPArchitectureTest {
                     // (it creates no threads and owns no platform API), but a platform-neutral
                     // delegating decorator that times the RTP-submitted tasks it forwards to the
                     // real platform scheduler. It must live in core because it is installed
-                    // around RTP.scheduler in the core RTP() constructor; the thread-isolation
+                    // around RTPRuntime.scheduler() in the core RTP() constructor; the thread-isolation
                     // intent of this rule is not weakened because all threading still belongs to
                     // the wrapped platform scheduler.
                     .and().doNotHaveFullyQualifiedName(
@@ -237,7 +237,7 @@ public class RTPArchitectureTest {
     /**
      * Rule 8 - Logging Discipline (No printStackTrace).
      *
-     * <p>Stack traces must be routed through {@code RTP.log(Level.WARNING, ...)}
+     * <p>Stack traces must be routed through {@code RTPRuntime.log(Level.WARNING, ...)}
      * and never dumped via {@link Throwable#printStackTrace()}.
      */
     @ArchTest
@@ -254,7 +254,7 @@ public class RTPArchitectureTest {
     /**
      * Rule 9 - Console and Platform Logger Isolation (No System.out / Bukkit.getLogger).
      *
-     * <p>Logging must go through {@code RTP.log()} / {@code RTPServerAccessor.log()}.
+     * <p>Logging must go through {@code RTPRuntime.log()} / {@code RTPServerAccessor.log()}.
      * Direct stdout/stderr console writes and direct {@code Bukkit.getLogger()} calls are prohibited.
      */
     @ArchTest
@@ -444,4 +444,22 @@ public class RTPArchitectureTest {
                     .resideInAPackage("io.github.dailystruggle.rtp.common.selection.region")
                     .because("ADR-115: selection.region depends on tools, so tools must not "
                             + "depend back on it.");
+
+    /**
+     * Rule 20 - Runtime Holder Is Tier 1 (ADR-115 seam 4).
+     *
+     * <p>{@code common.runtime} holds the platform accessor, scheduler, economy and the bootstrap
+     * log buffer that every core package reads, typed only by {@code rtp-api}. A core dependency
+     * here would close a cycle with each package that logs.
+     */
+    @ArchTest
+    static final ArchRule runtime_holder_must_not_depend_on_core =
+            noClasses()
+                    .that().resideInAPackage("io.github.dailystruggle.rtp.common.runtime..")
+                    .should().dependOnClassesThat(
+                            JavaClass.Predicates.resideInAPackage(CORE_PACKAGE).and(
+                                    JavaClass.Predicates.resideOutsideOfPackage(
+                                            "io.github.dailystruggle.rtp.common.runtime..")))
+                    .because("ADR-115 seam 4: the runtime holder is Tier 1; the composition root "
+                            + "injects config-dependent behaviour such as the log buffer gate.");
 }

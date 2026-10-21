@@ -4,9 +4,12 @@ import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import java.util.logging.Level;
 import org.bukkit.Location;
@@ -32,12 +35,12 @@ public final class OnPlayerTeleport implements Listener {
   public void onPlayerTeleport(PlayerTeleportEvent event) {
     Player player = event.getPlayer();
 
-    TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
+    TeleportData data = TeleportSessions.current().latestTeleportData.get(player.getUniqueId());
     if (data == null || data.completed) return;
 
     // if currently teleporting, stop that and clean up
-    if (RTP.getInstance().latestTeleportData.containsKey(player.getUniqueId())) {
-      TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
+    if (TeleportSessions.current().latestTeleportData.containsKey(player.getUniqueId())) {
+      TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(player.getUniqueId());
       if (!teleportData.completed) stopTeleport(event);
     }
   }
@@ -45,13 +48,13 @@ public final class OnPlayerTeleport implements Listener {
   private void stopTeleport(PlayerTeleportEvent event) {
     Player player = event.getPlayer();
 
-    TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
+    TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(player.getUniqueId());
     if (teleportData == null) return;
 
     Location eventTo = event.getTo();
     if (eventTo == null) return;
 
-    ConfigParser<?> parser = RTP.configs.configParserMap.get(ConfigKeys.class);
+    ConfigParser<?> parser = ActiveConfigs.get().configParserMap.get(ConfigKeys.class);
     ConfigParser<ConfigKeys> configParser;
     if (parser.myClass.equals(ConfigKeys.class))
       //noinspection unchecked
@@ -64,7 +67,7 @@ public final class OnPlayerTeleport implements Listener {
     RTPCoords selectedCoords = teleportData.selectedCoords;
     if (selectedCoords == null) return;
 
-    RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(eventTo.getWorld().getUID());
+    RTPWorld rtpWorld = RTPRuntime.serverAccessor().getRTPWorld(eventTo.getWorld().getUID());
     if (rtpWorld == null) return;
 
     RTPCommandSender sender = teleportData.sender;

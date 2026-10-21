@@ -96,7 +96,7 @@ class FactoryValueFuzzyTest {
 
         val.setData(map);
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor();
         assertNotNull(accessor);
         assertTrue(
                 accessor.logMessages.stream().anyMatch(m ->

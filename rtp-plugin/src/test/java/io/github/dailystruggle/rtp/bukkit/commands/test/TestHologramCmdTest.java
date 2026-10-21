@@ -7,10 +7,10 @@ import io.github.dailystruggle.effectsapi.common.hologram.VirtualHologramHandle;
 import io.github.dailystruggle.effectsapi.common.volumetric.Vector3d;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -33,8 +33,8 @@ class TestHologramCmdTest {
   @BeforeEach
   void setUp() {
     serverAccessor = new MockRTPServerAccessor(new File("."));
-    RTP.serverAccessor = serverAccessor;
-    RTP.scheduler = serverAccessor.getScheduler();
+    RTPRuntime.setServerAccessor(serverAccessor);
+    RTPRuntime.setScheduler(serverAccessor.getScheduler());
     cmd = new TestHologramCmd(null);
   }
 

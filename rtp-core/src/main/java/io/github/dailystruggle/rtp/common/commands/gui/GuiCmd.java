@@ -3,8 +3,8 @@ package io.github.dailystruggle.rtp.common.commands.gui;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.hooks.RootActionRegistry;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -71,11 +71,11 @@ public final class GuiCmd extends BaseRTPCmdImpl {
     if (action == null) {
       return false;
     }
-    Consumer<String> feedback = m -> RTP.serverAccessor.sendMessage(senderId, m);
+    Consumer<String> feedback = m -> RTPRuntime.serverAccessor().sendMessage(senderId, m);
     try {
       return action.run(senderId, feedback);
     } catch (Throwable t) {
-      RTP.log(Level.WARNING,
+      RTPRuntime.log(Level.WARNING,
           "[RTP] /rtp gui bound action threw; unbinding it and deferring to classic teleport", t);
       // A bound action that throws is almost always permanently broken on this runtime
       // (e.g. a GUI menu whose backend cannot load on a too-old modded server). Unbind it
@@ -85,11 +85,11 @@ public final class GuiCmd extends BaseRTPCmdImpl {
         RootActionRegistry registry = RTPAPI.hooks().rootAction();
         if (registry != null) {
           registry.clear();
-          RTP.log(Level.INFO,
+          RTPRuntime.log(Level.INFO,
               "[RTP] unbound failing /rtp root action; bare /rtp reset to the classic teleport");
         }
       } catch (Throwable clearError) {
-        RTP.log(Level.FINE, "[RTP] could not unbind the failing /rtp root action", clearError);
+        RTPRuntime.log(Level.FINE, "[RTP] could not unbind the failing /rtp root action", clearError);
       }
       return false;
     }

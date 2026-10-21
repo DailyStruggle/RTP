@@ -8,10 +8,10 @@ import io.github.dailystruggle.rtp.api.editor.EditorSession;
 import io.github.dailystruggle.rtp.api.editor.EditorTab;
 import io.github.dailystruggle.rtp.api.editor.EditorWidget;
 import io.github.dailystruggle.rtp.api.hooks.EditorExtensionRegistry;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorChannel;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopbackJson;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -117,14 +117,14 @@ public final class EditorExtensions {
             if (map.putIfAbsent(id, extension) != null) {
                 throw new IllegalStateException("editor extension id '" + id + "' is already registered");
             }
-            RTP.log(Level.INFO, "[editor] extension '" + id + "' registered; it joins the next editor session");
+            RTPRuntime.log(Level.INFO, "[editor] extension '" + id + "' registered; it joins the next editor session");
         }
 
         @Override
         public boolean unregister(String id) {
             if (id == null || map.remove(id) == null) return false;
             for (Session s : SESSIONS) s.detach(id);
-            RTP.log(Level.INFO, "[editor] extension '" + id + "' unregistered");
+            RTPRuntime.log(Level.INFO, "[editor] extension '" + id + "' unregistered");
             return true;
         }
 
@@ -712,7 +712,7 @@ public final class EditorExtensions {
         void fail() {
             if (failed) return;
             failed = true;
-            RTP.log(Level.WARNING, "[editor] extension '" + extId + "' disabled for this editor session after "
+            RTPRuntime.log(Level.WARNING, "[editor] extension '" + extId + "' disabled for this editor session after "
                     + MAX_FAILURES + " failures; core and other extensions carry on");
             session.channel.sendExtension(extId, "{\"type\":\"" + extId + "." + ERROR + "\",\"reason\":\"failed\"}", null, null);
             session.channel.unregisterNamespace(extId);
@@ -776,8 +776,8 @@ public final class EditorExtensions {
             if (LAST_LOGGED.size() >= 512) LAST_LOGGED.clear();
             LAST_LOGGED.put(key, now);
         }
-        if (t == null) RTP.log(level, line);
-        else RTP.log(level, line, t);
+        if (t == null) RTPRuntime.log(level, line);
+        else RTPRuntime.log(level, line, t);
     }
 
     // ---- JSON ----

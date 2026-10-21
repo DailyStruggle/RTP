@@ -18,7 +18,7 @@ import java.util.Set;
  * {@link #snapshotJson()} run on the async payload build, {@link #stateJson()} on the live feed's
  * async tick, {@link #onMessage} and the session callbacks on the transport thread (must not
  * block), {@link #validate} / {@link #applied} on the Hot-Apply pipeline. Schedule world access
- * through {@code RTP.scheduler} and answer later. Every call is wrapped: exceptions are logged and
+ * through {@code RTPRuntime.scheduler()} and answer later. Every call is wrapped: exceptions are logged and
  * three failures mark the extension failed for that session.
  *
  * <p>JSON strings are JSON texts; a value that does not parse is refused and logged.

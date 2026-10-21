@@ -5,10 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.RegionConfigLoader;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import java.util.Collections;
@@ -30,14 +32,14 @@ class CacheMemoryCostTest {
     Configs mockConfigs = Mockito.mock(Configs.class);
     @SuppressWarnings("unchecked")
     ConfigParser<LoggingKeys> mockLoggingParser = Mockito.mock(ConfigParser.class);
-    RTP.configs = mockConfigs;
+    ActiveConfigs.set(mockConfigs);
     Mockito.when(mockConfigs.getParser(LoggingKeys.class)).thenReturn(mockLoggingParser);
     Mockito.doReturn(false).when(mockLoggingParser).getConfigValue(Mockito.eq(LoggingKeys.detailed_region_init), Mockito.any());
 
     RTPServerAccessor accessor = Mockito.mock(RTPServerAccessor.class);
     Mockito.when(accessor.getRTPWorlds()).thenReturn(Collections.<RTPWorld<?>>emptyList());
     Mockito.when(accessor.getRTPWorld(Mockito.anyString())).thenReturn(null);
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
   }
 
   @AfterAll

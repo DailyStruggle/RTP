@@ -3,9 +3,10 @@ package io.github.dailystruggle.rtp.common.commands.maps;
 import io.github.dailystruggle.mapsapi.model.CompositeRegionModel;
 import io.github.dailystruggle.mapsapi.render.CompositeRegionRenderer;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
@@ -56,15 +57,15 @@ public class RegionCompositeResolverTest {
         "",
         false);
     region = new Region("composite_test", settings);
-    RTP.selectionAPI = new SelectionAPI();
-    RTP.selectionAPI.permRegionLookup.put("composite_test", region);
+    ActiveSelection.set(new SelectionAPI());
+    ActiveSelection.get().permRegionLookup.put("composite_test", region);
   }
 
   @AfterEach
   void tearDown() {
-    if (RTP.selectionAPI != null) RTP.selectionAPI.permRegionLookup.clear();
-    RTP.serverAccessor = null;
-    RTP.scheduler = null;
+    if (ActiveSelection.get() != null) ActiveSelection.get().permRegionLookup.clear();
+    RTPRuntime.setServerAccessor(null);
+    RTPRuntime.setScheduler(null);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
   }
 

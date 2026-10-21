@@ -8,8 +8,14 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.network.NetworkHooks;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.LocationGenerator;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
@@ -66,7 +72,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
       org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
       return new WorldBorder(
           () -> {
-            Shape<?> shape = (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE");
+            Shape<?> shape = (Shape<?>) FactoryRegistry.get(FactoryNames.shape).get("SQUARE");
             if (shape instanceof Square square) {
               square.set(GenericMemoryShapeParams.radius, (long) (worldBorder.getSize() / 32.0));
               square.set(GenericMemoryShapeParams.centerX, (long) (worldBorder.getCenter().getBlockX() / 16.0));
@@ -92,7 +98,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
         s -> {
           World world = Bukkit.getWorld(s);
           if (world == null) return null;
-          Region region = RTP.selectionAPI.getRegion(Objects.requireNonNull(getRTPWorld(world.getUID())));
+          Region region = ActiveSelection.get().getRegion(Objects.requireNonNull(getRTPWorld(world.getUID())));
           if (region == null) throw new IllegalStateException();
           Object o = region.getData(RegionKeys.shape);
           if (!(o instanceof Shape<?>)) throw new IllegalStateException();
@@ -331,7 +337,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public void sendMessage(UUID target, Enum<?> msgType, String tag) {
-    Object cv = RTP.configs.getConfigValue(msgType, "");
+    Object cv = ActiveConfigs.get().getConfigValue(msgType, "");
     String message = cv == null ? "" : cv.toString();
     RTP.log(Level.FINE, "[ENQUEUE_TRACE] AbstractServerAccessor.sendMessage(UUID, Enum) target=" + target
             + " msgType=" + msgType
@@ -343,7 +349,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public void sendMessage(UUID target1, UUID target2, Enum<?> msgType, String tag) {
-    Object cv = RTP.configs.getConfigValue(msgType, "");
+    Object cv = ActiveConfigs.get().getConfigValue(msgType, "");
     String message = cv == null ? "" : cv.toString();
     sendMessage(target1, target2, message, tag);
   }
@@ -605,14 +611,14 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     // ADR-049: install the platform backend-heartbeat sampler factory so the
     // platform-neutral NetworkModeBootstrap (rtp-core) can build a sampler
     // without importing this Bukkit-family class. Idempotent across reloads.
-    RTP.backendStateSamplerFactory = lobbyMode ->
-        new io.github.dailystruggle.rtp.bukkitplatform.network.BukkitBackendStateSampler(lobbyMode);
+    NetworkHooks.setBackendStateSamplerFactory(lobbyMode ->
+        new io.github.dailystruggle.rtp.bukkitplatform.network.BukkitBackendStateSampler(lobbyMode));
     // rtp-proxy-ADR-016: install the tier-1 (DB-free) plugin-message bridge
     // factory so NetworkModeBootstrap can open the plugin-message / auto
     // transports without importing this Bukkit-family class. Idempotent across
     // reloads; a fresh bridge per call re-registers the channel cleanly.
-    RTP.networkBridgeFactory = () ->
-        new io.github.dailystruggle.rtp.bukkitplatform.network.BukkitNetworkBridge(bukkitPlugin);
+    NetworkHooks.setBridgeFactory(() ->
+        new io.github.dailystruggle.rtp.bukkitplatform.network.BukkitNetworkBridge(bukkitPlugin));
   }
 
   @Override
@@ -655,7 +661,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
 
   @Override
   public io.github.dailystruggle.rtp.api.scheduling.RTPScheduler getScheduler() {
-    return io.github.dailystruggle.rtp.common.RTP.scheduler;
+    return io.github.dailystruggle.rtp.common.runtime.RTPRuntime.scheduler();
   }
 
   @Override
@@ -666,7 +672,7 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
     // shipped on Bukkit since pre-Metrics days.
     try {
       io.github.dailystruggle.metrics.api.MetricsSnapshot s =
-          io.github.dailystruggle.rtp.common.RTP.metrics.snapshot();
+          CoreMetrics.instance().snapshot();
       double v = (ticks >= 600) ? s.tps15m : (ticks >= 100 ? s.tps5m : s.tps1m);
       if (!Double.isNaN(v)) return v;
     } catch (Throwable ignored) {
@@ -1412,8 +1418,8 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
             }
           };
 
-      if (io.github.dailystruggle.rtp.common.RTP.scheduler != null) {
-        io.github.dailystruggle.rtp.common.RTP.scheduler.runTaskForPlayer(rtpPlayer, damageTask, 0L);
+      if (io.github.dailystruggle.rtp.common.runtime.RTPRuntime.scheduler() != null) {
+        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.scheduler().runTaskForPlayer(rtpPlayer, damageTask, 0L);
       } else {
         damageTask.run();
       }

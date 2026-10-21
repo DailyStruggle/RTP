@@ -2,9 +2,9 @@ package io.github.dailystruggle.rtp.common.commands.admin;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -60,9 +60,9 @@ public class ClearCmd extends BaseRTPCmdImpl {
     if (nextCommand != null) return nextCommand.onCommand(callerId, parameterValues, null);
 
     String msg = "RTP: usage - /rtp clear <cache|cooldown|queue|limit|invuln>";
-    if (callerId != null && RTP.serverAccessor != null) {
+    if (callerId != null && RTPRuntime.serverAccessor() != null) {
       try {
-        RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);
+        RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, msg);
       } catch (RuntimeException ignored) {
         // serverAccessor failures (headless / test scaffolds) are not fatal.
       }

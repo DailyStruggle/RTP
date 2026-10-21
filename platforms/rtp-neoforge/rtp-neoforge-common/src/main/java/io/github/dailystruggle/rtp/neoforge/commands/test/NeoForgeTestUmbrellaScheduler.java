@@ -2,12 +2,13 @@ package io.github.dailystruggle.rtp.neoforge.commands.test;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaScheduler;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 /**
  * NeoForge implementation of {@link TestUmbrellaScheduler}. Delegates
- * deferred dispatch to {@link RTP#scheduler} (e.g.
+ * deferred dispatch to {@link RTPRuntime#scheduler()} (e.g.
  * {@link io.github.dailystruggle.rtp.neoforge.scheduling.NeoForgeScheduler}).
  *
  * <p>When the platform async scheduler is unavailable (headless tests),
@@ -33,14 +34,14 @@ public final class NeoForgeTestUmbrellaScheduler implements TestUmbrellaSchedule
       }
     };
     try {
-      if (RTP.scheduler != null) {
+      if (RTPRuntime.scheduler() != null) {
         long delayTicks = Math.max(1L, (delay + 49L) / 50L);
         final Object[] handle = new Object[1];
-        handle[0] = RTP.scheduler.runTaskTimerAsynchronously(
+        handle[0] = RTPRuntime.scheduler().runTaskTimerAsynchronously(
             () -> {
               try {
                 if (handle[0] != null) {
-                  RTP.scheduler.cancelTask(handle[0]);
+                  RTPRuntime.scheduler().cancelTask(handle[0]);
                   handle[0] = null;
                 }
               } catch (Throwable ignored) {

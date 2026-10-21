@@ -2,8 +2,9 @@ package io.github.dailystruggle.rtp.common.network;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.proxy.common.selector.ServerRegion;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkTransport;
@@ -86,15 +87,15 @@ public final class DirectDatabaseDispatcher {
         Objects.requireNonNull(serverHint, "serverHint");
 
         // Verify player is online before taking any action.
-        RTPPlayer player = (RTP.serverAccessor != null) ? RTP.serverAccessor.getPlayer(playerId) : null;
+        RTPPlayer player = (RTPRuntime.serverAccessor() != null) ? RTPRuntime.serverAccessor().getPlayer(playerId) : null;
         if (player == null || !player.isOnline()) {
-            RTP.log(Level.FINE, "[RTP] Direct DB dispatch aborted: player " + playerId + " is offline.");
+            RTPRuntime.log(Level.FINE, "[RTP] Direct DB dispatch aborted: player " + playerId + " is offline.");
             handleFailure(playerId, NetworkMessages.networkRegionUnavailable, "Player offline");
             return CompletableFuture.completedFuture(DispatchResult.failure(ResultStatus.PLAYER_OFFLINE, "Player offline"));
         }
 
         if (bridge == null) {
-            RTP.log(Level.WARNING, "[RTP] Direct DB dispatch failed: NetworkBridge is null (S-004).");
+            RTPRuntime.log(Level.WARNING, "[RTP] Direct DB dispatch failed: NetworkBridge is null (S-004).");
             handleFailure(playerId, NetworkMessages.networkRegionUnavailable, "Bridge unavailable");
             return CompletableFuture.completedFuture(DispatchResult.failure(ResultStatus.BRIDGE_UNAVAILABLE, "Bridge unavailable"));
         }
@@ -112,7 +113,7 @@ public final class DirectDatabaseDispatcher {
         }
 
         if (targetServer == null || targetServer.isBlank() || targetServer.equals(localServerId)) {
-            RTP.log(Level.WARNING, "[RTP] Direct DB dispatch: no candidate peer server found for " + playerId + " (S-004).");
+            RTPRuntime.log(Level.WARNING, "[RTP] Direct DB dispatch: no candidate peer server found for " + playerId + " (S-004).");
             handleFailure(playerId, NetworkMessages.networkRegionUnavailable, "No destination server available");
             return CompletableFuture.completedFuture(DispatchResult.failure(ResultStatus.NO_CANDIDATE, "No candidate peer server"));
         }
@@ -120,18 +121,18 @@ public final class DirectDatabaseDispatcher {
         final String finalTargetServer = targetServer;
         final String finalTargetRegion = (targetRegion != null && !targetRegion.isBlank()) ? targetRegion : "default";
 
-        RTP.log(Level.FINE, "[RTP] Direct DB dispatching " + playerId + " -> server=" + finalTargetServer + " region=" + finalTargetRegion);
+        RTPRuntime.log(Level.FINE, "[RTP] Direct DB dispatching " + playerId + " -> server=" + finalTargetServer + " region=" + finalTargetRegion);
 
         // 2. Claim reservation token in the shared store.
         return transport.claim(finalTargetServer, playerId, tokenTtl, Optional.of(finalTargetRegion))
                 .handle((token, err) -> {
                     if (err != null) {
-                        RTP.log(Level.WARNING, "[RTP] Direct DB claim failed for " + playerId + " against " + finalTargetServer + ": " + err.getMessage(), err);
+                        RTPRuntime.log(Level.WARNING, "[RTP] Direct DB claim failed for " + playerId + " against " + finalTargetServer + ": " + err.getMessage(), err);
                         handleFailure(playerId, NetworkMessages.networkRegionUnavailable, "Claim error: " + err.getMessage());
                         return DispatchResult.failure(ResultStatus.CLAIM_FAILED, err.getMessage());
                     }
                     if (token == null) {
-                        RTP.log(Level.WARNING, "[RTP] Direct DB claim returned null token for " + playerId + " against " + finalTargetServer + " (S-004).");
+                        RTPRuntime.log(Level.WARNING, "[RTP] Direct DB claim returned null token for " + playerId + " against " + finalTargetServer + " (S-004).");
                         handleFailure(playerId, NetworkMessages.networkRegionUnavailable, "Claim returned null");
                         return DispatchResult.failure(ResultStatus.CLAIM_FAILED, "Claim returned null token");
                     }
@@ -146,10 +147,10 @@ public final class DirectDatabaseDispatcher {
                     // 4. Issue Connect plugin message.
                     try {
                         bridge.connect(playerId, finalTargetServer);
-                        RTP.log(Level.FINE, "[RTP] Direct DB sent Connect packet for " + playerId + " -> " + finalTargetServer);
+                        RTPRuntime.log(Level.FINE, "[RTP] Direct DB sent Connect packet for " + playerId + " -> " + finalTargetServer);
                         return DispatchResult.success(finalTargetServer, finalTargetRegion);
                     } catch (Throwable connectErr) {
-                        RTP.log(Level.WARNING, "[RTP] Direct DB connect failed for " + playerId + " -> " + finalTargetServer + ": " + connectErr.getMessage(), connectErr);
+                        RTPRuntime.log(Level.WARNING, "[RTP] Direct DB connect failed for " + playerId + " -> " + finalTargetServer + ": " + connectErr.getMessage(), connectErr);
                         handleFailure(playerId, NetworkMessages.networkRegionUnavailable, "Connect failed: " + connectErr.getMessage());
                         return DispatchResult.failure(ResultStatus.ERROR, connectErr.getMessage());
                     }
@@ -162,11 +163,11 @@ public final class DirectDatabaseDispatcher {
                 onTerminalFailure.accept(playerId);
             } catch (Throwable ignored) {}
         }
-        if (RTP.serverAccessor != null) {
+        if (RTPRuntime.serverAccessor() != null) {
             try {
-                String tmpl = (String) RTP.configs.getConfigValue(msgKey, "&c[RTP] Destination unavailable.");
+                String tmpl = (String) ActiveConfigs.get().getConfigValue(msgKey, "&c[RTP] Destination unavailable.");
                 if (tmpl != null && !tmpl.isBlank()) {
-                    RTP.serverAccessor.sendMessage(playerId, tmpl);
+                    RTPRuntime.serverAccessor().sendMessage(playerId, tmpl);
                 }
             } catch (Throwable ignored) {}
         }

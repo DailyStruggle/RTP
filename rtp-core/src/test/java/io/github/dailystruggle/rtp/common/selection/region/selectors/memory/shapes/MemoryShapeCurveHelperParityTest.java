@@ -10,8 +10,8 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.EllipseMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.NormalDistributionParams;
@@ -52,7 +52,7 @@ class MemoryShapeCurveHelperParityTest {
 
   static {
     MockRTPServerAccessor accessor = new MockRTPServerAccessor(new java.io.File("target/test-data"));
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
   }
 

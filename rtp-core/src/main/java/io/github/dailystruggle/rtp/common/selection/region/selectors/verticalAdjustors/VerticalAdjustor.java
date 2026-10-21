@@ -5,9 +5,11 @@ import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.IOException;
 import java.util.EnumMap;
 import java.util.List;
@@ -28,7 +30,7 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
    * @param verifiers list of placement verifiers
    * @param def       default data values
    */
-  @SuppressWarnings("unchecked") // heterogeneous RTP.factoryMap holds the vert Factory under a raw value type
+  @SuppressWarnings("unchecked") // heterogeneous FactoryRegistry.map() holds the vert Factory under a raw value type
   protected VerticalAdjustor(
       Class<E> eClass,
       String name,
@@ -38,13 +40,13 @@ public abstract class VerticalAdjustor<E extends Enum<E>> extends FactoryValue<E
     this.verifiers = verifiers;
     setData(def);
     Factory<VerticalAdjustor<?>> vertAdjustorFactory =
-        (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
+        (Factory<VerticalAdjustor<?>>) FactoryRegistry.get(FactoryNames.vert);
     this.name = name;
     if (!vertAdjustorFactory.contains(name)) vertAdjustorFactory.add(name, this);
     try {
       loadLangFile("definitions/regions/.vert");
     } catch (IOException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
     }
   }
 

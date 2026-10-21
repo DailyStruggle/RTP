@@ -1,13 +1,11 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.lang.reflect.Field;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -34,9 +32,7 @@ class MemoryShapeShutdownTest {
      */
     private YamlFileDatabase wireDatabaseAccessor() throws Exception {
         YamlFileDatabase db = new YamlFileDatabase(tempDir.toFile());
-        Field daField = RTP.class.getDeclaredField("databaseAccessor");
-        daField.setAccessible(true);
-        daField.set(RTP.getInstance(), db);
+        io.github.dailystruggle.rtp.common.database.ActiveDatabase.setAccessor(db);
         return db;
     }
 

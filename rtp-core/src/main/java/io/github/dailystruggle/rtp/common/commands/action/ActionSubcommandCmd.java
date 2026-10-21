@@ -5,10 +5,11 @@ import io.github.dailystruggle.rtp.api.action.ActionDefinition;
 import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.action.ActionPlaceholderSanitizer;
+import io.github.dailystruggle.rtp.common.action.ActionServices;
 import io.github.dailystruggle.rtp.common.action.ActionSessionImpl;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
@@ -59,26 +60,26 @@ public class ActionSubcommandCmd extends BaseRTPCmdImpl {
       UUID senderId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
 
-    RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
+    RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(senderId);
     String perm = permission();
     if (perm != null && !perm.isBlank() && !sender.hasPermission(perm) && !sender.isRtpAdmin()) {
-      RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.noPerms);
+      RTPRuntime.serverAccessor().sendMessage(senderId, senderId, PlayerMessages.noPerms);
       return true;
     }
 
     // Subcommands act on the caller's own match (e.g. forfeit kills [player]); refuse outside one.
     if (!(sender instanceof RTPPlayer player)) {
-      RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.consoleCmdNotAllowed);
+      RTPRuntime.serverAccessor().sendMessage(senderId, senderId, PlayerMessages.consoleCmdNotAllowed);
       return true;
     }
-    ActionSessionImpl session = (RTP.actionManager == null) ? null
-        : RTP.actionManager.getSessionForParticipant(player.uuid())
+    ActionSessionImpl session = (ActionServices.actionManager() == null) ? null
+        : ActionServices.actionManager().getSessionForParticipant(player.uuid())
             .filter(s -> s instanceof ActionSessionImpl)
             .map(s -> (ActionSessionImpl) s)
             .filter(s -> actionId.equals(s.actionId()))
             .orElse(null);
     if (session == null) {
-      RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.notInSession);
+      RTPRuntime.serverAccessor().sendMessage(senderId, senderId, PlayerMessages.notInSession);
       return true;
     }
 
@@ -114,33 +115,33 @@ public class ActionSubcommandCmd extends BaseRTPCmdImpl {
           return;
         }
         UUID serverId = new UUID(0, 0);
-        RTP.serverAccessor.executeCommand(serverId, raw);
+        RTPRuntime.serverAccessor().executeCommand(serverId, raw);
       }
       case PLAYER -> {
         String raw = ActionPlaceholderSanitizer.substitute(cmd.payload(), tokens);
         if (ActionPlaceholderSanitizer.containsUnresolvedPrefix(raw, "target")) {
           return;
         }
-        RTP.serverAccessor.executeCommand(senderId, raw);
+        RTPRuntime.serverAccessor().executeCommand(senderId, raw);
       }
       case MESSAGE -> {
         String raw = ActionPlaceholderSanitizer.substitute(cmd.payload(), tokens);
         if (ActionPlaceholderSanitizer.containsUnresolvedPrefix(raw, "target")) {
           return;
         }
-        RTP.serverAccessor.sendMessage(senderId, raw);
+        RTPRuntime.serverAccessor().sendMessage(senderId, raw);
       }
       case ACTION -> {
         String actionName = cmd.payload().trim();
-        if ("DISARM".equalsIgnoreCase(actionName) && RTP.actionManager != null) {
-          RTP.actionManager.getSessionForParticipant(senderId).ifPresent(s -> {
+        if ("DISARM".equalsIgnoreCase(actionName) && ActionServices.actionManager() != null) {
+          ActionServices.actionManager().getSessionForParticipant(senderId).ifPresent(s -> {
             if (s instanceof ActionSessionImpl sessionImpl) {
               sessionImpl.disarm();
             }
           });
         }
       }
-      default -> RTP.log(Level.FINE, "[RTP Action] Subcommand unhandled action type: " + cmd.type());
+      default -> RTPRuntime.log(Level.FINE, "[RTP Action] Subcommand unhandled action type: " + cmd.type());
     }
   }
 }

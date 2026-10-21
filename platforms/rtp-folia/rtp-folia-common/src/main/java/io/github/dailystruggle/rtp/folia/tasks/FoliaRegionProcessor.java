@@ -3,6 +3,8 @@ package io.github.dailystruggle.rtp.folia.tasks;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.metrics.api.MetricsBinding;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import io.github.dailystruggle.rtp.folia.metrics.FoliaMetricsBinding;
@@ -39,7 +41,7 @@ public class FoliaRegionProcessor implements Runnable {
         // region, carrying current queue depth. Best-effort; failures are
         // swallowed so observability never breaks the pipeline.
         try {
-            MetricsBinding b = RTP.metrics.getBinding();
+            MetricsBinding b = CoreMetrics.instance().getBinding();
             if (b instanceof FoliaMetricsBinding) {
                 ((FoliaMetricsBinding) b).recordRegionTick(key, queue.size());
             }
@@ -65,15 +67,15 @@ public class FoliaRegionProcessor implements Runnable {
             activeProcessors.remove(key);
             // Double-check in case a task was injected during removal
             if (!queue.isEmpty() && activeProcessors.add(key)) {
-                RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(key.worldId());
+                RTPWorld<?> world = RTPRuntime.serverAccessor().getRTPWorld(key.worldId());
                 if (world != null) {
-                    RTP.serverAccessor.getScheduler().runTaskLater(world, key.regionX() << 5, key.regionZ() << 5, this, 1L);
+                    RTPRuntime.serverAccessor().getScheduler().runTaskLater(world, key.regionX() << 5, key.regionZ() << 5, this, 1L);
                 }
             }
         } else {
-            RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(key.worldId());
+            RTPWorld<?> world = RTPRuntime.serverAccessor().getRTPWorld(key.worldId());
             if (world != null) {
-                RTP.serverAccessor.getScheduler().runTaskLater(world, key.regionX() << 5, key.regionZ() << 5, this, 1L);
+                RTPRuntime.serverAccessor().getScheduler().runTaskLater(world, key.regionX() << 5, key.regionZ() << 5, this, 1L);
             } else {
                 activeProcessors.remove(key);
             }

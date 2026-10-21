@@ -2,8 +2,9 @@ package io.github.dailystruggle.rtp.common.commands.config;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -48,8 +49,8 @@ class ConfigImportCmdExtendedTest {
   @Test
   void testImportNullDirectory() {
     ConfigImportCmd cmd = new ConfigImportCmd(null);
-    RTP.configs = null;
-    RTP.serverAccessor = null;
+    ActiveConfigs.set(null);
+    RTPRuntime.setServerAccessor(null);
     assertFalse(cmd.onCommand(UUID.randomUUID(), Collections.emptyMap(), null));
   }
 

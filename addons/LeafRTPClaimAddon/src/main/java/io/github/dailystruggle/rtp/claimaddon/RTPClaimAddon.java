@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.claimaddon;
 import io.github.dailystruggle.rtp.api.addon.RTPAddon;
 import io.github.dailystruggle.rtp.api.server.PlatformFamily;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.logging.Level;
 
 /**
@@ -19,7 +20,7 @@ public final class RTPClaimAddon implements RTPAddon {
 
   @Override
   public void onLoad() {
-    PlatformFamily family = RTP.serverAccessor.getPlatformFamily();
+    PlatformFamily family = RTPRuntime.serverAccessor().getPlatformFamily();
     if (family != PlatformFamily.BUKKIT) {
       RTP.log(Level.INFO,
           "[LeafRTPClaimAddon] skipping claim integrations: not a Bukkit-family server (platform family "

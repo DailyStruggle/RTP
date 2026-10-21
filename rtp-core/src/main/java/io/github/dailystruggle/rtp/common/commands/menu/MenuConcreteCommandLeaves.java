@@ -4,8 +4,9 @@ import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.api.menu.MenuAction;
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
@@ -398,18 +399,18 @@ final class MenuConcreteCommandLeaves {
                                  Map<String, List<String>> parameterValues,
                                  @Nullable Consumer<String> messageMethod) {
             String regionName = firstValue(parameterValues, PARAM_REGION);
-            RTP.log(java.util.logging.Level.FINE,
+            RTPRuntime.log(java.util.logging.Level.FINE,
                     "[viz/" + name + "] leaf reached: caller=" + callerId
                             + " region=" + regionName
                             + " hasMsg=" + (messageMethod != null));
             if (regionName == null || regionName.isEmpty()) {
-                RTP.log(java.util.logging.Level.FINE,
+                RTPRuntime.log(java.util.logging.Level.FINE,
                         "[viz/" + name + "] no region= -> opening selector");
                 Boolean ok = selectorOpener.apply(callerId, messageMethod);
                 return Boolean.TRUE.equals(ok);
             }
             boolean result = paint(callerId, regionName, messageMethod);
-            RTP.log(java.util.logging.Level.FINE,
+            RTPRuntime.log(java.util.logging.Level.FINE,
                     "[viz/" + name + "] leaf returning result=" + result);
             return result;
         }
@@ -425,8 +426,8 @@ final class MenuConcreteCommandLeaves {
 
         static Set<String> liveRegionNames() {
             try {
-                if (RTP.selectionAPI == null) return Collections.emptySet();
-                Set<String> names = RTP.selectionAPI.regionNames();
+                if (ActiveSelection.get() == null) return Collections.emptySet();
+                Set<String> names = ActiveSelection.get().regionNames();
                 if (names == null || names.isEmpty()) return Collections.emptySet();
                 return new LinkedHashSet<>(names);
             } catch (RuntimeException e) {
@@ -548,11 +549,11 @@ final class MenuConcreteCommandLeaves {
         }
 
         private boolean dispatch(UUID callerId, @Nullable Consumer<String> messageMethod) {
-            RTP.log(java.util.logging.Level.FINE,
+            RTPRuntime.log(java.util.logging.Level.FINE,
                     "[viz/sparkline] leaf reached: caller=" + callerId
                             + " hasMsg=" + (messageMethod != null));
             boolean result = dispatch.paintSparkline(callerId, messageMethod);
-            RTP.log(java.util.logging.Level.FINE,
+            RTPRuntime.log(java.util.logging.Level.FINE,
                     "[viz/sparkline] leaf returning result=" + result);
             return result;
         }
@@ -860,7 +861,7 @@ final class MenuConcreteCommandLeaves {
                     @Override
                     public Set<String> values() {
                         try {
-                            return RTP.selectionAPI != null ? RTP.selectionAPI.regionNames() : Collections.emptySet();
+                            return ActiveSelection.get() != null ? ActiveSelection.get().regionNames() : Collections.emptySet();
                         } catch (Exception e) {
                             return Collections.emptySet();
                         }
@@ -902,16 +903,16 @@ final class MenuConcreteCommandLeaves {
                 Integer[] dims = parseDimensions(parameterValues);
                 double zoom = parseZoom(parameterValues);
 
-                if (RTP.scheduler == null) return false;
-                RTP.scheduler.runTaskAsynchronously(() -> {
+                if (RTPRuntime.scheduler() == null) return false;
+                RTPRuntime.scheduler().runTaskAsynchronously(() -> {
                     try {
-                        if (RTP.selectionAPI == null) {
+                        if (ActiveSelection.get() == null) {
                             sendMsg(callerId, "[RTP] Selection API not initialized", messageMethod);
                             return;
                         }
                         io.github.dailystruggle.rtp.common.selection.region.Region region;
                         try {
-                            region = RTP.selectionAPI.getRegionOrDefault(regionName);
+                            region = ActiveSelection.get().getRegionOrDefault(regionName);
                         } catch (Exception e) {
                             sendMsg(callerId, "[RTP] Region not found: " + regionName, messageMethod);
                             return;
@@ -931,7 +932,7 @@ final class MenuConcreteCommandLeaves {
                                 result.imageFile().getPath(), result.executionTimeMs(), result.nnMean(), result.badChunksCount());
                         sendMsg(callerId, msg, messageMethod);
                     } catch (Exception e) {
-                        RTP.log(java.util.logging.Level.WARNING, "Export comprehensive failed for " + regionName + ": " + e.getMessage(), e);
+                        RTPRuntime.log(java.util.logging.Level.WARNING, "Export comprehensive failed for " + regionName + ": " + e.getMessage(), e);
                         sendMsg(callerId, "[RTP] Export comprehensive failed: " + e.getMessage(), messageMethod);
                     }
                 });
@@ -941,8 +942,8 @@ final class MenuConcreteCommandLeaves {
             private void sendMsg(UUID callerId, String msg, @Nullable Consumer<String> messageMethod) {
                 if (messageMethod != null) {
                     messageMethod.accept(msg);
-                } else if (RTP.serverAccessor != null) {
-                    RTP.serverAccessor.sendMessage(io.github.dailystruggle.rtp.api.RTPAPI.serverId, callerId, msg, null);
+                } else if (RTPRuntime.serverAccessor() != null) {
+                    RTPRuntime.serverAccessor().sendMessage(io.github.dailystruggle.rtp.api.RTPAPI.serverId, callerId, msg, null);
                 }
             }
         }
@@ -958,7 +959,7 @@ final class MenuConcreteCommandLeaves {
                     @Override
                     public Set<String> values() {
                         try {
-                            return RTP.selectionAPI != null ? RTP.selectionAPI.regionNames() : Collections.emptySet();
+                            return ActiveSelection.get() != null ? ActiveSelection.get().regionNames() : Collections.emptySet();
                         } catch (Exception e) {
                             return Collections.emptySet();
                         }
@@ -1000,17 +1001,17 @@ final class MenuConcreteCommandLeaves {
                 Integer[] dims = parseDimensions(parameterValues);
                 double zoom = parseZoom(parameterValues);
 
-                if (RTP.scheduler == null) return false;
-                RTP.scheduler.runTaskAsynchronously(() -> {
+                if (RTPRuntime.scheduler() == null) return false;
+                RTPRuntime.scheduler().runTaskAsynchronously(() -> {
                     long t0 = System.currentTimeMillis();
                     try {
-                        if (RTP.selectionAPI == null) {
+                        if (ActiveSelection.get() == null) {
                             sendMsg(callerId, "[RTP] Selection API not initialized", messageMethod);
                             return;
                         }
                         io.github.dailystruggle.rtp.common.selection.region.Region region;
                         try {
-                            region = RTP.selectionAPI.getRegionOrDefault(regionName);
+                            region = ActiveSelection.get().getRegionOrDefault(regionName);
                         } catch (Exception e) {
                             sendMsg(callerId, "[RTP] Region not found: " + regionName, messageMethod);
                             return;
@@ -1066,7 +1067,7 @@ final class MenuConcreteCommandLeaves {
                                     }
                                 }
                             } catch (Exception e) {
-                                RTP.log(java.util.logging.Level.FINE, "Failed individual visualization in export all (" + typeName + "): " + e.getMessage(), e);
+                                RTPRuntime.log(java.util.logging.Level.FINE, "Failed individual visualization in export all (" + typeName + "): " + e.getMessage(), e);
                             }
                         }
 
@@ -1077,7 +1078,7 @@ final class MenuConcreteCommandLeaves {
                                             region, outDir, dims[0], dims[1], zoom);
                             exportedFiles.add(result.imageFile().getPath());
                         } catch (Exception e) {
-                            RTP.log(java.util.logging.Level.FINE, "Failed comprehensive visualization in export all: " + e.getMessage(), e);
+                            RTPRuntime.log(java.util.logging.Level.FINE, "Failed comprehensive visualization in export all: " + e.getMessage(), e);
                         }
 
                         long elapsed = System.currentTimeMillis() - t0;
@@ -1085,7 +1086,7 @@ final class MenuConcreteCommandLeaves {
                                 "[RTP] Exported %d visualization images for %s to %s (%dms)",
                                 exportedFiles.size(), regionName, outDir.getPath(), elapsed), messageMethod);
                     } catch (Exception e) {
-                        RTP.log(java.util.logging.Level.WARNING, "Export all failed for " + regionName + ": " + e.getMessage(), e);
+                        RTPRuntime.log(java.util.logging.Level.WARNING, "Export all failed for " + regionName + ": " + e.getMessage(), e);
                         sendMsg(callerId, "[RTP] Export all failed: " + e.getMessage(), messageMethod);
                     }
                 });
@@ -1095,8 +1096,8 @@ final class MenuConcreteCommandLeaves {
             private void sendMsg(UUID callerId, String msg, @Nullable Consumer<String> messageMethod) {
                 if (messageMethod != null) {
                     messageMethod.accept(msg);
-                } else if (RTP.serverAccessor != null) {
-                    RTP.serverAccessor.sendMessage(io.github.dailystruggle.rtp.api.RTPAPI.serverId, callerId, msg, null);
+                } else if (RTPRuntime.serverAccessor() != null) {
+                    RTPRuntime.serverAccessor().sendMessage(io.github.dailystruggle.rtp.api.RTPAPI.serverId, callerId, msg, null);
                 }
             }
         }
@@ -1117,7 +1118,7 @@ final class MenuConcreteCommandLeaves {
                     @Override
                     public Set<String> values() {
                         try {
-                            return RTP.selectionAPI != null ? RTP.selectionAPI.regionNames() : Collections.emptySet();
+                            return ActiveSelection.get() != null ? ActiveSelection.get().regionNames() : Collections.emptySet();
                         } catch (Exception e) {
                             return Collections.emptySet();
                         }
@@ -1158,8 +1159,8 @@ final class MenuConcreteCommandLeaves {
                 String regionName = (regVals != null && !regVals.isEmpty()) ? regVals.get(0) : "default";
                 Integer[] dims = parseDimensions(parameterValues);
 
-                if (RTP.scheduler == null) return false;
-                RTP.scheduler.runTaskAsynchronously(() -> {
+                if (RTPRuntime.scheduler() == null) return false;
+                RTPRuntime.scheduler().runTaskAsynchronously(() -> {
                     long t0 = System.currentTimeMillis();
                     try {
                         io.github.dailystruggle.rtp.api.maps.ChartSpec spec =
@@ -1179,9 +1180,9 @@ final class MenuConcreteCommandLeaves {
                         }
 
                         io.github.dailystruggle.rtp.common.selection.region.Region region = null;
-                        if (RTP.selectionAPI != null) {
+                        if (ActiveSelection.get() != null) {
                             try {
-                                region = RTP.selectionAPI.getRegionOrDefault(regionName);
+                                region = ActiveSelection.get().getRegionOrDefault(regionName);
                             } catch (Exception ignored) {
                             }
                         }
@@ -1209,7 +1210,7 @@ final class MenuConcreteCommandLeaves {
                         long elapsed = System.currentTimeMillis() - t0;
                         sendMsg(callerId, "[RTP] Exported " + typeName + " chart to " + target.getPath() + " (" + elapsed + "ms, " + framed.getWidth() + "x" + framed.getHeight() + ")", messageMethod);
                     } catch (Exception e) {
-                        RTP.log(java.util.logging.Level.WARNING, "Export failed for " + typeName + ": " + e.getMessage(), e);
+                        RTPRuntime.log(java.util.logging.Level.WARNING, "Export failed for " + typeName + ": " + e.getMessage(), e);
                         sendMsg(callerId, "[RTP] Export failed: " + e.getMessage(), messageMethod);
                     }
                 });
@@ -1219,8 +1220,8 @@ final class MenuConcreteCommandLeaves {
             private void sendMsg(UUID callerId, String msg, @Nullable Consumer<String> messageMethod) {
                 if (messageMethod != null) {
                     messageMethod.accept(msg);
-                } else if (RTP.serverAccessor != null) {
-                    RTP.serverAccessor.sendMessage(io.github.dailystruggle.rtp.api.RTPAPI.serverId, callerId, msg, null);
+                } else if (RTPRuntime.serverAccessor() != null) {
+                    RTPRuntime.serverAccessor().sendMessage(io.github.dailystruggle.rtp.api.RTPAPI.serverId, callerId, msg, null);
                 }
             }
         }

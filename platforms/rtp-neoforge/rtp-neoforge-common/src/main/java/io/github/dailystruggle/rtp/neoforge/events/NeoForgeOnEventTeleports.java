@@ -5,9 +5,13 @@ import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.LockFreeLocationBuffer;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -46,7 +50,7 @@ import java.util.logging.Level;
  * "first join" signal.</p>
  *
  * <p><b>S-005 compliance.</b> This method does no chunk I/O - it dispatches a
- * {@code TeleportPipelineTask} via {@code RTP.scheduler.runTaskAsynchronously};
+ * {@code TeleportPipelineTask} via {@code RTPRuntime.scheduler().runTaskAsynchronously};
  * all chunk-touching work happens off the server thread inside the pipeline.</p>
  *
  * <p>No {@code org.bukkit.*} imports.</p>
@@ -72,7 +76,7 @@ public final class NeoForgeOnEventTeleports {
             if (id == null) return;
             long start = System.nanoTime();
 
-            RTPCommandSender sender = RTP.serverAccessor.getSender(id);
+            RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(id);
             if (sender == null) return;
 
             boolean hasFirstJoin = ParsePermissions.hasPerm(sender, "rtp.onevent.", "firstjoin");
@@ -83,7 +87,7 @@ public final class NeoForgeOnEventTeleports {
 
             @SuppressWarnings("unchecked")
             ConfigParser<LoggingKeys> logging =
-                    (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
+                    (ConfigParser<LoggingKeys>) ActiveConfigs.get().getParser(LoggingKeys.class);
             boolean verbose = false;
             if (logging != null) {
                 Object o = logging.getConfigValue(LoggingKeys.event_join, false);
@@ -106,10 +110,10 @@ public final class NeoForgeOnEventTeleports {
                 return;
             }
             if (hasJoin) {
-                TeleportData data = RTP.getInstance().latestTeleportData.get(id);
+                TeleportData data = TeleportSessions.current().latestTeleportData.get(id);
                 long time = (data == null) ? 0 : data.time;
                 if (!sender.hasPermission("rtp.nocooldown") && (start - time) < cooldownTime) {
-                    RTP.serverAccessor.sendMessage(id, PlayerMessages.cooldownMessage);
+                    RTPRuntime.serverAccessor().sendMessage(id, PlayerMessages.cooldownMessage);
                     return;
                 }
                 if (verbose) {
@@ -135,9 +139,9 @@ public final class NeoForgeOnEventTeleports {
      */
     private static void primeFromLoginCache(UUID id) {
         try {
-            RTPPlayer rtpPlayer = RTP.serverAccessor.getPlayer(id);
+            RTPPlayer rtpPlayer = RTPRuntime.serverAccessor().getPlayer(id);
             if (rtpPlayer == null) return;
-            Region region = RTP.selectionAPI.getRegion(rtpPlayer);
+            Region region = ActiveSelection.get().getRegion(rtpPlayer);
             if (region == null) return;
             LockFreeLocationBuffer login = region.queueManager.loginLocations;
             if (login == null || login.isEmpty()) return;
@@ -158,23 +162,23 @@ public final class NeoForgeOnEventTeleports {
      * {@link #primeFromLoginCache(UUID)}.
      */
     private static void teleportAction(UUID id) {
-        if (RTP.getInstance().processingPlayers.contains(id)) return;
-        RTP.getInstance().processingPlayers.add(id);
-        TeleportData teleportData = RTP.getInstance().latestTeleportData.get(id);
+        if (TeleportSessions.current().processingPlayers.contains(id)) return;
+        TeleportSessions.current().processingPlayers.add(id);
+        TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(id);
         if (teleportData != null) {
             if (!teleportData.completed) return;
-            RTP.getInstance().priorTeleportData.put(id, teleportData);
+            TeleportSessions.current().priorTeleportData.put(id, teleportData);
         }
-        RTP.getInstance().latestTeleportData.remove(id);
-        RTPPlayer rtpPlayer = RTP.serverAccessor.getPlayer(id);
+        TeleportSessions.current().latestTeleportData.remove(id);
+        RTPPlayer rtpPlayer = RTPRuntime.serverAccessor().getPlayer(id);
         if (rtpPlayer == null) return;
-        Region region = RTP.selectionAPI.getRegion(rtpPlayer);
+        Region region = ActiveSelection.get().getRegion(rtpPlayer);
         if (region == null) return;
         TeleportPipelineTask pipelineTask =
                 new TeleportPipelineTask(new GenerationContext(rtpPlayer, rtpPlayer, null), region);
         pipelineTask.setDelay(10);
         pipelineTask.region().inFlightCalculations.incrementAndGet();
-        RTP.scheduler.runTaskAsynchronously(pipelineTask);
+        RTPRuntime.scheduler().runTaskAsynchronously(pipelineTask);
     }
 
     /**

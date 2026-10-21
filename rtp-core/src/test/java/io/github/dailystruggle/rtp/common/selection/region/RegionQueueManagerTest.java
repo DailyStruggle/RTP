@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import org.junit.jupiter.api.BeforeEach;
@@ -490,7 +491,7 @@ public class RegionQueueManagerTest {
         qm.requestTeleport(id);
 
         assertTrue(qm.playerQueue.contains(id));
-        assertTrue(io.github.dailystruggle.rtp.common.RTP.getInstance().queuedPlayers.contains(id));
+        assertTrue(TeleportSessions.current().queuedPlayers.contains(id));
     }
 
     @Test

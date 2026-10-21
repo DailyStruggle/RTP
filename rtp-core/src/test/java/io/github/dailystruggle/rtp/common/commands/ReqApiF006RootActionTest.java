@@ -8,11 +8,12 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.info.InfoCmd;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -72,13 +73,13 @@ public class ReqApiF006RootActionTest {
         data.put(PlayerMessages.alreadyTeleporting, "you're already teleporting!");
         data.put(PlayerMessages.cooldownMessage, "cooldown active");
         data.forEach((k, v) -> {
-            Object fv = RTP.configs.getParser((Class) k.getDeclaringClass());
+            Object fv = ActiveConfigs.get().getParser((Class) k.getDeclaringClass());
             if (fv instanceof io.github.dailystruggle.rtp.common.configuration.ConfigParser) {
                 ((io.github.dailystruggle.rtp.common.configuration.ConfigParser) fv).set((Enum) k, v);
             }
         });
 
-        RTP.getInstance().processingPlayers.clear();
+        TeleportSessions.current().processingPlayers.clear();
         RTPAPI.hooks().rootAction().clear();
     }
 
@@ -93,7 +94,7 @@ public class ReqApiF006RootActionTest {
         MockRTPPlayer sender = new MockRTPPlayer(UUID.randomUUID(), "test", null);
         accessor.addPlayer(sender);
         // Simulate an in-flight teleport so the classic path would emit alreadyTeleporting.
-        RTP.getInstance().processingPlayers.add(sender.uuid());
+        TeleportSessions.current().processingPlayers.add(sender.uuid());
 
         AtomicInteger invocations = new AtomicInteger();
         RTPAPI.hooks().rootAction().bind((player, feedback) -> {
@@ -118,7 +119,7 @@ public class ReqApiF006RootActionTest {
     void actionReturningFalse_fallsThroughToClassic() {
         MockRTPPlayer sender = new MockRTPPlayer(UUID.randomUUID(), "test", null);
         accessor.addPlayer(sender);
-        RTP.getInstance().processingPlayers.add(sender.uuid());
+        TeleportSessions.current().processingPlayers.add(sender.uuid());
 
         RTPAPI.hooks().rootAction().bind((player, feedback) -> false);
 
@@ -135,7 +136,7 @@ public class ReqApiF006RootActionTest {
     void thrownAction_fallsThroughToClassic() {
         MockRTPPlayer sender = new MockRTPPlayer(UUID.randomUUID(), "test", null);
         accessor.addPlayer(sender);
-        RTP.getInstance().processingPlayers.add(sender.uuid());
+        TeleportSessions.current().processingPlayers.add(sender.uuid());
 
         RTPAPI.hooks().rootAction().bind((player, feedback) -> {
             throw new RuntimeException("boom");
@@ -202,7 +203,7 @@ public class ReqApiF006RootActionTest {
         // opened on those platforms. This exercises compute() directly.
         MockRTPPlayer sender = new MockRTPPlayer(UUID.randomUUID(), "test", null);
         accessor.addPlayer(sender);
-        RTP.getInstance().processingPlayers.add(sender.uuid());
+        TeleportSessions.current().processingPlayers.add(sender.uuid());
 
         AtomicInteger invocations = new AtomicInteger();
         RTPAPI.hooks().rootAction().bind((player, feedback) -> {
@@ -220,7 +221,7 @@ public class ReqApiF006RootActionTest {
         assertEquals(1, invocations.get(), "bound action must run for a bare /rtp via compute()");
         assertTrue(sender.sentMessages.stream().anyMatch(m -> m.contains("menu opened")),
                 "action feedback should reach the player. Sent: " + sender.sentMessages);
-        assertFalse(RTP.getInstance().processingPlayers.contains(sender.uuid()),
+        assertFalse(TeleportSessions.current().processingPlayers.contains(sender.uuid()),
                 "a handled action must release the processingPlayers lock");
     }
 
@@ -250,7 +251,7 @@ public class ReqApiF006RootActionTest {
     void unboundAction_classicBehavior() {
         MockRTPPlayer sender = new MockRTPPlayer(UUID.randomUUID(), "test", null);
         accessor.addPlayer(sender);
-        RTP.getInstance().processingPlayers.add(sender.uuid());
+        TeleportSessions.current().processingPlayers.add(sender.uuid());
 
         // No bind() call; registry current() is null.
         TestRTPCmd rtpCmd = new TestRTPCmd();

@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -110,7 +110,7 @@ public class CfDiagTest {
 
     @Test
     void ensureStartedHandlesSchedulerThrowAndResetsStarted() throws Exception {
-        RTPServerAccessor originalAccessor = RTP.serverAccessor;
+        RTPServerAccessor originalAccessor = RTPRuntime.serverAccessor();
         try {
             RTPServerAccessor throwingAccessor = (RTPServerAccessor) java.lang.reflect.Proxy.newProxyInstance(
                     getClass().getClassLoader(),
@@ -122,7 +122,7 @@ public class CfDiagTest {
                         return null;
                     }
             );
-            RTP.serverAccessor = throwingAccessor;
+            RTPRuntime.setServerAccessor(throwingAccessor);
 
             // Calling ensureStarted when scheduler throws should catch exception and reset STARTED to false
             assertDoesNotThrow(CfDiag::ensureStarted);
@@ -132,7 +132,7 @@ public class CfDiagTest {
             boolean started = ((AtomicBoolean) startedField.get(null)).get();
             assertFalse(started, "STARTED must be reset to false when scheduler fails");
         } finally {
-            RTP.serverAccessor = originalAccessor;
+            RTPRuntime.setServerAccessor(originalAccessor);
         }
     }
 
@@ -162,7 +162,7 @@ public class CfDiagTest {
 
         // Verify that the logged message actually contains formatted delta rates
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor mockAccessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor();
         assertFalse(mockAccessor.logMessages.isEmpty());
         String lastLog = mockAccessor.logMessages.get(mockAccessor.logMessages.size() - 1);
         assertTrue(lastLog.contains("[RTP][CFDIAG] window="));
@@ -212,7 +212,7 @@ public class CfDiagTest {
 
     private static String lastLog() {
         java.util.List<String> logs =
-                ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).logMessages;
+                ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor()).logMessages;
         return logs.isEmpty() ? "" : logs.get(logs.size() - 1);
     }
 
@@ -276,7 +276,7 @@ public class CfDiagTest {
 
         for (Object[] row : rateLayout()) {
             java.util.List<String> logs =
-                    ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).logMessages;
+                    ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor()).logMessages;
             int before = logs.size();
             ((java.util.concurrent.atomic.LongAdder) row[1]).add(1);
             dumpOnce.invoke(null);

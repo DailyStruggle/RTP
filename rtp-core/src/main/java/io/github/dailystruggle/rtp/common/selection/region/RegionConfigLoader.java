@@ -2,11 +2,15 @@ package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigDefaultResolver;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Polygon;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
@@ -35,7 +39,7 @@ public class RegionConfigLoader {
         String name = regionParser.name.replace(".yml", "");
 //        System.out.println("[RTP-DEBUG] RegionLoader: --- Processing Region '" + name + "' ---");
 
-        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
+        ConfigParser<LoggingKeys> logging = (ConfigParser<LoggingKeys>) ActiveConfigs.get().getParser(LoggingKeys.class);
         boolean detailedRegionInit = true;
         if (logging != null) {
             Object o = logging.getConfigValue(LoggingKeys.detailed_region_init, false);
@@ -59,13 +63,13 @@ public class RegionConfigLoader {
             if (worldName.startsWith("[") && worldName.endsWith("]")) {
                 try {
                     int num = Integer.parseInt(worldName.substring(1, worldName.length() - 1));
-                    List<RTPWorld<?>> worlds = RTP.serverAccessor.getRTPWorlds();
+                    List<RTPWorld<?>> worlds = RTPRuntime.serverAccessor().getRTPWorlds();
                     if (num >= 0 && num < worlds.size()) {
                         world = worlds.get(num);
                     }
                 } catch (NumberFormatException ignored) {}
             } else {
-                world = RTP.serverAccessor.getRTPWorld(worldName);
+                world = RTPRuntime.serverAccessor().getRTPWorld(worldName);
             }
 
             // No fallback: if the configured world cannot be resolved (e.g. an automatic world
@@ -102,7 +106,7 @@ public class RegionConfigLoader {
             shape = deserializeShape(new java.util.HashMap<>(), name);
             if (shape != null) {
                 regionParser.set(RegionKeys.shape, shape);
-                RTP.log(Level.WARNING, "[RTP] Region '" + name
+                RTPRuntime.log(Level.WARNING, "[RTP] Region '" + name
                         + "' had no readable shape; falling back to the default " + shape.name + ".");
             }
         }
@@ -134,7 +138,7 @@ public class RegionConfigLoader {
             vert = deserializeVert(vertDefault, name);
             if (vert != null) {
                 regionParser.set(RegionKeys.vert, vert);
-                RTP.log(Level.WARNING, "[RTP] Region '" + name
+                RTPRuntime.log(Level.WARNING, "[RTP] Region '" + name
                         + "' had no readable vert; falling back to the default " + vert.name + ".");
             }
         }
@@ -270,10 +274,10 @@ public class RegionConfigLoader {
         if (map == null) map = new java.util.HashMap<>();
         Object rawName = map.get("name");
         String shapeName = (rawName != null) ? String.valueOf(rawName).trim() : "CIRCLE";
-        Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+        Factory<Shape<?>> factory = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
         if (factory == null || !factory.list().hasMoreElements()) {
             RTP.registerDefaultShapes();
-            factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+            factory = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
         }
         if (factory == null) return null;
 
@@ -294,14 +298,14 @@ public class RegionConfigLoader {
             resolvedName = lookup.matchedKey();
         } else if (lookup.isPerceptible()) {
             String regionPrefix = (regionName != null && !regionName.isEmpty()) ? "Region '" + regionName + "' " : "";
-            RTP.log(Level.WARNING, "[RTP] " + regionPrefix + "shape '" + shapeName
+            RTPRuntime.log(Level.WARNING, "[RTP] " + regionPrefix + "shape '" + shapeName
                     + "' was not recognized, but closely matches '" + lookup.matchedKey()
                     + "'. Autocorrecting to '" + lookup.matchedKey() + "'.");
             prototype = lookup.match();
             resolvedName = lookup.matchedKey();
         } else {
             String regionPrefix = (regionName != null && !regionName.isEmpty()) ? "Region '" + regionName + "' " : "";
-            RTP.log(Level.WARNING, "[RTP] " + regionPrefix + "shape '" + shapeName
+            RTPRuntime.log(Level.WARNING, "[RTP] " + regionPrefix + "shape '" + shapeName
                     + "' is invalid (valid options: " + String.join(", ", lookup.availableCandidates())
                     + "). Falling back to CIRCLE.");
             prototype = (Shape<?>) factory.get("CIRCLE");
@@ -356,7 +360,7 @@ public class RegionConfigLoader {
         }
         if (!(rawVertices instanceof Iterable<?> iterable)) {
             if (rawVertices != null) {
-                RTP.log(Level.WARNING, "[RTP] Shape " + shape.name
+                RTPRuntime.log(Level.WARNING, "[RTP] Shape " + shape.name
                         + ": 'vertices' must be a list of [x, z] pairs; got "
                         + rawVertices.getClass().getSimpleName()
                         + ". Falling back to the bounding square.");
@@ -368,7 +372,7 @@ public class RegionConfigLoader {
         for (Object entry : iterable) {
             int[] vertex = parseVertex(entry);
             if (vertex == null) {
-                RTP.log(Level.WARNING, "[RTP] Shape " + shape.name
+                RTPRuntime.log(Level.WARNING, "[RTP] Shape " + shape.name
                         + ": vertex " + vertices.size() + " (" + entry
                         + ") is not an [x, z] pair. Falling back to the bounding square.");
                 return;
@@ -379,7 +383,7 @@ public class RegionConfigLoader {
         try {
             polygon.setVertices(vertices);
         } catch (IllegalArgumentException e) {
-            RTP.log(Level.WARNING, "[RTP] Shape " + shape.name + ": " + e.getMessage()
+            RTPRuntime.log(Level.WARNING, "[RTP] Shape " + shape.name + ": " + e.getMessage()
                     + ". Falling back to the bounding square.");
             return;
         }
@@ -387,7 +391,7 @@ public class RegionConfigLoader {
         // ADR-034: expand is hard-off for a polygon. Say so instead of ignoring it silently.
         Object rawExpand = map.get("expand");
         if (rawExpand != null && getBoolean(rawExpand)) {
-            RTP.log(Level.WARNING, "[RTP] Shape " + shape.name
+            RTPRuntime.log(Level.WARNING, "[RTP] Shape " + shape.name
                     + ": 'expand: true' is ignored for polygons - the boundary is the vertex list.");
         }
     }
@@ -447,7 +451,7 @@ public class RegionConfigLoader {
         if (map == null) map = new java.util.HashMap<>();
         Object rawName = map.get("name");
         String vertName = (rawName != null) ? String.valueOf(rawName).trim() : "LINEAR";
-        Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
+        Factory<VerticalAdjustor<?>> factory = (Factory<VerticalAdjustor<?>>) FactoryRegistry.get(FactoryNames.vert);
         if (factory == null) return null;
 
         Map<String, VerticalAdjustor<?>> candidateMap = new LinkedHashMap<>();
@@ -467,14 +471,14 @@ public class RegionConfigLoader {
             resolvedName = lookup.matchedKey();
         } else if (lookup.isPerceptible()) {
             String regionPrefix = (regionName != null && !regionName.isEmpty()) ? "Region '" + regionName + "' " : "";
-            RTP.log(Level.WARNING, "[RTP] " + regionPrefix + "vert '" + vertName
+            RTPRuntime.log(Level.WARNING, "[RTP] " + regionPrefix + "vert '" + vertName
                     + "' was not recognized, but closely matches '" + lookup.matchedKey()
                     + "'. Autocorrecting to '" + lookup.matchedKey() + "'.");
             prototype = lookup.match();
             resolvedName = lookup.matchedKey();
         } else {
             String regionPrefix = (regionName != null && !regionName.isEmpty()) ? "Region '" + regionName + "' " : "";
-            RTP.log(Level.WARNING, "[RTP] " + regionPrefix + "vert '" + vertName
+            RTPRuntime.log(Level.WARNING, "[RTP] " + regionPrefix + "vert '" + vertName
                     + "' is invalid (valid options: " + String.join(", ", lookup.availableCandidates())
                     + "). Falling back to LINEAR.");
             prototype = (VerticalAdjustor<?>) factory.get("LINEAR");

@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.proxy.common;
 
 /**
  * Static holder for the registered {@link RTPProxyAccessor}, mirroring
- * {@code RTP.serverAccessor} in {@code rtp-core}.
+ * {@code RTPRuntime.serverAccessor()} in {@code rtp-core}.
  *
  * <p>Bootstrap order (rtp-proxy-ADR-013):
  * <ol>

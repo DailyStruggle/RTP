@@ -1,10 +1,10 @@
 package io.github.dailystruggle.rtp.common.commands.config.list;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,8 +40,8 @@ class ListCmdTest {
     @BeforeEach
     void setUp() throws Exception {
         accessor = RTPTestSetup.install(tempDir);
-        RTP.getInstance().miscAsyncTasks.clear();
-        RTP.getInstance().miscAsyncTasks.start();
+        MiscTasks.async().clear();
+        MiscTasks.async().start();
 
         file = new RtpYamlConfig(new File(tempDir, "list.yml"));
         file.createOrLoad();

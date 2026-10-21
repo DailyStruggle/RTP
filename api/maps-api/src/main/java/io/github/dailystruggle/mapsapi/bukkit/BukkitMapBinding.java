@@ -155,7 +155,7 @@ public class BukkitMapBinding implements MapBinding, MapBindingLifecycle {
      *
      * <p>Threading: this call mutates world state and must run on the
      * viewer's region thread. The caller ({@code MapDispatch}) is responsible
-     * for dispatching this onto the correct thread via {@code RTP.scheduler}
+     * for dispatching this onto the correct thread via {@code RTPRuntime.scheduler()}
      * (on Folia, the region thread owning the viewer's location; on
      * Paper/Spigot, the main thread). This method therefore drops the item
      * directly and assumes it is already on the right thread.

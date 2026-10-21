@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region.claim;
 
 import io.github.dailystruggle.rtp.api.claim.ClaimBoundary;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
@@ -242,7 +242,7 @@ public class ClaimAnchoredRegionTracker {
 
     if (ingestedCount > 0) {
       try {
-        RTP.log(Level.INFO, "[ClaimAnchoredRegionTracker] Ingested " + ingestedCount
+        RTPRuntime.log(Level.INFO, "[ClaimAnchoredRegionTracker] Ingested " + ingestedCount
             + " hazard chunks from region " + sourceRegion.name + " into claim " + boundary.id());
       } catch (Exception ignored) {
       }
@@ -320,7 +320,7 @@ public class ClaimAnchoredRegionTracker {
         }
       }
     } catch (Throwable t) {
-      RTP.log(Level.WARNING, "[ClaimAnchoredRegionTracker] Failed to resolve claim boundary at (" + x + "," + z + ")", t);
+      RTPRuntime.log(Level.WARNING, "[ClaimAnchoredRegionTracker] Failed to resolve claim boundary at (" + x + "," + z + ")", t);
     }
 
     if (boundary == null) {
@@ -372,7 +372,7 @@ public class ClaimAnchoredRegionTracker {
 
     if (marked > 0) {
       shape.flushAndRebuildIfNeeded(shape.spatialResolution());
-      RTP.log(Level.FINE, "[ClaimAnchoredRegionTracker] Encapsulated claim boundary '" + boundary.id()
+      RTPRuntime.log(Level.FINE, "[ClaimAnchoredRegionTracker] Encapsulated claim boundary '" + boundary.id()
           + "' [" + bMinX + "," + bMinZ + " -> " + bMaxX + "," + bMaxZ
           + "], marked " + marked + " locations with TTL " + effectiveTtl + "s");
     }

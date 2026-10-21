@@ -88,6 +88,10 @@ One changelog covers both the free and Pro jars, which ship the same code.
 
 ## [Unreleased]
 
+### Added
+
+- **Refuse steep landing spots ([ADR-119](https://github.com/DailyStruggle/RTP/tree/V3/docs/adr/ADR-119-slope-detection-and-elevation-memory.md)).** `linear` and `jump` verts accept two new optional keys. `maxSlope` is the largest floor-height step, in blocks, allowed between the landing spot and the ground `slopeRadius` blocks away (default `2`, range `1`-`8`) to the north, south, east and west. Spots on cliff edges or steep hillsides are skipped and the search moves on to the next spot. The check follows the floor the player would stand on, so it also works in caves and the Nether. Regions without `maxSlope` behave as before and keep their saved region data. Setting or changing either key rebuilds that region's saved data once. Steep worlds with a low `maxSlope` reject more chunks. Not available on `fixed`, which places players in mid-air.
+
 ### Fixed
 
 - **minePlots claim check now detects plots.** With `rerollMinePlots: true`, the check never found a plot, so players could land inside minePlots plots. It looked minePlots up under the wrong plugin name and guessed at its classes. It is now built against minePlots' published API (`plugin-api` 4.6.2, `PlotServiceApi.getPlot` from the Bukkit ServicesManager) instead of looking classes up by name, and rejects the spot if minePlots is enabled but that service is missing or the lookup fails. It is tested against the published API, not yet on a live minePlots server, so treat it as best effort.

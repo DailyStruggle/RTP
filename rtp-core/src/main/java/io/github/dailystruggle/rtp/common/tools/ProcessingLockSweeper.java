@@ -1,10 +1,12 @@
 package io.github.dailystruggle.rtp.common.tools;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.network.LobbyDispatchRetryQueue;
 import io.github.dailystruggle.rtp.common.network.NetworkModeBootstrap;
 import io.github.dailystruggle.rtp.common.network.NetworkStatusCache;
 
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.tasks.teleport.DeathTeleports;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,19 +37,19 @@ public final class ProcessingLockSweeper {
    * @return number of locks released
    */
   static int sweep(Set<UUID> livePipelines, Set<UUID> liveData) {
-    RTP rtp = RTP.getInstance();
-    if (rtp == null) {
+    TeleportSessions sessions = TeleportSessions.current();
+    if (sessions == null) {
       return 0;
     }
-    Set<UUID> locks = rtp.processingPlayers;
+    Set<UUID> locks = TeleportSessions.current().processingPlayers;
     suspects.retainAll(locks);
     int released = 0;
     for (UUID id : locks) {
       if (unownedTwice(id, livePipelines, liveData) && locks.remove(id)) {
         released++;
-        RTP.log(Level.WARNING, "[RTP] released stale teleport lock for player " + id
+        RTPRuntime.log(Level.WARNING, "[RTP] released stale teleport lock for player " + id
             + " (no queue, pipeline, death hold or network enrolment owned it across two"
-            + " sweeps); the player can /rtp again (S-004)");
+            + " sweeps); the player can /sessions again (S-004)");
       }
     }
     return released;
@@ -78,11 +80,11 @@ public final class ProcessingLockSweeper {
     if (livePipelines.contains(id)) {
       return true;
     }
-    RTP rtp = RTP.getInstance();
-    if (rtp != null && rtp.queuedPlayers.contains(id)) {
+    TeleportSessions sessions = TeleportSessions.current();
+    if (sessions != null && TeleportSessions.current().queuedPlayers.contains(id)) {
       return true;
     }
-    if (RTP.deathEffectInFlight.contains(id) || RTP.pendingDeathTeleports.containsKey(id)) {
+    if (DeathTeleports.effectInFlight().contains(id) || DeathTeleports.pending().containsKey(id)) {
       return true;
     }
     return heldByNetwork(id);

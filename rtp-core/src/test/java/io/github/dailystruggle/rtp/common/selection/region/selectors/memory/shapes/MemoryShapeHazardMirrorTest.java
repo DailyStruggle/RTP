@@ -3,8 +3,8 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.HybridHazardTable;
 import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
@@ -26,7 +26,7 @@ public class MemoryShapeHazardMirrorTest {
   static void beforeAll() {
     MockRTPServerAccessor accessor =
         new MockRTPServerAccessor(new File("target/test-data-hazard-mirror"));
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
   }
 

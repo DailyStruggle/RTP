@@ -2,10 +2,12 @@ package io.github.dailystruggle.rtp.common.tasks.teleport;
 
 import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
 import java.util.List;
@@ -24,9 +26,9 @@ public final class RTPTeleportCancel extends RTPRunnable {
 
   @SuppressWarnings("unchecked") // configParserMap keyed by EconomyKeys.class guarantees the parser's E
   public static void refund(UUID playerId) {
-    if (RTP.configs == null || RTP.configs.configParserMap == null) return;
+    if (ActiveConfigs.get() == null || ActiveConfigs.get().configParserMap == null) return;
     ConfigParser<EconomyKeys> eco =
-        (ConfigParser<EconomyKeys>) RTP.configs.configParserMap.get(EconomyKeys.class);
+        (ConfigParser<EconomyKeys>) ActiveConfigs.get().configParserMap.get(EconomyKeys.class);
     if (eco == null) return;
     Object configValue = eco.getConfigValue(EconomyKeys.refundOnCancel, Boolean.TRUE);
 
@@ -36,7 +38,7 @@ public final class RTPTeleportCancel extends RTPRunnable {
     else refund = Boolean.parseBoolean(configValue.toString());
 
     // check if teleporting
-    TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
+    TeleportData data = TeleportSessions.current().latestTeleportData.get(playerId);
     if (data == null) return;
     if (data.completed) return;
 
@@ -45,24 +47,24 @@ public final class RTPTeleportCancel extends RTPRunnable {
     }
 
     // reset player data
-    TeleportData repData = RTP.getInstance().priorTeleportData.get(playerId);
-    RTP.getInstance().priorTeleportData.remove(playerId);
-    if (repData != null) RTP.getInstance().latestTeleportData.put(playerId, repData);
-    else RTP.getInstance().latestTeleportData.remove(playerId);
+    TeleportData repData = TeleportSessions.current().priorTeleportData.get(playerId);
+    TeleportSessions.current().priorTeleportData.remove(playerId);
+    if (repData != null) TeleportSessions.current().latestTeleportData.put(playerId, repData);
+    else TeleportSessions.current().latestTeleportData.remove(playerId);
 
-    if (RTP.economy != null && data.cost != 0.0 && refund && data.sender instanceof RTPPlayer) {
+    if (RTPRuntime.economy() != null && data.cost != 0.0 && refund && data.sender instanceof RTPPlayer) {
       final double refundAmount = data.cost;
       final UUID refundTarget = data.sender.uuid();
       io.github.dailystruggle.rtp.common.economy.EconomyHop.run(
-          () -> RTP.economy.give(refundTarget, refundAmount));
+          () -> RTPRuntime.economy().give(refundTarget, refundAmount));
     }
 
-    RTP.getInstance().processingPlayers.remove(playerId);
+    TeleportSessions.current().processingPlayers.remove(playerId);
   }
 
   public static void message(UUID playerId) {
-    String msg = RTP.configs.getConfigValue(PlayerMessages.teleportCancel, "").toString();
-    RTP.serverAccessor.sendMessage(playerId, msg);
+    String msg = ActiveConfigs.get().getConfigValue(PlayerMessages.teleportCancel, "").toString();
+    RTPRuntime.serverAccessor().sendMessage(playerId, msg);
   }
 
   @Override
@@ -70,13 +72,13 @@ public final class RTPTeleportCancel extends RTPRunnable {
     preActions.forEach(rtpTeleportCancelConsumer -> rtpTeleportCancelConsumer.accept(this));
 
     // check if teleporting
-    TeleportData data = RTP.getInstance().latestTeleportData.get(playerId);
+    TeleportData data = TeleportSessions.current().latestTeleportData.get(playerId);
     if (data == null) return;
     if (data.completed) return;
     if (data.nextTask == null) return;
 
     // check no-cancel permission
-    RTPPlayer player = RTP.serverAccessor.getPlayer(playerId);
+    RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(playerId);
     if (player != null && player.isOnline() && player.hasPermission("rtp.noCancel")) return;
 
     data.nextTask.setCancelled(true);

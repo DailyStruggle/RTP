@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.bukkit.bukkitListeners;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.action.ActionServices;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -16,12 +16,12 @@ public class OnPlayerDeath implements Listener {
 
   @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
   public void onPlayerDeath(PlayerDeathEvent event) {
-    if (RTP.actionManager == null) return;
+    if (ActionServices.actionManager() == null) return;
     Player victim = event.getEntity();
     UUID victimId = victim.getUniqueId();
     Player killer = victim.getKiller();
     UUID killerId = (killer != null) ? killer.getUniqueId() : null;
 
-    RTP.actionManager.handlePlayerDeath(victimId, killerId);
+    ActionServices.actionManager().handlePlayerDeath(victimId, killerId);
   }
 }

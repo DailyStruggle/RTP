@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.api;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionQueueManager;
@@ -32,8 +32,8 @@ class RtpCoreIntrospectionTest {
     @BeforeEach
     void setUp() {
         RTPTestSetup.install(tempDir);
-        RTP.selectionAPI.permRegionLookup.clear();
-        RTP.selectionAPI.tempRegions.clear();
+        ActiveSelection.get().permRegionLookup.clear();
+        ActiveSelection.get().tempRegions.clear();
     }
 
     private static Region buildRegion(String name) {
@@ -59,7 +59,7 @@ class RtpCoreIntrospectionTest {
         region.queueManager.keptLocations.offer(loc(100, 100));
         region.queueManager.keptLocations.offer(loc(200, 200));
         region.queueManager.unkeptLocations.offer(loc(300, 300));
-        RTP.selectionAPI.permRegionLookup.put("default", region);
+        ActiveSelection.get().permRegionLookup.put("default", region);
 
         List<RegionQueueDepths> all = RtpCoreIntrospection.queueDepths();
         assertEquals(1, all.size());
@@ -79,7 +79,7 @@ class RtpCoreIntrospectionTest {
     void queueDepths_byName() {
         Region region = buildRegion("nether");
         region.queueManager.unkeptLocations.offer(loc(1, 1));
-        RTP.selectionAPI.permRegionLookup.put("nether", region);
+        ActiveSelection.get().permRegionLookup.put("nether", region);
 
         RegionQueueDepths d = RtpCoreIntrospection.queueDepths("nether");
         assertNotNull(d);
@@ -93,7 +93,7 @@ class RtpCoreIntrospectionTest {
     @Test
     @DisplayName("returned list is unmodifiable (read-only surface, no mutator)")
     void queueDepths_listIsUnmodifiable() {
-        RTP.selectionAPI.permRegionLookup.put("default", buildRegion("default"));
+        ActiveSelection.get().permRegionLookup.put("default", buildRegion("default"));
         List<RegionQueueDepths> all = RtpCoreIntrospection.queueDepths();
         assertThrows(UnsupportedOperationException.class,
                 () -> all.add(new RegionQueueDepths("x", 0, 0, 0, 0, 0, 0, 0, 0)));
@@ -107,7 +107,7 @@ class RtpCoreIntrospectionTest {
         assertFalse(RtpCoreIntrospection.hasFastLocation("missing", UUID.randomUUID()));
 
         Region region = buildRegion("default");
-        RTP.selectionAPI.permRegionLookup.put("default", region);
+        ActiveSelection.get().permRegionLookup.put("default", region);
         assertFalse(RtpCoreIntrospection.hasFastLocation("default", UUID.randomUUID()));
     }
 

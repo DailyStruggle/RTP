@@ -2,9 +2,9 @@ package io.github.dailystruggle.rtp.common.tasks.scan;
 
 import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.CircleOptimizedDualLayer;
@@ -61,13 +61,13 @@ class ScanTaskShapeBoundsTest {
                 "scan_bounds_region", world, circle, new LinearAdjustor(new ArrayList<>()),
                 false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
         region = new Region("scan_bounds_region", settings);
-        RTP.selectionAPI.permRegionLookup.put("scan_bounds_region", region);
-        RTP.getInstance().scanTasks.clear();
+        ActiveSelection.get().permRegionLookup.put("scan_bounds_region", region);
+        ScanTasks.current().clear();
     }
 
     @AfterEach
     void tearDown() {
-        RTP.getInstance().scanTasks.clear();
+        ScanTasks.current().clear();
     }
 
     private long counter(ScanTask task, String name) throws Exception {

@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes;
 
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.NormalDistributionParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
@@ -25,7 +25,7 @@ public class ShapeEdgeCaseTest {
     static {
         MockRTPServerAccessor accessor =
                 new MockRTPServerAccessor(new java.io.File("target/test-data"));
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
     }
 

@@ -9,17 +9,19 @@ import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.admin.AdminCmd;
 import io.github.dailystruggle.rtp.common.commands.base.SearchCommandHandlerAware;
 import io.github.dailystruggle.rtp.common.commands.menu.multiconfig.DefaultMultiConfigRemovalGuards;
 import io.github.dailystruggle.rtp.common.commands.menu.multiconfig.MultiConfigMenuBuilder;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 import io.github.dailystruggle.rtp.common.menu.search.ConfigSearchResultsBuilder;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -155,7 +157,7 @@ final class MenuWiringSupportInstaller {
                 java.util.TreeSet<String> childDirs = new java.util.TreeSet<>();
                 String prefix = dir.isEmpty() ? "" : dir + "/";
                 try {
-                    for (ConfigParser<?> parser : RTP.configs.configParserMap.values()) {
+                    for (ConfigParser<?> parser : ActiveConfigs.get().configParserMap.values()) {
                         if (parser == null || parser.name == null) continue;
                         String leaf = parser.name;
                         if (leaf.toLowerCase(Locale.ROOT).endsWith(".yml")) {
@@ -176,7 +178,7 @@ final class MenuWiringSupportInstaller {
                         }
                     }
                 } catch (RuntimeException e) {
-                    RTP.log(Level.WARNING,
+                    RTPRuntime.log(Level.WARNING,
                             "menu config-selector: failed to enumerate parsers: " + e.getMessage(), e);
                 }
                 return new CommandTreeMenuBuilder()
@@ -301,7 +303,7 @@ final class MenuWiringSupportInstaller {
             try {
                 hits = ConfigSearchResultsBuilder.search(safeQuery);
             } catch (RuntimeException e) {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "menu config-search: search failed for query='" + safeQuery
                                 + "': " + e.getMessage(), e);
                 return null;
@@ -411,7 +413,7 @@ final class MenuWiringSupportInstaller {
         if (single != null) return single.getYamlRoot();
         // Multiconfig sub-parsers (e.g. per-region entries like default.yml),
         // which resolveParserByFileName does not cover.
-        Configs configs = RTP.configs;
+        Configs configs = ActiveConfigs.get();
         if (configs == null || fileName == null || fileName.isEmpty()) return null;
         String target = stripYml(fileName).toLowerCase(Locale.ROOT);
         try {
@@ -447,12 +449,12 @@ final class MenuWiringSupportInstaller {
                 Predicate<String> probe = menuPermissionProbe.apply(viewer);
                 try {
                     if (probe == null || !probe.test("rtp.menu.admin")) {
-                        RTP.log(Level.WARNING,
+                        RTPRuntime.log(Level.WARNING,
                                 "/rtp admin opener: " + viewer + " lacks rtp.menu.admin");
                         return;
                     }
                 } catch (RuntimeException e) {
-                    RTP.log(Level.WARNING,
+                    RTPRuntime.log(Level.WARNING,
                             "/rtp admin opener: permission probe threw for " + viewer
                                     + ": " + e.getMessage(), e);
                     return;
@@ -461,20 +463,20 @@ final class MenuWiringSupportInstaller {
                 try {
                     model = adminPanelBuilder.build(rtpRoot, viewer, probe);
                 } catch (RuntimeException e) {
-                    RTP.log(Level.WARNING,
+                    RTPRuntime.log(Level.WARNING,
                             "/rtp admin opener: admin-panel builder failed for " + viewer
                                     + ": " + e.getMessage(), e);
                     return;
                 }
                 if (model == null) {
-                    RTP.log(Level.WARNING,
+                    RTPRuntime.log(Level.WARNING,
                             "/rtp admin opener: admin-panel builder returned null model for " + viewer);
                     return;
                 }
                 try {
                     menuRenderer.render(viewer, model);
                 } catch (RuntimeException e) {
-                    RTP.log(Level.WARNING,
+                    RTPRuntime.log(Level.WARNING,
                             "/rtp admin opener: renderer failed for " + viewer
                                     + ": " + e.getMessage(), e);
                 }
@@ -499,7 +501,7 @@ final class MenuWiringSupportInstaller {
         // after ConfigCmd but before the menu mirror seeds at 10 ticks.
         final MenuRedeemSubcommand.MenuConfigSearchBuilder finalSearchBuilder = configSearchBuilder;
         final MenuRenderer finalRenderer = menuRenderer;
-        RTP.getInstance().miscAsyncTasks.add(new RTPRunnable(() -> {
+        MiscTasks.async().add(new RTPRunnable(() -> {
             CommandsAPICommand configCmd = rtpRoot.getCommandLookup().get("CONFIG");
             if (!(configCmd instanceof TreeCommand configTree)) {
                 return;
@@ -512,7 +514,7 @@ final class MenuWiringSupportInstaller {
             searchAware.setSearchHandler((UUID callerId, String query) -> {
                 var model = finalSearchBuilder.buildResults(callerId, query, 1);
                 if (model == null) {
-                    RTP.log(Level.WARNING,
+                    RTPRuntime.log(Level.WARNING,
                             "config search: empty model for query='" + query + "'");
                     return;
                 }
@@ -527,13 +529,13 @@ final class MenuWiringSupportInstaller {
         if (fileName == null || fileName.isEmpty()) return null;
         String wanted = stripYml(fileName).toLowerCase(Locale.ROOT);
         try {
-            for (ConfigParser<?> parser : RTP.configs.configParserMap.values()) {
+            for (ConfigParser<?> parser : ActiveConfigs.get().configParserMap.values()) {
                 if (parser == null || parser.name == null) continue;
                 String n = stripYml(parser.name).toLowerCase(Locale.ROOT);
                 if (n.equals(wanted)) return parser;
             }
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu config: failed to resolve parser '" + fileName + "': "
                             + e.getMessage(), e);
         }

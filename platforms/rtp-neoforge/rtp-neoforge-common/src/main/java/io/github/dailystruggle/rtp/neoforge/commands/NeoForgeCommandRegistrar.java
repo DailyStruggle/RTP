@@ -9,6 +9,7 @@ import io.github.dailystruggle.commandsapi.common.localCommands.TreeCommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.CoreRtpRoot;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.neoforge.tools.NeoForgeBrigadierSourceBridge;
 import net.minecraft.commands.CommandSourceStack;
 
@@ -139,7 +140,7 @@ public final class NeoForgeCommandRegistrar {
                   if (uuid != null && !uuid.equals(RTPAPI.serverId)) {
                     // Player source - formats placeholders + legacy colour codes
                     // and dispatches through the player's RTPCommandSender.
-                    RTP.serverAccessor.sendMessage(uuid, msg, null);
+                    RTPRuntime.serverAccessor().sendMessage(uuid, msg, null);
                   } else {
                     // Console / command-block / serverId sentinel: route through
                     // RTP.log so the message lands in the server console with

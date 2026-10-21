@@ -13,6 +13,8 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.config.ConfigCmd;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -150,14 +152,14 @@ public class ReqRtpMenuRedeemCoverageTest {
         assertNotNull(resEmpty);
 
         // Mock factory contents for shape and vert
-        Factory shapeFactory = RTP.factoryMap.get(RTP.factoryNames.shape);
+        Factory shapeFactory = FactoryRegistry.get(FactoryNames.shape);
         if (shapeFactory != null) {
             io.github.dailystruggle.rtp.common.factory.FactoryValue dummyVal = org.mockito.Mockito.mock(io.github.dailystruggle.rtp.common.factory.FactoryValue.class);
             shapeFactory.map.put("CIRCLE.yml", dummyVal);
             shapeFactory.map.put("SQUARE.yml", dummyVal);
         }
 
-        Factory vertFactory = RTP.factoryMap.get(RTP.factoryNames.vert);
+        Factory vertFactory = FactoryRegistry.get(FactoryNames.vert);
         if (vertFactory != null) {
             io.github.dailystruggle.rtp.common.factory.FactoryValue dummyVal = org.mockito.Mockito.mock(io.github.dailystruggle.rtp.common.factory.FactoryValue.class);
             vertFactory.map.put("SURFACE.yml", dummyVal);

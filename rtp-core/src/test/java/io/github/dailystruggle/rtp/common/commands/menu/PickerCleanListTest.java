@@ -6,8 +6,8 @@ import io.github.dailystruggle.rtp.api.menu.MenuConsumerProfile;
 import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 
 import org.junit.jupiter.api.AfterEach;
@@ -33,22 +33,22 @@ class PickerCleanListTest {
 
     // The picker's "type a custom value..." label is resolved via
     // CommandTreeMenuBuilder#lookupMsg, which returns the built-in fallback
-    // text only when the RTP.configs singleton is null. These tests assert on
+    // text only when the ActiveConfigs.get() singleton is null. These tests assert on
     // that fallback text, so they must not observe a config populated by an
     // unrelated test running earlier in the same JVM. Under forked/parallel
-    // execution that ordering is non-deterministic, so pin RTP.configs to null
+    // execution that ordering is non-deterministic, so pin ActiveConfigs.get() to null
     // for the duration of each test and restore whatever was there afterward.
     private Configs savedConfigs;
 
     @BeforeEach
     void pinDefaultMessages() {
-        savedConfigs = RTP.configs;
-        RTP.configs = null;
+        savedConfigs = ActiveConfigs.get();
+        ActiveConfigs.set(null);
     }
 
     @AfterEach
     void restoreConfigs() {
-        RTP.configs = savedConfigs;
+        ActiveConfigs.set(savedConfigs);
     }
 
     @Test

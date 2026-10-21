@@ -7,8 +7,10 @@ import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -172,13 +174,13 @@ public final class VisualizationsSubmenuBuilder {
     }
 
     private static List<String> collectRegionNames() {
-        if (RTP.selectionAPI == null) return List.of();
+        if (ActiveSelection.get() == null) return List.of();
         try {
-            java.util.Set<String> names = RTP.selectionAPI.regionNames();
+            java.util.Set<String> names = ActiveSelection.get().regionNames();
             if (names == null || names.isEmpty()) return List.of();
             return new ArrayList<>(new TreeSet<>(names));
         } catch (RuntimeException e) {
-            RTP.log(java.util.logging.Level.WARNING,
+            RTPRuntime.log(java.util.logging.Level.WARNING,
                     "VisualizationsSubmenuBuilder: regionNames lookup failed: " + e.getMessage(),
                     e);
             return List.of();
@@ -234,8 +236,8 @@ public final class VisualizationsSubmenuBuilder {
 
     @SuppressWarnings({"unchecked", "unused"})
     private static String lookupMsg(Enum<?> key, String fallback) {
-        if (RTP.configs == null) return fallback;
-        Object v = RTP.configs.getConfigValue(key, fallback);
+        if (ActiveConfigs.get() == null) return fallback;
+        Object v = ActiveConfigs.get().getConfigValue(key, fallback);
         String s = v == null ? fallback : v.toString();
         return s;
     }

@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.visualization;
 
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
@@ -593,7 +593,7 @@ public final class ComprehensiveRegionImageExporter {
       com.google.gson.Gson gson = new com.google.gson.GsonBuilder().setPrettyPrinting().create();
       gson.toJson(root, writer);
     } catch (IOException ex) {
-      RTP.log(java.util.logging.Level.WARNING, "Failed to write diagnostic JSON: " + ex.getMessage(), ex);
+      RTPRuntime.log(java.util.logging.Level.WARNING, "Failed to write diagnostic JSON: " + ex.getMessage(), ex);
     }
   }
 }

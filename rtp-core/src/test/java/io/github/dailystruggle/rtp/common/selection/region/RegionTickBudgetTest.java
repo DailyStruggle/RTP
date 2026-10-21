@@ -1,12 +1,13 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.mock.TrackedMockWorld;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import io.github.dailystruggle.rtp.common.tools.CfDiag;
 import io.github.dailystruggle.rtp.common.tools.ServerHealthGate;
 import org.junit.jupiter.api.AfterEach;
@@ -36,14 +37,14 @@ class RegionTickBudgetTest {
         world = new TrackedMockWorld("tick_budget_world");
         accessor.addWorld(world);
         ServerHealthGate.resetForTesting();
-        RTP.getInstance().miscSyncTasks.clear();
-        RTP.getInstance().miscSyncTasks.start();
+        MiscTasks.sync().clear();
+        MiscTasks.sync().start();
     }
 
     @AfterEach
     void tearDown() {
         ServerHealthGate.resetForTesting();
-        RTP.getInstance().miscSyncTasks.clear();
+        MiscTasks.sync().clear();
     }
 
     /** Cold cache full of candidates, hot cap far above the per-pulse promotion cap. */
@@ -77,18 +78,18 @@ class RegionTickBudgetTest {
     @Test
     @DisplayName("REQ-RTP-S-005: on the tick thread, promotion verify is queued on the budgeted sync pipe")
     void verifyIsDeferredToSyncPipeOnTickThread() {
-        org.junit.jupiter.api.Assumptions.assumeTrue(RTP.serverAccessor.isPrimaryThread(),
+        org.junit.jupiter.api.Assumptions.assumeTrue(RTPRuntime.serverAccessor().isPrimaryThread(),
                 "harness runs callbacks off the primary thread");
         Region region = regionWithColdCandidates("verify_reg", 4);
-        long before = RTP.getInstance().miscSyncTasks.size();
+        long before = MiscTasks.sync().size();
 
         region.execute(TimeUnit.MILLISECONDS.toNanos(25));
 
-        assertTrue(RTP.getInstance().miscSyncTasks.size() > before,
+        assertTrue(MiscTasks.sync().size() > before,
                 "chunk-load callbacks must hand verify to miscSyncTasks, not run it inline");
         assertTrue(region.inFlightCalculations.get() > 0, "promotions stay in flight until the sync pipe runs");
 
-        RTP.getInstance().miscSyncTasks.execute(Long.MAX_VALUE);
+        MiscTasks.sync().execute(Long.MAX_VALUE);
         assertEquals(0, region.inFlightCalculations.get(), "draining the sync pipe settles every promotion");
     }
 
@@ -113,9 +114,9 @@ class RegionTickBudgetTest {
     @DisplayName("ADR-087 regional circuit breaker: candidates in a saturated region stay cold, others promote")
     void saturatedRegionCandidatesStayCold() {
         Region region = regionWithColdCandidates("breaker_reg", 8);
-        io.github.dailystruggle.rtp.api.scheduling.RTPScheduler original = RTP.scheduler;
+        io.github.dailystruggle.rtp.api.scheduling.RTPScheduler original = RTPRuntime.scheduler();
         // Chunks x < 4 belong to a backlogged region; x >= 4 are healthy.
-        RTP.scheduler = new SaturationScheduler(original, cx -> cx < 4);
+        RTPRuntime.setScheduler(new SaturationScheduler(original, cx -> cx < 4));
         try {
             long before = CfDiag.regionDeficitDispatch.sum();
             region.execute(TimeUnit.SECONDS.toNanos(1));
@@ -129,7 +130,7 @@ class RegionTickBudgetTest {
             }
             assertEquals(4, stillCold, "saturated-region candidates are kept, not dropped");
         } finally {
-            RTP.scheduler = original;
+            RTPRuntime.setScheduler(original);
         }
     }
 

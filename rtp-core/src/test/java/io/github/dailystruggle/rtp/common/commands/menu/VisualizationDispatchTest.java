@@ -3,11 +3,11 @@ package io.github.dailystruggle.rtp.common.commands.menu;
 import io.github.dailystruggle.mapsapi.MapBinding;
 import io.github.dailystruggle.mapsapi.noop.NoopMapBinding;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.maps.ChartSpecResolver;
 import io.github.dailystruggle.rtp.common.commands.maps.ChartSpecResolvers;
 import io.github.dailystruggle.rtp.common.commands.maps.MapDispatch;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -54,8 +54,8 @@ class VisualizationDispatchTest {
 
     @AfterEach
     void tearDown() {
-        RTP.serverAccessor = null;
-        RTP.scheduler = null;
+        RTPRuntime.setServerAccessor(null);
+        RTPRuntime.setScheduler(null);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
         MapDispatch.setMapBinding(new NoopMapBinding());
     }
@@ -329,7 +329,7 @@ class VisualizationDispatchTest {
         assertTrue(capturedMessages.stream().anyMatch(m -> m.contains("Usage: /rtp visualization export")));
 
         // Test ExportAllCmd without scheduler returns false
-        RTP.scheduler = null;
+        RTPRuntime.setScheduler(null);
         MenuConcreteCommandLeaves.VisualizationExportCmd.ExportAllCmd allCmd =
                 new MenuConcreteCommandLeaves.VisualizationExportCmd.ExportAllCmd();
         assertFalse(allCmd.onCommand(adminViewer, java.util.Collections.emptyMap(), null, messageMethod));
@@ -341,7 +341,7 @@ class VisualizationDispatchTest {
         assertFalse(typeCmd.onCommand(adminViewer, java.util.Collections.emptyMap(), null, messageMethod));
 
         // Test with synchronous scheduler execution
-        RTP.scheduler = ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).getMockScheduler();
+        RTPRuntime.setScheduler(((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor()).getMockScheduler());
 
         // Parameter values check on ExportAllCmd
         assertNotNull(allCmd.getParameterLookup().get(MenuConcreteCommandLeaves.PARAM_REGION));

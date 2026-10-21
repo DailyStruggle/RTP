@@ -2,7 +2,10 @@ package io.github.dailystruggle.rtp.common.configuration;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -476,7 +479,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     // the file equals the active locale resource it never fires again - so a repeated reload never
     // accumulates redundant .old backups.
     if (onDiskIsPristineForeignLocale(f)) {
-      RTP.log(
+      RTPRuntime.log(
           Level.INFO,
           "[RTP] Locale switch detected for "
               + this.name
@@ -526,7 +529,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       // it so the next load can extract a clean copy from the JAR; otherwise
       // every subsequent reload would re-trip the parser and the plugin would
       // never recover without manual operator intervention.
-      RTP.log(
+      RTPRuntime.log(
           Level.WARNING,
           "[RTP] " + f + " appears to be corrupt; quarantining and re-extracting defaults.",
           e);
@@ -585,7 +588,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       preserved.put(e.getValue(), value);
     }
 
-    RTP.log(
+    RTPRuntime.log(
         Level.INFO,
         "[RTP] Locale switch detected for "
             + this.name
@@ -763,7 +766,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       Map<String, Long> mtimes = fileDatabase.cachedLookupLastModified.get();
       if (mtimes != null) mtimes.remove(this.name);
     } catch (Exception ex) {
-      RTP.log(Level.WARNING, "[RTP] Failed to invalidate cache for " + this.name, ex);
+      RTPRuntime.log(Level.WARNING, "[RTP] Failed to invalidate cache for " + this.name, ex);
     }
 
     // renameFiles() relies on a JAR-bundled localized resource. If it is
@@ -781,7 +784,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
           }
         }
       } catch (IOException e) {
-        RTP.log(Level.WARNING, e.getMessage(), e);
+        RTPRuntime.log(Level.WARNING, e.getMessage(), e);
       }
     }
 
@@ -829,7 +832,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       }
       Files.write(f.toPath(), out.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     } catch (IOException e) {
-      RTP.log(Level.WARNING, "[RTP] Failed to stamp version on " + this.name, e);
+      RTPRuntime.log(Level.WARNING, "[RTP] Failed to stamp version on " + this.name, e);
     }
   }
 
@@ -940,7 +943,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       } catch (IOException moveEx) {
         // Fallback: try delete so saveResource can write a fresh file.
         if (!corrupt.delete()) {
-          RTP.log(
+          RTPRuntime.log(
               Level.WARNING,
               "[RTP] Could not move or delete corrupt file " + corrupt + ": " + moveEx.getMessage());
           return;
@@ -967,13 +970,13 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         try {
           saveResource(this.name, true);
         } catch (IOException | IllegalArgumentException e) {
-          RTP.log(
+          RTPRuntime.log(
               Level.WARNING,
               "[RTP] Failed to re-extract default for corrupt file " + corrupt + ": " + e.getMessage());
         }
       }
     } catch (RuntimeException e) {
-      RTP.log(Level.WARNING, "[RTP] quarantineCorruptFile failed for " + corrupt, e);
+      RTPRuntime.log(Level.WARNING, "[RTP] quarantineCorruptFile failed for " + corrupt, e);
     }
   }
 
@@ -1003,7 +1006,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       }
       return true;
     } catch (java.io.IOException e) {
-      RTP.log(Level.WARNING, "[RTP] Failed to extract " + jarPath, e);
+      RTPRuntime.log(Level.WARNING, "[RTP] Failed to extract " + jarPath, e);
       return false;
     }
   }
@@ -1034,7 +1037,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     try {
       loadLangFile(langFile);
     } catch (IOException | IllegalArgumentException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
     }
 
     // ADR-020: if the on-disk YAML belongs to a different locale than the one
@@ -1048,7 +1051,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       try {
         saveResource(this.name, true);
       } catch (IOException | IllegalArgumentException e) {
-        RTP.log(Level.WARNING, e.getMessage(), e);
+        RTPRuntime.log(Level.WARNING, e.getMessage(), e);
       }
     }
     //        loadResource( f );
@@ -1063,7 +1066,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       // on the next reload, rather than silently running with empty data.
       File corrupt = new File(configDir(), this.name);
       if (corrupt.exists()) {
-        RTP.log(
+        RTPRuntime.log(
             Level.WARNING,
             "[RTP] " + corrupt + " could not be parsed; quarantining and re-extracting defaults.");
         quarantineCorruptFile(pluginDirectory, corrupt);
@@ -1102,7 +1105,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       try {
         update();
       } catch (Exception e) {
-        RTP.log(Level.WARNING, e.getMessage(), e);
+        RTPRuntime.log(Level.WARNING, e.getMessage(), e);
       }
     }
 
@@ -1126,7 +1129,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         try {
           set(entry.getKey(), entry.getValue());
         } catch (IllegalArgumentException ex) {
-          RTP.log(
+          RTPRuntime.log(
               Level.WARNING,
               "[RTP] Could not preserve customization for "
                   + entry.getKey().name()
@@ -1138,7 +1141,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         RtpYamlConfig yf = cachedLookup.get().get(name);
         if (yf != null) yf.save();
       } catch (IOException e) {
-        RTP.log(Level.WARNING, e.getMessage(), e);
+        RTPRuntime.log(Level.WARNING, e.getMessage(), e);
       }
     }
   }
@@ -1165,11 +1168,11 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
       try { // ensure can place
         Files.deleteIfExists(newFile.toPath());
       } catch (IOException e) {
-        RTP.log(Level.WARNING, e.getMessage(), e);
+        RTPRuntime.log(Level.WARNING, e.getMessage(), e);
       }
       boolean b = oldFile.getAbsoluteFile().renameTo(newFile.getAbsoluteFile());
       if (!b)
-        RTP.log(
+        RTPRuntime.log(
             Level.WARNING,
             "RTP - unable to rename file:" + oldFile.getName() + " to: " + newFile.getName());
     }
@@ -1180,10 +1183,10 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     try {
       Files.deleteIfExists(newFile.toPath());
     } catch (IOException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
     }
     boolean b = oldFile.getAbsoluteFile().renameTo(newFile.getAbsoluteFile());
-    if (!b) RTP.log(Level.WARNING, "RTP - unable to rename file:" + oldFile.getAbsoluteFile());
+    if (!b) RTPRuntime.log(Level.WARNING, "RTP - unable to rename file:" + oldFile.getAbsoluteFile());
 
     if (isEnglish() || !extractLocalizedResource(this.name, true)) {
       saveResourceFromJar(jarPrefix() + this.name, true);
@@ -1462,7 +1465,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   public void saveResource(String name, boolean overwrite) throws IOException {
     String myDirectory = pluginDirectory.getAbsolutePath();
 
-    String pDirectory = RTP.serverAccessor.getPluginDirectory().getAbsolutePath();
+    String pDirectory = RTPRuntime.serverAccessor().getPluginDirectory().getAbsolutePath();
     if (myDirectory.equals(pDirectory)) {
       // Try locale-specific JAR resource first (e.g. lang/de/messages.yml -> messages.yml on disk).
       if (!isEnglish() && extractLocalizedResource(name, overwrite)) {
@@ -1566,7 +1569,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
 
       RtpYamlConfig.save();
     } catch (IOException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
     }
   }
 
@@ -1612,12 +1615,12 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
 
       if (RtpYamlSection.getName().equalsIgnoreCase("shape") && value instanceof String) {
         String shapeName = (String) value;
-        value = RTP.factoryMap.get(RTP.factoryNames.shape).getOrDefault(shapeName);
+        value = FactoryRegistry.get(FactoryNames.shape).getOrDefault(shapeName);
       }
 
       if (RtpYamlSection.getName().equalsIgnoreCase("vert") && value instanceof String) {
         String vertName = (String) value;
-        value = RTP.factoryMap.get(RTP.factoryNames.vert).getOrDefault(vertName);
+        value = FactoryRegistry.get(FactoryNames.vert).getOrDefault(vertName);
       }
 
       if (value instanceof FactoryValue<?>) {
@@ -1710,7 +1713,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
         ConfigBackups.backup(configFile, bakRetention);
       }
     } catch (IOException | RuntimeException backupFailure) {
-      RTP.log(Level.WARNING,
+      RTPRuntime.log(Level.WARNING,
           "[RTP] config backup failed for " + name + " - proceeding with save: "
               + backupFailure.getMessage());
     }

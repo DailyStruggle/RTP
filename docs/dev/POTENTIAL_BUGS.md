@@ -63,6 +63,16 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** None known today; a future upstream rename would be caught only at runtime (fail closed, SEVERE log), not at build time.
 - **Suggested next step:** Per plugin, add the artifact as `compileOnly`/`testImplementation` with `content { includeGroup ... }`, call the API types directly, and delete the matching stub package (it would clash on the test classpath). UltimateClaims (repo.craftaro.com unresolvable), CrashClaim, KingdomsX and FactionsBridge publish nothing usable and stay reflective.
 
+### 2026-10-20 - `JumpAdjustorExpandTokensTest` fails when run on its own
+
+- **Severity:** Low
+- **Status:** Open
+- **Discovered during:** ADR-119 slope check (filtered `:rtp-core:test --tests "*JumpAdjustor*"` run)
+- **Location:** `rtp-core/src/test/.../verticalAdjustors/jump/JumpAdjustorExpandTokensTest.java` `nullWorldGuards`, `keysAndParameters`; `VerticalAdjustor.<init>` line 45
+- **Symptom / hypothesis:** Run alone (or with only adjustor tests), both tests throw `NullPointerException: vertAdjustorFactory is null` in the `VerticalAdjustor` constructor; they pass in the full suite. The test likely relied on `RTP.<clinit>` filling the factory registry, which the package-hub refactor made explicit (`RTP.ensureInitialized()`).
+- **Impact:** Test-only; filtered runs report false failures.
+- **Suggested next step:** Call `RTP.ensureInitialized()` (or `RTPTestSetup.install`) in the test's setup, as was done for the other tests listed in `docs/dev/RTP-HUB-RESUME.md` Wave 2.
+
 ### 2026-10-08 — Probe governor's probe time includes coalescer queue wait
 
 - **Severity:** Medium
@@ -395,5 +405,15 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** `rtp-plugin/src/main/resources/lang/` ships de, es, fr, it, ja, ko, nl, pl, pt, ru, zh (plus the `cat` novelty locale). `sanitize` accepts all of them, but tab completion and the fallback `language.yml` comment list fewer.
 - **Impact:** Operators may not know it, ja, ko, pl, pt, ru or zh exist unless they read the docs; typing them works.
 - **Suggested next step:** Derive the suggestion set from the jar's `lang/` entries (or one shared constant checked by `LocaleParityTest`) and use it for the fallback comment.
+
+### 2026-10-20 - `SUPPORT.md` says paid support is "Not offered"
+
+- **Severity:** Cosmetic
+- **Status:** Open
+- **Discovered during:** README rewrite (support section)
+- **Location:** `SUPPORT.md`, "Where to ask" table, row "Commercial / paid support"; also its resource link `spigotmc.org/resources/rtp.94812/` vs `leafrtp.94812` in `README.md`
+- **Symptom / hypothesis:** The row predates the Pro support tier (ADR-100, ADR-108), which sells priority support. README and the storefront pages say it is offered.
+- **Impact:** Buyers and readers get contradictory answers about paid support.
+- **Suggested next step:** Point the row at the BuiltByBit Pro listing and describe what it covers, matching the README wording.
 
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->

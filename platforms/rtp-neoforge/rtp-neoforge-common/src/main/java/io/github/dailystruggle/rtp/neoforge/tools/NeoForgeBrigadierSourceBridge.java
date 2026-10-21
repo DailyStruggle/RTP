@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.neoforge.tools;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -53,7 +54,7 @@ public final class NeoForgeBrigadierSourceBridge {
     /**
      * Permission predicate. Non-player sources (console / command blocks /
      * serverId sentinel) are treated as fully privileged; players consult
-     * {@code RTP.serverAccessor.getSender(uuid).hasPermission(perm)}; unknown
+     * {@code RTPRuntime.serverAccessor().getSender(uuid).hasPermission(perm)}; unknown
      * sender entries fail closed.
      */
     public static boolean checkPermission(Object src, String permission) {
@@ -61,7 +62,7 @@ public final class NeoForgeBrigadierSourceBridge {
         UUID uuid = resolveSenderUuid(src);
         if (RTPAPI.serverId.equals(uuid)) return true;
         try {
-            RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
+            RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(uuid);
             if (sender == null) return false;
             return sender.hasPermission(permission);
         } catch (Throwable t) {

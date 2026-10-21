@@ -8,8 +8,8 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.server.PlatformFamily;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -114,7 +114,7 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
   public static Result runProbe(UUID callerId) {
     Result r = new Result();
 
-    if (RTP.serverAccessor == null) {
+    if (RTPRuntime.serverAccessor() == null) {
       r.pass = false;
       r.message = "RTPServerAccessor is null";
       return r;
@@ -122,7 +122,7 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
 
     // 1. Materials probe
     try {
-      Set<String> mats = RTP.serverAccessor.materials();
+      Set<String> mats = RTPRuntime.serverAccessor().materials();
       if (hasCommonMaterials(mats)) {
         r.materialsValid = true;
       } else {
@@ -136,7 +136,7 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
 
     // 2. Block tag snapshot probe
     try {
-      Map<String, Set<String>> tags = RTP.serverAccessor.blockTagSnapshot();
+      Map<String, Set<String>> tags = RTPRuntime.serverAccessor().blockTagSnapshot();
       if (tags != null) {
         r.tagsValid = true;
       } else {
@@ -150,16 +150,16 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
 
     // 3. Sender resolution & null safety probe
     try {
-      RTPCommandSender console = RTP.serverAccessor.getSender(RTPAPI.serverId);
+      RTPCommandSender console = RTPRuntime.serverAccessor().getSender(RTPAPI.serverId);
       if (console == null) {
-        console = RTP.serverAccessor.getConsolePlayer();
+        console = RTPRuntime.serverAccessor().getConsolePlayer();
       }
       if (console != null) {
         boolean hasAdmin = console.hasPermission("*") || console.hasPermission("rtp.test");
         if (hasAdmin) {
           // Synthetic UUID lookup should fail closed (return null without throwing)
           UUID synthetic = UUID.randomUUID();
-          RTPPlayer unknown = RTP.serverAccessor.getPlayer(synthetic);
+          RTPPlayer unknown = RTPRuntime.serverAccessor().getPlayer(synthetic);
           if (unknown == null) {
             r.senderValid = true;
           } else {
@@ -180,8 +180,8 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
     // 4. Formatting and placeholder expansion probe
     try {
       String rawWithColor = "&a[player]";
-      String formatted = RTP.serverAccessor.format(callerId, rawWithColor);
-      String formattedNoColor = RTP.serverAccessor.formatNoColor(callerId, rawWithColor);
+      String formatted = RTPRuntime.serverAccessor().format(callerId, rawWithColor);
+      String formattedNoColor = RTPRuntime.serverAccessor().formatNoColor(callerId, rawWithColor);
 
       if (formatted != null && formattedNoColor != null) {
         // formatNoColor should not contain the '&' color token if parsed
@@ -198,7 +198,7 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
 
     // 5. Thread context & overtime probe
     try {
-      long over = RTP.serverAccessor.overTime();
+      long over = RTPRuntime.serverAccessor().overTime();
       if (over >= 0L) {
         r.threadValid = true;
       } else {
@@ -213,21 +213,21 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
     // 6. Biome sampling probe
     try {
       RTPWorld<?> world = null;
-      List<RTPWorld<?>> worlds = RTP.serverAccessor.getRTPWorlds();
+      List<RTPWorld<?>> worlds = RTPRuntime.serverAccessor().getRTPWorlds();
       if (worlds != null && !worlds.isEmpty()) {
         world = worlds.get(0);
       }
       if (world == null) {
-        world = RTP.serverAccessor.getRTPWorld("world");
+        world = RTPRuntime.serverAccessor().getRTPWorld("world");
       }
 
       if (world != null) {
-        String sampled = RTP.serverAccessor.sampleBiome(world, 0, 64, 0);
+        String sampled = RTPRuntime.serverAccessor().sampleBiome(world, 0, 64, 0);
         if (sampled != null && !sampled.isEmpty()) {
           r.biomeValid = true;
         } else {
           // sampleBiome may return empty on unsupported headless mock, check getBiomes
-          Set<String> biomes = RTP.serverAccessor.getBiomes(world);
+          Set<String> biomes = RTPRuntime.serverAccessor().getBiomes(world);
           if (biomes != null) {
             r.biomeValid = true;
           } else {
@@ -246,10 +246,10 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
 
     // 7. Menu surface probe (server-side queries)
     try {
-      Predicate<String> probe = RTP.serverAccessor.menuPermissionProbe(callerId);
-      Set<String> perms = RTP.serverAccessor.menuEffectivePermissions(callerId);
-      String loc = RTP.serverAccessor.menuLocale(callerId);
-      String desc = RTP.serverAccessor.menuRegionDescriptor(callerId);
+      Predicate<String> probe = RTPRuntime.serverAccessor().menuPermissionProbe(callerId);
+      Set<String> perms = RTPRuntime.serverAccessor().menuEffectivePermissions(callerId);
+      String loc = RTPRuntime.serverAccessor().menuLocale(callerId);
+      String desc = RTPRuntime.serverAccessor().menuRegionDescriptor(callerId);
 
       if (probe != null && perms != null && loc != null && desc != null) {
         r.menuValid = true;
@@ -265,16 +265,16 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
 
     // 8. Version & Platform metadata probe
     try {
-      String sVer = RTP.serverAccessor.getServerVersion();
-      String pVer = RTP.serverAccessor.getPluginVersion();
-      String plat = RTP.serverAccessor.getPlatform();
-      PlatformFamily fam = RTP.serverAccessor.getPlatformFamily();
-      Integer intVer = RTP.serverAccessor.getServerIntVersion();
+      String sVer = RTPRuntime.serverAccessor().getServerVersion();
+      String pVer = RTPRuntime.serverAccessor().getPluginVersion();
+      String plat = RTPRuntime.serverAccessor().getPlatform();
+      PlatformFamily fam = RTPRuntime.serverAccessor().getPlatformFamily();
+      Integer intVer = RTPRuntime.serverAccessor().getServerIntVersion();
 
-      boolean comp = RTP.serverAccessor.isCompatible(fam, 0, Integer.MAX_VALUE);
-      boolean atLeast = RTP.serverAccessor.isServerVersionAtLeast(0);
-      boolean atMost = RTP.serverAccessor.isServerVersionAtMost(Integer.MAX_VALUE);
-      boolean isFam = fam != null && RTP.serverAccessor.isPlatformFamily(fam);
+      boolean comp = RTPRuntime.serverAccessor().isCompatible(fam, 0, Integer.MAX_VALUE);
+      boolean atLeast = RTPRuntime.serverAccessor().isServerVersionAtLeast(0);
+      boolean atMost = RTPRuntime.serverAccessor().isServerVersionAtMost(Integer.MAX_VALUE);
+      boolean isFam = fam != null && RTPRuntime.serverAccessor().isPlatformFamily(fam);
 
       if (sVer != null && !sVer.isEmpty()
           && pVer != null && !pVer.isEmpty()
@@ -296,16 +296,16 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
 
     // 9. World & WorldBorder probe
     try {
-      List<RTPWorld<?>> worlds = RTP.serverAccessor.getRTPWorlds();
-      Set<String> allBiomes = RTP.serverAccessor.getBiomes();
+      List<RTPWorld<?>> worlds = RTPRuntime.serverAccessor().getRTPWorlds();
+      Set<String> allBiomes = RTPRuntime.serverAccessor().getBiomes();
       if (worlds != null && !worlds.isEmpty()) {
         RTPWorld<?> w = worlds.get(0);
-        RTPWorld<?> byName = RTP.serverAccessor.getRTPWorld(w.name());
-        RTPWorld<?> byId = RTP.serverAccessor.getRTPWorld(w.id());
-        Object border = RTP.serverAccessor.getWorldBorder(w.name());
+        RTPWorld<?> byName = RTPRuntime.serverAccessor().getRTPWorld(w.name());
+        RTPWorld<?> byId = RTPRuntime.serverAccessor().getRTPWorld(w.id());
+        Object border = RTPRuntime.serverAccessor().getWorldBorder(w.name());
 
         RTPLocation testLoc = new RTPLocation(w, 0, 64, 0);
-        RTP.serverAccessor.shapePlatform(testLoc);
+        RTPRuntime.serverAccessor().shapePlatform(testLoc);
 
         if (byName != null && byId != null && border != null && allBiomes != null) {
           r.worldValid = true;
@@ -328,23 +328,23 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
     try {
       final String testTag = "testTag";
       final String testMsg = "probe test message";
-      RTPCommandSender console = RTP.serverAccessor.getSender(RTPAPI.serverId);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, CommandMessages.infoTitle);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, CommandMessages.infoTitle, testTag);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, RTPAPI.serverId, CommandMessages.infoTitle);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, RTPAPI.serverId, CommandMessages.infoTitle, testTag);
+      RTPCommandSender console = RTPRuntime.serverAccessor().getSender(RTPAPI.serverId);
+      RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, CommandMessages.infoTitle);
+      RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, CommandMessages.infoTitle, testTag);
+      RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, RTPAPI.serverId, CommandMessages.infoTitle);
+      RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, RTPAPI.serverId, CommandMessages.infoTitle, testTag);
 
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, testMsg);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, testMsg, testTag);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, RTPAPI.serverId, testMsg);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, RTPAPI.serverId, testMsg, testTag);
+      RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, testMsg);
+      RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, testMsg, testTag);
+      RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, RTPAPI.serverId, testMsg);
+      RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, RTPAPI.serverId, testMsg, testTag);
 
-      RTP.serverAccessor.sendMessageAndSuggest(RTPAPI.serverId, "probe suggest", "/rtp");
+      RTPRuntime.serverAccessor().sendMessageAndSuggest(RTPAPI.serverId, "probe suggest", "/rtp");
       if (console != null) {
-        RTP.serverAccessor.sendMessage(console, "probe sender", "hover", "/rtp", null);
-        RTP.serverAccessor.sendMessageWithRunCommand(console, "probe click", "hover", "/rtp");
+        RTPRuntime.serverAccessor().sendMessage(console, "probe sender", "hover", "/rtp", null);
+        RTPRuntime.serverAccessor().sendMessageWithRunCommand(console, "probe click", "hover", "/rtp");
       }
-      RTP.serverAccessor.announce("probe announce", "rtp.test", null);
+      RTPRuntime.serverAccessor().announce("probe announce", "rtp.test", null);
       r.messagingValid = true;
     } catch (Throwable t) {
       r.pass = false;
@@ -353,14 +353,14 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
 
     // 11. Subsystems & performance probe
     try {
-      double tps20 = RTP.serverAccessor.getTPS(20);
-      double tps100 = RTP.serverAccessor.getTPS(100);
-      File pluginDir = RTP.serverAccessor.getPluginDirectory();
-      io.github.dailystruggle.rtp.api.scheduling.RTPScheduler scheduler = RTP.serverAccessor.getScheduler();
-      io.github.dailystruggle.rtp.api.selection.ILocationGenerator generator = RTP.serverAccessor.getLocationGenerator();
+      double tps20 = RTPRuntime.serverAccessor().getTPS(20);
+      double tps100 = RTPRuntime.serverAccessor().getTPS(100);
+      File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
+      io.github.dailystruggle.rtp.api.scheduling.RTPScheduler scheduler = RTPRuntime.serverAccessor().getScheduler();
+      io.github.dailystruggle.rtp.api.selection.ILocationGenerator generator = RTPRuntime.serverAccessor().getLocationGenerator();
 
       // Dispatch non-throwing command test
-      RTP.serverAccessor.executeCommand(RTPAPI.serverId, "rtp test sem");
+      RTPRuntime.serverAccessor().executeCommand(RTPAPI.serverId, "rtp test sem");
 
       boolean tpsOk = tps20 >= 0.0 && tps100 >= 0.0;
       boolean dirOk = pluginDir != null;
@@ -382,19 +382,19 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
 
     // 12. WorldBorder packet & online player confinement SPI probe (ADR-093 / ADR-095)
     try {
-      java.util.Collection<RTPPlayer> online = RTP.serverAccessor.getOnlinePlayers();
+      java.util.Collection<RTPPlayer> online = RTPRuntime.serverAccessor().getOnlinePlayers();
       if (online != null) {
         // Probe sendWorldBorder and resetWorldBorder both with synthetic ID and any online player
         UUID testPlayerId = UUID.randomUUID();
-        RTP.serverAccessor.sendWorldBorder(testPlayerId, 0.0, 0.0, 100.0);
-        RTP.serverAccessor.sendWorldBorder(testPlayerId, 0.0, 0.0, 100.0, 50.0, 5L);
-        RTP.serverAccessor.resetWorldBorder(testPlayerId);
+        RTPRuntime.serverAccessor().sendWorldBorder(testPlayerId, 0.0, 0.0, 100.0);
+        RTPRuntime.serverAccessor().sendWorldBorder(testPlayerId, 0.0, 0.0, 100.0, 50.0, 5L);
+        RTPRuntime.serverAccessor().resetWorldBorder(testPlayerId);
 
         for (RTPPlayer p : online) {
           if (p != null && p.uuid() != null) {
-            RTP.serverAccessor.sendWorldBorder(p.uuid(), 0.0, 0.0, 100.0);
-            RTP.serverAccessor.sendWorldBorder(p.uuid(), 0.0, 0.0, 100.0, 50.0, 5L);
-            RTP.serverAccessor.resetWorldBorder(p.uuid());
+            RTPRuntime.serverAccessor().sendWorldBorder(p.uuid(), 0.0, 0.0, 100.0);
+            RTPRuntime.serverAccessor().sendWorldBorder(p.uuid(), 0.0, 0.0, 100.0, 50.0, 5L);
+            RTPRuntime.serverAccessor().resetWorldBorder(p.uuid());
           }
         }
         r.worldBorderValid = true;
@@ -484,16 +484,16 @@ public class TestAccessorCmd extends BaseRTPCmdImpl {
             r.jacocoDumpTriggered);
 
     if (!callerId.equals(RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, summary);
+      RTPRuntime.serverAccessor().sendMessage(callerId, summary);
       if (!r.pass && !r.details.isEmpty()) {
-        RTP.serverAccessor.sendMessage(callerId, "&c[RTP test/accessor] failure details: " + r.message);
+        RTPRuntime.serverAccessor().sendMessage(callerId, "&c[RTP test/accessor] failure details: " + r.message);
       }
     }
 
     Level level = r.pass ? Level.INFO : Level.WARNING;
-    RTP.log(level, summary);
+    RTPRuntime.log(level, summary);
     if (!r.pass && !r.details.isEmpty()) {
-      RTP.log(Level.WARNING, "[RTP test/accessor] failure details: " + r.message);
+      RTPRuntime.log(Level.WARNING, "[RTP test/accessor] failure details: " + r.message);
     }
   }
 }

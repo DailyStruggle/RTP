@@ -7,12 +7,13 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.pvp.PvPGate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,7 +69,7 @@ public class RTPCmdPvPGateTest {
 
   @SuppressWarnings("unchecked")
   private ConfigParser<SafetyKeys> safety() {
-    return (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+    return (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
   }
 
   private void setSafety(String key, Object value) {
@@ -89,7 +90,7 @@ public class RTPCmdPvPGateTest {
     data.put(PlayerMessages.pvpInCombat, "IN_COMBAT refused");
     data.put(PlayerMessages.consoleCmdNotAllowed, "console disallowed");
     data.forEach((k, v) -> {
-            Object fv = RTP.configs.getParser((Class) k.getDeclaringClass());
+            Object fv = ActiveConfigs.get().getParser((Class) k.getDeclaringClass());
             if (fv instanceof io.github.dailystruggle.rtp.common.configuration.ConfigParser) {
                 ((io.github.dailystruggle.rtp.common.configuration.ConfigParser) fv).set((Enum) k, v);
             }
@@ -118,7 +119,7 @@ public class RTPCmdPvPGateTest {
     assertTrue(res);
     assertNotNull(msg.get(), "refusal must emit the pvpInCombat message");
     assertTrue(msg.get().contains("IN_COMBAT"), "expected pvpInCombat template, got: " + msg.get());
-    assertFalse(RTP.getInstance().processingPlayers.contains(playerId),
+    assertFalse(TeleportSessions.current().processingPlayers.contains(playerId),
             "a refused request must not enrol the player in processingPlayers");
   }
 
@@ -132,14 +133,14 @@ public class RTPCmdPvPGateTest {
     accessor.addPlayer(new MockRTPPlayer(playerId, "combatantLocked", null));
     PvPGate.nativeTracker().stamp(playerId, System.currentTimeMillis());
     // RTPCmd.onCommand(sender, ...) adds the sender before dispatching to compute().
-    RTP.getInstance().processingPlayers.add(playerId);
+    TeleportSessions.current().processingPlayers.add(playerId);
 
     TestRTPCmd cmd = new TestRTPCmd();
     AtomicReference<String> msg = new AtomicReference<>();
     assertTrue(cmd.onCommand(playerId, new HashMap<>(), null, msg::set));
 
     assertNotNull(msg.get(), "refusal must emit the pvpInCombat message");
-    assertFalse(RTP.getInstance().processingPlayers.contains(playerId),
+    assertFalse(TeleportSessions.current().processingPlayers.contains(playerId),
             "a refused request must not leave the player 'already teleporting'");
   }
 

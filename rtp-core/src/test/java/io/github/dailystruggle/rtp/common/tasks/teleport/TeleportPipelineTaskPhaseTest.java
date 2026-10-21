@@ -1,6 +1,10 @@
 package io.github.dailystruggle.rtp.common.tasks.teleport;
 
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,8 +41,8 @@ class TeleportPipelineTaskPhaseTest {
     @AfterEach
     void tearDown() {
         clearAllHooks();
-        io.github.dailystruggle.rtp.common.RTP.getInstance().latestTeleportData.clear();
-        io.github.dailystruggle.rtp.common.RTP.getInstance().processingPlayers.clear();
+        TeleportSessions.current().latestTeleportData.clear();
+        TeleportSessions.current().processingPlayers.clear();
     }
 
     // -----------------------------------------------------------------------
@@ -270,13 +274,13 @@ class TeleportPipelineTaskPhaseTest {
     @Test
     @Timeout(value = 1, unit = TimeUnit.SECONDS)
     void runCleanup_records_one_sample_into_pipeline_histogram() {
-        long before = io.github.dailystruggle.rtp.common.RTP.metrics
+        long before = CoreMetrics.instance()
                 .pipelineHistogram().totalRecorded();
         TeleportPipelineTask task = buildMinimalTask();
         task.setCancelled(true);
         // Drives runCleanup via the cancelled-path in run().
         assertDoesNotThrow(task::run);
-        long after = io.github.dailystruggle.rtp.common.RTP.metrics
+        long after = CoreMetrics.instance()
                 .pipelineHistogram().totalRecorded();
         assertEquals(before + 1, after,
                 "runCleanup must record exactly one pipeline sample");
@@ -287,11 +291,11 @@ class TeleportPipelineTaskPhaseTest {
     void runCleanup_is_idempotent_for_pipeline_histogram() {
         TeleportPipelineTask task = buildMinimalTask();
         task.setCancelled(true);
-        long before = io.github.dailystruggle.rtp.common.RTP.metrics
+        long before = CoreMetrics.instance()
                 .pipelineHistogram().totalRecorded();
         assertDoesNotThrow(task::run);
         assertDoesNotThrow(task::run); // a second invocation must not double-record
-        long after = io.github.dailystruggle.rtp.common.RTP.metrics
+        long after = CoreMetrics.instance()
                 .pipelineHistogram().totalRecorded();
         assertEquals(before + 1, after,
                 "histogram must record exactly once per task lifecycle");
@@ -347,7 +351,7 @@ class TeleportPipelineTaskPhaseTest {
     void full_teleport_stage_assertions() {
         io.github.dailystruggle.rtp.common.mock.TrackedMockWorld world = new io.github.dailystruggle.rtp.common.mock.TrackedMockWorld("full_pipe_w");
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor();
         accessor.addWorld(world);
 
         io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle circle =
@@ -360,7 +364,7 @@ class TeleportPipelineTaskPhaseTest {
                         "full_test_reg", world, circle, vert, false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
         io.github.dailystruggle.rtp.common.selection.region.Region reg =
                 new io.github.dailystruggle.rtp.common.selection.region.Region("full_test_reg", settings);
-        io.github.dailystruggle.rtp.common.RTP.selectionAPI.permRegionLookup.put(reg.name, reg);
+        ActiveSelection.get().permRegionLookup.put(reg.name, reg);
 
         java.util.UUID pid = java.util.UUID.randomUUID();
         io.github.dailystruggle.rtp.common.mock.MockRTPPlayer p = new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(
@@ -394,7 +398,7 @@ class TeleportPipelineTaskPhaseTest {
 
         TeleportPipelineTask task = new TeleportPipelineTask(ctx, reg, targetCoords, res);
 
-        io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor = org.mockito.Mockito.mock(io.github.dailystruggle.rtp.common.database.DatabaseAccessor.class);
+        ActiveDatabase.setAccessor(org.mockito.Mockito.mock(io.github.dailystruggle.rtp.common.database.DatabaseAccessor.class));
 
         // Run through LOAD -> TELEPORT -> CLEANUP
         task.run();
@@ -414,7 +418,7 @@ class TeleportPipelineTaskPhaseTest {
     void setup_phase_drives_location_generator_and_transitions_to_load() {
         io.github.dailystruggle.rtp.common.mock.TrackedMockWorld world = new io.github.dailystruggle.rtp.common.mock.TrackedMockWorld("setup_pipe_w");
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor();
         accessor.addWorld(world);
 
         io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle circle =
@@ -427,7 +431,7 @@ class TeleportPipelineTaskPhaseTest {
                         "setup_test_reg", world, circle, vert, false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
         io.github.dailystruggle.rtp.common.selection.region.Region reg =
                 new io.github.dailystruggle.rtp.common.selection.region.Region("setup_test_reg", settings);
-        io.github.dailystruggle.rtp.common.RTP.selectionAPI.permRegionLookup.put(reg.name, reg);
+        ActiveSelection.get().permRegionLookup.put(reg.name, reg);
 
         java.util.UUID pid = java.util.UUID.randomUUID();
         io.github.dailystruggle.rtp.common.mock.MockRTPPlayer p = new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(
@@ -458,7 +462,7 @@ class TeleportPipelineTaskPhaseTest {
     void setup_phase_null_coords_fails_gracefully_to_cleanup() {
         io.github.dailystruggle.rtp.common.mock.TrackedMockWorld world = new io.github.dailystruggle.rtp.common.mock.TrackedMockWorld("setup_fail_w");
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor();
         accessor.addWorld(world);
 
         io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle circle =
@@ -471,7 +475,7 @@ class TeleportPipelineTaskPhaseTest {
                         "setup_fail_reg", world, circle, vert, false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
         io.github.dailystruggle.rtp.common.selection.region.Region reg =
                 new io.github.dailystruggle.rtp.common.selection.region.Region("setup_fail_reg", settings);
-        io.github.dailystruggle.rtp.common.RTP.selectionAPI.permRegionLookup.put(reg.name, reg);
+        ActiveSelection.get().permRegionLookup.put(reg.name, reg);
 
         java.util.UUID pid = java.util.UUID.randomUUID();
         io.github.dailystruggle.rtp.common.mock.MockRTPPlayer p = new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(
@@ -497,7 +501,7 @@ class TeleportPipelineTaskPhaseTest {
                                                         io.github.dailystruggle.rtp.common.mock.MockRTPPlayer[] out) {
         io.github.dailystruggle.rtp.common.mock.TrackedMockWorld world = new io.github.dailystruggle.rtp.common.mock.TrackedMockWorld(name + "_w");
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor();
         accessor.addWorld(world);
         io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle circle =
                 new io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle();
@@ -509,7 +513,7 @@ class TeleportPipelineTaskPhaseTest {
                         name + "_reg", world, circle, vert, false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
         io.github.dailystruggle.rtp.common.selection.region.Region reg =
                 new io.github.dailystruggle.rtp.common.selection.region.Region(name + "_reg", settings);
-        io.github.dailystruggle.rtp.common.RTP.selectionAPI.permRegionLookup.put(reg.name, reg);
+        ActiveSelection.get().permRegionLookup.put(reg.name, reg);
 
         java.util.UUID pid = java.util.UUID.randomUUID();
         io.github.dailystruggle.rtp.common.mock.MockRTPPlayer p = new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(
@@ -525,8 +529,8 @@ class TeleportPipelineTaskPhaseTest {
         });
 
         // /rtp holds processingPlayers for the whole attempt (acquired in RTPCmd.onCommand).
-        io.github.dailystruggle.rtp.common.RTP.getInstance().processingPlayers.add(pid);
-        if (queued) io.github.dailystruggle.rtp.common.RTP.getInstance().queuedPlayers.add(pid);
+        TeleportSessions.current().processingPlayers.add(pid);
+        if (queued) TeleportSessions.current().queuedPlayers.add(pid);
 
         TeleportPipelineTask task = new TeleportPipelineTask(
                 new io.github.dailystruggle.rtp.api.selection.GenerationContext(p, p, null), reg);
@@ -544,13 +548,13 @@ class TeleportPipelineTaskPhaseTest {
         try {
             TeleportPipelineTask task = runSetupWithNullResult("null_fail", false, p);
             assertEquals(TeleportPipelineTask.Phase.CLEANUP, task.getPhase());
-            assertFalse(io.github.dailystruggle.rtp.common.RTP.getInstance().processingPlayers.contains(p[0].uuid()),
+            assertFalse(TeleportSessions.current().processingPlayers.contains(p[0].uuid()),
                     "a failed generation must not leave the player 'already teleporting'");
             assertTrue(p[0].sentMessages.stream().anyMatch(m -> m.contains("UNSAFE_NULL_RESULT")),
                     "the failure must be reported to the player");
         } finally {
             TeleportPipelineTask.ConfigCache.unsafe = savedUnsafe;
-            if (p[0] != null) io.github.dailystruggle.rtp.common.RTP.getInstance().processingPlayers.remove(p[0].uuid());
+            if (p[0] != null) TeleportSessions.current().processingPlayers.remove(p[0].uuid());
         }
     }
 
@@ -565,13 +569,13 @@ class TeleportPipelineTaskPhaseTest {
             TeleportPipelineTask task = runSetupWithNullResult("null_queued", true, p);
             assertNotEquals(TeleportPipelineTask.Phase.CLEANUP, task.getPhase(),
                     "a queued player is served later by Region.execute(); the attempt must not clean up");
-            assertTrue(io.github.dailystruggle.rtp.common.RTP.getInstance().processingPlayers.contains(p[0].uuid()));
+            assertTrue(TeleportSessions.current().processingPlayers.contains(p[0].uuid()));
             assertFalse(p[0].sentMessages.stream().anyMatch(m -> m.contains("UNSAFE_NULL_RESULT")));
         } finally {
             TeleportPipelineTask.ConfigCache.unsafe = savedUnsafe;
             if (p[0] != null) {
-                io.github.dailystruggle.rtp.common.RTP.getInstance().processingPlayers.remove(p[0].uuid());
-                io.github.dailystruggle.rtp.common.RTP.getInstance().queuedPlayers.remove(p[0].uuid());
+                TeleportSessions.current().processingPlayers.remove(p[0].uuid());
+                TeleportSessions.current().queuedPlayers.remove(p[0].uuid());
             }
         }
     }
@@ -644,7 +648,7 @@ class TeleportPipelineTaskPhaseTest {
             }
         };
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor();
         accessor.addWorld(world);
 
         io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle circle =
@@ -657,7 +661,7 @@ class TeleportPipelineTaskPhaseTest {
                         "plat_test_reg", world, circle, vert, false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
         io.github.dailystruggle.rtp.common.selection.region.Region reg =
                 new io.github.dailystruggle.rtp.common.selection.region.Region("plat_test_reg", settings);
-        io.github.dailystruggle.rtp.common.RTP.selectionAPI.permRegionLookup.put(reg.name, reg);
+        ActiveSelection.get().permRegionLookup.put(reg.name, reg);
 
         java.util.UUID pid = java.util.UUID.randomUUID();
         io.github.dailystruggle.rtp.common.mock.MockRTPPlayer p = new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(
@@ -684,7 +688,7 @@ class TeleportPipelineTaskPhaseTest {
     void platform_creator_lifecycle_handling() {
         io.github.dailystruggle.rtp.common.mock.TrackedMockWorld world = new io.github.dailystruggle.rtp.common.mock.TrackedMockWorld("plat_creator_w");
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor();
         accessor.addWorld(world);
 
         java.util.UUID pid = java.util.UUID.randomUUID();
@@ -700,7 +704,7 @@ class TeleportPipelineTaskPhaseTest {
 
         io.github.dailystruggle.rtp.api.selection.GenerationContext ctx = new io.github.dailystruggle.rtp.api.selection.GenerationContext(p, p, null);
 
-        io.github.dailystruggle.rtp.common.RTP.getInstance().databaseAccessor = org.mockito.Mockito.mock(io.github.dailystruggle.rtp.common.database.DatabaseAccessor.class);
+        ActiveDatabase.setAccessor(org.mockito.Mockito.mock(io.github.dailystruggle.rtp.common.database.DatabaseAccessor.class));
 
         // Test with custom platform creator returning true
         AtomicBoolean customCreated = new AtomicBoolean(false);
@@ -762,7 +766,7 @@ class TeleportPipelineTaskPhaseTest {
     void processGenerationResult_null_result_when_player_queued_halts() throws Exception {
         io.github.dailystruggle.rtp.common.mock.TrackedMockWorld world = new io.github.dailystruggle.rtp.common.mock.TrackedMockWorld("pgr_null_proc_w");
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor();
         accessor.addWorld(world);
 
         UUID pid = UUID.randomUUID();
@@ -770,9 +774,9 @@ class TeleportPipelineTaskPhaseTest {
                 pid, "ProcPlayer", new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 0, 64, 0));
         accessor.addPlayer(p);
 
-        io.github.dailystruggle.rtp.common.RTP.getInstance().processingPlayers.add(pid);
+        TeleportSessions.current().processingPlayers.add(pid);
         // The enqueue branch registers queued players; only they are served later by Region.execute().
-        io.github.dailystruggle.rtp.common.RTP.getInstance().queuedPlayers.add(pid);
+        TeleportSessions.current().queuedPlayers.add(pid);
         try {
             io.github.dailystruggle.rtp.api.selection.GenerationContext ctx =
                     new io.github.dailystruggle.rtp.api.selection.GenerationContext(p, p, null);
@@ -794,8 +798,8 @@ class TeleportPipelineTaskPhaseTest {
             // force-closes it and tears down the queued player's state.
             assertNull(trackingId.get(task), "halted queued pipeline must be untracked");
         } finally {
-            io.github.dailystruggle.rtp.common.RTP.getInstance().processingPlayers.remove(pid);
-            io.github.dailystruggle.rtp.common.RTP.getInstance().queuedPlayers.remove(pid);
+            TeleportSessions.current().processingPlayers.remove(pid);
+            TeleportSessions.current().queuedPlayers.remove(pid);
         }
     }
 
@@ -804,7 +808,7 @@ class TeleportPipelineTaskPhaseTest {
     void processGenerationResult_null_coords_triggers_unsafe_and_cleanup() throws Exception {
         io.github.dailystruggle.rtp.common.mock.TrackedMockWorld world = new io.github.dailystruggle.rtp.common.mock.TrackedMockWorld("pgr_unsafe_w");
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor();
         accessor.addWorld(world);
 
         UUID pid = UUID.randomUUID();
@@ -860,7 +864,7 @@ class TeleportPipelineTaskPhaseTest {
     void deathEffect_suspends_runTeleport_and_completes_on_respawn() throws Exception {
         io.github.dailystruggle.rtp.common.mock.TrackedMockWorld world = new io.github.dailystruggle.rtp.common.mock.TrackedMockWorld("death_susp_w");
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor();
         accessor.addWorld(world);
 
         UUID pid = UUID.randomUUID();
@@ -906,8 +910,8 @@ class TeleportPipelineTaskPhaseTest {
         runTeleport.invoke(task);
 
         // Player should NOT have setLocation invoked yet, and task should be placed on hold
-        assertTrue(io.github.dailystruggle.rtp.common.RTP.pendingDeathTeleports.containsKey(pid));
-        assertSame(task, io.github.dailystruggle.rtp.common.RTP.pendingDeathTeleports.get(pid));
+        assertTrue(DeathTeleports.pending().containsKey(pid));
+        assertSame(task, DeathTeleports.pending().get(pid));
         assertFalse(data.completed);
 
         // Test completeDeathTeleport with invulnerability and queueing branches
@@ -918,12 +922,12 @@ class TeleportPipelineTaskPhaseTest {
         });
 
         // When player respawns, completeDeathTeleport(true) marks completed and cleans up
-        TeleportPipelineTask pending = io.github.dailystruggle.rtp.common.RTP.pendingDeathTeleports.remove(pid);
+        TeleportPipelineTask pending = DeathTeleports.pending().remove(pid);
         assertNotNull(pending);
         pending.completeDeathTeleport(true);
 
         assertTrue(data.completed);
-        assertFalse(io.github.dailystruggle.rtp.common.RTP.pendingDeathTeleports.containsKey(pid));
+        assertFalse(DeathTeleports.pending().containsKey(pid));
 
         TeleportPipelineTask.ConfigCache.lockAfterUses = 0;
         TeleportPipelineTask.ConfigCache.postTeleportQueueing = false;
@@ -935,7 +939,7 @@ class TeleportPipelineTaskPhaseTest {
     void deathEffect_suspends_runTeleport_and_cancels_on_disconnect() throws Exception {
         io.github.dailystruggle.rtp.common.mock.TrackedMockWorld world = new io.github.dailystruggle.rtp.common.mock.TrackedMockWorld("death_disc_w");
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor();
         accessor.addWorld(world);
 
         UUID pid = UUID.randomUUID();
@@ -980,15 +984,15 @@ class TeleportPipelineTaskPhaseTest {
         runTeleport.setAccessible(true);
         runTeleport.invoke(task);
 
-        assertTrue(io.github.dailystruggle.rtp.common.RTP.pendingDeathTeleports.containsKey(pid));
+        assertTrue(DeathTeleports.pending().containsKey(pid));
 
         // On disconnect without respawning, completeDeathTeleport(false) cleans up without completing
-        TeleportPipelineTask pending = io.github.dailystruggle.rtp.common.RTP.pendingDeathTeleports.remove(pid);
+        TeleportPipelineTask pending = DeathTeleports.pending().remove(pid);
         assertNotNull(pending);
         pending.completeDeathTeleport(false);
 
         assertFalse(data.completed);
-        assertFalse(io.github.dailystruggle.rtp.common.RTP.pendingDeathTeleports.containsKey(pid));
+        assertFalse(DeathTeleports.pending().containsKey(pid));
     }
 
     @Test
@@ -996,7 +1000,7 @@ class TeleportPipelineTaskPhaseTest {
     void deathInFlight_set_triggers_suspend_and_cancel_cleans_up() throws Exception {
         io.github.dailystruggle.rtp.common.mock.TrackedMockWorld world = new io.github.dailystruggle.rtp.common.mock.TrackedMockWorld("death_set_w");
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor();
         accessor.addWorld(world);
 
         UUID pid = UUID.randomUUID();
@@ -1030,7 +1034,7 @@ class TeleportPipelineTaskPhaseTest {
                 new io.github.dailystruggle.rtp.api.selection.GenerationContext(p, p, null);
 
         TeleportPipelineTask task = new TeleportPipelineTask(ctx, region, target);
-        io.github.dailystruggle.rtp.common.RTP.deathEffectInFlight.add(pid);
+        DeathTeleports.effectInFlight().add(pid);
 
         java.lang.reflect.Field dataField = TeleportPipelineTask.class.getDeclaredField("teleportData");
         dataField.setAccessible(true);
@@ -1041,12 +1045,12 @@ class TeleportPipelineTaskPhaseTest {
         runTeleport.setAccessible(true);
         runTeleport.invoke(task);
 
-        assertTrue(io.github.dailystruggle.rtp.common.RTP.pendingDeathTeleports.containsKey(pid));
+        assertTrue(DeathTeleports.pending().containsKey(pid));
 
         // Cancellation cleans up death pending and death in flight
         task.setCancelled(true);
-        assertFalse(io.github.dailystruggle.rtp.common.RTP.pendingDeathTeleports.containsKey(pid));
-        assertFalse(io.github.dailystruggle.rtp.common.RTP.deathEffectInFlight.contains(pid));
+        assertFalse(DeathTeleports.pending().containsKey(pid));
+        assertFalse(DeathTeleports.effectInFlight().contains(pid));
     }
 
     @Test
@@ -1054,7 +1058,7 @@ class TeleportPipelineTaskPhaseTest {
     void normalTeleport_withoutDeathEffect_doesNotSuspend_and_completesImmediately() throws Exception {
         io.github.dailystruggle.rtp.common.mock.TrackedMockWorld world = new io.github.dailystruggle.rtp.common.mock.TrackedMockWorld("normal_tele_w");
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor();
         accessor.addWorld(world);
 
         UUID pid = UUID.randomUUID();
@@ -1092,7 +1096,7 @@ class TeleportPipelineTaskPhaseTest {
 
         TeleportPipelineTask task = new TeleportPipelineTask(ctx, region, target);
         assertFalse(task.deathEffectTriggered);
-        assertFalse(io.github.dailystruggle.rtp.common.RTP.deathEffectInFlight.contains(pid));
+        assertFalse(DeathTeleports.effectInFlight().contains(pid));
 
         java.lang.reflect.Field dataField = TeleportPipelineTask.class.getDeclaredField("teleportData");
         dataField.setAccessible(true);
@@ -1108,7 +1112,7 @@ class TeleportPipelineTaskPhaseTest {
         assertEquals(75, p.getLocation().y());
         assertEquals(500, p.getLocation().z());
         assertTrue(data.completed);
-        assertFalse(io.github.dailystruggle.rtp.common.RTP.pendingDeathTeleports.containsKey(pid));
+        assertFalse(DeathTeleports.pending().containsKey(pid));
     }
 
     // -----------------------------------------------------------------------

@@ -1,7 +1,9 @@
 package io.github.dailystruggle.rtp.common.tasks.tick;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.action.ActionServices;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 
@@ -34,7 +36,7 @@ public final class SyncTaskProcessing extends RTPRunnable {
 
   /** Budget for this pulse in nanoseconds. */
   long budgetNanos() {
-    return (RTP.configs == null && availableTime > 0L) ? availableTime : TickBudget.syncNanos();
+    return (ActiveConfigs.get() == null && availableTime > 0L) ? availableTime : TickBudget.syncNanos();
   }
 
   @Override
@@ -46,7 +48,7 @@ public final class SyncTaskProcessing extends RTPRunnable {
         MemoryTracker.updateTracking(trackingId);
       }
     } catch (Throwable t) {
-      RTP.log(Level.WARNING, "Exception during sync task processing", t);
+      RTPRuntime.log(Level.WARNING, "Exception during sync task processing", t);
     }
 
     try {
@@ -55,24 +57,24 @@ public final class SyncTaskProcessing extends RTPRunnable {
         CommandsAPI.execute(Math.max(0L, budget - (System.nanoTime() - start)));
       }
     } catch (Throwable t) {
-      RTP.log(Level.WARNING, "Exception during CommandsAPI execution", t);
+      RTPRuntime.log(Level.WARNING, "Exception during CommandsAPI execution", t);
     }
 
     try {
-      if (RTP.actionManager != null) {
-        RTP.actionManager.tick();
+      if (ActionServices.actionManager() != null) {
+        ActionServices.actionManager().tick();
       }
     } catch (Throwable t) {
-      RTP.log(Level.WARNING, "Exception during action manager tick", t);
+      RTPRuntime.log(Level.WARNING, "Exception during action manager tick", t);
     }
 
     try {
       // Floor of 1 ns: at least one due task per tick, so teleport stages queued here
       // always progress even when the stages above spent the budget (S-004).
       long remaining = budget - (System.nanoTime() - start);
-      RTP.getInstance().miscSyncTasks.execute(Math.max(1L, remaining));
+      MiscTasks.sync().execute(Math.max(1L, remaining));
     } catch (Throwable t) {
-      RTP.log(Level.WARNING, "Exception during sync task processing", t);
+      RTPRuntime.log(Level.WARNING, "Exception during sync task processing", t);
     }
   }
 }

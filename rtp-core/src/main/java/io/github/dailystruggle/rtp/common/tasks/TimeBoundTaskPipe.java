@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.tasks;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.predict.BudgetPacer;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
@@ -63,7 +63,7 @@ public class TimeBoundTaskPipe extends RTPTaskPipe {
                             ((RTPRunnable) runnable).runWithTracking();
                         else runnable.run();
                     } catch (Throwable throwable) {
-                        RTP.log(Level.WARNING, throwable.getMessage(), throwable);
+                        RTPRuntime.log(Level.WARNING, throwable.getMessage(), throwable);
                     }
                     long localStop = System.nanoTime();
                     ranAny = true;
@@ -74,7 +74,7 @@ public class TimeBoundTaskPipe extends RTPTaskPipe {
                     dt = localStop - start;
                 }
             } catch (Throwable t) {
-                RTP.log(Level.WARNING, t.getMessage(), t);
+                RTPRuntime.log(Level.WARNING, t.getMessage(), t);
             } finally {
                 accessGuard.release();
             }

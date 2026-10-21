@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.tasks.teleport;
 
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 
 import java.util.logging.Level;
@@ -48,7 +48,7 @@ public final class ViewDistanceRestoreTask extends RTPRunnable {
     try {
       captured = player.getViewDistance();
     } catch (Throwable t) {
-      RTP.log(Level.FINE, "[RTP] view-distance clamp skipped; getViewDistance failed", t);
+      RTPRuntime.log(Level.FINE, "[RTP] view-distance clamp skipped; getViewDistance failed", t);
       return;
     }
     if (captured < 0) {
@@ -69,7 +69,7 @@ public final class ViewDistanceRestoreTask extends RTPRunnable {
     try {
       player.setSendViewDistance(captured);
     } catch (Throwable t) {
-      RTP.log(Level.FINE, "[RTP] send-view-distance pin could not be applied", t);
+      RTPRuntime.log(Level.FINE, "[RTP] send-view-distance pin could not be applied", t);
       // Non-fatal: continue with a tracking-only clamp (pre-flash-fix behaviour).
     }
 
@@ -77,7 +77,7 @@ public final class ViewDistanceRestoreTask extends RTPRunnable {
     try {
       player.setViewDistance(clampValue);
     } catch (Throwable t) {
-      RTP.log(Level.FINE, "[RTP] view-distance clamp could not be applied", t);
+      RTPRuntime.log(Level.FINE, "[RTP] view-distance clamp could not be applied", t);
       releaseSendPin(player);
       return;
     }
@@ -102,7 +102,7 @@ public final class ViewDistanceRestoreTask extends RTPRunnable {
     try {
       player.setSendViewDistance(-1);
     } catch (Throwable t) {
-      RTP.log(Level.FINE, "[RTP] send-view-distance pin could not be released", t);
+      RTPRuntime.log(Level.FINE, "[RTP] send-view-distance pin could not be released", t);
     }
   }
 
@@ -137,7 +137,7 @@ public final class ViewDistanceRestoreTask extends RTPRunnable {
     try {
       current = player.getViewDistance();
     } catch (Throwable t) {
-      RTP.log(Level.FINE, "[RTP] view-distance restore read failed; ending ramp", t);
+      RTPRuntime.log(Level.FINE, "[RTP] view-distance restore read failed; ending ramp", t);
       releaseSendPin(player);
       finish();
       return;
@@ -163,7 +163,7 @@ public final class ViewDistanceRestoreTask extends RTPRunnable {
     try {
       player.setViewDistance(desired);
     } catch (Throwable t) {
-      RTP.log(Level.FINE, "[RTP] view-distance restore step failed; ending ramp", t);
+      RTPRuntime.log(Level.FINE, "[RTP] view-distance restore step failed; ending ramp", t);
       finish();
       return;
     }

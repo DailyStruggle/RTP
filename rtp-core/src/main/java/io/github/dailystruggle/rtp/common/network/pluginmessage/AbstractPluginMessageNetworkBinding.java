@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.network.pluginmessage;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.proxy.common.security.HmacVerifier;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkSnapshot;
@@ -65,13 +65,13 @@ public abstract class AbstractPluginMessageNetworkBinding implements NetworkTran
         this.clock = java.util.Objects.requireNonNull(clock, "clock");
         this.verifier = verifier;
         this.rejectedWarning = new ThrottledWarning(
-                m -> RTP.log(Level.WARNING, m), ThrottledWarning.DEFAULT_INTERVAL_MS, clock);
+                m -> RTPRuntime.log(Level.WARNING, m), ThrottledWarning.DEFAULT_INTERVAL_MS, clock);
         this.capWarning = new ThrottledWarning(
-                m -> RTP.log(Level.WARNING, m), ThrottledWarning.DEFAULT_INTERVAL_MS, clock);
+                m -> RTPRuntime.log(Level.WARNING, m), ThrottledWarning.DEFAULT_INTERVAL_MS, clock);
         this.outboundWarning = new ThrottledWarning(
-                m -> RTP.log(Level.WARNING, m), ThrottledWarning.DEFAULT_INTERVAL_MS, clock);
+                m -> RTPRuntime.log(Level.WARNING, m), ThrottledWarning.DEFAULT_INTERVAL_MS, clock);
         if (verifier == null) {
-            RTP.log(Level.WARNING, "[RTP] " + getClass().getSimpleName()
+            RTPRuntime.log(Level.WARNING, "[RTP] " + getClass().getSimpleName()
                     + " running UNSIGNED: inbound plugin-message heartbeats are not authenticated"
                     + " and can be forged by clients. Set network.secretEnv (RTP_NET_SECRET) on"
                     + " every backend and the proxy.");

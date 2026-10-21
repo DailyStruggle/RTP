@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.addon.RTPAddon;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.action.ActionServices;
 import java.util.ServiceLoader;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,16 +30,16 @@ class RTPActionAddonServiceLoaderTest {
   @DisplayName("LeafRTPActionAddon lifecycle registers and unregisters cleanly")
   void testLifecycleCleanliness() {
     RTPActionAddon addon = new RTPActionAddon();
-    assertNull(RTP.actionManager);
+    assertNull(ActionServices.actionManager());
     assertNull(RTPAPI.actionService);
 
     addon.onLoad();
-    assertNotNull(RTP.actionManager);
+    assertNotNull(ActionServices.actionManager());
     assertNotNull(RTPAPI.actionService);
-    assertEquals(RTP.actionManager, RTPAPI.actionService);
+    assertEquals(ActionServices.actionManager(), RTPAPI.actionService);
 
     addon.onUnload();
-    assertNull(RTP.actionManager);
+    assertNull(ActionServices.actionManager());
     assertNull(RTPAPI.actionService);
   }
 }

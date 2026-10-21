@@ -3,10 +3,10 @@ package io.github.dailystruggle.rtp.common.commands.admin;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
@@ -52,9 +52,9 @@ class ClearCacheCmdTest {
 
     @AfterEach
     void tearDown() {
-        if (RTP.selectionAPI != null) {
+        if (ActiveSelection.get() != null) {
             for (String name : registered) {
-                RTP.selectionAPI.permRegionLookup.remove(name);
+                ActiveSelection.get().permRegionLookup.remove(name);
             }
         }
     }
@@ -73,7 +73,7 @@ class ClearCacheCmdTest {
                 new RTPLocation(new RTPCoords(world.name(), 10, 64, 10), 1L, null));
         region.queueManager.unkeptLocations.add(
                 new RTPLocation(new RTPCoords(world.name(), 20, 64, 20), 1L, null));
-        RTP.selectionAPI.permRegionLookup.put(name, region);
+        ActiveSelection.get().permRegionLookup.put(name, region);
         registered.add(name);
         return region;
     }

@@ -3,8 +3,8 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
@@ -24,7 +24,7 @@ class Adr079CauseTtlAndStagedExpirationTest {
   static void beforeAll() {
     MockRTPServerAccessor accessor =
         new MockRTPServerAccessor(new java.io.File("target/test-data"));
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
   }
 

@@ -2,12 +2,12 @@ package io.github.dailystruggle.rtp.common.action;
 
 import io.github.dailystruggle.rtp.api.action.ActionDefinition;
 import io.github.dailystruggle.rtp.api.action.ConfinementBoundary;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.search.FuzzySearchEngine;
 import java.io.File;
 import java.io.FileInputStream;
@@ -44,8 +44,8 @@ public final class ActionConfigLoader {
         RtpYamlSection root = null;
         if (parser.pluginDirectory != null && parser.name != null) {
           File f = new File(parser.pluginDirectory, parser.name);
-          if (!f.exists() && RTP.serverAccessor != null && RTP.serverAccessor.getPluginDirectory() != null) {
-            f = new File(new File(RTP.serverAccessor.getPluginDirectory(), "definitions/actions"), parser.name);
+          if (!f.exists() && RTPRuntime.serverAccessor() != null && RTPRuntime.serverAccessor().getPluginDirectory() != null) {
+            f = new File(new File(RTPRuntime.serverAccessor().getPluginDirectory(), "definitions/actions"), parser.name);
           }
           if (f.exists()) {
             try (Reader reader = new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8)) {
@@ -60,9 +60,9 @@ public final class ActionConfigLoader {
         }
         ActionDefinition def = (root != null) ? parseDefinition(id, root) : parseDefinition(id, parser);
         manager.registerAction(def);
-        RTP.log(Level.FINE, "[RTP Action] Loaded scripted action: " + id);
+        RTPRuntime.log(Level.FINE, "[RTP Action] Loaded scripted action: " + id);
       } catch (Exception e) {
-        RTP.log(Level.WARNING, "[RTP Action] Failed parsing action config: " + parser.name, e);
+        RTPRuntime.log(Level.WARNING, "[RTP Action] Failed parsing action config: " + parser.name, e);
       }
     }
   }
@@ -88,9 +88,9 @@ public final class ActionConfigLoader {
         RtpYamlConfig yaml = RtpYamlConfig.parse(reader);
         ActionDefinition def = parseDefinition(id, yaml);
         manager.registerAction(def);
-        RTP.log(Level.FINE, "[RTP Action] Loaded scripted action: " + id);
+        RTPRuntime.log(Level.FINE, "[RTP Action] Loaded scripted action: " + id);
       } catch (Exception e) {
-        RTP.log(Level.WARNING, "[RTP Action] Failed parsing action config: " + file.getName(), e);
+        RTPRuntime.log(Level.WARNING, "[RTP Action] Failed parsing action config: " + file.getName(), e);
       }
     }
   }
@@ -107,8 +107,8 @@ public final class ActionConfigLoader {
     RtpYamlSection root = parser.getYamlRoot();
     if (root == null && parser.pluginDirectory != null && parser.name != null) {
       File f = new File(parser.pluginDirectory, parser.name);
-      if (!f.exists() && RTP.serverAccessor != null && RTP.serverAccessor.getPluginDirectory() != null) {
-        f = new File(new File(RTP.serverAccessor.getPluginDirectory(), "definitions/actions"), parser.name);
+      if (!f.exists() && RTPRuntime.serverAccessor() != null && RTPRuntime.serverAccessor().getPluginDirectory() != null) {
+        f = new File(new File(RTPRuntime.serverAccessor().getPluginDirectory(), "definitions/actions"), parser.name);
       }
       if (f.exists()) {
         try (Reader reader = new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8)) {
@@ -361,7 +361,7 @@ public final class ActionConfigLoader {
     if (lookup.isExact()) {
       return lookup.match();
     } else if (lookup.isPerceptible()) {
-      RTP.log(
+      RTPRuntime.log(
           Level.WARNING,
           "[RTP Action] Parameter type '"
               + rawType
@@ -372,7 +372,7 @@ public final class ActionConfigLoader {
               + "'.");
       return lookup.match();
     } else {
-      RTP.log(
+      RTPRuntime.log(
           Level.WARNING,
           "[RTP Action] Unknown parameter type: '"
               + rawType
@@ -554,7 +554,7 @@ public final class ActionConfigLoader {
       if (lookup.isExact()) {
         boundary = lookup.match();
       } else if (lookup.isPerceptible()) {
-        RTP.log(
+        RTPRuntime.log(
             Level.WARNING,
             "[RTP Action] Confinement boundary '"
                 + bStr
@@ -565,7 +565,7 @@ public final class ActionConfigLoader {
                 + "'.");
         boundary = lookup.match();
       } else {
-        RTP.log(
+        RTPRuntime.log(
             Level.WARNING,
             "[RTP Action] Unknown confinement boundary: '"
                 + bStr
@@ -983,7 +983,7 @@ public final class ActionConfigLoader {
         result.add(new io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec(
             triggerId, type, world, minX, minY, minZ, maxX, maxY, maxZ, actionId, cooldown, batchInterval));
       } catch (Exception e) {
-        RTP.log(Level.WARNING, "[RTP Action] Invalid trigger definition '" + triggerId + "' for action '" + actionId + "': " + e.getMessage());
+        RTPRuntime.log(Level.WARNING, "[RTP Action] Invalid trigger definition '" + triggerId + "' for action '" + actionId + "': " + e.getMessage());
       }
     }
 

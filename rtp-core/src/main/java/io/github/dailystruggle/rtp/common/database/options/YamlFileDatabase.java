@@ -1,10 +1,14 @@
 package io.github.dailystruggle.rtp.common.database.options;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
@@ -122,7 +126,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
         if (!file.exists()) file.createNewFile(true);
         file.save();
       } catch (IOException e) {
-        RTP.log(Level.WARNING, e.getMessage(), e);
+        RTPRuntime.log(Level.WARNING, e.getMessage(), e);
       }
     }
   }
@@ -157,14 +161,14 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
         try {
           database.get("default.yml").copyTo(filePath);
         } catch (IOException e) {
-          RTP.log(Level.WARNING, e.getMessage(), e);
+          RTPRuntime.log(Level.WARNING, e.getMessage(), e);
           return;
         }
       } else {
         try {
           file.createNewFile();
         } catch (IOException e) {
-          RTP.log(Level.WARNING, e.getMessage(), e);
+          RTPRuntime.log(Level.WARNING, e.getMessage(), e);
           return;
         }
       }
@@ -174,7 +178,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
     try {
       file.loadWithComments();
     } catch (IOException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
       return;
     }
 
@@ -188,12 +192,12 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
 
         if (configurationSection.getName().equalsIgnoreCase("shape") && value instanceof String) {
           String shapeName = (String) value;
-          value = RTP.factoryMap.get(RTP.factoryNames.shape).getOrDefault(shapeName);
+          value = FactoryRegistry.get(FactoryNames.shape).getOrDefault(shapeName);
         }
 
         if (configurationSection.getName().equalsIgnoreCase("vert") && value instanceof String) {
           String vertName = (String) value;
-          value = RTP.factoryMap.get(RTP.factoryNames.vert).getOrDefault(vertName);
+          value = FactoryRegistry.get(FactoryNames.vert).getOrDefault(vertName);
         }
 
         if (value instanceof FactoryValue<?>) {
@@ -225,7 +229,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
       cachedLookupLastModified.get().put(tableName, file.file().lastModified());
       cachedLookup.get().put(tableName, file);
     } catch (IOException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
     }
   }
 
@@ -244,7 +248,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
       }
       file.save();
     } catch (IOException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
     }
   }
 
@@ -274,7 +278,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
       Map<TableObj, TableObj> tableMap = localTables.get("rtp_cached_locations.yml");
       if (tableMap != null) tableMap.clear();
     } catch (IOException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
     }
   }
 
@@ -314,7 +318,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
         res.add(new StoredLocation(id, regionName, worldName, x, y, z, attempts, seed, playerUuid));
       }
     } catch (IOException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
     }
     return res;
   }
@@ -422,11 +426,11 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
           for (String key : toRemove) cachedFile.set(key, null);
           cachedFile.save();
           if (isSystemDatabaseLoggingEnabled()) {
-            RTP.log(Level.INFO, "Purged " + toRemove.size() + " stale cached locations from the database.");
+            RTPRuntime.log(Level.INFO, "Purged " + toRemove.size() + " stale cached locations from the database.");
           }
         }
       } catch (IOException e) {
-        RTP.log(Level.WARNING, e.getMessage(), e);
+        RTPRuntime.log(Level.WARNING, e.getMessage(), e);
       }
     }
 
@@ -453,7 +457,7 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
             UUID id = UUID.fromString(key.split("\\.")[0]);
             TeleportData teleportData = new TeleportData();
             teleportData.sender =
-                RTP.serverAccessor.getSender(UUID.fromString(dataMap.get("senderId").toString()));
+                RTPRuntime.serverAccessor().getSender(UUID.fromString(dataMap.get("senderId").toString()));
             teleportData.time = (Long) dataMap.getOrDefault("time", 0L);
             if (teleportData.time != 0L)
               teleportData.time =
@@ -487,15 +491,15 @@ public class YamlFileDatabase extends DatabaseAccessor<Map<String, RtpYamlConfig
             teleportData.attempts = ((Number) dataMap.get("attempts")).intValue();
             teleportData.cost = ((Number) dataMap.get("cost")).intValue();
             teleportData.targetRegion =
-                RTP.selectionAPI.getRegion(dataMap.get("region").toString());
+                ActiveSelection.get().getRegion(dataMap.get("region").toString());
             teleportData.completed = true;
-            RTP.getInstance().latestTeleportData.put(id, teleportData);
+            TeleportSessions.current().latestTeleportData.put(id, teleportData);
           } catch (Exception ignored) {
 
           }
         }
       } catch (IllegalArgumentException exception) {
-        RTP.log(Level.WARNING, "Failed to parse teleportData referenceTime", exception);
+        RTPRuntime.log(Level.WARNING, "Failed to parse teleportData referenceTime", exception);
       }
     }
   }

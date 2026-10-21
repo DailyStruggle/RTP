@@ -11,6 +11,7 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
 import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
 import org.jetbrains.annotations.Nullable;
@@ -220,7 +221,7 @@ public class MockRTPServerAccessor implements RTPServerAccessor {
     public void sendMessage(UUID target, Enum<?> msgType, String tag) {
         RTPCommandSender sender = getSender(target);
         if (sender != null) {
-            Object configValue = RTP.configs.getConfigValue(msgType, null);
+            Object configValue = ActiveConfigs.get().getConfigValue(msgType, null);
             String msg = (configValue != null) ? String.valueOf(configValue) : msgType.name();
             sender.sendMessage(msg);
         }

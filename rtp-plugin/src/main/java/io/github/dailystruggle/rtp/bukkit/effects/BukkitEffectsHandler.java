@@ -7,14 +7,18 @@ import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.bukkit.events.*;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.tasks.teleport.DeathTeleports;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import io.github.dailystruggle.rtp.effects.EffectsResolver;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.SendMessage;
 import org.bukkit.Bukkit;
@@ -93,8 +97,8 @@ public class BukkitEffectsHandler {
         //    (hasPermission / uuid() / name()). Falls back to a permission-only
         //    union when the platform accessor isn't ready.
         String stage = stageOf(prefix);
-        RTPPlayer rp = (RTP.serverAccessor != null)
-                ? RTP.serverAccessor.getPlayer(player.getUniqueId())
+        RTPPlayer rp = (RTPRuntime.serverAccessor() != null)
+                ? RTPRuntime.serverAccessor().getPlayer(player.getUniqueId())
                 : null;
         Collection<String> union = (rp != null)
                 ? EffectsResolver.resolveUnioned(stage, rp, prefix, nodes)
@@ -116,7 +120,7 @@ public class BukkitEffectsHandler {
         for (Effect<?> effect : effects) {
             effect.setTarget(target);
             if (effect instanceof io.github.dailystruggle.effectsapi.common.effects.DeathEffect) {
-                RTP.deathEffectInFlight.add(player.getUniqueId());
+                DeathTeleports.effectInFlight().add(player.getUniqueId());
                 if (pipelineTask != null) {
                     pipelineTask.deathEffectTriggered = true;
                 }
@@ -128,7 +132,7 @@ public class BukkitEffectsHandler {
             // UnsupportedOperationException and BukkitEffectsInitializer's
             // catch-block then falls back to running the effect directly on
             // the calling async pipeline thread, which is the failure mode
-            // this routes around. We prefer RTP.scheduler.runTaskForPlayer
+            // this routes around. We prefer RTPRuntime.scheduler().runTaskForPlayer
             // (Folia entity-scheduler aware; "runTaskForPlayer" is the
             // historic name for a generic "run runnable on a thread owning
             // the player after N ticks" path) and fall back to the legacy
@@ -139,7 +143,7 @@ public class BukkitEffectsHandler {
 
     /**
      * Run {@code effect} on a thread that legally owns its target player.
-     * Folia: routes through {@link RTP#scheduler}'s
+     * Folia: routes through {@link RTPRuntime#scheduler()}'s
      * {@code runTaskForPlayer(RTPPlayer, RTPRunnable, delayTicks)} entry
      * point (per-entity scheduler hop). Paper/Spigot or when the
      * {@link RTPPlayer} view is unavailable: falls back to the legacy
@@ -148,9 +152,9 @@ public class BukkitEffectsHandler {
      * main-thread dispatch on those platforms.
      */
     private static void dispatchEffectForPlayer(JavaPlugin plugin, Effect<?> effect, RTPPlayer rp) {
-        if (RTP.scheduler != null && rp != null) {
+        if (RTPRuntime.scheduler() != null && rp != null) {
             try {
-                RTP.scheduler.runTaskForPlayer(
+                RTPRuntime.scheduler().runTaskForPlayer(
                         rp,
                         new io.github.dailystruggle.rtp.common.tasks.RTPRunnable((Runnable) effect),
                         1L);
@@ -179,7 +183,7 @@ public class BukkitEffectsHandler {
         // effects in a static block - the platform initializer must be invoked
         // explicitly. Idempotent.
         BukkitEffectsInitializer.registerAll();
-        Configs configs = RTP.configs;
+        Configs configs = ActiveConfigs.get();
         FactoryValue<PerformanceKeys> parser = configs.getParser(PerformanceKeys.class);
 
         TeleportPipelineTask.setupPreActions.add(
@@ -193,8 +197,7 @@ public class BukkitEffectsHandler {
                             return;
                         Player player = resolveBukkitPlayer(task.player().uuid(), "presetup");
                         if (player == null) return;
-                        RTP.getInstance()
-                                .miscAsyncTasks
+                        MiscTasks.async()
                                 .add(() -> dispatchEffects(plugin, "rtp.effect.presetup", player));
                     }
                 });
@@ -210,8 +213,7 @@ public class BukkitEffectsHandler {
                             return;
                         Player player = resolveBukkitPlayer(task.player().uuid(), "postsetup");
                         if (player == null) return;
-                        RTP.getInstance()
-                                .miscAsyncTasks
+                        MiscTasks.async()
                                 .add(() -> dispatchEffects(plugin, "rtp.effect.postsetup", player));
                     }
                 });
@@ -227,8 +229,7 @@ public class BukkitEffectsHandler {
                             return;
                         Player player = resolveBukkitPlayer(task.player().uuid(), "preload");
                         if (player == null) return;
-                        RTP.getInstance()
-                                .miscAsyncTasks
+                        MiscTasks.async()
                                 .add(() -> dispatchEffects(plugin, "rtp.effect.preload", player));
                     }
                 });
@@ -244,8 +245,7 @@ public class BukkitEffectsHandler {
                             return;
                         Player player = resolveBukkitPlayer(task.player().uuid(), "postload");
                         if (player == null) return;
-                        RTP.getInstance()
-                                .miscAsyncTasks
+                        MiscTasks.async()
                                 .add(() -> dispatchEffects(plugin, "rtp.effect.postload", player));
                     }
                 });
@@ -295,31 +295,31 @@ public class BukkitEffectsHandler {
                          */
                         @SuppressWarnings("unchecked")
                         ConfigParser<PlayerMessages> lang =
-                                (ConfigParser<PlayerMessages>) RTP.configs.getParser(PlayerMessages.class);
+                                (ConfigParser<PlayerMessages>) ActiveConfigs.get().getParser(PlayerMessages.class);
                         if (lang == null) return;
 
-                        String title = RTP.configs.getConfigValue(PlayerMessages.title, "").toString();
-                        String subtitle = RTP.configs.getConfigValue(PlayerMessages.subtitle, "").toString();
+                        String title = ActiveConfigs.get().getConfigValue(PlayerMessages.title, "").toString();
+                        String subtitle = ActiveConfigs.get().getConfigValue(PlayerMessages.subtitle, "").toString();
 
                         int fadeIn = lang.getNumber(PlayerMessages.fadeIn, 0).intValue();
                         int stay = lang.getNumber(PlayerMessages.stay, 0).intValue();
                         int fadeOut = lang.getNumber(PlayerMessages.fadeOut, 0).intValue();
 
-                        String actionbar = RTP.configs.getConfigValue(PlayerMessages.actionbar, "").toString();
+                        String actionbar = ActiveConfigs.get().getConfigValue(PlayerMessages.actionbar, "").toString();
 
-                        RTP.scheduler.runTask(() -> {
+                        RTPRuntime.scheduler().runTask(() -> {
                             SendMessage.title(player, title, subtitle, fadeIn, stay, fadeOut);
                             SendMessage.actionbar(player, actionbar);
                         });
 
                         ConfigParser<ConfigKeys> configParser =
-                                (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+                                (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
 
                         /*
                          * Folia note: command dispatch (Bukkit.dispatchCommand and player.performCommand)
                          * is handled by the global region. Region/entity threads throw
                          * IllegalStateException("Dispatching command async"). Always route to the
-                         * global region scheduler via RTP.scheduler.runTask(Runnable).
+                         * global region scheduler via RTPRuntime.scheduler().runTask(Runnable).
                          * Collect all commands and dispatch them in a single scheduled task to
                          * reduce per-command scheduling overhead.
                          */
@@ -348,7 +348,7 @@ public class BukkitEffectsHandler {
                         }
 
                         if (!consoleCommandsToRun.isEmpty() || !playerCommandsToRun.isEmpty()) {
-                            RTP.scheduler.runTask(() -> {
+                            RTPRuntime.scheduler().runTask(() -> {
                                 for (String c : consoleCommandsToRun) {
                                     Bukkit.dispatchCommand(Bukkit.getConsoleSender(), c);
                                 }
@@ -374,8 +374,7 @@ public class BukkitEffectsHandler {
 
                         Player player = resolveBukkitPlayer(task.player().uuid(), "postteleport");
                         if (player == null) return;
-                        RTP.getInstance()
-                                .miscAsyncTasks
+                        MiscTasks.async()
                                 .add(() -> dispatchEffects(plugin, "rtp.effect.postteleport", player));
                     }
                 });
@@ -390,8 +389,7 @@ public class BukkitEffectsHandler {
                     TeleportCancelEvent event = new TeleportCancelEvent(uuid);
                     Bukkit.getPluginManager().callEvent(event);
 
-                    RTP.getInstance()
-                            .miscAsyncTasks
+                    MiscTasks.async()
                             .add(
                                     () -> {
                                         if (!Boolean.parseBoolean(
@@ -411,8 +409,7 @@ public class BukkitEffectsHandler {
                     PlayerQueuePushEvent event = new PlayerQueuePushEvent(region, uuid);
                     Bukkit.getPluginManager().callEvent(event);
 
-                    RTP.getInstance()
-                            .miscAsyncTasks
+                    MiscTasks.async()
                             .add(
                                     () -> {
                                         if (!Boolean.parseBoolean(
@@ -432,8 +429,7 @@ public class BukkitEffectsHandler {
                     PlayerQueuePopEvent event = new PlayerQueuePopEvent(region, uuid);
                     Bukkit.getPluginManager().callEvent(event);
 
-                    RTP.getInstance()
-                            .miscAsyncTasks
+                    MiscTasks.async()
                             .add(
                                     () -> {
                                         if (!Boolean.parseBoolean(
@@ -450,8 +446,7 @@ public class BukkitEffectsHandler {
                 @org.bukkit.event.EventHandler(priority = org.bukkit.event.EventPriority.MONITOR)
                 public void onPlayerDeath(org.bukkit.event.entity.PlayerDeathEvent event) {
                     Player player = event.getEntity();
-                    RTP.getInstance()
-                            .miscAsyncTasks
+                    MiscTasks.async()
                             .add(
                                     () -> {
                                         if (!Boolean.parseBoolean(

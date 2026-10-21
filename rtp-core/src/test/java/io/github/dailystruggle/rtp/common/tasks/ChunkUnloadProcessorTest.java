@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.tasks;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,13 +22,13 @@ class ChunkUnloadProcessorTest {
     @BeforeEach
     void setUp() {
         RTPTestSetup.install(tempDir);
-        RTP.getInstance().chunksToUnload.clear();
+        MiscTasks.chunksToUnload().clear();
     }
 
     @AfterEach
     void tearDown() {
         if (RTP.getInstance() != null) {
-            RTP.getInstance().chunksToUnload.clear();
+            MiscTasks.chunksToUnload().clear();
         }
     }
 
@@ -46,14 +47,14 @@ class ChunkUnloadProcessorTest {
         when(chunk1.isLoaded()).thenReturn(true);
         when(chunk2.isLoaded()).thenReturn(false);
 
-        RTP.getInstance().chunksToUnload.add(chunk1);
-        RTP.getInstance().chunksToUnload.add(chunk2);
+        MiscTasks.chunksToUnload().add(chunk1);
+        MiscTasks.chunksToUnload().add(chunk2);
 
         processor.run();
 
         verify(chunk1, times(1)).unload();
         verify(chunk2, never()).unload();
-        assertTrue(RTP.getInstance().chunksToUnload.isEmpty());
+        assertTrue(MiscTasks.chunksToUnload().isEmpty());
     }
 
     @Test
@@ -62,12 +63,12 @@ class ChunkUnloadProcessorTest {
         for (int i = 0; i < 75; i++) {
             RTPChunk<?> chunk = mock(RTPChunk.class);
             when(chunk.isLoaded()).thenReturn(false);
-            RTP.getInstance().chunksToUnload.add(chunk);
+            MiscTasks.chunksToUnload().add(chunk);
         }
 
-        assertEquals(75, RTP.getInstance().chunksToUnload.size());
+        assertEquals(75, MiscTasks.chunksToUnload().size());
         processor.run();
-        assertEquals(25, RTP.getInstance().chunksToUnload.size());
+        assertEquals(25, MiscTasks.chunksToUnload().size());
     }
 
     @Test
@@ -76,7 +77,7 @@ class ChunkUnloadProcessorTest {
         RTPChunk<?> throwingChunk = mock(RTPChunk.class);
         when(throwingChunk.isLoaded()).thenThrow(new RuntimeException("forced test failure"));
 
-        RTP.getInstance().chunksToUnload.add(throwingChunk);
+        MiscTasks.chunksToUnload().add(throwingChunk);
         assertDoesNotThrow(processor::run);
     }
 }

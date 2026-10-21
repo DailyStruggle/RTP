@@ -4,9 +4,10 @@ import io.github.dailystruggle.mapsapi.model.ChartModel;
 import io.github.dailystruggle.mapsapi.model.Heatmap2D;
 import io.github.dailystruggle.mapsapi.render.HeatmapRenderer;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
@@ -57,8 +58,8 @@ class BadPointsHeatmapResolverTest {
         false, false,
         10L, 1000L, 0L, 5, 0.0, 1L, "", false);
     region = new Region("default", settings);
-    RTP.selectionAPI = new SelectionAPI();
-    RTP.selectionAPI.permRegionLookup.put("default", region);
+    ActiveSelection.set(new SelectionAPI());
+    ActiveSelection.get().permRegionLookup.put("default", region);
     resolver = new BadPointsHeatmapResolver();
   }
 
@@ -66,9 +67,9 @@ class BadPointsHeatmapResolverTest {
   void tearDown() {
     // Clear leaked region registrations so subsequent tests in the same JVM
     // do not walk our test region during their own reload / shutdown paths.
-    if (RTP.selectionAPI != null) RTP.selectionAPI.permRegionLookup.clear();
-    RTP.serverAccessor = null;
-    RTP.scheduler = null;
+    if (ActiveSelection.get() != null) ActiveSelection.get().permRegionLookup.clear();
+    RTPRuntime.setServerAccessor(null);
+    RTPRuntime.setScheduler(null);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
   }
 
@@ -123,7 +124,7 @@ class BadPointsHeatmapResolverTest {
   @Test
   @DisplayName("Failure: unknown region name -> UnresolvableChartSpecException")
   void unknownRegion_throws() {
-    RTP.selectionAPI.permRegionLookup.clear();
+    ActiveSelection.get().permRegionLookup.clear();
     ChartSpec spec = ChartSpec.of(ChartSpec.Kind.BAD_POINTS_HEATMAP, "no_such_region");
     assertThrows(ChartSpecResolver.UnresolvableChartSpecException.class,
         () -> resolver.resolve(spec));

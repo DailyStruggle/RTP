@@ -4,7 +4,9 @@ import io.github.dailystruggle.rtp.api.RtpTarget;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPCommandSender;
+import io.github.dailystruggle.rtp.common.network.NetworkHooks;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -95,7 +97,7 @@ public class BackCmdTest {
         TeleportData td = new TeleportData();
         td.time = System.currentTimeMillis();
         td.completed = true;
-        RTP.getInstance().latestTeleportData.put(playerId, td);
+        TeleportSessions.current().latestTeleportData.put(playerId, td);
         assertEquals(td.time, RTP.getEffectiveLastTeleportTime(playerId));
 
         io.github.dailystruggle.rtp.api.RtpTargetStatus status =
@@ -121,25 +123,25 @@ public class BackCmdTest {
         assertFalse(res1.isSuccess());
 
         // With cross-server hook: returns queued
-        RTP.networkCommandHook = (pId, args) ->
+        NetworkHooks.setCommandHook((pId, args) ->
                 io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.crossServer(
-                        UUID.randomUUID(), "default", "remote-node");
+                        UUID.randomUUID(), "default", "remote-node"));
         io.github.dailystruggle.rtp.api.RTPResult res2 = io.github.dailystruggle.rtp.api.RTPAPI.teleport(playerId, remoteTarget).join();
         assertTrue(res2.isQueued());
 
         // With reject hook: returns failure
-        RTP.networkCommandHook = (pId, args) ->
-                io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.reject("server_full", "Server full");
+        NetworkHooks.setCommandHook((pId, args) ->
+                io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.reject("server_full", "Server full"));
         io.github.dailystruggle.rtp.api.RTPResult res3 = io.github.dailystruggle.rtp.api.RTPAPI.teleport(playerId, remoteTarget).join();
         assertEquals(io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET, res3.reason());
 
         // With local fallback: returns failure on unexpected routing
-        RTP.networkCommandHook = (pId, args) ->
-                io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.local();
+        NetworkHooks.setCommandHook((pId, args) ->
+                io.github.dailystruggle.rtp.api.network.NetworkCommandHook.RoutingResult.local());
         io.github.dailystruggle.rtp.api.RTPResult res4 = io.github.dailystruggle.rtp.api.RTPAPI.teleport(playerId, remoteTarget).join();
         assertEquals(io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET, res4.reason());
 
-        RTP.networkCommandHook = io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY;
+        NetworkHooks.setCommandHook(io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY);
     }
 
     @Test
@@ -174,7 +176,7 @@ public class BackCmdTest {
         TeleportData td = new TeleportData();
         td.originalCoords = new RTPCoords("world", 50, 70, 50);
         td.completed = true;
-        RTP.getInstance().latestTeleportData.put(pId, td);
+        TeleportSessions.current().latestTeleportData.put(pId, td);
 
         assertTrue(cmd.onCommand(pId, java.util.Map.of(), null));
         // Verify coordinates updated to originalCoords

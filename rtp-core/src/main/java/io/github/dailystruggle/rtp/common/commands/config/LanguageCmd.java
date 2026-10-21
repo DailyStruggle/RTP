@@ -4,10 +4,11 @@ import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmd;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
@@ -77,13 +78,13 @@ public class LanguageCmd extends BaseRTPCmdImpl {
       return false;
     }
 
-    String updateMsg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.updating, ""));
+    String updateMsg = String.valueOf(ActiveConfigs.get().getConfigValue(SystemMessages.updating, ""));
     updateMsg = updateMsg.replace("[filename]", LanguageBootstrap.FILE_NAME);
-    RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updateMsg);
+    RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, updateMsg);
 
     final String finalLocale = locale;
-    RTP.scheduler.runTaskAsynchronously(() -> {
-      File pluginDir = RTP.serverAccessor.getPluginDirectory();
+    RTPRuntime.scheduler().runTaskAsynchronously(() -> {
+      File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
       File file = new File(pluginDir, LanguageBootstrap.FILE_NAME);
 
       try {
@@ -94,14 +95,14 @@ public class LanguageCmd extends BaseRTPCmdImpl {
         yaml.set(LanguageBootstrap.KEY, finalLocale);
         yaml.save();
       } catch (IOException e) {
-        RTP.log(Level.WARNING, "[RTP] LanguageCmd failed to write " + LanguageBootstrap.FILE_NAME, e);
+        RTPRuntime.log(Level.WARNING, "[RTP] LanguageCmd failed to write " + LanguageBootstrap.FILE_NAME, e);
         msgInvalidCommand(callerId, "LANG");
         return;
       }
 
-      String updatedMsg = String.valueOf(RTP.configs.getConfigValue(SystemMessages.updated, ""));
+      String updatedMsg = String.valueOf(ActiveConfigs.get().getConfigValue(SystemMessages.updated, ""));
       updatedMsg = updatedMsg.replace("[filename]", LanguageBootstrap.FILE_NAME);
-      RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, updatedMsg);
+      RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, updatedMsg);
 
       BaseRTPCmd.dispatchReload(callerId);
     });

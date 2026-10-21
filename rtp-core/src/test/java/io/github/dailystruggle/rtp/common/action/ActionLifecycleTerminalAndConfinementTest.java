@@ -6,10 +6,10 @@ import io.github.dailystruggle.rtp.api.action.ConfinementBoundary;
 import io.github.dailystruggle.rtp.api.event.PlayerMoveEvent;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,13 +45,13 @@ class ActionLifecycleTerminalAndConfinementTest {
   void setUp() {
     serverAccessor = RTPTestSetup.install(tempDir);
     actionManager = new ActionManager();
-    RTP.actionManager = actionManager;
+    ActionServices.setActionManager(actionManager);
     io.github.dailystruggle.rtp.api.RTPAPI.actionService = actionManager;
   }
 
   @AfterEach
   void tearDown() {
-    RTP.actionManager = null;
+    ActionServices.setActionManager(null);
     io.github.dailystruggle.rtp.api.RTPAPI.actionService = null;
     RTPTestSetup.cleanUp();
   }
@@ -72,7 +72,7 @@ class ActionLifecycleTerminalAndConfinementTest {
         return true;
       }
     };
-    RTP.serverAccessor = customAccessor;
+    RTPRuntime.setServerAccessor(customAccessor);
     customAccessor.addPlayer(player);
 
     ActionDefinition.LifecycleStep delayedStep = new ActionDefinition.LifecycleStep(
@@ -120,7 +120,7 @@ class ActionLifecycleTerminalAndConfinementTest {
     assertFalse(session.isActive(), "Session must be disarmed after triggerExpire");
 
     // The delayed task was scheduled via MockRTPScheduler.runTaskLater. Run pending tasks:
-    for (Object task : ((io.github.dailystruggle.rtp.common.mock.MockRTPScheduler) RTP.scheduler).getScheduledTasks()) {
+    for (Object task : ((io.github.dailystruggle.rtp.common.mock.MockRTPScheduler) RTPRuntime.scheduler()).getScheduledTasks()) {
       if (task != null) {
         try {
           java.lang.reflect.Field rf = task.getClass().getDeclaredField("runnable");
@@ -159,7 +159,7 @@ class ActionLifecycleTerminalAndConfinementTest {
         return true;
       }
     };
-    RTP.serverAccessor = customAccessor;
+    RTPRuntime.setServerAccessor(customAccessor);
     customAccessor.addPlayer(player);
 
     ActionDefinition.LifecycleStep delayedStep = new ActionDefinition.LifecycleStep(
@@ -203,7 +203,7 @@ class ActionLifecycleTerminalAndConfinementTest {
     session.triggerExpire();
 
     // Run scheduled tasks
-    for (Object task : ((io.github.dailystruggle.rtp.common.mock.MockRTPScheduler) RTP.scheduler).getScheduledTasks()) {
+    for (Object task : ((io.github.dailystruggle.rtp.common.mock.MockRTPScheduler) RTPRuntime.scheduler()).getScheduledTasks()) {
       if (task != null) {
         try {
           java.lang.reflect.Field rf = task.getClass().getDeclaredField("runnable");
@@ -261,7 +261,7 @@ class ActionLifecycleTerminalAndConfinementTest {
         return true;
       }
     };
-    RTP.serverAccessor = customAccessor;
+    RTPRuntime.setServerAccessor(customAccessor);
     customAccessor.addPlayer(player);
 
     ActionSessionImpl session = new ActionSessionImpl(
@@ -329,7 +329,7 @@ class ActionLifecycleTerminalAndConfinementTest {
         return true;
       }
     };
-    RTP.serverAccessor = customAccessor;
+    RTPRuntime.setServerAccessor(customAccessor);
     customAccessor.addPlayer(player);
 
     ActionSessionImpl session = new ActionSessionImpl(
@@ -384,7 +384,7 @@ class ActionLifecycleTerminalAndConfinementTest {
         return true;
       }
     };
-    RTP.serverAccessor = customAccessor;
+    RTPRuntime.setServerAccessor(customAccessor);
     customAccessor.addPlayer(player1);
     customAccessor.addPlayer(player2);
 

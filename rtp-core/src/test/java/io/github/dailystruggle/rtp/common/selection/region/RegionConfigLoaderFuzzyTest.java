@@ -1,8 +1,10 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
@@ -31,34 +33,34 @@ class RegionConfigLoaderFuzzyTest {
     @BeforeAll
     static void setupServer() {
         MockRTPServerAccessor accessor = new MockRTPServerAccessor(new File("target/test-data-fuzzy"));
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
     }
 
     @BeforeEach
     void setUpFactories() {
-        previousShapeFactory = RTP.factoryMap.get(RTP.factoryNames.shape);
-        previousVertFactory = RTP.factoryMap.get(RTP.factoryNames.vert);
+        previousShapeFactory = FactoryRegistry.get(FactoryNames.shape);
+        previousVertFactory = FactoryRegistry.get(FactoryNames.vert);
 
         Factory<Shape<?>> shapeFactory = new Factory<>();
         shapeFactory.add("CIRCLE", new Circle());
         shapeFactory.add("SQUARE", new Square());
-        RTP.factoryMap.put(RTP.factoryNames.shape, shapeFactory);
+        FactoryRegistry.map().put(FactoryNames.shape, shapeFactory);
 
         Factory<VerticalAdjustor<?>> vertFactory = new Factory<>();
         vertFactory.add("LINEAR", new LinearAdjustor(new ArrayList<>()));
         vertFactory.add("JUMP", new JumpAdjustor(new ArrayList<>()));
-        RTP.factoryMap.put(RTP.factoryNames.vert, vertFactory);
+        FactoryRegistry.map().put(FactoryNames.vert, vertFactory);
     }
 
     @AfterEach
     @SuppressWarnings({"unchecked", "rawtypes"})
     void restoreFactories() {
         if (previousShapeFactory != null) {
-            RTP.factoryMap.put(RTP.factoryNames.shape, (Factory) previousShapeFactory);
+            FactoryRegistry.map().put(FactoryNames.shape, (Factory) previousShapeFactory);
         }
         if (previousVertFactory != null) {
-            RTP.factoryMap.put(RTP.factoryNames.vert, (Factory) previousVertFactory);
+            FactoryRegistry.map().put(FactoryNames.vert, (Factory) previousVertFactory);
         }
     }
 

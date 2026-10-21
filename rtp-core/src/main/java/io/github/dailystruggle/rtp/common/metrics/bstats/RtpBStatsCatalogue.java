@@ -9,17 +9,21 @@ import io.github.dailystruggle.bstats.api.ServerInfo;
 import io.github.dailystruggle.bstats.api.SimplePie;
 import io.github.dailystruggle.bstats.api.SingleLineChart;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap;
 import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.metrics.ChunkLoadProfile;
 import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.metrics.RTPMetricsExtension;
 import io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats;
 import io.github.dailystruggle.rtp.common.metrics.RtpSchedulerProfile;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 
 import java.util.Arrays;
@@ -37,7 +41,7 @@ import java.util.regex.Pattern;
  *
  * <p>Privacy constraints:
  * <ul>
- *   <li>Suppliers read {@code RTP.metrics.snapshot()} / core counters; platform
+ *   <li>Suppliers read {@code CoreMetrics.instance().snapshot()} / core counters; platform
  *       facts come only through {@link Host}.</li>
  *   <li>Every numeric value is bucketised; no raw scalar that could fingerprint a
  *       server is emitted.</li>
@@ -64,7 +68,7 @@ public final class RtpBStatsCatalogue {
         /** Online players, {@code -1} when unknown. */
         default int onlinePlayerCount() {
             try {
-                return (RTP.metrics != null) ? RTP.metrics.snapshot().playerCount : -1;
+                return (CoreMetrics.instance() != null) ? CoreMetrics.instance().snapshot().playerCount : -1;
             } catch (Throwable t) {
                 return -1;
             }
@@ -73,7 +77,7 @@ public final class RtpBStatsCatalogue {
         /** Host game version reduced to {@code major.minor}, or {@code unknown}. */
         default String gameVersion() {
             try {
-                return (RTP.serverAccessor != null) ? majorMinor(RTP.serverAccessor.getServerVersion()) : "unknown";
+                return (RTPRuntime.serverAccessor() != null) ? majorMinor(RTPRuntime.serverAccessor().getServerVersion()) : "unknown";
             } catch (Throwable t) {
                 return "unknown";
             }
@@ -82,7 +86,7 @@ public final class RtpBStatsCatalogue {
         /** RTP plugin version, or {@code unknown}. */
         default String pluginVersion() {
             try {
-                String v = (RTP.serverAccessor != null) ? RTP.serverAccessor.getPluginVersion() : null;
+                String v = (RTPRuntime.serverAccessor() != null) ? RTPRuntime.serverAccessor().getPluginVersion() : null;
                 return (v == null || v.isBlank()) ? "unknown" : v;
             } catch (Throwable t) {
                 return "unknown";
@@ -104,7 +108,7 @@ public final class RtpBStatsCatalogue {
             String name = displayName(platform());
             String mc = null;
             try {
-                if (RTP.serverAccessor != null) mc = RTP.serverAccessor.getServerVersion();
+                if (RTPRuntime.serverAccessor() != null) mc = RTPRuntime.serverAccessor().getServerVersion();
             } catch (Throwable ignored) {
                 // unknown
             }
@@ -169,7 +173,7 @@ public final class RtpBStatsCatalogue {
      */
     public static void register(BStatsService service, Host host, String assemblyVariant) {
         if (service == null || host == null) {
-            RTP.log(Level.WARNING, "[RTP] bStats catalogue register called with null service/host; charts not registered");
+            RTPRuntime.log(Level.WARNING, "[RTP] bStats catalogue register called with null service/host; charts not registered");
             return;
         }
         final String variant = (assemblyVariant == null || assemblyVariant.isBlank()) ? "unknown" : assemblyVariant;
@@ -269,7 +273,7 @@ public final class RtpBStatsCatalogue {
     // --- Snapshot access ---
 
     private static MetricsSnapshot snapshot() {
-        return RTP.metrics.snapshot();
+        return CoreMetrics.instance().snapshot();
     }
 
     /** RTP counters on the snapshot, or a zeroed extension under the NOOP binding. Never null. */
@@ -300,7 +304,7 @@ public final class RtpBStatsCatalogue {
 
     public static String detectDatabaseBackend() {
         try {
-            Object accessor = (RTP.getInstance() == null) ? null : RTP.getInstance().databaseAccessor;
+            Object accessor = (TeleportSessions.current() == null) ? null : ActiveDatabase.accessor();
             if (accessor == null) return "none";
             String lc = accessor.getClass().getSimpleName().toLowerCase(Locale.ROOT);
             if (lc.contains("yaml")) return "yaml";
@@ -317,8 +321,8 @@ public final class RtpBStatsCatalogue {
     /** Active locale normalised to {@link #KNOWN_LOCALES}, {@code "other"} or {@code "unknown"}. */
     public static String detectLanguage() {
         try {
-            if (RTP.serverAccessor == null) return "unknown";
-            String locale = LanguageBootstrap.resolve(RTP.serverAccessor.getPluginDirectory());
+            if (RTPRuntime.serverAccessor() == null) return "unknown";
+            String locale = LanguageBootstrap.resolve(RTPRuntime.serverAccessor().getPluginDirectory());
             if (locale == null || locale.isBlank()) return "unknown";
             String lc = locale.toLowerCase(Locale.ROOT);
             return KNOWN_LOCALES.contains(lc) ? lc : "other";
@@ -331,8 +335,8 @@ public final class RtpBStatsCatalogue {
     public static Map<String, Integer> detectRegionShapesInUse() {
         Map<String, Integer> tally = new HashMap<>();
         try {
-            if (RTP.selectionAPI == null || RTP.selectionAPI.permRegionLookup == null) return tally;
-            for (var region : RTP.selectionAPI.permRegionLookup.values()) {
+            if (ActiveSelection.get() == null || ActiveSelection.get().permRegionLookup == null) return tally;
+            for (var region : ActiveSelection.get().permRegionLookup.values()) {
                 if (region == null) continue;
                 String label = "unknown";
                 try {
@@ -359,13 +363,13 @@ public final class RtpBStatsCatalogue {
     @SuppressWarnings("unchecked")
     public static String detectSafetyFeaturesEnabled() {
         try {
-            if (RTP.getInstance() == null || RTP.configs == null) return "unknown";
-            ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+            if (TeleportSessions.current() == null || ActiveConfigs.get() == null) return "unknown";
+            ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
             if (safety == null) return "unknown";
             TreeSet<String> on = new TreeSet<>();
             Object anvil = safety.getConfigValue(SafetyKeys.anvilPrefilterEnabled, Boolean.TRUE);
             if (!Boolean.parseBoolean(String.valueOf(anvil))) on.add("anvil_prefilter_off");
-            Object biome = RTP.configs.getConfigValue(BiomesKeys.biomeWhitelist, Boolean.FALSE);
+            Object biome = ActiveConfigs.get().getConfigValue(BiomesKeys.biomeWhitelist, Boolean.FALSE);
             if (Boolean.parseBoolean(String.valueOf(biome))) on.add("biome_whitelist");
             return on.isEmpty() ? "default" : String.join("+", on);
         } catch (Throwable t) {
@@ -375,8 +379,8 @@ public final class RtpBStatsCatalogue {
 
     static int safeRegionCount() {
         try {
-            if (RTP.selectionAPI == null || RTP.selectionAPI.permRegionLookup == null) return 0;
-            return RTP.selectionAPI.permRegionLookup.size();
+            if (ActiveSelection.get() == null || ActiveSelection.get().permRegionLookup == null) return 0;
+            return ActiveSelection.get().permRegionLookup.size();
         } catch (Throwable t) {
             return 0;
         }
@@ -386,8 +390,8 @@ public final class RtpBStatsCatalogue {
     static double[] computeCacheFillPercentages() {
         long keptUsed = 0L, keptCap = 0L, unkeptUsed = 0L, unkeptCap = 0L;
         try {
-            if (RTP.selectionAPI != null && RTP.selectionAPI.permRegionLookup != null) {
-                for (var region : RTP.selectionAPI.permRegionLookup.values()) {
+            if (ActiveSelection.get() != null && ActiveSelection.get().permRegionLookup != null) {
+                for (var region : ActiveSelection.get().permRegionLookup.values()) {
                     if (region == null || region.queueManager == null) continue;
                     if (region.queueManager.keptLocations != null) {
                         keptUsed += region.queueManager.keptLocations.size();
@@ -443,8 +447,8 @@ public final class RtpBStatsCatalogue {
     /** Point-in-time p99 of host MSPT from the core snapshot ring; NaN when unavailable. */
     public static double msptP99Ms() {
         try {
-            if (RTP.metrics instanceof CoreMetrics) {
-                return percentile(((CoreMetrics) RTP.metrics).snapshotRing().msptSnapshot(), 0.99);
+            if (CoreMetrics.instance() instanceof CoreMetrics) {
+                return percentile(((CoreMetrics) CoreMetrics.instance()).snapshotRing().msptSnapshot(), 0.99);
             }
         } catch (Throwable ignored) {
             // fall through to NaN
@@ -478,14 +482,14 @@ public final class RtpBStatsCatalogue {
     // --- RTP cost windows ---
 
     /**
-     * Starts the 1-minute RTP-cost sampler on {@link RTP#scheduler}. Idempotent; no-op
+     * Starts the 1-minute RTP-cost sampler on {@link RTPRuntime#scheduler()}. Idempotent; no-op
      * without a scheduler; the body never propagates onto the scheduler thread.
      */
     static void startRtpCostSampler() {
         synchronized (RtpBStatsCatalogue.class) {
             try {
-                if (rtpCostSamplerTask != null || RTP.scheduler == null) return;
-                rtpCostSamplerTask = RTP.scheduler.runTaskTimerAsynchronously(() -> {
+                if (rtpCostSamplerTask != null || RTPRuntime.scheduler() == null) return;
+                rtpCostSamplerTask = RTPRuntime.scheduler().runTaskTimerAsynchronously(() -> {
                     try {
                         long rtp = RtpOutcomeStats.GLOBAL.successCount();
                         RTP_SYNC_COST_WINDOW.sample(RtpSchedulerProfile.GLOBAL.syncNanos(), rtp);
@@ -497,7 +501,7 @@ public final class RtpBStatsCatalogue {
                     }
                 }, 1200L, 1200L);
             } catch (Throwable t) {
-                RTP.log(Level.WARNING, "[RTP] failed to start rtp-cost sampler", t);
+                RTPRuntime.log(Level.WARNING, "[RTP] failed to start rtp-cost sampler", t);
             }
         }
     }
@@ -507,9 +511,9 @@ public final class RtpBStatsCatalogue {
      */
     static void stopRtpCostSampler() {
         synchronized (RtpBStatsCatalogue.class) {
-            if (rtpCostSamplerTask != null && RTP.scheduler != null) {
+            if (rtpCostSamplerTask != null && RTPRuntime.scheduler() != null) {
                 try {
-                    RTP.scheduler.cancelTask(rtpCostSamplerTask);
+                    RTPRuntime.scheduler().cancelTask(rtpCostSamplerTask);
                 } catch (Throwable ignored) {
                     // best-effort: scheduler may already be shut down
                 }

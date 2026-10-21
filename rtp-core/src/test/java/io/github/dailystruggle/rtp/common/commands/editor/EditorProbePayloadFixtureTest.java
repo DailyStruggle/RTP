@@ -2,9 +2,11 @@ package io.github.dailystruggle.rtp.common.commands.editor;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.CircleOptimizedDualLayer;
@@ -45,20 +47,20 @@ class EditorProbePayloadFixtureTest {
 
     @BeforeEach
     void accessor() {
-        RTP.serverAccessor = new MockRTPServerAccessor(tempDir.toFile());
+        RTPRuntime.setServerAccessor(new MockRTPServerAccessor(tempDir.toFile()));
     }
 
     @AfterEach
     void clearAccessor() {
-        RTP.serverAccessor = null;
+        RTPRuntime.setServerAccessor(null);
     }
 
     @SuppressWarnings("unchecked")
     private static Factory<Shape<?>> shapes() {
-        Factory<Shape<?>> shapes = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+        Factory<Shape<?>> shapes = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
         if (shapes == null) {
             shapes = new Factory<>();
-            RTP.factoryMap.put(RTP.factoryNames.shape, shapes);
+            FactoryRegistry.map().put(FactoryNames.shape, shapes);
         }
         return shapes;
     }

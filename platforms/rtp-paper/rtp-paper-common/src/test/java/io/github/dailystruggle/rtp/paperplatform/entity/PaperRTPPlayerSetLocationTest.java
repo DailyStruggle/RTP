@@ -13,10 +13,11 @@ import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.bukkitplatform.entity.TeleportPathSelector;
 import io.github.dailystruggle.rtp.bukkitplatform.world.BukkitRTPWorld;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.bukkit.Location;
@@ -59,14 +60,14 @@ class PaperRTPPlayerSetLocationTest {
     when(player.isOnline()).thenReturn(true);
 
     scheduler = mock(RTPScheduler.class);
-    previousScheduler = RTP.scheduler;
-    RTP.scheduler = scheduler;
+    previousScheduler = RTPRuntime.scheduler();
+    RTPRuntime.setScheduler(scheduler);
   }
 
   @AfterEach
   void tearDown() {
     TeleportPathSelector.resetForTesting();
-    RTP.scheduler = previousScheduler;
+    RTPRuntime.setScheduler(previousScheduler);
   }
 
   /** Main thread, not Folia, destination chunk (6, -4) resident. */
@@ -133,21 +134,21 @@ class PaperRTPPlayerSetLocationTest {
   @DisplayName("ADR-005: teleportPath ASYNC forces teleportAsync even when the inline path is safe")
   void testSetLocation_asyncModeForcesTeleportAsync() {
     directPreconditions(true, true);
-    Configs previousConfigs = RTP.configs;
+    Configs previousConfigs = ActiveConfigs.get();
     try {
       Configs configs = mock(Configs.class);
       ConfigParser perf = mock(ConfigParser.class);
       when(configs.getParser(PerformanceKeys.class)).thenReturn(perf);
       when(perf.getConfigValue(org.mockito.ArgumentMatchers.eq(PerformanceKeys.teleportPath), any()))
           .thenReturn("ASYNC");
-      RTP.configs = configs;
+      ActiveConfigs.set(configs);
 
       new PaperRTPPlayer(player).setLocation(destination);
 
       verify(player).teleportAsync(any(Location.class));
       verify(player, never()).teleport(any(Location.class));
     } finally {
-      RTP.configs = previousConfigs;
+      ActiveConfigs.set(previousConfigs);
     }
   }
 

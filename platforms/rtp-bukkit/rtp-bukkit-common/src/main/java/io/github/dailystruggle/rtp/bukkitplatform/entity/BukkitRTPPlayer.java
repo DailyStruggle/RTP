@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.bukkitplatform.entity;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Optional;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.BukkitServers;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
@@ -276,7 +277,7 @@ public class BukkitRTPPlayer implements RTPPlayer {
 
     // Default path: legacy Spigot mandates that entity teleportation occurs on the main thread.
     Runnable tpTask = () -> future.complete(player.teleport(location));
-    RTP.scheduler.runTask(tpTask);
+    RTPRuntime.scheduler().runTask(tpTask);
     return future;
   }
 
@@ -308,7 +309,7 @@ public class BukkitRTPPlayer implements RTPPlayer {
     if (player == null) return null;
     Location location = player.getLocation();
     return new RTPLocation(
-        RTP.serverAccessor.getRTPWorld(player.getWorld().getUID()),
+        RTPRuntime.serverAccessor().getRTPWorld(player.getWorld().getUID()),
         location.getBlockX(),
         location.getBlockY(),
         location.getBlockZ());

@@ -3,7 +3,12 @@ package io.github.dailystruggle.rtp.fabric.network;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.network.BackendStateSampler;
+import io.github.dailystruggle.rtp.common.network.NetworkHooks;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat;
 import io.github.dailystruggle.rtp.proxy.common.spi.BackendHeartbeat.PluginState;
@@ -20,7 +25,7 @@ import java.util.Set;
  * rtp-fabric-ADR-013 backend parity). Structurally mirrors
  * {@code BukkitBackendStateSampler}: it pulls TPS / MSPT / player count from
  * the active {@link io.github.dailystruggle.metrics.api.MetricsBinding} via
- * {@link RTP#metrics} and reads available regions from the active {@link RTP}
+ * {@link CoreMetrics#instance()} and reads available regions from the active {@link RTP}
  * instance.
  *
  * <p>The only platform-specific difference from the Bukkit sampler is loaded
@@ -29,7 +34,7 @@ import java.util.Set;
  * so the class itself carries no {@code net.minecraft.*} import and can live in
  * {@code rtp-fabric-common} alongside the other carrier-agnostic Fabric glue.</p>
  *
- * <p>Installed onto {@link RTP#backendStateSamplerFactory} by the Fabric mod
+ * <p>Installed onto {@link NetworkHooks#backendStateSamplerFactory()} by the Fabric mod
  * entrypoint ({@code RTPFabricMod}); {@code NetworkModeBootstrap.boot(...)}
  * invokes the factory with the {@code routing.lobbyMode} flag.</p>
  */
@@ -73,7 +78,7 @@ public final class FabricBackendStateSampler implements BackendStateSampler {
         long now = System.currentTimeMillis();
 
         // Metrics: best-effort. Before MetricsBindingDispatcher installs a real
-        // binding, RTP.metrics may report UNSAMPLED; coerce to 0 / -1 so the
+        // binding, CoreMetrics.instance() may report UNSAMPLED; coerce to 0 / -1 so the
         // schema's NOT NULL columns are still satisfied.
         double mspt;
         int playerCount;
@@ -81,7 +86,7 @@ public final class FabricBackendStateSampler implements BackendStateSampler {
         long heapUsed;
         long heapMax;
         try {
-            MetricsSnapshot s = RTP.metrics.snapshot();
+            MetricsSnapshot s = CoreMetrics.instance().snapshot();
             mspt = s == null || Double.isNaN(s.mspt) ? 0.0 : s.mspt;
             playerCount = s == null ? 0 : s.playerCount;
             softCap = s == null ? 0 : s.softCap;
@@ -100,8 +105,8 @@ public final class FabricBackendStateSampler implements BackendStateSampler {
         // sampler's Bukkit.getWorlds() loop).
         List<String> worlds = new ArrayList<>();
         try {
-            if (RTP.serverAccessor != null) {
-                for (RTPWorld<?> w : RTP.serverAccessor.getRTPWorlds()) {
+            if (RTPRuntime.serverAccessor() != null) {
+                for (RTPWorld<?> w : RTPRuntime.serverAccessor().getRTPWorlds()) {
                     if (w != null && w.name() != null) {
                         worlds.add(w.name());
                     }
@@ -116,7 +121,7 @@ public final class FabricBackendStateSampler implements BackendStateSampler {
         try {
             RTP r = RTP.getInstance();
             if (r != null) {
-                queueDepth = r.processingPlayers.size();
+                queueDepth = TeleportSessions.current().processingPlayers.size();
             }
         } catch (Throwable ignored) {
             // Defensive.
@@ -143,7 +148,7 @@ public final class FabricBackendStateSampler implements BackendStateSampler {
             try {
                 RTP r = RTP.getInstance();
                 if (r != null) {
-                    for (Region region : RTP.selectionAPI.permRegionLookup.values()) {
+                    for (Region region : ActiveSelection.get().permRegionLookup.values()) {
                         if (region == null || region.name == null) continue;
                         regions.add(region.name);
                         regionSet.add(region.name);

@@ -5,10 +5,14 @@ import io.github.dailystruggle.rtp.api.RtpTarget;
 import io.github.dailystruggle.rtp.api.RtpTargetStatus;
 import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.pvp.PvPGate;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
@@ -18,6 +22,7 @@ import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,10 +65,10 @@ class RTPApiSurfaceTest {
         // resolve to a concrete world rather than null.
         accessor.addWorld(new MockRTPWorld("default"));
         RTP rtp = RTP.getInstance();
-        rtp.latestTeleportData.clear();
-        rtp.priorTeleportData.clear();
-        rtp.queuedPlayers.clear();
-        rtp.processingPlayers.clear();
+        TeleportSessions.current().latestTeleportData.clear();
+        TeleportSessions.current().priorTeleportData.clear();
+        TeleportSessions.current().queuedPlayers.clear();
+        TeleportSessions.current().processingPlayers.clear();
     }
 
     @AfterEach
@@ -229,7 +234,7 @@ class RTPApiSurfaceTest {
         recent.sender = player;
         recent.time = System.currentTimeMillis();
         recent.completed = false;
-        RTP.getInstance().latestTeleportData.put(id, recent);
+        TeleportSessions.current().latestTeleportData.put(id, recent);
 
         RtpTargetStatus status = RTPAPI.getTargetStatus(id, RtpTarget.defaultRegion());
         assertNotNull(status);
@@ -248,20 +253,20 @@ class RTPApiSurfaceTest {
         // With a price configured and a broke player (no rtp.free), the status
         // read must report NO_FUNDS rather than READY.
         ConfigParser<EconomyKeys> eco = (ConfigParser<EconomyKeys>)
-                RTP.configs.getParser(EconomyKeys.class);
+                ActiveConfigs.get().getParser(EconomyKeys.class);
         EnumMap<EconomyKeys, Object> saved = eco.getData();
-        RTPEconomy savedEconomy = RTP.economy;
+        RTPEconomy savedEconomy = RTPRuntime.economy();
         try {
             EnumMap<EconomyKeys, Object> mutated = new EnumMap<>(saved);
             mutated.put(EconomyKeys.price, 100.0);
             mutated.put(EconomyKeys.balanceFloor, 0.0);
             eco.setData(mutated);
 
-            RTP.economy = new RTPEconomy() {
+            RTPRuntime.setEconomy(new RTPEconomy() {
                 @Override public void give(UUID playerId, double money) { }
                 @Override public boolean take(UUID playerId, double money) { return true; }
                 @Override public double bal(UUID playerId) { return 0.0; }
-            };
+            });
 
             UUID id = UUID.randomUUID();
             MockRTPPlayer broke = new MockRTPPlayer(
@@ -282,7 +287,7 @@ class RTPApiSurfaceTest {
             assertNotEquals(RtpTargetStatus.Availability.READY, status.availability());
         } finally {
             eco.setData(saved);
-            RTP.economy = savedEconomy;
+            RTPRuntime.setEconomy(savedEconomy);
         }
     }
 
@@ -291,7 +296,7 @@ class RTPApiSurfaceTest {
     @SuppressWarnings("unchecked")
     void getTargetStatus_inCombat_reportsInCombatWithRemaining() {
         ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>)
-                RTP.configs.getParser(SafetyKeys.class);
+                ActiveConfigs.get().getParser(SafetyKeys.class);
         EnumMap<SafetyKeys, Object> saved = safety.getData();
         MockRTPWorld defaultWorld = (MockRTPWorld) accessor.getRTPWorld("default");
         if (defaultWorld == null) {
@@ -310,7 +315,7 @@ class RTPApiSurfaceTest {
         org.mockito.Mockito.doReturn(regSettings).when(mockRegion).getSettings();
         org.mockito.Mockito.doReturn(shape).when(mockRegion).getShape();
         org.mockito.Mockito.doReturn(vert).when(mockRegion).getVert();
-        RTP.selectionAPI.permRegionLookup.put("default", mockRegion);
+        ActiveSelection.get().permRegionLookup.put("default", mockRegion);
         try {
             EnumMap<SafetyKeys, Object> mutated = new EnumMap<>(saved);
             mutated.put(SafetyKeys.pvpCheckEnabled, true);
@@ -333,7 +338,7 @@ class RTPApiSurfaceTest {
         } finally {
             safety.setData(saved);
             PvPGate.nativeTracker().clearAll();
-            RTP.selectionAPI.permRegionLookup.remove("default");
+            ActiveSelection.get().permRegionLookup.remove("default");
         }
     }
 
@@ -357,7 +362,7 @@ class RTPApiSurfaceTest {
         org.mockito.Mockito.doReturn(regSettings).when(mockRegion).getSettings();
         org.mockito.Mockito.doReturn(shape).when(mockRegion).getShape();
         org.mockito.Mockito.doReturn(vert).when(mockRegion).getVert();
-        RTP.selectionAPI.permRegionLookup.put("default", mockRegion);
+        ActiveSelection.get().permRegionLookup.put("default", mockRegion);
         try {
             UUID id = UUID.randomUUID();
             MockRTPPlayer player = new MockRTPPlayer(
@@ -374,7 +379,7 @@ class RTPApiSurfaceTest {
             assertNotNull(status);
             assertEquals(3500L, status.delayMillis());
         } finally {
-            RTP.selectionAPI.permRegionLookup.remove("default");
+            ActiveSelection.get().permRegionLookup.remove("default");
         }
     }
 
@@ -455,10 +460,10 @@ class RTPApiSurfaceTest {
     @Test
     @Timeout(10)
     void handleMigration_nonMigrationTransition_isNoOp() {
-        long before = RTP.getInstance().miscAsyncTasks.size();
+        long before = MiscTasks.async().size();
         // yaml -> yaml is not an engine change; nothing is queued.
         RTP.handleMigration("yaml", "yaml");
-        assertEquals(before, RTP.getInstance().miscAsyncTasks.size());
+        assertEquals(before, MiscTasks.async().size());
     }
 
     @Test
@@ -489,13 +494,13 @@ class RTPApiSurfaceTest {
         Files.write(new File(databaseDir, "teleportData.yml").toPath(),
                 aggregate.getBytes(StandardCharsets.UTF_8));
 
-        long before = RTP.getInstance().miscAsyncTasks.size();
+        long before = MiscTasks.async().size();
         RTP.handleMigration("yaml", "sqlite");
-        assertTrue(RTP.getInstance().miscAsyncTasks.size() > before,
+        assertTrue(MiscTasks.async().size() > before,
                 "a background migration task must be queued");
 
         // Drain the queued migration runnable; it must complete without throwing.
         assertDoesNotThrow(() ->
-                RTP.getInstance().miscAsyncTasks.execute(Long.MAX_VALUE));
+                MiscTasks.async().execute(Long.MAX_VALUE));
     }
 }

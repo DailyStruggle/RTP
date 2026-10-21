@@ -5,8 +5,8 @@ import static org.junit.jupiter.api.Assertions.*;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.action.ActionContext;
 import io.github.dailystruggle.rtp.api.action.ActionDefinition;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.action.ActionManager;
+import io.github.dailystruggle.rtp.common.action.ActionServices;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -29,7 +29,7 @@ class ActionSubcommandAndCancelCmdTest {
   void setUp() {
     accessor = RTPTestSetup.install(tempDir.toFile());
     actionManager = new ActionManager();
-    RTP.actionManager = actionManager;
+    ActionServices.setActionManager(actionManager);
     RTPAPI.actionService = actionManager;
   }
 

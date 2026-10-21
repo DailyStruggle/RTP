@@ -4,7 +4,7 @@ import io.github.dailystruggle.rtp.api.menu.MenuAction;
 import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
@@ -51,7 +51,7 @@ final class MultiConfigMenuBuilderTest {
         RTPTestSetup.install(tempDir.toFile());
         @SuppressWarnings("unchecked")
         MultiConfigParser<RegionKeys> r = (MultiConfigParser<RegionKeys>)
-                RTP.configs.multiConfigParserMap.get(RegionKeys.class);
+                ActiveConfigs.get().multiConfigParserMap.get(RegionKeys.class);
         assertNotNull(r, "regions MultiConfigParser must be provisioned by RTPTestSetup");
         this.regions = r;
         // The MultiConfigParser populates its entry set from on-disk files,

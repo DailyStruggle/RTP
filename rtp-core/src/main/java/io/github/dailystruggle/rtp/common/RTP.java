@@ -6,23 +6,29 @@ import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
-import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
+import io.github.dailystruggle.rtp.common.action.ActionServices;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.EconomyKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
-import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.database.options.AbstractSQLDatabaseAccessor;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.network.NetworkHooks;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
-import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.*;
@@ -35,13 +41,17 @@ import io.github.dailystruggle.rtp.common.tasks.scan.ScanTask;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.RTPTaskPipe;
 import io.github.dailystruggle.rtp.common.tasks.TimeBoundTaskPipe;
+import io.github.dailystruggle.rtp.common.tasks.scan.ScanTasks;
+import io.github.dailystruggle.rtp.common.tasks.teleport.DeathTeleports;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import io.github.dailystruggle.rtp.common.tools.ChunkyChecker;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 
+import io.github.dailystruggle.rtp.common.trigger.PhysicalTriggerManager;
 import java.io.File;
 import java.util.*;
 import java.util.concurrent.*;
@@ -57,20 +67,12 @@ public class RTP {
   public static final ConcurrentLinkedQueue<CompletableFuture<?>> futures =
       new ConcurrentLinkedQueue<>();
 
-  public static SelectionAPI selectionAPI = new SelectionAPI();
-
-  public static EnumMap<factoryNames, Factory<?>> factoryMap = new EnumMap<>(factoryNames.class);
-
-  public final Set<UUID> queuedPlayers = ConcurrentHashMap.newKeySet();
-
   /**
    * minimum number of teleportations to executeAsyncTasks per gametick, to prevent bottlenecking
    * during lag spikes
    */
   public static int minRTPExecutions = 1;
 
-  /** only one of each of these objects */
-  public static Configs configs;
 
   /**
    * Platform-agnostic registry of {@link io.github.dailystruggle.rtp.api.addon.RTPAddon}s.
@@ -92,13 +94,9 @@ public class RTP {
 
   public static final UUID serverId = RTPAPI.serverId;
 
-  public static RTPServerAccessor serverAccessor;
-  public static RTPScheduler scheduler;
-  public static RTPEconomy economy = null;
-
   /**
    * Process-wide entry point for multi-participant subspace group teleports.
-   * Eagerly constructed and stateless: it reads {@link #selectionAPI} at call time and fails
+   * Eagerly constructed and stateless: it reads {@link ActiveSelection#get()} at call time and fails
    * closed (structured {@link io.github.dailystruggle.rtp.api.group.GroupPlacementResult.Reason})
    * when the region/world is not resolvable, so it is safe to reference before core is fully wired.
    */
@@ -107,74 +105,11 @@ public class RTP {
           new io.github.dailystruggle.rtp.common.selection.region.GroupPlacementDispatcher();
 
   /**
-   * Process-wide entry point for declarative scripted actions (ADR-093).
-   * Initialized by LeafRTPActionAddon when loaded; null when omitted.
-   */
-  public static volatile io.github.dailystruggle.rtp.common.action.ActionManager
-      actionManager = null;
-
-  /**
-   * Background task pre-warming candidate placements for registered actions (ADR-097).
-   * Initialized by LeafRTPActionAddon when loaded; null when omitted.
-   */
-  public static volatile io.github.dailystruggle.rtp.common.action.ActionCacheWarmTask
-      actionCacheWarmTask = null;
-
-  /**
-   * Process-wide manager for physical world triggers (portals, pressure plates, step-in zones) (ADR-093).
-   */
-  public static final io.github.dailystruggle.rtp.common.trigger.PhysicalTriggerManager
-      triggerManager = new io.github.dailystruggle.rtp.common.trigger.PhysicalTriggerManager();
-
-  /**
-   * Pre-dispatch hook to decide whether {@code /rtp} is served locally,
-   * enrolled on cross-server wait queue, or rejected.
-   * Defaults to {@link io.github.dailystruggle.rtp.api.network.NetworkCommandHook#LOCAL_ONLY}.
-   */
-  public static volatile io.github.dailystruggle.rtp.api.network.NetworkCommandHook
-      networkCommandHook =
-          io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY;
-
-  /**
-   * Platform-supplied factory for the backend heartbeat sampler.
-   * Constructs a sampler reading host TPS/MSPT/player count/worlds.
-   * Boolean argument is the lobbyMode flag. Null indicates no sampler installed.
-   */
-  public static volatile java.util.function.Function<Boolean,
-      io.github.dailystruggle.rtp.common.network.BackendStateSampler>
-      backendStateSamplerFactory;
-
-  /**
-   * Platform-supplied factory for plugin-message network bridge.
-   * Wires proxy messaging channels where supported.
-   */
-  public static volatile java.util.function.Supplier<
-      io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge>
-      networkBridgeFactory;
-
-  /**
-   * When true, this backend operates as a pure cross-server lobby,
-   * skipping local region pre-fill and steady-state generation pulses.
-   */
-  public static volatile boolean lobbyMode = false;
-
-  /**
    * Platform-supplied carrier for {@code /rtp test} runtime umbrella SPI.
    * Resolved via {@link io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaContext#require()}.
    */
   public static volatile io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaContext
       testUmbrellaContext;
-
-  /**
-   * Process-wide runtime metrics aggregator. Defaults to a {@link CoreMetrics} with a
-   * {@link io.github.dailystruggle.metrics.api.MetricsBinding#NOOP NOOP} binding so
-   * callers never have to null-check; platform adapters install a real binding via
-   * {@link CoreMetrics#setBinding} during startup.
-   */
-  public static final CoreMetrics metrics = new CoreMetrics();
-
-  public static final ThreadLocal<RTPWorld> worldContext = new ThreadLocal<>();
-  public static final ThreadLocal<Region> regionContext = new ThreadLocal<>();
 
   /**
    * Optional per-thread message interceptor for book-mode mirroring in {@code /rtp info}.
@@ -194,15 +129,15 @@ public class RTP {
   public static Set<String> getAirBlocks() {
     Set<String> cached = AIR_BLOCKS_CACHE.get();
     try {
-      if (configs == null) return cached;
-      Object value = configs.getConfigValue(
+      if (ActiveConfigs.get() == null) return cached;
+      Object value = ActiveConfigs.get().getConfigValue(
           io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys.airBlocks,
           new ArrayList<>());
       if (!(value instanceof Collection<?> coll)) return cached;
       Map<String, Set<String>> tagSnapshot = Collections.emptyMap();
-      if (serverAccessor != null) {
+      if (RTPRuntime.serverAccessor() != null) {
         try {
-          Map<String, Set<String>> s = serverAccessor.blockTagSnapshot();
+          Map<String, Set<String>> s = RTPRuntime.serverAccessor().blockTagSnapshot();
           if (s != null) tagSnapshot = s;
         } catch (Throwable ignoredTag) {
           // best-effort
@@ -264,15 +199,12 @@ public class RTP {
     reloading.set(true);
     AIR_BLOCKS_CACHE.set(Collections.emptySet());
     try {
-      if (configs == null) return false;
-      return configs.reload();
+      if (ActiveConfigs.get() == null) return false;
+      return ActiveConfigs.get().reload();
     } finally {
       reloading.set(false);
     }
   }
-
-  public static final Set<UUID> deathEffectInFlight = ConcurrentHashMap.newKeySet();
-  public static final Map<UUID, io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask> pendingDeathTeleports = new ConcurrentHashMap<>();
 
   /** only one instance will exist at a time, reset on plugin load */
   private static RTP instance;
@@ -281,24 +213,29 @@ public class RTP {
   private static final List<Object> trackedTasks = new CopyOnWriteArrayList<>();
 
   static {
+    // ADR-115 seam 4: the bootstrap log buffer lives in the Tier 1 runtime holder; the gate
+    // reads config state, so the root injects it before anything else can log.
+    RTPRuntime.setLogBufferGate(RTP::loggingParserUnavailable);
+
     Factory<Shape<?>> shapeFactory = new Factory<>();
-    selectionAPI.shapeFactory = shapeFactory;
-    factoryMap.put(factoryNames.shape, shapeFactory);
+    ActiveSelection.get().shapeFactory = shapeFactory;
+    FactoryRegistry.map().put(FactoryNames.shape, shapeFactory);
 
     Factory<VerticalAdjustor<?>> verticalAdjustorFactory = new Factory<>();
-    factoryMap.put(factoryNames.vert, verticalAdjustorFactory);
-    factoryMap.put(factoryNames.singleConfig, new Factory<ConfigParser<?>>());
-    factoryMap.put(factoryNames.multiConfig, new Factory<MultiConfigParser<?>>());
+    FactoryRegistry.map().put(FactoryNames.vert, verticalAdjustorFactory);
+    FactoryRegistry.map().put(FactoryNames.singleConfig, new Factory<ConfigParser<?>>());
+    FactoryRegistry.map().put(FactoryNames.multiConfig, new Factory<MultiConfigParser<?>>());
 
     registerDefaultShapes();
     registerDefaultVerticalAdjustors();
 
-    // ADR-115: reload steps on tasks and regions live in Tier 4. Installed in static init
-    // because every Configs constructor touches RTP.configs, so any Configs (tests included)
-    // reloads with the coordinator.
+    // ADR-115: reload steps on tasks and regions live in Tier 4. Installed in static init, which
+    // platform entry points force first (ensureInitialized), so the Configs built later reloads
+    // with the coordinator. A Configs built before RTP initializes has no coordinator.
     Configs.setReloadLifecycle(new io.github.dailystruggle.rtp.common.lifecycle.ConfigReloadCoordinator());
-    // Same for the scan and teleport tasks a Region starts: every Region path reads RTP statics
-    // before dispatching, so this class is initialised first.
+    // Same for the scan and teleport tasks a Region starts. Region no longer reads RTP statics,
+    // so only the explicit ensureInitialized ordering guarantees this runs before any dispatch;
+    // until then Region uses RegionTaskDispatcher.NONE.
     Region.setTaskDispatcher(new io.github.dailystruggle.rtp.common.lifecycle.RegionTaskCoordinator());
     // MemoryTracker (tools) counts region queues through views it owns, not Region itself.
     MemoryTracker.setRegionSource(
@@ -318,7 +255,7 @@ public class RTP {
         new io.github.dailystruggle.rtp.common.hooks.DefaultRTPHooks();
     io.github.dailystruggle.rtp.api.RTPAPI.isAirDelegate = RTP::isAir;
 
-    triggerManager.start();
+    PhysicalTriggerManager.instance().start();
 
     // First-class teleport entry point for addons: trigger an RTP for an online
     // player and complete a future with the outcome, without reaching into core
@@ -329,7 +266,7 @@ public class RTP {
       java.util.concurrent.CompletableFuture<io.github.dailystruggle.rtp.api.RTPResult> future =
           new java.util.concurrent.CompletableFuture<>();
       try {
-        RTPPlayer player = serverAccessor.getPlayer(uuid);
+        RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(uuid);
         if (player == null) {
           future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
               io.github.dailystruggle.rtp.api.RTPResult.Reason.PLAYER_OFFLINE,
@@ -342,10 +279,10 @@ public class RTP {
         // is the signal to clear a stale processingPlayers entry (same preemptive
         // cleanup the command path performs) so the alreadyTeleporting guard below
         // does not misfire on a finished teleport.
-        TeleportData priorData = getInstance().latestTeleportData.get(uuid);
+        TeleportData priorData = TeleportSessions.current().latestTeleportData.get(uuid);
         Region reqRegion = null;
         if (target != null && target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.REGION) {
-          reqRegion = selectionAPI.getRegion(target.name());
+          reqRegion = ActiveSelection.get().getRegion(target.name());
         }
         RegionSettings regSettings = (reqRegion != null) ? reqRegion.getSettings() : null;
         boolean hasRegionOverride = (regSettings != null && regSettings.cooldownMillis() != null && regSettings.cooldownMillis() >= 0);
@@ -365,7 +302,7 @@ public class RTP {
                 "Teleport is on cooldown for this player"));
             return future;
           } else if (priorData != null && priorData.completed) {
-            getInstance().processingPlayers.remove(uuid);
+            TeleportSessions.current().processingPlayers.remove(uuid);
           }
         }
 
@@ -377,13 +314,13 @@ public class RTP {
         // command-only before now.
         if (!player.hasPermission("rtp.nolock")) {
           ConfigParser<ConfigKeys> cfg =
-              (ConfigParser<ConfigKeys>) configs.getParser(ConfigKeys.class);
+              (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
           if (cfg != null) {
             long cap = cfg.getNumber(ConfigKeys.lockAfterUses, 0L).longValue();
             if (cap > 0) {
               long resetMillis =
                   cfg.getNumber(ConfigKeys.lockAfterResetSeconds, 0L).longValue() * 1000L;
-              if (getInstance().teleportLimitStore.isLocked(
+              if (ActiveDatabase.teleportLimitStore().isLocked(
                   uuid, cap, resetMillis, System.currentTimeMillis())) {
                 future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
                     io.github.dailystruggle.rtp.api.RTPResult.Reason.LOCKED,
@@ -410,7 +347,7 @@ public class RTP {
         // clicking the menu while a /rtp is already warming up). The local
         // launch paths below register the player in processingPlayers; the
         // pipeline's terminal cleanup (TeleportPipelineTask / Region) clears it.
-        if (getInstance().processingPlayers.contains(uuid)) {
+        if (TeleportSessions.current().processingPlayers.contains(uuid)) {
           future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
               io.github.dailystruggle.rtp.api.RTPResult.Reason.ALREADY_TELEPORTING,
               "A teleport is already in progress for this player"));
@@ -431,7 +368,7 @@ public class RTP {
                 getNoPermissionMessage(target)));
             return future;
           }
-          io.github.dailystruggle.rtp.api.network.NetworkCommandHook hook = networkCommandHook;
+          io.github.dailystruggle.rtp.api.network.NetworkCommandHook hook = NetworkHooks.commandHook();
           if (hook == null
               || hook == io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY) {
             future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
@@ -464,7 +401,7 @@ public class RTP {
             // RoutingResult.Local: the hook elected to serve the request on this
             // backend (e.g. a self-pin). Fall through to the local pipeline using
             // the bare region name.
-            Region localRegion = selectionAPI.getRegionOrDefault(regionKey);
+            Region localRegion = ActiveSelection.get().getRegionOrDefault(regionKey);
             if (localRegion == null || localRegion.getWorld() == null) {
               future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
                   io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET,
@@ -499,7 +436,7 @@ public class RTP {
           if (isLocal) {
             String worldName = target.worldName();
             RTPWorld<?> world = (worldName != null && !worldName.isBlank())
-                ? serverAccessor.getRTPWorld(worldName)
+                ? RTPRuntime.serverAccessor().getRTPWorld(worldName)
                 : null;
             if (world == null) {
               future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
@@ -509,9 +446,9 @@ public class RTP {
             }
             io.github.dailystruggle.rtp.api.world.RTPLocation loc =
                 new io.github.dailystruggle.rtp.api.world.RTPLocation(world, target.x(), target.y(), target.z());
-            getInstance().processingPlayers.add(uuid);
+            TeleportSessions.current().processingPlayers.add(uuid);
             player.setLocation(loc).whenComplete((success, ex) -> {
-              getInstance().processingPlayers.remove(uuid);
+              TeleportSessions.current().processingPlayers.remove(uuid);
               if (ex != null || (success != null && !success)) {
                 future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
                     io.github.dailystruggle.rtp.api.RTPResult.Reason.ERROR,
@@ -523,7 +460,7 @@ public class RTP {
             return future;
           } else {
             // Remote server coordinate route: dispatch through NetworkCommandHook
-            io.github.dailystruggle.rtp.api.network.NetworkCommandHook hook = networkCommandHook;
+            io.github.dailystruggle.rtp.api.network.NetworkCommandHook hook = NetworkHooks.commandHook();
             if (hook == null || hook == io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY) {
               future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
                   io.github.dailystruggle.rtp.api.RTPResult.Reason.INVALID_TARGET,
@@ -607,7 +544,7 @@ public class RTP {
                 io.github.dailystruggle.rtp.common.economy.EconomyGate.PriceKey.SELF, false, false);
         if (apiCharge.result()
             == io.github.dailystruggle.rtp.common.economy.EconomyGate.Result.INSUFFICIENT_FUNDS) {
-          getInstance().processingPlayers.remove(uuid);
+          TeleportSessions.current().processingPlayers.remove(uuid);
           future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
               io.github.dailystruggle.rtp.api.RTPResult.Reason.INSUFFICIENT_FUNDS,
               "Player cannot afford the teleport cost"));
@@ -623,7 +560,7 @@ public class RTP {
         data.targetRegion = targetRegion;
         data.onComplete = td -> {
           if (td.completed && td.selectedCoords != null) {
-            RTPWorld<?> w = serverAccessor.getRTPWorld(td.selectedCoords.worldName());
+            RTPWorld<?> w = RTPRuntime.serverAccessor().getRTPWorld(td.selectedCoords.worldName());
             if (w == null) w = targetRegion.getWorld();
             future.complete(io.github.dailystruggle.rtp.api.RTPResult.success(
                 new io.github.dailystruggle.rtp.api.world.RTPLocation(
@@ -634,7 +571,7 @@ public class RTP {
                 "No safe location was found"));
           }
         };
-        getInstance().latestTeleportData.put(uuid, data);
+        TeleportSessions.current().latestTeleportData.put(uuid, data);
 
         java.util.Set<String> biomeFilter = null;
         if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.BIOME) {
@@ -646,7 +583,7 @@ public class RTP {
                 new io.github.dailystruggle.rtp.api.selection.GenerationContext(player, player, biomeFilter),
                 targetRegion);
         data.nextTask = task;
-        getInstance().processingPlayers.add(uuid);
+        TeleportSessions.current().processingPlayers.add(uuid);
         targetRegion.inFlightCalculations.incrementAndGet();
         // Fast path, mirroring the sync branch of RTPCmd.compute(): when a
         // pre-verified location is already cached for this player (its chunk is
@@ -658,10 +595,10 @@ public class RTP {
         if (biomeFilter == null && targetRegion.hasLocation(uuid)) {
           task.run();
         } else {
-          scheduler.runTaskAsynchronously(task);
+          RTPRuntime.scheduler().runTaskAsynchronously(task);
         }
       } catch (Throwable t) {
-        getInstance().processingPlayers.remove(uuid);
+        TeleportSessions.current().processingPlayers.remove(uuid);
         future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
             io.github.dailystruggle.rtp.api.RTPResult.Reason.ERROR, String.valueOf(t.getMessage())));
       }
@@ -669,9 +606,9 @@ public class RTP {
     };
 
     io.github.dailystruggle.rtp.api.RTPAPI.cancelDelegate = uuid -> {
-      TeleportData d = getInstance().latestTeleportData.get(uuid);
+      TeleportData d = TeleportSessions.current().latestTeleportData.get(uuid);
       boolean pending = (d != null && !d.completed)
-          || getInstance().processingPlayers.contains(uuid);
+          || TeleportSessions.current().processingPlayers.contains(uuid);
       new RTPTeleportCancel(uuid).run();
       return pending;
     };
@@ -690,8 +627,8 @@ public class RTP {
     };
 
     io.github.dailystruggle.rtp.api.RTPAPI.warmupDelegate = uuid -> {
-      TeleportData d = getInstance().latestTeleportData.get(uuid);
-      return (d != null && !d.completed) || getInstance().processingPlayers.contains(uuid);
+      TeleportData d = TeleportSessions.current().latestTeleportData.get(uuid);
+      return (d != null && !d.completed) || TeleportSessions.current().processingPlayers.contains(uuid);
     };
 
     // GUI-author SPI reads. Permission-gated target list + per-target status
@@ -703,7 +640,7 @@ public class RTP {
       // A bare /rtp is always offered.
       out.add(io.github.dailystruggle.rtp.api.RtpTarget.defaultRegion());
       try {
-        RTPPlayer player = serverAccessor.getPlayer(uuid);
+        RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(uuid);
 
         // The bare default target (added above) resolves, for this player, to a
         // concrete named region. Listing that same region again in the loop
@@ -713,7 +650,7 @@ public class RTP {
         String defaultRegionName = null;
         if (player != null) {
           try {
-            Region defaultRegion = selectionAPI.getRegion(player);
+            Region defaultRegion = ActiveSelection.get().getRegion(player);
             if (defaultRegion != null) defaultRegionName = defaultRegion.name;
           } catch (RuntimeException ignored) {
             // Defensive: default-region resolution must not break enumeration.
@@ -725,14 +662,14 @@ public class RTP {
         // Sort case-insensitively so the GUI (and any other consumer) renders
         // a deterministic, consistent region order.
         java.util.List<String> sortedNames =
-            new ArrayList<>(selectionAPI.regionNames());
+            new ArrayList<>(ActiveSelection.get().regionNames());
         sortedNames.sort(String.CASE_INSENSITIVE_ORDER);
         for (String name : sortedNames) {
           if (name == null || name.isBlank()) continue;
           if (defaultRegionName != null && defaultRegionName.equalsIgnoreCase(name)) {
             continue; // already offered as the bare default target
           }
-          Region region = selectionAPI.getRegion(name);
+          Region region = ActiveSelection.get().getRegion(name);
           if (region == null) continue;
           boolean requirePerm = region.getSettings().requirePermission();
           if (requirePerm
@@ -745,9 +682,9 @@ public class RTP {
         // Configured worlds: enumerate worlds and gate on `rtp.worlds.<world>` / `rtp.worlds.*`
         // when requirePermission is enabled.
         java.util.Set<String> worldCandidates = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-        if (serverAccessor != null) {
+        if (RTPRuntime.serverAccessor() != null) {
           try {
-            java.util.List<RTPWorld<?>> rtpWorlds = serverAccessor.getRTPWorlds();
+            java.util.List<RTPWorld<?>> rtpWorlds = RTPRuntime.serverAccessor().getRTPWorlds();
             if (rtpWorlds != null) {
               for (RTPWorld<?> w : rtpWorlds) {
                 if (w != null && w.name() != null && !w.name().isBlank()) {
@@ -758,10 +695,10 @@ public class RTP {
           } catch (Throwable ignored) {
           }
         }
-        if (configs != null && configs.multiConfigParserMap != null) {
+        if (ActiveConfigs.get() != null && ActiveConfigs.get().multiConfigParserMap != null) {
           @SuppressWarnings("unchecked")
           MultiConfigParser<WorldKeys> worldMcp =
-              (MultiConfigParser<WorldKeys>) configs.multiConfigParserMap.get(WorldKeys.class);
+              (MultiConfigParser<WorldKeys>) ActiveConfigs.get().multiConfigParserMap.get(WorldKeys.class);
           if (worldMcp != null && worldMcp.configParserFactory != null) {
             for (String key : worldMcp.configParserFactory.map.keySet()) {
               if (key == null || key.isBlank()) continue;
@@ -774,10 +711,10 @@ public class RTP {
         for (String worldName : worldCandidates) {
           if (worldName == null || worldName.isBlank()) continue;
           boolean requirePerm = false;
-          if (configs != null && configs.multiConfigParserMap != null) {
+          if (ActiveConfigs.get() != null && ActiveConfigs.get().multiConfigParserMap != null) {
             @SuppressWarnings("unchecked")
             MultiConfigParser<WorldKeys> worldMcp =
-                (MultiConfigParser<WorldKeys>) configs.multiConfigParserMap.get(WorldKeys.class);
+                (MultiConfigParser<WorldKeys>) ActiveConfigs.get().multiConfigParserMap.get(WorldKeys.class);
             if (worldMcp != null && worldMcp.configParserFactory != null && worldMcp.configParserFactory.contains(worldName)) {
               ConfigParser<WorldKeys> wp = worldMcp.getParser(worldName);
               if (wp != null) {
@@ -798,8 +735,8 @@ public class RTP {
         java.util.Set<String> biomeCandidates = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         @SuppressWarnings("unchecked")
         ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys> biomesParser =
-            (configs != null) ? (ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys>)
-                configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys.class) : null;
+            (ActiveConfigs.get() != null) ? (ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys>)
+                ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys.class) : null;
         if (biomesParser != null) {
           Object configuredBiomes = biomesParser.getConfigValue(
               io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys.biomes, null);
@@ -899,7 +836,7 @@ public class RTP {
 
     io.github.dailystruggle.rtp.api.RTPAPI.targetStatusDelegate = (uuid, target) -> {
       try {
-        RTPPlayer player = serverAccessor.getPlayer(uuid);
+        RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(uuid);
         if (player == null) {
           return new io.github.dailystruggle.rtp.api.RtpTargetStatus(
               io.github.dailystruggle.rtp.api.RtpTargetStatus.Availability.UNKNOWN, 0L, 0.0);
@@ -976,14 +913,14 @@ public class RTP {
           // Fall back to default region if resolveApiRegion did not find a region for world or biome
           try {
             if (player != null) {
-              region = selectionAPI.getRegion(player);
+              region = ActiveSelection.get().getRegion(player);
             }
             if (region == null || region.getWorld() == null) {
-              region = selectionAPI.getRegionOrDefault("default");
+              region = ActiveSelection.get().getRegionOrDefault("default");
             }
             if (region == null || region.getWorld() == null) {
               // Try selectionAPI.permRegionLookup
-              for (Region r : selectionAPI.permRegionLookup.values()) {
+              for (Region r : ActiveSelection.get().permRegionLookup.values()) {
                 if (r != null && r.getWorld() != null) {
                   region = r;
                   break;
@@ -1010,11 +947,11 @@ public class RTP {
         // player teleports for free. Funds check mirrors RTPCmd's balanceFloor.
         double cost = region.getSettings().price();
         boolean noFunds = false;
-        RTPEconomy economy = RTP.economy;
-        if (economy != null && !player.hasPermission("rtp.free")) {
+        RTPEconomy econ = RTPRuntime.economy();
+        if (econ != null && !player.hasPermission("rtp.free")) {
           double floor = 0.0;
           ConfigParser<EconomyKeys> eco =
-              (ConfigParser<EconomyKeys>) configs.getParser(EconomyKeys.class);
+              (ConfigParser<EconomyKeys>) ActiveConfigs.get().getParser(EconomyKeys.class);
           if (eco != null) {
             cost += eco.getNumber(EconomyKeys.price, 0.0).doubleValue();
             if (target.kind() == io.github.dailystruggle.rtp.api.RtpTarget.Kind.BIOME) {
@@ -1022,7 +959,7 @@ public class RTP {
             }
             floor = eco.getNumber(EconomyKeys.balanceFloor, 0.0).doubleValue();
           }
-          if ((economy.bal(uuid) - cost) < floor) {
+          if ((econ.bal(uuid) - cost) < floor) {
             noFunds = true;
           }
         }
@@ -1036,7 +973,7 @@ public class RTP {
             ? getLastRegionTeleportTime(uuid, region.name)
             : getEffectiveLastTeleportTime(uuid);
         if (hasRegionOverride && lastTp <= 0L) {
-          TeleportData prior = getInstance().latestTeleportData.get(uuid);
+          TeleportData prior = TeleportSessions.current().latestTeleportData.get(uuid);
           if (prior != null && prior.targetRegion != null && region.name.equalsIgnoreCase(prior.targetRegion.name)) {
             lastTp = prior.time;
           }
@@ -1112,7 +1049,7 @@ public class RTP {
 
     // Runtime-health snapshot for dashboard tiles. Sampled by the active metrics
     // binding, not computed on the caller's thread (no main-thread cost / chunk I/O).
-    io.github.dailystruggle.rtp.api.RTPAPI.metricsSnapshotDelegate = () -> metrics.snapshot();
+    io.github.dailystruggle.rtp.api.RTPAPI.metricsSnapshotDelegate = () -> CoreMetrics.instance().snapshot();
   }
 
   /**
@@ -1135,7 +1072,7 @@ public class RTP {
             io.github.dailystruggle.rtp.common.economy.EconomyGate.PriceKey.SELF, false, false);
     if (charge.result()
         == io.github.dailystruggle.rtp.common.economy.EconomyGate.Result.INSUFFICIENT_FUNDS) {
-      getInstance().processingPlayers.remove(uuid);
+      TeleportSessions.current().processingPlayers.remove(uuid);
       future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(
           io.github.dailystruggle.rtp.api.RTPResult.Reason.INSUFFICIENT_FUNDS,
           "Player cannot afford the teleport cost"));
@@ -1151,7 +1088,7 @@ public class RTP {
     data.targetRegion = targetRegion;
     data.onComplete = td -> {
       if (td.completed && td.selectedCoords != null) {
-        RTPWorld<?> w = serverAccessor.getRTPWorld(td.selectedCoords.worldName());
+        RTPWorld<?> w = RTPRuntime.serverAccessor().getRTPWorld(td.selectedCoords.worldName());
         if (w == null) w = targetRegion.getWorld();
         future.complete(io.github.dailystruggle.rtp.api.RTPResult.success(
             new io.github.dailystruggle.rtp.api.world.RTPLocation(
@@ -1162,21 +1099,21 @@ public class RTP {
             "No safe location was found"));
       }
     };
-    getInstance().latestTeleportData.put(uuid, data);
+    TeleportSessions.current().latestTeleportData.put(uuid, data);
 
     io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask task =
         new io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask(
             new io.github.dailystruggle.rtp.api.selection.GenerationContext(player, player, null),
             targetRegion);
     data.nextTask = task;
-    getInstance().processingPlayers.add(uuid);
+    TeleportSessions.current().processingPlayers.add(uuid);
     targetRegion.inFlightCalculations.incrementAndGet();
-    scheduler.runTaskAsynchronously(task);
+    RTPRuntime.scheduler().runTaskAsynchronously(task);
   }
 
   private static String getNoPermissionMessage(io.github.dailystruggle.rtp.api.RtpTarget target) {
-    if (configs != null) {
-      Object val = configs.getConfigValue(PlayerMessages.noPerms, null);
+    if (ActiveConfigs.get() != null) {
+      Object val = ActiveConfigs.get().getConfigValue(PlayerMessages.noPerms, null);
       if (val instanceof String msg && !msg.isBlank()) {
         return msg;
       }
@@ -1222,8 +1159,8 @@ public class RTP {
                 && !player.hasPermission("rtp.regions.*"));
       }
       case WORLD: {
-        if (configs == null) return false;
-        ConfigParser<WorldKeys> worldParser = configs.getWorldParser(target.name());
+        if (ActiveConfigs.get() == null) return false;
+        ConfigParser<WorldKeys> worldParser = ActiveConfigs.get().getWorldParser(target.name());
         boolean requirePerm = worldParser != null
             && Boolean.parseBoolean(
                 worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
@@ -1241,8 +1178,8 @@ public class RTP {
             && !player.hasPermission("rtp.regions." + target.name());
       case COORDINATE: {
         String worldName = target.worldName();
-        if (worldName != null && !worldName.isBlank() && configs != null) {
-          ConfigParser<WorldKeys> worldParser = configs.getWorldParser(worldName);
+        if (worldName != null && !worldName.isBlank() && ActiveConfigs.get() != null) {
+          ConfigParser<WorldKeys> worldParser = ActiveConfigs.get().getWorldParser(worldName);
           boolean requirePerm = worldParser != null
               && Boolean.parseBoolean(
                   worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
@@ -1274,26 +1211,26 @@ public class RTP {
     }
     switch (target.kind()) {
       case REGION:
-        return selectionAPI.getRegionOrDefault(target.name());
+        return ActiveSelection.get().getRegionOrDefault(target.name());
       case WORLD: {
-        ConfigParser<WorldKeys> worldParser = configs.getWorldParser(target.name());
+        ConfigParser<WorldKeys> worldParser = ActiveConfigs.get().getWorldParser(target.name());
         String regionName = (worldParser == null)
             ? "default"
             : worldParser.getConfigValue(WorldKeys.region, "default").toString();
-        return selectionAPI.getRegionOrDefault(regionName);
+        return ActiveSelection.get().getRegionOrDefault(regionName);
       }
       case BIOME: {
         // Resolve the best region that observes or accommodates this biome
         String best = io.github.dailystruggle.rtp.common.selection.region.BiomeMenuSource.bestRegionForBiome(
             player != null ? player.uuid() : null, target.name(), null);
         if (best != null) {
-          Region r = selectionAPI.getRegion(best);
+          Region r = ActiveSelection.get().getRegion(best);
           if (r != null) return r;
         }
         if (player != null) {
-          return selectionAPI.getRegion(player);
+          return ActiveSelection.get().getRegion(player);
         }
-        return selectionAPI.getRegionOrDefault("default");
+        return ActiveSelection.get().getRegionOrDefault("default");
       }
       case ACTION:
       case COORDINATE:
@@ -1303,41 +1240,24 @@ public class RTP {
         if (player == null) {
           throw new IllegalArgumentException("default-region target requires an online player");
         }
-        return selectionAPI.getRegion(player);
+        return ActiveSelection.get().getRegion(player);
     }
   }
 
-  public final io.github.dailystruggle.rtp.common.playerData.TimeBinnedCache<UUID, TeleportData> priorTeleportData =
-      new io.github.dailystruggle.rtp.common.playerData.TimeBinnedCache<>(60_000L, 120_000L);
-  public final io.github.dailystruggle.rtp.common.playerData.TimeBinnedCache<UUID, TeleportData> latestTeleportData =
-      new io.github.dailystruggle.rtp.common.playerData.TimeBinnedCache<>(60_000L, 120_000L);
+  // ADR-115 seam 4: per-instance state lives in its owning package; installed when this
+  // instance becomes current (see the constructor). Field-init order is unchanged.
+  private final TeleportSessions sessions = new TeleportSessions();
   public io.github.dailystruggle.rtp.common.playerData.FileBinStore fileBinStore;
-
   /**
-   * Per-player rolling usage-cap state backing the BetterRTP {@code LockAfter}
-   * parity feature ({@code lockAfterUses} / {@code lockAfterResetSeconds}).
-   * Inert while {@code lockAfterUses <= 0}.
+   * Teleport-limit guard seam (ADR-068). Fronts the usage cap and adds best-effort local
+   * persistence of the rolling window so it survives a restart (parity with the
+   * already-persisted cooldown). The cross-server durable/proxy layers of ADR-068 slot in
+   * behind {@link ActiveDatabase#teleportLimitStore()}.
    */
-  public final io.github.dailystruggle.rtp.common.playerData.UsageCapTracker usageCaps =
-      new io.github.dailystruggle.rtp.common.playerData.UsageCapTracker();
-  /**
-   * Teleport-limit guard seam (ADR-068). Fronts the usage cap above and adds
-   * best-effort local persistence of the rolling window so it survives a
-   * restart (parity with the already-persisted cooldown). The cross-server
-   * durable/proxy layers of ADR-068 slot in behind this same field.
-   */
-  public final io.github.dailystruggle.rtp.common.playerData.TeleportLimitStore teleportLimitStore =
-      new io.github.dailystruggle.rtp.common.playerData.LocalTeleportLimitStore(usageCaps, true);
-  public final ConcurrentSkipListSet<UUID> processingPlayers = new ConcurrentSkipListSet<>();
-  public RTPTaskPipe miscSyncTasks;
-  public RTPTaskPipe miscAsyncTasks;
-  public RTPTaskPipe startupTasks;
-  public RTPTaskPipe cancelTasks;
-  public final Map<String, ScanTask> scanTasks = new ConcurrentHashMap<>();
-  public final ConcurrentHashMap<UUID, Long> invulnerablePlayers = new ConcurrentHashMap<>();
-  public final ConcurrentMap<UUID, Map<String, Long>> regionTeleportTimes = new ConcurrentHashMap<>();
-  public final ConcurrentLinkedQueue<RTPChunk<?>> chunksToUnload = new ConcurrentLinkedQueue<>();
-  public DatabaseAccessor<?> databaseAccessor;
+  private final io.github.dailystruggle.rtp.common.playerData.TeleportLimitStore limitStore =
+      new io.github.dailystruggle.rtp.common.playerData.LocalTeleportLimitStore(sessions.usageCaps, true);
+  private final Map<String, ScanTask> scanTaskMap = new ConcurrentHashMap<>();
+  private final ConcurrentLinkedQueue<RTPChunk<?>> unloadQueue = new ConcurrentLinkedQueue<>();
   /**
    * Optional cross-server messaging bus. Field type is the {@code RTPNetworkManager}
    * interface so {@code rtp-core} carries no symbolic reference to any concrete driver
@@ -1357,14 +1277,14 @@ public class RTP {
     long localTime = 0L;
     RTP inst = instance;
     if (inst != null) {
-      TeleportData localData = inst.latestTeleportData.get(uuid);
+      TeleportData localData = TeleportSessions.current().latestTeleportData.get(uuid);
       if (localData != null) {
         localTime = localData.time;
       }
     }
     long sharedTime = 0L;
     try {
-      if (inst != null && inst.databaseAccessor instanceof AbstractSQLDatabaseAccessor sql) {
+      if (inst != null && ActiveDatabase.accessor() instanceof AbstractSQLDatabaseAccessor sql) {
         io.github.dailystruggle.rtp.common.database.options.NetworkStateBinding binding = sql.getNetworkStateBinding();
         if (binding != null) {
           sharedTime = binding.getLastTeleportTime(uuid);
@@ -1390,7 +1310,7 @@ public class RTP {
     RTP inst = instance;
     if (inst == null) return;
     try {
-      if (inst.databaseAccessor instanceof AbstractSQLDatabaseAccessor sql) {
+      if (ActiveDatabase.accessor() instanceof AbstractSQLDatabaseAccessor sql) {
         io.github.dailystruggle.rtp.common.database.options.NetworkStateBinding binding = sql.getNetworkStateBinding();
         if (binding != null) {
           binding.setLastTeleportTime(uuid, epochMillis);
@@ -1415,7 +1335,7 @@ public class RTP {
     if (uuid == null || regionName == null) return 0L;
     RTP inst = instance;
     if (inst == null) return 0L;
-    Map<String, Long> map = inst.regionTeleportTimes.get(uuid);
+    Map<String, Long> map = TeleportSessions.current().regionTeleportTimes.get(uuid);
     if (map == null) return 0L;
     Long time = map.get(regionName.toLowerCase(Locale.ROOT));
     return time != null ? time : 0L;
@@ -1432,7 +1352,7 @@ public class RTP {
     if (uuid == null || regionName == null) return;
     RTP inst = instance;
     if (inst == null) return;
-    inst.regionTeleportTimes
+    TeleportSessions.current().regionTeleportTimes
         .computeIfAbsent(uuid, k -> new ConcurrentHashMap<>())
         .put(regionName.toLowerCase(Locale.ROOT), epochMillis);
   }
@@ -1488,20 +1408,22 @@ public class RTP {
   }
 
   /**
-   * Wraps the installed platform {@link #scheduler} in a profiling decorator
+   * Wraps the installed platform {@link RTPRuntime#scheduler()} in a profiling decorator
    * to track wall-clock execution time of sync/async tasks. Idempotent.
    */
   private static void installProfilingScheduler() {
     synchronized (RTP.class) {
-      if (!(scheduler instanceof io.github.dailystruggle.rtp.common.metrics.ProfilingRTPScheduler)) {
-        scheduler = new io.github.dailystruggle.rtp.common.metrics.ProfilingRTPScheduler(scheduler);
+      RTPScheduler current = RTPRuntime.scheduler();
+      if (!(current instanceof io.github.dailystruggle.rtp.common.metrics.ProfilingRTPScheduler)) {
+        RTPRuntime.setScheduler(
+            new io.github.dailystruggle.rtp.common.metrics.ProfilingRTPScheduler(current));
       }
     }
   }
 
   public RTP() {
-    if (serverAccessor == null) throw new IllegalStateException("null serverAccessor");
-    if (scheduler == null) throw new IllegalStateException("null scheduler");
+    if (RTPRuntime.serverAccessor() == null) throw new IllegalStateException("null serverAccessor");
+    if (RTPRuntime.scheduler() == null) throw new IllegalStateException("null scheduler");
 
     // Wrap the platform scheduler in a profiling decorator so the wall-clock cost
     // of RTP's own sync (main-thread / region) and async tasks is attributable
@@ -1511,22 +1433,27 @@ public class RTP {
 
     // Install the active scheduler into RTPRunnable so tasks can self-dispatch onto the
     // correct thread via RTPRunnable#schedule() (entity/region/async routing).
-    RTPRunnable.scheduler = scheduler;
+    RTPRunnable.scheduler = RTPRuntime.scheduler();
 
-    miscSyncTasks = (RTPTaskPipe) serverAccessor.createTaskPipe();
-    miscAsyncTasks = (RTPTaskPipe) serverAccessor.createTaskPipe();
-    startupTasks = (RTPTaskPipe) serverAccessor.createTaskPipe();
-    cancelTasks = (RTPTaskPipe) serverAccessor.createTaskPipe();
-    if (cancelTasks instanceof TimeBoundTaskPipe timeBoundTaskPipe) {
+    MiscTasks.setSync((RTPTaskPipe) RTPRuntime.serverAccessor().createTaskPipe());
+    MiscTasks.setAsync((RTPTaskPipe) RTPRuntime.serverAccessor().createTaskPipe());
+    MiscTasks.setStartup((RTPTaskPipe) RTPRuntime.serverAccessor().createTaskPipe());
+    MiscTasks.setCancel((RTPTaskPipe) RTPRuntime.serverAccessor().createTaskPipe());
+    if (MiscTasks.cancel() instanceof TimeBoundTaskPipe timeBoundTaskPipe) {
       timeBoundTaskPipe.setAvailableTime(Long.MAX_VALUE);
     }
-    RTPAPI.setServerAccessor(serverAccessor);
+    RTPAPI.setServerAccessor(RTPRuntime.serverAccessor());
+    TeleportSessions.install(sessions);
+    ScanTasks.install(scanTaskMap);
+    ActiveDatabase.setAccessor(null);
+    ActiveDatabase.setTeleportLimitStore(limitStore);
+    MiscTasks.setChunksToUnload(unloadQueue);
     instance = this;
 
     registerDefaultShapes();
     registerDefaultVerticalAdjustors();
 
-    configs = new Configs(serverAccessor.getPluginDirectory());
+    ActiveConfigs.set(new Configs(RTPRuntime.serverAccessor().getPluginDirectory()));
 
     // Opt-in core backlog prefilter provider; addons that bind later replace it.
     if (RTPAPI.hooks != null) {
@@ -1534,8 +1461,8 @@ public class RTP {
           RTPAPI.hooks.anvilPrefilter());
     }
 
-    startupTasks.add(new RTPRunnable(() -> {
-      ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) configs.getParser(ConfigKeys.class);
+    MiscTasks.startup().add(new RTPRunnable(() -> {
+      ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
       if (configParser == null) return;
 
       Map<String, Object> networkMap = configParser.getMap(ConfigKeys.network);
@@ -1567,7 +1494,7 @@ public class RTP {
 
     ChunkyChecker.loadChunky();
 
-    trackedTasks.add(scheduler.runTaskTimerAsynchronously(
+    trackedTasks.add(RTPRuntime.scheduler().runTaskTimerAsynchronously(
             MemoryTracker::runDiagnostics,
       1200L,
       1200L));
@@ -1576,10 +1503,10 @@ public class RTP {
     // (/rtp visualization sparkline) with ~2 minutes of rolling history at
     // 128 slots. Uses metrics.snapshot() which is platform-aware and
     // already wired with the active MetricsBinding by the platform adapter.
-    trackedTasks.add(scheduler.runTaskTimerAsynchronously(
+    trackedTasks.add(RTPRuntime.scheduler().runTaskTimerAsynchronously(
             () -> {
                 try {
-                    metrics.snapshotRing().recordFromSnapshot(metrics.snapshot());
+                    CoreMetrics.instance().snapshotRing().recordFromSnapshot(CoreMetrics.instance().snapshot());
                 } catch (Throwable ignored) {
                     // Sampler shall never poison the scheduler thread.
                 }
@@ -1587,23 +1514,23 @@ public class RTP {
             20L,
             20L));
 
-    io.github.dailystruggle.rtp.common.tools.PerformanceTracker.start(scheduler);
-    trackedTasks.add(scheduler.runTaskTimerAsynchronously(
+    io.github.dailystruggle.rtp.common.tools.PerformanceTracker.start(RTPRuntime.scheduler());
+    trackedTasks.add(RTPRuntime.scheduler().runTaskTimerAsynchronously(
         () -> {
-          if (databaseAccessor != null) {
+          if (ActiveDatabase.accessor() != null) {
             // Rewrite the cached-locations table from authoritative in-memory
             // state so already-consumed locations cannot leak across restarts.
             // Must run BEFORE flushDirtyCache so the wipe-then-write ordering
             // survives into the shared writeQueue drain.
-            databaseAccessor.rebuildCachedLocationsFromMemory();
-            databaseAccessor.flushDirtyCache();
+            ActiveDatabase.accessor().rebuildCachedLocationsFromMemory();
+            ActiveDatabase.accessor().flushDirtyCache();
           }
         },
         6000,
         6000));
-    trackedTasks.add(scheduler.runTaskTimerAsynchronously(
+    trackedTasks.add(RTPRuntime.scheduler().runTaskTimerAsynchronously(
         () -> {
-          if (databaseAccessor instanceof AbstractSQLDatabaseAccessor sqlDatabaseAccessor) {
+          if (ActiveDatabase.accessor() instanceof AbstractSQLDatabaseAccessor sqlDatabaseAccessor) {
             sqlDatabaseAccessor.flush();
           }
         },
@@ -1613,16 +1540,16 @@ public class RTP {
     updateRetentionWindow();
 
     // Periodic binned cleaner for memory, disk file bins, and shared database
-    trackedTasks.add(scheduler.runTaskTimerAsynchronously(
+    trackedTasks.add(RTPRuntime.scheduler().runTaskTimerAsynchronously(
         () -> {
           long now = System.currentTimeMillis();
-          latestTeleportData.purgeExpired(now);
-          priorTeleportData.purgeExpired(now);
+          TeleportSessions.current().latestTeleportData.purgeExpired(now);
+          TeleportSessions.current().priorTeleportData.purgeExpired(now);
           if (fileBinStore != null) {
             fileBinStore.purgeExpired(now);
           }
-          if (databaseAccessor instanceof AbstractSQLDatabaseAccessor sql) {
-            sql.purgeStaleTeleportData(latestTeleportData.getRetentionMs());
+          if (ActiveDatabase.accessor() instanceof AbstractSQLDatabaseAccessor sql) {
+            sql.purgeStaleTeleportData(TeleportSessions.current().latestTeleportData.getRetentionMs());
           }
         },
         1200L,
@@ -1630,37 +1557,37 @@ public class RTP {
 
     // Both pulses fire every tick; per-pulse budgets come from TickBudget (performance.yml).
     long syncTime = TimeUnit.MILLISECONDS.toNanos(io.github.dailystruggle.rtp.common.tasks.tick.TickBudget.DEFAULT_SYNC_MS);
-    trackedTasks.add(scheduler.runTaskTimer(new io.github.dailystruggle.rtp.common.tasks.tick.SyncTaskProcessing(syncTime), 1, 1));
+    trackedTasks.add(RTPRuntime.scheduler().runTaskTimer(new io.github.dailystruggle.rtp.common.tasks.tick.SyncTaskProcessing(syncTime), 1, 1));
 
     // Drive the world-scan on-screen progress bar from a platform-neutral main/server-thread
     // timer (once per second). The platform RTPServerAccessor renders it (boss-bar on
     // Bukkit/Fabric/NeoForge, no-op elsewhere); an empty scanBossBar template disables it.
-    trackedTasks.add(scheduler.runTaskTimer(
+    trackedTasks.add(RTPRuntime.scheduler().runTaskTimer(
         io.github.dailystruggle.rtp.common.tasks.tick.ScanProgressBars::update, 20, 20));
 
     long asyncTime = TimeUnit.MILLISECONDS.toNanos(io.github.dailystruggle.rtp.common.tasks.tick.TickBudget.DEFAULT_ASYNC_MS);
-    trackedTasks.add(scheduler.runTaskTimerAsynchronously(new io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing(asyncTime), 1, 1));
+    trackedTasks.add(RTPRuntime.scheduler().runTaskTimerAsynchronously(new io.github.dailystruggle.rtp.common.tasks.tick.AsyncTaskProcessing(asyncTime), 1, 1));
 
     // The static initializer ran before the platform set the scheduler, so the wave
     // accumulator for batchInterval triggers (ADR-093) can only be scheduled here.
-    triggerManager.start();
+    PhysicalTriggerManager.instance().start();
 
     // Discover and load platform-agnostic addons once core init has settled. Deferred via a
     // startup task so RTPAPI delegates installed by the platform adapter after construction are
     // visible to RTPAddon#onLoad (the load is idempotent; late programmatic registrations are
     // loaded eagerly by AddonRegistry#register).
-    startupTasks.add(new RTPRunnable(() -> {
-      if (serverAccessor != null) {
+    MiscTasks.startup().add(new RTPRunnable(() -> {
+      if (RTPRuntime.serverAccessor() != null) {
         try {
-          serverAccessor.getPlayerLifecycleHook().onPlayerQuit(uuid -> {
+          RTPRuntime.serverAccessor().getPlayerLifecycleHook().onPlayerQuit(uuid -> {
             if (uuid == null) return;
             io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask pending =
-                pendingDeathTeleports.remove(uuid);
+                DeathTeleports.pending().remove(uuid);
             if (pending != null) {
               pending.completeDeathTeleport(false);
             }
-            if (actionManager != null) {
-              actionManager.handlePlayerQuit(uuid);
+            if (ActionServices.actionManager() != null) {
+              ActionServices.actionManager().handlePlayerQuit(uuid);
             }
           });
         } catch (Throwable t) {
@@ -1671,8 +1598,8 @@ public class RTP {
       // Also scan an optional RTP-owned folder so operators can drop addon jars into
       // <pluginDir>/addons instead of plugins/, where the server's plugin loader would
       // reject them for lacking a plugin.yml. A missing/empty folder is a no-op.
-      if (serverAccessor != null) {
-        File pluginDir = serverAccessor.getPluginDirectory();
+      if (RTPRuntime.serverAccessor() != null) {
+        File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
         if (pluginDir != null) {
           File addonsDir = new File(pluginDir, "addons");
           // Unpack (and, on an RTP update, refresh) every addon jar bundled inside the
@@ -1697,8 +1624,8 @@ public class RTP {
    */
   public void updateRetentionWindow() {
     long cdMillis = 60_000L;
-    if (configs != null) {
-      ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) configs.getParser(ConfigKeys.class);
+    if (ActiveConfigs.get() != null) {
+      ConfigParser<ConfigKeys> configParser = (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
       if (configParser != null) {
         Object val = configParser.getConfigValue(ConfigKeys.teleportCooldown, 0);
         long parsed = ConfigParser.parseSecondsDurationMillis(val, 0L);
@@ -1708,11 +1635,11 @@ public class RTP {
     long retentionMs = Math.max(cdMillis * 2L, 60_000L);
     long binWidthMs = Math.min(Math.max(cdMillis, 30_000L), 300_000L);
 
-    latestTeleportData.setRetentionMs(retentionMs);
-    priorTeleportData.setRetentionMs(retentionMs);
+    TeleportSessions.current().latestTeleportData.setRetentionMs(retentionMs);
+    TeleportSessions.current().priorTeleportData.setRetentionMs(retentionMs);
 
-    File baseDir = (serverAccessor != null)
-        ? new File(serverAccessor.getPluginDirectory(), "data" + File.separator + "bins")
+    File baseDir = (RTPRuntime.serverAccessor() != null)
+        ? new File(RTPRuntime.serverAccessor().getPluginDirectory(), "data" + File.separator + "bins")
         : new File("plugins/RTP/data/bins");
     if (this.fileBinStore == null) {
       this.fileBinStore = new io.github.dailystruggle.rtp.common.playerData.FileBinStore(baseDir, binWidthMs, retentionMs);
@@ -1747,9 +1674,9 @@ public class RTP {
             currentState.equalsIgnoreCase("h2") ||
             currentState.equalsIgnoreCase("mysql") ||
             currentState.equalsIgnoreCase("postgresql"))) {
-      serverAccessor.log(Level.INFO, "&aDatabase engine change detected. Initiating background migration from YAML to SQL...");
-      getInstance().miscAsyncTasks.add(new RTPRunnable(() -> {
-        File pluginDir = serverAccessor.getPluginDirectory();
+      RTPRuntime.serverAccessor().log(Level.INFO, "&aDatabase engine change detected. Initiating background migration from YAML to SQL...");
+      MiscTasks.async().add(new RTPRunnable(() -> {
+        File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
         File databaseDir = new File(pluginDir, "database");
 
         // 1. Migrate teleportData.yml
@@ -1767,7 +1694,7 @@ public class RTP {
 
             try {
               TeleportData teleportData = new TeleportData();
-              teleportData.sender = serverAccessor.getSender(UUID.fromString(dataMap.get("senderId").toString()));
+              teleportData.sender = RTPRuntime.serverAccessor().getSender(UUID.fromString(dataMap.get("senderId").toString()));
               teleportData.time = ((Number) dataMap.getOrDefault("time", 0L)).longValue();
               Object oWorld = dataMap.get("originalWorldName");
               if (oWorld != null) teleportData.originalCoords = new RTPCoords(oWorld.toString(), ((Number) dataMap.get("originalX")).intValue(), ((Number) dataMap.get("originalY")).intValue(), ((Number) dataMap.get("originalZ")).intValue());
@@ -1775,10 +1702,10 @@ public class RTP {
               if (sWorld != null) teleportData.selectedCoords = new RTPCoords(sWorld.toString(), ((Number) dataMap.get("selectedX")).intValue(), ((Number) dataMap.get("selectedY")).intValue(), ((Number) dataMap.get("selectedZ")).intValue());
               teleportData.attempts = ((Number) dataMap.getOrDefault("attempts", 0)).longValue();
               teleportData.cost = ((Number) dataMap.getOrDefault("cost", 0.0)).doubleValue();
-              teleportData.targetRegion = selectionAPI.getRegion(dataMap.getOrDefault("region", "default").toString());
+              teleportData.targetRegion = ActiveSelection.get().getRegion(dataMap.getOrDefault("region", "default").toString());
               teleportData.completed = true;
 
-              if (getInstance().databaseAccessor instanceof AbstractSQLDatabaseAccessor sqlDb) {
+              if (ActiveDatabase.accessor() instanceof AbstractSQLDatabaseAccessor sqlDb) {
                 sqlDb.cacheValue(teleportData);
               }
             } catch (Exception ignored) {}
@@ -1813,7 +1740,7 @@ public class RTP {
                     TeleportData teleportData = new TeleportData();
                     Object senderIdObj = dataMap.get("senderId");
                     if (senderIdObj == null) continue;
-                    teleportData.sender = serverAccessor.getSender(UUID.fromString(senderIdObj.toString()));
+                    teleportData.sender = RTPRuntime.serverAccessor().getSender(UUID.fromString(senderIdObj.toString()));
                     teleportData.time = ((Number) dataMap.getOrDefault("time", 0L)).longValue();
                     Object oWorld = dataMap.get("originalWorldName");
                     if (oWorld != null) teleportData.originalCoords = new RTPCoords(oWorld.toString(), ((Number) dataMap.get("originalX")).intValue(), ((Number) dataMap.get("originalY")).intValue(), ((Number) dataMap.get("originalZ")).intValue());
@@ -1821,10 +1748,10 @@ public class RTP {
                     if (sWorld != null) teleportData.selectedCoords = new RTPCoords(sWorld.toString(), ((Number) dataMap.get("selectedX")).intValue(), ((Number) dataMap.get("selectedY")).intValue(), ((Number) dataMap.get("selectedZ")).intValue());
                     teleportData.attempts = ((Number) dataMap.getOrDefault("attempts", 0)).longValue();
                     teleportData.cost = ((Number) dataMap.getOrDefault("cost", 0.0)).doubleValue();
-                    teleportData.targetRegion = selectionAPI.getRegion(dataMap.getOrDefault("region", "default").toString());
+                    teleportData.targetRegion = ActiveSelection.get().getRegion(dataMap.getOrDefault("region", "default").toString());
                     teleportData.completed = true;
 
-                    if (getInstance().databaseAccessor instanceof AbstractSQLDatabaseAccessor sqlDb) {
+                    if (ActiveDatabase.accessor() instanceof AbstractSQLDatabaseAccessor sqlDb) {
                       sqlDb.cacheValue(teleportData);
                       success = true;
                     }
@@ -1841,7 +1768,7 @@ public class RTP {
           }
         }
 
-        if (getInstance().databaseAccessor instanceof AbstractSQLDatabaseAccessor sqlDb) {
+        if (ActiveDatabase.accessor() instanceof AbstractSQLDatabaseAccessor sqlDb) {
           sqlDb.flush();
         }
       }, 0));
@@ -1850,13 +1777,13 @@ public class RTP {
 
   @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the shape Factory under a raw value type
   public static void registerDefaultShapes() {
-    Factory<Shape<?>> shapeFactory = (Factory<Shape<?>>) factoryMap.get(factoryNames.shape);
+    Factory<Shape<?>> shapeFactory = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
     if (shapeFactory == null) {
       shapeFactory = new Factory<>();
-      factoryMap.put(factoryNames.shape, shapeFactory);
+      FactoryRegistry.map().put(FactoryNames.shape, shapeFactory);
     }
-    if (selectionAPI != null && selectionAPI.shapeFactory == null) {
-      selectionAPI.shapeFactory = shapeFactory;
+    if (ActiveSelection.get() != null && ActiveSelection.get().shapeFactory == null) {
+      ActiveSelection.get().shapeFactory = shapeFactory;
     }
     addShape(new Circle());
     addShape(new CircleOptimizedDualLayer());
@@ -1873,10 +1800,10 @@ public class RTP {
 
   @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the vert Factory under a raw value type
   public static void registerDefaultVerticalAdjustors() {
-    Factory<VerticalAdjustor<?>> vertFactory = (Factory<VerticalAdjustor<?>>) factoryMap.get(factoryNames.vert);
+    Factory<VerticalAdjustor<?>> vertFactory = (Factory<VerticalAdjustor<?>>) FactoryRegistry.get(FactoryNames.vert);
     if (vertFactory == null) {
       vertFactory = new Factory<>();
-      factoryMap.put(factoryNames.vert, vertFactory);
+      FactoryRegistry.map().put(FactoryNames.vert, vertFactory);
     }
     addVerticalAdjustor(new LinearAdjustor(new ArrayList<>()));
     addVerticalAdjustor(new JumpAdjustor(new ArrayList<>()));
@@ -1886,17 +1813,17 @@ public class RTP {
   @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the shape Factory under a raw value type
   public static void addShape(Shape<?> shape) {
     Factory<Shape<?>> shapeFactory =
-        (Factory<Shape<?>>) factoryMap.computeIfAbsent(factoryNames.shape, k -> new Factory<Shape<?>>());
+        (Factory<Shape<?>>) FactoryRegistry.map().computeIfAbsent(FactoryNames.shape, k -> new Factory<Shape<?>>());
     shapeFactory.add(shape.name, shape);
-    if (selectionAPI != null && selectionAPI.shapeFactory == null) {
-      selectionAPI.shapeFactory = shapeFactory;
+    if (ActiveSelection.get() != null && ActiveSelection.get().shapeFactory == null) {
+      ActiveSelection.get().shapeFactory = shapeFactory;
     }
   }
 
   @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the vert Factory under a raw value type
   public static void addVerticalAdjustor(VerticalAdjustor<?> verticalAdjustor) {
     Factory<VerticalAdjustor<?>> vertFactory = (Factory<VerticalAdjustor<?>>)
-        factoryMap.computeIfAbsent(factoryNames.vert, k -> new Factory<VerticalAdjustor<?>>());
+        FactoryRegistry.map().computeIfAbsent(FactoryNames.vert, k -> new Factory<VerticalAdjustor<?>>());
     vertFactory.add(verticalAdjustor.name, verticalAdjustor);
   }
 
@@ -1904,33 +1831,28 @@ public class RTP {
     return instance;
   }
 
-  public Object getPlugin() {
-    return serverAccessor.getPlugin();
+  /**
+   * Runs {@code RTP}'s static initializer if it has not run yet; otherwise a no-op.
+   *
+   * <p>Platform entry points shall call this before {@link RTPRuntime#setServerAccessor}.
+   * The static initializer registers the default shapes, whose lang-file load is skipped while
+   * no accessor is installed; the former {@code RTP.serverAccessor} field write forced that
+   * ordering implicitly (ADR-115 invariant 3).
+   */
+  public static void ensureInitialized() {
+    // Invoking any static method triggers class initialization (JLS 12.4.1).
   }
 
-  /**
-   * Bounded buffer for sub-INFO log entries emitted before {@code logging.yml} parser is built.
-   * Drained via {@link #flushPendingLogs()} once configuration is loaded.
-   */
-  private static final java.util.concurrent.ConcurrentLinkedQueue<Object[]> pendingLogs =
-      new java.util.concurrent.ConcurrentLinkedQueue<>();
-
-  /** Hard cap so a misconfigured/late bootstrap can't grow the buffer unbounded. */
-  private static final int PENDING_LOGS_CAP = 4096;
-
-  /**
-   * True once {@link #flushPendingLogs()} has run; subsequent calls bypass the
-   * buffer and emit directly. Kept volatile so the gate is visible across threads
-   * without locking the hot log path.
-   */
-  private static volatile boolean logsBuffered = true;
+  public Object getPlugin() {
+    return RTPRuntime.serverAccessor().getPlugin();
+  }
 
   /**
    * Returns true when the {@code logging.yml} parser hasn't been built yet, so
    * sub-INFO records would otherwise leak past the (yet-unfiltered) sink.
    */
   private static boolean loggingParserUnavailable() {
-    Configs c = configs;
+    Configs c = ActiveConfigs.get();
     if (c == null) return true;
     try {
       return c.getParser(
@@ -1941,67 +1863,19 @@ public class RTP {
     }
   }
 
-  /**
-   * Drains any sub-INFO records buffered during bootstrap through the live sink.
-   * Idempotent: callers (notably {@link Configs#reloadConfigs()} after the atomic
-   * parser swap) may invoke this freely. Once drained, future {@link #log} calls
-   * bypass the buffer.
-   */
+  /** Delegates to {@link RTPRuntime#flushPendingLogs()}; kept for platform and addon callers. */
   public static void flushPendingLogs() {
-    logsBuffered = false;
-    RTPServerAccessor accessor = serverAccessor;
-    Object[] entry;
-    while ((entry = pendingLogs.poll()) != null) {
-      Level lvl = (Level) entry[0];
-      String msg = (String) entry[1];
-      Throwable t = (Throwable) entry[2];
-      try {
-        if (accessor == null) {
-          if (t == null) java.util.logging.Logger.getLogger("RTP").log(lvl, msg);
-          else java.util.logging.Logger.getLogger("RTP").log(lvl, msg, t);
-        } else {
-          if (t == null) accessor.log(lvl, msg);
-          else accessor.log(lvl, msg, t);
-        }
-      } catch (Throwable ignored) {
-        // Never let replay failures break the caller.
-      }
-    }
+    RTPRuntime.flushPendingLogs();
   }
 
+  /** Delegates to {@link RTPRuntime#log(Level, String)}; kept for platform and addon callers. */
   public static void log(Level level, String str) {
-    RTPServerAccessor accessor = serverAccessor;
-    if (logsBuffered && level != null && level.intValue() < Level.INFO.intValue()
-        && loggingParserUnavailable()) {
-      if (pendingLogs.size() < PENDING_LOGS_CAP) {
-        pendingLogs.offer(new Object[] {level, str, null});
-      }
-      return;
-    }
-    if (accessor == null) {
-      // Bootstrap fallback: serverAccessor is wired during onEnable, but lifecycle
-      // tracing fires before/after that window (e.g. early onEnable, onDisable after a
-      // failed onEnable). Route through JUL so we never NPE during plugin enable/disable.
-      java.util.logging.Logger.getLogger("RTP").log(level, str);
-      return;
-    }
-    accessor.log(level, str);
+    RTPRuntime.log(level, str);
   }
 
+  /** Delegates to {@link RTPRuntime#log(Level, String, Throwable)}; kept for platform and addon callers. */
   public static void log(Level level, String str, Throwable throwable) {
-    RTPServerAccessor accessor = serverAccessor;
-    if (logsBuffered && level != null && level.intValue() < Level.INFO.intValue()
-        && loggingParserUnavailable()) {
-      if (pendingLogs.size() < PENDING_LOGS_CAP) {
-        pendingLogs.offer(new Object[] {level, str, throwable});
-      }
-      return;
-    }
-    if (accessor == null) {
-      java.util.logging.Logger.getLogger("RTP").log(level, str, throwable);
-      return;
-    }
-    accessor.log(level, str, throwable);
+    RTPRuntime.log(level, str, throwable);
   }
 
   @SuppressWarnings("unchecked") // heterogeneous multiConfigParserMap keyed by enum class; WorldKeys parser cast is safe
@@ -2010,7 +1884,7 @@ public class RTP {
     Set<String> worldsAttempted = new HashSet<>();
     String worldName = player.getLocation().world().name();
     MultiConfigParser<WorldKeys> worldParsers =
-        (MultiConfigParser<WorldKeys>) RTP.configs.multiConfigParserMap.get(WorldKeys.class);
+        (MultiConfigParser<WorldKeys>) ActiveConfigs.get().multiConfigParserMap.get(WorldKeys.class);
     ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
     boolean requirePermission =
         Boolean.parseBoolean(
@@ -2031,7 +1905,7 @@ public class RTP {
               worldParser.getConfigValue(WorldKeys.requirePermission, false).toString());
     }
 
-    return serverAccessor.getRTPWorld(worldName);
+    return RTPRuntime.serverAccessor().getRTPWorld(worldName);
   }
 
   public static void stop() {
@@ -2064,7 +1938,7 @@ public class RTP {
     }
 
     int inflight = 0;
-    for (Map.Entry<UUID, TeleportData> e : instance.latestTeleportData.entrySet()) {
+    for (Map.Entry<UUID, TeleportData> e : TeleportSessions.current().latestTeleportData.entrySet()) {
       TeleportData data = e.getValue();
       if (data == null || data.completed) continue;
       log(Level.FINER,
@@ -2080,8 +1954,8 @@ public class RTP {
     io.github.dailystruggle.rtp.common.commands.editor.EditorLiveFeed.stopActive("plugin disabled");
     io.github.dailystruggle.rtp.common.commands.editor.EditorExtensions.unregisterAll();
 
-    if (instance.databaseAccessor != null) {
-      if (instance.databaseAccessor instanceof AbstractSQLDatabaseAccessor sqlDatabaseAccessor) {
+    if (ActiveDatabase.accessor() != null) {
+      if (ActiveDatabase.accessor() instanceof AbstractSQLDatabaseAccessor sqlDatabaseAccessor) {
         log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop SQL accessor flush (WAL checkpoint)");
         sqlDatabaseAccessor.flush();
       }
@@ -2091,33 +1965,33 @@ public class RTP {
       // write-vs-delete ordering race in processQueries) survive into the next
       // startup and get re-hydrated as ghosts.
       log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop rebuildCachedLocationsFromMemory");
-      instance.databaseAccessor.rebuildCachedLocationsFromMemory();
+      ActiveDatabase.accessor().rebuildCachedLocationsFromMemory();
       // Drain dirtyCache -> writeQueue (this enqueues async writes via setValue().thenAccept(),
       // but getTable returns a completed future synchronously, so the enqueue runs inline).
       log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop flushDirtyCache");
-      instance.databaseAccessor.flushDirtyCache();
+      ActiveDatabase.accessor().flushDirtyCache();
       // CRITICAL: actually drain the writeQueue (and deleteQueue) to disk. Previously this
       // step was missing on shutdown, so every cached-location save/delete that accumulated
       // between the 5-minute periodic flushDirtyCache cycle and server stop was lost -
       // which is why the kept cache appeared empty after restart. Must happen BEFORE
       // stop.set(true) below, because processQueries bails immediately if stop is set.
       log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop processQueries(MAX) drain BEFORE stop.set(true)");
-      instance.databaseAccessor.processQueries(Long.MAX_VALUE);
+      ActiveDatabase.accessor().processQueries(Long.MAX_VALUE);
     }
 
     log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop StopPipes miscAsyncTasks/miscSyncTasks");
-    instance.miscAsyncTasks.stop();
-    instance.miscSyncTasks.stop();
+    MiscTasks.async().stop();
+    MiscTasks.sync().stop();
 
     log(Level.FINE,
         "[SHUTDOWN_TRACE] RTP.stop CancelTracked count=" + trackedTasks.size());
     for (Object task : trackedTasks) {
       log(Level.FINER, "[SHUTDOWN_TRACE] RTP.stop cancelTrackedTask task=" + task);
-      scheduler.cancelTask(task);
+      RTPRuntime.scheduler().cancelTask(task);
     }
     trackedTasks.clear();
     // Cancels the wave timer and drops triggers so the next enable schedules afresh.
-    triggerManager.close();
+    PhysicalTriggerManager.instance().close();
 
     // Delayed arrival releases never run once the plugin is disabled (S-002).
     int arrivalHolds =
@@ -2126,31 +2000,31 @@ public class RTP {
 
     log(Level.FINE,
         "[SHUTDOWN_TRACE] RTP.stop permRegionLookup shutDown count="
-            + selectionAPI.permRegionLookup.size());
-    for (Region r : selectionAPI.permRegionLookup.values()) {
+            + ActiveSelection.get().permRegionLookup.size());
+    for (Region r : ActiveSelection.get().permRegionLookup.values()) {
       log(Level.FINER, "[SHUTDOWN_TRACE] RTP.stop permRegion.shutDown name=" + r.name);
       r.shutDown();
     }
-    selectionAPI.permRegionLookup.clear();
+    ActiveSelection.get().permRegionLookup.clear();
 
     log(Level.FINE,
-        "[SHUTDOWN_TRACE] RTP.stop tempRegions shutDown count=" + selectionAPI.tempRegions.size());
-    for (Region r : selectionAPI.tempRegions.values()) {
+        "[SHUTDOWN_TRACE] RTP.stop tempRegions shutDown count=" + ActiveSelection.get().tempRegions.size());
+    for (Region r : ActiveSelection.get().tempRegions.values()) {
       log(Level.FINER, "[SHUTDOWN_TRACE] RTP.stop tempRegion.shutDown name=" + r.name);
       r.shutDown();
     }
-    selectionAPI.tempRegions.clear();
+    ActiveSelection.get().tempRegions.clear();
 
-    if (instance.databaseAccessor != null) {
+    if (ActiveDatabase.accessor() != null) {
       log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop databaseAccessor.stop.set(true) + close()");
-      if (instance.databaseAccessor.stop != null) {
-        instance.databaseAccessor.stop.set(true);
+      if (ActiveDatabase.accessor().stop != null) {
+        ActiveDatabase.accessor().stop.set(true);
       }
-      instance.databaseAccessor.close();
-      instance.databaseAccessor = null;
+      ActiveDatabase.accessor().close();
+      ActiveDatabase.setAccessor(null);
     }
 
-    instance.latestTeleportData.forEach(
+    TeleportSessions.current().latestTeleportData.forEach(
         (uuid, data) -> {
           if (!data.completed) {
             log(Level.FINER,
@@ -2159,7 +2033,7 @@ public class RTP {
           }
         });
 
-    instance.processingPlayers.clear();
+    TeleportSessions.current().processingPlayers.clear();
 
     log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop ScanTask.kill");
     ScanTask.kill();
@@ -2173,15 +2047,7 @@ public class RTP {
     addons.unloadAll();
 
     log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop serverAccessor.stop");
-    serverAccessor.stop();
+    RTPRuntime.serverAccessor().stop();
     log(Level.FINE, "[SHUTDOWN_TRACE] RTP.stop EXIT");
-  }
-
-  /** dynamic factories for certain types */
-  public enum factoryNames {
-    shape,
-    vert,
-    singleConfig,
-    multiConfig
   }
 }

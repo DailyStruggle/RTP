@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.search;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopbackJson;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -59,7 +59,7 @@ public final class ThesaurusIndex {
 
         try (InputStream in = ThesaurusIndex.class.getResourceAsStream(resourcePath)) {
             if (in == null) {
-                RTP.log(Level.FINE, "[RTP] thesaurus resource missing: " + resourcePath);
+                RTPRuntime.log(Level.FINE, "[RTP] thesaurus resource missing: " + resourcePath);
                 return new ThesaurusIndex(conceptMap, keyMap);
             }
 
@@ -80,7 +80,7 @@ public final class ThesaurusIndex {
                 populate(synonymsSection, conceptMap, keyMap);
             }
         } catch (IOException | RuntimeException e) {
-            RTP.log(Level.FINE, "[RTP] thesaurus resource unreadable (" + resourcePath + "): " + e);
+            RTPRuntime.log(Level.FINE, "[RTP] thesaurus resource unreadable (" + resourcePath + "): " + e);
         }
 
         return new ThesaurusIndex(conceptMap, keyMap);

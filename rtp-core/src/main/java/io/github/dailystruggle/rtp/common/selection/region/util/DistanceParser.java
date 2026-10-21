@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region.util;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Locale;
 import java.util.logging.Level;
 import java.util.regex.Matcher;
@@ -135,6 +135,6 @@ public final class DistanceParser {
         blockEquiv,
         SpatialUnit.fromString(newUnit) != null ? SpatialUnit.fromString(newUnit).getPrimarySuffix() : newUnit
     );
-    RTP.log(Level.INFO, msg);
+    RTPRuntime.log(Level.INFO, msg);
   }
 }

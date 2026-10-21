@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.guiaddon.common;
 
 import io.github.dailystruggle.rtp.api.RtpTarget;
 import io.github.dailystruggle.rtp.api.RtpTargetStatus;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 
 /**
@@ -26,8 +26,8 @@ public final class GuiMenuConfig {
 
   @SuppressWarnings("unchecked")
   private ConfigParser<GuiMenuKeys> parser() {
-    if (RTP.configs == null) return null;
-    return (ConfigParser<GuiMenuKeys>) RTP.configs.getParser(GuiMenuKeys.class);
+    if (ActiveConfigs.get() == null) return null;
+    return (ConfigParser<GuiMenuKeys>) ActiveConfigs.get().getParser(GuiMenuKeys.class);
   }
 
   private String str(GuiMenuKeys key, String fallback) {

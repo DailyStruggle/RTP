@@ -2,11 +2,15 @@ package io.github.dailystruggle.rtp.common.commands.config;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
@@ -46,8 +50,8 @@ public class RegionCenterZReproTest {
     @SuppressWarnings("unchecked")
     void setUp() throws Exception {
         RTPTestSetup.install(tempDir.toFile());
-        RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
-        Configs configs = RTP.configs;
+        ActiveSelection.set(new io.github.dailystruggle.rtp.common.selection.SelectionAPI());
+        Configs configs = ActiveConfigs.get();
 
         io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase mockDb =
                 mock(io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase.class);
@@ -97,18 +101,18 @@ public class RegionCenterZReproTest {
         configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.PlaceholderMessages.class, lang);
 
         // Populate the shape/vert factories so getParameters() sub-knobs exist.
-        Factory<Shape<?>> shapeFactory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+        Factory<Shape<?>> shapeFactory = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
         if (shapeFactory == null) {
             shapeFactory = new Factory<>();
-            RTP.factoryMap.put(RTP.factoryNames.shape, shapeFactory);
+            FactoryRegistry.map().put(FactoryNames.shape, shapeFactory);
         }
         shapeFactory.add("SQUARE", new Square());
 
         Factory<VerticalAdjustor<?>> vertFactory =
-                (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
+                (Factory<VerticalAdjustor<?>>) FactoryRegistry.get(FactoryNames.vert);
         if (vertFactory == null) {
             vertFactory = new Factory<>();
-            RTP.factoryMap.put(RTP.factoryNames.vert, vertFactory);
+            FactoryRegistry.map().put(FactoryNames.vert, vertFactory);
         }
         vertFactory.add("JUMP", new JumpAdjustor(new ArrayList<>()));
 

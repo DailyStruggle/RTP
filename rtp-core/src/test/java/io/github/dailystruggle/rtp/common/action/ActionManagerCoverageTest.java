@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -34,7 +35,7 @@ class ActionManagerCoverageTest {
   @BeforeEach
   void setUp() {
     serverAccessor = new MockRTPServerAccessor(new File("."));
-    RTP.serverAccessor = serverAccessor;
+    RTPRuntime.setServerAccessor(serverAccessor);
     originalGroupService = RTP.groupPlacementService;
     actionManager = new ActionManager();
   }
@@ -218,11 +219,11 @@ class ActionManagerCoverageTest {
     serverAccessor.addPlayer(new MockRTPPlayer(p, "Orphan", new RTPLocation(serverAccessor.getRTPWorld("world"), 0, 64, 0)));
     actionManager.sweepStartupOrphans();
     assertTrue(serverAccessor.getExecutedCommands().stream().anyMatch(c -> c.equals("tag @a remove rtp_session_*")));
-    RTP.serverAccessor = null;
+    RTPRuntime.setServerAccessor(null);
     try {
       assertDoesNotThrow(actionManager::sweepStartupOrphans);
     } finally {
-      RTP.serverAccessor = serverAccessor;
+      RTPRuntime.setServerAccessor(serverAccessor);
     }
   }
 

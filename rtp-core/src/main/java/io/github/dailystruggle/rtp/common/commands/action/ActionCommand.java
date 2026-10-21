@@ -6,9 +6,11 @@ import io.github.dailystruggle.rtp.api.action.ActionDefinition;
 import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.action.ActionManager;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -50,14 +52,14 @@ public class ActionCommand extends BaseRTPCmdImpl {
             paramPerm,
             "target player",
             (uuid, s) -> {
-              RTPCommandSender sender = RTP.serverAccessor.getSender(uuid);
+              RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(uuid);
               if (sender == null) return false;
               if (paramPerm != null && !paramPerm.isBlank() && !sender.hasPermission(paramPerm) && !sender.isRtpAdmin()) {
                 return false;
               }
-              RTPPlayer target = RTP.serverAccessor.getPlayer(s);
+              RTPPlayer target = RTPRuntime.serverAccessor().getPlayer(s);
               if (target == null || !target.name().equalsIgnoreCase(s)) return false;
-              RTPCommandSender targetSender = RTP.serverAccessor.getSender(target.uuid());
+              RTPCommandSender targetSender = RTPRuntime.serverAccessor().getSender(target.uuid());
               if (targetSender == null) return true;
               if (!(sender instanceof RTPPlayer)) return true;
               if (!targetSender.hasPermission("rtp.notme")) return true;
@@ -65,7 +67,7 @@ public class ActionCommand extends BaseRTPCmdImpl {
             }) {
           @Override
           public java.util.Set<String> values() {
-            return RTP.serverAccessor != null ? RTP.serverAccessor.getOnlinePlayerNames() : java.util.Collections.emptySet();
+            return RTPRuntime.serverAccessor() != null ? RTPRuntime.serverAccessor().getOnlinePlayerNames() : java.util.Collections.emptySet();
           }
         });
 
@@ -168,9 +170,9 @@ public class ActionCommand extends BaseRTPCmdImpl {
       io.github.dailystruggle.rtp.api.action.ParameterSpec targetParam =
           definition.command().firstParameterOfType(io.github.dailystruggle.rtp.api.action.ParameterType.PLAYER);
       if (targetParam != null && (!targetParam.hasPermission() || permissionCheckMethod.test(targetParam.permission()))
-          && RTP.serverAccessor != null) {
+          && RTPRuntime.serverAccessor() != null) {
         String prefix = args[0].toLowerCase(java.util.Locale.ROOT);
-        for (String name : RTP.serverAccessor.getOnlinePlayerNames()) {
+        for (String name : RTPRuntime.serverAccessor().getOnlinePlayerNames()) {
           if (name.toLowerCase(java.util.Locale.ROOT).startsWith(prefix)) {
             results.add(name);
           }
@@ -185,10 +187,10 @@ public class ActionCommand extends BaseRTPCmdImpl {
       UUID senderId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
 
-    RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
+    RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(senderId);
     String requiredPerm = permission();
     if (requiredPerm != null && !requiredPerm.isBlank() && !sender.hasPermission(requiredPerm) && !sender.isRtpAdmin()) {
-      RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.noPerms);
+      RTPRuntime.serverAccessor().sendMessage(senderId, senderId, PlayerMessages.noPerms);
       return true;
     }
 
@@ -221,7 +223,7 @@ public class ActionCommand extends BaseRTPCmdImpl {
     // teleport or single out -- an arbitrary player. The default path stays unrestricted.
     if (callerSuppliedTarget && targetParam != null && targetParam.hasPermission()
         && !sender.hasPermission(targetParam.permission()) && !sender.isRtpAdmin()) {
-      RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.noPerms);
+      RTPRuntime.serverAccessor().sendMessage(senderId, senderId, PlayerMessages.noPerms);
       return true;
     }
 
@@ -239,7 +241,7 @@ public class ActionCommand extends BaseRTPCmdImpl {
         for (String pName : split) {
           String trimmed = pName.trim();
           if (trimmed.isEmpty()) continue;
-          RTPPlayer target = RTP.serverAccessor.getPlayer(trimmed);
+          RTPPlayer target = RTPRuntime.serverAccessor().getPlayer(trimmed);
           if (target != null) {
             if (targetPlayerName == null) {
               targetPlayerName = target.name();
@@ -277,7 +279,7 @@ public class ActionCommand extends BaseRTPCmdImpl {
         targetPlayerName = null;
         targetPlayerUuid = null;
       } else {
-        RTPPlayer literalTarget = RTP.serverAccessor.getPlayer(defaultValue);
+        RTPPlayer literalTarget = RTPRuntime.serverAccessor().getPlayer(defaultValue);
         if (literalTarget != null) {
           targetPlayerName = literalTarget.name();
           targetPlayerUuid = literalTarget.uuid();
@@ -289,7 +291,7 @@ public class ActionCommand extends BaseRTPCmdImpl {
     }
 
     if (participants.isEmpty()) {
-      RTP.serverAccessor.sendMessage(senderId, senderId, "[RTP] No participants specified for action: " + definition.id());
+      RTPRuntime.serverAccessor().sendMessage(senderId, senderId, "[RTP] No participants specified for action: " + definition.id());
       return true;
     }
 
@@ -312,7 +314,7 @@ public class ActionCommand extends BaseRTPCmdImpl {
     }
 
     ActionContext context = new ActionContext(metadata);
-    RTP.log(
+    RTPRuntime.log(
         Level.FINE,
         "[action] invoking action '"
             + definition.id()
@@ -334,26 +336,26 @@ public class ActionCommand extends BaseRTPCmdImpl {
 
       actionService.trigger(definition.id(), participants, context).whenComplete((res, ex) -> {
         if (ex != null) {
-          RTP.log(Level.WARNING, "[action] execution threw exception for '" + definition.id() + "'", ex);
-          if (RTP.getInstance() != null) {
+          RTPRuntime.log(Level.WARNING, "[action] execution threw exception for '" + definition.id() + "'", ex);
+          if (TeleportSessions.current() != null) {
             io.github.dailystruggle.rtp.common.playerData.TeleportData td =
-                RTP.getInstance().latestTeleportData.computeIfAbsent(senderId, k -> new io.github.dailystruggle.rtp.common.playerData.TeleportData());
+                TeleportSessions.current().latestTeleportData.computeIfAbsent(senderId, k -> new io.github.dailystruggle.rtp.common.playerData.TeleportData());
             td.attempts = (definition.placement() != null) ? definition.placement().retries() : 1;
           }
-          RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.unsafe);
+          RTPRuntime.serverAccessor().sendMessage(senderId, senderId, PlayerMessages.unsafe);
         } else if (res != null && !res.success()) {
           String reason = res.failureReason();
-          RTP.log(Level.WARNING, "[action] execution failed for '" + definition.id() + "': " + reason);
+          RTPRuntime.log(Level.WARNING, "[action] execution failed for '" + definition.id() + "': " + reason);
           if (reason != null && (reason.contains("INSUFFICIENT_SAFE_SLOTS")
               || reason.contains("safe slots")
               || reason.contains("Spatial subspace placement failed")
               || reason.contains("NO_ANCHOR"))) {
-            if (RTP.getInstance() != null) {
+            if (TeleportSessions.current() != null) {
               io.github.dailystruggle.rtp.common.playerData.TeleportData td =
-                  RTP.getInstance().latestTeleportData.computeIfAbsent(senderId, k -> new io.github.dailystruggle.rtp.common.playerData.TeleportData());
+                  TeleportSessions.current().latestTeleportData.computeIfAbsent(senderId, k -> new io.github.dailystruggle.rtp.common.playerData.TeleportData());
               td.attempts = (definition.placement() != null) ? definition.placement().retries() : 1;
             }
-            RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.unsafe);
+            RTPRuntime.serverAccessor().sendMessage(senderId, senderId, PlayerMessages.unsafe);
           } else if (reason != null && reason.contains("already in an active session")) {
             String pName = "";
             int idx = reason.indexOf(':');
@@ -364,25 +366,25 @@ public class ActionCommand extends BaseRTPCmdImpl {
               pName = (sender instanceof RTPPlayer p) ? p.name() : "You";
             }
             // Send localized alreadyInSession message
-            Object msgObj = (RTP.configs != null) ? RTP.configs.getConfigValue(PlayerMessages.alreadyInSession, "") : null;
+            Object msgObj = (ActiveConfigs.get() != null) ? ActiveConfigs.get().getConfigValue(PlayerMessages.alreadyInSession, "") : null;
             String msg = (msgObj != null) ? msgObj.toString() : "";
             if (msg.isBlank()) {
               msg = "&c[P0] [player] is already in an active match session.";
             }
             msg = msg.replace("[player]", pName);
-            RTP.serverAccessor.sendMessage(senderId, senderId, msg);
+            RTPRuntime.serverAccessor().sendMessage(senderId, senderId, msg);
           } else {
-            RTP.serverAccessor.sendMessage(senderId, senderId, "[RTP] Action failed: " + reason);
+            RTPRuntime.serverAccessor().sendMessage(senderId, senderId, "[RTP] Action failed: " + reason);
           }
         } else if (res != null && res.success()) {
-          RTP.log(Level.FINE, "[action] session successfully started: " + res.sessionId());
+          RTPRuntime.log(Level.FINE, "[action] session successfully started: " + res.sessionId());
         }
       });
 
       // If the action was enqueued into a wait queue (e.g. waiting for participants or gate conditions),
       // send the queueUpdate message so the user knows they are waiting in queue.
       boolean isWaitQueued = (actionService instanceof ActionManager am) && am.isQueued(definition.id(), senderId);
-      RTP.log(
+      RTPRuntime.log(
           Level.FINE,
           "[action] status after trigger for '"
               + definition.id()
@@ -391,12 +393,12 @@ public class ActionCommand extends BaseRTPCmdImpl {
               + ", isCached="
               + isCached);
       if (isWaitQueued) {
-        RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.queueUpdate);
+        RTPRuntime.serverAccessor().sendMessage(senderId, senderId, PlayerMessages.queueUpdate);
       } else if (!isCached && definition.placement().enabled()) {
         if (hasUnqueuedPerm) {
-          RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.chunkLoading);
+          RTPRuntime.serverAccessor().sendMessage(senderId, senderId, PlayerMessages.chunkLoading);
         } else {
-          RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.queueUpdate);
+          RTPRuntime.serverAccessor().sendMessage(senderId, senderId, PlayerMessages.queueUpdate);
         }
       }
     }

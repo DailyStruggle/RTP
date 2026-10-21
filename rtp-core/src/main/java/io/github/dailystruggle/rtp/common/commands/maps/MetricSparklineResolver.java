@@ -3,9 +3,10 @@ package io.github.dailystruggle.rtp.common.commands.maps;
 import io.github.dailystruggle.mapsapi.model.DualSparkline;
 import io.github.dailystruggle.mapsapi.render.DualSparklineRenderer;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.metrics.MetricsSnapshotRing;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.logging.Level;
 
 /**
@@ -32,7 +33,7 @@ public final class MetricSparklineResolver implements ChartSpecResolver {
 
     @Override
     public Resolution resolve(ChartSpec spec) throws UnresolvableChartSpecException {
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
                 "[viz/sparkline] resolver entry: spec="
                         + (spec == null ? "null" : spec.kind().toString()));
         if (spec == null) {
@@ -43,7 +44,7 @@ public final class MetricSparklineResolver implements ChartSpecResolver {
                     "MetricSparklineResolver only handles METRIC_SPARKLINE, got " + spec.kind());
         }
 
-        MetricsSnapshotRing ring = RTP.metrics.snapshotRing();
+        MetricsSnapshotRing ring = CoreMetrics.instance().snapshotRing();
         if (ring == null) {
             // CoreMetrics always exposes a ring; defensive guard.
             throw new UnresolvableChartSpecException(
@@ -98,7 +99,7 @@ public final class MetricSparklineResolver implements ChartSpecResolver {
 
         // Autoscale heap to [0, max(observed, 256 MB or heapMaxBytes / MB)].
         double heapMax = HEAP_FLOOR_CEILING_BYTES / (1024.0 * 1024.0);
-        long heapMaxBytes = RTP.metrics.snapshot().heapMaxBytes;
+        long heapMaxBytes = CoreMetrics.instance().snapshot().heapMaxBytes;
         if (heapMaxBytes > 0) {
             heapMax = Math.max(heapMax,
                     ((double) heapMaxBytes) / (1024.0 * 1024.0));
@@ -107,7 +108,7 @@ public final class MetricSparklineResolver implements ChartSpecResolver {
             if (!Double.isNaN(v) && v > heapMax) heapMax = v;
         }
 
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
                 "[viz/sparkline] resolver: samples=" + n
                         + " mspt-range=[0," + msptMax + "]"
                         + " heap-range=[0," + heapMax + "] MB");

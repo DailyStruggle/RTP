@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import org.junit.jupiter.api.AfterEach;
@@ -60,8 +61,8 @@ class PregenStateTest {
 
     @AfterEach
     void tearDown() {
-        RTP.serverAccessor = null;
-        RTP.scheduler = null;
+        RTPRuntime.setServerAccessor(null);
+        RTPRuntime.setScheduler(null);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
     }
 
@@ -107,7 +108,7 @@ class PregenStateTest {
     @Test
     @DisplayName("build with null/empty biomes falls back to default biomes configuration")
     void build_defaultBiomesFallback() {
-        ConfigParser<BiomesKeys> biomesParser = (ConfigParser<BiomesKeys>) RTP.configs.getParser(BiomesKeys.class);
+        ConfigParser<BiomesKeys> biomesParser = (ConfigParser<BiomesKeys>) ActiveConfigs.get().getParser(BiomesKeys.class);
         biomesParser.set(BiomesKeys.biomeWhitelist, false);
         biomesParser.set(BiomesKeys.biomes, List.of("NETHER_WASTES", "soul_sand_valley"));
 
@@ -124,7 +125,7 @@ class PregenStateTest {
     @DisplayName("build configures biome weighting and weights map")
     void build_biomeWeighting() {
         ConfigParser<BiomesKeys> biomesParser =
-                (ConfigParser<BiomesKeys>) RTP.configs.getParser(BiomesKeys.class);
+                (ConfigParser<BiomesKeys>) ActiveConfigs.get().getParser(BiomesKeys.class);
         biomesParser.set(BiomesKeys.biomeWeighted, true);
         biomesParser.set(BiomesKeys.biomeWeights, Map.of("PLAINS", 2.5, "DESERT", -1.0));
 
@@ -141,7 +142,7 @@ class PregenStateTest {
     @DisplayName("build compiles unsafe blocks and handles invalid tokens via SafetyCompilationCache")
     void build_unsafeBlocksAndTokens() {
         ConfigParser<BlocksKeys> blocksParser =
-                (ConfigParser<BlocksKeys>) RTP.configs.getParser(BlocksKeys.class);
+                (ConfigParser<BlocksKeys>) ActiveConfigs.get().getParser(BlocksKeys.class);
         blocksParser.set(BlocksKeys.unsafeBlocks, List.of("LAVA", "WATER", "#invalid_tag:bad!"));
 
         PregenState state = PregenState.build(region, null);
@@ -155,7 +156,7 @@ class PregenStateTest {
     @DisplayName("build computes attempt bounds and ceiling")
     void build_attemptsCalculation() {
         ConfigParser<PerformanceKeys> perfParser =
-                (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+                (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         perfParser.set(PerformanceKeys.maxAttempts, 50L);
 
         PregenState state = PregenState.build(region, null);

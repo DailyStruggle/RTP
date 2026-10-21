@@ -2,8 +2,8 @@ package io.github.dailystruggle.rtp.common.commands.editor;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Polygon;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
@@ -35,13 +35,13 @@ class EditorCurveModelBranchTest {
 
     @BeforeEach
     void accessor() {
-        previousAccessor = RTP.serverAccessor;
-        RTP.serverAccessor = new MockRTPServerAccessor(tempDir.toFile());
+        previousAccessor = RTPRuntime.serverAccessor();
+        RTPRuntime.setServerAccessor(new MockRTPServerAccessor(tempDir.toFile()));
     }
 
     @AfterEach
     void restoreAccessor() {
-        RTP.serverAccessor = previousAccessor;
+        RTPRuntime.setServerAccessor(previousAccessor);
     }
 
     /** Polygon with a fixed vertex list, bypassing validation and the async mask walker. */

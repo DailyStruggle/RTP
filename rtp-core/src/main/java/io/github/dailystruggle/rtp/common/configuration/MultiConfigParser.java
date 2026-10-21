@@ -1,9 +1,9 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.factory.Factory;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.util.Map;
 import java.util.Set;
@@ -161,7 +161,7 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
 //      System.out.println("[RTP-DEBUG] MultiConfig: Loaded " + files.length + " files for " + name);
 
     } catch (Throwable T) {
-      RTP.log(Level.WARNING, "Error scanning directory for multi config " + name, T);
+      RTPRuntime.log(Level.WARNING, "Error scanning directory for multi config " + name, T);
     }
 
     this.langMap = dotLangMap(pluginDirectory, this.directory);
@@ -249,7 +249,7 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
         }
       }
     } catch (Exception e) {
-      RTP.log(Level.FINE, "Could not enumerate jar resources for " + this.directory, e);
+      RTPRuntime.log(Level.FINE, "Could not enumerate jar resources for " + this.directory, e);
     }
 
     if (!extractedAny) {
@@ -258,7 +258,7 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
         try {
           saveResourceFromJar(this.directory + "/default.yml", true);
         } catch (IllegalArgumentException e) {
-          RTP.log(Level.WARNING, e.getMessage(), e);
+          RTPRuntime.log(Level.WARNING, e.getMessage(), e);
         }
       }
     }
@@ -279,7 +279,7 @@ public class MultiConfigParser<E extends Enum<E>> extends FactoryValue<E> implem
     if (configParserFactory.contains(name)) return configParserFactory.map.get(name);
     else {
       String worldName = name.replace(".YML", "");
-      if (RTP.serverAccessor.getRTPWorld(worldName) == null) {
+      if (RTPRuntime.serverAccessor().getRTPWorld(worldName) == null) {
         ConfigParser<E> parser = (ConfigParser<E>) configParserFactory.getOrDefault("DEFAULT.YML");
         if (parser != null) return parser;
         return new ConfigParser<>(

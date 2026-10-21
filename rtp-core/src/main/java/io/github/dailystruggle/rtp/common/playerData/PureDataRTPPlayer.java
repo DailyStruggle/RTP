@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.playerData;
 
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -28,8 +28,8 @@ public class PureDataRTPPlayer extends PureDataRTPCommandSender implements RTPPl
 
   @Override
   public CompletableFuture<Boolean> setLocation(RTPLocation to) {
-    if (RTP.serverAccessor != null) {
-      RTPPlayer live = RTP.serverAccessor.getPlayer(uuid);
+    if (RTPRuntime.serverAccessor() != null) {
+      RTPPlayer live = RTPRuntime.serverAccessor().getPlayer(uuid);
       if (live != null) {
         return live.setLocation(to);
       }
@@ -39,8 +39,8 @@ public class PureDataRTPPlayer extends PureDataRTPCommandSender implements RTPPl
 
   @Override
   public RTPLocation getLocation() {
-    if (RTP.serverAccessor != null) {
-      RTPPlayer live = RTP.serverAccessor.getPlayer(uuid);
+    if (RTPRuntime.serverAccessor() != null) {
+      RTPPlayer live = RTPRuntime.serverAccessor().getPlayer(uuid);
       if (live != null) {
         return live.getLocation();
       }
@@ -50,8 +50,8 @@ public class PureDataRTPPlayer extends PureDataRTPCommandSender implements RTPPl
 
   @Override
   public boolean isOnline() {
-    if (RTP.serverAccessor != null) {
-      RTPPlayer live = RTP.serverAccessor.getPlayer(uuid);
+    if (RTPRuntime.serverAccessor() != null) {
+      RTPPlayer live = RTPRuntime.serverAccessor().getPlayer(uuid);
       return live != null && live.isOnline();
     }
     return false;

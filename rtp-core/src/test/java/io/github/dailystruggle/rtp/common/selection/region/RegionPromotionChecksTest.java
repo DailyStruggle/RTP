@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPChunk;
@@ -78,7 +78,7 @@ class RegionPromotionChecksTest {
     @Test
     @SuppressWarnings("unchecked")
     void blacklistedBiomeIsDropped() throws Exception {
-        ConfigParser<BiomesKeys> biomes = (ConfigParser<BiomesKeys>) RTP.configs.getParser(BiomesKeys.class);
+        ConfigParser<BiomesKeys> biomes = (ConfigParser<BiomesKeys>) ActiveConfigs.get().getParser(BiomesKeys.class);
         biomes.set(BiomesKeys.biomeWhitelist, false);
         biomes.set(BiomesKeys.biomes, List.of("DESERT"));
 

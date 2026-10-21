@@ -48,13 +48,13 @@ class BukkitTeleportSafetyTest {
         world = server.addSimpleWorld("safety-test-world");
         accessor = new DummyServerAccessor();
         RTPAPI.serverAccessor = accessor;
-        io.github.dailystruggle.rtp.common.RTP.serverAccessor = accessor;
+        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(accessor);
     }
 
     @AfterEach
     void tearDown() {
         RTPAPI.serverAccessor = null;
-        io.github.dailystruggle.rtp.common.RTP.serverAccessor = null;
+        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(null);
         if (accessor != null) {
             accessor.stop();
         }

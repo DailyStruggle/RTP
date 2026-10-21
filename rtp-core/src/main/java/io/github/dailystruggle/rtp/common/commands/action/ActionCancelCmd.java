@@ -7,9 +7,10 @@ import io.github.dailystruggle.rtp.api.action.ActionService;
 import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.action.ActionServices;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.base.ServerAccessorCommandParameters;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
@@ -48,8 +49,8 @@ public class ActionCancelCmd extends BaseRTPCmdImpl {
             @Override
             public Set<String> values() {
               ActionService service = RTPAPI.actions();
-              if (service == null && RTP.actionManager != null) {
-                service = RTP.actionManager;
+              if (service == null && ActionServices.actionManager() != null) {
+                service = ActionServices.actionManager();
               }
               return (service != null) ? service.getActionIds() : Collections.emptySet();
             }
@@ -93,15 +94,15 @@ public class ActionCancelCmd extends BaseRTPCmdImpl {
       UUID senderId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
 
-    RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
+    RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(senderId);
 
     ActionService actionService = RTPAPI.actions();
-    if (actionService == null && RTP.actionManager != null) {
-      actionService = RTP.actionManager;
+    if (actionService == null && ActionServices.actionManager() != null) {
+      actionService = ActionServices.actionManager();
     }
 
     if (actionService == null) {
-      RTP.serverAccessor.sendMessage(senderId, senderId, "[RTP] Action service is unavailable.");
+      RTPRuntime.serverAccessor().sendMessage(senderId, senderId, "[RTP] Action service is unavailable.");
       return true;
     }
 
@@ -128,14 +129,14 @@ public class ActionCancelCmd extends BaseRTPCmdImpl {
 
     if (targetSessionId != null) {
       if (!sender.hasPermission(PERMISSION_OTHER) && !sender.hasPermission("rtp.*")) {
-        RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.noPerms);
+        RTPRuntime.serverAccessor().sendMessage(senderId, senderId, PlayerMessages.noPerms);
         return true;
       }
       if (actionService.getSession(targetSessionId).isPresent()) {
         actionService.disarm(targetSessionId);
-        RTP.serverAccessor.sendMessage(senderId, senderId, "[RTP] Cancelled session " + targetSessionId + ".");
+        RTPRuntime.serverAccessor().sendMessage(senderId, senderId, "[RTP] Cancelled session " + targetSessionId + ".");
       } else {
-        RTP.serverAccessor.sendMessage(senderId, senderId, "[RTP] No active session found with ID: " + targetSessionId);
+        RTPRuntime.serverAccessor().sendMessage(senderId, senderId, "[RTP] No active session found with ID: " + targetSessionId);
       }
       return true;
     }
@@ -148,11 +149,11 @@ public class ActionCancelCmd extends BaseRTPCmdImpl {
     if (playerArgs != null && !playerArgs.isEmpty()) {
       targetPlayerName = playerArgs.get(0).trim();
       if (!targetPlayerName.isEmpty()) {
-        RTPPlayer target = RTP.serverAccessor.getPlayer(targetPlayerName);
+        RTPPlayer target = RTPRuntime.serverAccessor().getPlayer(targetPlayerName);
         if (target != null) {
           targetPlayerId = target.uuid();
         } else {
-          RTP.serverAccessor.sendMessage(senderId, senderId, "[RTP] Player not found: " + targetPlayerName);
+          RTPRuntime.serverAccessor().sendMessage(senderId, senderId, "[RTP] Player not found: " + targetPlayerName);
           return true;
         }
       }
@@ -162,7 +163,7 @@ public class ActionCancelCmd extends BaseRTPCmdImpl {
       if (sender instanceof RTPPlayer player) {
         targetPlayerId = player.uuid();
       } else {
-        RTP.serverAccessor.sendMessage(senderId, senderId, "[RTP] Console must specify player=<name>");
+        RTPRuntime.serverAccessor().sendMessage(senderId, senderId, "[RTP] Console must specify player=<name>");
         return true;
       }
     }
@@ -170,7 +171,7 @@ public class ActionCancelCmd extends BaseRTPCmdImpl {
     // Permission check for cancelling others
     boolean cancellingSelf = (sender instanceof RTPPlayer player) && player.uuid().equals(targetPlayerId);
     if (!cancellingSelf && (!sender.hasPermission(PERMISSION_OTHER) && !sender.hasPermission("rtp.*"))) {
-      RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.noPerms);
+      RTPRuntime.serverAccessor().sendMessage(senderId, senderId, PlayerMessages.noPerms);
       return true;
     }
 
@@ -190,22 +191,22 @@ public class ActionCancelCmd extends BaseRTPCmdImpl {
     if (cancelled) {
       String actionLabel = (targetActionId != null) ? targetActionId : "action";
       if (cancellingSelf) {
-        RTP.serverAccessor.sendMessage(senderId, senderId, "[RTP] Cancelled " + actionLabel + ".");
+        RTPRuntime.serverAccessor().sendMessage(senderId, senderId, "[RTP] Cancelled " + actionLabel + ".");
       } else {
-        RTP.serverAccessor.sendMessage(senderId, senderId, "[RTP] Cancelled " + actionLabel + " for " + (targetPlayerName != null ? targetPlayerName : targetPlayerId) + ".");
+        RTPRuntime.serverAccessor().sendMessage(senderId, senderId, "[RTP] Cancelled " + actionLabel + " for " + (targetPlayerName != null ? targetPlayerName : targetPlayerId) + ".");
       }
     } else {
       if (actionService.getSessionForParticipant(targetPlayerId).isPresent()) {
         if (!cancellingSelf && (sender.hasPermission(PERMISSION_OTHER) || sender.hasPermission("rtp.*"))) {
           io.github.dailystruggle.rtp.api.action.ActionSession session = actionService.getSessionForParticipant(targetPlayerId).get();
           actionService.disarm(session.sessionId());
-          RTP.serverAccessor.sendMessage(senderId, senderId, "[RTP] Disarmed active session " + session.sessionId() + " for " + (targetPlayerName != null ? targetPlayerName : targetPlayerId) + ".");
+          RTPRuntime.serverAccessor().sendMessage(senderId, senderId, "[RTP] Disarmed active session " + session.sessionId() + " for " + (targetPlayerName != null ? targetPlayerName : targetPlayerId) + ".");
           return true;
         }
-        RTP.serverAccessor.sendMessage(senderId, senderId, "[RTP] Cannot cancel an ongoing match session.");
+        RTPRuntime.serverAccessor().sendMessage(senderId, senderId, "[RTP] Cannot cancel an ongoing match session.");
       } else {
         String actionLabel = (targetActionId != null) ? " for action: " + targetActionId : "";
-        RTP.serverAccessor.sendMessage(senderId, senderId, "[RTP] No pending queue or active session found" + actionLabel + ".");
+        RTPRuntime.serverAccessor().sendMessage(senderId, senderId, "[RTP] No pending queue or active session found" + actionLabel + ".");
       }
     }
 

@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.playerData;
 
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Objects;
@@ -66,8 +66,8 @@ public class PureDataRTPCommandSender implements RTPCommandSender, Cloneable {
 
   @Override
   public @Nullable Object getLiveSender() {
-    if (RTP.serverAccessor != null) {
-      RTPCommandSender live = RTP.serverAccessor.getSender(uuid);
+    if (RTPRuntime.serverAccessor() != null) {
+      RTPCommandSender live = RTPRuntime.serverAccessor().getSender(uuid);
       if (live != null && !live.isSelfContained()) {
         return live.getLiveSender();
       }
@@ -84,8 +84,8 @@ public class PureDataRTPCommandSender implements RTPCommandSender, Cloneable {
 
   @Override
   public void sendMessage(String message) {
-    if (RTP.serverAccessor != null) {
-      RTP.serverAccessor.sendMessage(uuid, message);
+    if (RTPRuntime.serverAccessor() != null) {
+      RTPRuntime.serverAccessor().sendMessage(uuid, message);
     }
   }
 
@@ -106,8 +106,8 @@ public class PureDataRTPCommandSender implements RTPCommandSender, Cloneable {
 
   @Override
   public void performCommand(@Nullable RTPPlayer player, String command) {
-    if (RTP.serverAccessor != null) {
-      RTPCommandSender live = RTP.serverAccessor.getSender(uuid);
+    if (RTPRuntime.serverAccessor() != null) {
+      RTPCommandSender live = RTPRuntime.serverAccessor().getSender(uuid);
       if (live != null && !live.isSelfContained()) {
         live.performCommand(player, command);
       }

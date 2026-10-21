@@ -8,11 +8,13 @@ import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.model.BiomeNames;
 import io.github.dailystruggle.rtp.common.selection.region.MaterialNames;
 import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
@@ -311,8 +313,8 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
 
   /** Stop all running scan tasks */
   public static void kill() {
-    RTP.getInstance().scanTasks.forEach((s, scanTask) -> scanTask.setCancelled(true));
-    RTP.getInstance().scanTasks.clear();
+    ScanTasks.current().forEach((s, scanTask) -> scanTask.setCancelled(true));
+    ScanTasks.current().clear();
   }
 
   @Override
@@ -324,11 +326,11 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
     }
 
     if (!isRunning.compareAndSet(false, true)) {
-      RTP.log(Level.FINER, "[ScanTask] run() reentry skipped (already running) region=" + region.name);
+      RTPRuntime.log(Level.FINER, "[ScanTask] run() reentry skipped (already running) region=" + region.name);
       return;
     }
 
-    RTP.log(Level.FINE, "[ScanTask] batch entry region=" + region.name
+    RTPRuntime.log(Level.FINE, "[ScanTask] batch entry region=" + region.name
             + " phase=" + phaseLabel(scanPhase.get())
             + " scanIter=" + scanIter.get()
             + " scanIncrement=" + scanIncrement.get()
@@ -340,11 +342,11 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
     // entry into a phase (fresh start, resume after pause, or resume after
     // restart with a persisted phase).
     if (prescanAnnounced.compareAndSet(false, true)) {
-      RTP.log(Level.INFO, "[RTP] starting scan (hybrid MCA off-tick / full-load generation) for region=" + region.name);
+      RTPRuntime.log(Level.INFO, "[RTP] starting scan (hybrid MCA off-tick / full-load generation) for region=" + region.name);
     }
 
     if (pause.get() || isCancelled() || scanIncrement.get() <= 0) {
-      RTP.log(Level.FINE, "[ScanTask] batch short-circuit region=" + region.name
+      RTPRuntime.log(Level.FINE, "[ScanTask] batch short-circuit region=" + region.name
               + " pause=" + pause.get() + " cancelled=" + isCancelled()
               + " scanIncrement=" + scanIncrement.get());
       if (pause.get() || isCancelled()) {
@@ -354,7 +356,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
         }
         save();
         if (isCancelled()) {
-          RTP.getInstance().scanTasks.remove(region.name, this);
+          ScanTasks.current().remove(region.name, this);
           done.complete(true);
         }
       }
@@ -367,26 +369,26 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
     MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
     VerticalAdjustor<?> vert = region.getVert();
     if (vert == null) {
-      RTP.log(Level.WARNING, "null vert");
+      RTPRuntime.log(Level.WARNING, "null vert");
       isRunning.set(false);
       return;
     }
 
     ConfigParser<PerformanceKeys> performance =
-            (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+            (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
     ConfigParser<SafetyKeys> safety =
-            (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+            (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
     ConfigParser<BlocksKeys> blocks =
-            (ConfigParser<BlocksKeys>) RTP.configs.getParser(BlocksKeys.class);
+            (ConfigParser<BlocksKeys>) ActiveConfigs.get().getParser(BlocksKeys.class);
     ConfigParser<BiomesKeys> biomesParser =
-            (ConfigParser<BiomesKeys>) RTP.configs.getParser(BiomesKeys.class);
+            (ConfigParser<BiomesKeys>) ActiveConfigs.get().getParser(BiomesKeys.class);
 
     Object o = biomesParser.getConfigValue(BiomesKeys.biomeWhitelist, false);
     boolean whitelist = (o instanceof Boolean) ? (Boolean) o : Boolean.parseBoolean(o.toString());
 
     o = biomesParser.getConfigValue(BiomesKeys.biomes, new ArrayList<String>());
     if (!(o instanceof List<?>)) {
-      RTP.log(Level.WARNING, "expected list for biomes in advanced/biomes.yml, received - " + o.getClass().getSimpleName(),
+      RTPRuntime.log(Level.WARNING, "expected list for biomes in advanced/biomes.yml, received - " + o.getClass().getSimpleName(),
               new IllegalArgumentException("expected list for biomes in advanced/biomes.yml, received - " + o.getClass().getSimpleName()));
       biomesParser.set(BiomesKeys.biomes, new ArrayList<String>());
     }
@@ -398,7 +400,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
     if (whitelist) {
       defaultBiomes = biomeSet;
     } else {
-      Set<String> biomes = RTP.serverAccessor.getBiomes(region.getWorld());
+      Set<String> biomes = RTPRuntime.serverAccessor().getBiomes(region.getWorld());
       Set<String> set = new HashSet<>();
       for (String s : biomes) {
         String su = s.toUpperCase();
@@ -419,7 +421,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
     boolean biomeRecall = Boolean.parseBoolean(performance.getConfigValue(PerformanceKeys.biomeRecall, false).toString());
 
     RTPWorld world = region.getWorld();
-    WorldBorder border = (WorldBorder) RTP.serverAccessor.getWorldBorder(world.name());
+    WorldBorder border = (WorldBorder) RTPRuntime.serverAccessor().getWorldBorder(world.name());
 
     long range = shape.getRange();
     long pos;
@@ -503,18 +505,18 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
 
     // Dispatch bin-by-bin: one full region file's worth of candidates completes before the next
     // bin starts. Within-bin in-flight probes all share the same .mca -> cache hit rate ~1.0.
-    RTP.log(Level.FINER, "[ScanTask] dispatching bins region=" + region.name
+    RTPRuntime.log(Level.FINER, "[ScanTask] dispatching bins region=" + region.name
             + " bins=" + binHeaders.size() + " cap=" + MAX_PENDING_CHUNKS);
     outer:
     for (java.util.Map.Entry<Long, long[]> binEntry : binHeaders.entrySet()) {
       if (pause.get() || isCancelled()) {
-        RTP.log(Level.FINE, "[ScanTask] dispatch loop interrupted region=" + region.name
+        RTPRuntime.log(Level.FINE, "[ScanTask] dispatch loop interrupted region=" + region.name
                 + " pause=" + pause.get() + " cancelled=" + isCancelled());
         break;
       }
       long key = binEntry.getKey();
       int binCount = (int) binEntry.getValue()[0];
-      RTP.log(Level.FINER, "[ScanTask] bin start region=" + region.name
+      RTPRuntime.log(Level.FINER, "[ScanTask] bin start region=" + region.name
               + " binKey=" + key + " binCount=" + binCount);
       long[] positions = binPositions.get(key);
       int[] cxArr = binCx.get(key);
@@ -565,7 +567,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
           // the same failure. Mark the twin spiral index too.
           shape.addBadChunk(currentPos);
           scanBadCount.incrementAndGet();
-          RTP.log(Level.WARNING, "Synchronous calculation failure at " + currentPos, e);
+          RTPRuntime.log(Level.WARNING, "Synchronous calculation failure at " + currentPos, e);
         }
       }
 
@@ -580,7 +582,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
     final long finalActiveChecks = activeChecks;
 
     // 4. Drain the gate to wait for the final trailing chunks of the iteration to complete
-    RTP.log(Level.FINER, "[ScanTask] drain begin region=" + region.name
+    RTPRuntime.log(Level.FINER, "[ScanTask] drain begin region=" + region.name
             + " activeChecks=" + activeChecks + " inFlight=" + inFlight.get());
     long drainStart = System.nanoTime();
     try {
@@ -589,7 +591,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
-    RTP.log(Level.FINER, "[ScanTask] drain end region=" + region.name
+    RTPRuntime.log(Level.FINER, "[ScanTask] drain end region=" + region.name
             + " drainMs=" + ((System.nanoTime() - drainStart) / 1_000_000L));
 
     // 5. Execute synchronously on the async thread, avoiding detached callback contexts
@@ -642,7 +644,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
         landPercentage = (totalEvaluated > 0.0) ? (good * 100.0 / totalEvaluated) : 0.0;
         this.latestLandPercentage = landPercentage;
 
-        RTP.log(Level.FINE, "[ScanTask] checkpoint region=" + region.name
+        RTPRuntime.log(Level.FINE, "[ScanTask] checkpoint region=" + region.name
                 + " pos=" + finalPos1 + "/" + range
                 + " cps=" + cps_local + " etaSec=" + etaSeconds
                 + " land%=" + String.format("%.2f", landPercentage));
@@ -660,13 +662,13 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
         String probeOutcomeSuffix = readProbeOutcomeStatsAndReset();
         String phaseLabelStr = phaseLabel(scanPhase.get());
         // Per-batch diagnostic split logged at Level.FINE to aid troubleshooting without INFO spam.
-        RTP.log(Level.FINE, "[TRACE] ScanTask diag region=" + region.name
+        RTPRuntime.log(Level.FINE, "[TRACE] ScanTask diag region=" + region.name
             + " phase=" + phaseLabelStr
             + " cps=" + cps_local + " activeChecks=" + activeChecks + " peakInFlight=" + peak
             + " currentInFlight=" + inFlight.get() + " cap=" + MAX_PENDING_CHUNKS
             + cacheSuffix + gcSuffix + fullLoadSuffix + probeOutcomeSuffix);
 
-        String msg = RTP.configs.getConfigValue(CommandMessages.scanStatus, "").toString();
+        String msg = ActiveConfigs.get().getConfigValue(CommandMessages.scanStatus, "").toString();
 
         if (msg != null && !msg.isEmpty()) {
           msg = msg.replace("[scan_regions]", region.name);
@@ -677,7 +679,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
           msg = msg.replace("[scan_cps]", String.valueOf(windowCps));
           msg = msg.replace("[scan_landPercentage]", String.format(java.util.Locale.ROOT, "%.2f", landPercentage));
           msg = msg.replace("[scan_eta]", io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider.formatEta(etaSeconds));
-          RTP.serverAccessor.announce(msg, "rtp.scan", "");
+          RTPRuntime.serverAccessor().announce(msg, "rtp.scan", "");
         }
 
         save();
@@ -691,7 +693,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
         try {
           region.getWorld().save();
         } catch (Throwable t) {
-          RTP.log(Level.WARNING,
+          RTPRuntime.log(Level.WARNING,
               "[ScanTask] world.save() failed for region=" + region.name
                   + " world=" + region.getWorld().name(), t);
         }
@@ -701,14 +703,14 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
     scanIter.set(finalPos1);
 
     if (finalPos1 >= range) {
-      RTP.log(Level.INFO, "[RTP] scan complete for region=" + region.name);
+      RTPRuntime.log(Level.INFO, "[RTP] scan complete for region=" + region.name);
 
-      RTP.log(Level.FINE, "[ScanTask] scan complete region=" + region.name
+      RTPRuntime.log(Level.FINE, "[ScanTask] scan complete region=" + region.name
               + " finalPos=" + finalPos1 + " range=" + range);
       shape.flushAndRebuild(shape.spatialResolution());
       shape.save(region.name + "_" + region.getWorld().getSeed(), region.getWorld().name());
       save(); // Ensure final pass is securely flushed before deletion
-      RTP.getInstance().scanTasks.remove(region.name, this);
+      ScanTasks.current().remove(region.name, this);
       delete();
       // Mark the region as sufficiently pre-generated. This unlocks the
       // backlog cache pulse (Region.processBacklog), which is gated on
@@ -722,8 +724,8 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
       super.setCancelled(true);
       isRunning.set(false);
     } else if (!isCancelled() && !pause.get()) {
-      if (RTP.getInstance().scanTasks.get(region.name) == this) {
-        RTP.log(Level.FINER, "[ScanTask] yielding to scheduler for next batch region=" + region.name
+      if (ScanTasks.current().get(region.name) == this) {
+        RTPRuntime.log(Level.FINER, "[ScanTask] yielding to scheduler for next batch region=" + region.name
                 + " nextScanIter=" + finalPos1);
         shape.flushAndRebuild(shape.spatialResolution());
         isRunning.set(false);
@@ -734,10 +736,10 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                 new java.util.concurrent.atomic.AtomicBoolean(false);
         final Runnable dispatch = () -> {
           if (dispatched.compareAndSet(false, true)) {
-            RTP.scheduler.runTaskAsynchronously(self);
+            RTPRuntime.scheduler().runTaskAsynchronously(self);
           }
         };
-        RTP.scheduler.runTask(dispatch);
+        RTPRuntime.scheduler().runTask(dispatch);
         // Fallback fires via the platform async scheduler (Bukkit/Folia/
         // Paper/Fabric) so the next batch starts even when the main thread
         // is jammed. The fallback is a self-cancelling repeating-async
@@ -746,14 +748,14 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
         // the chunk-ticket budget used elsewhere in the pipeline.
         final java.util.concurrent.atomic.AtomicReference<Object> fallbackHandle =
                 new java.util.concurrent.atomic.AtomicReference<>();
-        Object handle = RTP.scheduler.runTaskTimerAsynchronously(() -> {
+        Object handle = RTPRuntime.scheduler().runTaskTimerAsynchronously(() -> {
           try {
             dispatch.run();
           } finally {
             Object h = fallbackHandle.get();
             if (h != null) {
               try {
-                RTP.scheduler.cancelTask(h);
+                RTPRuntime.scheduler().cancelTask(h);
               } catch (Throwable ignored) {
                 // Platform scheduler may reject double-cancel; benign.
               }
@@ -762,17 +764,17 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
         }, 40L, 40L);
         fallbackHandle.set(handle);
       } else {
-        RTP.log(Level.FINE, "[ScanTask] task supplanted; halting reschedule region=" + region.name);
+        RTPRuntime.log(Level.FINE, "[ScanTask] task supplanted; halting reschedule region=" + region.name);
         isRunning.set(false);
       }
     } else {
       isRunning.set(false);
       if (isCancelled()) {
-        RTP.log(Level.FINE, "[ScanTask] batch end (cancelled) region=" + region.name);
-        RTP.getInstance().scanTasks.remove(region.name, this);
+        RTPRuntime.log(Level.FINE, "[ScanTask] batch end (cancelled) region=" + region.name);
+        ScanTasks.current().remove(region.name, this);
         done.complete(true);
       } else {
-        RTP.log(Level.FINE, "[ScanTask] batch end (paused) region=" + region.name);
+        RTPRuntime.log(Level.FINE, "[ScanTask] batch end (paused) region=" + region.name);
       }
     }
   }
@@ -953,18 +955,18 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
 
   public void save() {
     if (isCancelled()) {
-      RTP.log(Level.FINER, "[ScanTask] save() skipped (cancelled); deleting progress file region=" + region.name);
+      RTPRuntime.log(Level.FINER, "[ScanTask] save() skipped (cancelled); deleting progress file region=" + region.name);
       delete();
       return;
     }
-    RTP.log(Level.FINER, "[ScanTask] save() region=" + region.name
+    RTPRuntime.log(Level.FINER, "[ScanTask] save() region=" + region.name
             + " scanIter=" + scanIter.get()
             + " currentOffset=" + currentOffset
             + " phase=" + scanPhase.get());
-    File pluginDir = RTP.serverAccessor.getPluginDirectory();
+    File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
     File dir = new File(pluginDir, "database" + File.separator + "regionData");
     if (!dir.isDirectory() && !dir.mkdirs()) {
-      RTP.log(Level.WARNING, "[ScanTask] save() could not create " + dir + "; progress not saved for region=" + region.name);
+      RTPRuntime.log(Level.WARNING, "[ScanTask] save() could not create " + dir + "; progress not saved for region=" + region.name);
       return;
     }
     File file = new File(dir, region.name + "_" + region.cacheKey() + ".scan");
@@ -985,12 +987,12 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
       buf.put((byte) (persistedPhase & 0xFF));
       out.write(buf.array());
     } catch (java.io.IOException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
     }
   }
 
   public static long[] loadProgress(String regionName, String cacheKey) {
-    File pluginDir = RTP.serverAccessor.getPluginDirectory();
+    File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
     File file =
         new File(
             pluginDir,
@@ -1041,7 +1043,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
    * orphan progress files behind.
    */
   public static void delete(String regionName) {
-    File pluginDir = RTP.serverAccessor.getPluginDirectory();
+    File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
     File dir = new File(pluginDir, "database" + File.separator + "regionData");
     if (!dir.isDirectory()) return;
     String prefix = regionName + "_";
@@ -1055,7 +1057,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
         java.nio.file.Files.deleteIfExists(f.toPath());
       } catch (Exception e) {
         if (f.exists()) {
-          RTP.log(Level.FINE, "[ScanTask] Could not delete scan progress file: " + f.getName(), e);
+          RTPRuntime.log(Level.FINE, "[ScanTask] Could not delete scan progress file: " + f.getName(), e);
         }
       }
     }
@@ -1139,7 +1141,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
       // this world) means "no border in effect" - accept the candidate here
       // and let downstream shape/region constraints bound the selection.
       if (border != null && !border.isInside().apply(new RTPLocation(world, blockX, (vert.maxY() + vert.minY()) / 2, blockZ))) {
-        RTP.log(Level.FINER, "[ScanTask] border-reject region=" + region.name
+        RTPRuntime.log(Level.FINER, "[ScanTask] border-reject region=" + region.name
                 + " pos=" + pos + " block=(" + blockX + "," + blockZ + ")");
         // addBadChunk: chunk-uniform - within a chunk the per-column selection order is
         // deterministic, so re-rolling onto the same chunk yields the same picked column,
@@ -1205,7 +1207,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
           genscanUngeneratedTotal.incrementAndGet();
         }
       } catch (Throwable t) {
-        RTP.log(Level.FINE, "[ScanTask] isChunkGenerated threw for world=" + world.name()
+        RTPRuntime.log(Level.FINE, "[ScanTask] isChunkGenerated threw for world=" + world.name()
                 + " chunk=(" + cx + "," + cz + "): " + t);
         generated = true;
         genscanThrew.incrementAndGet();
@@ -1229,7 +1231,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
               finalSafetyRadius, unsafeBlocks, defaultBiomes, biomeRecall, res);
       return res;
     } catch (Throwable t) {
-      RTP.log(Level.SEVERE, "[ScanTask] Synchronous abort at testPos for location " + pos, t);
+      RTPRuntime.log(Level.SEVERE, "[ScanTask] Synchronous abort at testPos for location " + pos, t);
       return CompletableFuture.completedFuture(false);
     }
   }
@@ -1267,7 +1269,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
       // every candidate and every probe-accept would degrade to a full load.
       fut = world.probeChunkColumn(cx, cz, minY - 1, maxY);
     } catch (Throwable t) {
-      RTP.log(Level.FINE,
+      RTPRuntime.log(Level.FINE,
               "[ScanTask] probeChunkColumn threw for world=" + world.name()
                       + " chunk=(" + cx + "," + cz + "): " + t);
       probeOutcomeProbeNull.incrementAndGet();
@@ -1295,7 +1297,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
     // from within the callback.
     fut.whenComplete((probe, ex) -> {
       if (ex != null) {
-        RTP.log(Level.FINE,
+        RTPRuntime.log(Level.FINE,
                 "[ScanTask] probeChunkColumn failed for world=" + world.name()
                         + " chunk=(" + cx + "," + cz + "): "
                         + ex.getClass().getSimpleName() + ": " + ex.getMessage());
@@ -1516,17 +1518,17 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                             || unwrap(throwable) instanceof CancellationException;
                     if (throwable != null) {
                       if (!stopping) {
-                        RTP.log(Level.WARNING, "[ScanTask] Chunk generation exception at " + pos, throwable);
+                        RTPRuntime.log(Level.WARNING, "[ScanTask] Chunk generation exception at " + pos, throwable);
                       }
                       fullLoadOutcomeTimeoutOrNull.incrementAndGet();
                     } else if (resolvedChunk == null) {
                       if (!stopping) {
-                        RTP.log(Level.WARNING, "[ScanTask] INSTANT BYPASS: Chunk manager returned a null chunk for " + pos);
+                        RTPRuntime.log(Level.WARNING, "[ScanTask] INSTANT BYPASS: Chunk manager returned a null chunk for " + pos);
                       }
                       fullLoadOutcomeTimeoutOrNull.incrementAndGet();
                     } else {
                         if (!stopping) {
-                          RTP.log(Level.WARNING, "[ScanTask] undetermined failure at " + pos);
+                          RTPRuntime.log(Level.WARNING, "[ScanTask] undetermined failure at " + pos);
                           fullLoadOutcomeTimeoutOrNull.incrementAndGet();
                         }
                     }
@@ -1560,7 +1562,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                   }
 
                   RTPLocation targetLoc = new RTPLocation(world, blockX, 0, blockZ);
-                  RTP.serverAccessor.getScheduler().runTask(targetLoc, () -> {
+                  RTPRuntime.serverAccessor().getScheduler().runTask(targetLoc, () -> {
                     try {
                       MutableRTPCoords localCursor = new MutableRTPCoords(blockX, blockZ);
                       localCursor.setWorldName(world.name());
@@ -1690,14 +1692,14 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                                     : Math.max(1L, (long) (bMaxX - bMinX + 1) * (bMaxZ - bMinZ + 1));
                                 scanBadCount.addAndGet(pointsApprox);
 
-                                RTP.log(Level.FINE, "[ScanTask] Encapsulated claim boundary '" + boundary.id()
+                                RTPRuntime.log(Level.FINE, "[ScanTask] Encapsulated claim boundary '" + boundary.id()
                                     + "' [" + bMinX + "," + bMinZ + " -> " + bMaxX + "," + bMaxZ
                                     + "] in region '" + region.name + "'");
                                 claimEncapsulated = true;
                               }
                             }
                           } catch (Throwable t) {
-                            RTP.log(Level.WARNING, "[ScanTask] Error encapsulating claim boundary at " + localCursor, t);
+                            RTPRuntime.log(Level.WARNING, "[ScanTask] Error encapsulating claim boundary at " + localCursor, t);
                           }
                         }
 
@@ -1711,7 +1713,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                         res.complete(false);
                       }
                       } catch (Throwable t) {
-                        RTP.log(Level.SEVERE, "[ScanTask] Verifier verdict crashed at location " + pos, t);
+                        RTPRuntime.log(Level.SEVERE, "[ScanTask] Verifier verdict crashed at location " + pos, t);
                         shape.addBadChunk(pos);
                         fullLoadOutcomeCrashed.incrementAndGet();
                         res.complete(false);
@@ -1729,7 +1731,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                       }
                       verdict.whenComplete((vr, ex) -> {
                         if (ex != null) {
-                          RTP.log(Level.SEVERE, "[ScanTask] Claim verifier failed at location " + pos, ex);
+                          RTPRuntime.log(Level.SEVERE, "[ScanTask] Claim verifier failed at location " + pos, ex);
                           shape.addBadChunk(pos);
                           fullLoadOutcomeCrashed.incrementAndGet();
                           res.complete(false);
@@ -1738,7 +1740,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                         finish.accept(vr != null && vr.passed(), vr);
                       });
                     } catch (Throwable t) {
-                      RTP.log(Level.SEVERE, "[ScanTask] Validation crashed on Region Thread at location " + pos, t);
+                      RTPRuntime.log(Level.SEVERE, "[ScanTask] Validation crashed on Region Thread at location " + pos, t);
                       // addBadChunk: chunk-uniform - within a chunk the per-column
                       // selection order is deterministic, so re-rolling the same chunk
                       // would crash the same way.
@@ -1748,7 +1750,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
                     }
                   });
                 } catch (Throwable t) {
-                  RTP.log(Level.SEVERE, "[ScanTask] Async callback crashed at location " + pos, t);
+                  RTPRuntime.log(Level.SEVERE, "[ScanTask] Async callback crashed at location " + pos, t);
                   // addBadChunk: chunk-uniform - within a chunk the per-column selection
                   // order is deterministic, so re-rolling the same chunk would crash the
                   // async callback identically.
@@ -1855,10 +1857,10 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
     }
     long drainMs = (System.nanoTime() - drainStart) / 1_000_000L;
     if (drained) {
-      RTP.log(Level.FINER, "[ScanTask] " + reason + " drain complete region=" + region.name
+      RTPRuntime.log(Level.FINER, "[ScanTask] " + reason + " drain complete region=" + region.name
               + " drainMs=" + drainMs);
     } else {
-      RTP.log(Level.FINE, "[ScanTask] " + reason + " drain timed out region=" + region.name
+      RTPRuntime.log(Level.FINE, "[ScanTask] " + reason + " drain timed out region=" + region.name
               + " after " + drainMs + "ms inFlight=" + inFlight.get()
               + " - proceeding (cancelled/pause flag guards late callbacks)");
     }
@@ -1879,7 +1881,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
    * @param onDone receives null on success, or the teardown failure (S-004); may be null
    */
   public void pause(java.util.function.Consumer<Throwable> onDone) {
-    RTP.log(Level.FINE, "[ScanTask] pause requested region=" + region.name
+    RTPRuntime.log(Level.FINE, "[ScanTask] pause requested region=" + region.name
             + " inFlight=" + inFlight.get());
     pause.set(true);
     statusWindowStartMs = -1L;
@@ -1904,7 +1906,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
    */
   public void setCancelled(boolean cancelled, java.util.function.Consumer<Throwable> onDone) {
     if (cancelled) {
-      RTP.log(Level.FINE, "[ScanTask] cancellation requested region=" + region.name
+      RTPRuntime.log(Level.FINE, "[ScanTask] cancellation requested region=" + region.name
               + " inFlight=" + inFlight.get());
       // Mark cancelled BEFORE draining: prevents late callback exception spam during cancel.
       super.setCancelled(true);
@@ -1935,7 +1937,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
     CompletableFuture<Void> gate = new CompletableFuture<>();
     teardownDone = gate;
     PENDING_TEARDOWNS.put(region.name, gate);
-    RTP.scheduler.runTaskAsynchronously(() -> {
+    RTPRuntime.scheduler().runTaskAsynchronously(() -> {
       try {
         drainInFlight(reason, DRAIN_TIMEOUT_MS);
         MemoryShape<?> shape = (MemoryShape<?>) region.getShape();
@@ -1950,12 +1952,12 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
         save();
         if (!pauseSave) {
           delete(region.name);
-          RTP.getInstance().scanTasks.remove(region.name, this);
+          ScanTasks.current().remove(region.name, this);
         }
         gate.complete(null);
         reportTeardown(onDone, null);
       } catch (Throwable t) {
-        RTP.log(Level.WARNING, "[ScanTask] " + reason + " teardown failed region=" + region.name, t);
+        RTPRuntime.log(Level.WARNING, "[ScanTask] " + reason + " teardown failed region=" + region.name, t);
         gate.completeExceptionally(t);
         reportTeardown(onDone, t);
       } finally {
@@ -1966,7 +1968,7 @@ public class ScanTask extends RTPRunnable implements ScanProgressView {
 
   private static void reportTeardown(java.util.function.Consumer<Throwable> onDone, Throwable failure) {
     if (onDone == null) return;
-    RTP.scheduler.runTask(() -> onDone.accept(failure));
+    RTPRuntime.scheduler().runTask(() -> onDone.accept(failure));
   }
 
   /** Completes when the most recent teardown has finished; used to order a restart after it. */

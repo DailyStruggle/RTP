@@ -78,9 +78,9 @@ final class MenuBindingPlatformGateTest {
     assertNotNull(ids);
     assertFalse(ids.isEmpty());
 
-    // Configure RTP.configs with menu map
-    if (io.github.dailystruggle.rtp.common.RTP.configs != null) {
-      var configParser = io.github.dailystruggle.rtp.common.RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.class);
+    // Configure ActiveConfigs.get() with menu map
+    if (io.github.dailystruggle.rtp.common.configuration.ActiveConfigs.get() != null) {
+      var configParser = io.github.dailystruggle.rtp.common.configuration.ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.class);
       if (configParser != null) {
         configParser.set(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.menu, java.util.Map.of("renderer", java.util.List.of("book", "chat")));
         java.util.List<?> listIds = (java.util.List<?>) m.invoke(null);
@@ -101,14 +101,14 @@ final class MenuBindingPlatformGateTest {
       }
     }
 
-    // When RTP.configs throws
-    var origConfigs = io.github.dailystruggle.rtp.common.RTP.configs;
+    // When ActiveConfigs.get() throws
+    var origConfigs = io.github.dailystruggle.rtp.common.configuration.ActiveConfigs.get();
     try {
-      io.github.dailystruggle.rtp.common.RTP.configs = null;
+      io.github.dailystruggle.rtp.common.configuration.ActiveConfigs.set(null);
       java.util.List<?> nullConfigsIds = (java.util.List<?>) m.invoke(null);
       assertEquals(java.util.List.of("book"), nullConfigsIds);
     } finally {
-      io.github.dailystruggle.rtp.common.RTP.configs = origConfigs;
+      io.github.dailystruggle.rtp.common.configuration.ActiveConfigs.set(origConfigs);
     }
   }
 }

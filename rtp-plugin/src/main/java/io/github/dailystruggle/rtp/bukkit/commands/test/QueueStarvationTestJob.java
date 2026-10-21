@@ -7,6 +7,8 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.parameters.IntegerParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -111,7 +113,7 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
             + " ("
             + expectedPipe
             + " pipe)";
-    RTP.serverAccessor.sendMessage(callerId, startMsg);
+    RTPRuntime.serverAccessor().sendMessage(callerId, startMsg);
     RTP.log(Level.INFO, startMsg);
 
     Runnable body =
@@ -132,7 +134,7 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
 
     // REQ-RTP-S-005: kick off on the async scheduler; never touch the
     // main thread for chunk-adjacent work.
-    handleHolder[0] = RTP.scheduler.runTaskAsynchronously(body);
+    handleHolder[0] = RTPRuntime.scheduler().runTaskAsynchronously(body);
 
     Runnable canceller =
         () -> {
@@ -140,13 +142,13 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
           Object h = handleHolder[0];
           if (h != null) {
             try {
-              RTP.scheduler.cancelTask(h);
+              RTPRuntime.scheduler().cancelTask(h);
             } catch (Throwable ignored) {
               // best-effort; see ActiveTestJobs.cancelOwned
             }
           }
           String msg = "[RTP test/queue-starvation] cancelled by operator";
-          RTP.serverAccessor.sendMessage(callerId, msg);
+          RTPRuntime.serverAccessor().sendMessage(callerId, msg);
           RTP.log(Level.INFO, msg);
         };
     unregisterHolder[0] =
@@ -240,7 +242,7 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
     // ---- Refill pulse: time SelectionAPI.compute() ----
     long refillBefore = System.nanoTime();
     try {
-      RTP.selectionAPI.compute();
+      ActiveSelection.get().compute();
     } catch (Throwable t) {
       RTP.log(
           Level.WARNING,
@@ -288,9 +290,9 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
         "[RTP test/queue-starvation] refill: SelectionAPI.compute() tookMs=" + refillMs;
     String detail = "[RTP test/queue-starvation] per-sample ms=" + timings;
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, header);
-      RTP.serverAccessor.sendMessage(callerId, drainLine);
-      RTP.serverAccessor.sendMessage(callerId, refillLine);
+      RTPRuntime.serverAccessor().sendMessage(callerId, header);
+      RTPRuntime.serverAccessor().sendMessage(callerId, drainLine);
+      RTPRuntime.serverAccessor().sendMessage(callerId, refillLine);
     }
     RTP.log(Level.INFO, header);
     RTP.log(Level.INFO, drainLine);
@@ -320,13 +322,13 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
     String regionName = (regionNames == null || regionNames.isEmpty()) ? null : regionNames.get(0);
     Region region;
     if (regionName != null) {
-      region = RTP.selectionAPI.getRegionOrDefault(regionName);
+      region = ActiveSelection.get().getRegionOrDefault(regionName);
         return region;
     }
     // Fall back to caller's current region.
     try {
       region =
-          RTP.selectionAPI.getRegion(RTP.serverAccessor.getPlayer(callerId));
+          ActiveSelection.get().getRegion(RTPRuntime.serverAccessor().getPlayer(callerId));
     } catch (Throwable t) {
       region = null;
     }
@@ -334,7 +336,7 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
       String msg =
           "&c[RTP test/queue-starvation] no region specified and caller has no resolvable region";
       if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, msg);
+        RTPRuntime.serverAccessor().sendMessage(callerId, msg);
       }
       RTP.log(Level.WARNING, msg);
       return null;
@@ -344,7 +346,7 @@ public class QueueStarvationTestJob extends BaseRTPCmdImpl {
 
   private static String safePlatform() {
     try {
-      String p = RTP.serverAccessor.getPlatform();
+      String p = RTPRuntime.serverAccessor().getPlatform();
       return p == null ? "Unknown" : p;
     } catch (Throwable t) {
       return "Unknown";

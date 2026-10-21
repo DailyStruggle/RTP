@@ -1,13 +1,14 @@
 package io.github.dailystruggle.rtp.common.commands.prefab;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -62,7 +63,7 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
                              @Nullable CommandsAPICommand nextCommand) {
         if (nextCommand != null) return true;
         if (callerId == null) {
-            RTP.log(Level.WARNING, "/rtp admin prefab apply rejected: no caller UUID");
+            RTPRuntime.log(Level.WARNING, "/rtp admin prefab apply rejected: no caller UUID");
             return false;
         }
         List<String> idValues = parameterValues == null ? null : parameterValues.get("id");
@@ -79,22 +80,22 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
         }
         Prefab prefab = opt.get();
         // Snapshot the live trees so the diff describes the true delta from the on-disk state.
-        File pluginDir = (RTP.serverAccessor == null) ? null : RTP.serverAccessor.getPluginDirectory();
+        File pluginDir = (RTPRuntime.serverAccessor() == null) ? null : RTPRuntime.serverAccessor().getPluginDirectory();
         Map<String, Map<String, Object>> baseline = PrefabDiskIO.snapshotLiveBaseline(pluginDir, prefab);
         // Collect live world names so MultiWorldExpander can synthesise a
         // definitions/regions/<world>.yml per loaded world. Ignored when the prefab has
         // expandPerWorld=false (2-arg semantics via the 3-arg overload).
         List<String> worldNames = new ArrayList<>();
-        if (RTP.serverAccessor != null) {
+        if (RTPRuntime.serverAccessor() != null) {
             try {
                 for (io.github.dailystruggle.rtp.api.world.RTPWorld<?> w
-                        : RTP.serverAccessor.getRTPWorlds()) {
+                        : RTPRuntime.serverAccessor().getRTPWorlds()) {
                     if (w == null) continue;
                     String n = w.name();
                     if (n != null && !n.isEmpty()) worldNames.add(n);
                 }
             } catch (RuntimeException re) {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "[prefab] apply: world enumeration failed for " + prefab.id()
                                 + " - falling back to empty world list: " + re.getMessage());
             }
@@ -103,16 +104,16 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
         // definitions/worlds/<world>.yml "region" field at its new per-world region. Every
         // loaded world has an in-memory WorldKeys parser by definition (a
         // definitions/worlds/<world>.yml file may not exist on disk when the world runs on
-        // defaults), so seed the baseline from RTP.configs rather than reading
+        // defaults), so seed the baseline from ActiveConfigs.get() rather than reading
         // the file. That makes the diff describe the true delta from the live
         // region binding (e.g. "default" -> "<world>") instead of an absent
         // value when the physical file is missing.
-        if (prefab.expandPerWorld() && RTP.configs != null) {
+        if (prefab.expandPerWorld() && ActiveConfigs.get() != null) {
             for (String world : worldNames) {
                 String fileId = "definitions/worlds/" + world;
                 Map<String, Object> worldTree = new LinkedHashMap<>();
                 try {
-                    ConfigParser<WorldKeys> worldParser = RTP.configs.getWorldParser(world);
+                    ConfigParser<WorldKeys> worldParser = ActiveConfigs.get().getWorldParser(world);
                     if (worldParser != null) {
                         Object region = worldParser.getConfigValue(WorldKeys.region, null);
                         if (region != null) {
@@ -120,7 +121,7 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
                         }
                     }
                 } catch (RuntimeException re) {
-                    RTP.log(Level.WARNING,
+                    RTPRuntime.log(Level.WARNING,
                             "[prefab] apply: world region lookup failed for " + fileId
                                     + " - falling back to empty baseline: " + re.getMessage());
                 }
@@ -144,7 +145,7 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
             changeCount += changes.size();
         }
 
-        RTP.log(Level.INFO,
+        RTPRuntime.log(Level.INFO,
                 "[prefab] apply requested: caller=" + callerId
                         + " prefab=" + prefab.id()
                         + " files=" + diff.size()
@@ -184,11 +185,11 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
     @SuppressWarnings("unchecked")
     private static MultiWorldExpander.RegionOverlayAmender buildDimensionVertAmender(Prefab prefab) {
         if (!prefab.expandPerWorld()) return null;
-        if (RTP.serverAccessor == null || RTP.configs == null) {
+        if (RTPRuntime.serverAccessor() == null || ActiveConfigs.get() == null) {
             return MultiWorldExpander.defaultDimensionVertAmender();
         }
         MultiConfigParser<RegionKeys> regions =
-                (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
+                (MultiConfigParser<RegionKeys>) ActiveConfigs.get().multiConfigParserMap.get(RegionKeys.class);
         if (regions == null) {
             return MultiWorldExpander.defaultDimensionVertAmender();
         }
@@ -205,7 +206,7 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
         return (world, overlay) -> {
             try {
                 io.github.dailystruggle.rtp.api.world.RTPWorld<?> rtpWorld =
-                        RTP.serverAccessor.getRTPWorld(world);
+                        RTPRuntime.serverAccessor().getRTPWorld(world);
                 if (rtpWorld == null) return;
                 String wn = rtpWorld.name();
                 if (wn == null || !(wn.endsWith("_nether") || wn.endsWith("_the_end"))) return;
@@ -228,7 +229,7 @@ public class PrefabApplyCmd extends BaseRTPCmdImpl {
                             Boolean.parseBoolean(pv.get("requireskylight").get(0)));
                 }
             } catch (RuntimeException re) {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "[prefab] dimension vert repair failed for world " + world
                                 + " - " + re.getMessage());
             }

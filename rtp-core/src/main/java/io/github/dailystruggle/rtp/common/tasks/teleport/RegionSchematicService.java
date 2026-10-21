@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.tasks.teleport;
 
 import io.github.dailystruggle.rtp.api.schematic.SchematicSource;
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -51,10 +51,10 @@ public final class RegionSchematicService {
     if (regionName == null || regionName.isEmpty()) {
       return null;
     }
-    if (RTP.serverAccessor == null) {
+    if (RTPRuntime.serverAccessor() == null) {
       return null;
     }
-    File pluginDir = RTP.serverAccessor.getPluginDirectory();
+    File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
     if (pluginDir == null) {
       return null;
     }

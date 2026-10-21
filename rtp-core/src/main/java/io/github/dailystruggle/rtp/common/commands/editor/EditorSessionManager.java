@@ -1,11 +1,16 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.docs.DocsRegistry;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorKeys;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopbackJson;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.CoordinateRunEncoder;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
@@ -155,14 +160,14 @@ public final class EditorSessionManager {
             try {
                 curve = EditorCurveModel.curve(memoryShape, js);
             } catch (RuntimeException e) {
-                RTP.log(Level.FINE, "[editor] region '" + region.name + "' keeps the sketch: curve block failed", e);
+                RTPRuntime.log(Level.FINE, "[editor] region '" + region.name + "' keeps the sketch: curve block failed", e);
             }
         }
         if (curve != null && curveCode != null) {
             // One source per key: a second class under the same name can't share the entry
             String prior = curveCode.putIfAbsent((String) curve.get("shape"), js);
             if (prior != null && !prior.equals(js)) {
-                RTP.log(Level.FINE, "[editor] region '" + region.name + "' keeps the sketch: shape name "
+                RTPRuntime.log(Level.FINE, "[editor] region '" + region.name + "' keeps the sketch: shape name "
                         + curve.get("shape") + " already carries another helper");
                 curve = null;
             }
@@ -399,18 +404,18 @@ public final class EditorSessionManager {
         String members = "";
         try (java.io.InputStream in = EditorSessionManager.class.getResourceAsStream(EDITOR_DATA_RESOURCE)) {
             if (in == null) {
-                RTP.log(Level.WARNING, "[editor] packaged editor data missing from classpath: " + EDITOR_DATA_RESOURCE
+                RTPRuntime.log(Level.WARNING, "[editor] packaged editor data missing from classpath: " + EDITOR_DATA_RESOURCE
                         + "; sessions carry no shipped defaults or field docs");
             } else {
                 String json = new String(in.readAllBytes(), StandardCharsets.UTF_8).trim();
                 if (json.startsWith("{") && json.endsWith("}")) {
                     members = json.substring(1, json.length() - 1).trim();
                 } else {
-                    RTP.log(Level.WARNING, "[editor] packaged editor data is not a JSON object: " + EDITOR_DATA_RESOURCE);
+                    RTPRuntime.log(Level.WARNING, "[editor] packaged editor data is not a JSON object: " + EDITOR_DATA_RESOURCE);
                 }
             }
         } catch (IOException e) {
-            RTP.log(Level.WARNING, "[editor] packaged editor data unreadable: " + e.getMessage(), e);
+            RTPRuntime.log(Level.WARNING, "[editor] packaged editor data unreadable: " + e.getMessage(), e);
         }
         editorDataMembers = members;
         return members;
@@ -480,20 +485,20 @@ public final class EditorSessionManager {
      * @return map of relative file path (e.g. "config.yml", "regions/default.yml") to text
      */
     public Map<String, String> collectCurrentConfigs() {
-        if (RTP.configs == null || RTP.serverAccessor == null) {
+        if (ActiveConfigs.get() == null || RTPRuntime.serverAccessor() == null) {
             throw new IllegalStateException("RTP core or configurations not initialized yet (S-006 fail-closed)");
         }
 
         Map<String, String> configMap = new LinkedHashMap<>();
 
-        File pluginDir = RTP.serverAccessor.getPluginDirectory();
+        File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
         if (pluginDir == null || !pluginDir.exists()) {
             return configMap;
         }
 
         // Iterate over configParserMap and multiConfigParserMap
-        if (RTP.configs.fileDatabase != null && RTP.configs.fileDatabase.cachedLookup != null) {
-            Map<String, RtpYamlConfig> lookup = RTP.configs.fileDatabase.cachedLookup.get();
+        if (ActiveConfigs.get().fileDatabase != null && ActiveConfigs.get().fileDatabase.cachedLookup != null) {
+            Map<String, RtpYamlConfig> lookup = ActiveConfigs.get().fileDatabase.cachedLookup.get();
             if (lookup != null) {
                 for (Map.Entry<String, RtpYamlConfig> entry : lookup.entrySet()) {
                     String name = entry.getKey();
@@ -533,7 +538,7 @@ public final class EditorSessionManager {
                                     try {
                                         configMap.put(rel, Files.readString(p, StandardCharsets.UTF_8));
                                     } catch (IOException e) {
-                                        RTP.log(Level.WARNING, "[editor] " + rel + " left out of the editor session: "
+                                        RTPRuntime.log(Level.WARNING, "[editor] " + rel + " left out of the editor session: "
                                                 + e.getMessage(), e);
                                     }
                                 }
@@ -541,7 +546,7 @@ public final class EditorSessionManager {
                 }
             }
         } catch (IOException | java.io.UncheckedIOException e) {
-            RTP.log(Level.WARNING, "[editor] plugin folder scan incomplete; the editor session may miss files: "
+            RTPRuntime.log(Level.WARNING, "[editor] plugin folder scan incomplete; the editor session may miss files: "
                     + e.getMessage(), e);
         }
 
@@ -645,9 +650,9 @@ public final class EditorSessionManager {
         String sha256 = EditorHttpTransport.computeSha256(filesContent);
 
         String pluginVersion = "unknown";
-        if (RTP.serverAccessor != null) {
+        if (RTPRuntime.serverAccessor() != null) {
             try {
-                pluginVersion = RTP.serverAccessor.getServerVersion();
+                pluginVersion = RTPRuntime.serverAccessor().getServerVersion();
             } catch (Exception ignored) {
             }
         }
@@ -667,7 +672,7 @@ public final class EditorSessionManager {
         try {
             rawDocs = DocsRegistry.getInstance().getAllRawSources();
         } catch (IllegalStateException notReady) {
-            RTP.log(Level.WARNING, "[editor] docs registry not ready; the session carries no docs");
+            RTPRuntime.log(Level.WARNING, "[editor] docs registry not ready; the session carries no docs");
         }
         String editorData = editorDataMembers();
         // protocol + addon extension descriptors (ADR-107 §5.2); extension calls are guarded inside
@@ -707,15 +712,15 @@ public final class EditorSessionManager {
     public String buildSchemaJson() {
         Map<String, Object> schema = new LinkedHashMap<>();
         Map<String, Object> curveParams = new TreeMap<>();
-        schema.put("shape", factoryParams(RTP.factoryNames.shape, curveParams));
-        schema.put("vert", factoryParams(RTP.factoryNames.vert, null));
+        schema.put("shape", factoryParams(FactoryNames.shape, curveParams));
+        schema.put("vert", factoryParams(FactoryNames.vert, null));
         schema.put("curveParams", curveParams);
         return mapToJson(schema);
     }
 
-    private static Map<String, Object> factoryParams(RTP.factoryNames which, Map<String, Object> curveParams) {
+    private static Map<String, Object> factoryParams(FactoryNames which, Map<String, Object> curveParams) {
         Map<String, Object> out = new TreeMap<>();
-        io.github.dailystruggle.rtp.common.factory.Factory<?> factory = RTP.factoryMap.get(which);
+        io.github.dailystruggle.rtp.common.factory.Factory<?> factory = FactoryRegistry.get(which);
         if (factory == null) return out;
         for (Map.Entry<String, ? extends io.github.dailystruggle.rtp.common.factory.FactoryValue<?>> e : factory.map.entrySet()) {
             String name = e.getKey();
@@ -736,7 +741,7 @@ public final class EditorSessionManager {
                 }
             } catch (RuntimeException ex) {
                 // Name stays valid; only its parameters are unknown (page then skips key / type checks)
-                RTP.log(Level.FINE, "[RTP] editor schema: no parameters for " + which + " " + name, ex);
+                RTPRuntime.log(Level.FINE, "[RTP] editor schema: no parameters for " + which + " " + name, ex);
             }
             out.put(name, params);
         }
@@ -757,7 +762,7 @@ public final class EditorSessionManager {
                 raw = v.getParameters();
             }
         } catch (RuntimeException ex) {
-            RTP.log(Level.FINE, "[RTP] editor schema: getParameters failed for " + value.getClass().getName(), ex);
+            RTPRuntime.log(Level.FINE, "[RTP] editor schema: getParameters failed for " + value.getClass().getName(), ex);
         }
         Map<String, io.github.dailystruggle.commandsapi.common.CommandParameter> out = new HashMap<>();
         if (raw == null) return out;
@@ -915,7 +920,7 @@ public final class EditorSessionManager {
      * region of that shape exists. A name already carrying another class's helper keeps it.
      */
     static void addRegisteredCurveHelpers(Map<String, String> curveSources, Map<String, Map<String, Object>> samples) {
-        io.github.dailystruggle.rtp.common.factory.Factory<?> factory = RTP.factoryMap.get(RTP.factoryNames.shape);
+        io.github.dailystruggle.rtp.common.factory.Factory<?> factory = FactoryRegistry.get(FactoryNames.shape);
         if (factory == null) return;
         for (io.github.dailystruggle.rtp.common.factory.FactoryValue<?> value : factory.map.values()) {
             if (!(value instanceof MemoryShape<?> template)) continue;
@@ -928,7 +933,7 @@ public final class EditorSessionManager {
                 samples.put(name, EditorCurveModel.curve(template.clone(), js));
             } catch (RuntimeException e) {
                 // The helper still ships; the page then checks it against live regions only
-                RTP.log(Level.FINE, "[editor] no curve sample for registered shape " + name, e);
+                RTPRuntime.log(Level.FINE, "[editor] no curve sample for registered shape " + name, e);
             }
         }
     }
@@ -956,8 +961,8 @@ public final class EditorSessionManager {
     /** As {@link #collectAllRegionVisualizationPayloads()}, collecting helper sources into {@code curveCode}. */
     Map<String, Map<String, Object>> collectAllRegionVisualizationPayloads(Map<String, String> curveCode) {
         Map<String, Map<String, Object>> models = new LinkedHashMap<>();
-        if (RTP.selectionAPI != null && RTP.selectionAPI.permRegionLookup != null) {
-            for (Map.Entry<String, Region> entry : RTP.selectionAPI.permRegionLookup.entrySet()) {
+        if (ActiveSelection.get() != null && ActiveSelection.get().permRegionLookup != null) {
+            for (Map.Entry<String, Region> entry : ActiveSelection.get().permRegionLookup.entrySet()) {
                 Region r = entry.getValue();
                 if (r != null) {
                     models.put(entry.getKey(), generateVisualizationPayload(r, curveCode));
@@ -1053,23 +1058,23 @@ public final class EditorSessionManager {
         int latSamples = 0;
         long latTotal = 0;
 
-        if (RTP.serverAccessor != null) {
+        if (RTPRuntime.serverAccessor() != null) {
             try {
-                java.util.Collection<?> players = RTP.serverAccessor.getOnlinePlayers();
+                java.util.Collection<?> players = RTPRuntime.serverAccessor().getOnlinePlayers();
                 onlinePlayers = (players != null) ? players.size() : 0;
-                Object fam = RTP.serverAccessor.getPlatformFamily();
+                Object fam = RTPRuntime.serverAccessor().getPlatformFamily();
                 platform = (fam != null) ? fam.toString() : "JVM";
             } catch (Exception ignored) {
             }
         }
 
         // Extract real metrics if metrics subsystem is active
-        if (RTP.metrics != null) {
+        if (CoreMetrics.instance() != null) {
             try {
-                io.github.dailystruggle.metrics.api.MetricsSnapshot snap = RTP.metrics.snapshot();
+                io.github.dailystruggle.metrics.api.MetricsSnapshot snap = CoreMetrics.instance().snapshot();
                 if (snap != null) {
                     if (!Double.isNaN(snap.tps1m) && snap.tps1m >= 0) tps1m = snap.tps1m;
-                    else if (RTP.serverAccessor != null) tps1m = RTP.serverAccessor.getTPS(20);
+                    else if (RTPRuntime.serverAccessor() != null) tps1m = RTPRuntime.serverAccessor().getTPS(20);
                     if (!Double.isNaN(snap.tps5m) && snap.tps5m >= 0) tps5m = snap.tps5m;
                     else tps5m = tps1m;
                     if (!Double.isNaN(snap.tps15m) && snap.tps15m >= 0) tps15m = snap.tps15m;
@@ -1096,7 +1101,7 @@ public final class EditorSessionManager {
             }
 
             try {
-                io.github.dailystruggle.rtp.common.metrics.PipelineHistogram hist = RTP.metrics.pipelineHistogram();
+                io.github.dailystruggle.rtp.common.metrics.PipelineHistogram hist = CoreMetrics.instance().pipelineHistogram();
                 if (hist != null) {
                     double m = hist.mean();
                     if (!Double.isNaN(m)) latMean = m;
@@ -1125,9 +1130,9 @@ public final class EditorSessionManager {
         int l2Cold = 0;
 
         StringBuilder regionsArr = new StringBuilder("[");
-        if (RTP.selectionAPI != null && RTP.selectionAPI.permRegionLookup != null) {
+        if (ActiveSelection.get() != null && ActiveSelection.get().permRegionLookup != null) {
             boolean rFirst = true;
-            for (Map.Entry<String, Region> entry : RTP.selectionAPI.permRegionLookup.entrySet()) {
+            for (Map.Entry<String, Region> entry : ActiveSelection.get().permRegionLookup.entrySet()) {
                 Region r = entry.getValue();
                 if (r == null) continue;
                 if (!rFirst) regionsArr.append(",");
@@ -1394,10 +1399,10 @@ public final class EditorSessionManager {
     /**
      * As {@link #applyPayload(String)}; {@code requireDigest} for payloads fetched from the byte store
      * (see {@link #parseAndValidatePayload(String, boolean)}). A {@code "<redacted>"} value keeps the
-     * on-disk value of its key. Runs on {@code RTP.scheduler}'s async pool.
+     * on-disk value of its key. Runs on {@code RTPRuntime.scheduler()}'s async pool.
      */
     public CompletableFuture<Void> applyPayload(String json, boolean requireDigest) {
-        if (RTP.configs == null || RTP.serverAccessor == null) {
+        if (ActiveConfigs.get() == null || RTPRuntime.serverAccessor() == null) {
             return CompletableFuture.failedFuture(
                     new IllegalStateException("RTP core or configurations not initialized (S-006 fail-closed)"));
         }
@@ -1405,7 +1410,7 @@ public final class EditorSessionManager {
         return EditorSecurity.runAsync(() -> {
             ParsedPayload validated = parseAndValidatePayload(json, requireDigest);
 
-            File pluginDir = RTP.serverAccessor.getPluginDirectory();
+            File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
             if (pluginDir == null) {
                 throw new IllegalStateException("Plugin directory is null (S-006)");
             }
@@ -1462,7 +1467,7 @@ public final class EditorSessionManager {
                             Files.copy(target, bakFile);
                         }
                     } catch (IOException e) {
-                        RTP.log(Level.WARNING, "Failed to create .bak backup for " + target + ": " + e.getMessage(), e);
+                        RTPRuntime.log(Level.WARNING, "Failed to create .bak backup for " + target + ": " + e.getMessage(), e);
                         throw new RuntimeException("Backup failed for " + relPath + ": " + e.getMessage(), e);
                     }
                 }
@@ -1490,13 +1495,13 @@ public final class EditorSessionManager {
                         Files.move(tmpFile, target, StandardCopyOption.REPLACE_EXISTING);
                     }
                 } catch (IOException e) {
-                    RTP.log(Level.WARNING, "Failed writing file " + target + ": " + e.getMessage(), e);
+                    RTPRuntime.log(Level.WARNING, "Failed writing file " + target + ": " + e.getMessage(), e);
                     throw new RuntimeException("Failed writing configuration file " + relPath + ": " + e.getMessage(), e);
                 }
 
                 // In-memory update of cachedLookup if applicable
-                if (RTP.configs.fileDatabase != null && RTP.configs.fileDatabase.cachedLookup != null) {
-                    Map<String, RtpYamlConfig> lookup = RTP.configs.fileDatabase.cachedLookup.get();
+                if (ActiveConfigs.get().fileDatabase != null && ActiveConfigs.get().fileDatabase.cachedLookup != null) {
+                    Map<String, RtpYamlConfig> lookup = ActiveConfigs.get().fileDatabase.cachedLookup.get();
                     if (lookup != null) {
                         try {
                             String baseName = target.getFileName().toString();
@@ -1506,7 +1511,7 @@ public final class EditorSessionManager {
                             lookup.put(target.getFileName().toString(), parsedYaml);
                         } catch (Exception e) {
                             // The reload below re-reads the file; the cached copy stays stale until then
-                            RTP.log(Level.WARNING, "[editor] cached copy of " + relPath + " not refreshed after apply: "
+                            RTPRuntime.log(Level.WARNING, "[editor] cached copy of " + relPath + " not refreshed after apply: "
                                     + e.getMessage(), e);
                         }
                     }
@@ -1518,9 +1523,9 @@ public final class EditorSessionManager {
 
             // Trigger hot-reload on configs
             try {
-                RTP.configs.reload();
+                ActiveConfigs.get().reload();
             } catch (Exception e) {
-                RTP.log(Level.WARNING, "Hot-reload encountered an error after applying payload: " + e.getMessage(), e);
+                RTPRuntime.log(Level.WARNING, "Hot-reload encountered an error after applying payload: " + e.getMessage(), e);
                 throw new RuntimeException("Hot-reload error: " + e.getMessage(), e);
             }
         });

@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,8 +47,8 @@ class RealSQLiteDatabaseAccessorTest {
     void tearDown() {
         if (db != null) db.close();
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
-        io.github.dailystruggle.rtp.common.RTP.serverAccessor = null;
-        io.github.dailystruggle.rtp.common.RTP.scheduler = null;
+        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(null);
+        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setScheduler(null);
     }
 
     private static Map<DatabaseAccessor.TableObj, DatabaseAccessor.TableObj> cachedLocationRow(String uuid,
@@ -285,7 +286,7 @@ class RealSQLiteDatabaseAccessorTest {
 
         db.startup();
 
-        TeleportData loaded = io.github.dailystruggle.rtp.common.RTP.getInstance().latestTeleportData.get(playerUuid);
+        TeleportData loaded = TeleportSessions.current().latestTeleportData.get(playerUuid);
         assertNotNull(loaded);
         assertEquals(9999L, loaded.time);
         assertEquals(15.5, loaded.cost);

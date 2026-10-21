@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.folia.tasks;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPCancellable;
 import io.github.dailystruggle.rtp.common.tasks.RTPDelayable;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
@@ -91,8 +92,8 @@ public class CountBoundTaskPipe extends RTPTaskPipe {
 
     private static void dispatchToRegion(RTPLocation location, Runnable runnable) {
         try {
-            RTPScheduler scheduler = RTP.serverAccessor != null ? RTP.serverAccessor.getScheduler() : null;
-            if (scheduler == null) scheduler = RTP.scheduler;
+            RTPScheduler scheduler = RTPRuntime.serverAccessor() != null ? RTPRuntime.serverAccessor().getScheduler() : null;
+            if (scheduler == null) scheduler = RTPRuntime.scheduler();
             if (scheduler == null) {
                 throw new IllegalStateException("no scheduler installed for region-bound task");
             }

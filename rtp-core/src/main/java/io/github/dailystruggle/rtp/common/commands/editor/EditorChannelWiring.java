@@ -3,17 +3,18 @@ package io.github.dailystruggle.rtp.common.commands.editor;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.BytesocksTransport;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.ChannelTransport;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorChannel;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorKeys;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.LoopbackTransport;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.TrustedEditors;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -120,7 +121,7 @@ final class EditorChannelWiring {
     }
 
     private static EditorChannel snapshotOnly(OperatorNotices notices, String relay, String reason, Throwable t) {
-        RTP.log(Level.WARNING, "[editor] relay channel at " + relay + " unavailable (" + reason
+        RTPRuntime.log(Level.WARNING, "[editor] relay channel at " + relay + " unavailable (" + reason
                 + "); this editor session is snapshot-only", t);
         notices.closed("relay unavailable: " + reason);
         return null;
@@ -131,7 +132,7 @@ final class EditorChannelWiring {
         try {
             return EditorKeys.loadOrCreate(editorDir.resolve(KEYS_DIR));
         } catch (IOException e) {
-            RTP.log(Level.WARNING, "[editor] channel key directory not writable; using a key for this session only: "
+            RTPRuntime.log(Level.WARNING, "[editor] channel key directory not writable; using a key for this session only: "
                     + e.getMessage(), e);
             return EditorKeys.generate();
         }
@@ -147,7 +148,7 @@ final class EditorChannelWiring {
      * when unset, negative or unreadable (logged). Reads the file: off the main thread.
      */
     static long trustMaxAgeMillis() {
-        File dir = RTP.serverAccessor == null ? null : RTP.serverAccessor.getPluginDirectory();
+        File dir = RTPRuntime.serverAccessor() == null ? null : RTPRuntime.serverAccessor().getPluginDirectory();
         File file = dir == null ? null : new File(dir, "advanced" + File.separator + "network.yml");
         if (file == null || !file.isFile()) return 0L;
         try {
@@ -155,12 +156,12 @@ final class EditorChannelWiring {
             RtpYamlSection trust = editor == null ? null : editor.getConfigurationSection("trust");
             long days = trust == null ? 0L : trust.getLong("maxAgeDays", 0L);
             if (days < 0L) {
-                RTP.log(Level.WARNING, "[editor] " + file + " editor.trust.maxAgeDays " + days + " is negative; trust never expires");
+                RTPRuntime.log(Level.WARNING, "[editor] " + file + " editor.trust.maxAgeDays " + days + " is negative; trust never expires");
                 return 0L;
             }
             return days > Long.MAX_VALUE / 86_400_000L ? 0L : days * 86_400_000L;
         } catch (IOException | RuntimeException e) {
-            RTP.log(Level.WARNING, "[editor] could not read " + file + " editor.trust; trust never expires: " + e.getMessage(), e);
+            RTPRuntime.log(Level.WARNING, "[editor] could not read " + file + " editor.trust; trust never expires: " + e.getMessage(), e);
             return 0L;
         }
     }
@@ -182,7 +183,7 @@ final class EditorChannelWiring {
         });
         ch.register(EditorLoopbackApply.ACTION, in -> apply.handleAuthorized(in.body()).whenComplete((ack, t) -> {
             if (ack == null || !in.reply(ack)) {
-                RTP.log(Level.WARNING, "[editor] apply_ack undeliverable to editor key " + in.from().substring(0, 16)
+                RTPRuntime.log(Level.WARNING, "[editor] apply_ack undeliverable to editor key " + in.from().substring(0, 16)
                         + (ack == null ? "" : ": " + ack), t);
             }
         }));
@@ -191,15 +192,15 @@ final class EditorChannelWiring {
     }
 
     static Path editorDir() {
-        File pluginDir = RTP.serverAccessor == null ? null : RTP.serverAccessor.getPluginDirectory();
+        File pluginDir = RTPRuntime.serverAccessor() == null ? null : RTPRuntime.serverAccessor().getPluginDirectory();
         return (pluginDir == null ? new File(".") : pluginDir).toPath().resolve("editor");
     }
 
     /** Configurable value of {@code key}, or {@code fallback} before the configs load. */
     static String message(CommandMessages key, String fallback) {
         try {
-            if (RTP.configs == null) return fallback;
-            Object v = RTP.configs.getConfigValue(key, fallback);
+            if (ActiveConfigs.get() == null) return fallback;
+            Object v = ActiveConfigs.get().getConfigValue(key, fallback);
             return v == null ? fallback : v.toString();
         } catch (RuntimeException e) {
             return fallback;
@@ -212,8 +213,8 @@ final class EditorChannelWiring {
      */
     static String message(String key, String fallback) {
         try {
-            if (RTP.configs == null) return fallback;
-            if (!(RTP.configs.getParser(CommandMessages.class) instanceof ConfigParser<?> parser)) return fallback;
+            if (ActiveConfigs.get() == null) return fallback;
+            if (!(ActiveConfigs.get().getParser(CommandMessages.class) instanceof ConfigParser<?> parser)) return fallback;
             RtpYamlSection root = parser.getYamlRoot();
             String v = root == null ? null : root.getString(key);
             return v == null ? fallback : v;
@@ -224,11 +225,11 @@ final class EditorChannelWiring {
 
     /** Sends to the session's operator (the console when it ran the command); empty templates are skipped. */
     static void tell(UUID target, String text) {
-        if (target == null || text == null || text.isBlank() || RTP.serverAccessor == null) return;
+        if (target == null || text == null || text.isBlank() || RTPRuntime.serverAccessor() == null) return;
         try {
-            RTP.serverAccessor.sendMessage(RTPAPI.serverId, target, text);
+            RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, target, text);
         } catch (RuntimeException e) {
-            RTP.log(Level.FINE, "[editor] channel notice not delivered: " + e.getMessage());
+            RTPRuntime.log(Level.FINE, "[editor] channel notice not delivered: " + e.getMessage());
         }
     }
 
@@ -242,7 +243,7 @@ final class EditorChannelWiring {
 
         @Override
         public void trustPrompt(String nonce, String fingerprint) {
-            if (creator == null || RTP.serverAccessor == null) return;
+            if (creator == null || RTPRuntime.serverAccessor() == null) return;
             // Full fingerprint: a 16-hex prefix is cheap to collide for a look-alike key
             String text = message(CommandMessages.editorTrustPrompt,
                     "[P0] A web editor page asks for access with code [nonce]. If your page shows the same code, click here.")
@@ -251,13 +252,13 @@ final class EditorChannelWiring {
                     .replace("[nonce]", nonce).replace("[fingerprint]", fingerprint);
             if (text.isBlank()) return;
             try {
-                RTPCommandSender sender = RTP.serverAccessor.getSender(creator);
+                RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(creator);
                 if (sender != null) {
-                    RTP.serverAccessor.sendMessage(sender, text, hover, "/rtp editor trust nonce=" + nonce);
+                    RTPRuntime.serverAccessor().sendMessage(sender, text, hover, "/rtp editor trust nonce=" + nonce);
                     return;
                 }
             } catch (RuntimeException e) {
-                RTP.log(Level.FINE, "[editor] clickable trust prompt failed, sending plain text: " + e.getMessage());
+                RTPRuntime.log(Level.FINE, "[editor] clickable trust prompt failed, sending plain text: " + e.getMessage());
             }
             tell(creator, text);
         }

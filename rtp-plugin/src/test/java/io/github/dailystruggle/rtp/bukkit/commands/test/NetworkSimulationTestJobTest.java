@@ -33,8 +33,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Focused tests for {@link NetworkSimulationTestJob}'s D3-slot resolver and the
  * publish/subscribe/snapshot contract the probe relies on. The full
- * {@code onCommand} async dispatch needs a live {@code RTP.scheduler} and
- * {@code RTP.serverAccessor}, which a unit test cannot stand up; we exercise
+ * {@code onCommand} async dispatch needs a live {@code RTPRuntime.scheduler()} and
+ * {@code RTPRuntime.serverAccessor()}, which a unit test cannot stand up; we exercise
  * the resolver and the in-memory transport interactions instead.
  */
 class NetworkSimulationTestJobTest {

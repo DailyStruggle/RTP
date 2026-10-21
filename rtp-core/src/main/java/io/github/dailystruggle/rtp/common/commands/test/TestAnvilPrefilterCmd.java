@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.commands.test;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -90,9 +90,9 @@ public class TestAnvilPrefilterCmd extends BaseRTPCmdImpl {
     Snapshot s = snapshot();
     String summary = "[RTP test/anvil-prefilter] " + s;
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, summary);
+      RTPRuntime.serverAccessor().sendMessage(callerId, summary);
     }
-    RTP.log(Level.INFO, summary);
+    RTPRuntime.log(Level.INFO, summary);
 
     if (s.total() == 0L) {
       String note =
@@ -101,9 +101,9 @@ public class TestAnvilPrefilterCmd extends BaseRTPCmdImpl {
               + "a candidate chunk load since startup. Spigot, Paper (section 13.2), and Folia "
               + "all enter the prefilter; Fabric is out of scope (section 13.2).";
       if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, note);
+        RTPRuntime.serverAccessor().sendMessage(callerId, note);
       }
-      RTP.log(Level.INFO, note);
+      RTPRuntime.log(Level.INFO, note);
     }
     return true;
   }

@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.parameters;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiFunction;
@@ -17,7 +17,7 @@ public class WorldParameter extends CommandParameter {
   // todo: store and update
   @Override
   public Set<String> values() {
-    return RTP.serverAccessor.getRTPWorlds().stream()
+    return RTPRuntime.serverAccessor().getRTPWorlds().stream()
         .map(RTPWorld::name)
         .collect(Collectors.toSet());
   }

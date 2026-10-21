@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.metrics;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.RtpOutcomeStats;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
@@ -25,7 +25,7 @@ public class RtpOutcomeStatsAndCauseTaggingTest {
     static {
         MockRTPServerAccessor accessor =
                 new MockRTPServerAccessor(new java.io.File("target/test-data"));
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
     }
 

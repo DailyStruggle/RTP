@@ -1,10 +1,10 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -36,19 +36,19 @@ public class MultiConfigParserIsolationTest {
         Path defaultYaml = worldsDir.resolve("default.yml");
         Files.writeString(defaultYaml, "requirePermission: false\nregion: default\noverride: none\nversion: 1.0\n");
 
-        RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
+        ActiveSelection.set(new io.github.dailystruggle.rtp.common.selection.SelectionAPI());
 
         // Initialize Configs and MultiConfigParser
-        RTP.configs = new Configs(tempDir.toFile());
+        ActiveConfigs.set(new Configs(tempDir.toFile()));
         worldParser = new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", tempDir.toFile());
-        RTP.configs.putParser(worldParser);
+        ActiveConfigs.get().putParser(worldParser);
     }
 
     @Test
     void testStateIsolationBetweenWorlds() {
         // 1. Get world_nether and world
-        ConfigParser<WorldKeys> nether = RTP.configs.getWorldParser("world_nether");
-        ConfigParser<WorldKeys> overworld = RTP.configs.getWorldParser("world");
+        ConfigParser<WorldKeys> nether = ActiveConfigs.get().getWorldParser("world_nether");
+        ConfigParser<WorldKeys> overworld = ActiveConfigs.get().getWorldParser("world");
 
         assertNotNull(nether);
         assertNotNull(overworld);
@@ -67,7 +67,7 @@ public class MultiConfigParserIsolationTest {
     void testInvalidWorldReturnsNullOrFallbacksGracefully() {
         // The requirement says getWorldParser("invalid_world") strictly returns null
         // or falls back gracefully without generating a blank, orphaned config file.
-        ConfigParser<WorldKeys> invalid = RTP.configs.getWorldParser("invalid_world");
+        ConfigParser<WorldKeys> invalid = ActiveConfigs.get().getWorldParser("invalid_world");
         assertNull(invalid, "Expected null for unregistered/invalid world");
 
         File invalidFile = tempDir.resolve("worlds/invalid_world.yml").toFile();
@@ -85,9 +85,9 @@ public class MultiConfigParserIsolationTest {
 
         // Rebuild the MultiConfigParser so it picks up the new file
         worldParser = new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", tempDir.toFile());
-        RTP.configs.putParser(worldParser);
+        ActiveConfigs.get().putParser(worldParser);
 
-        ConfigParser<WorldKeys> nether = RTP.configs.getWorldParser("world_nether");
+        ConfigParser<WorldKeys> nether = ActiveConfigs.get().getWorldParser("world_nether");
         assertNotNull(nether);
         assertEquals(true, nether.getData(WorldKeys.requirePermission),
                 "world_nether.yml override should take precedence over default");
@@ -96,7 +96,7 @@ public class MultiConfigParserIsolationTest {
     @Test
     void testDefaultFallbackWhenWorldFileAbsent() {
         // "world" has no explicit yml file; should fall back to default.yml values
-        ConfigParser<WorldKeys> overworld = RTP.configs.getWorldParser("world");
+        ConfigParser<WorldKeys> overworld = ActiveConfigs.get().getWorldParser("world");
         assertNotNull(overworld);
         // default.yml sets requirePermission: false
         assertEquals(false, overworld.getData(WorldKeys.requirePermission),
@@ -107,7 +107,7 @@ public class MultiConfigParserIsolationTest {
 
     @Test
     void testReloadAfterMutation() throws IOException {
-        ConfigParser<WorldKeys> nether = RTP.configs.getWorldParser("world_nether");
+        ConfigParser<WorldKeys> nether = ActiveConfigs.get().getWorldParser("world_nether");
         assertNotNull(nether);
 
         // Mutate in memory
@@ -117,9 +117,9 @@ public class MultiConfigParserIsolationTest {
         // Save and reload via a fresh MultiConfigParser
         nether.save();
         worldParser = new MultiConfigParser<>(WorldKeys.class, "worlds", "1.0", tempDir.toFile());
-        RTP.configs.putParser(worldParser);
+        ActiveConfigs.get().putParser(worldParser);
 
-        ConfigParser<WorldKeys> reloaded = RTP.configs.getWorldParser("world_nether");
+        ConfigParser<WorldKeys> reloaded = ActiveConfigs.get().getWorldParser("world_nether");
         assertNotNull(reloaded);
         assertEquals(true, reloaded.getData(WorldKeys.requirePermission),
                 "Mutated value should persist after save and reload");

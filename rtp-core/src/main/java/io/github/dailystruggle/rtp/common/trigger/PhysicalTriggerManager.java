@@ -8,8 +8,9 @@ import io.github.dailystruggle.rtp.api.event.PlayerMoveEvent;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.action.ActionServices;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -28,6 +29,15 @@ import java.util.logging.Level;
  */
 public class PhysicalTriggerManager implements AutoCloseable {
 
+  /** Process-wide manager (formerly {@code PhysicalTriggerManager.instance()}); {@code RTP} starts it in static init. */
+  public static PhysicalTriggerManager instance() {
+    return Holder.INSTANCE;
+  }
+
+  private static final class Holder {
+    static final PhysicalTriggerManager INSTANCE = new PhysicalTriggerManager();
+  }
+
   private final Map<String, PhysicalTriggerSpec> triggers = new ConcurrentHashMap<>();
   private final Map<String, Map<UUID, Long>> cooldowns = new ConcurrentHashMap<>();
   private final Map<String, Set<UUID>> occupants = new ConcurrentHashMap<>();
@@ -40,8 +50,8 @@ public class PhysicalTriggerManager implements AutoCloseable {
     if (moveRegistration == null && RTPAPI.playerMoveEvents != null) {
       moveRegistration = RTPAPI.playerMoveEvents.watchAll(this::onPlayerMove);
     }
-    if (accumulatorTaskHandle == null && RTP.scheduler != null) {
-      accumulatorTaskHandle = RTP.scheduler.runTaskTimerAsynchronously(this::tickWaveAccumulator, 20L, 20L);
+    if (accumulatorTaskHandle == null && RTPRuntime.scheduler() != null) {
+      accumulatorTaskHandle = RTPRuntime.scheduler().runTaskTimerAsynchronously(this::tickWaveAccumulator, 20L, 20L);
     }
   }
 
@@ -142,16 +152,16 @@ public class PhysicalTriggerManager implements AutoCloseable {
             if (future != null) {
               future.whenComplete((result, ex) -> {
                 if (ex != null) {
-                  RTP.log(Level.WARNING, "[RTP] Physical trigger " + trigger.id() + " failed: " + ex.getMessage(), ex);
+                  RTPRuntime.log(Level.WARNING, "[RTP] Physical trigger " + trigger.id() + " failed: " + ex.getMessage(), ex);
                 } else if (result != null && !result.success()) {
-                  RTP.log(Level.WARNING, "[RTP] Physical trigger " + trigger.id() + " rejected: " + result.failureReason());
+                  RTPRuntime.log(Level.WARNING, "[RTP] Physical trigger " + trigger.id() + " rejected: " + result.failureReason());
                 } else if (result != null && result.success()) {
-                  RTP.log(Level.FINE, "[RTP] Physical trigger " + trigger.id() + " succeeded, session: " + result.sessionId());
+                  RTPRuntime.log(Level.FINE, "[RTP] Physical trigger " + trigger.id() + " succeeded, session: " + result.sessionId());
                 }
               });
             }
           } catch (Throwable t) {
-            RTP.log(Level.WARNING, "[RTP] Physical trigger " + trigger.id() + " failed: " + t.getMessage(), t);
+            RTPRuntime.log(Level.WARNING, "[RTP] Physical trigger " + trigger.id() + " failed: " + t.getMessage(), t);
           }
         }
       }
@@ -165,7 +175,7 @@ public class PhysicalTriggerManager implements AutoCloseable {
   public void tickWaveAccumulator() {
     if (triggers.isEmpty()) return;
 
-    RTPServerAccessor accessor = RTP.serverAccessor;
+    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
 
     for (PhysicalTriggerSpec trigger : triggers.values()) {
       if (trigger.batchIntervalSeconds() <= 0) continue;
@@ -222,12 +232,12 @@ public class PhysicalTriggerManager implements AutoCloseable {
         }
 
         if (!playersToDispatch.isEmpty()) {
-          RTP.log(Level.INFO, "[RTP] Physical trigger wave dispatching " + playersToDispatch.size()
+          RTPRuntime.log(Level.INFO, "[RTP] Physical trigger wave dispatching " + playersToDispatch.size()
               + " occupants for action '" + trigger.actionId() + "' in zone '" + trigger.id() + "'");
 
           java.util.concurrent.CompletableFuture<io.github.dailystruggle.rtp.api.action.ActionSessionResult> future = null;
-          if (RTP.actionManager != null) {
-            future = RTP.actionManager.dispatchGroupAction(playersToDispatch, trigger.actionId());
+          if (ActionServices.actionManager() != null) {
+            future = ActionServices.actionManager().dispatchGroupAction(playersToDispatch, trigger.actionId());
           } else if (RTPAPI.actions() != null) {
             future = RTPAPI.actions().trigger(trigger.actionId(), playersToDispatch, ActionContext.EMPTY);
           }
@@ -235,13 +245,13 @@ public class PhysicalTriggerManager implements AutoCloseable {
           if (future != null) {
             future.whenComplete((result, ex) -> {
               if (ex != null) {
-                RTP.log(Level.WARNING, "[RTP] Physical trigger wave dispatch failed for action '"
+                RTPRuntime.log(Level.WARNING, "[RTP] Physical trigger wave dispatch failed for action '"
                     + trigger.actionId() + "': " + ex.getMessage(), ex);
               } else if (result != null && !result.success()) {
-                RTP.log(Level.WARNING, "[RTP] Physical trigger wave dispatch rejected for action '"
+                RTPRuntime.log(Level.WARNING, "[RTP] Physical trigger wave dispatch rejected for action '"
                     + trigger.actionId() + "': " + result.failureReason());
               } else if (result != null && result.success()) {
-                RTP.log(Level.FINE, "[RTP] Physical trigger wave dispatch succeeded for action '"
+                RTPRuntime.log(Level.FINE, "[RTP] Physical trigger wave dispatch succeeded for action '"
                     + trigger.actionId() + "', session: " + result.sessionId());
               }
             });
@@ -252,12 +262,12 @@ public class PhysicalTriggerManager implements AutoCloseable {
   }
 
   private void broadcastLobbyFeedback(PhysicalTriggerSpec trigger, Set<UUID> occupants, long remainingSeconds) {
-    RTPServerAccessor accessor = RTP.serverAccessor;
+    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
     if (accessor == null || occupants.isEmpty()) return;
 
     // Check if action defines onEnqueue / onWait lifecycles
-    ActionDefinition actionDef = (RTP.actionManager != null)
-        ? RTP.actionManager.getAction(trigger.actionId()).orElse(null)
+    ActionDefinition actionDef = (ActionServices.actionManager() != null)
+        ? ActionServices.actionManager().getAction(trigger.actionId()).orElse(null)
         : null;
 
     if (actionDef != null && actionDef.lifecycle() != null && !actionDef.lifecycle().onEnqueue().isEmpty()) {
@@ -303,9 +313,9 @@ public class PhysicalTriggerManager implements AutoCloseable {
       }
       moveRegistration = null;
     }
-    if (accumulatorTaskHandle != null && RTP.scheduler != null) {
+    if (accumulatorTaskHandle != null && RTPRuntime.scheduler() != null) {
       try {
-        RTP.scheduler.cancelTask(accumulatorTaskHandle);
+        RTPRuntime.scheduler().cancelTask(accumulatorTaskHandle);
       } catch (Exception ignored) {
       }
       accumulatorTaskHandle = null;

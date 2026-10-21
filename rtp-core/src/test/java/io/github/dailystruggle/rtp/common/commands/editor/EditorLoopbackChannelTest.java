@@ -4,7 +4,8 @@ import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopback
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopbackJson;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.LoopbackTransport;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
@@ -295,7 +296,7 @@ class EditorLoopbackChannelTest {
     @Test
     @DisplayName("ADR-104: production apply fails closed before core init (S-006)")
     void productionApplyFailsClosedPreInit() {
-        Assumptions.assumeTrue(RTP.configs == null && RTP.serverAccessor == null, "core initialised by another test");
+        Assumptions.assumeTrue(ActiveConfigs.get() == null && RTPRuntime.serverAccessor() == null, "core initialised by another test");
         Map<?, ?> ack = ack(EditorLoopbackApply.forSessionManager(token), applyMessage(token, Map.of("config.yml", "a: 1")));
         assertEquals(Boolean.FALSE, ack.get("success"));
         assertTrue(String.valueOf(ack.get("error")).contains("S-006"));
@@ -304,7 +305,7 @@ class EditorLoopbackChannelTest {
     @Test
     @DisplayName("ADR-104: start() without a scheduler throws IllegalStateException (S-006)")
     void startWithoutSchedulerFailsClosed() {
-        Assumptions.assumeTrue(RTP.scheduler == null, "scheduler initialised by another test");
+        Assumptions.assumeTrue(RTPRuntime.scheduler() == null, "scheduler initialised by another test");
         assertThrows(IllegalStateException.class, () -> EditorLoopbackChannel.start(token, (c, t) -> { }));
     }
 

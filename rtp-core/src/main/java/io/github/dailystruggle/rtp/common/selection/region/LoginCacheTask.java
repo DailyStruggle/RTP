@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.world.ChunkReservation;
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.logging.Level;
 
 /**
@@ -50,7 +50,7 @@ public final class LoginCacheTask implements Runnable {
 
     private static boolean isFoliaPlatform() {
         try {
-            return "Folia".equals(RTP.serverAccessor.getPlatform());
+            return "Folia".equals(RTPRuntime.serverAccessor().getPlatform());
         } catch (Throwable ignored) {
             return false;
         }
@@ -102,7 +102,7 @@ public final class LoginCacheTask implements Runnable {
                             }
                         } catch (Throwable verifyEx) {
                             resolved = null;
-                            RTP.log(Level.FINE,
+                            RTPRuntime.log(Level.FINE,
                                     "[LoginCacheTask] unkept->login safety re-verification failed: "
                                             + verifyEx.getClass().getSimpleName() + ": " + verifyEx.getMessage());
                         }
@@ -120,10 +120,10 @@ public final class LoginCacheTask implements Runnable {
                         if (!added) {
                             reservation.close();
                             qm.unkeptLocations.offer(coldLoc);
-                            RTP.log(Level.FINE,
+                            RTPRuntime.log(Level.FINE,
                                     "[LoginCacheTask] login cache full; returned to unkept");
                         } else {
-                            RTP.log(Level.FINE,
+                            RTPRuntime.log(Level.FINE,
                                     "[LoginCacheTask] promoted to login cache; size="
                                             + login.size());
                         }
@@ -132,7 +132,7 @@ public final class LoginCacheTask implements Runnable {
                     }
                 };
                 if (isFoliaPlatform()) {
-                    RTP.scheduler.runTask(region.getWorld(), cx, cz, verify);
+                    RTPRuntime.scheduler().runTask(region.getWorld(), cx, cz, verify);
                 } else {
                     verify.run();
                 }

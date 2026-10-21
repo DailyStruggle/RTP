@@ -7,11 +7,11 @@ import io.github.dailystruggle.rtp.api.action.ActionDefinition;
 import io.github.dailystruggle.rtp.api.action.ConfinementBoundary;
 import io.github.dailystruggle.rtp.api.event.PlayerMoveEvent;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer;
@@ -35,7 +35,7 @@ class ActionSessionImplTest {
   @BeforeEach
   void setUp(@TempDir Path tempDir) {
     RTPTestSetup.install(tempDir.toFile());
-    accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+    accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
     world = (MockRTPWorld) accessor.getRTPWorld("world");
     ActionSessionImpl.resetScoreboardObjectivesInitializedForTesting();
   }

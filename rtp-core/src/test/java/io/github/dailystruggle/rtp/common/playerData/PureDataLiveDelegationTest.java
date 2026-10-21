@@ -12,7 +12,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -30,15 +30,15 @@ class PureDataLiveDelegationTest {
 
   @BeforeEach
   void setUp() {
-    originalAccessor = RTP.serverAccessor;
+    originalAccessor = RTPRuntime.serverAccessor();
     accessor = mock(RTPServerAccessor.class);
-    RTP.serverAccessor = null;
+    RTPRuntime.setServerAccessor(null);
     uuid = UUID.randomUUID();
   }
 
   @AfterEach
   void tearDown() {
-    RTP.serverAccessor = originalAccessor;
+    RTPRuntime.setServerAccessor(originalAccessor);
   }
 
   private PureDataRTPCommandSender sender(Set<String> perms) {
@@ -100,7 +100,7 @@ class PureDataLiveDelegationTest {
     PureDataRTPCommandSender s = sender(Set.of());
     assertNull(s.getLiveSender());
 
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     when(accessor.getSender(uuid)).thenReturn(null);
     assertNull(s.getLiveSender());
 
@@ -115,7 +115,7 @@ class PureDataLiveDelegationTest {
     RTPCommandSender live = mock(RTPCommandSender.class);
     when(live.isSelfContained()).thenReturn(false);
     when(live.getLiveSender()).thenReturn(handle);
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     when(accessor.getSender(uuid)).thenReturn(live);
 
     assertSame(handle, sender(Set.of()).getLiveSender());
@@ -127,7 +127,7 @@ class PureDataLiveDelegationTest {
     PureDataRTPCommandSender s = sender(Set.of());
     assertDoesNotThrow(() -> s.sendMessage("ignored"));
 
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     s.sendMessage("hello");
     verify(accessor).sendMessage(uuid, "hello");
   }
@@ -138,7 +138,7 @@ class PureDataLiveDelegationTest {
     PureDataRTPCommandSender s = sender(Set.of());
     assertDoesNotThrow(() -> s.performCommand(null, "rtp"));
 
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     when(accessor.getSender(uuid)).thenReturn(null);
     assertDoesNotThrow(() -> s.performCommand(null, "rtp"));
 
@@ -176,7 +176,7 @@ class PureDataLiveDelegationTest {
     RTPLocation to = new RTPLocation(null, 1, 64, 1);
     assertFalse(p.setLocation(to).join());
 
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     when(accessor.getPlayer(uuid)).thenReturn(null);
     assertFalse(p.setLocation(to).join());
 
@@ -190,7 +190,7 @@ class PureDataLiveDelegationTest {
   @DisplayName("getLocation returns null when offline and the live location when online")
   void playerGetLocation() {
     PureDataRTPPlayer p = new PureDataRTPPlayer(uuid, "Alex", 0L, 0L, Set.of());
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     when(accessor.getPlayer(uuid)).thenReturn(null);
     assertNull(p.getLocation());
 
@@ -205,7 +205,7 @@ class PureDataLiveDelegationTest {
   @DisplayName("isOnline reflects the live player state when an accessor is present")
   void playerIsOnline() {
     PureDataRTPPlayer p = new PureDataRTPPlayer(uuid, "Alex", 0L, 0L, Set.of());
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     when(accessor.getPlayer(uuid)).thenReturn(null);
     assertFalse(p.isOnline());
 

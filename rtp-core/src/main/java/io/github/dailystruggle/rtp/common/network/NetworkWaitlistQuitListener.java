@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.network;
 
 import io.github.dailystruggle.rtp.api.server.PlayerLifecycleHook;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue;
 
 import java.util.Objects;
@@ -69,7 +69,7 @@ public final class NetworkWaitlistQuitListener {
                 // released and the entry dropped.
                 lobbyRetryQueue.cancel(uuid, null);
             } catch (Throwable t) {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "[RTP] lobby retry cancel-on-quit threw for "
                                 + uuid + ": " + t.getMessage(), t);
             }
@@ -77,7 +77,7 @@ public final class NetworkWaitlistQuitListener {
         try {
             requestQueue.cancel(uuid, NetworkRequestQueue.CancelReason.PLAYER_DISCONNECT)
                     .exceptionally(t -> {
-                        RTP.log(Level.WARNING,
+                        RTPRuntime.log(Level.WARNING,
                                 "[RTP] waitlist cancel-on-quit failed for "
                                         + uuid + ": " + t.getMessage(), t);
                         return null;
@@ -85,7 +85,7 @@ public final class NetworkWaitlistQuitListener {
         } catch (Throwable t) {
             // S-004: never silently swallow, but never let a quit handler
             // throw out of Bukkit's event dispatch.
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[RTP] waitlist cancel-on-quit threw synchronously for "
                             + uuid + ": " + t.getMessage(), t);
         }

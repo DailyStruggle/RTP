@@ -3,8 +3,8 @@ package io.github.dailystruggle.rtp.guiaddon.common;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.RTPResult;
 import io.github.dailystruggle.rtp.api.RtpTarget;
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.UUID;
 
 /**
@@ -14,7 +14,7 @@ import java.util.UUID;
  * resolved target; everything from here is engine work. The teleport goes through
  * {@link RTPAPI#teleport}, which enforces permission / cooldown / cost / safety
  * off-thread and always completes with a result (never a silent no-op, per
- * REQ-RTP-S-004). Player messaging is routed through {@code RTP.serverAccessor} so it
+ * REQ-RTP-S-004). Player messaging is routed through {@code RTPRuntime.serverAccessor()} so it
  * lands on the right thread on every platform, and the failure path is always
  * surfaced to the player rather than swallowed.
  */
@@ -162,12 +162,12 @@ public final class MenuActions {
 
   /** Sends a message on the correct platform thread; the callback may be off-thread. */
   private static void message(UUID playerId, String text) {
-    if (RTP.serverAccessor == null || RTP.serverAccessor.getPlayer(playerId) == null) {
+    if (RTPRuntime.serverAccessor() == null || RTPRuntime.serverAccessor().getPlayer(playerId) == null) {
       return;
     }
-    RTP.scheduler.runTask(() -> {
-      if (RTP.serverAccessor.getPlayer(playerId) != null) {
-        RTP.serverAccessor.sendMessage(playerId, text);
+    RTPRuntime.scheduler().runTask(() -> {
+      if (RTPRuntime.serverAccessor().getPlayer(playerId) != null) {
+        RTPRuntime.serverAccessor().sendMessage(playerId, text);
       }
     });
   }
@@ -243,7 +243,7 @@ public final class MenuActions {
   }
 
   private static void dispatchCommand(UUID playerId, String commandLine) {
-    if (RTP.serverAccessor == null || RTP.serverAccessor.getPlayer(playerId) == null) {
+    if (RTPRuntime.serverAccessor() == null || RTPRuntime.serverAccessor().getPlayer(playerId) == null) {
       return;
     }
     String normalized = commandLine;
@@ -255,9 +255,9 @@ public final class MenuActions {
       }
     }
     final String finalCommand = normalized;
-    RTP.scheduler.runTask(() -> {
-      if (RTP.serverAccessor != null && RTP.serverAccessor.getPlayer(playerId) != null) {
-        RTP.serverAccessor.executeCommand(playerId, finalCommand);
+    RTPRuntime.scheduler().runTask(() -> {
+      if (RTPRuntime.serverAccessor() != null && RTPRuntime.serverAccessor().getPlayer(playerId) != null) {
+        RTPRuntime.serverAccessor().executeCommand(playerId, finalCommand);
       }
     });
   }

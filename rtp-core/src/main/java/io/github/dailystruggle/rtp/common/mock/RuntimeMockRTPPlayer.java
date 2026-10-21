@@ -3,8 +3,8 @@ package io.github.dailystruggle.rtp.common.mock;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;
@@ -32,7 +32,7 @@ public final class RuntimeMockRTPPlayer implements RTPPlayer {
   @Override
   public CompletableFuture<Boolean> setLocation(RTPLocation to) {
     this.location = to;
-    RTP.log(
+    RTPRuntime.log(
         Level.INFO,
         "[MOCK] player '" + name + "' (" + uuid + ") teleported to "
             + (to == null ? "null" : to.world().name() + " " + to.x() + "," + to.y() + "," + to.z()));
@@ -65,7 +65,7 @@ public final class RuntimeMockRTPPlayer implements RTPPlayer {
 
   @Override
   public void sendMessage(String message) {
-    RTP.log(Level.INFO, "[MOCK->" + name + "] " + message);
+    RTPRuntime.log(Level.INFO, "[MOCK->" + name + "] " + message);
   }
 
   @Override
@@ -90,7 +90,7 @@ public final class RuntimeMockRTPPlayer implements RTPPlayer {
 
   @Override
   public void performCommand(@Nullable RTPPlayer player, String command) {
-    RTP.log(Level.INFO, "[MOCK->" + name + "] performCommand: " + command);
+    RTPRuntime.log(Level.INFO, "[MOCK->" + name + "] performCommand: " + command);
   }
 
   @Override

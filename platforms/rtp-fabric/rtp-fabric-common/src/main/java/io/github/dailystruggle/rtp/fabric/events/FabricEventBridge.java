@@ -1,7 +1,11 @@
 package io.github.dailystruggle.rtp.fabric.events;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.pvp.PvPGate;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
+import io.github.dailystruggle.rtp.common.tasks.teleport.DeathTeleports;
 import io.github.dailystruggle.rtp.fabric.database.FabricDatabaseHandler;
 import io.github.dailystruggle.rtp.fabric.scheduling.FabricScheduler;
 import io.github.dailystruggle.rtp.fabric.server.FabricServerAccessor;
@@ -209,7 +213,7 @@ public final class FabricEventBridge {
                                     } catch (Throwable ignored) {}
                                     if (uuid != null) {
                                         io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask pending =
-                                                RTP.pendingDeathTeleports.remove(uuid);
+                                                DeathTeleports.pending().remove(uuid);
                                         if (pending != null) {
                                             pending.completeDeathTeleport(true);
                                         }
@@ -376,7 +380,7 @@ public final class FabricEventBridge {
                     io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
                     (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
                             io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
-                            RTP.configs.getParser(
+                            ActiveConfigs.get().getParser(
                                     io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
             if (perf == null) return;
             Object enabledObj = perf.getConfigValue(
@@ -399,7 +403,7 @@ public final class FabricEventBridge {
                 // binding itself already uses internally) on the NOOP path.
                 int snapCap = 0;
                 try {
-                    snapCap = RTP.metrics.snapshot().softCap;
+                    snapCap = CoreMetrics.instance().snapshot().softCap;
                 } catch (Throwable ignored) {
                     // snapshot() is non-throwing by contract; defensive.
                 }
@@ -420,7 +424,7 @@ public final class FabricEventBridge {
             }
 
             io.github.dailystruggle.rtp.common.selection.region.Region region =
-                    RTP.selectionAPI.permRegionLookup.values().stream()
+                    ActiveSelection.get().permRegionLookup.values().stream()
                             .filter(r -> r.getWorld() != null
                                     && defaultWorldName.equals(r.getWorld().name()))
                             .findFirst()
@@ -445,7 +449,7 @@ public final class FabricEventBridge {
             // agree at bootstrap).
             int online;
             try {
-                int snapOnline = RTP.metrics.snapshot().playerCount;
+                int snapOnline = CoreMetrics.instance().snapshot().playerCount;
                 online = (snapOnline > 0) ? snapOnline : resolveOnlinePlayerCount(server);
             } catch (Throwable ignored) {
                 online = resolveOnlinePlayerCount(server);
@@ -495,7 +499,7 @@ public final class FabricEventBridge {
 
     /**
      * ADR-023 - refill the login reserve cache on player disconnect.
-     * Iterates {@code RTP.selectionAPI.permRegionLookup} and dispatches one
+     * Iterates {@code ActiveSelection.get().permRegionLookup} and dispatches one
      * async {@code LoginCacheTask.promoteUpTo(1)} per region whose
      * {@code loginLocations} buffer is non-null. Mirror of the Bukkit
      * {@code OnPlayerQuit} handler. Fail-soft per-region: a throw from one
@@ -503,9 +507,9 @@ public final class FabricEventBridge {
      */
     private static void refillLoginReserveOnQuit() {
         try {
-            if (RTP.getInstance() == null || RTP.selectionAPI == null) return;
+            if (RTP.getInstance() == null || ActiveSelection.get() == null) return;
             for (io.github.dailystruggle.rtp.common.selection.region.Region region
-                    : RTP.selectionAPI.permRegionLookup.values()) {
+                    : ActiveSelection.get().permRegionLookup.values()) {
                 try {
                     if (region == null) continue;
                     if (region.queueManager == null) continue;
@@ -648,8 +652,8 @@ public final class FabricEventBridge {
         // type probe is reflective so this module compiles without a hard
         // dependency on the binding class name beyond its package.
         try {
-            if (RTP.getInstance() != null && RTP.metrics != null) {
-                Object binding = RTP.metrics.getBinding();
+            if (RTP.getInstance() != null && CoreMetrics.instance() != null) {
+                Object binding = CoreMetrics.instance().getBinding();
                 if (binding instanceof io.github.dailystruggle.rtp.fabric.metrics.FabricMetricsBinding fmb) {
                     fmb.tick();
                 }

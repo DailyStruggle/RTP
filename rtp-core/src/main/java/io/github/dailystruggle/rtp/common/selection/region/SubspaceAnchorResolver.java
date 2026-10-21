@@ -4,7 +4,7 @@ import io.github.dailystruggle.rtp.api.claim.ClaimBoundary;
 import io.github.dailystruggle.rtp.api.group.AnchorSource;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.claim.ClaimAnchoredRegionTracker;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
@@ -35,11 +35,11 @@ public final class SubspaceAnchorResolver {
    */
   public static CompletableFuture<GenerationResult> resolveAnchor(Region region, AnchorSource anchorSource) {
     if (region == null) {
-      RTP.log(Level.WARNING, "[group] resolveAnchor: region is null");
+      RTPRuntime.log(Level.WARNING, "[group] resolveAnchor: region is null");
       return CompletableFuture.completedFuture(null);
     }
     AnchorSource source = (anchorSource != null) ? anchorSource : AnchorSource.regionQueue();
-    RTP.log(
+    RTPRuntime.log(
         Level.FINE,
         "[group] resolveAnchor: region='"
             + region.name
@@ -53,17 +53,17 @@ public final class SubspaceAnchorResolver {
         if (pollFuture != null) {
           return pollFuture.thenApply(loc -> {
             if (loc == null || loc.coords() == null) {
-              RTP.log(Level.FINE, "[group] resolveAnchor: queueManager.poll returned null for region '" + region.name + "'");
+              RTPRuntime.log(Level.FINE, "[group] resolveAnchor: queueManager.poll returned null for region '" + region.name + "'");
               return null;
             }
-            RTP.log(Level.FINE, "[group] resolveAnchor: queueManager.poll resolved anchor at " + loc.coords());
+            RTPRuntime.log(Level.FINE, "[group] resolveAnchor: queueManager.poll resolved anchor at " + loc.coords());
             return new GenerationResult(loc.coords(), loc.attempts(), null, loc.reservation());
           });
         }
       }
-      RTP.log(Level.FINE, "[group] resolveAnchor: queueManager was null or had no poll, falling back to getLocation for '" + region.name + "'");
+      RTPRuntime.log(Level.FINE, "[group] resolveAnchor: queueManager was null or had no poll, falling back to getLocation for '" + region.name + "'");
       return region.getLocation(Collections.emptySet()).thenApply(res -> {
-        RTP.log(Level.FINE, "[group] resolveAnchor: region.getLocation completed: " + (res != null ? res.coords() : "null"));
+        RTPRuntime.log(Level.FINE, "[group] resolveAnchor: region.getLocation completed: " + (res != null ? res.coords() : "null"));
         return res;
       });
     }
@@ -83,8 +83,8 @@ public final class SubspaceAnchorResolver {
           future.completeExceptionally(t);
         }
       };
-      if (RTP.scheduler != null) {
-        RTP.scheduler.runTaskAsynchronously(task);
+      if (RTPRuntime.scheduler() != null) {
+        RTPRuntime.scheduler().runTaskAsynchronously(task);
       } else {
         task.run();
       }
@@ -111,7 +111,7 @@ public final class SubspaceAnchorResolver {
         .thenApply(
             coords -> {
               if (coords == null) {
-                RTP.log(Level.WARNING, "[group] resolveAnchor returned null coords for strategy " + source);
+                RTPRuntime.log(Level.WARNING, "[group] resolveAnchor returned null coords for strategy " + source);
                 return null;
               }
               // If world name is missing or empty, inherit from region world
@@ -119,12 +119,12 @@ public final class SubspaceAnchorResolver {
               if ((worldName == null || worldName.isBlank()) && region.getWorld() != null) {
                 coords = new RTPCoords(region.getWorld().name(), coords.x(), coords.y(), coords.z());
               }
-              RTP.log(Level.FINE, "[group] resolveAnchor successfully resolved anchor at " + coords);
+              RTPRuntime.log(Level.FINE, "[group] resolveAnchor successfully resolved anchor at " + coords);
               return new GenerationResult(coords, 1, null);
             })
         .exceptionally(
             ex -> {
-              RTP.log(Level.WARNING, "[group] anchor resolution failed for region '" + region.name + "'", ex);
+              RTPRuntime.log(Level.WARNING, "[group] anchor resolution failed for region '" + region.name + "'", ex);
               return null;
             });
   }

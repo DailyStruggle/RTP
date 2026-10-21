@@ -7,8 +7,9 @@ import io.github.dailystruggle.rtp.api.group.GroupProfileSpec;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,8 +54,8 @@ class GroupPlacementDispatcherTest {
 
     @AfterEach
     void tearDown() {
-        RTP.serverAccessor = null;
-        RTP.scheduler = null;
+        RTPRuntime.setServerAccessor(null);
+        RTPRuntime.setScheduler(null);
     }
 
     @Test
@@ -87,7 +88,7 @@ class GroupPlacementDispatcherTest {
     @DisplayName("Returns failure when group size exceeds maxGroupSize")
     void testExceededMaxGroupSize() throws Exception {
         Region mockRegion = mock(Region.class);
-        RTP.selectionAPI.permRegionLookup.put("capacity_test_region", mockRegion);
+        ActiveSelection.get().permRegionLookup.put("capacity_test_region", mockRegion);
 
         try {
             GroupProfileSpec spec = GroupProfileSpec.of("square", 16, 2, 5, 2);
@@ -102,7 +103,7 @@ class GroupPlacementDispatcherTest {
             assertFalse(result.isSuccess());
             assertEquals(GroupPlacementResult.Reason.EXCEEDED_MAX_GROUP_SIZE, result.reason());
         } finally {
-            RTP.selectionAPI.permRegionLookup.remove("capacity_test_region");
+            ActiveSelection.get().permRegionLookup.remove("capacity_test_region");
         }
     }
 
@@ -111,7 +112,7 @@ class GroupPlacementDispatcherTest {
     void testNullAnchorResult() throws Exception {
         Region mockRegion = mock(Region.class);
         when(mockRegion.getLocation(anySet())).thenReturn(CompletableFuture.completedFuture(null));
-        RTP.selectionAPI.permRegionLookup.put("mock_region", mockRegion);
+        ActiveSelection.get().permRegionLookup.put("mock_region", mockRegion);
 
         try {
             GroupProfileSpec spec = GroupProfileSpec.of("square", 16, 2, 5, 4);
@@ -126,7 +127,7 @@ class GroupPlacementDispatcherTest {
             assertFalse(result.isSuccess());
             assertEquals(GroupPlacementResult.Reason.NO_ANCHOR, result.reason());
         } finally {
-            RTP.selectionAPI.permRegionLookup.remove("mock_region");
+            ActiveSelection.get().permRegionLookup.remove("mock_region");
         }
     }
 
@@ -143,7 +144,7 @@ class GroupPlacementDispatcherTest {
         );
         when(mockRegion.getLocation(anySet())).thenReturn(CompletableFuture.completedFuture(genResult));
         when(mockRegion.getWorld()).thenReturn(null);
-        RTP.selectionAPI.permRegionLookup.put("no_world_region", mockRegion);
+        ActiveSelection.get().permRegionLookup.put("no_world_region", mockRegion);
 
         try {
             GroupProfileSpec spec = GroupProfileSpec.of("square", 16, 2, 5, 4);
@@ -159,7 +160,7 @@ class GroupPlacementDispatcherTest {
             assertEquals(GroupPlacementResult.Reason.INVALID_REGION, result.reason());
             verify(ticket).close();
         } finally {
-            RTP.selectionAPI.permRegionLookup.remove("no_world_region");
+            ActiveSelection.get().permRegionLookup.remove("no_world_region");
         }
     }
 
@@ -175,7 +176,7 @@ class GroupPlacementDispatcherTest {
                 null,
                 ticket
         );
-        RTPWorld<?> world = RTP.serverAccessor.getRTPWorld("world");
+        RTPWorld<?> world = RTPRuntime.serverAccessor().getRTPWorld("world");
         org.mockito.Mockito.doReturn(world).when(mockRegion).getWorld();
         when(mockRegion.getLocation(anySet())).thenReturn(CompletableFuture.completedFuture(genResult));
         when(mockRegion.candidateValidator()).thenReturn(new CandidateValidator() {
@@ -189,7 +190,7 @@ class GroupPlacementDispatcherTest {
                 return CompletableFuture.completedFuture(validate(x, z));
             }
         });
-        RTP.selectionAPI.permRegionLookup.put("offline_test_region", mockRegion);
+        ActiveSelection.get().permRegionLookup.put("offline_test_region", mockRegion);
 
         try {
             GroupProfileSpec spec = GroupProfileSpec.of("square", 16, 2, 5, 4);
@@ -204,7 +205,7 @@ class GroupPlacementDispatcherTest {
             assertFalse(result.isSuccess());
             assertEquals(GroupPlacementResult.Reason.CANCELLED, result.reason());
         } finally {
-            RTP.selectionAPI.permRegionLookup.remove("offline_test_region");
+            ActiveSelection.get().permRegionLookup.remove("offline_test_region");
         }
     }
 
@@ -212,8 +213,8 @@ class GroupPlacementDispatcherTest {
     @DisplayName("Returns INSUFFICIENT_SAFE_SLOTS when subspace fails to allocate enough slots")
     void testSubspaceInsufficientSlots() throws Exception {
         UUID onlineUuid = UUID.randomUUID();
-        RTPWorld<?> world = RTP.serverAccessor.getRTPWorld("world");
-        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(
+        RTPWorld<?> world = RTPRuntime.serverAccessor().getRTPWorld("world");
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor()).addPlayer(
                 new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(
                         onlineUuid, "OnlinePlayer", new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 0, 64, 0)));
 
@@ -239,7 +240,7 @@ class GroupPlacementDispatcherTest {
                 return CompletableFuture.completedFuture(null);
             }
         });
-        RTP.selectionAPI.permRegionLookup.put("insufficient_test_region", mockRegion);
+        ActiveSelection.get().permRegionLookup.put("insufficient_test_region", mockRegion);
 
         try {
             GroupProfileSpec spec = GroupProfileSpec.of("square", 16, 2, 5, 4);
@@ -255,7 +256,7 @@ class GroupPlacementDispatcherTest {
             assertEquals(GroupPlacementResult.Reason.INSUFFICIENT_SAFE_SLOTS, result.reason());
             verify(ticket).close();
         } finally {
-            RTP.selectionAPI.permRegionLookup.remove("insufficient_test_region");
+            ActiveSelection.get().permRegionLookup.remove("insufficient_test_region");
         }
     }
 
@@ -263,8 +264,8 @@ class GroupPlacementDispatcherTest {
     @DisplayName("Footprint chunks are warmed asynchronously before slot selection")
     void testFootprintChunksWarmedBeforeSlotSelection() throws Exception {
         UUID onlineUuid = UUID.randomUUID();
-        RTPWorld<?> world = RTP.serverAccessor.getRTPWorld("world");
-        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(
+        RTPWorld<?> world = RTPRuntime.serverAccessor().getRTPWorld("world");
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor()).addPlayer(new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(
                 onlineUuid, "WarmedPlayer", new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 0, 64, 0)));
 
         Region mockRegion = mock(Region.class);
@@ -278,7 +279,7 @@ class GroupPlacementDispatcherTest {
         org.mockito.Mockito.doReturn(world).when(mockRegion).getWorld();
         when(mockRegion.getLocation(anySet())).thenReturn(CompletableFuture.completedFuture(genResult));
         when(mockRegion.candidateValidator()).thenReturn((x, z) -> new RTPLocation(new RTPCoords("world", x, 64, z), 1));
-        RTP.selectionAPI.permRegionLookup.put("warm_test_region", mockRegion);
+        ActiveSelection.get().permRegionLookup.put("warm_test_region", mockRegion);
 
         try {
             GroupProfileSpec spec = GroupProfileSpec.of("square", 16, 2, 5, 4);
@@ -293,7 +294,7 @@ class GroupPlacementDispatcherTest {
             assertTrue(result.isSuccess(), "Placement should succeed when chunks are warmed");
             assertEquals(1, result.placements().size());
         } finally {
-            RTP.selectionAPI.permRegionLookup.remove("warm_test_region");
+            ActiveSelection.get().permRegionLookup.remove("warm_test_region");
         }
     }
 
@@ -309,11 +310,11 @@ class GroupPlacementDispatcherTest {
                 null,
                 ticket
         );
-        RTPWorld<?> world = RTP.serverAccessor.getRTPWorld("world");
+        RTPWorld<?> world = RTPRuntime.serverAccessor().getRTPWorld("world");
         org.mockito.Mockito.doReturn(world).when(mockRegion).getWorld();
         when(mockRegion.getLocation(anySet())).thenReturn(CompletableFuture.completedFuture(genResult));
         when(mockRegion.candidateValidator()).thenReturn((x, z) -> new RTPLocation(new RTPCoords("world", x, 64, z), 1L));
-        RTP.selectionAPI.permRegionLookup.put("circle_shape_region", mockRegion);
+        ActiveSelection.get().permRegionLookup.put("circle_shape_region", mockRegion);
 
         try {
             GroupProfileSpec spec = GroupProfileSpec.of("circle", 32, 4, 5, 4);
@@ -327,7 +328,7 @@ class GroupPlacementDispatcherTest {
             GroupPlacementResult result = future.get(5, TimeUnit.SECONDS);
             assertNotNull(result);
         } finally {
-            RTP.selectionAPI.permRegionLookup.remove("circle_shape_region");
+            ActiveSelection.get().permRegionLookup.remove("circle_shape_region");
         }
     }
 
@@ -335,7 +336,7 @@ class GroupPlacementDispatcherTest {
     @DisplayName("Places online participants successfully and releases anchor ticket")
     void testSuccessfulGroupPlacement() throws Exception {
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor();
         RTPWorld<?> world = accessor.getRTPWorld("world");
 
         UUID p1Uuid = UUID.randomUUID();
@@ -358,7 +359,7 @@ class GroupPlacementDispatcherTest {
         org.mockito.Mockito.doReturn(world).when(mockRegion).getWorld();
         when(mockRegion.getLocation(anySet())).thenReturn(CompletableFuture.completedFuture(genResult));
         when(mockRegion.candidateValidator()).thenReturn((x, z) -> new RTPLocation(new RTPCoords("world", x, 64, z), 1));
-        RTP.selectionAPI.permRegionLookup.put("success_test_region", mockRegion);
+        ActiveSelection.get().permRegionLookup.put("success_test_region", mockRegion);
 
         try {
             GroupProfileSpec spec = GroupProfileSpec.of("square", 32, 2, 5, 4);
@@ -375,7 +376,7 @@ class GroupPlacementDispatcherTest {
             assertEquals(2, result.placements().size());
             verify(ticket).close();
         } finally {
-            RTP.selectionAPI.permRegionLookup.remove("success_test_region");
+            ActiveSelection.get().permRegionLookup.remove("success_test_region");
         }
     }
 
@@ -383,7 +384,7 @@ class GroupPlacementDispatcherTest {
     @DisplayName("Places online participants when some are offline, releasing offline reservation")
     void testPartialOfflineGroupPlacement() throws Exception {
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor();
         RTPWorld<?> world = accessor.getRTPWorld("world");
 
         UUID p1Uuid = UUID.randomUUID();
@@ -403,7 +404,7 @@ class GroupPlacementDispatcherTest {
         org.mockito.Mockito.doReturn(world).when(mockRegion).getWorld();
         when(mockRegion.getLocation(anySet())).thenReturn(CompletableFuture.completedFuture(genResult));
         when(mockRegion.candidateValidator()).thenReturn((x, z) -> new RTPLocation(new RTPCoords("world", x, 64, z), 1));
-        RTP.selectionAPI.permRegionLookup.put("partial_test_region", mockRegion);
+        ActiveSelection.get().permRegionLookup.put("partial_test_region", mockRegion);
 
         try {
             GroupProfileSpec spec = GroupProfileSpec.of("square", 32, 2, 5, 4);
@@ -420,7 +421,7 @@ class GroupPlacementDispatcherTest {
             assertEquals(2, result.placements().size());
             verify(ticket).close();
         } finally {
-            RTP.selectionAPI.permRegionLookup.remove("partial_test_region");
+            ActiveSelection.get().permRegionLookup.remove("partial_test_region");
         }
     }
 
@@ -437,7 +438,7 @@ class GroupPlacementDispatcherTest {
         );
         when(mockRegion.getLocation(anySet())).thenReturn(CompletableFuture.completedFuture(genResult));
         when(mockRegion.getWorld()).thenReturn(null);
-        RTP.selectionAPI.permRegionLookup.put("no_world_region", mockRegion);
+        ActiveSelection.get().permRegionLookup.put("no_world_region", mockRegion);
 
         try {
             GroupProfileSpec spec = GroupProfileSpec.of("square", 32, 2, 5, 4);
@@ -454,14 +455,14 @@ class GroupPlacementDispatcherTest {
             assertEquals(GroupPlacementResult.Reason.INVALID_REGION, result.reason());
             verify(ticket).close();
         } finally {
-            RTP.selectionAPI.permRegionLookup.remove("no_world_region");
+            ActiveSelection.get().permRegionLookup.remove("no_world_region");
         }
     }
 
     @Test
     @DisplayName("Returns INSUFFICIENT_SAFE_SLOTS when global verifier rejects a slot")
     void testGlobalVerifierRejectsSlot() throws Exception {
-        RTPWorld<?> world = RTP.serverAccessor.getRTPWorld("world");
+        RTPWorld<?> world = RTPRuntime.serverAccessor().getRTPWorld("world");
         Region mockRegion = mock(Region.class);
         ChunkReservation ticket = mock(ChunkReservation.class);
         GenerationResult genResult = new GenerationResult(
@@ -473,7 +474,7 @@ class GroupPlacementDispatcherTest {
         org.mockito.Mockito.doReturn(world).when(mockRegion).getWorld();
         when(mockRegion.getLocation(anySet())).thenReturn(CompletableFuture.completedFuture(genResult));
         when(mockRegion.candidateValidator()).thenReturn((x, z) -> new RTPLocation(new RTPCoords("world", x, 64, z), 1));
-        RTP.selectionAPI.permRegionLookup.put("verifier_fail_region", mockRegion);
+        ActiveSelection.get().permRegionLookup.put("verifier_fail_region", mockRegion);
 
         // Add verifier that fails everything
         GlobalRegionVerifiers.addGlobalRegionVerifier(coords -> false);
@@ -494,14 +495,14 @@ class GroupPlacementDispatcherTest {
             verify(ticket).close();
         } finally {
             GlobalRegionVerifiers.clearGlobalRegionVerifiers();
-            RTP.selectionAPI.permRegionLookup.remove("verifier_fail_region");
+            ActiveSelection.get().permRegionLookup.remove("verifier_fail_region");
         }
     }
 
     @Test
     @DisplayName("Verifier failure records safetyExternal bad chunk to parent MemoryShape")
     void testGlobalVerifierFailureInheritsBadChunkToMemoryShape() throws Exception {
-        RTPWorld<?> world = RTP.serverAccessor.getRTPWorld("world");
+        RTPWorld<?> world = RTPRuntime.serverAccessor().getRTPWorld("world");
         Region mockRegion = mock(Region.class);
         io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape<?> mockMemShape =
                 mock(io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape.class);
@@ -520,7 +521,7 @@ class GroupPlacementDispatcherTest {
         doReturn(world).when(mockRegion).getWorld();
         when(mockRegion.getLocation(anySet())).thenReturn(CompletableFuture.completedFuture(genResult));
         when(mockRegion.candidateValidator()).thenReturn((x, z) -> new RTPLocation(new RTPCoords("world", x, 64, z), 1));
-        RTP.selectionAPI.permRegionLookup.put("verifier_bad_chunk_region", mockRegion);
+        ActiveSelection.get().permRegionLookup.put("verifier_bad_chunk_region", mockRegion);
 
         // Fail global verifier
         GlobalRegionVerifiers.addGlobalRegionVerifier(coords -> false);
@@ -543,18 +544,18 @@ class GroupPlacementDispatcherTest {
             );
         } finally {
             GlobalRegionVerifiers.clearGlobalRegionVerifiers();
-            RTP.selectionAPI.permRegionLookup.remove("verifier_bad_chunk_region");
+            ActiveSelection.get().permRegionLookup.remove("verifier_bad_chunk_region");
         }
     }
 
     @Test
     @DisplayName("Returns INVALID_REGION when region lookup throws cyclic or lookup exception")
     void testCyclicOrThrowingRegionLookup() throws Exception {
-        io.github.dailystruggle.rtp.common.selection.SelectionAPI originalSelectionAPI = RTP.selectionAPI;
+        io.github.dailystruggle.rtp.common.selection.SelectionAPI originalSelectionAPI = ActiveSelection.get();
         io.github.dailystruggle.rtp.common.selection.SelectionAPI mockSelectionAPI = mock(io.github.dailystruggle.rtp.common.selection.SelectionAPI.class);
         when(mockSelectionAPI.getRegion(org.mockito.ArgumentMatchers.eq("cyclic_region")))
                 .thenThrow(new IllegalStateException("infinite override loop detected at region - cyclic_region"));
-        RTP.selectionAPI = mockSelectionAPI;
+        ActiveSelection.set(mockSelectionAPI);
 
         try {
             GroupProfileSpec spec = GroupProfileSpec.of("square", 32, 2, 5, 4);
@@ -571,7 +572,7 @@ class GroupPlacementDispatcherTest {
             assertEquals(GroupPlacementResult.Reason.INVALID_REGION, result.reason());
             assertTrue(result.message().contains("infinite override loop detected"));
         } finally {
-            RTP.selectionAPI = originalSelectionAPI;
+            ActiveSelection.set(originalSelectionAPI);
         }
     }
 
@@ -597,12 +598,12 @@ class GroupPlacementDispatcherTest {
     @DisplayName("Places nearplayer using EntityAnchorSource with single participant")
     void testNearPlayerPlacement() throws Exception {
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor();
         RTPWorld<?> world = accessor.getRTPWorld("world");
         Region mockRegion = mock(Region.class);
         org.mockito.Mockito.doReturn(world).when(mockRegion).getWorld();
         when(mockRegion.candidateValidator()).thenReturn((x, z) -> new RTPLocation(new RTPCoords("world", x, 64, z), 1));
-        RTP.selectionAPI.permRegionLookup.put("nearplayer_region", mockRegion);
+        ActiveSelection.get().permRegionLookup.put("nearplayer_region", mockRegion);
 
         UUID playerUuid = UUID.randomUUID();
         io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
@@ -632,7 +633,7 @@ class GroupPlacementDispatcherTest {
             int dz = Math.abs(placedLoc.z() - targetPlayerPos.z());
             assertTrue(dx <= 32 && dz <= 32, "Placed spot must be within profile half-extent");
         } finally {
-            RTP.selectionAPI.permRegionLookup.remove("nearplayer_region");
+            ActiveSelection.get().permRegionLookup.remove("nearplayer_region");
         }
     }
 
@@ -640,7 +641,7 @@ class GroupPlacementDispatcherTest {
     @DisplayName("Bounded retries: retries with a fresh anchor when initial placement fails (ADR-097)")
     void testBoundedPlacementRetriesOnInitialFailure() throws Exception {
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor();
         RTPWorld<?> world = accessor.getRTPWorld("world");
         Region mockRegion = mock(Region.class);
         doReturn(world).when(mockRegion).getWorld();
@@ -668,7 +669,7 @@ class GroupPlacementDispatcherTest {
             return new RTPLocation(new RTPCoords("world", x, 64, z), 1);
         });
 
-        RTP.selectionAPI.permRegionLookup.put("retry_region", mockRegion);
+        ActiveSelection.get().permRegionLookup.put("retry_region", mockRegion);
 
         try {
             // Profile with retries = 3
@@ -691,7 +692,7 @@ class GroupPlacementDispatcherTest {
             assertTrue(Math.abs(placedLoc.x() - 200) <= 16);
             assertTrue(Math.abs(placedLoc.z() - 200) <= 16);
         } finally {
-            RTP.selectionAPI.permRegionLookup.remove("retry_region");
+            ActiveSelection.get().permRegionLookup.remove("retry_region");
         }
     }
 
@@ -705,9 +706,9 @@ class GroupPlacementDispatcherTest {
         assertEquals(GroupPlacementResult.Reason.ERROR, nullPrep.result().reason());
 
         // 2. region lookup throwing exception
-        io.github.dailystruggle.rtp.common.selection.SelectionAPI realSel = RTP.selectionAPI;
+        io.github.dailystruggle.rtp.common.selection.SelectionAPI realSel = ActiveSelection.get();
         try {
-            RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI() {
+            ActiveSelection.set(new io.github.dailystruggle.rtp.common.selection.SelectionAPI() {
                 @Override
                 public Region getRegion(String name) {
                     if ("throw_region".equals(name)) {
@@ -715,7 +716,7 @@ class GroupPlacementDispatcherTest {
                     }
                     return null;
                 }
-            };
+            });
             GroupProfileSpec spec = GroupProfileSpec.of("square", 16, 2, 5, 1, 1);
             GroupPlacementRequest throwReq = GroupPlacementRequest.of(
                     "throw_region",
@@ -727,7 +728,7 @@ class GroupPlacementDispatcherTest {
             assertFalse(throwPrep.isSuccess());
             assertEquals(GroupPlacementResult.Reason.INVALID_REGION, throwPrep.result().reason());
         } finally {
-            RTP.selectionAPI = realSel;
+            ActiveSelection.set(realSel);
         }
 
         // 3. createWorldFallbackValidator branches
@@ -737,7 +738,7 @@ class GroupPlacementDispatcherTest {
         assertNull(fallbackValidator.validateAsync(0, 0).get(5, TimeUnit.SECONDS));
 
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor();
         RTPWorld<?> world = accessor.getRTPWorld("world");
         CandidateValidator realFallback = GroupPlacementDispatcher.createWorldFallbackValidator(world);
         RTPLocation val = realFallback.validate(0, 0);
@@ -763,7 +764,7 @@ class GroupPlacementDispatcherTest {
     @DisplayName("2x candidate over-provisioning absorbs global verifier attrition and closes excess reservations (S-002)")
     void testOverProvisioningAbsorbsAttritionAndReleasesExcessReservations() throws Exception {
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor();
         RTPWorld<?> world = accessor.getRTPWorld("world");
 
         UUID p1Uuid = UUID.randomUUID();
@@ -804,7 +805,7 @@ class GroupPlacementDispatcherTest {
             }
         });
 
-        RTP.selectionAPI.permRegionLookup.put("overprov_region", mockRegion);
+        ActiveSelection.get().permRegionLookup.put("overprov_region", mockRegion);
 
         // Global verifier rejects the 1st candidate, but accepts subsequent candidates
         GlobalRegionVerifiers.addGlobalRegionVerifier(coords -> {
@@ -841,7 +842,7 @@ class GroupPlacementDispatcherTest {
             verify(anchorTicket).close();
         } finally {
             GlobalRegionVerifiers.clearGlobalRegionVerifiers();
-            RTP.selectionAPI.permRegionLookup.remove("overprov_region");
+            ActiveSelection.get().permRegionLookup.remove("overprov_region");
         }
     }
 
@@ -849,7 +850,7 @@ class GroupPlacementDispatcherTest {
     @DisplayName("Failed placement releases all candidate reservations (S-002)")
     void testFailedPlacementReleasesAllCandidateReservations() throws Exception {
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor();
         RTPWorld<?> world = accessor.getRTPWorld("world");
 
         UUID p1Uuid = UUID.randomUUID();
@@ -884,7 +885,7 @@ class GroupPlacementDispatcherTest {
             }
         });
 
-        RTP.selectionAPI.permRegionLookup.put("fail_release_region", mockRegion);
+        ActiveSelection.get().permRegionLookup.put("fail_release_region", mockRegion);
 
         // Global verifier rejects everything
         GlobalRegionVerifiers.addGlobalRegionVerifier(coords -> false);
@@ -912,7 +913,7 @@ class GroupPlacementDispatcherTest {
             verify(anchorTicket).close();
         } finally {
             GlobalRegionVerifiers.clearGlobalRegionVerifiers();
-            RTP.selectionAPI.permRegionLookup.remove("fail_release_region");
+            ActiveSelection.get().permRegionLookup.remove("fail_release_region");
         }
     }
 
@@ -920,7 +921,7 @@ class GroupPlacementDispatcherTest {
     @DisplayName("Phase 3: GroupPlacementDispatcher places multiple participants with guaranteed separation")
     void testGroupPlacementMultipleParticipantsWithSeparation() throws Exception {
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor();
         RTPWorld<?> world = accessor.getRTPWorld("world");
 
         UUID p1Uuid = UUID.randomUUID();
@@ -955,7 +956,7 @@ class GroupPlacementDispatcherTest {
             }
         });
 
-        RTP.selectionAPI.permRegionLookup.put("multi_placement_region", mockRegion);
+        ActiveSelection.get().permRegionLookup.put("multi_placement_region", mockRegion);
 
         try {
             GroupProfileSpec spec = GroupProfileSpec.of("square", 48, 2, 8, 4);
@@ -979,7 +980,7 @@ class GroupPlacementDispatcherTest {
             assertTrue(dx * dx + dz * dz >= 8 * 8, "Slots must satisfy minSeparation: " + Math.sqrt(dx * dx + dz * dz));
             verify(anchorTicket).close();
         } finally {
-            RTP.selectionAPI.permRegionLookup.remove("multi_placement_region");
+            ActiveSelection.get().permRegionLookup.remove("multi_placement_region");
         }
     }
 
@@ -1013,7 +1014,7 @@ class GroupPlacementDispatcherTest {
         // enumeration is NOT starved) with a world whose warming succeeds but whose chunks never become
         // resident, so every column fails closed - the "point C" the mocks previously hid.
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor();
         WarmButNotResidentWorld world = new WarmButNotResidentWorld("world");
         accessor.addWorld(world);
 
@@ -1054,7 +1055,7 @@ class GroupPlacementDispatcherTest {
         // The REAL production validator - reads only resident chunks, fails closed otherwise.
         when(mockRegion.candidateValidator()).thenReturn(new RegionCandidateValidator(mockRegion));
 
-        RTP.selectionAPI.permRegionLookup.put("live_repro_region", mockRegion);
+        ActiveSelection.get().permRegionLookup.put("live_repro_region", mockRegion);
 
         try {
             GroupProfileSpec spec = GroupProfileSpec.of("square", 64, 24, 64, 2);
@@ -1073,7 +1074,7 @@ class GroupPlacementDispatcherTest {
             assertTrue(result.placements() == null || result.placements().isEmpty(),
                     "No participant should be placed when every column fails closed");
         } finally {
-            RTP.selectionAPI.permRegionLookup.remove("live_repro_region");
+            ActiveSelection.get().permRegionLookup.remove("live_repro_region");
         }
     }
 }

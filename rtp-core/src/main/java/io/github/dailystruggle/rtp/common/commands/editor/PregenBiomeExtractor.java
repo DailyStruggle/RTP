@@ -7,7 +7,7 @@ import io.github.dailystruggle.rtp.anvil.RegionFileReader;
 import io.github.dailystruggle.rtp.anvil.RegionFileResolver;
 import io.github.dailystruggle.rtp.anvil.RegionFormatRegistry;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 
@@ -98,9 +98,9 @@ public final class PregenBiomeExtractor {
         String worldName = resolveWorldName(region);
 
         // 1. Try RTPWorld if serverAccessor is active
-        if (RTP.serverAccessor != null) {
+        if (RTPRuntime.serverAccessor() != null) {
             try {
-                RTPWorld<?> rtpWorld = RTP.serverAccessor.getRTPWorld(worldName);
+                RTPWorld<?> rtpWorld = RTPRuntime.serverAccessor().getRTPWorld(worldName);
                 if (rtpWorld != null) {
                     Object nativeWorld = rtpWorld.world();
                     if (nativeWorld != null) {

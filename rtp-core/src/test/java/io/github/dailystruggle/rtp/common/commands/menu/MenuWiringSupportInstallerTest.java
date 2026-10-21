@@ -5,11 +5,14 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -47,14 +50,14 @@ final class MenuWiringSupportInstallerTest {
     @BeforeEach
     void setUp() {
         RTPTestSetup.install(tempDir.toFile());
-        RTP.selectionAPI = new SelectionAPI();
+        ActiveSelection.set(new SelectionAPI());
     }
 
     @AfterEach
     void tearDown() {
-        if (RTP.selectionAPI != null) RTP.selectionAPI.permRegionLookup.clear();
-        RTP.serverAccessor = null;
-        RTP.scheduler = null;
+        if (ActiveSelection.get() != null) ActiveSelection.get().permRegionLookup.clear();
+        RTPRuntime.setServerAccessor(null);
+        RTPRuntime.setScheduler(null);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
     }
 
@@ -226,7 +229,7 @@ final class MenuWiringSupportInstallerTest {
 
         // Precedent for tasking: drain miscAsyncTasks to run installConfigSearchHandler's 8-tick task
         for (int i = 0; i < 15; i++) {
-            RTP.getInstance().miscAsyncTasks.execute(Long.MAX_VALUE);
+            MiscTasks.async().execute(Long.MAX_VALUE);
         }
 
         // Trigger search leaf handler now that it is wired
@@ -253,7 +256,7 @@ final class MenuWiringSupportInstallerTest {
 
         io.github.dailystruggle.rtp.common.commands.menu.ConfigMenuConsumerProfile profile =
                 new io.github.dailystruggle.rtp.common.commands.menu.ConfigMenuConsumerProfile(
-                        fileName -> RTP.configs != null ? RTP.configs.configParserMap.values().iterator().next().getYamlRoot() : null);
+                        fileName -> ActiveConfigs.get() != null ? ActiveConfigs.get().configParserMap.values().iterator().next().getYamlRoot() : null);
 
         io.github.dailystruggle.rtp.common.menu.search.ConfigSearchResultsBuilder.Hit hit =
                 new io.github.dailystruggle.rtp.common.menu.search.ConfigSearchResultsBuilder.Hit(
@@ -290,7 +293,7 @@ final class MenuWiringSupportInstallerTest {
         io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys> mcp =
                 new io.github.dailystruggle.rtp.common.configuration.MultiConfigParser<>(
                         io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class, "regions", "1.0", tempDir.toFile());
-        RTP.configs.multiConfigParserMap.put(io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class, mcp);
+        ActiveConfigs.get().multiConfigParserMap.put(io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys.class, mcp);
 
         // Pre-create some dummy hit records to test the pagination loop of lambda$buildConfigSearchBuilder$3 directly
         java.lang.reflect.Method mSearchBuilder = MenuWiringSupportInstaller.class.getDeclaredMethod("buildConfigSearchBuilder");
@@ -378,8 +381,8 @@ final class MenuWiringSupportInstallerTest {
     }
 
     private static String anyParserName() {
-        if (RTP.configs == null) return null;
-        for (ConfigParser<?> parser : RTP.configs.configParserMap.values()) {
+        if (ActiveConfigs.get() == null) return null;
+        for (ConfigParser<?> parser : ActiveConfigs.get().configParserMap.values()) {
             if (parser != null && parser.name != null && !parser.name.isEmpty()) {
                 return parser.name;
             }

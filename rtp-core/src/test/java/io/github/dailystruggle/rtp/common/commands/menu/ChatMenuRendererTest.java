@@ -6,10 +6,10 @@ import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -41,7 +41,7 @@ class ChatMenuRendererTest {
 
     @BeforeEach
     void setUp() {
-        // Install the standard fixture so RTP.serverAccessor / RTP.scheduler /
+        // Install the standard fixture so RTPRuntime.serverAccessor() / RTPRuntime.scheduler() /
         // RTP.getInstance() are wired, then swap in a capturing subclass.
         RTPTestSetup.install(tempDir);
         viewer = UUID.randomUUID();
@@ -49,7 +49,7 @@ class ChatMenuRendererTest {
         capturing.addPlayer(new MockRTPPlayer(viewer, "viewer", null));
         // Replace both static fields exposed by RTPTestSetup.install so the
         // renderer's lookups land on the capturing instance.
-        RTP.serverAccessor = capturing;
+        RTPRuntime.setServerAccessor(capturing);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = capturing;
     }
 
@@ -151,7 +151,7 @@ class ChatMenuRendererTest {
         //   RUN    "[other]"    -> /rtp menu admin
         List<RunCommandCall> runs = new ArrayList<>(runCalls);
         List<HoverCall> hovers = new ArrayList<>(hoverCalls);
-        RTPCommandSender target = RTP.serverAccessor.getSender(viewer);
+        RTPCommandSender target = RTPRuntime.serverAccessor().getSender(viewer);
         List<String> plain = ((MockRTPPlayer) target).sentMessages;
 
         assertAll(
@@ -182,7 +182,7 @@ class ChatMenuRendererTest {
 
         new ChatMenuRenderer().render(viewer, model);
 
-        MockRTPPlayer player = (MockRTPPlayer) RTP.serverAccessor.getSender(viewer);
+        MockRTPPlayer player = (MockRTPPlayer) RTPRuntime.serverAccessor().getSender(viewer);
         // Expect dividers around both pages.
         long dividers = player.sentMessages.stream()
                 .filter(m -> m.startsWith("&8-- page "))

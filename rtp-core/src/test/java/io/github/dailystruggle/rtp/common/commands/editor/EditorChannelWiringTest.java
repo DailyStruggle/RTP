@@ -1,7 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
 import com.google.gson.JsonObject;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.ChannelPageStub;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorChannel;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorKeys;
@@ -9,6 +8,8 @@ import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopback
 import io.github.dailystruggle.rtp.common.commands.editor.channel.InMemoryTransport;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.TrustedEditors;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
@@ -291,10 +292,10 @@ class EditorChannelWiringTest {
     @DisplayName("Every registered shape's helper ships in curveCode with a sample curve block at its defaults")
     @SuppressWarnings("unchecked")
     void registeredHelpersShipWithSample() {
-        Factory<Shape<?>> shapes = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+        Factory<Shape<?>> shapes = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
         if (shapes == null) {
             shapes = new Factory<>();
-            RTP.factoryMap.put(RTP.factoryNames.shape, shapes);
+            FactoryRegistry.map().put(FactoryNames.shape, shapes);
         }
         shapes.add("SAMPLE_CIRCLE_TEST", new Circle("SAMPLE_CIRCLE_TEST"));
         try {

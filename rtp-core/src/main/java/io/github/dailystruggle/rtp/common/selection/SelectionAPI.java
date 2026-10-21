@@ -3,12 +3,16 @@ package io.github.dailystruggle.rtp.common.selection;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.WorldKeys;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
@@ -49,9 +53,9 @@ public class SelectionAPI {
   public Factory<Shape<?>> shapeFactory;
 
   public SelectionAPI() {
-    if (RTP.factoryMap != null) {
+    if (FactoryRegistry.map() != null) {
       @SuppressWarnings("unchecked")
-      Factory<Shape<?>> sf = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+      Factory<Shape<?>> sf = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
       if (sf != null) {
         this.shapeFactory = sf;
       }
@@ -59,9 +63,9 @@ public class SelectionAPI {
   }
 
   public Factory<Shape<?>> getShapeFactory() {
-    if (shapeFactory == null && RTP.factoryMap != null) {
+    if (shapeFactory == null && FactoryRegistry.map() != null) {
       @SuppressWarnings("unchecked")
-      Factory<Shape<?>> sf = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+      Factory<Shape<?>> sf = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
       shapeFactory = sf;
     }
     return shapeFactory;
@@ -162,7 +166,7 @@ public class SelectionAPI {
 
     @SuppressWarnings("unchecked")
     ConfigParser<PerformanceKeys> perf =
-        (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
     if (perf == null) return;
     if (!Boolean.parseBoolean(
         perf.getConfigValue(PerformanceKeys.checkOnChunkLoads, false).toString())) {
@@ -246,7 +250,7 @@ public class SelectionAPI {
     while (urgentReq > 0 || System.nanoTime() < deadline) {
       Runnable task = selectionPipelineUrgent.poll();
       if (task == null) break;
-      RTP.log(java.util.logging.Level.FINER,
+      RTPRuntime.log(java.util.logging.Level.FINER,
           "[SelectionAPI] running urgent pipeline task " + task.getClass().getSimpleName());
       runSelectionTask(task);
       urgentRan++;
@@ -256,7 +260,7 @@ public class SelectionAPI {
     while (standardReq > 0 || System.nanoTime() < deadline) {
       Runnable task = selectionPipeline.poll();
       if (task == null) break;
-      RTP.log(java.util.logging.Level.FINER,
+      RTPRuntime.log(java.util.logging.Level.FINER,
           "[SelectionAPI] running standard pipeline task " + task.getClass().getSimpleName());
       runSelectionTask(task);
       standardRan++;
@@ -264,7 +268,7 @@ public class SelectionAPI {
     }
 
     if (urgentRan > 0 || standardRan > 0) {
-      RTP.log(java.util.logging.Level.FINE,
+      RTPRuntime.log(java.util.logging.Level.FINE,
           "[SelectionAPI] compute() drained urgent=" + urgentRan
               + " standard=" + standardRan
               + " urgentRemaining=" + selectionPipelineUrgent.size()
@@ -276,7 +280,7 @@ public class SelectionAPI {
     try {
       task.run();
     } catch (Throwable t) {
-      RTP.log(java.util.logging.Level.WARNING,
+      RTPRuntime.log(java.util.logging.Level.WARNING,
           "[SelectionAPI] selection task " + task.getClass().getSimpleName() + " failed", t);
     }
   }
@@ -347,7 +351,7 @@ public class SelectionAPI {
     RTPWorld<?> baseWorld = baseRegion.getWorld();
     if (baseWorld != null && worldName.equals(baseWorld.name())) return baseRegion;
 
-    RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(worldName);
+    RTPWorld<?> world = RTPRuntime.serverAccessor().getRTPWorld(worldName);
     if (world == null) return null;
     UUID worldId = world.id();
     if (worldId == null) return null;
@@ -391,7 +395,7 @@ public class SelectionAPI {
     if (!nether && !end) return baseVert;
 
     Factory<VerticalAdjustor<?>> factory =
-        (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
+        (Factory<VerticalAdjustor<?>>) FactoryRegistry.get(FactoryNames.vert);
     if (factory == null) return baseVert;
     VerticalAdjustor<?> resolved = (VerticalAdjustor<?>) factory.get("linear");
     if (resolved == null) return baseVert;
@@ -430,10 +434,10 @@ public class SelectionAPI {
     io.github.dailystruggle.rtp.api.world.RTPLocation loc = player.getLocation();
     if (loc == null || loc.world() == null) return getRegionOrDefault("default");
     String worldName = loc.world().name();
-    RTP.log(Level.FINE, "[SELECT_TRACE] SelectionAPI.getRegion ENTER playerId=" + player.uuid()
+    RTPRuntime.log(Level.FINE, "[SELECT_TRACE] SelectionAPI.getRegion ENTER playerId=" + player.uuid()
         + " startingWorld=" + worldName);
     MultiConfigParser<WorldKeys> worldParsers =
-        (MultiConfigParser<WorldKeys>) RTP.configs.multiConfigParserMap.get(WorldKeys.class);
+        (MultiConfigParser<WorldKeys>) ActiveConfigs.get().multiConfigParserMap.get(WorldKeys.class);
     if (worldParsers == null) return getRegionOrDefault("default");
     ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
     if (worldParser == null) return getRegionOrDefault("default");
@@ -448,7 +452,7 @@ public class SelectionAPI {
 
       String previousWorld = worldName;
       worldName = String.valueOf(worldParser.getConfigValue(WorldKeys.override, "default"));
-      RTP.log(Level.FINER, "[SELECT_TRACE] world override step playerId=" + player.uuid()
+      RTPRuntime.log(Level.FINER, "[SELECT_TRACE] world override step playerId=" + player.uuid()
           + " from=" + previousWorld + " to=" + worldName
           + " attemptedSoFar=" + worldsAttempted);
       worldParser = worldParsers.getParser(worldName);
@@ -459,10 +463,10 @@ public class SelectionAPI {
     }
 
     String regionName = String.valueOf(worldParser.getConfigValue(WorldKeys.region, "default"));
-    RTP.log(Level.FINE, "[SELECT_TRACE] world resolved playerId=" + player.uuid()
+    RTPRuntime.log(Level.FINE, "[SELECT_TRACE] world resolved playerId=" + player.uuid()
         + " resolvedWorld=" + worldName + " initialRegion=" + regionName);
     MultiConfigParser<RegionKeys> regionParsers =
-        (MultiConfigParser<RegionKeys>) RTP.configs.multiConfigParserMap.get(RegionKeys.class);
+        (MultiConfigParser<RegionKeys>) ActiveConfigs.get().multiConfigParserMap.get(RegionKeys.class);
     if (regionParsers == null) return getRegionOrDefault("default");
     ConfigParser<RegionKeys> regionParser = regionParsers.getParser(regionName);
     if (regionParser == null) return getRegionOrDefault("default");
@@ -479,7 +483,7 @@ public class SelectionAPI {
 
       String previousRegion = regionName;
       regionName = String.valueOf(regionParser.getConfigValue(RegionKeys.override, "default"));
-      RTP.log(Level.FINER, "[SELECT_TRACE] region override step playerId=" + player.uuid()
+      RTPRuntime.log(Level.FINER, "[SELECT_TRACE] region override step playerId=" + player.uuid()
           + " from=" + previousRegion + " to=" + regionName
           + " attemptedSoFar=" + regionsAttempted);
       regionParser = regionParsers.getParser(regionName);
@@ -488,7 +492,7 @@ public class SelectionAPI {
           Boolean.parseBoolean(
               regionParser.getConfigValue(RegionKeys.requirePermission, false).toString());
     }
-    RTP.log(Level.FINE, "[SELECT_TRACE] SelectionAPI.getRegion EXIT playerId=" + player.uuid()
+    RTPRuntime.log(Level.FINE, "[SELECT_TRACE] SelectionAPI.getRegion EXIT playerId=" + player.uuid()
         + " resolvedRegion=" + regionName);
     return getRegion(regionName);
   }
@@ -504,7 +508,7 @@ public class SelectionAPI {
     if (world == null) return getRegionOrDefault("default");
     String worldName = world.name();
     MultiConfigParser<WorldKeys> worldParsers =
-        (MultiConfigParser<WorldKeys>) RTP.configs.multiConfigParserMap.get(WorldKeys.class);
+        (MultiConfigParser<WorldKeys>) ActiveConfigs.get().multiConfigParserMap.get(WorldKeys.class);
     if (worldParsers == null) return getRegionOrDefault("default");
     ConfigParser<WorldKeys> worldParser = worldParsers.getParser(worldName);
     if (worldParser == null) return getRegionOrDefault("default");

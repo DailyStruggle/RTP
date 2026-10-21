@@ -1,12 +1,12 @@
 package io.github.dailystruggle.rtp.common.commands.menu;
 
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.api.menu.MenuAction;
 import io.github.dailystruggle.rtp.api.menu.MenuFragment;
 import io.github.dailystruggle.rtp.api.menu.MenuLine;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuPage;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import org.junit.jupiter.api.BeforeEach;
@@ -240,7 +240,7 @@ class MenuConfigSubtreeBuildersTest {
 
         @SuppressWarnings("unchecked")
         ConfigParser<PerformanceKeys> parser =
-                (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+                (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         assertNotNull(parser, "RTPTestSetup must wire up the performance parser");
 
         // The menu surfaces only keys actually loaded from disk (per the
@@ -314,7 +314,7 @@ class MenuConfigSubtreeBuildersTest {
                 EmptyKeys.class, "empty.yml", "1.0",
                 tempDir.toFile(),
                 tempDir.toFile(),
-                RTP.configs.fileDatabase);
+                ActiveConfigs.get().fileDatabase);
 
         MenuModel model = builder.buildConfigFile(UUID.randomUUID(), "empty.yml", empty);
         List<MenuLine> lines = model.pages().get(0).lines();
@@ -342,7 +342,7 @@ class MenuConfigSubtreeBuildersTest {
 
         @SuppressWarnings("unchecked")
         ConfigParser<PerformanceKeys> parser =
-                (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+                (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
 
         assertThrows(NullPointerException.class,
                 () -> builder.buildConfigFile(null, "performance.yml", parser));
@@ -415,7 +415,7 @@ class MenuConfigSubtreeBuildersTest {
 
         @SuppressWarnings("unchecked")
         ConfigParser<PerformanceKeys> parser =
-                (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+                (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         assertNotNull(parser, "RTPTestSetup must wire up the performance parser");
 
         // Simulate a packaging variant (lite jar / hand-trimmed admin YAML)
@@ -475,8 +475,8 @@ class MenuConfigSubtreeBuildersTest {
                     "menu must show exactly one row per loaded editable key (version excluded), not per enum constant");
         } finally {
             // Leave the wired parser in a clean state for any other tests
-            // sharing this RTP.configs install in the same class.
-            RTP.configs.reloadConfigs();
+            // sharing this ActiveConfigs.get() install in the same class.
+            ActiveConfigs.get().reloadConfigs();
         }
     }
 }

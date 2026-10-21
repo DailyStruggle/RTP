@@ -4,10 +4,10 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.prefab.Prefab;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabApplier;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabDiskIO;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
@@ -101,7 +101,7 @@ public final class SetupHandlerSupport {
             renderer.render(callerId, model);
             return true;
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING, "Failed to render setup book menu for " + callerId + ": " + e.getMessage(), e);
+            RTPRuntime.log(Level.WARNING, "Failed to render setup book menu for " + callerId + ": " + e.getMessage(), e);
             List<String> lines = SetupConsoleFormatter.formatStatus(session, null);
             for (String line : lines) {
                 sendMessage(callerId, line);
@@ -112,7 +112,7 @@ public final class SetupHandlerSupport {
 
     public static Map<String, List<PrefabApplier.Change>> computeDiffPreview(SetupSession session) {
         try {
-            File baseDir = (RTP.serverAccessor != null) ? RTP.serverAccessor.getPluginDirectory() : null;
+            File baseDir = (RTPRuntime.serverAccessor() != null) ? RTPRuntime.serverAccessor().getPluginDirectory() : null;
             List<String> worldNames = collectWorldNames();
             List<Prefab> recipe = SetupRecipe.compileRecipe(session, worldNames);
 
@@ -121,7 +121,7 @@ public final class SetupHandlerSupport {
             var result = SetupRecipe.applyPipeline(baseline, recipe, worldNames);
             return result.perFileDiff();
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING, "Failed to compute setup diff preview: " + e.getMessage(), e);
+            RTPRuntime.log(Level.WARNING, "Failed to compute setup diff preview: " + e.getMessage(), e);
             return Map.of();
         }
     }
@@ -162,9 +162,9 @@ public final class SetupHandlerSupport {
 
     public static List<String> collectWorldNames() {
         List<String> worldNames = new ArrayList<>();
-        if (RTP.serverAccessor != null) {
+        if (RTPRuntime.serverAccessor() != null) {
             try {
-                for (RTPWorld<?> w : RTP.serverAccessor.getRTPWorlds()) {
+                for (RTPWorld<?> w : RTPRuntime.serverAccessor().getRTPWorlds()) {
                     if (w != null && w.name() != null && !w.name().isEmpty()) {
                         worldNames.add(w.name());
                     }
@@ -177,9 +177,9 @@ public final class SetupHandlerSupport {
 
     public static void sendMessage(@Nullable UUID callerId, String message) {
         if (callerId == null || callerId.equals(SetupSession.CONSOLE_CALLER_ID)) {
-            RTP.log(Level.INFO, message);
-        } else if (RTP.serverAccessor != null) {
-            RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, message);
+            RTPRuntime.log(Level.INFO, message);
+        } else if (RTPRuntime.serverAccessor() != null) {
+            RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, message);
         }
     }
 }

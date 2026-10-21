@@ -1,10 +1,11 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorChannel;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopbackJson;
 import io.github.dailystruggle.rtp.common.metrics.LandingHeatmap;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 
@@ -32,7 +33,7 @@ import java.util.regex.Pattern;
 /**
  * Zero-listener live channel for the {@code file://} web editor export (ADR-104 §4.6).
  *
- * <p>An async {@code RTP.scheduler} timer rewrites {@code <editor>/live/feed.js} every
+ * <p>An async {@code RTPRuntime.scheduler()} timer rewrites {@code <editor>/live/feed.js} every
  * {@link #PERIOD_MILLIS} with telemetry, progress and the version of every tile group, and writes
  * location-keyed tiles the page loads only for its viewport:
  * <ul>
@@ -176,7 +177,7 @@ public final class EditorLiveFeed {
         try {
             return shape.toJavaScript();
         } catch (RuntimeException e) {
-            RTP.log(Level.FINE, "[editor] curve helper lookup failed for " + shape.getClass().getSimpleName(), e);
+            RTPRuntime.log(Level.FINE, "[editor] curve helper lookup failed for " + shape.getClass().getSimpleName(), e);
             return null;
         }
     }
@@ -282,7 +283,7 @@ public final class EditorLiveFeed {
      */
     public static EditorLiveFeed start(Path editorDir, Consumer<String> push) throws IOException {
         Objects.requireNonNull(editorDir, "editorDir");
-        if (RTP.scheduler == null) {
+        if (RTPRuntime.scheduler() == null) {
             throw new IllegalStateException("RTP scheduler not initialized yet (S-006 fail-closed)");
         }
         EditorLiveFeed feed = new EditorLiveFeed(editorDir.resolve(LIVE_DIR), planSurveys(),
@@ -294,7 +295,7 @@ public final class EditorLiveFeed {
             if (active != null) active.stop("superseded by a newer export", false);
             feed.prepareDirectory();
             active = feed;
-            feed.taskHandle = RTP.scheduler.runTaskTimerAsynchronously(feed::tick, 0L, PERIOD_TICKS);
+            feed.taskHandle = RTPRuntime.scheduler().runTaskTimerAsynchronously(feed::tick, 0L, PERIOD_TICKS);
         }
         return feed;
     }
@@ -318,7 +319,7 @@ public final class EditorLiveFeed {
      */
     public static EditorLiveFeed startHosted(EditorChannel ch, Function<String, CompletableFuture<String>> handoff) {
         Objects.requireNonNull(ch, "ch");
-        if (RTP.scheduler == null) {
+        if (RTPRuntime.scheduler() == null) {
             throw new IllegalStateException("RTP scheduler not initialized yet (S-006 fail-closed)");
         }
         EditorLiveFeed feed = new EditorLiveFeed(EditorChannelWiring.editorDir().resolve(LIVE_DIR), false, planSurveys(),
@@ -333,7 +334,7 @@ public final class EditorLiveFeed {
         synchronized (LOCK) {
             old = active;
             active = feed;
-            feed.taskHandle = RTP.scheduler.runTaskTimerAsynchronously(feed::tick, 0L, PERIOD_TICKS);
+            feed.taskHandle = RTPRuntime.scheduler().runTaskTimerAsynchronously(feed::tick, 0L, PERIOD_TICKS);
         }
         // Stopping closes the old feed's channel: never under LOCK
         if (old != null) old.stop("superseded by a newer editor session", false);
@@ -390,7 +391,7 @@ public final class EditorLiveFeed {
                 maxZ = Math.max(maxZ, xz[1]);
             }
         } catch (RuntimeException e) {
-            RTP.log(Level.FINE, "[editor] region extent lookup failed for " + shape.getClass().getSimpleName(), e);
+            RTPRuntime.log(Level.FINE, "[editor] region extent lookup failed for " + shape.getClass().getSimpleName(), e);
             return null;
         }
         if (minX > maxX) return null;
@@ -449,7 +450,7 @@ public final class EditorLiveFeed {
         try {
             ch = EditorChannelWiring.ready(EditorChannelWiring.openLocal(creator, EditorLiveFeed::active));
         } catch (IOException | RuntimeException e) {
-            RTP.log(Level.WARNING, "[editor] editor channel unavailable; the page uses live/feed.js only: " + e.getMessage(), e);
+            RTPRuntime.log(Level.WARNING, "[editor] editor channel unavailable; the page uses live/feed.js only: " + e.getMessage(), e);
         }
         synchronized (LOCK) {
             old = channel;
@@ -513,9 +514,9 @@ public final class EditorLiveFeed {
         Map<String, RTPWorld<?>> worlds = regionWorlds();
         List<RTPWorld<?>> live;
         try {
-            live = (RTP.serverAccessor == null) ? List.of() : RTP.serverAccessor.getRTPWorlds();
+            live = (RTPRuntime.serverAccessor() == null) ? List.of() : RTPRuntime.serverAccessor().getRTPWorlds();
         } catch (RuntimeException e) {
-            RTP.log(Level.FINE, "[editor] world list unavailable; land covers region worlds only: " + e.getMessage());
+            RTPRuntime.log(Level.FINE, "[editor] world list unavailable; land covers region worlds only: " + e.getMessage());
             live = List.of();
         }
         return withWorlds(worlds, live);
@@ -533,8 +534,8 @@ public final class EditorLiveFeed {
     }
 
     static Map<String, Region> configuredRegions() {
-        if (RTP.selectionAPI == null || RTP.selectionAPI.permRegionLookup == null) return Map.of();
-        return new LinkedHashMap<>(RTP.selectionAPI.permRegionLookup);
+        if (ActiveSelection.get() == null || ActiveSelection.get().permRegionLookup == null) return Map.of();
+        return new LinkedHashMap<>(ActiveSelection.get().permRegionLookup);
     }
 
     /** Curve-backed shapes of the configured regions, by region name. */
@@ -558,7 +559,7 @@ public final class EditorLiveFeed {
                 w = null;
             }
             if (w == null) {
-                RTP.log(Level.FINE, "[editor] live feed skips region '" + r.name + "': world not loaded");
+                RTPRuntime.log(Level.FINE, "[editor] live feed skips region '" + r.name + "': world not loaded");
                 continue;
             }
             worlds.putIfAbsent(w.name(), w);
@@ -683,7 +684,7 @@ public final class EditorLiveFeed {
                     try {
                         sink.accept(msg);
                     } catch (RuntimeException e) {
-                        RTP.log(Level.FINE, "[editor] live feed push failed: " + e.getMessage());
+                        RTPRuntime.log(Level.FINE, "[editor] live feed push failed: " + e.getMessage());
                     }
                 }
             }
@@ -694,15 +695,15 @@ public final class EditorLiveFeed {
         } catch (IOException e) {
             // Windows refuses to replace a file another process is reading; retry next tick
             if (++consecutiveFailures >= MAX_CONSECUTIVE_WRITE_FAILURES) {
-                RTP.log(Level.WARNING, "[editor] live feed stopped after " + consecutiveFailures
+                RTPRuntime.log(Level.WARNING, "[editor] live feed stopped after " + consecutiveFailures
                         + " consecutive write failures in " + liveDir + ": " + e.getMessage(), e);
                 stop("write failures: " + e.getMessage(), false);
                 return false;
             }
-            RTP.log(Level.FINE, "[editor] live feed write retry " + consecutiveFailures + ": " + e.getMessage());
+            RTPRuntime.log(Level.FINE, "[editor] live feed write retry " + consecutiveFailures + ": " + e.getMessage());
             return true;
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING, "[editor] live feed tick failed; stopping: " + e.getMessage(), e);
+            RTPRuntime.log(Level.WARNING, "[editor] live feed tick failed; stopping: " + e.getMessage(), e);
             stop("internal error: " + e.getMessage(), false);
             return false;
         } finally {
@@ -820,7 +821,7 @@ public final class EditorLiveFeed {
                     if (loc >= 0 && loc < t.range && loc < best) best = loc;
                 }
             } catch (RuntimeException e) {
-                RTP.log(Level.FINE, "[editor] curve position lookup failed for " + t.name, e);
+                RTPRuntime.log(Level.FINE, "[editor] curve position lookup failed for " + t.name, e);
             }
         }
         if (best != Long.MAX_VALUE) return best;
@@ -927,7 +928,7 @@ public final class EditorLiveFeed {
                 // Once at WARNING (S-004): a byte store outage would repeat this every upload period
                 Level level = landUploadWarned ? Level.FINE : Level.WARNING;
                 landUploadWarned = true;
-                RTP.log(level, "[editor] land upload of " + marked.size() + " bins failed; retrying in "
+                RTPRuntime.log(level, "[editor] land upload of " + marked.size() + " bins failed; retrying in "
                         + (LAND_UPLOAD_MILLIS / 1000L) + " s: " + (err == null ? "no key" : err.getMessage()), err);
                 landUploads.add(new LandUpload(null, marked));
             } else {
@@ -985,7 +986,7 @@ public final class EditorLiveFeed {
                     + ",\"palette\":" + paletteJson + ",\"bins\":[" + rows + "]}";
             if (!EditorChannel.fitsFrame(msg)) {
                 taken.forEach(landQueue::remove);
-                RTP.log(Level.FINE, "[editor] land batch over the frame cap dropped (" + taken.size() + " bins)");
+                RTPRuntime.log(Level.FINE, "[editor] land batch over the frame cap dropped (" + taken.size() + " bins)");
                 continue;
             }
             if (!ch.send(msg)) break;
@@ -1007,7 +1008,7 @@ public final class EditorLiveFeed {
             try {
                 json = EditorSessionManager.mapToJson(EditorCurveModel.curve(t.shape, t.js));
             } catch (RuntimeException e) {
-                RTP.log(Level.FINE, "[editor] curve block for region '" + t.name + "' failed", e);
+                RTPRuntime.log(Level.FINE, "[editor] curve block for region '" + t.name + "' failed", e);
                 continue;
             }
             if (json.equals(t.curveJson)) continue;
@@ -1032,12 +1033,12 @@ public final class EditorLiveFeed {
             try {
                 now = EditorCurveModel.encodeHazardRuns(t.shape);
             } catch (RuntimeException e) {
-                RTP.log(Level.FINE, "[editor] hazard runs for region '" + t.name + "' failed", e);
+                RTPRuntime.log(Level.FINE, "[editor] hazard runs for region '" + t.name + "' failed", e);
                 continue;
             }
             if (now == null) {
                 t.hazardOff = true;
-                RTP.log(Level.INFO, "[editor] region '" + t.name + "': hazard runs over the "
+                RTPRuntime.log(Level.INFO, "[editor] region '" + t.name + "': hazard runs over the "
                         + (EditorCurveModel.MAX_HAZARD_RUN_BYTES >> 10) + " KiB cap; no live hazard updates");
                 continue;
             }
@@ -1077,7 +1078,7 @@ public final class EditorLiveFeed {
         if (upload == null) {
             if (!t.handoffWarned) {
                 t.handoffWarned = true;
-                RTP.log(Level.INFO, "[editor] region '" + t.name + "': hazard reset of " + runs.length()
+                RTPRuntime.log(Level.INFO, "[editor] region '" + t.name + "': hazard reset of " + runs.length()
                         + " characters exceeds one channel frame and this session has no byte store; the page keeps its snapshot runs");
             }
             return true;
@@ -1094,7 +1095,7 @@ public final class EditorLiveFeed {
         f.whenComplete((key, err) -> {
             t.handoffBusy = false;
             if (err != null || key == null) {
-                RTP.log(Level.WARNING, "[editor] hazard reset hand-off for region '" + t.name + "' failed: "
+                RTPRuntime.log(Level.WARNING, "[editor] hazard reset hand-off for region '" + t.name + "' failed: "
                         + (err == null ? "no key" : err.getMessage()), err);
                 return;
             }
@@ -1302,11 +1303,11 @@ public final class EditorLiveFeed {
         stopped = true;
         stopReason = reason;
         Object handle = taskHandle;
-        if (handle != null && RTP.scheduler != null) {
+        if (handle != null && RTPRuntime.scheduler() != null) {
             try {
-                RTP.scheduler.cancelTask(handle);
+                RTPRuntime.scheduler().cancelTask(handle);
             } catch (RuntimeException e) {
-                RTP.log(Level.WARNING, "[editor] failed to cancel live feed task: " + e.getMessage(), e);
+                RTPRuntime.log(Level.WARNING, "[editor] failed to cancel live feed task: " + e.getMessage(), e);
             }
         }
         WorldBiomeStore.saveAll();
@@ -1314,10 +1315,10 @@ public final class EditorLiveFeed {
             try {
                 write(liveDir.resolve(FEED_FILE), feedScript(feedJson(clock.getAsLong(), null)));
             } catch (IOException e) {
-                RTP.log(Level.WARNING, "[editor] failed to write final live feed state: " + e.getMessage(), e);
+                RTPRuntime.log(Level.WARNING, "[editor] failed to write final live feed state: " + e.getMessage(), e);
             }
         }
-        RTP.log(Level.INFO, "[editor] live feed stopped: " + reason);
+        RTPRuntime.log(Level.INFO, "[editor] live feed stopped: " + reason);
         EditorChannel own = ownChannel;
         synchronized (LOCK) {
             if (active == this) active = null;

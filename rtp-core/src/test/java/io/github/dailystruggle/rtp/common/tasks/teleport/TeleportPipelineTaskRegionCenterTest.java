@@ -4,12 +4,13 @@ import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.rtp.api.selection.GenerationContext;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.mock.TrackedMockWorld;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
@@ -78,18 +79,18 @@ class TeleportPipelineTaskRegionCenterTest {
     void setUp() {
         RTPTestSetup.install(tempDir);
         world = new TrackedMockWorld("center_world");
-        accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+        accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
         accessor.addWorld(world);
         RTPRunnable.scheduler = accessor.getMockScheduler();
         TeleportPipelineTask.ConfigCache.reload();
-        RTP.getInstance().latestTeleportData.clear();
-        RTP.getInstance().processingPlayers.clear();
+        TeleportSessions.current().latestTeleportData.clear();
+        TeleportSessions.current().processingPlayers.clear();
     }
 
     @AfterEach
     void tearDown() {
-        RTP.getInstance().latestTeleportData.clear();
-        RTP.getInstance().processingPlayers.clear();
+        TeleportSessions.current().latestTeleportData.clear();
+        TeleportSessions.current().processingPlayers.clear();
     }
 
     private RegionSettings settings(String name) {
@@ -208,7 +209,7 @@ class TeleportPipelineTaskRegionCenterTest {
         MockRTPPlayer player = new MockRTPPlayer(playerId, "DataPlayer", new RTPLocation(world, 100, 64, 200));
         accessor.addPlayer(player);
         TeleportData data = new TeleportData();
-        RTP.getInstance().latestTeleportData.put(playerId, data);
+        TeleportSessions.current().latestTeleportData.put(playerId, data);
 
         TeleportPipelineTask task = new TeleportPipelineTask(new GenerationContext(player, player, null),
                 new Region("data_region", settings("data_region")), new RTPCoords("center_world", 400, 64, 600));

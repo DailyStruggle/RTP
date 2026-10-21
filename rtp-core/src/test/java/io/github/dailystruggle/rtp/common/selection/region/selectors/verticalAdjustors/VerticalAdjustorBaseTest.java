@@ -5,8 +5,9 @@ import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.mock.ConfigurableMockChunk;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
@@ -98,7 +99,7 @@ public class VerticalAdjustorBaseTest {
     @SuppressWarnings("unchecked")
     void constructor_registersInFactory() {
         Factory<VerticalAdjustor<?>> factory =
-                (Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
+                (Factory<VerticalAdjustor<?>>) FactoryRegistry.get(FactoryNames.vert);
         assertNotNull(factory);
 
         String uniqueName = "dummy_test_" + UUID.randomUUID().toString().replace("-", "");

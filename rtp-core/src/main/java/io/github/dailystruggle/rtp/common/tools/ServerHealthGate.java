@@ -2,10 +2,12 @@ package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.metrics.api.FoliaRegionSample;
 import io.github.dailystruggle.metrics.api.MetricsBinding;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -89,13 +91,13 @@ public final class ServerHealthGate {
               // fail open on diagnostic read
             }
           }
-          RTP.log(Level.WARNING, String.format(Locale.ROOT,
+          RTPRuntime.log(Level.WARNING, String.format(Locale.ROOT,
               "[RTP] Server tick unhealthy (%s%s; minTPS %.2f, maxMSPT %.1f); "
                   + "pausing background cache generation. Waiting players are still served.",
               reading, detail, minTps, maxMspt));
         }
       } else if (was) {
-        RTP.log(Level.INFO, String.format(Locale.ROOT,
+        RTPRuntime.log(Level.INFO, String.format(Locale.ROOT,
             "[RTP] Server tick recovered (%s); resuming background cache generation.", reading));
       }
     }
@@ -189,7 +191,7 @@ public final class ServerHealthGate {
 
   private static MetricsBinding binding() {
     try {
-      return RTP.metrics.getBinding();
+      return CoreMetrics.instance().getBinding();
     } catch (Throwable ignored) {
       return null;
     }
@@ -225,8 +227,8 @@ public final class ServerHealthGate {
         v = regional ? binding.tps1m() : binding.worstTps1m();
       }
       if (!Double.isNaN(v) && v > 0.0) return v;
-      if (RTP.serverAccessor != null) {
-        double fallback = RTP.serverAccessor.getTPS(20);
+      if (RTPRuntime.serverAccessor() != null) {
+        double fallback = RTPRuntime.serverAccessor().getTPS(20);
         if (fallback > 0.0) return fallback;
       }
     } catch (Throwable ignored) {
@@ -247,10 +249,10 @@ public final class ServerHealthGate {
 
   private static double configured(PerformanceKeys key, double def) {
     try {
-      if (RTP.configs != null) {
+      if (ActiveConfigs.get() != null) {
         @SuppressWarnings("unchecked")
         ConfigParser<PerformanceKeys> perf =
-            (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+            (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         if (perf != null) return perf.getNumber(key, def).doubleValue();
       }
     } catch (Throwable ignored) {

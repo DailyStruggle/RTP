@@ -4,7 +4,7 @@ import io.github.dailystruggle.rtp.anvil.AnvilChunkView;
 import io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
@@ -128,8 +128,8 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
 
     @Override
     public RTPWorld<?> getWorld() {
-        if (RTP.serverAccessor == null) return null;
-        return RTP.serverAccessor.getRTPWorld(worldId);
+        if (RTPRuntime.serverAccessor() == null) return null;
+        return RTPRuntime.serverAccessor().getRTPWorld(worldId);
     }
 
     @Override
@@ -197,7 +197,7 @@ public final class FabricRTPChunkUnobf extends RTPChunk<ChunkAccess> {
     /**
      * Fabric-internal accessor for the underlying {@link ServerLevel}; useful
      * for adapters that want to do follow-up queries against world state
-     * without re-resolving via {@code RTP.serverAccessor}. Not part of the
+     * without re-resolving via {@code RTPRuntime.serverAccessor()}. Not part of the
      * platform-neutral API. Returns {@code null} for Anvil-backed instances.
      */
     public @Nullable ServerLevel level() {

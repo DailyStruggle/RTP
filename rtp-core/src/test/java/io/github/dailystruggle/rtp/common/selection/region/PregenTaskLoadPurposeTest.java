@@ -2,12 +2,13 @@ package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
@@ -42,7 +43,7 @@ class PregenTaskLoadPurposeTest {
         MockRTPServerAccessor accessor = RTPTestSetup.install(tempDir);
         world = new MockRTPWorld("purpose_world");
         accessor.addWorld(world);
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         perf.set(PerformanceKeys.maxAttempts, 1L);
         // 100 disables the heap gate: deterministic regardless of the test JVM's heap.
         perf.set(PerformanceKeys.maxHeapPercent, 100.0);
@@ -56,8 +57,8 @@ class PregenTaskLoadPurposeTest {
         HeapPressureMonitor.resetForTesting();
         LiveLoadGate.resetAll();
         ProbeFirstGovernor.resetAll();
-        RTP.serverAccessor = null;
-        RTP.scheduler = null;
+        RTPRuntime.setServerAccessor(null);
+        RTPRuntime.setScheduler(null);
         LocationGenerator.setRng(null);
     }
 
@@ -115,7 +116,7 @@ class PregenTaskLoadPurposeTest {
     @Test
     @DisplayName("speculative + unreadable chunk + no pin slot + heap pressure: deferred once, run ends")
     void speculativeDefersUnderHeapPressure() throws Exception {
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         perf.set(PerformanceKeys.maxHeapPercent, 0.001);
         HeapPressureMonitor.resetForTesting();
         MockRTPWorld spy = spy(world);
@@ -214,7 +215,7 @@ class PregenTaskLoadPurposeTest {
     @Test
     @DisplayName("ADR-028: a deferred backlog entry goes back as UNKNOWN, never dropped")
     void deferredBacklogEntryReturnsUnknown() throws Exception {
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         perf.set(PerformanceKeys.maxHeapPercent, 0.001);
         HeapPressureMonitor.resetForTesting();
         MockRTPWorld spy = spy(world);

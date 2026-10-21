@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.benchmark;
 
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 
@@ -139,13 +139,13 @@ public class PolygonOptimizedDualLayer extends SquareOptimizedDualLayer {
     if (walkerScheduled) return;
     if (vertices.isEmpty()) return;
     if (!isBadLocationsEmpty()) return;
-    if (RTP.scheduler == null) return;
+    if (RTPRuntime.scheduler() == null) return;
 
     walkerScheduled = true;
     try {
-      RTP.scheduler.runTaskAsynchronously(this::runMaskWalker);
+      RTPRuntime.scheduler().runTaskAsynchronously(this::runMaskWalker);
     } catch (Throwable t) {
-      RTP.log(Level.WARNING, "[PolygonOptimizedDualLayer] failed to schedule async mask walker: " + t.getMessage(), t);
+      RTPRuntime.log(Level.WARNING, "[PolygonOptimizedDualLayer] failed to schedule async mask walker: " + t.getMessage(), t);
       walkerScheduled = false;
     }
   }

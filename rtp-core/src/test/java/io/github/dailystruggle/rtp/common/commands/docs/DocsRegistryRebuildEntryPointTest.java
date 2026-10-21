@@ -6,9 +6,9 @@ import io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.editor.EditorSessionManager;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,17 +53,17 @@ class DocsRegistryRebuildEntryPointTest {
 
     @BeforeEach
     void setUp() {
-        previousAccessor = RTP.serverAccessor;
-        previousScheduler = RTP.scheduler;
-        RTP.serverAccessor = new MockRTPServerAccessor(dataFolder.toFile());
+        previousAccessor = RTPRuntime.serverAccessor();
+        previousScheduler = RTPRuntime.scheduler();
+        RTPRuntime.setServerAccessor(new MockRTPServerAccessor(dataFolder.toFile()));
         scheduler = new InlineScheduler();
-        RTP.scheduler = scheduler;
+        RTPRuntime.setScheduler(scheduler);
     }
 
     @AfterEach
     void tearDown() {
-        RTP.serverAccessor = previousAccessor;
-        RTP.scheduler = previousScheduler;
+        RTPRuntime.setServerAccessor(previousAccessor);
+        RTPRuntime.setScheduler(previousScheduler);
     }
 
     @Test

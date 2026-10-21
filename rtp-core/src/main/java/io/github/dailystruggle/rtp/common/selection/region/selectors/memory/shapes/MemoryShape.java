@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.common.selection.region.selectors.memory.sha
 
 import io.github.dailystruggle.rtp.anvil.StorageLatencyProbe;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.residency.StrideGroupResidencyManager;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.table.HybridHazardTable;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
@@ -260,7 +260,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         if (in == null) continue;
         byte[] bytes = in.readNBytes(MAX_CURVE_HELPER_BYTES + 1);
         if (bytes.length > MAX_CURVE_HELPER_BYTES) {
-          RTP.log(
+          RTPRuntime.log(
               Level.WARNING,
               "[RTP] editor curve helper " + resource + " for " + type.getName()
                   + " exceeds " + MAX_CURVE_HELPER_BYTES + " bytes; refused (ADR-106)");
@@ -268,7 +268,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
         }
         return new String(bytes, StandardCharsets.UTF_8);
       } catch (java.io.IOException e) {
-        RTP.log(Level.WARNING, "[RTP] failed to read editor curve helper " + resource, e);
+        RTPRuntime.log(Level.WARNING, "[RTP] failed to read editor curve helper " + resource, e);
         return null;
       }
     }
@@ -1029,7 +1029,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     long range = getEffectiveRange();
     if (range <= 0L || range > Integer.MAX_VALUE) {
       if (hazardMirrorLogWarned.compareAndSet(false, true)) {
-        RTP.log(
+        RTPRuntime.log(
             Level.FINE,
             "[MemoryShape] Shape "
                 + name
@@ -1379,7 +1379,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   public void save(String fileName, String worldName) {
     if (!fileName.endsWith(".bin")) fileName = fileName + ".bin";
 
-    File pluginDir = RTP.serverAccessor.getPluginDirectory();
+    File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
     String dirPath =
         pluginDir.getAbsolutePath() + File.separator + "database" + File.separator + "regionData";
     String filePath = dirPath + File.separator + fileName;
@@ -1562,7 +1562,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       // The buffer is sized for worst-case varints, so only the written prefix is emitted.
       java.nio.file.Files.write(p, Arrays.copyOf(buf.array(), buf.position()));
     } catch (Exception e) {
-      RTP.log(Level.WARNING, "[MemoryShape] Failed to write binary file: " + filePath + " - " + e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, "[MemoryShape] Failed to write binary file: " + filePath + " - " + e.getMessage(), e);
     }
   }
 
@@ -1857,10 +1857,10 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     root.put("biomeLocations", biomeMap);
 
     // 5. Write to File
-    java.io.File pluginDir = io.github.dailystruggle.rtp.common.RTP.serverAccessor.getPluginDirectory();
+    java.io.File pluginDir = io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor().getPluginDirectory();
     java.io.File outDir = new java.io.File(pluginDir, "database" + java.io.File.separator + "regionData" + java.io.File.separator + "debug");
     if (!outDir.isDirectory() && !outDir.mkdirs()) {
-      io.github.dailystruggle.rtp.common.RTP.log(java.util.logging.Level.WARNING, "Failed to write debug JSON: could not create " + outDir);
+      io.github.dailystruggle.rtp.common.runtime.RTPRuntime.log(java.util.logging.Level.WARNING, "Failed to write debug JSON: could not create " + outDir);
       return;
     }
     java.io.File outFile = new java.io.File(outDir, fileName);
@@ -1869,7 +1869,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       com.google.gson.Gson gson = new com.google.gson.GsonBuilder().setPrettyPrinting().create();
       gson.toJson(root, writer);
     } catch (java.io.IOException ex) {
-      io.github.dailystruggle.rtp.common.RTP.log(java.util.logging.Level.WARNING, "Failed to write debug JSON: " + ex.getMessage(), ex);
+      io.github.dailystruggle.rtp.common.runtime.RTPRuntime.log(java.util.logging.Level.WARNING, "Failed to write debug JSON: " + ex.getMessage(), ex);
     }
   }
 
@@ -1927,7 +1927,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
   public CompletableFuture<Void> load(String fileName, String worldName) {
     if (!fileName.endsWith(".bin")) fileName = fileName + ".bin";
 
-    File pluginDir = RTP.serverAccessor.getPluginDirectory();
+    File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
     String filePath =
         pluginDir.getAbsolutePath()
             + File.separator
@@ -1944,7 +1944,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       try {
         data = java.nio.file.Files.readAllBytes(p);
       } catch (Exception e) {
-        RTP.log(Level.WARNING, "[MemoryShape] Failed to read binary file: " + filePath + " - " + e.getMessage(), e);
+        RTPRuntime.log(Level.WARNING, "[MemoryShape] Failed to read binary file: " + filePath + " - " + e.getMessage(), e);
         return;
       }
       if (data.length < 4) {
@@ -2034,7 +2034,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
 
                 // If curve or P changed incompatibly, discard learned bad runs safely
                 if (!curveMatch || !losslessRatchet) {
-                  RTP.log(Level.INFO, "[MemoryShape] Incompatible curve/P transition ("
+                  RTPRuntime.log(Level.INFO, "[MemoryShape] Incompatible curve/P transition ("
                       + readCurve + " P=" + readP + " -> " + myCurve + " P=" + myP
                       + ") for world " + worldName + "; table discarded and will be relearned.");
                   badSize = 0;
@@ -2127,7 +2127,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
                   writeLock.unlock();
                 }
               } catch (Throwable t) {
-                RTP.log(Level.WARNING, t.getMessage(), t);
+                RTPRuntime.log(Level.WARNING, t.getMessage(), t);
               }
             });
     return loadFuture;
@@ -2201,7 +2201,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
       }
     }
     if (!report) return;
-    RTP.log(
+    RTPRuntime.log(
         Level.FINE,
         "[plugin] shape "
             + name
@@ -2536,10 +2536,10 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     if (s.equalsIgnoreCase("auto")) {
       // Lowest power of 2 at or under standard server view distance (default 10 -> 8 chunks)
       int viewDistance = 10;
-      if (io.github.dailystruggle.rtp.common.RTP.configs != null) {
+      if (io.github.dailystruggle.rtp.common.configuration.ActiveConfigs.get() != null) {
         io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> parser =
             (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
-                io.github.dailystruggle.rtp.common.RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
+                io.github.dailystruggle.rtp.common.configuration.ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
         if (parser != null) {
           Number n = parser.getNumber(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.viewDistanceSelect, 10L);
           if (n != null && n.intValue() > 0) {
@@ -3809,7 +3809,7 @@ public abstract class MemoryShape<E extends Enum<E>> extends Shape<E> {
     if (key != null) set(key, Boolean.FALSE);
     if (!expandWarningLogged) {
       expandWarningLogged = true;
-      RTP.log(
+      RTPRuntime.log(
           Level.WARNING,
           "["
               + getClass().getSimpleName()

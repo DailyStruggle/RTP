@@ -4,7 +4,8 @@ import io.github.dailystruggle.mapsapi.BiomeColorSource;
 import io.github.dailystruggle.mapsapi.model.RegionBiomesRgb;
 import io.github.dailystruggle.mapsapi.render.RegionBiomesRgbRenderer;
 import io.github.dailystruggle.rtp.api.maps.ChartSpec;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 
@@ -27,7 +28,7 @@ public final class RegionBiomesResolver implements ChartSpecResolver {
 
     @Override
     public Resolution resolve(ChartSpec spec) throws UnresolvableChartSpecException {
-        RTP.log(java.util.logging.Level.FINE,
+        RTPRuntime.log(java.util.logging.Level.FINE,
                 "[viz/biomes] resolver entry: spec="
                         + (spec == null ? "null"
                                 : (spec.kind() + " region=" + spec.regionName())));
@@ -41,7 +42,7 @@ public final class RegionBiomesResolver implements ChartSpecResolver {
 
         Region region;
         try {
-            region = RTP.selectionAPI.getRegionOrDefault(spec.regionName());
+            region = ActiveSelection.get().getRegionOrDefault(spec.regionName());
         } catch (RuntimeException e) {
             throw new UnresolvableChartSpecException(
                     "no region resolved for '" + spec.regionName() + "'", e);
@@ -145,7 +146,7 @@ public final class RegionBiomesResolver implements ChartSpecResolver {
 
         // Build a tiny "top biomes by pixel count" summary for the diag log.
         List<String> topBiomes = topBiomesByFrequency(biomeCounts, 5);
-        RTP.log(java.util.logging.Level.FINE,
+        RTPRuntime.log(java.util.logging.Level.FINE,
                 "[viz/biomes] saved-data-paint: region=" + region.name
                         + " bbox=(" + minX + "," + minZ + ")..(" + maxX + "," + maxZ + ")"
                         + " inside-disk-pixels=" + insideCount

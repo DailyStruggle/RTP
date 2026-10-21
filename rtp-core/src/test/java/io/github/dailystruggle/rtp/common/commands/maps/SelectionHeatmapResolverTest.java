@@ -9,6 +9,7 @@ import io.github.dailystruggle.rtp.api.maps.ChartSpec;
 import io.github.dailystruggle.rtp.common.metrics.LandingHeatmap;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer;
@@ -56,8 +57,8 @@ class SelectionHeatmapResolverTest {
                 false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false
         );
         testRegion = new Region("test-region", settings);
-        if (io.github.dailystruggle.rtp.common.RTP.selectionAPI != null) {
-            io.github.dailystruggle.rtp.common.RTP.selectionAPI.permRegionLookup.put("test-region", testRegion);
+        if (ActiveSelection.get() != null) {
+            ActiveSelection.get().permRegionLookup.put("test-region", testRegion);
         }
     }
 
@@ -84,7 +85,7 @@ class SelectionHeatmapResolverTest {
                 name, new MockRTPWorld("test_world"), shape, new LinearAdjustor(new ArrayList<>()),
                 false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
         Region region = new Region(name, settings);
-        io.github.dailystruggle.rtp.common.RTP.selectionAPI.permRegionLookup.put(name, region);
+        ActiveSelection.get().permRegionLookup.put(name, region);
 
         // Block (520, -200) -> chunk (32, -13), three landings; block (-700, 300) -> chunk (-44, 18), one
         for (int i = 0; i < 3; i++) LandingHeatmap.record(name, 520, -200);

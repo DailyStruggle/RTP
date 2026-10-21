@@ -12,11 +12,11 @@ import io.github.dailystruggle.rtp.api.action.ConfinementBoundary;
 import io.github.dailystruggle.rtp.api.event.PlayerMoveEvent;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.SquareOptimizedDualLayer;
@@ -52,7 +52,7 @@ class ActionSessionImplCoverageTest {
   @BeforeEach
   void setUp(@TempDir Path tempDir) {
     RTPTestSetup.install(tempDir.toFile());
-    accessor = (MockRTPServerAccessor) RTP.serverAccessor;
+    accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
     world = (MockRTPWorld) accessor.getRTPWorld("world");
     ActionSessionImpl.resetScoreboardObjectivesInitializedForTesting();
     MemoryTracker.reset();
@@ -811,8 +811,8 @@ class ActionSessionImplCoverageTest {
             List.of(step(CommandAction.console("say violation"), CommandAction.player("spawn"),
                 CommandAction.message("hi"))),
             List.of(), List.of(), List.of()));
-    RTPServerAccessor saved = RTP.serverAccessor;
-    RTP.serverAccessor = null;
+    RTPServerAccessor saved = RTPRuntime.serverAccessor();
+    RTPRuntime.setServerAccessor(null);
     try {
       ActionSessionImpl s = session(d, List.of(a, b), Map.of(a, new int[] {0, 64, 0}), "world");
       s.arm();
@@ -825,7 +825,7 @@ class ActionSessionImplCoverageTest {
       s.eliminate(a);
       assertFalse(s.isActive());
     } finally {
-      RTP.serverAccessor = saved;
+      RTPRuntime.setServerAccessor(saved);
     }
     assertTrue(commandsStartingWith("say ").isEmpty());
     assertTrue(accessor.getSentWorldBorders().isEmpty());

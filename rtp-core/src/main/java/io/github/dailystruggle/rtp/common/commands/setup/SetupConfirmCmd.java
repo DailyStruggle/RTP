@@ -6,6 +6,8 @@ import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.prefab.Prefab;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabApplier;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabDiskIO;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
@@ -61,7 +63,7 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
         }
 
         SetupSession session = opt.get();
-        File baseDir = (RTP.serverAccessor != null) ? RTP.serverAccessor.getPluginDirectory() : null;
+        File baseDir = (RTPRuntime.serverAccessor() != null) ? RTPRuntime.serverAccessor().getPluginDirectory() : null;
         if (baseDir == null) {
             SetupHandlerSupport.sendMessage(callerId, "&c[RTP Setup] Cannot resolve plugin directory for writing configs.");
             return false;
@@ -112,7 +114,7 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
                     }
                 }
 
-                RTP.log(Level.INFO, "[setup] Applied setup wizard recipe for caller=" + callerId
+                RTPRuntime.log(Level.INFO, "[setup] Applied setup wizard recipe for caller=" + callerId
                         + ", writtenFiles=" + writtenFiles.size() + ", backups=" + backups.size());
                 SetupHandlerSupport.sendMessage(callerId, "&a[RTP Setup] Successfully applied setup recipe!");
                 SetupHandlerSupport.sendMessage(callerId, "&7Written: &f" + String.join(", ", writtenFiles));
@@ -126,10 +128,10 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
                             : null;
                     if (reload != null) {
                         reloaded = reload.onCommand(callerId, java.util.Collections.emptyMap(), null);
-                    } else if (RTP.configs != null) {
+                    } else if (ActiveConfigs.get() != null) {
                         RTP.reloading.set(true);
                         try {
-                            reloaded = RTP.configs.reload();
+                            reloaded = ActiveConfigs.get().reload();
                         } finally {
                             RTP.reloading.set(false);
                         }
@@ -148,13 +150,13 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
                     SetupHandlerSupport.sendMessage(callerId, "&7[RTP Setup] Run &f/rtp reload&7 to pick up changes.");
                 }
             } catch (IOException | RuntimeException e) {
-                RTP.log(Level.WARNING, "[setup] Failed to write setup recipe to disk: " + e.getMessage(), e);
+                RTPRuntime.log(Level.WARNING, "[setup] Failed to write setup recipe to disk: " + e.getMessage(), e);
                 SetupHandlerSupport.sendMessage(callerId, "&c[RTP Setup] Error writing setup configuration to disk: " + e.getMessage());
             }
         };
 
-        if (RTP.scheduler != null) {
-            RTP.scheduler.runTaskAsynchronously(applyTask);
+        if (RTPRuntime.scheduler() != null) {
+            RTPRuntime.scheduler().runTaskAsynchronously(applyTask);
         } else {
             applyTask.run();
         }

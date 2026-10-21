@@ -1,8 +1,9 @@
 package io.github.dailystruggle.rtp.common.database.options;
 
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.sql.*;
 import java.util.*;
@@ -14,7 +15,7 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
   private Connection connection;
 
   public SQLiteDatabaseAccessor(String url) {
-    File pluginDir = RTP.serverAccessor.getPluginDirectory();
+    File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
     File databaseFile = new File(pluginDir, "database" + File.separator + "rtp.db");
     if (!databaseFile.getParentFile().exists()) {
       databaseFile.getParentFile().mkdirs();
@@ -62,7 +63,7 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
         statement.execute(schema);
       }
     } catch (SQLException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
     }
   }
 
@@ -97,7 +98,7 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
         connection.close();
       }
     } catch (SQLException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
     }
   }
 
@@ -108,7 +109,7 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
     try {
       conn = getConnection();
     } catch (SQLException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
       return;
     }
 
@@ -156,12 +157,12 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
         teleportData.originWorldName = resultSet.getString("originalWorldName");
         teleportData.cost = Double.parseDouble(resultSet.getString("cost"));
 
-        if (RTP.getInstance() != null && RTP.getInstance().latestTeleportData != null) {
-          RTP.getInstance().latestTeleportData.put(uuid, teleportData, teleportData.time);
+        if (TeleportSessions.current() != null && TeleportSessions.current().latestTeleportData != null) {
+          TeleportSessions.current().latestTeleportData.put(uuid, teleportData, teleportData.time);
         }
       }
     } catch (SQLException throwables) {
-      RTP.log(Level.WARNING, "Failed to load cached locations from SQLite", throwables);
+      RTPRuntime.log(Level.WARNING, "Failed to load cached locations from SQLite", throwables);
     } catch (IllegalArgumentException ignored) {
       // Ignore corrupted or malformed UUID strings in database rows
     }
@@ -395,7 +396,7 @@ public class SQLiteDatabaseAccessor extends AbstractSQLDatabaseAccessor {
     try {
       statement.execute(sql);
     } catch (SQLException e) {
-      RTP.log(Level.WARNING, e.getMessage(), e);
+      RTPRuntime.log(Level.WARNING, e.getMessage(), e);
     }
   }
 

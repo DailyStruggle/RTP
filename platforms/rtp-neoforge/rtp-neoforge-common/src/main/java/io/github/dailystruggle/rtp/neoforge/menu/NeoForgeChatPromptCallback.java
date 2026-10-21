@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.menu.MenuRedeemSubcommand;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.NeoForge;
@@ -41,12 +42,12 @@ import java.util.logging.Level;
  *       and submits the assembled command via the viewer's
  *       {@link RTPCommandSender#performCommand}.</li>
  *   <li>A reaper task runs every {@link #REAP_PERIOD_TICKS} ticks via
- *       {@code RTP.scheduler.runTaskTimerAsynchronously} and drops any entry
+ *       {@code RTPRuntime.scheduler().runTaskTimerAsynchronously} and drops any entry
  *       older than {@link #TTL_MILLIS}.</li>
  * </ul>
  *
  * <p><b>Thread-safety.</b> {@link #pending} is a {@link ConcurrentHashMap}. The
- * command dispatch is wrapped in {@code RTP.scheduler.runTask(...)} so it lands
+ * command dispatch is wrapped in {@code RTPRuntime.scheduler().runTask(...)} so it lands
  * on the server tick thread regardless of which thread fired the chat event.
  */
 public final class NeoForgeChatPromptCallback implements MenuRedeemSubcommand.AnvilInputOpener {
@@ -81,7 +82,7 @@ public final class NeoForgeChatPromptCallback implements MenuRedeemSubcommand.An
         this.listenerInstalled = installed;
         if (installed) {
             try {
-                RTP.scheduler.runTaskTimerAsynchronously(
+                RTPRuntime.scheduler().runTaskTimerAsynchronously(
                         this::reap, REAP_PERIOD_TICKS, REAP_PERIOD_TICKS);
             } catch (Throwable t) {
                 RTP.log(Level.WARNING,
@@ -109,7 +110,7 @@ public final class NeoForgeChatPromptCallback implements MenuRedeemSubcommand.An
                         @Nullable MenuRedeemSubcommand.CartSink sink) {
         if (!listenerInstalled) return false;
         if (viewer == null || paramName == null || paramName.isEmpty()) return false;
-        RTPCommandSender target = RTP.serverAccessor.getSender(viewer);
+        RTPCommandSender target = RTPRuntime.serverAccessor().getSender(viewer);
         if (target == null) return false;
         // Replace any earlier pending prompt for the same viewer.
         pending.put(viewer, new PendingPrompt(
@@ -131,7 +132,7 @@ public final class NeoForgeChatPromptCallback implements MenuRedeemSubcommand.An
         PendingPrompt prompt = pending.remove(viewer);
         if (prompt == null) return;
         if (typed != null && typed.equalsIgnoreCase("cancel")) {
-            RTPCommandSender sender = RTP.serverAccessor.getSender(viewer);
+            RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(viewer);
             if (sender != null) sender.sendMessage("&7menu prompt cancelled.");
             return;
         }
@@ -173,9 +174,9 @@ public final class NeoForgeChatPromptCallback implements MenuRedeemSubcommand.An
     }
 
     private static void submitCommand(UUID viewer, String command) {
-        RTPCommandSender sender = RTP.serverAccessor.getSender(viewer);
+        RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(viewer);
         if (sender == null) return;
-        RTPPlayer player = RTP.serverAccessor.getPlayer(viewer);
+        RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(viewer);
         sender.performCommand(player, command);
     }
 
@@ -204,7 +205,7 @@ public final class NeoForgeChatPromptCallback implements MenuRedeemSubcommand.An
             event.setCanceled(true);
             // Dispatch the completion on the server tick thread (S-005 / parity
             // with the Paper AnvilInputSession path).
-            RTP.scheduler.runTask(() -> completePromptOnServerThread(viewer, typed));
+            RTPRuntime.scheduler().runTask(() -> completePromptOnServerThread(viewer, typed));
         } catch (Throwable t) {
             RTP.log(Level.WARNING,
                     "[RTP][NeoForge] chat-prompt listener threw "

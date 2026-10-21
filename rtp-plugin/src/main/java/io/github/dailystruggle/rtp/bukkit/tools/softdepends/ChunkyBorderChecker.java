@@ -4,7 +4,10 @@ import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.Mode;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
@@ -44,9 +47,9 @@ public class ChunkyBorderChecker {
 
     // chunkyborder initialization
     if (chunkyBorder != null) {
-      RTP.serverAccessor.setWorldBorderFunction(
+      RTPRuntime.serverAccessor().setWorldBorderFunction(
           worldName -> {
-            RTPWorld rtpWorld = RTP.serverAccessor.getRTPWorld(worldName);
+            RTPWorld rtpWorld = RTPRuntime.serverAccessor().getRTPWorld(worldName);
             WorldBorder vanillaBorder = null;
             WorldBorder chunkyBorder = null;
             long radiusVanilla = Long.MAX_VALUE;
@@ -58,7 +61,7 @@ public class ChunkyBorderChecker {
                   new WorldBorder(
                       () -> {
                         Shape<?> shape =
-                            (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE");
+                            (Shape<?>) FactoryRegistry.get(FactoryNames.shape).get("SQUARE");
                         Square square = (Square) shape;
                         square.set(
                             GenericMemoryShapeParams.radius,
@@ -77,7 +80,7 @@ public class ChunkyBorderChecker {
                         return shape;
                       },
                       rtpLocation -> {
-                        if (RTP.serverAccessor.getServerIntVersion() > 10)
+                        if (RTPRuntime.serverAccessor().getServerIntVersion() > 10)
                           return worldBorder.isInside(
                               new Location(
                                   world, rtpLocation.x(), rtpLocation.y(), rtpLocation.z()));
@@ -99,7 +102,7 @@ public class ChunkyBorderChecker {
               if (borderDataOptional.isPresent()) {
                 BorderData borderData = borderDataOptional.get();
 
-                Factory<?> factory = RTP.factoryMap.get(RTP.factoryNames.shape);
+                Factory<?> factory = FactoryRegistry.get(FactoryNames.shape);
                 org.popcraft.chunky.shape.Shape border = borderData.getBorder();
                 FactoryValue<?> value = factory.get("chunky_" + border.name());
                 if (!(value instanceof Shape<?>))

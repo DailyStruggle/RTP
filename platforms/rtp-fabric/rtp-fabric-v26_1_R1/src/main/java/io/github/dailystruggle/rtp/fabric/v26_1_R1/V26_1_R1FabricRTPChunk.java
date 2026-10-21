@@ -2,7 +2,7 @@ package io.github.dailystruggle.rtp.fabric.v26_1_R1;
 
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
@@ -47,8 +47,8 @@ public final class V26_1_R1FabricRTPChunk extends RTPChunk<ChunkAccess> {
 
     @Override
     public RTPWorld<?> getWorld() {
-        if (RTP.serverAccessor == null) return null;
-        return RTP.serverAccessor.getRTPWorld(worldId);
+        if (RTPRuntime.serverAccessor() == null) return null;
+        return RTPRuntime.serverAccessor().getRTPWorld(worldId);
     }
 
     @Override

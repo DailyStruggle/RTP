@@ -2,8 +2,8 @@ package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
 import io.github.dailystruggle.rtp.api.world.*;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tools.CfDiag;
 import io.github.dailystruggle.rtp.common.tools.ServerHealthGate;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
@@ -136,7 +136,7 @@ final class PregenTask implements Runnable {
         releasePin();
         releaseImmediatePermit();
         Region r = state.region;
-        RTP.log(Level.FINE, "[RTP] [" + ((r == null) ? "" : r.name)
+        RTPRuntime.log(Level.FINE, "[RTP] [" + ((r == null) ? "" : r.name)
                 + "] speculative fill deferred (" + state.purpose + ") at attempt " + i);
         BacklogLocationBuffer.BacklogEntry taken = takenFromBacklog;
         takenFromBacklog = null;
@@ -168,7 +168,7 @@ final class PregenTask implements Runnable {
         } else {
             // Prevent CompletableFuture graph leak: do not call run() directly from callbacks.
             // Fresh submission bounds BiApply/CoCompletion chain depth (see LESSONS_LEARNED.md).
-            RTP.serverAccessor.getScheduler().runTaskAsynchronously(this);
+            RTPRuntime.serverAccessor().getScheduler().runTaskAsynchronously(this);
         }
     }
 
@@ -556,7 +556,7 @@ final class PregenTask implements Runnable {
         try {
             r.run();
         } catch (Throwable t) {
-            RTP.log(Level.WARNING, "[RTP] PregenTask inline step failed: " + t, t);
+            RTPRuntime.log(Level.WARNING, "[RTP] PregenTask inline step failed: " + t, t);
             result.complete(null);
         }
     }
@@ -569,7 +569,7 @@ final class PregenTask implements Runnable {
             try {
                 runAttempt();
             } catch (Throwable t) {
-                RTP.log(Level.WARNING, "[RTP] PregenTask attempt threw: " + t, t);
+                RTPRuntime.log(Level.WARNING, "[RTP] PregenTask attempt threw: " + t, t);
                 result.complete(null);
                 inRunAttempt = false;
                 return;
@@ -639,7 +639,7 @@ final class PregenTask implements Runnable {
                                 + (long) (LocationGenerator.rng().nextDouble() * width);
                     }
                 } else if (state.biomeRecallForced) {
-                    RTP.log(Level.WARNING,
+                    RTPRuntime.log(Level.WARNING,
                             "[RTP] invalid state, biome recall enabled but biomes are not in memory - "
                                     + Arrays.toString(state.biomeNames.toArray()));
                     result.complete(new GenerationResult(null, i, null));
@@ -668,7 +668,7 @@ final class PregenTask implements Runnable {
         // Treat absent border as "no border in effect" - accept the candidate
         // rather than NPE'ing this attempt every tick. The downstream
         // shape/region constraints still bound the selection space.
-        WorldBorder border = (WorldBorder) RTP.serverAccessor.getWorldBorder(state.world.name());
+        WorldBorder border = (WorldBorder) RTPRuntime.serverAccessor().getWorldBorder(state.world.name());
         io.github.dailystruggle.rtp.api.world.RTPLocation borderProbe =
                 new io.github.dailystruggle.rtp.api.world.RTPLocation(
                         state.world,
@@ -679,7 +679,7 @@ final class PregenTask implements Runnable {
             if (state.maxAttempts < state.maxAttemptsCeiling) state.maxAttempts++;
             state.worldBorderFails++;
             if (state.worldBorderFails > 1000L) {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "[RTP] 1000 worldborder checks failed. region/selection is likely outside the worldborder");
                 result.complete(new GenerationResult(null, i, null));
                 return;
@@ -769,7 +769,7 @@ final class PregenTask implements Runnable {
             fut = state.world.probeChunkColumn(cx, cz, minY - 1, maxY);
         } catch (Throwable t) {
             // Adapter threw - treat as UNKNOWN, fall through to full path.
-            RTP.log(Level.FINE,
+            RTPRuntime.log(Level.FINE,
                     "[RTP] probeChunkColumn threw for world=" + state.world.name()
                             + " chunk=(" + cx + "," + cz + "): " + t);
             return false;
@@ -802,7 +802,7 @@ final class PregenTask implements Runnable {
             long effectiveNanos = (drain > 0L) ? Math.min(drain, probeNanos) : probeNanos;
             int group = (probe != null) ? probe.groupSize() : 0;
             if (ex != null) {
-                RTP.log(Level.FINE,
+                RTPRuntime.log(Level.FINE,
                         "[RTP] probeChunkColumn failed for world=" + state.world.name()
                                 + " chunk=(" + cx + "," + cz + "): "
                                 + ex.getClass().getSimpleName() + ": " + ex.getMessage());
@@ -1025,7 +1025,7 @@ final class PregenTask implements Runnable {
                         immGov.recordNativeLoad(duration / 1_000_000.0, 1.0);
                     }
                     if (ex != null) {
-                        RTP.log(Level.WARNING,
+                        RTPRuntime.log(Level.WARNING,
                                 "[RTP] getOrLoadChunk failed for world=" + state.world.name()
                                         + " chunk=(" + cx + "," + cz + "): "
                                         + ex.getClass().getSimpleName() + ": " + ex.getMessage());
@@ -1080,7 +1080,7 @@ final class PregenTask implements Runnable {
                 if (immGov != null) {
                     immGov.recordNativeLoad((System.nanoTime() - ticketStart) / 1_000_000.0, 1.0);
                 }
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "[RTP] Chunk ticket application did not complete within 2s ("
                                 + state.world.name() + " " + cx + "," + cz
                                 + "); rejecting candidate.");
@@ -1110,21 +1110,21 @@ final class PregenTask implements Runnable {
                 new io.github.dailystruggle.rtp.api.world.RTPLocation(
                         state.world, (cx << 4) + 7, 0, (cz << 4) + 7);
         try {
-            RTP.serverAccessor.getScheduler().runTask(targetLoc, () -> {
+            RTPRuntime.serverAccessor().getScheduler().runTask(targetLoc, () -> {
                 try {
                     // Stale-chunk guard on the region-owning thread, where
                     // isChunkLoaded is authoritative and legal to call.
                     if (!state.world.isChunkLoaded(cx, cz)) {
                         closeIfPresent(reservation);
                         if (staleRetries < state.staleChunkRetryLimit) {
-                            RTP.log(Level.FINE,
+                            RTPRuntime.log(Level.FINE,
                                     "[RTP] Stale chunk detected on region-thread dispatch ("
                                             + state.world.name() + " " + cx + "," + cz
                                             + "); re-requesting (attempt " + (staleRetries + 1)
                                             + "/" + state.staleChunkRetryLimit + ")");
                             // Bounce back to async pool - the async scheduler is
                             // where the CF chain is safe.
-                            RTP.serverAccessor.getScheduler().runTaskAsynchronously(
+                            RTPRuntime.serverAccessor().getScheduler().runTaskAsynchronously(
                                     () -> requestChunk(cx, cz, finalL, staleRetries + 1));
                         } else {
                             if (state.verbose) {
@@ -1132,20 +1132,20 @@ final class PregenTask implements Runnable {
                                         .compute("reason=staleChunkBeforeVert", (s, a) -> (a == null) ? 1L : ++a);
                             }
                             recordOutcome("nullChunk/staleChunkBeforeVert chunk=(" + cx + "," + cz + ")");
-                            RTP.serverAccessor.getScheduler().runTaskAsynchronously(this::rescheduleNextAttempt);
+                            RTPRuntime.serverAccessor().getScheduler().runTaskAsynchronously(this::rescheduleNextAttempt);
                         }
                         return;
                     }
                     proceedWithEvaluation(cx, cz, finalL, chunk, reservation);
                 } catch (Throwable t) {
-                    RTP.log(Level.WARNING,
+                    RTPRuntime.log(Level.WARNING,
                             "[RTP] Region-thread evaluation threw: " + t, t);
                     closeIfPresent(reservation);
-                    RTP.serverAccessor.getScheduler().runTaskAsynchronously(this::rescheduleNextAttempt);
+                    RTPRuntime.serverAccessor().getScheduler().runTaskAsynchronously(this::rescheduleNextAttempt);
                 }
             });
         } catch (Throwable t) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[RTP] Failed to dispatch region-thread evaluation: " + t, t);
             closeIfPresent(reservation);
             continueInline(this::rescheduleNextAttempt);
@@ -1287,7 +1287,7 @@ final class PregenTask implements Runnable {
                 .whenComplete((v, ex) -> {
                     if (ex != null) {
                         CfDiag.pregenAllOfTimeout.increment();
-                        RTP.log(Level.WARNING,
+                        RTPRuntime.log(Level.WARNING,
                                 "[RTP] Safety-check neighbour loads failed ("
                                         + state.world.name() + " center=(" + cx + "," + cz + ")): " + ex);
                         if (state.verbose) {
@@ -1354,17 +1354,17 @@ final class PregenTask implements Runnable {
                 new io.github.dailystruggle.rtp.api.world.RTPLocation(
                         state.world, (cx << 4) + 7, 0, (cz << 4) + 7);
         try {
-            RTP.serverAccessor.getScheduler().runTask(at, () -> {
+            RTPRuntime.serverAccessor().getScheduler().runTask(at, () -> {
                 try {
                     body.run();
                 } catch (Throwable t) {
-                    RTP.log(Level.WARNING, "[RTP] Region-thread safety scan threw: " + t, t);
+                    RTPRuntime.log(Level.WARNING, "[RTP] Region-thread safety scan threw: " + t, t);
                     closeIfPresent(reservation);
-                    RTP.serverAccessor.getScheduler().runTaskAsynchronously(this::rescheduleNextAttempt);
+                    RTPRuntime.serverAccessor().getScheduler().runTaskAsynchronously(this::rescheduleNextAttempt);
                 }
             });
         } catch (Throwable t) {
-            RTP.log(Level.WARNING, "[RTP] Failed to dispatch region-thread safety scan: " + t, t);
+            RTPRuntime.log(Level.WARNING, "[RTP] Failed to dispatch region-thread safety scan: " + t, t);
             closeIfPresent(reservation);
             continueInline(this::rescheduleNextAttempt);
         }
@@ -1372,7 +1372,7 @@ final class PregenTask implements Runnable {
 
     private static boolean isFoliaPlatform() {
         try {
-            return RTP.serverAccessor != null && "Folia".equals(RTP.serverAccessor.getPlatform());
+            return RTPRuntime.serverAccessor() != null && "Folia".equals(RTPRuntime.serverAccessor().getPlatform());
         } catch (Throwable t) {
             return false;
         }
@@ -1525,7 +1525,7 @@ final class PregenTask implements Runnable {
         long reported = Math.min(i, state.maxAttempts);
         // Verbose failure summary - preserves the historical log shape.
         if (state.verbose && i >= state.maxAttempts) {
-            RTP.log(Level.INFO,
+            RTPRuntime.log(Level.INFO,
                     "#00ff80[RTP] ["
                             + state.region.name
                             + "] failed to generate a location within "
@@ -1542,10 +1542,10 @@ final class PregenTask implements Runnable {
                     count += entry.getValue();
                     pos++;
                 }
-                RTP.log(Level.INFO,
+                RTPRuntime.log(Level.INFO,
                         "#00ff80[RTP] [" + state.region.name + "]  cause=" + mapEntry.getKey() + " fails=" + count);
                 for (String out : output) {
-                    RTP.log(Level.INFO, out);
+                    RTPRuntime.log(Level.INFO, out);
                 }
             }
 
@@ -1557,22 +1557,22 @@ final class PregenTask implements Runnable {
                 selectionsStr.append("(").append(entry.getKey()).append(",").append(entry.getValue()).append(")");
             }
             selectionsStr.append("}");
-            RTP.log(Level.INFO, "#0f0080[RTP] [" + state.region.name + "] selections: " + selectionsStr);
+            RTPRuntime.log(Level.INFO, "#0f0080[RTP] [" + state.region.name + "] selections: " + selectionsStr);
 
             // Per-attempt outcome breadcrumb - always printed (diagnostic: reveals
             // which code path actually fired when the failMap bucketing is
             // ambiguous or appears silent).
             if (state.attemptOutcomes.isEmpty()) {
-                RTP.log(Level.INFO,
+                RTPRuntime.log(Level.INFO,
                         "#ff8040[RTP] [" + state.region.name
                                 + "] attemptOutcomes: <empty — no rescheduleNextAttempt site fired;"
                                 + " investigate CF callback suppression or task re-entry>");
             } else {
-                RTP.log(Level.INFO,
+                RTPRuntime.log(Level.INFO,
                         "#ff8040[RTP] [" + state.region.name + "] attemptOutcomes ("
                                 + state.attemptOutcomes.size() + "):");
                 for (String outcome : state.attemptOutcomes) {
-                    RTP.log(Level.INFO, "#ff8040[RTP] [" + state.region.name + "]   " + outcome);
+                    RTPRuntime.log(Level.INFO, "#ff8040[RTP] [" + state.region.name + "]   " + outcome);
                 }
             }
         } else if (i >= state.maxAttempts) {
@@ -1596,7 +1596,7 @@ final class PregenTask implements Runnable {
                 cause = cause.substring(0, cut);
                 causeTally.merge(cause, 1, Integer::sum);
             }
-            RTP.log(Level.INFO,
+            RTPRuntime.log(Level.INFO,
                     "[RTP][PROMOTE_DIAG] [" + state.region.name + "] location generation FAILED after "
                             + state.maxAttempts + " attempts (every candidate rejected). "
                             + "Per-cause tally=" + causeTally

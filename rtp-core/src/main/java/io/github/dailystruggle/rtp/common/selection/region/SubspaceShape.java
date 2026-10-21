@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import java.util.ArrayList;
@@ -398,7 +398,7 @@ public class SubspaceShape {
       cells = footprintCandidateColumns(distributionShape, minSeparation, false);
     }
     if (cells.size() < memberCount) {
-      RTP.log(
+      RTPRuntime.log(
           java.util.logging.Level.FINE,
           "[group] subspace candidate enumeration produced "
               + cells.size()
@@ -416,7 +416,7 @@ public class SubspaceShape {
             (validated, ex) -> {
               if (ex == null) {
                 int got = (validated == null) ? 0 : validated.size();
-                RTP.log(
+                RTPRuntime.log(
                     java.util.logging.Level.FINE,
                     "[group] subspace candidate validation: "
                         + got

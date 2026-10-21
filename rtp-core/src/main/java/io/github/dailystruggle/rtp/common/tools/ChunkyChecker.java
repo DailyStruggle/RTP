@@ -2,6 +2,8 @@ package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.RectangleParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import java.lang.reflect.Field;
@@ -46,7 +48,7 @@ public class ChunkyChecker {
           s = "chunky_" + s;
 
           Factory<Shape<?>> factory =
-              (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+              (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
           Shape<RectangleParams> shape = (Shape<RectangleParams>) factory.get(s);
           if (shape == null) {
             shape = new ChunkyRTPShape(s);

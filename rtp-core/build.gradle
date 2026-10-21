@@ -287,9 +287,10 @@ spotbugsTestFixtures.enabled = false
 // (selection/worldborder) -- because those carry the S-001..S-005 prohibitions
 // where a surviving mutant is a genuine safety gap, not cosmetic.
 //
-// Opt-in ONLY via `-Pmutation`, matching the `-Pcoverage` / `-PstaticAnalysis`
-// pattern: a routine `.\gradlew.bat build` never resolves the PIT toolchain nor
-// pays its (large) run cost. When enabled, `pitest` runs the mutation analysis
+// Opt-in ONLY via `-Pmutation`: a routine `.\gradlew.bat build` never resolves
+// the PIT toolchain nor pays its (large) run cost. Unlike `-Pcoverage` /
+// `-PstaticAnalysis`, per-push CI does not pass it; mutation-testing.yml runs it
+// weekly and on demand. When enabled, `pitest` runs the mutation analysis
 // and FAILS the build below the 60% score floor (the item's target).
 //   Run the gate : .\gradlew.bat :rtp-core:pitest -Pmutation
 if (project.hasProperty('mutation')) {

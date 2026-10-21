@@ -8,7 +8,12 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
+import io.github.dailystruggle.rtp.common.network.NetworkHooks;
 import io.github.dailystruggle.rtp.common.tools.MessageTagger;
 import io.github.dailystruggle.rtp.folia.entity.FoliaRTPCommandSender;
 import io.github.dailystruggle.rtp.folia.entity.FoliaRTPPlayer;
@@ -55,7 +60,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
       org.bukkit.WorldBorder worldBorder = world.getWorldBorder();
       return new WorldBorder(
           () -> {
-            Shape<?> shape = (Shape<?>) RTP.factoryMap.get(RTP.factoryNames.shape).get("SQUARE");
+            Shape<?> shape = (Shape<?>) FactoryRegistry.get(FactoryNames.shape).get("SQUARE");
             if (shape instanceof Square square) {
               square.set(GenericMemoryShapeParams.radius, (long) (worldBorder.getSize() / 32.0));
               square.set(GenericMemoryShapeParams.centerX, (long) (worldBorder.getCenter().getBlockX() / 16.0));
@@ -209,13 +214,13 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
 
   @Override
   public void sendMessage(UUID target, Enum<?> msgType, String tag) {
-    String message = String.valueOf(RTP.configs.getConfigValue(msgType, ""));
+    String message = String.valueOf(ActiveConfigs.get().getConfigValue(msgType, ""));
     sendMessage(target, message, tag);
   }
 
   @Override
   public void sendMessage(UUID target1, UUID target2, Enum<?> msgType, String tag) {
-    String message = String.valueOf(RTP.configs.getConfigValue(msgType, ""));
+    String message = String.valueOf(ActiveConfigs.get().getConfigValue(msgType, ""));
     sendMessage(target1, target2, message, tag);
   }
 
@@ -457,8 +462,8 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
     // without importing a platform class. BukkitBackendStateSampler is on the
     // Folia classpath (rtp-folia-common -> rtp-paper-common -> rtp-bukkit-common)
     // and uses only Folia-safe Bukkit API (Bukkit.getWorlds() + RTP internals).
-    RTP.backendStateSamplerFactory = lobbyMode ->
-        new io.github.dailystruggle.rtp.bukkitplatform.network.BukkitBackendStateSampler(lobbyMode);
+    NetworkHooks.setBackendStateSamplerFactory(lobbyMode ->
+        new io.github.dailystruggle.rtp.bukkitplatform.network.BukkitBackendStateSampler(lobbyMode));
   }
 
   @Override
@@ -502,7 +507,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
 
   @Override
   public io.github.dailystruggle.rtp.api.scheduling.RTPScheduler getScheduler() { // @AnyThread - returns stored field
-    return io.github.dailystruggle.rtp.common.RTP.scheduler;
+    return io.github.dailystruggle.rtp.common.runtime.RTPRuntime.scheduler();
   }
 
   @Override
@@ -512,7 +517,7 @@ public abstract class AbstractFoliaServerAccessor implements RTPServerAccessor {
     // global TPS; fall back to the nominal constant only on the NOOP path.
     try {
       io.github.dailystruggle.metrics.api.MetricsSnapshot s =
-          io.github.dailystruggle.rtp.common.RTP.metrics.snapshot();
+          CoreMetrics.instance().snapshot();
       double v = (ticks >= 600) ? s.tps15m : (ticks >= 100 ? s.tps5m : s.tps1m);
       if (!Double.isNaN(v)) return v;
     } catch (Throwable ignored) {

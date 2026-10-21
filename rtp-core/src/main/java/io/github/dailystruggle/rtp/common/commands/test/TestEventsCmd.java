@@ -5,9 +5,9 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.event.PlayerMoveEvent;
 import io.github.dailystruggle.rtp.api.event.PrefabAppliedEvent;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.base.RTPCommandEvents;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -58,7 +58,7 @@ public class TestEventsCmd extends BaseRTPCmdImpl {
       return false;
     }
 
-    if (RTP.scheduler == null) {
+    if (RTPRuntime.scheduler() == null) {
       TestSemaphore.release(callerId, name());
       report(callerId, "&c[RTP test/events] RTP.scheduler is null; core not yet loaded", Level.WARNING, null);
       return false;
@@ -68,7 +68,7 @@ public class TestEventsCmd extends BaseRTPCmdImpl {
     hookHolder[0] = ActiveTestJobs.register(
         callerId, new ActiveTestJobs.Job("events", () -> { /* no cancel handle */ }));
 
-    RTP.scheduler.runTaskAsynchronously(() -> {
+    RTPRuntime.scheduler().runTaskAsynchronously(() -> {
       try {
         runProbe(callerId);
       } finally {
@@ -112,8 +112,8 @@ public class TestEventsCmd extends BaseRTPCmdImpl {
       // Fire synthetic events
       RTPPlayer callerPlayer = null;
       try {
-        if (RTP.serverAccessor != null) {
-          callerPlayer = RTP.serverAccessor.getPlayer(callerId);
+        if (RTPRuntime.serverAccessor() != null) {
+          callerPlayer = RTPRuntime.serverAccessor().getPlayer(callerId);
         }
       } catch (Throwable ignored) {
       }
@@ -163,7 +163,7 @@ public class TestEventsCmd extends BaseRTPCmdImpl {
             closeable.close();
           }
         } catch (Throwable t) {
-          RTP.log(Level.WARNING, "[RTP test/events] error unregistering listener: " + t.getMessage(), t);
+          RTPRuntime.log(Level.WARNING, "[RTP test/events] error unregistering listener: " + t.getMessage(), t);
         }
       }
       report(callerId, "[RTP test/events] end", Level.INFO, null);
@@ -196,13 +196,13 @@ public class TestEventsCmd extends BaseRTPCmdImpl {
   }
 
   private void report(UUID callerId, String msg, Level level, Throwable t) {
-    if (!callerId.equals(RTPAPI.serverId) && RTP.serverAccessor != null) {
-      RTP.serverAccessor.sendMessage(callerId, msg);
+    if (!callerId.equals(RTPAPI.serverId) && RTPRuntime.serverAccessor() != null) {
+      RTPRuntime.serverAccessor().sendMessage(callerId, msg);
     }
     if (t != null) {
-      RTP.log(level, msg, t);
+      RTPRuntime.log(level, msg, t);
     } else {
-      RTP.log(level, msg);
+      RTPRuntime.log(level, msg);
     }
   }
 }

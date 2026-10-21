@@ -204,7 +204,7 @@ public class ParameterParsingTest {
         assertEquals("a region param",   param.description());
     }
 
-    // ── ShapeParameter (class-loadable only - needs RTP.factoryMap) ───────────
+    // ── ShapeParameter (class-loadable only - needs FactoryRegistry.map()) ───────────
 
     @Test
     void shapeParameter_classIsLoadable() {

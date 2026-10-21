@@ -7,6 +7,8 @@ import io.github.dailystruggle.rtp.api.group.GroupPlacementRequest;
 import io.github.dailystruggle.rtp.api.group.GroupProfileSpec;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.GroupPlacementDispatcher;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 
@@ -180,8 +182,8 @@ public final class ActionCacheWarmTask implements Runnable {
       if (mr != null && !mr.toString().isBlank()) effectiveRegion = mr.toString().trim();
     }
 
-    final Region parentRegion = (effectiveRegion != null && !effectiveRegion.isBlank() && RTP.selectionAPI != null)
-        ? RTP.selectionAPI.getRegion(effectiveRegion)
+    final Region parentRegion = (effectiveRegion != null && !effectiveRegion.isBlank() && ActiveSelection.get() != null)
+        ? ActiveSelection.get().getRegion(effectiveRegion)
         : null;
 
     AnchorSource anchorSource =
@@ -197,7 +199,7 @@ public final class ActionCacheWarmTask implements Runnable {
     dispatcher.preparePlacement(request).whenComplete((prep, ex) -> {
       try {
         if (ex != null) {
-          RTP.log(Level.FINE, "[ActionCacheWarmTask] Placement preparation failed for action '" + actionId + "': " + ex.getMessage());
+          RTPRuntime.log(Level.FINE, "[ActionCacheWarmTask] Placement preparation failed for action '" + actionId + "': " + ex.getMessage());
           return;
         }
 
@@ -210,12 +212,12 @@ public final class ActionCacheWarmTask implements Runnable {
           if (!offered) {
             placement.release();
           } else {
-            RTP.log(Level.FINER, "[ActionCacheWarmTask] Pre-warmed placement cached for action '" + actionId + "', size="
+            RTPRuntime.log(Level.FINER, "[ActionCacheWarmTask] Pre-warmed placement cached for action '" + actionId + "', size="
                 + actionManager.getCachedPlacementCount(actionId));
           }
         }
       } catch (Throwable t) {
-        RTP.log(Level.WARNING, "[ActionCacheWarmTask] Error offering cached placement for action '" + actionId + "'", t);
+        RTPRuntime.log(Level.WARNING, "[ActionCacheWarmTask] Error offering cached placement for action '" + actionId + "'", t);
       } finally {
         activeInFlight.decrementAndGet();
       }

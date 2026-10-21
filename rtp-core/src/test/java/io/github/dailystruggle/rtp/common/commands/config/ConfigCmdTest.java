@@ -2,10 +2,12 @@ package io.github.dailystruggle.rtp.common.commands.config;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -35,10 +37,10 @@ public class ConfigCmdTest {
     @BeforeEach
     void setUp() throws IOException {
         RTPTestSetup.install(tempDir.toFile());
-        RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
+        ActiveSelection.set(new io.github.dailystruggle.rtp.common.selection.SelectionAPI());
 
         configs = new Configs(tempDir.toFile());
-        RTP.configs = configs;
+        ActiveConfigs.set(configs);
 
         performanceConfig = mock(io.github.dailystruggle.rtp.common.configuration.ConfigParser.class);
         performanceConfig.language_mapping = new java.util.concurrent.ConcurrentHashMap<>();

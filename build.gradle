@@ -425,7 +425,8 @@ subprojects {
     // so a routine `.\gradlew.bat build` neither resolves the PMD toolchain nor
     // pays its scan cost (keeps the fast-build budget intact). When enabled,
     // `pmdMain`/`pmdTest` run as part of `check` and FAIL the build on any
-    // violation - this is the local + CI static-analysis gate.
+    // violation. Opt-in locally; always on in CI (gradle-set.yml passes
+    // `-PstaticAnalysis` to every set build, Jenkinsfile `Static Analysis` stage).
     //   Local / CI gate : .\gradlew.bat check -PstaticAnalysis
     //   Whole build      : .\gradlew.bat build -PstaticAnalysis
     // `pmdRegexMain` is a separate ADVISORY scan (config/pmd/regex.xml, never

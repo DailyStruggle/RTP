@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.commands.editor.channel;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.concurrent.CompletableFuture;
 
-import io.github.dailystruggle.rtp.common.RTP;
 
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
@@ -47,7 +47,7 @@ import java.util.regex.Pattern;
  * Loopback-only, token-gated WebSocket channel for the {@code file://} web editor (ADR-104).
  *
  * <p>Non-blocking RFC 6455 server on {@code 127.0.0.1:<ephemeral>}; no threads of its own. An async
- * {@code RTP.scheduler} timer calls {@link #poll()} every {@link #POLL_PERIOD_TICKS}, which does a
+ * {@code RTPRuntime.scheduler()} timer calls {@link #poll()} every {@link #POLL_PERIOD_TICKS}, which does a
  * {@code selectNow()} and a count-bound slice of accept/read/frame/write work (F-002). Admission:
  * {@code GET /rtp-editor-ws?token=<hex>}, loopback peer, loopback {@code Host}, {@code Origin}
  * absent / {@code null} / http(s) localhost, constant-time token compare. Production sockets carry
@@ -199,7 +199,7 @@ public final class EditorLoopbackChannel implements AutoCloseable {
     }
 
     /**
-     * Opens the listener and drives it from an async {@code RTP.scheduler} timer.
+     * Opens the listener and drives it from an async {@code RTPRuntime.scheduler()} timer.
      *
      * @param token 32-128 hex characters; the page connects with {@code ?token=}
      * @param listener receives every text message (Hot-Apply arrives signed, through {@code EditorChannel})
@@ -207,17 +207,17 @@ public final class EditorLoopbackChannel implements AutoCloseable {
      * @throws IOException when the loopback socket cannot be bound
      */
     public static EditorLoopbackChannel start(String token, Listener listener) throws IOException {
-        if (RTP.scheduler == null) {
+        if (RTPRuntime.scheduler() == null) {
             throw new IllegalStateException("RTP scheduler not initialized yet (S-006 fail-closed)");
         }
         EditorLoopbackChannel ch = new EditorLoopbackChannel(token, listener, null, System::currentTimeMillis);
         try {
-            ch.taskHandle = RTP.scheduler.runTaskTimerAsynchronously(ch::poll, 0L, POLL_PERIOD_TICKS);
+            ch.taskHandle = RTPRuntime.scheduler().runTaskTimerAsynchronously(ch::poll, 0L, POLL_PERIOD_TICKS);
         } catch (RuntimeException e) {
             ch.stop("scheduling failed: " + e.getMessage());
             throw e;
         }
-        RTP.log(Level.INFO, "[editor] loopback channel listening on " + ch.hostLiteral() + ":" + ch.port);
+        RTPRuntime.log(Level.INFO, "[editor] loopback channel listening on " + ch.hostLiteral() + ":" + ch.port);
         return ch;
     }
 
@@ -324,7 +324,7 @@ public final class EditorLoopbackChannel implements AutoCloseable {
             }
             for (Connection c : connections) service(c, now);
         } catch (IOException | RuntimeException e) {
-            RTP.log(Level.WARNING, "[editor] loopback channel poll failed; stopping: " + e.getMessage(), e);
+            RTPRuntime.log(Level.WARNING, "[editor] loopback channel poll failed; stopping: " + e.getMessage(), e);
             stop("poll failure: " + e.getMessage());
         } finally {
             ioLock.unlock();
@@ -339,11 +339,11 @@ public final class EditorLoopbackChannel implements AutoCloseable {
     public void stop(String reason) {
         if (!stopped.compareAndSet(false, true)) return;
         Object handle = taskHandle;
-        if (handle != null && RTP.scheduler != null) {
+        if (handle != null && RTPRuntime.scheduler() != null) {
             try {
-                RTP.scheduler.cancelTask(handle);
+                RTPRuntime.scheduler().cancelTask(handle);
             } catch (RuntimeException e) {
-                RTP.log(Level.WARNING, "[editor] failed to cancel loopback channel task: " + e.getMessage(), e);
+                RTPRuntime.log(Level.WARNING, "[editor] failed to cancel loopback channel task: " + e.getMessage(), e);
             }
         }
         ioLock.lock();
@@ -354,7 +354,7 @@ public final class EditorLoopbackChannel implements AutoCloseable {
                         // best effort: the socket is closed right after, no flush wait
                         c.channel.write(closeFrame(1001, "server stopping"));
                     } catch (IOException e) {
-                        RTP.log(Level.FINE, "[editor] loopback close frame to #" + c.id + " not sent: " + e.getMessage());
+                        RTPRuntime.log(Level.FINE, "[editor] loopback close frame to #" + c.id + " not sent: " + e.getMessage());
                     }
                 }
                 closeConnection(c, reason);
@@ -364,7 +364,7 @@ public final class EditorLoopbackChannel implements AutoCloseable {
         } finally {
             ioLock.unlock();
         }
-        RTP.log(Level.INFO, "[editor] loopback channel stopped: " + reason);
+        RTPRuntime.log(Level.INFO, "[editor] loopback channel stopped: " + reason);
     }
 
     @Override
@@ -381,17 +381,17 @@ public final class EditorLoopbackChannel implements AutoCloseable {
             SocketAddress addr = sc.getRemoteAddress();
             String remote = String.valueOf(addr);
             if (!(addr instanceof InetSocketAddress isa) || !isa.getAddress().isLoopbackAddress()) {
-                RTP.log(Level.WARNING, "[editor] loopback channel refused non-loopback peer " + remote);
+                RTPRuntime.log(Level.WARNING, "[editor] loopback channel refused non-loopback peer " + remote);
                 closeQuietly(sc, "refused socket");
                 continue;
             }
             if (connections.size() >= MAX_CLIENTS + MAX_PENDING) {
-                RTP.log(Level.WARNING, "[editor] loopback channel refused " + remote + ": too many sockets");
+                RTPRuntime.log(Level.WARNING, "[editor] loopback channel refused " + remote + ": too many sockets");
                 try {
                     sc.configureBlocking(false);
                     sc.write(httpError(503, "Service Unavailable", ""));
                 } catch (IOException e) {
-                    RTP.log(Level.FINE, "[editor] loopback 503 to " + remote + " not sent: " + e.getMessage());
+                    RTPRuntime.log(Level.FINE, "[editor] loopback 503 to " + remote + " not sent: " + e.getMessage());
                 }
                 closeQuietly(sc, "refused socket");
                 continue;
@@ -403,7 +403,7 @@ public final class EditorLoopbackChannel implements AutoCloseable {
                 c.key = sc.register(selector, SelectionKey.OP_READ, c);
                 connections.add(c);
             } catch (IOException e) {
-                RTP.log(Level.WARNING, "[editor] loopback channel failed to register " + remote + ": " + e.getMessage(), e);
+                RTPRuntime.log(Level.WARNING, "[editor] loopback channel failed to register " + remote + ": " + e.getMessage(), e);
                 closeQuietly(sc, "socket");
             }
         }
@@ -553,17 +553,17 @@ public final class EditorLoopbackChannel implements AutoCloseable {
         enqueue(c, ByteBuffer.wrap(response.getBytes(StandardCharsets.ISO_8859_1)));
         c.state = State.OPEN;
         c.opened = true;
-        RTP.log(Level.INFO, "[editor] loopback client #" + c.id + " connected from " + c.remote);
+        RTPRuntime.log(Level.INFO, "[editor] loopback client #" + c.id + " connected from " + c.remote);
         try {
             listener.onOpen(c);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING, "[editor] loopback listener onOpen failed: " + e.getMessage(), e);
+            RTPRuntime.log(Level.WARNING, "[editor] loopback listener onOpen failed: " + e.getMessage(), e);
         }
     }
 
     private void reject(Connection c, int code, String reason, String detail, String extraHeaders, long now) {
         Level level = code == 401 || code == 403 ? Level.WARNING : Level.INFO;
-        RTP.log(level, "[editor] loopback handshake from " + c.remote + " rejected (" + code + "): " + detail);
+        RTPRuntime.log(level, "[editor] loopback handshake from " + c.remote + " rejected (" + code + "): " + detail);
         c.out.clear();
         c.outBytes.set(0);
         enqueue(c, httpError(code, reason, extraHeaders));
@@ -717,17 +717,17 @@ public final class EditorLoopbackChannel implements AutoCloseable {
                 parsed = EditorLoopbackJson.parse(text);
             } catch (IllegalArgumentException notJson) {
                 // not an apply request; falls through to the listener unchanged
-                RTP.log(Level.FINE, "[editor] loopback message is not JSON: " + notJson.getMessage());
+                RTPRuntime.log(Level.FINE, "[editor] loopback message is not JSON: " + notJson.getMessage());
             }
             if (apply.isApply(parsed)) {
                 apply.handle((Map<?, ?>) parsed).whenComplete((ack, t) -> {
                     if (ack != null) {
                         if (!send(c, ack)) {
-                            RTP.log(Level.WARNING, "[editor] loopback apply_ack undeliverable to client #" + c.id
+                            RTPRuntime.log(Level.WARNING, "[editor] loopback apply_ack undeliverable to client #" + c.id
                                     + ": " + ack);
                         }
                     } else {
-                        RTP.log(Level.WARNING, "[editor] loopback apply produced no ack", t);
+                        RTPRuntime.log(Level.WARNING, "[editor] loopback apply produced no ack", t);
                     }
                 });
                 return;
@@ -736,12 +736,12 @@ public final class EditorLoopbackChannel implements AutoCloseable {
         try {
             listener.onMessage(c, text);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING, "[editor] loopback listener failed on client #" + c.id + ": " + e.getMessage(), e);
+            RTPRuntime.log(Level.WARNING, "[editor] loopback listener failed on client #" + c.id + ": " + e.getMessage(), e);
         }
     }
 
     private void fail(Connection c, int code, String reason, long now) {
-        RTP.log(Level.INFO, "[editor] loopback client #" + c.id + " protocol close " + code + ": " + reason);
+        RTPRuntime.log(Level.INFO, "[editor] loopback client #" + c.id + " protocol close " + code + ": " + reason);
         enqueue(c, closeFrame(code, reason));
         beginClosing(c, now);
     }
@@ -793,7 +793,7 @@ public final class EditorLoopbackChannel implements AutoCloseable {
     // ---- bookkeeping ----
 
     private void drop(Connection c, String reason) {
-        RTP.log(Level.WARNING, "[editor] loopback client #" + c.id + " dropped: " + reason);
+        RTPRuntime.log(Level.WARNING, "[editor] loopback client #" + c.id + " dropped: " + reason);
         closeConnection(c, reason);
     }
 
@@ -805,12 +805,12 @@ public final class EditorLoopbackChannel implements AutoCloseable {
         connections.remove(c);
         c.out.clear();
         c.outBytes.set(0);
-        RTP.log(Level.FINE, "[editor] loopback client #" + c.id + " closed: " + reason);
+        RTPRuntime.log(Level.FINE, "[editor] loopback client #" + c.id + " closed: " + reason);
         if (c.opened) {
             try {
                 listener.onClose(c);
             } catch (RuntimeException e) {
-                RTP.log(Level.WARNING, "[editor] loopback listener onClose failed: " + e.getMessage(), e);
+                RTPRuntime.log(Level.WARNING, "[editor] loopback listener onClose failed: " + e.getMessage(), e);
             }
         }
     }
@@ -839,7 +839,7 @@ public final class EditorLoopbackChannel implements AutoCloseable {
         try {
             c.close();
         } catch (IOException e) {
-            RTP.log(Level.FINE, "[editor] loopback channel failed to close " + what + ": " + e.getMessage());
+            RTPRuntime.log(Level.FINE, "[editor] loopback channel failed to close " + what + ": " + e.getMessage());
         }
     }
 }

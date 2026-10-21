@@ -14,6 +14,7 @@ import io.github.dailystruggle.rtp.common.commands.parameters.RegionParameter;
 import io.github.dailystruggle.rtp.common.commands.parameters.WorldParameter;
 import io.github.dailystruggle.rtp.common.commands.version.VersionCmd;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -95,12 +96,12 @@ public class CoreCommandTreeBuilderTest {
         new io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor(new java.util.ArrayList<>());
     io.github.dailystruggle.rtp.common.selection.region.RegionSettings settings =
         new io.github.dailystruggle.rtp.common.selection.region.RegionSettings(
-            "default", io.github.dailystruggle.rtp.common.RTP.serverAccessor.getRTPWorlds().get(0), shape, vert,
+            "default", io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor().getRTPWorlds().get(0), shape, vert,
             false, false,
             10L, 1000L, 0L, 5, 0.0, 1L, "", false);
     io.github.dailystruggle.rtp.common.selection.region.Region region =
         new io.github.dailystruggle.rtp.common.selection.region.Region("default", settings);
-    io.github.dailystruggle.rtp.common.RTP.selectionAPI.permRegionLookup.put("default", region);
+    ActiveSelection.get().permRegionLookup.put("default", region);
 
     CommandParameter regionParam = root.getParameterLookup().get("region");
     UUID caller = UUID.randomUUID();

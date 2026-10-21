@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.commands.editor.channel;
 
 import io.github.dailystruggle.rtp.api.editor.EditorDelivery;
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
@@ -246,7 +246,7 @@ public final class EditorChannel {
 
             @Override
             public void onPeerOpen() {
-                RTP.log(Level.FINE, "[editor] channel " + shortId() + ": page connected");
+                RTPRuntime.log(Level.FINE, "[editor] channel " + shortId() + ": page connected");
             }
 
             @Override
@@ -263,12 +263,12 @@ public final class EditorChannel {
 
     private EditorChannel opened() {
         OPEN.add(this);
-        RTP.log(Level.INFO, "[editor] channel " + shortId() + " open (" + transport.getClass().getSimpleName()
+        RTPRuntime.log(Level.INFO, "[editor] channel " + shortId() + " open (" + transport.getClass().getSimpleName()
                 + ", key " + keys.fingerprint().substring(0, 16) + ")");
         try {
             notifier.opened();
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING, "[editor] channel opened notice failed: " + e.getMessage(), e);
+            RTPRuntime.log(Level.WARNING, "[editor] channel opened notice failed: " + e.getMessage(), e);
         }
         runAll(openListeners, "open");
         return this;
@@ -342,7 +342,7 @@ public final class EditorChannel {
             try {
                 r.run();
             } catch (RuntimeException e) {
-                RTP.log(Level.WARNING, "[editor] channel " + what + " listener failed: " + e.getMessage(), e);
+                RTPRuntime.log(Level.WARNING, "[editor] channel " + what + " listener failed: " + e.getMessage(), e);
             }
         }
     }
@@ -441,7 +441,7 @@ public final class EditorChannel {
         try {
             handler.handle(new Inbound(this, type, from, msg, msgText));
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING, "[editor] channel handler for '" + type + "' failed: " + e.getMessage(), e);
+            RTPRuntime.log(Level.WARNING, "[editor] channel handler for '" + type + "' failed: " + e.getMessage(), e);
         }
         flush();
     }
@@ -496,12 +496,12 @@ public final class EditorChannel {
             reply.put("nonce", p.nonce);
             reply.put("nonceExpiresAt", p.nonceExpiresAt);
             if (fresh) {
-                RTP.log(Level.INFO, "[editor] channel " + shortId() + ": untrusted editor key " + from.substring(0, 16)
+                RTPRuntime.log(Level.INFO, "[editor] channel " + shortId() + ": untrusted editor key " + from.substring(0, 16)
                         + " is waiting for /rtp editor trust nonce=" + p.nonce);
                 try {
                     notifier.trustPrompt(p.nonce, from);
                 } catch (RuntimeException e) {
-                    RTP.log(Level.WARNING, "[editor] trust prompt failed: " + e.getMessage(), e);
+                    RTPRuntime.log(Level.WARNING, "[editor] trust prompt failed: " + e.getMessage(), e);
                 }
             }
         }
@@ -532,7 +532,7 @@ public final class EditorChannel {
         } catch (IOException e) {
             return false; // in memory: never thrown
         }
-        RTP.log(Level.INFO, "[editor] channel " + shortId() + ": editor key " + from.substring(0, 16)
+        RTPRuntime.log(Level.INFO, "[editor] channel " + shortId() + ": editor key " + from.substring(0, 16)
                 + " trusted for this session by its session link");
         return true;
     }
@@ -608,10 +608,10 @@ public final class EditorChannel {
         try {
             trusted.add(match.fingerprint, clock.getAsLong());
         } catch (IOException e) {
-            RTP.log(Level.WARNING, "[editor] could not persist trusted editor key " + match.fingerprint.substring(0, 16)
+            RTPRuntime.log(Level.WARNING, "[editor] could not persist trusted editor key " + match.fingerprint.substring(0, 16)
                     + "; it stays trusted until restart: " + e.getMessage(), e);
         }
-        RTP.log(Level.INFO, "[editor] channel " + shortId() + ": editor key " + match.fingerprint.substring(0, 16) + " trusted");
+        RTPRuntime.log(Level.INFO, "[editor] channel " + shortId() + ": editor key " + match.fingerprint.substring(0, 16) + " trusted");
         send(withHelloExtras("{\"type\":\"hello-reply\",\"state\":\"trusted\"}"), match.fingerprint);
         runAll(trustedHelloListeners, "trusted hello");
         return already ? TrustResult.ALREADY_TRUSTED : TrustResult.TRUSTED;
@@ -640,7 +640,7 @@ public final class EditorChannel {
             removed.addAll(c.trusted.forget(selector));
             removed.addAll(c.linkTrusted.forget(selector));
         }
-        if (!removed.isEmpty()) RTP.log(Level.INFO, "[editor] " + removed.size() + " editor key(s) untrusted in open channels");
+        if (!removed.isEmpty()) RTPRuntime.log(Level.INFO, "[editor] " + removed.size() + " editor key(s) untrusted in open channels");
         return removed;
     }
 
@@ -924,7 +924,7 @@ public final class EditorChannel {
             try {
                 send("{\"type\":\"bye\",\"reason\":\"" + shortReason + "\"}");
             } catch (RuntimeException e) {
-                RTP.log(Level.FINE, "[editor] channel bye not sent: " + e.getMessage());
+                RTPRuntime.log(Level.FINE, "[editor] channel bye not sent: " + e.getMessage());
             }
         }
         transport.close(reason);
@@ -935,11 +935,11 @@ public final class EditorChannel {
         if (!closed.compareAndSet(false, true)) return;
         closeReason = reason;
         OPEN.remove(this);
-        RTP.log(Level.INFO, "[editor] channel " + shortId() + " closed: " + reason);
+        RTPRuntime.log(Level.INFO, "[editor] channel " + shortId() + " closed: " + reason);
         try {
             notifier.closed(reason);
         } catch (RuntimeException e) {
-            RTP.log(Level.WARNING, "[editor] channel closed notice failed: " + e.getMessage(), e);
+            RTPRuntime.log(Level.WARNING, "[editor] channel closed notice failed: " + e.getMessage(), e);
         }
         runAll(closeListeners, "close");
     }
@@ -998,7 +998,7 @@ public final class EditorChannel {
             if (lastLogged.size() >= 256) lastLogged.clear();
             lastLogged.put(key, now);
         }
-        RTP.log(level, line);
+        RTPRuntime.log(level, line);
     }
 
     private String shortId() {

@@ -11,13 +11,19 @@ import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
+import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.tasks.ChunkTicketHolder;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.TrackableTask;
@@ -85,15 +91,15 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
    */
   static void holdArrivalReservation(ChunkReservation held, RTPWorld<?> world, int cx, int cz) {
     if (held == null) return;
-    if (RTP.scheduler == null || world == null) {
+    if (RTPRuntime.scheduler() == null || world == null) {
       held.close();
       return;
     }
     pendingArrivalReleases.put(held, world);
     try {
-      RTP.scheduler.runTaskLater(world, cx, cz, () -> releaseArrivalReservation(held), ARRIVAL_HOLD_TICKS);
+      RTPRuntime.scheduler().runTaskLater(world, cx, cz, () -> releaseArrivalReservation(held), ARRIVAL_HOLD_TICKS);
     } catch (Throwable t) {
-      RTP.log(Level.WARNING, "[RTP] arrival chunk hold could not be scheduled; releasing now", t);
+      RTPRuntime.log(Level.WARNING, "[RTP] arrival chunk hold could not be scheduled; releasing now", t);
       releaseArrivalReservation(held);
     }
   }
@@ -104,7 +110,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
     try {
       held.close();
     } catch (Throwable t) {
-      RTP.log(Level.WARNING, "[RTP] arrival chunk release failed", t);
+      RTPRuntime.log(Level.WARNING, "[RTP] arrival chunk release failed", t);
     }
     return true;
   }
@@ -172,11 +178,11 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
     private ConfigCache() {}
 
     public static void reload() {
-      unsafe = RTP.configs.getConfigValue(PlayerMessages.unsafe, "").toString();
-      teleportMessage = RTP.configs.getConfigValue(PlayerMessages.teleportMessage, "").toString();
+      unsafe = ActiveConfigs.get().getConfigValue(PlayerMessages.unsafe, "").toString();
+      teleportMessage = ActiveConfigs.get().getConfigValue(PlayerMessages.teleportMessage, "").toString();
 
       ConfigParser<PerformanceKeys> perf =
-          (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+          (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
       viewDistanceTeleport = perf.getNumber(PerformanceKeys.viewDistanceTeleport, 0L).longValue();
       viewDistanceRestoreInterval =
           perf.getNumber(PerformanceKeys.viewDistanceRestoreInterval, 200L).longValue();
@@ -184,7 +190,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
           perf.getConfigValue(PerformanceKeys.postTeleportQueueing, false).toString());
 
       ConfigParser<ConfigKeys> cfg =
-          (ConfigParser<ConfigKeys>) RTP.configs.getParser(ConfigKeys.class);
+          (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
       if (cfg != null) {
         setRespawnOnTeleport = Boolean.parseBoolean(
             cfg.getConfigValue(ConfigKeys.setRespawnOnTeleport, false).toString());
@@ -348,19 +354,19 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
     try {
       computeDistanceUnchecked();
     } catch (RuntimeException e) {
-      RTP.log(Level.WARNING, "[RTP] distance placeholder computation failed; continuing teleport", e);
+      RTPRuntime.log(Level.WARNING, "[RTP] distance placeholder computation failed; continuing teleport", e);
     }
   }
 
   private void computeDistanceUnchecked() {
     if (coords == null) return;
-    RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(coords.worldName());
+    RTPWorld<?> world = RTPRuntime.serverAccessor().getRTPWorld(coords.worldName());
     if (world == null && region != null) world = region.getWorld();
     this.destination = new RTPLocation(world, coords.x(), coords.y(), coords.z(), reservation);
 
     RTPLocation origin = null;
     if (teleportData != null && teleportData.originalCoords != null) {
-      RTPWorld<?> origWorld = RTP.serverAccessor.getRTPWorld(teleportData.originalCoords.worldName());
+      RTPWorld<?> origWorld = RTPRuntime.serverAccessor().getRTPWorld(teleportData.originalCoords.worldName());
       origin = new RTPLocation(origWorld, teleportData.originalCoords.x(), teleportData.originalCoords.y(), teleportData.originalCoords.z());
     } else if (originSnapshot != null) {
       origin = originSnapshot;
@@ -382,8 +388,8 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
     RTPPlayer player = (context != null) ? context.player() : null;
     UUID playerId = (player != null) ? player.uuid() : null;
     TeleportData targetData = teleportData;
-    if (targetData == null && playerId != null && RTP.getInstance() != null) {
-      targetData = RTP.getInstance().latestTeleportData.get(playerId);
+    if (targetData == null && playerId != null && TeleportSessions.current() != null) {
+      targetData = TeleportSessions.current().latestTeleportData.get(playerId);
     }
 
     if (targetData != null) {
@@ -481,15 +487,15 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
       }
       if (player() != null) {
         UUID pid = player().uuid();
-        RTP.deathEffectInFlight.remove(pid);
-        RTP.pendingDeathTeleports.remove(pid);
+        DeathTeleports.effectInFlight().remove(pid);
+        DeathTeleports.pending().remove(pid);
       }
     }
   }
 
   @Override
   public void run() {
-    RTP.log(Level.FINER, "[PIPELINE_TRACE] dispatch phase=" + currentPhase
+    RTPRuntime.log(Level.FINER, "[PIPELINE_TRACE] dispatch phase=" + currentPhase
             + " cancelled=" + isCancelled()
             + " thread=" + Thread.currentThread().getName());
     if (isCancelled()) {
@@ -530,12 +536,12 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
     UUID playerId = player.uuid();
 
     if (region == null) {
-      region = RTP.selectionAPI.getRegion(player);
+      region = ActiveSelection.get().getRegion(player);
     }
 
     boolean success = false;
     try {
-      teleportData = RTP.getInstance().latestTeleportData.get(playerId);
+      teleportData = TeleportSessions.current().latestTeleportData.get(playerId);
       if (teleportData == null) {
         teleportData = new TeleportData();
         io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(teleportData, "TeleportData-" + playerId.toString(), 120000L);
@@ -555,14 +561,14 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
                         player.getLocation().x(),
                         player.getLocation().y(),
                         player.getLocation().z());
-        RTP.getInstance().latestTeleportData.put(playerId, teleportData);
+        TeleportSessions.current().latestTeleportData.put(playerId, teleportData);
       }
       recordOriginIfMissing(player);
       teleportData.nextTask = this;
       teleportData.targetRegion = region;
 
-      RTP.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] TeleportPipelineTask.runSetup invoking getLocation playerId=" + player.uuid() + " region=" + (region != null ? region.name : "null") + " thread=" + Thread.currentThread().getName());
-      CompletableFuture<GenerationResult> locationFuture = RTP.serverAccessor.getLocationGenerator().getLocation(region, context);
+      RTPRuntime.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] TeleportPipelineTask.runSetup invoking getLocation playerId=" + player.uuid() + " region=" + (region != null ? region.name : "null") + " thread=" + Thread.currentThread().getName());
+      CompletableFuture<GenerationResult> locationFuture = RTPRuntime.serverAccessor().getLocationGenerator().getLocation(region, context);
       if (locationFuture.isDone()) {
         processGenerationResult(locationFuture.join());
       } else {
@@ -590,13 +596,13 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
    */
   static void continueOffRegion(Runnable r) {
     try {
-      if (RTP.serverAccessor != null && RTP.scheduler != null
-          && "Folia".equals(RTP.serverAccessor.getPlatform()) && RTP.serverAccessor.isPrimaryThread()) {
-        RTP.scheduler.runTaskAsynchronously(r);
+      if (RTPRuntime.serverAccessor() != null && RTPRuntime.scheduler() != null
+          && "Folia".equals(RTPRuntime.serverAccessor().getPlatform()) && RTPRuntime.serverAccessor().isPrimaryThread()) {
+        RTPRuntime.scheduler().runTaskAsynchronously(r);
         return;
       }
     } catch (Throwable t) {
-      RTP.log(Level.FINE, "[RTP] off-region hop unavailable; continuing inline: " + t);
+      RTPRuntime.log(Level.FINE, "[RTP] off-region hop unavailable; continuing inline: " + t);
     }
     r.run();
   }
@@ -611,10 +617,10 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
         return;
       }
       UUID playerId = player.uuid();
-      RTP.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] TeleportPipelineTask.processGenerationResult ENTER playerId=" + playerId
+      RTPRuntime.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] TeleportPipelineTask.processGenerationResult ENTER playerId=" + playerId
               + " resNull=" + (res == null)
-              + " inProcessing=" + RTP.getInstance().processingPlayers.contains(playerId)
-              + " inQueuedPlayers=" + RTP.getInstance().queuedPlayers.contains(playerId)
+              + " inProcessing=" + TeleportSessions.current().processingPlayers.contains(playerId)
+              + " inQueuedPlayers=" + TeleportSessions.current().queuedPlayers.contains(playerId)
               + " thread=" + Thread.currentThread().getName());
 
       boolean success = false;
@@ -623,8 +629,8 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
           // Queued: the enqueue branch registered the player in queuedPlayers, and
           // Region.execute() spawns a new pipeline task when a location is ready.
           // processingPlayers is not a discriminator: /rtp always holds it here.
-          if (RTP.getInstance().queuedPlayers.contains(playerId)) {
-            RTP.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] TeleportPipelineTask silent-halt (queued) playerId=" + playerId);
+          if (TeleportSessions.current().queuedPlayers.contains(playerId)) {
+            RTPRuntime.log(java.util.logging.Level.FINE, "[ENQUEUE_TRACE] TeleportPipelineTask silent-halt (queued) playerId=" + playerId);
             if (region != null && handledInFlight.compareAndSet(false, true)) {
               region.inFlightCalculations.getAndDecrement();
             }
@@ -639,14 +645,14 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
 
           // Otherwise generation failed (start failure, biome search miss): S-004 - tell the
           // player, refund, and release the busy lock so the next /rtp is not refused.
-          RTP.log(Level.WARNING, "[RTP] location generation returned no result for player "
+          RTPRuntime.log(Level.WARNING, "[RTP] location generation returned no result for player "
                   + playerId + " region=" + (region != null ? region.name : "null")
                   + "; teleport aborted (S-004)");
           RTPCommandSender failSender = sender();
-          RTP.serverAccessor.sendMessage(
+          RTPRuntime.serverAccessor().sendMessage(
                   failSender != null ? failSender.uuid() : playerId, playerId, ConfigCache.unsafe);
           RTPTeleportCancel.refund(playerId);
-          RTP.getInstance().processingPlayers.remove(playerId);
+          TeleportSessions.current().processingPlayers.remove(playerId);
           currentPhase = Phase.CLEANUP;
           runCleanup();
           return;
@@ -658,7 +664,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
 
         if (coords == null) {
           teleportData.attempts = attempts;
-          RTP.serverAccessor.sendMessage(sender().uuid(), player.uuid(), ConfigCache.unsafe);
+          RTPRuntime.serverAccessor().sendMessage(sender().uuid(), player.uuid(), ConfigCache.unsafe);
           RTPTeleportCancel.refund(player.uuid());
           currentPhase = Phase.CLEANUP;
           runCleanup();
@@ -680,7 +686,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
         if (success) {
           currentPhase = Phase.LOAD;
 
-          RTPWorld<?> rtpWorld = RTP.serverAccessor.getRTPWorld(coords.worldName());
+          RTPWorld<?> rtpWorld = RTPRuntime.serverAccessor().getRTPWorld(coords.worldName());
           if (rtpWorld == null) rtpWorld = region.getWorld();
 
           if (this.reservation == null) {
@@ -703,9 +709,9 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
           }
 
           if (chunkSet.complete().isDone()) {
-            RTP.scheduler.runTask(rtpWorld, coords.x() >> 4, coords.z() >> 4, this);
+            RTPRuntime.scheduler().runTask(rtpWorld, coords.x() >> 4, coords.z() >> 4, this);
           } else {
-            RTP.scheduler.runTaskAsynchronously(this);
+            RTPRuntime.scheduler().runTaskAsynchronously(this);
           }
         }
       }
@@ -714,13 +720,13 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
       new RTPTeleportCancel(player().uuid()).run();
       currentPhase = Phase.CLEANUP;
       runCleanup();
-      RTP.getInstance().processingPlayers.remove(player().uuid());
+      TeleportSessions.current().processingPlayers.remove(player().uuid());
     }
   }
 
   private void runLoad() {
     try {
-      RTP.log(Level.FINE, "[PIPELINE_TRACE] runLoad ENTER playerId="
+      RTPRuntime.log(Level.FINE, "[PIPELINE_TRACE] runLoad ENTER playerId="
               + (context != null && context.player() != null ? context.player().uuid() : "null")
               + " coordsNull=" + (coords == null)
               + " reservationNull=" + (reservation == null)
@@ -740,7 +746,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
           return;
         }
         UUID playerId = player.uuid();
-        teleportData = RTP.getInstance().latestTeleportData.get(playerId);
+        teleportData = TeleportSessions.current().latestTeleportData.get(playerId);
         if (teleportData == null) {
           // ... [Standard teleport data initialization]
           teleportData = new TeleportData();
@@ -761,7 +767,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
                           player.getLocation().x(),
                           player.getLocation().y(),
                           player.getLocation().z());
-          RTP.getInstance().latestTeleportData.put(playerId, teleportData);
+          TeleportSessions.current().latestTeleportData.put(playerId, teleportData);
         }
         recordOriginIfMissing(player);
         teleportData.nextTask = this;
@@ -787,7 +793,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
       // (S-004): a missing file leaves schematicLoad null and the default platform path runs.
       if (schematicLoad == null) {
         try {
-          RTPWorld<?> schemWorld = RTP.serverAccessor.getRTPWorld(coords.worldName());
+          RTPWorld<?> schemWorld = RTPRuntime.serverAccessor().getRTPWorld(coords.worldName());
           if (schemWorld == null) schemWorld = region.getWorld();
           io.github.dailystruggle.rtp.api.schematic.SchematicSource src =
               (schemWorld != null) ? RegionSchematicService.resolveSource(region.name) : null;
@@ -802,7 +808,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
               // S-004 once-per-region: "no paster installed" is a static platform property, so it
               // is logged a single time per region rather than on every teleport (Fabric spam).
               if (loggedSchematicPlatformFallback.add(region.name + "|nopaster")) {
-                RTP.log(Level.WARNING, "[RTP] region schematic '" + region.name + "' resolved to '"
+                RTPRuntime.log(Level.WARNING, "[RTP] region schematic '" + region.name + "' resolved to '"
                     + src.path() + "' but no schematic paster is installed on this platform "
                     + "(" + (paster == null ? "null" : paster.getClass().getSimpleName())
                     + "); falling back to default platform (S-004).");
@@ -811,7 +817,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
               // S-004 once-per-region: format support is static for a platform + file, so log once.
               if (loggedSchematicPlatformFallback.add(
                   region.name + "|unsupported:" + src.formatHint())) {
-                RTP.log(Level.WARNING, "[RTP] region schematic '" + region.name + "' file '"
+                RTPRuntime.log(Level.WARNING, "[RTP] region schematic '" + region.name + "' file '"
                     + src.path() + "' (format '" + src.formatHint() + "') is not supported by "
                     + paster.getClass().getSimpleName()
                     + "; falling back to default platform (S-004).");
@@ -833,11 +839,11 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
               // paster's load() implementation.
               if (schematicLoad != null && schematicLoad.isDone()
                   && schematicLoad.join() == null) {
-                RTP.log(Level.WARNING, "[RTP] region schematic '" + region.name + "' file '"
+                RTPRuntime.log(Level.WARNING, "[RTP] region schematic '" + region.name + "' file '"
                     + src.path() + "' failed to decode; falling back to default platform "
                     + "(S-004). See the preceding schematic-decode log line for the cause.");
               } else {
-                RTP.log(Level.FINE, "[PIPELINE_TRACE] runLoad resolved region schematic '"
+                RTPRuntime.log(Level.FINE, "[PIPELINE_TRACE] runLoad resolved region schematic '"
                     + region.name + "' from '" + src.path() + "'");
               }
             }
@@ -863,7 +869,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
         }
         if (platformCreator != null) {
           try {
-            RTPWorld<?> platWorld = RTP.serverAccessor.getRTPWorld(coords.worldName());
+            RTPWorld<?> platWorld = RTPRuntime.serverAccessor().getRTPWorld(coords.worldName());
             if (platWorld == null) platWorld = region.getWorld();
             RTPLocation platAt =
                 new RTPLocation(platWorld, coords.x(), coords.y(), coords.z());
@@ -887,16 +893,16 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
         long toTicks = remainingDelayTicks();
         currentPhase = Phase.TELEPORT;
         if (toTicks > 0) {
-          RTP.scheduler.runTaskForPlayer(player(), this, toTicks);
+          RTPRuntime.scheduler().runTaskForPlayer(player(), this, toTicks);
         } else {
-          RTP.scheduler.runTask(this);
+          RTPRuntime.scheduler().runTask(this);
         }
         return;
       }
 
-      if(!chunkSet.complete().isDone()) RTP.serverAccessor.sendMessage(player().uuid(), PlayerMessages.chunkLoading);
+      if(!chunkSet.complete().isDone()) RTPRuntime.serverAccessor().sendMessage(player().uuid(), PlayerMessages.chunkLoading);
 
-      RTP.log(Level.FINER, "[PIPELINE_TRACE] runLoad awaiting chunkSet alreadyDone="
+      RTPRuntime.log(Level.FINER, "[PIPELINE_TRACE] runLoad awaiting chunkSet alreadyDone="
               + chunkSet.complete().isDone() + " cx=" + (coords.x() >> 4) + " cz=" + (coords.z() >> 4));
 
       chunkSet.complete().thenAccept(aBoolean -> {
@@ -912,16 +918,16 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
                   return;
                 }
 
-                RTP.log(Level.FINER, "[PIPELINE_TRACE] runLoad chunkSet completed result=" + aBoolean);
+                RTPRuntime.log(Level.FINER, "[PIPELINE_TRACE] runLoad chunkSet completed result=" + aBoolean);
 
                 long toTicks = remainingDelayTicks();
 
                 loadPostActions.forEach(consumer -> consumer.accept(this));
                 currentPhase = Phase.TELEPORT;
-                if (toTicks <= 0 && RTP.serverAccessor.isPrimaryThread()) {
+                if (toTicks <= 0 && RTPRuntime.serverAccessor().isPrimaryThread()) {
                   this.run();
                 } else {
-                  RTP.scheduler.runTaskForPlayer(player(), this, toTicks);
+                  RTPRuntime.scheduler().runTaskForPlayer(player(), this, toTicks);
                 }
               });
     } catch (Exception e) {
@@ -956,7 +962,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
   }
 
   private void runTeleport() {
-    RTP.log(Level.FINE, "[PIPELINE_TRACE] runTeleport ENTER playerId="
+    RTPRuntime.log(Level.FINE, "[PIPELINE_TRACE] runTeleport ENTER playerId="
             + (context != null && context.player() != null ? context.player().uuid() : "null")
             + " coords=" + (coords != null ? (coords.worldName() + "@" + coords.x() + "," + coords.y() + "," + coords.z()) : "null")
             + " thread=" + Thread.currentThread().getName());
@@ -981,29 +987,29 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
     try {
       pvpAction = io.github.dailystruggle.rtp.common.pvp.PvPGate.evaluate(playerId);
     } catch (Throwable t) {
-      RTP.log(Level.WARNING,
+      RTPRuntime.log(Level.WARNING,
           "[RTP] PvP gate evaluation threw at execution prefilter; allowing teleport", t);
       pvpAction = io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.ALLOW;
     }
     if (pvpAction != io.github.dailystruggle.rtp.api.hooks.PvPCombatAction.ALLOW) {
-      RTP.serverAccessor.sendMessage(playerId, PlayerMessages.pvpInCombat);
+      RTPRuntime.serverAccessor().sendMessage(playerId, PlayerMessages.pvpInCombat);
       // S-004: the abort is never silent.
-      RTP.log(Level.WARNING, "[RTP] PvP gate aborted teleport at execution prefilter for "
+      RTPRuntime.log(Level.WARNING, "[RTP] PvP gate aborted teleport at execution prefilter for "
           + playerId + " (action=" + pvpAction + ", in combat)");
-      RTP.getInstance().processingPlayers.remove(playerId);
+      TeleportSessions.current().processingPlayers.remove(playerId);
       currentPhase = Phase.CLEANUP;
       runCleanup();
       return;
     } else if (io.github.dailystruggle.rtp.common.pvp.PvPGate.isEnabled()
         && io.github.dailystruggle.rtp.common.pvp.PvPGate.isInCombat(playerId)) {
       // ALLOW-and-audit: operator wants visibility without changing behaviour.
-      RTP.log(Level.INFO, "[RTP] PvP gate: " + playerId
+      RTPRuntime.log(Level.INFO, "[RTP] PvP gate: " + playerId
           + " is in combat at execution but pvpOnCombat=ALLOW; permitting teleport");
     }
     // --- end PvP execution prefilter -----------------------------------------
 
     try {
-      RTPWorld<?> world = RTP.serverAccessor.getRTPWorld(coords.worldName());
+      RTPWorld<?> world = RTPRuntime.serverAccessor().getRTPWorld(coords.worldName());
       if (world == null) world = region.getWorld();
       if (teleportData != null && teleportData.targetRegion == null && region != null) {
         teleportData.targetRegion = region;
@@ -1011,7 +1017,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
       RTPLocation location = new RTPLocation(world, coords.x(), coords.y(), coords.z());
       location.setReservation(reservation);
       boolean buildPlatform = shouldBuildPlatform(world, coords);
-      RTP.log(Level.FINER, "[PIPELINE_TRACE] runTeleport platformDecision=" + buildPlatform
+      RTPRuntime.log(Level.FINER, "[PIPELINE_TRACE] runTeleport platformDecision=" + buildPlatform
               + " worldNull=" + (world == null));
 
       // ADR-058 - region-specific schematic paste (region thread). When the region has a
@@ -1028,7 +1034,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
       // runLoad already audited it once per region via loggedSchematicPlatformFallback, so
       // repeating it on every teleport would be the exact duplicate-spam this guard removes.
       if (loadedSchematic == null && schematicSource != null && schematicLoad != null) {
-        RTP.log(Level.WARNING, "[RTP] region schematic '" + region.name + "' file '"
+        RTPRuntime.log(Level.WARNING, "[RTP] region schematic '" + region.name + "' file '"
             + schematicSource.path() + "' was present but produced no loaded schematic ("
             + (!schematicLoad.isDone() ? "decode still pending at paste time"
                 : "decode returned no data")
@@ -1040,7 +1046,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
         // runTeleport (typically the player's current entity-region thread). Pasting directly
         // here throws Folia's "Cannot read world asynchronously" TickThread check whenever the
         // destination region differs from the player's current region. Bounce the paste - and
-        // its platform fallback - to the destination region via RTP.scheduler.runTask(location).
+        // its platform fallback - to the destination region via RTPRuntime.scheduler().runTask(location).
         // On non-Folia platforms this dispatches to the main thread / runs inline.
         // S-001: setLocation is chained after the paste/platform inside that task, so the
         // player never arrives before the footing exists; a throw there fails closed.
@@ -1055,7 +1061,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
             ? schematicFootprint
             : schematicFootprintClearAsync(
                 loadedFinal, locFinal, arrivalPasteOptions(), worldNameFinal);
-        RTP.scheduler.runTask(locFinal, () -> {
+        RTPRuntime.scheduler().runTask(locFinal, () -> {
           try {
             boolean pasted = false;
             io.github.dailystruggle.rtp.api.schematic.PasteOptions pasteOptions =
@@ -1064,7 +1070,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
             // claim-plugin call): any protected, pending or failed verdict suppresses the paste
             // and the default platform runs instead, so the paste never overwrites a claim.
             if (pasteOptions.claimAware() && !footprintVerdictClear(footprintFinal)) {
-              RTP.log(Level.INFO, "[RTP] region schematic '" + region.name + "' "
+              RTPRuntime.log(Level.INFO, "[RTP] region schematic '" + region.name + "' "
                   + (footprintFinal.isDone() ? "footprint intersects a claim"
                       : "footprint claim check still pending at paste time")
                   + "; paste suppressed (S-003), falling back to default platform.");
@@ -1074,10 +1080,10 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
                     schematicPaster.paste(loadedFinal, locFinal, pasteOptions);
                 if (pasteResult != null && pasteResult.placed()) {
                   pasted = true;
-                  RTP.log(Level.FINE, "[PIPELINE_TRACE] runTeleport pasted region schematic '"
+                  RTPRuntime.log(Level.FINE, "[PIPELINE_TRACE] runTeleport pasted region schematic '"
                       + region.name + "'");
                 } else {
-                  RTP.log(Level.WARNING, "[RTP] region schematic '" + region.name
+                  RTPRuntime.log(Level.WARNING, "[RTP] region schematic '" + region.name
                       + "' not pasted (" + pasteResult + "); falling back to default platform "
                       + "(S-004). See the preceding schematic-paste log line for the per-block "
                       + "cause.");
@@ -1123,10 +1129,10 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
     try {
       SupportLogger.logException(Level.WARNING,
           "arrival footing failed for " + playerId + "; teleport aborted (S-001)", cause);
-      RTP.serverAccessor.sendMessage(playerId, ConfigCache.unsafe);
+      RTPRuntime.serverAccessor().sendMessage(playerId, ConfigCache.unsafe);
       RTPTeleportCancel.refund(playerId);
     } finally {
-      RTP.getInstance().processingPlayers.remove(playerId);
+      TeleportSessions.current().processingPlayers.remove(playerId);
       currentPhase = Phase.CLEANUP;
       runCleanup();
     }
@@ -1141,21 +1147,21 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
   /** Arrival tail, run once the footing exists: death hold, bookkeeping, setLocation. */
   private void finishTeleport(RTPPlayer player, UUID playerId, RTPLocation location) {
     try {
-      if (deathEffectTriggered || RTP.deathEffectInFlight.contains(playerId)) {
-        RTP.log(Level.FINE, "[PIPELINE_TRACE] runTeleport deathEffect active playerId=" + playerId
+      if (deathEffectTriggered || DeathTeleports.effectInFlight().contains(playerId)) {
+        RTPRuntime.log(Level.FINE, "[PIPELINE_TRACE] runTeleport deathEffect active playerId=" + playerId
             + "; putting teleport on hold until respawn");
-        RTP.pendingDeathTeleports.put(playerId, this);
+        DeathTeleports.pending().put(playerId, this);
         if (teleportData != null) {
           teleportData.processingTime = System.currentTimeMillis() - teleportData.time;
-          if (teleportData.sender != null && RTP.getInstance().databaseAccessor != null) {
-            RTP.getInstance().databaseAccessor.cacheValue(teleportData);
+          if (teleportData.sender != null && ActiveDatabase.accessor() != null) {
+            ActiveDatabase.accessor().cacheValue(teleportData);
           }
         }
-        RTP.getInstance().processingPlayers.remove(playerId);
+        TeleportSessions.current().processingPlayers.remove(playerId);
         return;
       }
 
-      RTP.getInstance().invulnerablePlayers.put(playerId, System.currentTimeMillis());
+      TeleportSessions.current().invulnerablePlayers.put(playerId, System.currentTimeMillis());
 
       teleportData.completed = true;
       teleportData.processingTime = System.currentTimeMillis() - teleportData.time;
@@ -1163,7 +1169,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
       if (region != null && region.name != null) {
         RTP.setLastRegionTeleportTime(playerId, region.name, teleportData.time);
       }
-      RTP.getInstance().processingPlayers.remove(playerId);
+      TeleportSessions.current().processingPlayers.remove(playerId);
 
       // ADR-072: clamp the player's view distance immediately before the teleport so the engine's
       // implicit placement/chunk-tracking ring is small, then steadily restore it. Applied here
@@ -1173,18 +1179,18 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
           player, (int) ConfigCache.viewDistanceTeleport, ConfigCache.viewDistanceRestoreInterval);
 
       CompletableFuture<Boolean> setLocation = player.setLocation(location);
-      RTP.log(Level.FINE, "[PIPELINE_TRACE] runTeleport setLocation dispatched playerId=" + playerId
+      RTPRuntime.log(Level.FINE, "[PIPELINE_TRACE] runTeleport setLocation dispatched playerId=" + playerId
               + " attempts=" + teleportData.attempts
               + " processingTime=" + teleportData.processingTime + "ms");
       // Guarded: a throw here would skip the completion callback below (arrival hold, S-004 audit).
-      if (RTP.getInstance().databaseAccessor != null) {
-        RTP.getInstance().databaseAccessor.cacheValue(teleportData);
+      if (ActiveDatabase.accessor() != null) {
+        ActiveDatabase.accessor().cacheValue(teleportData);
       }
 
       setLocation.whenComplete(
           (aBoolean, throwable) -> {
             try {
-              RTP.log(Level.FINER, "[PIPELINE_TRACE] runTeleport setLocation completed playerId=" + playerId
+              RTPRuntime.log(Level.FINER, "[PIPELINE_TRACE] runTeleport setLocation completed playerId=" + playerId
                       + " success=" + aBoolean
                       + " throwable=" + (throwable != null ? throwable.getClass().getSimpleName() : "none"));
               if (reservation != null) {
@@ -1205,7 +1211,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
                 io.github.dailystruggle.rtp.common.metrics.LandingHeatmap.record(
                     region != null ? region.name : null, location.x(), location.z());
                 String message = formatWithPlaceholders(ConfigCache.teleportMessage, playerId);
-                RTP.serverAccessor.sendMessage(playerId, message);
+                RTPRuntime.serverAccessor().sendMessage(playerId, message);
 
                 // BetterRTP SetAsRespawn parity: anchor the player's respawn to the
                 // landed location. Runs on the teleport completion thread (the owning
@@ -1215,7 +1221,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
                   try {
                     player.setRespawnLocation(location);
                   } catch (Throwable t) {
-                    RTP.log(Level.WARNING,
+                    RTPRuntime.log(Level.WARNING,
                         "[RTP] setRespawnOnTeleport failed for " + playerId, t);
                   }
                 }
@@ -1223,23 +1229,23 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
                 // BetterRTP LockAfter parity: count this successful use toward the
                 // per-player cap. No-op while lockAfterUses <= 0.
                 if (ConfigCache.lockAfterUses > 0) {
-                  RTP.getInstance().teleportLimitStore.recordSuccess(playerId,
+                  ActiveDatabase.teleportLimitStore().recordSuccess(playerId,
                       ConfigCache.lockAfterUses, ConfigCache.lockAfterResetMillis,
                       System.currentTimeMillis());
                 }
-              } else if (RTP.deathEffectInFlight.contains(playerId)) {
+              } else if (DeathTeleports.effectInFlight().contains(playerId)) {
                 // Player died deliberately via DEATH effect in pipeline; respawn location was
                 // anchored to target and this teleport is completed rather than failed.
                 if (teleportData != null) {
                   teleportData.completed = true;
                 }
               } else {
-                RTP.serverAccessor.sendMessage(playerId, ConfigCache.unsafe);
+                RTPRuntime.serverAccessor().sendMessage(playerId, ConfigCache.unsafe);
               }
 
               // Null-safe fetch to prevent silent CompletableFuture crashes in test environments
               long duration = 0L;
-              ConfigParser<SafetyKeys> safetyParser = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+              ConfigParser<SafetyKeys> safetyParser = (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
               if (safetyParser != null) {
                 Number num = safetyParser.getNumber(SafetyKeys.invulnerabilityTime, 0L);
                 if (num != null) {
@@ -1248,12 +1254,12 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
               }
 
               if (duration > 0) {
-                RTP.getInstance().invulnerablePlayers.put(playerId, System.currentTimeMillis());
-                RTP.scheduler.runTaskLater(() -> {
-                  RTP.getInstance().invulnerablePlayers.remove(playerId);
+                TeleportSessions.current().invulnerablePlayers.put(playerId, System.currentTimeMillis());
+                RTPRuntime.scheduler().runTaskLater(() -> {
+                  TeleportSessions.current().invulnerablePlayers.remove(playerId);
                 }, duration * 20L);
               } else {
-                RTP.getInstance().invulnerablePlayers.remove(playerId);
+                TeleportSessions.current().invulnerablePlayers.remove(playerId);
               }
 
               teleportPostActions.forEach(consumer -> {
@@ -1278,7 +1284,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
                       new io.github.dailystruggle.rtp.common.selection.region.RegionCacheTask(
                           region, 1_000_000L));
                 } catch (Throwable t) {
-                  RTP.log(Level.WARNING,
+                  RTPRuntime.log(Level.WARNING,
                       "[RTP] postTeleportQueueing dispatch failed: " + t, t);
                 }
               }
@@ -1306,8 +1312,8 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
   public void completeDeathTeleport(boolean respawned) {
     UUID playerId = (context != null && context.player() != null) ? context.player().uuid() : null;
     if (playerId != null) {
-      RTP.deathEffectInFlight.remove(playerId);
-      RTP.pendingDeathTeleports.remove(playerId);
+      DeathTeleports.effectInFlight().remove(playerId);
+      DeathTeleports.pending().remove(playerId);
     }
     try {
       if (respawned) {
@@ -1321,17 +1327,17 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
                 region != null ? region.name : null, destination.x(), destination.z());
           }
           String message = formatWithPlaceholders(ConfigCache.teleportMessage, playerId);
-          RTP.serverAccessor.sendMessage(playerId, message);
+          RTPRuntime.serverAccessor().sendMessage(playerId, message);
 
           if (ConfigCache.lockAfterUses > 0) {
-            RTP.getInstance().teleportLimitStore.recordSuccess(playerId,
+            ActiveDatabase.teleportLimitStore().recordSuccess(playerId,
                 ConfigCache.lockAfterUses, ConfigCache.lockAfterResetMillis,
                 System.currentTimeMillis());
           }
 
           // Invulnerability duration on respawn
           long duration = 0L;
-          ConfigParser<SafetyKeys> safetyParser = (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+          ConfigParser<SafetyKeys> safetyParser = (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
           if (safetyParser != null) {
             Number num = safetyParser.getNumber(SafetyKeys.invulnerabilityTime, 0L);
             if (num != null) {
@@ -1339,12 +1345,12 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
             }
           }
           if (duration > 0) {
-            RTP.getInstance().invulnerablePlayers.put(playerId, System.currentTimeMillis());
-            RTP.scheduler.runTaskLater(() -> {
-              RTP.getInstance().invulnerablePlayers.remove(playerId);
+            TeleportSessions.current().invulnerablePlayers.put(playerId, System.currentTimeMillis());
+            RTPRuntime.scheduler().runTaskLater(() -> {
+              TeleportSessions.current().invulnerablePlayers.remove(playerId);
             }, duration * 20L);
           } else {
-            RTP.getInstance().invulnerablePlayers.remove(playerId);
+            TeleportSessions.current().invulnerablePlayers.remove(playerId);
           }
         }
 
@@ -1364,7 +1370,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
                 new io.github.dailystruggle.rtp.common.selection.region.RegionCacheTask(
                     region, 1_000_000L));
           } catch (Throwable t) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                 "[RTP] postTeleportQueueing dispatch failed: " + t, t);
           }
         }
@@ -1386,7 +1392,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
     try {
       @SuppressWarnings("unchecked")
       ConfigParser<SafetyKeys> safety =
-          (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+          (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
       int radius = (safety == null) ? 0 : safety.getNumber(SafetyKeys.platformRadius, 0).intValue();
       // Honour the documented "disable platforms" contract in safety.yml up front, so we never
       // charge the cost of a safety check when the operator has opted out entirely.
@@ -1403,7 +1409,7 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
 
       java.util.Set<String> unsafe = new java.util.HashSet<>();
       if (safety != null) {
-        Object raw = RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>());
+        Object raw = ActiveConfigs.get().getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>());
         if (raw instanceof java.util.Collection<?> col) {
           for (Object o : col) if (o != null) unsafe.add(o.toString().toUpperCase());
         }
@@ -1457,11 +1463,11 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
         built = false;
       }
       if (built) {
-        RTP.log(Level.FINE, "[PIPELINE_TRACE] arrival platform built by '"
+        RTPRuntime.log(Level.FINE, "[PIPELINE_TRACE] arrival platform built by '"
             + platformCreator.creatorName() + "'");
         return;
       }
-      RTP.log(Level.FINE, "[PIPELINE_TRACE] platform creator '" + platformCreator.creatorName()
+      RTPRuntime.log(Level.FINE, "[PIPELINE_TRACE] platform creator '" + platformCreator.creatorName()
           + "' declined; using default platform");
     }
     // Reservation-free copy: platform() implementations close the location's reservation, which
@@ -1554,26 +1560,26 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
     if (pipelineHistogramRecorded.compareAndSet(false, true)) {
       try {
         long elapsedMs = (System.nanoTime() - pipelineStartNanos) / 1_000_000L;
-        RTP.metrics.pipelineHistogram().record(elapsedMs);
+        CoreMetrics.instance().pipelineHistogram().record(elapsedMs);
         // ADR-053 section 2a (REQ-RTP-OBS-005): audit a slow latency only for immediate/unqueued
         // teleports. Queued (at-rate) teleports are excluded because their elapsed window
         // includes queue-wait time and would false-positive; their degradation signal is the
         // queue-growth audit (section 2b). The counter/WARN live on CoreMetrics; the audit is opt-out
         // (slowPipelineThresholdMs <= 0 disables) and never aborts cleanup (S-004 posture).
         if (immediateTeleport
-                && RTP.metrics instanceof io.github.dailystruggle.rtp.common.metrics.CoreMetrics) {
+                && CoreMetrics.instance() instanceof io.github.dailystruggle.rtp.common.metrics.CoreMetrics) {
           UUID auditId = (context != null && context.player() != null)
                   ? context.player().uuid() : null;
           String auditCtx = "player=" + auditId
                   + " region=" + (region != null ? region.name : "null");
-          ((io.github.dailystruggle.rtp.common.metrics.CoreMetrics) RTP.metrics)
+          ((io.github.dailystruggle.rtp.common.metrics.CoreMetrics) CoreMetrics.instance())
                   .auditImmediateTeleport(elapsedMs, auditCtx);
         }
       } catch (Throwable ignored) {
         // intentionally swallowed: metrics must not interfere with teardown.
       }
     }
-    RTP.log(Level.FINE, "[PIPELINE_TRACE] runCleanup ENTER playerId="
+    RTPRuntime.log(Level.FINE, "[PIPELINE_TRACE] runCleanup ENTER playerId="
             + (context != null && context.player() != null ? context.player().uuid() : "null")
             + " reservationNull=" + (reservation == null)
             + " handledInFlight=" + handledInFlight.get()
@@ -1607,20 +1613,20 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
 
       if (player() != null) {
         UUID pid = player().uuid();
-        RTP.deathEffectInFlight.remove(pid);
-        RTP.pendingDeathTeleports.remove(pid);
-        TeleportData data = RTP.getInstance().latestTeleportData.get(pid);
+        DeathTeleports.effectInFlight().remove(pid);
+        DeathTeleports.pending().remove(pid);
+        TeleportData data = TeleportSessions.current().latestTeleportData.get(pid);
 
         // Strict reference verification prevents overwriting subsequent requests
         if (data != null && data == this.teleportData && !data.completed) {
-          RTP.getInstance().latestTeleportData.remove(pid);
+          TeleportSessions.current().latestTeleportData.remove(pid);
         }
       }
 
       if (reservation != null) {
-        RTPWorld<?> rtpWorld = (coords != null) ? RTP.serverAccessor.getRTPWorld(coords.worldName()) : null;
+        RTPWorld<?> rtpWorld = (coords != null) ? RTPRuntime.serverAccessor().getRTPWorld(coords.worldName()) : null;
         if (rtpWorld == null && region != null) rtpWorld = region.getWorld();
-        RTP.log(Level.FINER, "[PIPELINE_TRACE] runCleanup releasing reservation world=" + rtpWorld);
+        RTPRuntime.log(Level.FINER, "[PIPELINE_TRACE] runCleanup releasing reservation world=" + rtpWorld);
         reservation.close();
         reservation = null;
       }

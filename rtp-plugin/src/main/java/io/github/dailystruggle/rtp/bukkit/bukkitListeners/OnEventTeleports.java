@@ -8,13 +8,18 @@ import io.github.dailystruggle.rtp.api.selection.GenerationContext;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.RTPLocation;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
+import io.github.dailystruggle.rtp.common.tasks.teleport.DeathTeleports;
 import io.github.dailystruggle.rtp.common.tasks.teleport.RTPTeleportCancel;
 import io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask;
 import io.github.dailystruggle.rtp.common.tools.ParsePermissions;
@@ -40,34 +45,34 @@ public class OnEventTeleports implements Listener {
 
   private static boolean checkPerms(Player player, String... permissions) {
     return ParsePermissions.hasPerm(
-        RTP.serverAccessor.getSender(player.getUniqueId()), "rtp.onevent.", permissions);
+        RTPRuntime.serverAccessor().getSender(player.getUniqueId()), "rtp.onevent.", permissions);
   }
 
   private static void teleportAction(Player player) {
-    if (RTP.getInstance().processingPlayers.contains(player.getUniqueId())) return;
-    RTP.getInstance().processingPlayers.add(player.getUniqueId());
-    TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
+    if (TeleportSessions.current().processingPlayers.contains(player.getUniqueId())) return;
+    TeleportSessions.current().processingPlayers.add(player.getUniqueId());
+    TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(player.getUniqueId());
     if (teleportData != null) {
       if (!teleportData.completed) return;
-      RTP.getInstance().priorTeleportData.put(player.getUniqueId(), teleportData);
+      TeleportSessions.current().priorTeleportData.put(player.getUniqueId(), teleportData);
     }
-    RTP.getInstance().latestTeleportData.remove(player.getUniqueId());
+    TeleportSessions.current().latestTeleportData.remove(player.getUniqueId());
     io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer =
-        RTP.serverAccessor.getPlayer(player.getUniqueId());
-    TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(rtpPlayer, rtpPlayer, null), RTP.selectionAPI.getRegion(rtpPlayer));
+        RTPRuntime.serverAccessor().getPlayer(player.getUniqueId());
+    TeleportPipelineTask pipelineTask = new TeleportPipelineTask(new GenerationContext(rtpPlayer, rtpPlayer, null), ActiveSelection.get().getRegion(rtpPlayer));
     pipelineTask.setDelay(10);
     pipelineTask.region().inFlightCalculations.incrementAndGet();
-    RTP.scheduler.runTaskAsynchronously(pipelineTask);
+    RTPRuntime.scheduler().runTaskAsynchronously(pipelineTask);
   }
 
   @EventHandler(priority = EventPriority.NORMAL)
   public void onPlayerChangeWorld(PlayerChangedWorldEvent event) {
     Player player = event.getPlayer();
     // skip world-change events that were triggered by an RTP teleport itself
-    if (RTP.getInstance().invulnerablePlayers.containsKey(player.getUniqueId())) return;
+    if (TeleportSessions.current().invulnerablePlayers.containsKey(player.getUniqueId())) return;
     if (checkPerms(event.getPlayer(), "changeworld")) {
       ConfigParser<LoggingKeys> logging =
-          (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
+          (ConfigParser<LoggingKeys>) ActiveConfigs.get().getParser(LoggingKeys.class);
       boolean verbose = false;
       if (logging != null) {
         Object o = logging.getConfigValue(LoggingKeys.event_join, false);
@@ -89,16 +94,16 @@ public class OnEventTeleports implements Listener {
     Player player = event.getEntity();
     UUID id = player.getUniqueId();
 
-    if (RTP.pendingDeathTeleports.containsKey(id) || RTP.deathEffectInFlight.contains(id)) {
+    if (DeathTeleports.pending().containsKey(id) || DeathTeleports.effectInFlight().contains(id)) {
       // Intentional death effect in active teleport pipeline:
       // Do NOT cancel the teleport, do NOT refund, and do NOT generate or recycle a respawn location.
       // The destination coordinate was anchored as the player's respawn location.
       return;
     }
 
-    TeleportData senderData = RTP.getInstance().latestTeleportData.get(id);
+    TeleportData senderData = TeleportSessions.current().latestTeleportData.get(id);
 
-    RTPCommandSender sender = RTP.serverAccessor.getSender(id);
+    RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(id);
     if (senderData != null) {
       if (senderData.sender == null) {
         senderData.sender = sender;
@@ -119,7 +124,7 @@ public class OnEventTeleports implements Listener {
     if (!checkPerms(player, "respawn")) return;
 
     ConfigParser<LoggingKeys> logging =
-        (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
+        (ConfigParser<LoggingKeys>) ActiveConfigs.get().getParser(LoggingKeys.class);
     boolean verbose = false;
     if (logging != null) {
       Object o = logging.getConfigValue(LoggingKeys.event_join, false);
@@ -136,7 +141,7 @@ public class OnEventTeleports implements Listener {
 
     respawningPlayers.add(id);
 
-    Region region = RTP.selectionAPI.getRegion(RTP.serverAccessor.getPlayer(player.getUniqueId()));
+    Region region = ActiveSelection.get().getRegion(RTPRuntime.serverAccessor().getPlayer(player.getUniqueId()));
 
     // I don't know how this can happen, but in case player dies twice, don't reprocess
     if (region.queueManager.fastLocations.containsKey(id)) return;
@@ -144,24 +149,24 @@ public class OnEventTeleports implements Listener {
     CompletableFuture<RTPLocation> future = new CompletableFuture<>();
     region.queueManager.fastLocations.put(id, future);
 
-    if (RTP.getInstance().latestTeleportData.containsKey(id)) {
-      RTP.getInstance().priorTeleportData.put(id, RTP.getInstance().latestTeleportData.get(id));
+    if (TeleportSessions.current().latestTeleportData.containsKey(id)) {
+      TeleportSessions.current().priorTeleportData.put(id, TeleportSessions.current().latestTeleportData.get(id));
     }
 
     // prep location so it's ready when they respawn or shortly after
     TeleportData teleportData = new TeleportData();
     io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(teleportData, "TeleportData-" + id.toString(), 120000L);
-    RTP.getInstance().latestTeleportData.put(id, teleportData);
+    TeleportSessions.current().latestTeleportData.put(id, teleportData);
     region.miscPipeline.add(
         () -> {
           GenerationContext context = new GenerationContext(
-                  RTP.serverAccessor.getSender(RTPAPI.serverId),
-                  RTP.serverAccessor.getPlayer(player.getUniqueId()),
+                  RTPRuntime.serverAccessor().getSender(RTPAPI.serverId),
+                  RTPRuntime.serverAccessor().getPlayer(player.getUniqueId()),
                   null);
           GenerationResult res = null;
           int i = 0;
           for (; res == null && i < 10; i++) {
-            res = RTP.serverAccessor.getLocationGenerator().getLocation(region, context).join();
+            res = RTPRuntime.serverAccessor().getLocationGenerator().getLocation(region, context).join();
           }
           if (res == null) {
             RTP.log(Level.WARNING, "#0080FF[RTP] failed to generate respawn location");
@@ -189,7 +194,7 @@ public class OnEventTeleports implements Listener {
     if (!respawningPlayers.contains(player.getUniqueId())) return;
     respawningPlayers.remove(player.getUniqueId());
 
-    Region region = RTP.selectionAPI.getRegion(RTP.serverAccessor.getPlayer(player.getUniqueId()));
+    Region region = ActiveSelection.get().getRegion(RTPRuntime.serverAccessor().getPlayer(player.getUniqueId()));
     ConcurrentHashMap<UUID, CompletableFuture<RTPLocation>> respawnLocations =
         region.queueManager.fastLocations;
     if (!respawnLocations.containsKey(player.getUniqueId())) {
@@ -217,16 +222,16 @@ public class OnEventTeleports implements Listener {
       return;
     }
 
-    TeleportData teleportData = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
+    TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(player.getUniqueId());
     if (teleportData == null) {
       teleportData = new TeleportData();
       io.github.dailystruggle.rtp.common.tools.MemoryTracker.track(teleportData, "TeleportData-" + player.getUniqueId().toString(), 120000L);
-      RTP.getInstance().latestTeleportData.put(player.getUniqueId(), teleportData);
+      TeleportSessions.current().latestTeleportData.put(player.getUniqueId(), teleportData);
     }
     teleportData.completed = true;
 
     ConfigParser<LoggingKeys> logging =
-        (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
+        (ConfigParser<LoggingKeys>) ActiveConfigs.get().getParser(LoggingKeys.class);
     boolean verbose = false;
     if (logging != null) {
       Object o = logging.getConfigValue(LoggingKeys.event_respawn, false);
@@ -271,7 +276,7 @@ public class OnEventTeleports implements Listener {
           RTP.log(Level.INFO, "#0080FF[RTP] updating respawn location for player:" + player);
         event.setRespawnLocation(
             new Location(world, rtpCoords.x(), rtpCoords.y(), rtpCoords.z()));
-        RTP.getInstance().processingPlayers.remove(player.getUniqueId());
+        TeleportSessions.current().processingPlayers.remove(player.getUniqueId());
       } else throw new IllegalStateException("expected bukkit world");
       return;
     }
@@ -282,11 +287,11 @@ public class OnEventTeleports implements Listener {
           if (finalVerbose)
             RTP.log(
                 Level.INFO, "#0080FF[RTP] teleporting player:" + player.getName() + " on respawn");
-          RTPPlayer rtpPlayer = RTP.serverAccessor.getPlayer(player.getUniqueId());
+          RTPPlayer rtpPlayer = RTPRuntime.serverAccessor().getPlayer(player.getUniqueId());
           TeleportPipelineTask pipelineTask =
               new TeleportPipelineTask(
-                  new GenerationContext(RTP.serverAccessor.getSender(RTPAPI.serverId), rtpPlayer, null), region);
-          RTP.getInstance().latestTeleportData.get(player.getUniqueId()).nextTask = pipelineTask;
+                  new GenerationContext(RTPRuntime.serverAccessor().getSender(RTPAPI.serverId), rtpPlayer, null), region);
+          TeleportSessions.current().latestTeleportData.get(player.getUniqueId()).nextTask = pipelineTask;
           pipelineTask.region().inFlightCalculations.incrementAndGet();
           pipelineTask.run();
         });
@@ -298,7 +303,7 @@ public class OnEventTeleports implements Listener {
 
     long start = System.nanoTime();
 
-    RTPCommandSender sender = RTP.serverAccessor.getSender(player.getUniqueId());
+    RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(player.getUniqueId());
     if (sender == null) return;
     boolean hasFirstJoin = ParsePermissions.hasPerm(sender, "rtp.onevent.", "firstjoin");
     boolean hasJoin = ParsePermissions.hasPerm(sender, "rtp.onevent.", "join");
@@ -306,7 +311,7 @@ public class OnEventTeleports implements Listener {
     long cooldownTime = sender.cooldown();
 
     ConfigParser<LoggingKeys> logging =
-        (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
+        (ConfigParser<LoggingKeys>) ActiveConfigs.get().getParser(LoggingKeys.class);
     boolean verbose = false;
     if (logging != null) {
       Object o = logging.getConfigValue(LoggingKeys.event_join, false);
@@ -323,10 +328,10 @@ public class OnEventTeleports implements Listener {
       primeFromLoginCache(player);
       teleportAction(player);
     } else if (hasJoin) {
-      TeleportData data = RTP.getInstance().latestTeleportData.get(player.getUniqueId());
+      TeleportData data = TeleportSessions.current().latestTeleportData.get(player.getUniqueId());
       long time = (data == null) ? 0 : data.time;
       if (!player.hasPermission("rtp.nocooldown") && (start - time) < cooldownTime) {
-        RTP.serverAccessor.sendMessage(player.getUniqueId(), PlayerMessages.cooldownMessage);
+        RTPRuntime.serverAccessor().sendMessage(player.getUniqueId(), PlayerMessages.cooldownMessage);
         return;
       }
       if (verbose) RTP.log(Level.INFO, "#0080FF[RTP] teleporting player:" + player + " on join");
@@ -347,9 +352,9 @@ public class OnEventTeleports implements Listener {
   private static void primeFromLoginCache(Player player) {
     try {
       io.github.dailystruggle.rtp.api.entity.RTPPlayer rtpPlayer =
-          RTP.serverAccessor.getPlayer(player.getUniqueId());
+          RTPRuntime.serverAccessor().getPlayer(player.getUniqueId());
       if (rtpPlayer == null) return;
-      Region region = RTP.selectionAPI.getRegion(rtpPlayer);
+      Region region = ActiveSelection.get().getRegion(rtpPlayer);
       if (region == null) return;
       io.github.dailystruggle.rtp.common.selection.region.LockFreeLocationBuffer login =
           region.queueManager.loginLocations;
@@ -374,7 +379,7 @@ public class OnEventTeleports implements Listener {
     if (from.distance(to) == 0.0d) return;
     Player player = event.getPlayer();
 
-    ConfigParser<?> parser = RTP.configs.configParserMap.get(ConfigKeys.class);
+    ConfigParser<?> parser = ActiveConfigs.get().configParserMap.get(ConfigKeys.class);
     if (!parser.myClass.equals(ConfigKeys.class)) {
       RTP.log(Level.WARNING, "unexpected class for configParser: " + parser.myClass);
       return;
@@ -393,7 +398,7 @@ public class OnEventTeleports implements Listener {
 
     if (checkPerms(player, "move")) {
       ConfigParser<LoggingKeys> logging =
-          (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
+          (ConfigParser<LoggingKeys>) ActiveConfigs.get().getParser(LoggingKeys.class);
       boolean verbose = false;
       if (logging != null) {
         Object o = logging.getConfigValue(LoggingKeys.event_move, false);
@@ -413,7 +418,7 @@ public class OnEventTeleports implements Listener {
     Player player = event.getPlayer();
     if (checkPerms(player, "teleport")) {
       ConfigParser<LoggingKeys> logging =
-          (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
+          (ConfigParser<LoggingKeys>) ActiveConfigs.get().getParser(LoggingKeys.class);
       boolean verbose = false;
       if (logging != null) {
         Object o = logging.getConfigValue(LoggingKeys.event_teleport, false);
@@ -425,7 +430,7 @@ public class OnEventTeleports implements Listener {
       }
       if (verbose)
         RTP.log(Level.INFO, "#0080FF[RTP] teleporting player:" + player + " on teleport");
-      RTP.scheduler.runTaskLater(() -> teleportAction(player), 5L);
+      RTPRuntime.scheduler().runTaskLater(() -> teleportAction(player), 5L);
     }
   }
 

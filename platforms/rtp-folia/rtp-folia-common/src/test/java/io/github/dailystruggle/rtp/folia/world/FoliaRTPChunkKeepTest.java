@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.folia.mock.MockAsyncScheduler;
 import io.github.dailystruggle.rtp.folia.mock.MockGlobalRegionScheduler;
 import io.github.dailystruggle.rtp.folia.mock.MockRegionScheduler;
@@ -67,11 +68,13 @@ class FoliaRTPChunkKeepTest {
     when(bukkitWorld.getUID()).thenReturn(worldId);
     FoliaRTPWorld rtpWorld = new FoliaRTPWorld(bukkitWorld);
 
-    previousAccessor = RTP.serverAccessor;
+    previousAccessor = RTPRuntime.serverAccessor();
     RTPServerAccessor accessor = Mockito.mock(RTPServerAccessor.class);
     when(accessor.getScheduler()).thenReturn(scheduler);
     Mockito.doReturn(rtpWorld).when(accessor).getRTPWorld(worldId);
-    RTP.serverAccessor = accessor;
+    // Mirror platform bootstrap: RTP's static init runs before any accessor is installed.
+    RTP.ensureInitialized();
+    RTPRuntime.setServerAccessor(accessor);
 
     tickets = new ArrayList<>();
     bukkitChunk = Mockito.mock(Chunk.class);
@@ -87,7 +90,7 @@ class FoliaRTPChunkKeepTest {
 
   @AfterEach
   void tearDown() throws Exception {
-    RTP.serverAccessor = previousAccessor;
+    RTPRuntime.setServerAccessor(previousAccessor);
     java.lang.reflect.Field serverField = org.bukkit.Bukkit.class.getDeclaredField("server");
     serverField.setAccessible(true);
     serverField.set(null, previousServer);

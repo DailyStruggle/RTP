@@ -1,8 +1,9 @@
 package io.github.dailystruggle.rtp.common.commands.admin;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import java.util.UUID;
 
 import org.jetbrains.annotations.Nullable;
@@ -41,20 +42,20 @@ public class ClearLimitCmd extends PlayerTargetedClearCmd {
 
   @Override
   protected int clearAll() {
-    RTP rtp = RTP.getInstance();
-    if (rtp != null) rtp.usageCaps.clear();
+    TeleportSessions sessions = TeleportSessions.current();
+    if (sessions != null) TeleportSessions.current().usageCaps.clear();
     return 0;
   }
 
   @Override
   protected boolean clearOne(UUID uuid) {
     if (uuid == null) return false;
-    RTP rtp = RTP.getInstance();
-    if (rtp == null) return false;
+    TeleportSessions sessions = TeleportSessions.current();
+    if (sessions == null) return false;
 
-    boolean had = rtp.usageCaps.snapshot(uuid) != null;
+    boolean had = TeleportSessions.current().usageCaps.snapshot(uuid) != null;
     // Route through the limit store so the persisted window is reset too.
-    rtp.teleportLimitStore.reset(uuid);
+    ActiveDatabase.teleportLimitStore().reset(uuid);
     return had;
   }
 }

@@ -3,8 +3,8 @@ package io.github.dailystruggle.rtp.common.commands.menu;
 import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
 import io.github.dailystruggle.rtp.api.menu.MenuModel;
 import io.github.dailystruggle.rtp.api.menu.MenuRenderer;
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.logging.Level;
@@ -52,7 +52,7 @@ final class MenuDrawer {
         } catch (RuntimeException e) {
             String tail = (extraWarnDiag == null || extraWarnDiag.isEmpty())
                     ? "" : " " + extraWarnDiag;
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "menu " + context + " render failed for " + viewer
                             + tail + ": " + e.getMessage(), e);
             if (rejecter != null) {

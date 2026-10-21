@@ -10,6 +10,7 @@ import io.github.dailystruggle.rtp.bukkitplatform.world.BukkitRegionPaths;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.parameters.IntegerParameter;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.io.RandomAccessFile;
 import java.nio.file.Files;
@@ -95,7 +96,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
 
     RTPWorld<?> resolvedWorld = null;
 
-    RTPPlayer caller = RTP.serverAccessor.getPlayer(callerId);
+    RTPPlayer caller = RTPRuntime.serverAccessor().getPlayer(callerId);
     if (caller != null) {
       RTPLocation loc = caller.getLocation();
       if (loc != null && loc.world() != null) {
@@ -104,13 +105,13 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
     }
 
     if (resolvedWorld == null) {
-      List<RTPWorld<?>> worlds = RTP.serverAccessor.getRTPWorlds();
+      List<RTPWorld<?>> worlds = RTPRuntime.serverAccessor().getRTPWorlds();
       resolvedWorld = worlds.stream().filter(Objects::nonNull).findFirst().orElse(null);
       if (resolvedWorld == null) {
         String msg =
             "&c[RTP test/chunk-probe-perf] no RTP worlds configured — cannot pick a default";
         if (callerId != null && !callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-          RTP.serverAccessor.sendMessage(callerId, msg);
+          RTPRuntime.serverAccessor().sendMessage(callerId, msg);
         }
         RTP.log(Level.WARNING, msg);
         return false;
@@ -137,11 +138,11 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
             + maxY
             + "] (random sample of pregenerated chunks)";
     if (callerId != null && !callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, startMsg);
+      RTPRuntime.serverAccessor().sendMessage(callerId, startMsg);
     }
     RTP.log(Level.INFO, startMsg);
 
-    RTP.scheduler.runTaskAsynchronously(
+    RTPRuntime.scheduler().runTaskAsynchronously(
         () -> runBenchmark(callerId, world, minY, maxY, samples));
     return true;
   }
@@ -155,7 +156,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
               + world.name()
               + " — aborting";
       if (callerId != null && !callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, msg);
+        RTPRuntime.serverAccessor().sendMessage(callerId, msg);
       }
       RTP.log(Level.WARNING, msg);
       return;
@@ -173,7 +174,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
               + ": "
               + t.getMessage();
       if (callerId != null && !callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, msg);
+        RTPRuntime.serverAccessor().sendMessage(callerId, msg);
       }
       RTP.log(Level.WARNING, msg, t);
       return;
@@ -185,7 +186,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
               + regionDir
               + " — nothing to sample";
       if (callerId != null && !callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, msg);
+        RTPRuntime.serverAccessor().sendMessage(callerId, msg);
       }
       RTP.log(Level.INFO, msg);
       return;
@@ -317,7 +318,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
             fullOverAnvil,
             fullCpuOverAnvil);
     if (callerId != null && !callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, summary);
+      RTPRuntime.serverAccessor().sendMessage(callerId, summary);
     }
     RTP.log(Level.INFO, summary);
 
@@ -327,7 +328,7 @@ public class TestChunkProbePerfCmd extends BaseRTPCmdImpl {
               + " world/adapter. Check SafetyKeys.anvilPrefilterEnabled and that the world is"
               + " an .mca-backed Bukkit/Paper/Folia world.";
       if (callerId != null && !callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, note);
+        RTPRuntime.serverAccessor().sendMessage(callerId, note);
       }
       RTP.log(Level.INFO, note);
     }

@@ -4,6 +4,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.test.TestUmbrellaSender;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.fabric.server.FabricServerAccessor;
 import io.github.dailystruggle.rtp.fabric.tools.FabricAnsiText;
 
@@ -38,7 +39,7 @@ public final class FabricTestUmbrellaSender implements TestUmbrellaSender {
 
     private RTPServerAccessor getAccessor() {
         if (accessor != null) return accessor;
-        return RTP.serverAccessor;
+        return RTPRuntime.serverAccessor();
     }
 
     @Override

@@ -1,9 +1,10 @@
 package io.github.dailystruggle.rtp.common.tools;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.metrics.HeapSampler;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 
@@ -43,10 +44,10 @@ public final class HeapPressureMonitor {
   private static double thresholdFraction() {
     double percent = DEFAULT_MAX_HEAP_PERCENT;
     try {
-      if (RTP.configs != null) {
+      if (ActiveConfigs.get() != null) {
         @SuppressWarnings("unchecked")
         ConfigParser<PerformanceKeys> perf =
-            (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+            (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         if (perf != null) {
           percent = perf.getNumber(PerformanceKeys.maxHeapPercent, DEFAULT_MAX_HEAP_PERCENT)
               .doubleValue();
@@ -108,7 +109,7 @@ public final class HeapPressureMonitor {
         if (cachedUnderPressure) {
           long lastWarn = lastWarnMs.get();
           if (now - lastWarn >= WARN_INTERVAL_MS && lastWarnMs.compareAndSet(lastWarn, now)) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                 String.format(
                     java.util.Locale.ROOT,
                     "[RTP] Heap usage %.1f%% of max exceeds maxHeapPercent threshold %.1f%%; "
@@ -120,7 +121,7 @@ public final class HeapPressureMonitor {
       }
 
       if (wasUnderPressure && !cachedUnderPressure) {
-        RTP.log(Level.INFO,
+        RTPRuntime.log(Level.INFO,
             String.format(
                 java.util.Locale.ROOT,
                 "[RTP] Heap pressure subsided (currently %.1f%% of max); resuming background cache generation.",

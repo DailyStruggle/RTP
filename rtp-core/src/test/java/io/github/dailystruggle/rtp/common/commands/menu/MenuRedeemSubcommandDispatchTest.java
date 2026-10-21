@@ -48,7 +48,7 @@ public class MenuRedeemSubcommandDispatchTest {
 
     @BeforeEach
     void setUp() {
-        // Reject paths call RTP.log / RTP.serverAccessor; RTPTestSetup wires both.
+        // Reject paths call RTPRuntime.log / RTPRuntime.serverAccessor(); RTPTestSetup wires both.
         RTPTestSetup.install(tempDir.toFile());
         root = new TestableRoot();
     }

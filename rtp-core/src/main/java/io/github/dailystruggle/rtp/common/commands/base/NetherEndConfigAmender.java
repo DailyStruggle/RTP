@@ -114,8 +114,8 @@ public final class NetherEndConfigAmender {
      */
     public static Map<String, Object> createDimensionVert(String worldName) {
         if (worldName == null || worldName.isEmpty()) return null;
-        RTPWorld<?> rtpWorld = (io.github.dailystruggle.rtp.common.RTP.serverAccessor != null)
-                ? io.github.dailystruggle.rtp.common.RTP.serverAccessor.getRTPWorld(worldName)
+        RTPWorld<?> rtpWorld = (io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor() != null)
+                ? io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor().getRTPWorld(worldName)
                 : null;
         return createDimensionVert(worldName, rtpWorld);
     }

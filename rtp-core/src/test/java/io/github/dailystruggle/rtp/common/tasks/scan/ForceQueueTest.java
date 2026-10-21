@@ -2,9 +2,9 @@ package io.github.dailystruggle.rtp.common.tasks.scan;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPCommandSender;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,7 +43,7 @@ class ForceQueueTest {
         ForceQueue forceQueue = new ForceQueue();
         assertNotNull(forceQueue.sender());
         assertEquals(CommandsAPI.serverId, forceQueue.sender().uuid());
-        assertEquals(RTP.selectionAPI.permRegionLookup.values().size(), forceQueue.regions().size());
+        assertEquals(ActiveSelection.get().permRegionLookup.values().size(), forceQueue.regions().size());
         assertEquals("rtp_force_queue", forceQueue.sparkFrameName());
     }
 
@@ -53,7 +53,7 @@ class ForceQueueTest {
         RTPCommandSender sender = new MockRTPCommandSender(customId, "CustomSender");
         ForceQueue forceQueue = new ForceQueue(sender);
         assertSame(sender, forceQueue.sender());
-        assertEquals(RTP.selectionAPI.permRegionLookup.values().size(), forceQueue.regions().size());
+        assertEquals(ActiveSelection.get().permRegionLookup.values().size(), forceQueue.regions().size());
     }
 
     @Test
@@ -74,10 +74,10 @@ class ForceQueueTest {
         RTPCommandSender sender = new MockRTPCommandSender(customId, "CustomSender");
 
         ForceQueue nullRegionsQueue = new ForceQueue(sender, null);
-        assertEquals(RTP.selectionAPI.permRegionLookup.values().size(), nullRegionsQueue.regions().size());
+        assertEquals(ActiveSelection.get().permRegionLookup.values().size(), nullRegionsQueue.regions().size());
 
         ForceQueue emptyRegionsQueue = new ForceQueue(sender, Collections.emptyList());
-        assertEquals(RTP.selectionAPI.permRegionLookup.values().size(), emptyRegionsQueue.regions().size());
+        assertEquals(ActiveSelection.get().permRegionLookup.values().size(), emptyRegionsQueue.regions().size());
     }
 
     @Test

@@ -534,7 +534,7 @@ public final class V1_21_R11FabricVersionAdapter implements FabricVersionAdapter
         // that the common FabricRTPPlayer resolved and owns, so all server/level
         // state is reached through the player handle (sp.level()) rather than a
         // standalone MinecraftServer. The caller has already hopped to the server
-        // tick thread via RTP.scheduler, so map allocation, colour writes, packet
+        // tick thread via RTPRuntime.scheduler(), so map allocation, colour writes, packet
         // dispatch, and inventory mutation are all server-thread-safe here.
         if (!(serverPlayer instanceof ServerPlayer sp)
                 || chartKey == null || argb == null) {

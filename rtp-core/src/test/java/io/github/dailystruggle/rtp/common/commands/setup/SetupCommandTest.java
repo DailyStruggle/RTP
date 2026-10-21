@@ -256,7 +256,7 @@ class SetupCommandTest {
         org.mockito.Mockito.when(mockAccessor.getRTPWorld("world_nether")).thenReturn((io.github.dailystruggle.rtp.api.world.RTPWorld) nether);
         org.mockito.Mockito.when(mockAccessor.getRTPWorld("world_the_end")).thenReturn((io.github.dailystruggle.rtp.api.world.RTPWorld) end);
 
-        io.github.dailystruggle.rtp.common.RTP.serverAccessor = mockAccessor;
+        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(mockAccessor);
 
         // Create default.yml with comments in definitions/regions/
         java.io.File defRegionDir = new java.io.File(tempDir, "definitions/regions");

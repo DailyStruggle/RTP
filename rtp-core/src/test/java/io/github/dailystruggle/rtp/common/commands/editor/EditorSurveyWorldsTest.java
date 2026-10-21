@@ -5,6 +5,7 @@ import com.google.gson.JsonParser;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,13 +33,15 @@ class EditorSurveyWorldsTest {
 
     @BeforeEach
     void setUp() {
-        savedAccessor = RTP.serverAccessor;
+        // Mirror platform bootstrap: RTP's static init runs before any accessor is installed.
+        RTP.ensureInitialized();
+        savedAccessor = RTPRuntime.serverAccessor();
         WorldBiomeStore.clearForTests();
     }
 
     @AfterEach
     void tearDown() {
-        RTP.serverAccessor = savedAccessor;
+        RTPRuntime.setServerAccessor(savedAccessor);
         WorldBiomeStore.clearForTests();
     }
 
@@ -51,7 +54,7 @@ class EditorSurveyWorldsTest {
     private static void liveWorlds(RTPWorld<?>... worlds) {
         RTPServerAccessor accessor = mock(RTPServerAccessor.class);
         when(accessor.getRTPWorlds()).thenReturn(new ArrayList<>(Arrays.asList(worlds)));
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
     }
 
     @Test
@@ -86,7 +89,7 @@ class EditorSurveyWorldsTest {
     void surveyWorldsFailingAccessor() {
         RTPServerAccessor accessor = mock(RTPServerAccessor.class);
         when(accessor.getRTPWorlds()).thenThrow(new IllegalStateException("not ready"));
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
 
         assertDoesNotThrow(EditorLiveFeed::surveyWorlds);
     }

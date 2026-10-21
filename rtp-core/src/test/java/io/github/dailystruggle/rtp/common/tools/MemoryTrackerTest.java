@@ -1,8 +1,10 @@
 package io.github.dailystruggle.rtp.common.tools;
 
 import io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -103,7 +105,7 @@ public class MemoryTrackerTest {
 
         // Add a world with activeChunkTickets
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor();
         io.github.dailystruggle.rtp.common.mock.MockRTPWorld world1 =
                 new io.github.dailystruggle.rtp.common.mock.MockRTPWorld("tickets-world-1");
         world1.activeChunkTickets.set(7L);
@@ -117,12 +119,12 @@ public class MemoryTrackerTest {
         assertEquals(20L, MemoryTracker.activeTickets());
 
         // When serverAccessor is null
-        io.github.dailystruggle.rtp.api.server.RTPServerAccessor orig = RTP.serverAccessor;
+        io.github.dailystruggle.rtp.api.server.RTPServerAccessor orig = RTPRuntime.serverAccessor();
         try {
-            RTP.serverAccessor = null;
+            RTPRuntime.setServerAccessor(null);
             assertEquals(0L, MemoryTracker.activeTickets());
         } finally {
-            RTP.serverAccessor = orig;
+            RTPRuntime.setServerAccessor(orig);
         }
     }
 
@@ -145,7 +147,7 @@ public class MemoryTrackerTest {
         UUID playerId = UUID.randomUUID();
         io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
                 new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(playerId, "ActiveTaskPlayer", null);
-        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor).addPlayer(player);
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor()).addPlayer(player);
         io.github.dailystruggle.rtp.api.selection.GenerationContext ctx =
                 new io.github.dailystruggle.rtp.api.selection.GenerationContext(player, player, java.util.Collections.emptySet());
         io.github.dailystruggle.rtp.common.tasks.teleport.TeleportPipelineTask pipelineTask =
@@ -229,7 +231,7 @@ public class MemoryTrackerTest {
         UUID playerId = UUID.randomUUID();
         io.github.dailystruggle.rtp.common.mock.MockRTPPlayer player =
                 new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(playerId, "MemPlayer", null);
-        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.RTP.serverAccessor).addPlayer(player);
+        ((io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) io.github.dailystruggle.rtp.common.runtime.RTPRuntime.serverAccessor()).addPlayer(player);
 
         io.github.dailystruggle.rtp.api.selection.GenerationContext ctx =
                 new io.github.dailystruggle.rtp.api.selection.GenerationContext(player, player, java.util.Collections.emptySet());
@@ -256,13 +258,13 @@ public class MemoryTrackerTest {
         // Ensure system_memory_tracker logging is enabled
         io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys> logging =
                 (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys>)
-                        RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.class);
+                        ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.class);
         if (logging != null) {
             logging.set(io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.system_memory_tracker, true);
         }
 
         io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
-                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTP.serverAccessor;
+                (io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor) RTPRuntime.serverAccessor();
         io.github.dailystruggle.rtp.common.mock.MockRTPWorld world =
                 (io.github.dailystruggle.rtp.common.mock.MockRTPWorld) accessor.getRTPWorlds().get(0);
 
@@ -286,8 +288,8 @@ public class MemoryTrackerTest {
                 new io.github.dailystruggle.rtp.common.playerData.TeleportData();
         td.completed = false;
 
-        RTP.getInstance().processingPlayers.add(playerId);
-        RTP.getInstance().latestTeleportData.put(playerId, td);
+        TeleportSessions.current().processingPlayers.add(playerId);
+        TeleportSessions.current().latestTeleportData.put(playerId, td);
 
         MemoryTracker.track(td, "TeleportData-" + playerId, 0L);
         Thread.sleep(5L);
@@ -295,7 +297,7 @@ public class MemoryTrackerTest {
         MemoryTracker.runDiagnostics();
 
         assertTrue(td.completed, "TeleportData must be marked completed");
-        assertFalse(RTP.getInstance().processingPlayers.contains(playerId), "processingPlayers lock must be released");
+        assertFalse(TeleportSessions.current().processingPlayers.contains(playerId), "processingPlayers lock must be released");
         assertEquals(0, MemoryTracker.trackedCountByLabel("TeleportData-" + playerId), "leaking TeleportData must be purged from tracker");
     }
 }

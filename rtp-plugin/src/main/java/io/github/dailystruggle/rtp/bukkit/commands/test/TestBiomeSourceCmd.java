@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.bukkit.commands.test;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -99,7 +100,7 @@ public class TestBiomeSourceCmd extends BaseRTPCmdImpl {
     Snapshot s = snapshot();
     String summary = "[RTP test/biome-source] " + s;
     if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-      RTP.serverAccessor.sendMessage(callerId, summary);
+      RTPRuntime.serverAccessor().sendMessage(callerId, summary);
     }
     RTP.log(Level.INFO, summary);
 
@@ -115,7 +116,7 @@ public class TestBiomeSourceCmd extends BaseRTPCmdImpl {
       }
       String reasonLine = sb.toString();
       if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, reasonLine);
+        RTPRuntime.serverAccessor().sendMessage(callerId, reasonLine);
       }
       RTP.log(Level.INFO, reasonLine);
     } catch (Throwable ignored) {
@@ -129,7 +130,7 @@ public class TestBiomeSourceCmd extends BaseRTPCmdImpl {
               + "adapter does not route getBiome through the ADR-016 section 13.1 chain "
               + "(Fabric is out of scope).";
       if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, note);
+        RTPRuntime.serverAccessor().sendMessage(callerId, note);
       }
       RTP.log(Level.INFO, note);
     }
@@ -143,15 +144,15 @@ public class TestBiomeSourceCmd extends BaseRTPCmdImpl {
 
   private void checkBiomeParity(UUID callerId) {
     try {
-      if (RTP.serverAccessor == null) return;
+      if (RTPRuntime.serverAccessor() == null) return;
       io.github.dailystruggle.rtp.api.world.RTPWorld<?> world =
-          RTP.serverAccessor.getRTPWorlds().stream().findFirst().orElse(null);
+          RTPRuntime.serverAccessor().getRTPWorlds().stream().findFirst().orElse(null);
       if (world == null) return;
 
       int x = 0;
       int y = 64;
       int z = 0;
-      String sampled = RTP.serverAccessor.sampleBiome(world, x, y, z);
+      String sampled = RTPRuntime.serverAccessor().sampleBiome(world, x, y, z);
       String worldBiome = world.getBiome(x, y, z);
 
       String parityMsg = "[RTP test/biome-source] parity probe world=" + world.name()
@@ -159,7 +160,7 @@ public class TestBiomeSourceCmd extends BaseRTPCmdImpl {
           + " sampleBiome=" + sampled
           + " getBiome=" + worldBiome;
       if (!callerId.equals(io.github.dailystruggle.rtp.api.RTPAPI.serverId)) {
-        RTP.serverAccessor.sendMessage(callerId, parityMsg);
+        RTPRuntime.serverAccessor().sendMessage(callerId, parityMsg);
       }
       RTP.log(Level.INFO, parityMsg);
     } catch (Throwable t) {

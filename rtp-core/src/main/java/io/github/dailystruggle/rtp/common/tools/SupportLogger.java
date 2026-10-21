@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.tools;
 
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.logging.Level;
 
 public class SupportLogger {
@@ -11,6 +11,6 @@ public class SupportLogger {
                 "Context: " + context + "\n" +
                 "Support Signature: " + SupportInfo.getSupportSignature() + "\n" +
                 "Stack Trace:";
-        RTP.log(level, report, throwable);
+        RTPRuntime.log(level, report, throwable);
     }
 }

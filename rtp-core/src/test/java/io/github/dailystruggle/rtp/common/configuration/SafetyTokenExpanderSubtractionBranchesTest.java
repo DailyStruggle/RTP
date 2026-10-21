@@ -2,9 +2,9 @@ package io.github.dailystruggle.rtp.common.configuration;
 
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -45,17 +45,17 @@ class SafetyTokenExpanderSubtractionBranchesTest {
   @BeforeEach
   void setUp() {
     pluginDir = tempDir.toFile();
-    originalAccessor = RTP.serverAccessor;
-    originalScheduler = RTP.scheduler;
-    RTP.serverAccessor = mock(RTPServerAccessor.class);
+    originalAccessor = RTPRuntime.serverAccessor();
+    originalScheduler = RTPRuntime.scheduler();
+    RTPRuntime.setServerAccessor(mock(RTPServerAccessor.class));
     // No scheduler: unresolved tags must not schedule deferred retries in this fixture.
-    RTP.scheduler = null;
+    RTPRuntime.setScheduler(null);
   }
 
   @AfterEach
   void tearDown() {
-    RTP.serverAccessor = originalAccessor;
-    RTP.scheduler = originalScheduler;
+    RTPRuntime.setServerAccessor(originalAccessor);
+    RTPRuntime.setScheduler(originalScheduler);
   }
 
   private ConfigParser<BlocksKeys> parserFor(String yaml) throws IOException {
@@ -100,7 +100,7 @@ class SafetyTokenExpanderSubtractionBranchesTest {
             + "  - \"#minecraft:leaves - #minecraft:azaleas - #minecraft:unknown\"\n"
             + "unsafeBlocks:\n"
             + "  - \"LAVA\"\n");
-    when(RTP.serverAccessor.blockTagSnapshot()).thenReturn(snapshot());
+    when(RTPRuntime.serverAccessor().blockTagSnapshot()).thenReturn(snapshot());
 
     SafetyTokenExpander.expandAndApply(parser);
 
@@ -118,7 +118,7 @@ class SafetyTokenExpanderSubtractionBranchesTest {
             + "unsafeBlocks:\n"
             + "  - \"#minecraft:slabs[type=bottom] - OAK_SLAB\"\n"
             + "  - \"#minecraft:slabs[type=bottom] - OAK_SLAB\"\n");
-    when(RTP.serverAccessor.blockTagSnapshot()).thenReturn(snapshot());
+    when(RTPRuntime.serverAccessor().blockTagSnapshot()).thenReturn(snapshot());
 
     SafetyTokenExpander.expandAndApply(parser);
 
@@ -138,7 +138,7 @@ class SafetyTokenExpanderSubtractionBranchesTest {
             + "  - \"" + token + "\"\n"
             + "unsafeBlocks:\n"
             + "  - \"LAVA\"\n");
-    when(RTP.serverAccessor.blockTagSnapshot()).thenReturn(snapshot());
+    when(RTPRuntime.serverAccessor().blockTagSnapshot()).thenReturn(snapshot());
 
     SafetyTokenExpander.expandAndApply(parser);
 
@@ -159,7 +159,7 @@ class SafetyTokenExpanderSubtractionBranchesTest {
             + "  - \"magma_block - DIRT\"\n"
             + "  - \"MAGMA_BLOCK - DIRT\"\n"
             + "  - \"WATER - #minecraft:unknown\"\n");
-    when(RTP.serverAccessor.blockTagSnapshot()).thenReturn(snapshot());
+    when(RTPRuntime.serverAccessor().blockTagSnapshot()).thenReturn(snapshot());
 
     SafetyTokenExpander.expandAndApply(parser);
 

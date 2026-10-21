@@ -3,10 +3,11 @@ package io.github.dailystruggle.rtp.common.selection.region;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.AbstractVerticalAdjustor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import java.util.ArrayList;
@@ -136,7 +137,7 @@ final class RegionCandidateValidator implements CandidateValidator {
       return null;
     } catch (Throwable t) {
       // Fail-closed on any error (S-004): a validation error is a rejection, never a silent pass.
-      RTP.log(Level.WARNING, "[RTP] RegionCandidateValidator failed: " + t, t);
+      RTPRuntime.log(Level.WARNING, "[RTP] RegionCandidateValidator failed: " + t, t);
       return null;
     }
   }
@@ -179,11 +180,11 @@ final class RegionCandidateValidator implements CandidateValidator {
       return java.util.concurrent.CompletableFuture.allOf(chunkFutures.toArray(new java.util.concurrent.CompletableFuture[0]))
           .thenApply(v -> validate(worldX, worldZ))
           .exceptionally(ex -> {
-            RTP.log(Level.WARNING, "[RTP] Async candidate validation failed: " + ex, ex);
+            RTPRuntime.log(Level.WARNING, "[RTP] Async candidate validation failed: " + ex, ex);
             return null;
           });
     } catch (Throwable t) {
-      RTP.log(Level.WARNING, "[RTP] RegionCandidateValidator validateAsync setup failed: " + t, t);
+      RTPRuntime.log(Level.WARNING, "[RTP] RegionCandidateValidator validateAsync setup failed: " + t, t);
       return java.util.concurrent.CompletableFuture.completedFuture(null);
     }
   }
@@ -195,10 +196,10 @@ final class RegionCandidateValidator implements CandidateValidator {
 
   private int readSafetyRadius() {
     try {
-      if (RTP.configs == null) return 0;
+      if (ActiveConfigs.get() == null) return 0;
       @SuppressWarnings("unchecked")
       ConfigParser<SafetyKeys> safety =
-          (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+          (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
       if (safety == null) return 0;
       Number n = safety.getNumber(SafetyKeys.safetyRadius, 0);
       return n != null ? n.intValue() : 0;
@@ -210,7 +211,7 @@ final class RegionCandidateValidator implements CandidateValidator {
   private Set<String> readUnsafeBlocks() {
     Set<String> out = new ConcurrentSkipListSet<>();
     try {
-      Object value = RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>());
+      Object value = ActiveConfigs.get().getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>());
       if (value instanceof Collection<?> collection) {
         for (Object o : collection) {
           if (o != null) out.add(o.toString());

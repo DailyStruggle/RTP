@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
@@ -336,7 +336,7 @@ public final class ProbeFirstGovernor {
         } finally {
             updateLock.unlock();
         }
-        if (log != null) RTP.log(Level.INFO, log);
+        if (log != null) RTPRuntime.log(Level.INFO, log);
     }
 
     /** One finished full load: wall time from request to chunk; {@code afterProbe} = a probe ran first. */
@@ -353,7 +353,7 @@ public final class ProbeFirstGovernor {
         } finally {
             updateLock.unlock();
         }
-        if (log != null) RTP.log(Level.INFO, log);
+        if (log != null) RTPRuntime.log(Level.INFO, log);
     }
 
     public Mode mode() {

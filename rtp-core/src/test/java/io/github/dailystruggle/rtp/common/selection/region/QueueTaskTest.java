@@ -5,13 +5,15 @@ import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
@@ -514,7 +516,7 @@ class QueueTaskTest {
         // Configure safety radius = 1
         @SuppressWarnings("unchecked")
         io.github.dailystruggle.rtp.common.configuration.ConfigParser<SafetyKeys> safetyParser =
-                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+                (io.github.dailystruggle.rtp.common.configuration.ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
         if (safetyParser != null) {
             safetyParser.set(SafetyKeys.safetyRadius, 1);
         }
@@ -570,7 +572,7 @@ class QueueTaskTest {
         TeleportData existing = new TeleportData();
         existing.delay = 5;
         existing.completed = false;
-        RTP.getInstance().latestTeleportData.put(player.uuid(), existing);
+        TeleportSessions.current().latestTeleportData.put(player.uuid(), existing);
         player.setPermission("rtp.unqueued", false);
 
         Square square = new Square();
@@ -594,7 +596,7 @@ class QueueTaskTest {
                 "",
                 false);
         Region testRegion = new Region("fallbackDataRegion", settings);
-        RTP.selectionAPI.permRegionLookup.put("fallbackDataRegion", testRegion);
+        ActiveSelection.get().permRegionLookup.put("fallbackDataRegion", testRegion);
 
         QueueTask task = new QueueTask(testRegion, player, player, null, result);
         task.start();
@@ -603,7 +605,7 @@ class QueueTaskTest {
         // On normal enqueue fallback, result.complete(null) is called and player is enqueued
         assertNull(gen);
         assertTrue(testRegion.queueManager.playerQueue.contains(player.uuid()));
-        assertTrue(RTP.getInstance().queuedPlayers.contains(player.uuid()));
+        assertTrue(TeleportSessions.current().queuedPlayers.contains(player.uuid()));
     }
 
     @Test
@@ -811,7 +813,7 @@ class QueueTaskTest {
             assertNotNull(gen.coords());
             assertTrue(closed.get());
             assertEquals(0, world.activeChunkTickets.get());
-            assertFalse(RTP.getInstance().processingPlayers.contains(player.uuid()));
+            assertFalse(TeleportSessions.current().processingPlayers.contains(player.uuid()));
         } finally {
             verifierHandle.close();
         }
@@ -886,7 +888,7 @@ class QueueTaskTest {
         CompletableFuture<GenerationResult> result = new CompletableFuture<>();
 
         // Register region into permRegionLookup so isRegionPumped() returns true
-        RTP.selectionAPI.permRegionLookup.put(region.name, region);
+        ActiveSelection.get().permRegionLookup.put(region.name, region);
 
         MockRTPPlayer queuedPlayer = new MockRTPPlayer(
                 UUID.randomUUID(),
@@ -917,14 +919,14 @@ class QueueTaskTest {
             assertNull(gen);
             assertTrue(pushNotified.get());
             assertTrue(region.queueManager.playerQueue.contains(queuedPlayer.uuid()));
-            assertTrue(RTP.getInstance().queuedPlayers.contains(queuedPlayer.uuid()));
-            assertTrue(RTP.getInstance().processingPlayers.contains(queuedPlayer.uuid()));
-            assertNotNull(RTP.getInstance().latestTeleportData.get(queuedPlayer.uuid()));
+            assertTrue(TeleportSessions.current().queuedPlayers.contains(queuedPlayer.uuid()));
+            assertTrue(TeleportSessions.current().processingPlayers.contains(queuedPlayer.uuid()));
+            assertNotNull(TeleportSessions.current().latestTeleportData.get(queuedPlayer.uuid()));
         } finally {
             Region.onPlayerQueuePush.remove(pushListener);
-            RTP.selectionAPI.permRegionLookup.remove(region.name);
-            RTP.getInstance().processingPlayers.remove(queuedPlayer.uuid());
-            RTP.getInstance().queuedPlayers.remove(queuedPlayer.uuid());
+            ActiveSelection.get().permRegionLookup.remove(region.name);
+            TeleportSessions.current().processingPlayers.remove(queuedPlayer.uuid());
+            TeleportSessions.current().queuedPlayers.remove(queuedPlayer.uuid());
         }
     }
 }

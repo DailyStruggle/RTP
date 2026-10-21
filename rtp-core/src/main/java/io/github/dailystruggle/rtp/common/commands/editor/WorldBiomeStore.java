@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.*;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
@@ -113,7 +113,7 @@ public final class WorldBiomeStore {
     }
 
     static Path cacheFile(String world) {
-        File dir = (RTP.serverAccessor != null) ? RTP.serverAccessor.getPluginDirectory() : null;
+        File dir = (RTPRuntime.serverAccessor() != null) ? RTPRuntime.serverAccessor().getPluginDirectory() : null;
         if (dir == null) return null;
         String safe = UNSAFE_FILE_CHARS.matcher(world).replaceAll("_");
         return dir.toPath().resolve(CACHE_DIR).resolve(safe + ".rbs");
@@ -340,7 +340,7 @@ public final class WorldBiomeStore {
             save(file);
             savedVersion = v;
         } catch (IOException e) {
-            RTP.log(Level.WARNING, "[editor] failed to save biome store of world '" + world + "' to " + file + ": " + e.getMessage(), e);
+            RTPRuntime.log(Level.WARNING, "[editor] failed to save biome store of world '" + world + "' to " + file + ": " + e.getMessage(), e);
         }
     }
 
@@ -382,7 +382,7 @@ public final class WorldBiomeStore {
             load(file);
             savedVersion = version.get();
         } catch (IOException | RuntimeException e) {
-            RTP.log(Level.WARNING, "[editor] ignoring unreadable biome store " + file + " (world '" + world + "'): " + e.getMessage(), e);
+            RTPRuntime.log(Level.WARNING, "[editor] ignoring unreadable biome store " + file + " (world '" + world + "'): " + e.getMessage(), e);
             bins.clear();
         }
     }

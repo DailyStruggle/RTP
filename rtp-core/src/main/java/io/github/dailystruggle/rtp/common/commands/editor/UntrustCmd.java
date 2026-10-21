@@ -2,10 +2,10 @@ package io.github.dailystruggle.rtp.common.commands.editor;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorChannel;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.TrustedEditors;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
@@ -72,7 +72,7 @@ public class UntrustCmd extends BaseRTPCmdImpl {
         final String sel = selector;
         EditorSecurity.supplyAsync(() -> untrust(sel)).whenComplete((removed, t) -> {
             if (t != null) {
-                RTP.log(Level.WARNING, "[editor] untrust command failed: " + t.getMessage(), t);
+                RTPRuntime.log(Level.WARNING, "[editor] untrust command failed: " + t.getMessage(), t);
                 EditorChannelWiring.tell(callerId, EditorChannelWiring.message("editorUntrustFailed",
                         "[P0] Could not update the trusted editor list: [reason]").replace("[reason]", String.valueOf(t.getMessage())));
                 return;
@@ -81,7 +81,7 @@ public class UntrustCmd extends BaseRTPCmdImpl {
                 EditorChannelWiring.tell(callerId, EditorChannelWiring.message("editorUntrustNone",
                         "[P0] No trusted editor browser matches [key].").replace("[key]", sel));
             } else {
-                RTP.log(Level.INFO, "[editor] " + removed.size() + " editor key(s) untrusted (" + sel + ")");
+                RTPRuntime.log(Level.INFO, "[editor] " + removed.size() + " editor key(s) untrusted (" + sel + ")");
                 EditorChannelWiring.tell(callerId, EditorChannelWiring.message("editorUntrustRemoved",
                         "[P0] Untrusted [count] web editor browser(s); they must be trusted again to preview or Hot-Apply.")
                         .replace("[count]", String.valueOf(removed.size())));

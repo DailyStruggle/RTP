@@ -2,9 +2,10 @@ package io.github.dailystruggle.rtp.common.commands.editor;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorChannel;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
@@ -19,7 +20,7 @@ import java.util.logging.Level;
  * Command verb {@code /rtp editor} (ADR-104).
  *
  * <p>Posts active server configurations and documentation to the byte-store transport
- * asynchronously on {@code RTP.scheduler} (S-005) and returns a clickable session URL to
+ * asynchronously on {@code RTPRuntime.scheduler()} (S-005) and returns a clickable session URL to
  * the operator, never silently swallowing errors (S-004) and failing closed pre-init (S-006).
  *
  * <p>Hosted sessions are two-way (ADR-106 §5.4): a relay channel is opened before the upload, the
@@ -76,7 +77,7 @@ public class EditorCmd extends BaseRTPCmdImpl {
         }
 
         // S-006: Pre-init fail-closed guard
-        if (RTP.serverAccessor == null || RTP.configs == null) {
+        if (RTPRuntime.serverAccessor() == null || ActiveConfigs.get() == null) {
             sendMessage(callerId, "RTP: Core is not initialized yet. Please wait.");
             return true;
         }
@@ -100,7 +101,7 @@ public class EditorCmd extends BaseRTPCmdImpl {
                 EditorSessionManager sessions = EditorSessionManager.getInstance();
                 return sessions.createPayloadJson(sessions.collectCurrentConfigs(), ch == null ? null : ch.snapshotBlock());
             } catch (Exception e) {
-                RTP.log(Level.WARNING, "Failed to create editor session payload: " + e.getMessage(), e);
+                RTPRuntime.log(Level.WARNING, "Failed to create editor session payload: " + e.getMessage(), e);
                 throw new RuntimeException("Failed to prepare payload: " + e.getMessage(), e);
             }
         })).thenCompose(json -> http.get().postPayload(json))
@@ -112,13 +113,13 @@ public class EditorCmd extends BaseRTPCmdImpl {
                     // Live curve / hazard / land producers for this session, closed with the channel
                     EditorLiveFeed.startHosted(ch, transport::postPayload);
                 } catch (RuntimeException e) {
-                    RTP.log(Level.WARNING, "[editor] hosted live updates unavailable; the session is snapshot-only: "
+                    RTPRuntime.log(Level.WARNING, "[editor] hosted live updates unavailable; the session is snapshot-only: "
                             + e.getMessage(), e);
                     ch.close("live feed failed: " + e.getMessage());
                 }
             }
             // The operator needs the link; logs only carry a token prefix
-            RTP.log(Level.FINE, "[editor] hosted session " + EditorSecurity.tokenPrefix(token) + " uploaded");
+            RTPRuntime.log(Level.FINE, "[editor] hosted session " + EditorSecurity.tokenPrefix(token) + " uploaded");
             // The browser that opens this link is trusted for the session without a trust code (ADR-106 §5.10)
             String editorUrl = transport.buildEditorUrl(token, ch == null ? null : ch.linkSecret());
             sendMessage(callerId, "RTP: Editor session created! Open link to edit: " + editorUrl);
@@ -129,19 +130,19 @@ public class EditorCmd extends BaseRTPCmdImpl {
             // S-004: Zero silent swallows on HTTP failure
             Throwable cause = (throwable.getCause() != null) ? throwable.getCause() : throwable;
             String errMsg = "RTP: Failed to upload editor session to byte-store: " + cause.getMessage();
-            RTP.log(Level.WARNING, errMsg, cause);
+            RTPRuntime.log(Level.WARNING, errMsg, cause);
             sendMessage(callerId, errMsg);
 
             // Fallback: automatically generate local standalone editor bundle when remote upload fails
             try {
-                File pluginDir = (RTP.serverAccessor != null) ? RTP.serverAccessor.getPluginDirectory() : new File(".");
+                File pluginDir = (RTPRuntime.serverAccessor() != null) ? RTPRuntime.serverAccessor().getPluginDirectory() : new File(".");
                 if (pluginDir == null) pluginDir = new File(".");
                 java.nio.file.Path localPath = pluginDir.toPath().resolve("editor").resolve("index.html");
                 Map<String, String> configs = EditorSessionManager.getInstance().collectCurrentConfigs();
                 EditorLiveFeed.exportAndStart(localPath, configs, callerId);
                 sendMessage(callerId, "RTP: Generated offline local editor bundle at " + localPath.toAbsolutePath());
             } catch (Exception localEx) {
-                RTP.log(Level.WARNING, "Failed to generate fallback local editor: " + localEx.getMessage(), localEx);
+                RTPRuntime.log(Level.WARNING, "Failed to generate fallback local editor: " + localEx.getMessage(), localEx);
             }
             return null;
         });
@@ -150,9 +151,9 @@ public class EditorCmd extends BaseRTPCmdImpl {
     }
 
     private void sendMessage(@Nullable UUID callerId, String msg) {
-        if (callerId == null || RTP.serverAccessor == null) return;
+        if (callerId == null || RTPRuntime.serverAccessor() == null) return;
         try {
-            RTP.serverAccessor.sendMessage(RTPAPI.serverId, callerId, msg);
+            RTPRuntime.serverAccessor().sendMessage(RTPAPI.serverId, callerId, msg);
         } catch (Exception ignored) {
         }
     }

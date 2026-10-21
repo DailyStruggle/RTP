@@ -2,9 +2,9 @@ package io.github.dailystruggle.rtp.common.configuration;
 
 import io.github.dailystruggle.rtp.api.safety.SafetyToken;
 import io.github.dailystruggle.rtp.api.safety.SafetyTokenParser;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -54,16 +54,16 @@ public final class SafetyTokenExpander {
         // registry may not be populated yet; rebuilding here gives the freshest
         // possible snapshot and is cheap (one pass over Tag.REGISTRY_BLOCKS).
         Map<String, Set<String>> tagSnapshot = Collections.emptyMap();
-        if (RTP.serverAccessor == null) {
-            RTP.log(Level.WARNING,
+        if (RTPRuntime.serverAccessor() == null) {
+            RTPRuntime.log(Level.WARNING,
                     "[RTP] SafetyTokenExpander: RTP.serverAccessor is null - tag tokens cannot be resolved");
         } else {
             try {
-                RTP.serverAccessor.rebuildBlockTagSnapshot();
-                Map<String, Set<String>> s = RTP.serverAccessor.blockTagSnapshot();
+                RTPRuntime.serverAccessor().rebuildBlockTagSnapshot();
+                Map<String, Set<String>> s = RTPRuntime.serverAccessor().blockTagSnapshot();
                 if (s != null) tagSnapshot = s;
             } catch (Throwable ex) {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "[RTP] SafetyTokenExpander: tag snapshot failed ("
                                 + ex.getClass().getSimpleName() + ": " + ex.getMessage() + ")");
             }
@@ -80,15 +80,15 @@ public final class SafetyTokenExpander {
 
     private static void scheduleRetry(ConfigParser<BlocksKeys> safety, int nextAttempt) {
         try {
-            if (RTP.scheduler == null) return;
-            RTP.scheduler.runTaskLater(() -> {
+            if (RTPRuntime.scheduler() == null) return;
+            RTPRuntime.scheduler().runTaskLater(() -> {
                 try {
-                    RTP.log(Level.FINE,
+                    RTPRuntime.log(Level.FINE,
                             "[RTP] SafetyTokenExpander: deferred retry #" + nextAttempt
                                     + " for unresolved tag tokens");
                     expandAndApply(safety, nextAttempt);
                 } catch (Throwable ex) {
-                    RTP.log(Level.FINE,
+                    RTPRuntime.log(Level.FINE,
                             "[RTP] SafetyTokenExpander: deferred retry #" + nextAttempt
                                     + " failed: " + ex.getClass().getSimpleName()
                                     + ": " + ex.getMessage());
@@ -96,7 +96,7 @@ public final class SafetyTokenExpander {
             }, RETRY_DELAY_TICKS);
         } catch (Throwable ex) {
             // Scheduler may not be available in test fixtures; non-fatal.
-            RTP.log(Level.FINE,
+            RTPRuntime.log(Level.FINE,
                     "[RTP] SafetyTokenExpander: could not schedule deferred retry ("
                             + ex.getClass().getSimpleName() + ": " + ex.getMessage() + ")");
         }
@@ -216,7 +216,7 @@ public final class SafetyTokenExpander {
             // also possible during early-bootstrap reload races. Non-fatal: the
             // lazy refresh in JumpAdjustor.refreshSafetySets is still wired and
             // will retry on the next adjustor invocation.
-            RTP.log(Level.FINE,
+            RTPRuntime.log(Level.FINE,
                     "[RTP] SafetyTokenExpander: skipped reapply for "
                             + key.name() + " (" + ex.getClass().getSimpleName()
                             + ": " + ex.getMessage() + ")");
@@ -236,7 +236,7 @@ public final class SafetyTokenExpander {
                     .append(tagsUnresolved).append(" tag(s) unresolved");
         }
         if (tagsExpanded > 0 || tagsUnresolved > 0) sb.append(")");
-        RTP.log(level, sb.toString());
+        RTPRuntime.log(level, sb.toString());
         return tagsUnresolved;
     }
 

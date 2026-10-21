@@ -1,9 +1,9 @@
 package io.github.dailystruggle.rtp.common.selection;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
@@ -42,7 +42,7 @@ class SelectionAPIWorldRegionTest {
   @BeforeEach
   void setUp() {
     accessor = RTPTestSetup.install(tempDir.toFile());
-    RTP.selectionAPI = new SelectionAPI();
+    ActiveSelection.set(new SelectionAPI());
     // Base region "default" lives in world "default_world".
     MockRTPWorld defaultWorld = new MockRTPWorld("default_world");
     accessor.addWorld(defaultWorld);
@@ -52,7 +52,7 @@ class SelectionAPIWorldRegionTest {
         "default", defaultWorld, shape, vert,
         false, false,
         10L, 1000L, 0L, 5, 0.0, 1L, "", false);
-    RTP.selectionAPI.permRegionLookup.put("default", new Region("default", settings));
+    ActiveSelection.get().permRegionLookup.put("default", new Region("default", settings));
     // A distinct target world (e.g. the nether) the player wants to RTP into.
     accessor.addWorld(new MockRTPWorld("nether_world"));
     // A dimension-suffixed world so the nether/end vert seeding kicks in.
@@ -62,19 +62,19 @@ class SelectionAPIWorldRegionTest {
 
   @AfterEach
   void tearDown() {
-    if (RTP.selectionAPI != null) {
-      RTP.selectionAPI.permRegionLookup.clear();
-      RTP.selectionAPI.tempRegions.clear();
+    if (ActiveSelection.get() != null) {
+      ActiveSelection.get().permRegionLookup.clear();
+      ActiveSelection.get().tempRegions.clear();
     }
-    RTP.serverAccessor = null;
-    RTP.scheduler = null;
+    RTPRuntime.setServerAccessor(null);
+    RTPRuntime.setScheduler(null);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
   }
 
   @Test
   @DisplayName("rebinds base region to the requested world and names it <base>_<world>")
   void worldRegion_rebindsToRequestedWorld() {
-    Region region = RTP.selectionAPI.worldRegion("default", "nether_world");
+    Region region = ActiveSelection.get().worldRegion("default", "nether_world");
     assertNotNull(region);
     assertEquals("default_nether_world", region.name);
     assertNotNull(region.getWorld());
@@ -84,26 +84,26 @@ class SelectionAPIWorldRegionTest {
   @Test
   @DisplayName("caches the override in tempRegions keyed by world id and reuses it")
   void worldRegion_cachedByWorldId() {
-    Region first = RTP.selectionAPI.worldRegion("default", "nether_world");
-    Region second = RTP.selectionAPI.worldRegion("default", "nether_world");
+    Region first = ActiveSelection.get().worldRegion("default", "nether_world");
+    Region second = ActiveSelection.get().worldRegion("default", "nether_world");
     assertSame(first, second, "repeated calls must reuse the cached region");
-    assertTrue(RTP.selectionAPI.tempRegions.containsValue(first));
+    assertTrue(ActiveSelection.get().tempRegions.containsValue(first));
     assertSame(first,
-        RTP.selectionAPI.tempRegions.get(accessor.getRTPWorld("nether_world").id()));
+        ActiveSelection.get().tempRegions.get(accessor.getRTPWorld("nether_world").id()));
   }
 
   @Test
   @DisplayName("returns the base region unchanged when it already targets the world")
   void worldRegion_baseAlreadyTargetsWorld() {
-    Region base = RTP.selectionAPI.getRegion("default");
-    Region region = RTP.selectionAPI.worldRegion("default", "default_world");
+    Region base = ActiveSelection.get().getRegion("default");
+    Region region = ActiveSelection.get().worldRegion("default", "default_world");
     assertSame(base, region, "no synthetic region when base already targets the world");
   }
 
   @Test
   @DisplayName("seeds a dimension-appropriate (LINEAR, downward, no-skylight) vert for _nether worlds")
   void worldRegion_seedsNetherVert() {
-    Region region = RTP.selectionAPI.worldRegion("default", "world_nether");
+    Region region = ActiveSelection.get().worldRegion("default", "world_nether");
     assertNotNull(region);
     var vert = (LinearAdjustor) region.getVert();
     assertNotNull(vert);
@@ -115,7 +115,7 @@ class SelectionAPIWorldRegionTest {
   @Test
   @DisplayName("seeds a dimension-appropriate vert for _the_end worlds")
   void worldRegion_seedsEndVert() {
-    Region region = RTP.selectionAPI.worldRegion("default", "world_the_end");
+    Region region = ActiveSelection.get().worldRegion("default", "world_the_end");
     assertNotNull(region);
     var vert = (LinearAdjustor) region.getVert();
     assertNotNull(vert);
@@ -127,7 +127,7 @@ class SelectionAPIWorldRegionTest {
   @Test
   @DisplayName("leaves the base vert unchanged for non-dimension worlds")
   void worldRegion_keepsBaseVertForOverworld() {
-    Region region = RTP.selectionAPI.worldRegion("default", "nether_world");
+    Region region = ActiveSelection.get().worldRegion("default", "nether_world");
     assertNotNull(region);
     var vert = (LinearAdjustor) region.getVert();
     assertNotNull(vert);
@@ -138,8 +138,8 @@ class SelectionAPIWorldRegionTest {
   @Test
   @DisplayName("returns null for an unknown world or missing base region")
   void worldRegion_nullOnUnknownInputs() {
-    assertNull(RTP.selectionAPI.worldRegion("default", "no_such_world"));
-    assertNull(RTP.selectionAPI.worldRegion("default", null));
-    assertNull(RTP.selectionAPI.worldRegion("default", ""));
+    assertNull(ActiveSelection.get().worldRegion("default", "no_such_world"));
+    assertNull(ActiveSelection.get().worldRegion("default", null));
+    assertNull(ActiveSelection.get().worldRegion("default", ""));
   }
 }

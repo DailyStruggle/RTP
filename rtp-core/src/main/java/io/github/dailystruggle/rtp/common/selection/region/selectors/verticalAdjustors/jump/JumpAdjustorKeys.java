@@ -22,5 +22,17 @@ public enum JumpAdjustorKeys {
   /**
    * Whether a valid location must have direct access to the sky.
    */
-  requireSkyLight
+  requireSkyLight,
+
+  /**
+   * Largest floor-height difference, in blocks, allowed between the landing spot and the floors
+   * {@link #slopeRadius} blocks away in each cardinal direction. Absent or negative disables the
+   * check (ADR-119). No default entry, so unset verts keep their cache key.
+   */
+  maxSlope,
+
+  /**
+   * Horizontal distance of the slope samples, clamped to [1, 8]; 2 when absent (ADR-119).
+   */
+  slopeRadius
 }

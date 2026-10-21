@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.dailystruggle.rtp.anvil.StorageLatencyProbe;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.benchmark.IndexConfigPlanner.Config;
 import io.github.dailystruggle.rtp.common.benchmark.IndexConfigPlanner.Situation;
 import io.github.dailystruggle.rtp.common.benchmark.ModelCrossoverPlanner.ModelChoice;
@@ -12,6 +11,7 @@ import io.github.dailystruggle.rtp.common.benchmark.ModelCrossoverPlanner.Reside
 import io.github.dailystruggle.rtp.common.benchmark.ModelCrossoverPlanner.ResidencyChoice;
 import io.github.dailystruggle.rtp.common.benchmark.SimulationReport.Provenance;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
@@ -86,7 +86,7 @@ public class CoarsenedSpiralBenchmarkTest {
 
   @BeforeAll
   public static void setup() {
-    RTP.serverAccessor = new MockRTPServerAccessor(new java.io.File("target/test-data"));
+    RTPRuntime.setServerAccessor(new MockRTPServerAccessor(new java.io.File("target/test-data")));
     if (!WorldOccupancyMask.available()) return;
     Path dir = WorldOccupancyMask.resolveDirectory();
     mask = new TiledOccupancyMask(WorldOccupancyMask.load(dir));

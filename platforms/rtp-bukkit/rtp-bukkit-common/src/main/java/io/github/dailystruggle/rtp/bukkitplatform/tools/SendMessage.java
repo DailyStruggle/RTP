@@ -4,7 +4,9 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.softdepends.PAPIChecker;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tools.GradientExpander;
 import io.github.dailystruggle.rtp.common.placeholders.PlaceholderProvider;
 import java.util.*;
@@ -132,7 +134,7 @@ public class SendMessage {
     if (sender instanceof Player) sendMessage((Player) sender, message);
     else {
       OfflinePlayer console = Bukkit.getOfflinePlayer(RTPAPI.serverId);
-      if (RTP.serverAccessor.getServerIntVersion() > 12) {
+      if (RTPRuntime.serverAccessor().getServerIntVersion() > 12) {
         BaseComponent[] components = toComponents(console, message);
         sender.spigot().sendMessage(components);
       } else {
@@ -144,7 +146,7 @@ public class SendMessage {
   public static void sendMessage(Player player, String message) {
     if (message == null || message.isEmpty()) return;
     intercept(message);
-    if (RTP.serverAccessor.getServerIntVersion() > 12) {
+    if (RTPRuntime.serverAccessor().getServerIntVersion() > 12) {
       BaseComponent[] components = toComponents(player, message);
       player.spigot().sendMessage(components);
     } else player.sendMessage(format(player, message));
@@ -171,7 +173,7 @@ public class SendMessage {
     if (sender instanceof Player) player = (OfflinePlayer) sender;
     else player = Bukkit.getOfflinePlayer(RTPAPI.serverId).getPlayer();
 
-    if (RTP.serverAccessor.getServerIntVersion() > 12) {
+    if (RTPRuntime.serverAccessor().getServerIntVersion() > 12) {
       BaseComponent[] textComponents = toComponents(player, message);
 
       if (hover != null && !hover.isEmpty()) {
@@ -192,7 +194,7 @@ public class SendMessage {
       // In a version-independent rtp-plugin, we use the API to send messages.
       // If it's a Bukkit server, we know the player's spigot() method is available if we check the
       // server version.
-      if (RTP.serverAccessor.getServerIntVersion() > 12) {
+      if (RTPRuntime.serverAccessor().getServerIntVersion() > 12) {
         Player bukkitPlayer = Bukkit.getPlayer(sender.uuid());
         if (bukkitPlayer != null) {
           bukkitPlayer.spigot().sendMessage(textComponents);
@@ -244,7 +246,7 @@ public class SendMessage {
 
     text = PlaceholderProvider.fillPlaceholders(text, uuid);
 
-    if (numericPlaceholders && RTP.configs != null) {
+    if (numericPlaceholders && ActiveConfigs.get() != null) {
       text = PlaceholderProvider.fillNumericPlaceholders(text);
     }
 
@@ -389,13 +391,13 @@ public class SendMessage {
    */
   private static Level resolveMinLevel() {
     try {
-      if (RTP.configs == null) return Level.ALL;
+      if (ActiveConfigs.get() == null) return Level.ALL;
       io.github.dailystruggle.rtp.common.configuration.ConfigParser<
               io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys>
           logging =
               (io.github.dailystruggle.rtp.common.configuration.ConfigParser<
                       io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys>)
-                  RTP.configs.getParser(
+                  ActiveConfigs.get().getParser(
                       io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys.class);
       if (logging == null) return Level.ALL;
       Object raw =
@@ -492,7 +494,7 @@ public class SendMessage {
     message = ChatColor.translateAlternateColorCodes('&', message);
     intercept(level, message);
 
-    if (RTP.serverAccessor.getServerIntVersion() <= 12) message = ChatColor.stripColor(message);
+    if (RTPRuntime.serverAccessor().getServerIntVersion() <= 12) message = ChatColor.stripColor(message);
 
     ChatColor color = colorFor(level);
     if (color == null) {
@@ -503,7 +505,7 @@ public class SendMessage {
     // Map CONFIG → INFO for the legacy (<=1.12) Bukkit logger path; newer servers use the
     // console-sender route which carries its own color and level via the component payload.
     Level legacyLevel = (level.equals(Level.CONFIG)) ? Level.INFO : level;
-    boolean modern = RTP.serverAccessor.getServerIntVersion() > 12;
+    boolean modern = RTPRuntime.serverAccessor().getServerIntVersion() > 12;
 
     for (String s : message.split("\n")) {
       String colored = color + s;

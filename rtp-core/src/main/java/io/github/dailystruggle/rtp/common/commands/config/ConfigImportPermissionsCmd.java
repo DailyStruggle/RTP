@@ -3,10 +3,10 @@ package io.github.dailystruggle.rtp.common.commands.config;
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.permission.PermissionMigrationService;
 import io.github.dailystruggle.rtp.common.permission.PermissionSourceResolver;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -77,7 +77,7 @@ public class ConfigImportPermissionsCmd extends BaseRTPCmdImpl {
             }
         }
 
-        if (RTP.serverAccessor == null) {
+        if (RTPRuntime.serverAccessor() == null) {
             sendMessage(callerId, "&c[RTP] Server accessor unavailable; cannot execute commands.");
             return false;
         }
@@ -98,7 +98,7 @@ public class ConfigImportPermissionsCmd extends BaseRTPCmdImpl {
 
             // Group Discovery: Dispatch configured group list template with capturing sender
             List<String> groupLines = new ArrayList<>();
-            boolean groupDispatched = RTP.serverAccessor.executeCommandWithCapture(groupListCmd, groupLines::add);
+            boolean groupDispatched = RTPRuntime.serverAccessor().executeCommandWithCapture(groupListCmd, groupLines::add);
             if (!groupDispatched && groupLines.isEmpty()) {
                 sendMessage(callerId, "&e[WARN] Could not capture group list from permission provider.");
                 sendMessage(callerId, "&7Tip: Configured templates map competitor nodes with context preservation:");
@@ -124,7 +124,7 @@ public class ConfigImportPermissionsCmd extends BaseRTPCmdImpl {
             for (String group : discoveredGroups) {
                 String permInfoCmd = migrationService.formatGroupGet(group);
                 List<String> permLines = new ArrayList<>();
-                RTP.serverAccessor.executeCommandWithCapture(permInfoCmd, permLines::add);
+                RTPRuntime.serverAccessor().executeCommandWithCapture(permInfoCmd, permLines::add);
 
                 List<PermissionMigrationService.ParsedNode> parsedNodes =
                         migrationService.parsePermissionInfoOutput(permLines);
@@ -152,7 +152,7 @@ public class ConfigImportPermissionsCmd extends BaseRTPCmdImpl {
             if (finalApply) {
                 sendMessage(callerId, "&a[RTP] Successfully migrated &f" + totalMigrated
                         + "&a competitor permission(s) across &f" + discoveredGroups.size() + "&a groups.");
-                RTP.log(Level.INFO, "[RTP] Permission migration applied " + totalMigrated
+                RTPRuntime.log(Level.INFO, "[RTP] Permission migration applied " + totalMigrated
                         + " permission set commands across " + discoveredGroups.size() + " groups.");
             } else {
                 sendMessage(callerId, "&7[RTP] Dry-run complete: &f" + totalPlanned
@@ -165,8 +165,8 @@ public class ConfigImportPermissionsCmd extends BaseRTPCmdImpl {
             sendMessage(callerId, "  &7Group set:   &f" + migrationService.getGroupSetTemplate());
         };
 
-        if (RTP.scheduler != null) {
-            RTP.scheduler.runTaskAsynchronously(migrationTask);
+        if (RTPRuntime.scheduler() != null) {
+            RTPRuntime.scheduler().runTaskAsynchronously(migrationTask);
         } else {
             migrationTask.run();
         }
@@ -210,10 +210,10 @@ public class ConfigImportPermissionsCmd extends BaseRTPCmdImpl {
     }
 
     private void sendMessage(@Nullable UUID callerId, String msg) {
-        if (callerId != null && RTP.serverAccessor != null) {
-            RTP.serverAccessor.sendMessage(callerId, msg);
+        if (callerId != null && RTPRuntime.serverAccessor() != null) {
+            RTPRuntime.serverAccessor().sendMessage(callerId, msg);
         } else {
-            RTP.log(Level.INFO, COLOR_CODE.matcher(msg).replaceAll(""));
+            RTPRuntime.log(Level.INFO, COLOR_CODE.matcher(msg).replaceAll(""));
         }
     }
 

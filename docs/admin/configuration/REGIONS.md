@@ -291,6 +291,16 @@ The `vert` block controls the Y-coordinate (height) selection.
 - `name`: The vertical adjustor engine.
 - `minY` / `maxY`: The allowed Y-range for teleportation.
 - `requireSkyLight`: If true, only accepts locations with direct access to the sky (surface-only).
+- `maxSlope` (`LINEAR` and `JUMP` only): Largest floor-height step, in blocks, allowed between the landing spot and the floor `slopeRadius` blocks away to the north, south, east and west. A spot that fails is skipped and the search continues with the next height or column. Omit it, or set `-1`, to turn the check off. `0` accepts only flat ground.
+- `slopeRadius` (`LINEAR` and `JUMP` only): How far from the landing spot the floor is sampled. Default `2`, range `1`-`8`.
+
+#### Slope check details (`maxSlope`)
+- The check looks for the floor near the landing spot's own height (within `maxSlope` blocks up or down), not from the sky down. Cave roofs, the Nether ceiling and other cave layers are ignored, so it works underground and in the Nether.
+- A sample with no floor within `maxSlope` blocks counts as too steep, so drops (cliff edges, ravines) and walls are both rejected.
+- **Chunk-edge caveat:** samples stay inside the landing spot's chunk. Near a chunk edge the samples on that side are moved inward or skipped, so steep ground just across the edge is not seen. Larger `slopeRadius` values make this more common.
+- Adding, changing or removing `maxSlope` or `slopeRadius` rebuilds that region's saved location data once, because chunks rejected under the old setting may be fine under the new one.
+- Steep terrain with a low `maxSlope` rejects more chunks, so selection can take longer. Raise `maxSlope` if `/rtp` starts failing in hilly regions.
+- `FIXED` ignores both keys: it places players in mid-air, where there is no floor to measure.
 
 ### Vert Engines and Parameters
 
@@ -312,7 +322,7 @@ A thorough scan of every Y level in a specific order.
 Places the player at a single configured Y level in **mid-air**, with no terrain scan. Designed for skyblock-style worlds where the platform tool builds a foothold around the player after teleport.
 - `y`: The exact Y-level for placement. Default `64`.
 - The destination cell `(x, y, z)` and the head cell `(x, y+1, z)` must both be air; any non-air block at either cell is treated as unsafe and the chunk is rejected so a different one is rolled.
-- Ignores `minY`, `maxY`, `direction`, `requireSkyLight`, and the `unsafeBlocks` ground sweep — none of those apply to mid-air placement.
+- Ignores `minY`, `maxY`, `direction`, `requireSkyLight`, `maxSlope`, `slopeRadius`, and the `unsafeBlocks` ground sweep — none of those apply to mid-air placement.
 - **Enable a platform builder** when using `FIXED`. Without one the player will fall straight through air.
 
 ---

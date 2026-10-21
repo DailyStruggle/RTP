@@ -6,9 +6,11 @@ import io.github.dailystruggle.rtp.api.claim.ClaimBoundaryProvider;
 import io.github.dailystruggle.rtp.api.hooks.ClaimBoundaryRegistry;
 import io.github.dailystruggle.rtp.api.hooks.RegionVerifierRegistry;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.LanguageBootstrap;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.ArrayList;
 import java.util.List;
 import org.bukkit.Bukkit;
@@ -36,7 +38,7 @@ public final class ClaimIntegrations {
    * @param resourceLoader the addon class loader, used to extract the bundled {@code integrations.yml}
    */
   public static void setup(ClassLoader resourceLoader) {
-    RTP.configs.putParser(buildParser(resourceLoader));
+    ActiveConfigs.get().putParser(buildParser(resourceLoader));
 
     // Lands needs a Bukkit plugin instance to register its API; reuse the RTP plugin.
     Plugin host = Bukkit.getPluginManager().getPlugin("RTP");
@@ -45,7 +47,7 @@ public final class ClaimIntegrations {
     }
 
     Configs.onReload(() -> {
-      RTP.configs.putParser(buildParser(resourceLoader));
+      ActiveConfigs.get().putParser(buildParser(resourceLoader));
       registerVerifiers();
       registerBoundaryProviders();
     });
@@ -55,15 +57,15 @@ public final class ClaimIntegrations {
   }
 
   private static ConfigParser<IntegrationsKeys> buildParser(ClassLoader resourceLoader) {
-    String locale = LanguageBootstrap.resolve(RTP.serverAccessor.getPluginDirectory());
-    migrateLegacyRoot(RTP.serverAccessor.getPluginDirectory(), "integrations.yml");
+    String locale = LanguageBootstrap.resolve(RTPRuntime.serverAccessor().getPluginDirectory());
+    migrateLegacyRoot(RTPRuntime.serverAccessor().getPluginDirectory(), "integrations.yml");
     return new ConfigParser<>(
         IntegrationsKeys.class,
         "addons/integrations",
         "1.0",
-        RTP.serverAccessor.getPluginDirectory(),
+        RTPRuntime.serverAccessor().getPluginDirectory(),
         null,
-        RTP.configs.fileDatabase,
+        ActiveConfigs.get().fileDatabase,
         resourceLoader,
         locale);
   }
@@ -91,7 +93,7 @@ public final class ClaimIntegrations {
   @SuppressWarnings("unchecked")
   private static void registerVerifiers() {
     ConfigParser<IntegrationsKeys> parser =
-        (ConfigParser<IntegrationsKeys>) RTP.configs.getParser(IntegrationsKeys.class);
+        (ConfigParser<IntegrationsKeys>) ActiveConfigs.get().getParser(IntegrationsKeys.class);
     if (parser == null) return;
 
     RegionVerifierRegistry verifiers = RTPAPI.hooks().verifiers();
@@ -175,7 +177,7 @@ public final class ClaimIntegrations {
   @SuppressWarnings("unchecked")
   private static void registerBoundaryProviders() {
     ConfigParser<IntegrationsKeys> parser =
-        (ConfigParser<IntegrationsKeys>) RTP.configs.getParser(IntegrationsKeys.class);
+        (ConfigParser<IntegrationsKeys>) ActiveConfigs.get().getParser(IntegrationsKeys.class);
     if (parser == null) return;
 
     ClaimBoundaryRegistry registry = RTPAPI.hooks().claimBoundaries();

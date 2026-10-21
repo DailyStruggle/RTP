@@ -1,11 +1,12 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
 import io.github.dailystruggle.rtp.api.selection.GenerationResult;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.OnDemandChunkReadBenchmarkTest.BenchmarkedRTPWorld;
 import io.github.dailystruggle.rtp.common.selection.region.OnDemandChunkReadBenchmarkTest.TerrainProfile;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
@@ -42,7 +43,7 @@ class ImmediatePermitScopeTest {
     @BeforeEach
     void setUp() {
         accessor = RTPTestSetup.install(tempDir);
-        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+        ConfigParser<PerformanceKeys> perf = (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         perf.set(PerformanceKeys.maxAttempts, 50L);
         perf.set(PerformanceKeys.maxHeapPercent, 100.0);
         HeapPressureMonitor.resetForTesting();
@@ -54,8 +55,8 @@ class ImmediatePermitScopeTest {
     void tearDown() {
         HeapPressureMonitor.resetForTesting();
         ImmediateLoadGovernor.resetAll();
-        RTP.serverAccessor = null;
-        RTP.scheduler = null;
+        RTPRuntime.setServerAccessor(null);
+        RTPRuntime.setScheduler(null);
         LocationGenerator.setRng(null);
     }
 

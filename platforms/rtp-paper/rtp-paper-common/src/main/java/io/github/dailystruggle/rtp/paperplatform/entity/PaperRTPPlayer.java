@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.paperplatform.entity;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Optional;
 import io.github.dailystruggle.rtp.bukkitplatform.tools.BukkitServers;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
@@ -81,7 +82,7 @@ public class PaperRTPPlayer extends BukkitRTPPlayer {
       // S-004: never silently swallow a teleport failure. Fall back to sync teleport on the scheduler.
       RTP.log(Level.WARNING, "[RTP] teleportAsync threw unexpectedly, falling back to sync teleport", t);
       Runnable tpTask = () -> future.complete(player.teleport(location));
-      RTP.scheduler.runTask(tpTask);
+      RTPRuntime.scheduler().runTask(tpTask);
     }
     return future;
   }

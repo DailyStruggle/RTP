@@ -6,9 +6,11 @@ import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.world.BiomeOverride;
 import io.github.dailystruggle.rtp.anvil.AnvilColumnProbeAdapter;
 import io.github.dailystruggle.rtp.neoforge.version.NeoForgeVersionAdapter;
@@ -200,8 +202,8 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                     java.util.Set<String> rawUnsafe = currentUnsafeBlocks();
                     return anvilProbeSupport
                             .probeAndPublish(worldFolder, dim, chunkX, chunkZ, key, rawUnsafe,
-                                    s -> (RTP.serverAccessor != null)
-                                            ? RTP.serverAccessor.reconcilePaletteIdentifier(s)
+                                    s -> (RTPRuntime.serverAccessor() != null)
+                                            ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
                                             : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(s))
                             .thenCompose(result -> {
                                 io.github.dailystruggle.rtp.anvil.AnvilChunkView view = result.view();
@@ -229,8 +231,8 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
     @SuppressWarnings("unchecked")
     private static java.util.Set<String> currentUnsafeBlocks() {
         try {
-            if (RTP.configs == null) return java.util.Collections.emptySet();
-            Object raw = RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new java.util.ArrayList<>());
+            if (ActiveConfigs.get() == null) return java.util.Collections.emptySet();
+            Object raw = ActiveConfigs.get().getConfigValue(BlocksKeys.unsafeBlocks, new java.util.ArrayList<>());
             if (raw instanceof java.util.Collection<?> c) {
                 java.util.Set<String> out = new java.util.HashSet<>(c.size());
                 for (Object o : c) if (o != null) out.add(o.toString());
@@ -499,8 +501,8 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
                 if (err != null) throw err;
                 if (probe == null) return null;
                 return ChunkColumnProbe.of(new AnvilColumnProbeAdapter(probe, cx, cz,
-                    s -> (RTP.serverAccessor != null)
-                        ? RTP.serverAccessor.reconcilePaletteIdentifier(s)
+                    s -> (RTPRuntime.serverAccessor() != null)
+                        ? RTPRuntime.serverAccessor().reconcilePaletteIdentifier(s)
                         : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalize(s)));
             } catch (Throwable t) {
                 RTP.log(java.util.logging.Level.FINE,
@@ -641,7 +643,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         try {
             @SuppressWarnings("unchecked")
             ConfigParser<SafetyKeys> safety =
-                (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+                (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
             if (safety == null) return true;
             Object raw = safety.getConfigValue(SafetyKeys.anvilPrefilterEnabled, Boolean.TRUE);
             if (raw instanceof Boolean b) return b;
@@ -856,8 +858,8 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
         if (view != null) {
             int cx = (int) (key & 0xffffffffL);
             int cz = (int) (key >> 32);
-            java.util.Set<String> reconciled = (RTP.serverAccessor != null)
-                    ? RTP.serverAccessor.reconcilePaletteIdentifiers(currentUnsafeBlocks())
+            java.util.Set<String> reconciled = (RTPRuntime.serverAccessor() != null)
+                    ? RTPRuntime.serverAccessor().reconcilePaletteIdentifiers(currentUnsafeBlocks())
                     : io.github.dailystruggle.rtp.anvil.PaletteIdentifierNormalizer.normalizeAll(currentUnsafeBlocks());
             return new NeoForgeRTPChunk(view, cx, cz, id, reconciled);
         }
@@ -866,12 +868,12 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
 
     @Override
     public void keepChunkAt(int chunkX, int chunkZ) {
-        RTP.scheduler.runTask(this, chunkX, chunkZ, () -> setForceLoaded(chunkX, chunkZ, true));
+        RTPRuntime.scheduler().runTask(this, chunkX, chunkZ, () -> setForceLoaded(chunkX, chunkZ, true));
     }
 
     @Override
     public void forgetChunkAt(int chunkX, int chunkZ) {
-        RTP.scheduler.runTask(this, chunkX, chunkZ, () -> {
+        RTPRuntime.scheduler().runTask(this, chunkX, chunkZ, () -> {
             setForceLoaded(chunkX, chunkZ, false);
             long key = ((long) chunkX & 0xffffffffL) | ((long) chunkZ << 32);
             chunkCache.remove(key);
@@ -935,7 +937,7 @@ public final class NeoForgeRTPWorld extends RTPWorld<ServerLevel> {
      * and writes the resulting {@code BlockState} via {@link ServerLevel#setBlock}.
      *
      * <p>Invoked on the server thread by the caller (the teleport pipeline dispatches the paste
-     * through {@code RTP.scheduler.runTask(location, ...)}). Performs block writes only and never
+     * through {@code RTPRuntime.scheduler().runTask(location, ...)}). Performs block writes only and never
      * loads chunks (S-005). A single undecodable token is counted as a skip and audited, never
      * thrown (S-004). Parity with {@code V26_2_R1FabricRTPWorld#setBlocks}.
      *

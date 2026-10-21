@@ -13,6 +13,7 @@ import io.github.dailystruggle.rtp.api.economy.RTPEconomy;
 import io.github.dailystruggle.rtp.api.hooks.RTPHooks;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.GlobalRegionVerifiers;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -43,7 +44,7 @@ class RTPHooksFacadeTest {
   @BeforeEach
   void setUp() {
     savedHooks = RTPAPI.hooks;
-    savedEconomy = RTP.economy;
+    savedEconomy = RTPRuntime.economy();
     GlobalRegionVerifiers.clearGlobalRegionVerifiers();
   }
 
@@ -51,7 +52,7 @@ class RTPHooksFacadeTest {
   void tearDown() {
     GlobalRegionVerifiers.clearGlobalRegionVerifiers();
     RTPAPI.hooks = savedHooks;
-    RTP.economy = savedEconomy;
+    RTPRuntime.setEconomy(savedEconomy);
   }
 
   @Test
@@ -129,10 +130,10 @@ class RTPHooksFacadeTest {
       @Override public double bal(UUID p) { return 0; }
     };
     hooks.economy().bind(fake);
-    assertSame(fake, RTP.economy);
+    assertSame(fake, RTPRuntime.economy());
     assertSame(fake, hooks.economy().current());
     hooks.economy().clear();
-    assertNull(RTP.economy);
+    assertNull(RTPRuntime.economy());
     assertThrows(IllegalArgumentException.class, () -> hooks.economy().bind(null));
   }
 

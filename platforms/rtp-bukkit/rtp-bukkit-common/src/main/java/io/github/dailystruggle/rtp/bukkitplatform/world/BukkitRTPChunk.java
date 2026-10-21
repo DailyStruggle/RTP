@@ -6,6 +6,8 @@ import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -114,10 +116,10 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
   @Override
   public RTPWorld<?> getWorld() {
     if (anvilView != null) {
-      return (RTP.serverAccessor != null) ? RTP.serverAccessor.getRTPWorld(anvilWorldId) : null;
+      return (RTPRuntime.serverAccessor() != null) ? RTPRuntime.serverAccessor().getRTPWorld(anvilWorldId) : null;
     }
     if (chunk == null) return null;
-    return (RTP.serverAccessor != null) ? RTP.serverAccessor.getRTPWorld(chunk.getWorld().getUID()) : null;
+    return (RTPRuntime.serverAccessor() != null) ? RTPRuntime.serverAccessor().getRTPWorld(chunk.getWorld().getUID()) : null;
   }
 
   @Override
@@ -213,8 +215,8 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
       org.bukkit.World w = chunk.getWorld();
       if (y < w.getMinHeight() || y >= w.getMaxHeight()) return false;
     }
-    Set<String> reconciledUnsafeSet = (RTP.serverAccessor != null)
-        ? RTP.serverAccessor.reconcilePaletteIdentifiers(unsafeBlocks)
+    Set<String> reconciledUnsafeSet = (RTPRuntime.serverAccessor() != null)
+        ? RTPRuntime.serverAccessor().reconcilePaletteIdentifiers(unsafeBlocks)
         : io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalizeAll(unsafeBlocks);
     if (anvilView != null) {
       // Prefer the pre-reconciled set we were constructed with; if absent, reconcile
@@ -228,8 +230,8 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
     // Live chunk path: reconcile both the block's material name and the raw unsafe
     // set to ensure a canonical comparison, matching the Anvil path's logic.
     String materialName = chunk.getBlock(x & 0xF, y, z & 0xF).getType().name();
-    return (RTP.serverAccessor != null)
-        ? !RTP.serverAccessor.matchesPaletteIdentifier(materialName, reconciledUnsafeSet)
+    return (RTPRuntime.serverAccessor() != null)
+        ? !RTPRuntime.serverAccessor().matchesPaletteIdentifier(materialName, reconciledUnsafeSet)
         : !reconciledUnsafeSet.contains(io.github.dailystruggle.rtp.api.configuration.PaletteIdentifierNormalizer.normalize(materialName));
   }
 
@@ -337,7 +339,7 @@ public final class BukkitRTPChunk extends RTPChunk<Chunk> {
     if (Bukkit.isPrimaryThread()) chunk.unload(false);
     else {
       RTP instance = RTP.getInstance();
-      if (instance != null) instance.chunksToUnload.offer(this);
+      if (instance != null) MiscTasks.chunksToUnload().offer(this);
     }
   }
 }

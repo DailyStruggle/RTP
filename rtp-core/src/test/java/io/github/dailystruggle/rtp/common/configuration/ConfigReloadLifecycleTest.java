@@ -4,6 +4,9 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.lifecycle.ConfigReloadCoordinator;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,7 +31,7 @@ class ConfigReloadLifecycleTest {
     void setUp() {
         MockRTPServerAccessor accessor = RTPTestSetup.install(tempDir.toFile());
         accessor.clearWorlds();
-        RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
+        ActiveSelection.set(new io.github.dailystruggle.rtp.common.selection.SelectionAPI());
         new RTP();
         installed = Configs.getReloadLifecycle();
     }
@@ -36,22 +39,22 @@ class ConfigReloadLifecycleTest {
     @AfterEach
     void tearDown() {
         Configs.setReloadLifecycle(installed);
-        if (RTP.configs != null && RTP.configs.fileDatabase != null) {
+        if (ActiveConfigs.get() != null && ActiveConfigs.get().fileDatabase != null) {
             try {
-                RTP.configs.fileDatabase.close();
+                ActiveConfigs.get().fileDatabase.close();
             } catch (Throwable ignored) {
             }
         }
         if (RTP.getInstance() != null) {
-            RTP.getInstance().miscAsyncTasks.clear();
-            RTP.getInstance().startupTasks.clear();
+            MiscTasks.async().clear();
+            MiscTasks.startup().clear();
             RTP.stop();
         }
-        if (RTP.serverAccessor instanceof MockRTPServerAccessor) {
-            ((MockRTPServerAccessor) RTP.serverAccessor).clearWorlds();
+        if (RTPRuntime.serverAccessor() instanceof MockRTPServerAccessor) {
+            ((MockRTPServerAccessor) RTPRuntime.serverAccessor()).clearWorlds();
         }
-        RTP.selectionAPI = null;
-        RTP.configs = null;
+        ActiveSelection.set(null);
+        ActiveConfigs.set(null);
     }
 
     @Test
@@ -64,7 +67,7 @@ class ConfigReloadLifecycleTest {
     @DisplayName("ADR-115 RTP-68: reload runs beforeReload, then parser refresh after the swap, then regions")
     void reloadRunsLifecycleStepsInOrder() {
         List<String> steps = new ArrayList<>();
-        Configs configs = RTP.configs;
+        Configs configs = ActiveConfigs.get();
         Object previousMap = configs.configParserMap;
         Configs.setReloadLifecycle(new ConfigReloadLifecycle() {
             @Override

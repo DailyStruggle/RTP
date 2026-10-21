@@ -4,8 +4,8 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
@@ -60,19 +60,19 @@ public class TestWorldOpsCmd extends BaseRTPCmdImpl {
   public static Result runProbe() {
     Result r = new Result();
 
-    if (RTP.serverAccessor == null) {
+    if (RTPRuntime.serverAccessor() == null) {
       r.pass = false;
       r.message = "RTPServerAccessor is null";
       return r;
     }
 
     RTPWorld<?> world = null;
-    List<RTPWorld<?>> worlds = RTP.serverAccessor.getRTPWorlds();
+    List<RTPWorld<?>> worlds = RTPRuntime.serverAccessor().getRTPWorlds();
     if (worlds != null && !worlds.isEmpty()) {
       world = worlds.get(0);
     }
     if (world == null) {
-      world = RTP.serverAccessor.getRTPWorld("world");
+      world = RTPRuntime.serverAccessor().getRTPWorld("world");
     }
 
     if (world == null) {
@@ -148,11 +148,11 @@ public class TestWorldOpsCmd extends BaseRTPCmdImpl {
 
   @Nullable
   private static WorldBorder resolveWorldBorder(RTPWorld<?> world) {
-    if (RTP.serverAccessor == null || world == null) return null;
+    if (RTPRuntime.serverAccessor() == null || world == null) return null;
 
     Object wbObj = null;
     try {
-      wbObj = RTP.serverAccessor.getWorldBorder(world.name());
+      wbObj = RTPRuntime.serverAccessor().getWorldBorder(world.name());
     } catch (Throwable ignored) {
     }
 
@@ -163,9 +163,9 @@ public class TestWorldOpsCmd extends BaseRTPCmdImpl {
     // Check createNativeWorldBorder reflection fallback on accessor
     for (String methodName : new String[] {"createNativeWorldBorder", "getWorldBorder"}) {
       try {
-        Method method = RTP.serverAccessor.getClass().getDeclaredMethod(methodName, String.class);
+        Method method = RTPRuntime.serverAccessor().getClass().getDeclaredMethod(methodName, String.class);
         method.setAccessible(true);
-        Object res = method.invoke(RTP.serverAccessor, world.name());
+        Object res = method.invoke(RTPRuntime.serverAccessor(), world.name());
         if (res instanceof WorldBorder wb) {
           return wb;
         }
@@ -173,9 +173,9 @@ public class TestWorldOpsCmd extends BaseRTPCmdImpl {
       }
 
       try {
-        Method method = RTP.serverAccessor.getClass().getDeclaredMethod(methodName, RTPWorld.class);
+        Method method = RTPRuntime.serverAccessor().getClass().getDeclaredMethod(methodName, RTPWorld.class);
         method.setAccessible(true);
-        Object res = method.invoke(RTP.serverAccessor, world);
+        Object res = method.invoke(RTPRuntime.serverAccessor(), world);
         if (res instanceof WorldBorder wb) {
           return wb;
         }
@@ -183,9 +183,9 @@ public class TestWorldOpsCmd extends BaseRTPCmdImpl {
       }
 
       try {
-        Method method = RTP.serverAccessor.getClass().getDeclaredMethod(methodName, Object.class);
+        Method method = RTPRuntime.serverAccessor().getClass().getDeclaredMethod(methodName, Object.class);
         method.setAccessible(true);
-        Object res = method.invoke(RTP.serverAccessor, world);
+        Object res = method.invoke(RTPRuntime.serverAccessor(), world);
         if (res instanceof WorldBorder wb) {
           return wb;
         }
@@ -217,10 +217,10 @@ public class TestWorldOpsCmd extends BaseRTPCmdImpl {
             + " msg="
             + r.message;
 
-    if (!callerId.equals(RTPAPI.serverId) && RTP.serverAccessor != null) {
-      RTP.serverAccessor.sendMessage(callerId, summary);
+    if (!callerId.equals(RTPAPI.serverId) && RTPRuntime.serverAccessor() != null) {
+      RTPRuntime.serverAccessor().sendMessage(callerId, summary);
     }
-    RTP.log(r.pass ? Level.INFO : Level.WARNING, summary);
+    RTPRuntime.log(r.pass ? Level.INFO : Level.WARNING, summary);
   }
 
   /** Structured probe result for assertion in unit tests. */

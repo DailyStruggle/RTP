@@ -4,13 +4,14 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.safety.SafetyCompilationCache;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.LoggingKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
@@ -149,23 +150,23 @@ final class PregenState {
         long resolution = Math.max(1L, region.getSettings().spatialResolution());
 
         ConfigParser<PerformanceKeys> performance =
-                (ConfigParser<PerformanceKeys>) RTP.configs.getParser(PerformanceKeys.class);
+                (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
         ConfigParser<SafetyKeys> safety =
-                (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+                (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
         ConfigParser<LoggingKeys> logging =
-                (ConfigParser<LoggingKeys>) RTP.configs.getParser(LoggingKeys.class);
+                (ConfigParser<LoggingKeys>) ActiveConfigs.get().getParser(LoggingKeys.class);
         ConfigParser<BiomesKeys> biomes =
-                (ConfigParser<BiomesKeys>) RTP.configs.getParser(BiomesKeys.class);
+                (ConfigParser<BiomesKeys>) ActiveConfigs.get().getParser(BiomesKeys.class);
 
         boolean defaultBiomes = false;
         boolean biomeWhitelist;
         Set<String> biomeNames;
         if (biomeNamesIn == null || biomeNamesIn.isEmpty()) {
             defaultBiomes = true;
-            Object o = RTP.configs.getConfigValue(BiomesKeys.biomeWhitelist, false);
+            Object o = ActiveConfigs.get().getConfigValue(BiomesKeys.biomeWhitelist, false);
             biomeWhitelist = (o instanceof Boolean b) ? b : Boolean.parseBoolean(o.toString());
 
-            o = RTP.configs.getConfigValue(BiomesKeys.biomes, null);
+            o = ActiveConfigs.get().getConfigValue(BiomesKeys.biomes, null);
             List<String> biomeList =
                     (o instanceof List<?> list)
                             ? list.stream().map(Object::toString).toList()
@@ -187,17 +188,17 @@ final class PregenState {
 
         Shape<?> shape = region.getShape();
         if (shape == null) {
-            RTP.log(Level.WARNING, "[RTP] invalid state, null shape", new IllegalStateException());
+            RTPRuntime.log(Level.WARNING, "[RTP] invalid state, null shape", new IllegalStateException());
             return null;
         }
 
         VerticalAdjustor<?> vert = region.getVert();
         if (vert == null) {
-            RTP.log(Level.WARNING, "[RTP] invalid state, null vert", new IllegalStateException());
+            RTPRuntime.log(Level.WARNING, "[RTP] invalid state, null vert", new IllegalStateException());
             return null;
         }
 
-        Object o = RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>());
+        Object o = ActiveConfigs.get().getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>());
         Set<String> unsafeBlocks =
                 (o instanceof Collection<?> collection)
                         ? collection
@@ -212,7 +213,7 @@ final class PregenState {
                 unsafeBlocks,
                 tagSnapshot,
                 rejection ->
-                        RTP.log(
+                        RTPRuntime.log(
                                 Level.WARNING,
                                 "[safety.yml] rejected unsafe-blocks token '"
                                         + rejection.rawToken()
@@ -231,7 +232,7 @@ final class PregenState {
         boolean biomeRecallForced = Boolean.parseBoolean(
                 performance.getConfigValue(PerformanceKeys.biomeRecallForced, false).toString());
         boolean biomeWeighted = Boolean.parseBoolean(
-                RTP.configs.getConfigValue(BiomesKeys.biomeWeighted, false).toString());
+                ActiveConfigs.get().getConfigValue(BiomesKeys.biomeWeighted, false).toString());
         Map<String, Double> biomeWeights = parseBiomeWeights(biomes);
 
         // ADR-062: resolve the world's biome registry and sampling capability
@@ -252,14 +253,14 @@ final class PregenState {
                     }
                 }
             } catch (RuntimeException re) {
-                RTP.log(Level.WARNING, "[RTP] biome registry lookup failed: " + re);
+                RTPRuntime.log(Level.WARNING, "[RTP] biome registry lookup failed: " + re);
             }
             try {
                 io.github.dailystruggle.rtp.api.world.BiomeSampleCapability cap =
                         accessor.biomeSampleCapability(world);
                 if (cap != null) biomeSampleCapability = cap;
             } catch (RuntimeException re) {
-                RTP.log(Level.WARNING, "[RTP] biome-sample capability lookup failed: " + re);
+                RTPRuntime.log(Level.WARNING, "[RTP] biome-sample capability lookup failed: " + re);
             }
         }
 

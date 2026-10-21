@@ -1,7 +1,7 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.Consumer;
@@ -91,7 +91,7 @@ public class LockFreeLocationBuffer {
      */
     public void add(RTPLocation location) {
         if (!offer(location)) {
-            RTP.serverAccessor.log(Level.SEVERE,"Buffer is full");
+            RTPRuntime.serverAccessor().log(Level.SEVERE,"Buffer is full");
         }
     }
 
@@ -116,7 +116,7 @@ public class LockFreeLocationBuffer {
                 location.reservation().close();
             }
             if (++iterations >= maxIterations) {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "LockFreeLocationBuffer.clear() aborted after " + iterations
                                 + " iterations; a producer may still be active. size=" + size());
                 return;

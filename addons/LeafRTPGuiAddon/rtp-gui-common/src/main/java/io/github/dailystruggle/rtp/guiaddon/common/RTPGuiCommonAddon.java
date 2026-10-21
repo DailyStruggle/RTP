@@ -3,9 +3,11 @@ package io.github.dailystruggle.rtp.guiaddon.common;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.addon.RTPAddon;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.logging.Level;
 
 /**
@@ -46,8 +48,8 @@ public final class RTPGuiCommonAddon implements RTPAddon {
   @Override
   public void onLoad() {
     // Register addons/guimenu.yml with RTP's config system (first-boot create + /rtp reload).
-    RTP.configs.putParser(registerParser());
-    Configs.onReload(() -> RTP.configs.putParser(registerParser()));
+    ActiveConfigs.get().putParser(registerParser());
+    Configs.onReload(() -> ActiveConfigs.get().putParser(registerParser()));
 
     // Discover platform renderers via META-INF/services. This is the load path that
     // matters when the addon is dropped into plugins/RTP/addons/ or extracted from the
@@ -77,10 +79,10 @@ public final class RTPGuiCommonAddon implements RTPAddon {
               + "); deferring to classic teleport");
           return false; // no platform renderer installed; classic teleport
         }
-        if (RTP.serverAccessor == null || RTP.serverAccessor.getPlayer(playerId) == null) {
+        if (RTPRuntime.serverAccessor() == null || RTPRuntime.serverAccessor().getPlayer(playerId) == null) {
           RTP.log(Level.FINE, "[RTP-GUI] bare /rtp for " + playerId
               + ": player not resolvable (serverAccessor="
-              + (RTP.serverAccessor == null ? "null" : "present")
+              + (RTPRuntime.serverAccessor() == null ? "null" : "present")
               + "); deferring to classic teleport");
           return false; // offline / not resolvable; classic teleport
         }
@@ -251,14 +253,14 @@ public final class RTPGuiCommonAddon implements RTPAddon {
   }
 
   private ConfigParser<GuiMenuKeys> registerParser() {
-    migrateLegacyRoot(RTP.serverAccessor.getPluginDirectory(), "guimenu.yml");
+    migrateLegacyRoot(RTPRuntime.serverAccessor().getPluginDirectory(), "guimenu.yml");
     return new ConfigParser<>(
         GuiMenuKeys.class,
         "addons/guimenu",
         "1.0",
-        RTP.serverAccessor.getPluginDirectory(),
+        RTPRuntime.serverAccessor().getPluginDirectory(),
         null,
-        RTP.configs.fileDatabase,
+        ActiveConfigs.get().fileDatabase,
         this.getClass().getClassLoader());
   }
 

@@ -77,7 +77,7 @@ public class InvalidCommandTest {
         data.put(PlayerMessages.consoleCmdNotAllowed, "You must be an in-game player");
         data.put(PlayerMessages.invalidCommand, "invalid command - [arg]");
         data.forEach((k, v) -> {
-            Object fv = io.github.dailystruggle.rtp.common.RTP.configs.getParser((Class) k.getDeclaringClass());
+            Object fv = io.github.dailystruggle.rtp.common.configuration.ActiveConfigs.get().getParser((Class) k.getDeclaringClass());
             if (fv instanceof io.github.dailystruggle.rtp.common.configuration.ConfigParser) {
                 ((io.github.dailystruggle.rtp.common.configuration.ConfigParser) fv).set((Enum) k, v);
             }
@@ -185,7 +185,7 @@ public class InvalidCommandTest {
         accessor.addPlayer(sender);
 
         // Pre-heat language parser
-        ((io.github.dailystruggle.rtp.common.configuration.ConfigParser) io.github.dailystruggle.rtp.common.RTP.configs.getParser(PlayerMessages.class)).set(PlayerMessages.badArg, "bad parameter - [arg]");
+        ((io.github.dailystruggle.rtp.common.configuration.ConfigParser) io.github.dailystruggle.rtp.common.configuration.ActiveConfigs.get().getParser(PlayerMessages.class)).set(PlayerMessages.badArg, "bad parameter - [arg]");
 
         sender.sentMessages.clear();
 

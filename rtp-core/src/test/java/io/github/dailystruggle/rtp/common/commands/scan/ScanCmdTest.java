@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.commands.scan;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
@@ -9,6 +9,8 @@ import io.github.dailystruggle.rtp.common.mock.MockRTPCommandSender;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
@@ -17,6 +19,7 @@ import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shap
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
 import io.github.dailystruggle.rtp.common.tasks.scan.ScanTask;
+import io.github.dailystruggle.rtp.common.tasks.scan.ScanTasks;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
@@ -100,8 +103,8 @@ public class ScanCmdTest {
         region = new Region("default", settings);
 
         // Register region in SelectionAPI
-        RTP.selectionAPI = new SelectionAPI();
-        RTP.selectionAPI.permRegionLookup.put("default", region);
+        ActiveSelection.set(new SelectionAPI());
+        ActiveSelection.get().permRegionLookup.put("default", region);
 
         // Mock Enum<?> parser so messages are non-empty
         ConfigParser langParser = mock(ConfigParser.class);
@@ -113,11 +116,11 @@ public class ScanCmdTest {
                     Enum<?> key = inv.getArgument(0);
                     return key.name() + " [region]";
                 });
-        RTP.configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.PlaceholderMessages.class, langParser);
-        RTP.configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.class, langParser);
-        RTP.configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages.class, langParser);
-        RTP.configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages.class, langParser);
-        RTP.configs.configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages.class, langParser);
+        ActiveConfigs.get().configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.PlaceholderMessages.class, langParser);
+        ActiveConfigs.get().configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages.class, langParser);
+        ActiveConfigs.get().configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.NetworkMessages.class, langParser);
+        ActiveConfigs.get().configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages.class, langParser);
+        ActiveConfigs.get().configParserMap.put(io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages.class, langParser);
 
         // Mock MultiConfigParser<RegionKeys> so getParser(regionName) returns a safe ConfigParser
         MultiConfigParser<RegionKeys> multiConfigParser = mock(MultiConfigParser.class);
@@ -126,14 +129,14 @@ public class ScanCmdTest {
         when(regionConfig.getConfigValue(any(), any())).thenReturn("false");
         when(regionConfig.getConfigValue(eq(RegionKeys.world), any())).thenReturn("default");
         when(multiConfigParser.getParser(any(String.class))).thenReturn(regionConfig);
-        RTP.configs.multiConfigParserMap.put(RegionKeys.class, multiConfigParser);
+        ActiveConfigs.get().multiConfigParserMap.put(RegionKeys.class, multiConfigParser);
 
         MultiConfigParser<WorldKeys> worldMultiConfigParser = mock(MultiConfigParser.class);
         ConfigParser<WorldKeys> worldConfig = mock(ConfigParser.class);
         when(worldConfig.getConfigValue(any(), any())).thenReturn("false");
         when(worldConfig.getConfigValue(eq(WorldKeys.region), any())).thenReturn("default");
         when(worldMultiConfigParser.getParser(any(String.class))).thenReturn(worldConfig);
-        RTP.configs.multiConfigParserMap.put(WorldKeys.class, worldMultiConfigParser);
+        ActiveConfigs.get().multiConfigParserMap.put(WorldKeys.class, worldMultiConfigParser);
 
         // Set up sender
         senderId = UUID.randomUUID();
@@ -148,14 +151,14 @@ public class ScanCmdTest {
         scanResetCmd = new ScanResetCmd(null);
 
         // Ensure scanTasks is clean
-        RTP.getInstance().scanTasks.clear();
+        ScanTasks.current().clear();
     }
 
     @AfterEach
     void tearDown() {
-        RTP.getInstance().scanTasks.clear();
-        RTP.serverAccessor = null;
-        RTP.scheduler = null;
+        ScanTasks.current().clear();
+        RTPRuntime.setServerAccessor(null);
+        RTPRuntime.setScheduler(null);
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
     }
 
@@ -197,7 +200,7 @@ public class ScanCmdTest {
                 name, world, scanSquare(radius, centerRadius), vert,
                 false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
         Region r = new Region(name, settings);
-        RTP.selectionAPI.permRegionLookup.put(name, r);
+        ActiveSelection.get().permRegionLookup.put(name, r);
         return r;
     }
 
@@ -257,7 +260,7 @@ public class ScanCmdTest {
 
     @Test
     void scanStartCmd_onCommand_noExistingTask_returnsTrue() {
-        assertNull(RTP.getInstance().scanTasks.get("default"));
+        assertNull(ScanTasks.current().get("default"));
 
         boolean result = scanStartCmd.onCommand(senderId, params(), null);
 
@@ -270,12 +273,12 @@ public class ScanCmdTest {
     void scanStartCmd_onCommand_whenTaskAlreadyRunning_doesNotReplace() {
         ScanTask existing = makeFakeTask();
         existing.pause.set(true); // pause so scheduler doesn't run it
-        RTP.getInstance().scanTasks.put("default", existing);
+        ScanTasks.current().put("default", existing);
 
         scanStartCmd.onCommand(senderId, params(), null);
 
         // existing task should still be in the map (start skips when task exists)
-        assertSame(existing, RTP.getInstance().scanTasks.get("default"),
+        assertSame(existing, ScanTasks.current().get("default"),
                 "ScanStartCmd should not replace an already-running ScanTask");
     }
 
@@ -321,7 +324,7 @@ public class ScanCmdTest {
     void scanPauseCmd_onCommand_whenTaskRunning_pausesTask() {
         ScanTask task = makeFakeTask();
         task.pause.set(false);
-        RTP.getInstance().scanTasks.put("default", task);
+        ScanTasks.current().put("default", task);
 
         boolean result = scanPauseCmd.onCommand(senderId, params(), null);
 
@@ -331,13 +334,13 @@ public class ScanCmdTest {
 
     @Test
     void scanPauseCmd_onCommand_whenNoTaskRunning_sendsNotRunningMessage() {
-        assertNull(RTP.getInstance().scanTasks.get("default"));
+        assertNull(ScanTasks.current().get("default"));
 
         boolean result = scanPauseCmd.onCommand(senderId, params(), null);
 
         assertTrue(result, "onCommand should still return true even when no task is running");
         // No exception thrown and no task created
-        assertNull(RTP.getInstance().scanTasks.get("default"));
+        assertNull(ScanTasks.current().get("default"));
     }
 
     @Test
@@ -361,14 +364,14 @@ public class ScanCmdTest {
         RegionSettings settings2 = new RegionSettings(
                 "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
         Region region2 = new Region("region2", settings2);
-        RTP.selectionAPI.permRegionLookup.put("region2", region2);
+        ActiveSelection.get().permRegionLookup.put("region2", region2);
 
         ScanTask task1 = makeFakeTask();
         task1.pause.set(false);
-        RTP.getInstance().scanTasks.put("default", task1);
+        ScanTasks.current().put("default", task1);
         ScanTask task2 = new ScanTask(region2, 0L);
         task2.pause.set(false);
-        RTP.getInstance().scanTasks.put("region2", task2);
+        ScanTasks.current().put("region2", task2);
 
         scanPauseCmd.onCommand(senderId, paramsWithRegion("default"), null);
 
@@ -397,24 +400,24 @@ public class ScanCmdTest {
     @Test
     void scanCancelCmd_onCommand_whenTaskRunning_cancelsAndRemovesTask() {
         ScanTask task = makeFakeTask();
-        RTP.getInstance().scanTasks.put("default", task);
+        ScanTasks.current().put("default", task);
 
         boolean result = scanCancelCmd.onCommand(senderId, params(), null);
 
         assertTrue(result);
         assertTrue(task.isCancelled(), "ScanCancelCmd should mark task as cancelled");
-        assertNull(RTP.getInstance().scanTasks.get("default"),
+        assertNull(ScanTasks.current().get("default"),
                 "ScanCancelCmd should remove the task from scanTasks map");
     }
 
     @Test
     void scanCancelCmd_onCommand_whenNoTaskRunning_sendsNotRunningMessage() {
-        assertNull(RTP.getInstance().scanTasks.get("default"));
+        assertNull(ScanTasks.current().get("default"));
 
         boolean result = scanCancelCmd.onCommand(senderId, params(), null);
 
         assertTrue(result);
-        assertNull(RTP.getInstance().scanTasks.get("default"));
+        assertNull(ScanTasks.current().get("default"));
     }
 
     @Test
@@ -427,7 +430,7 @@ public class ScanCmdTest {
         assertTrue(scanFile.exists(), "scan file should exist before cancel");
 
         ScanTask task = makeFakeTask();
-        RTP.getInstance().scanTasks.put("default", task);
+        ScanTasks.current().put("default", task);
 
         scanCancelCmd.onCommand(senderId, params(), null);
 
@@ -475,18 +478,18 @@ public class ScanCmdTest {
         RegionSettings settings2 = new RegionSettings(
                 "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
         Region region2 = new Region("region2", settings2);
-        RTP.selectionAPI.permRegionLookup.put("region2", region2);
+        ActiveSelection.get().permRegionLookup.put("region2", region2);
 
         ScanTask task1 = makeFakeTask();
-        RTP.getInstance().scanTasks.put("default", task1);
+        ScanTasks.current().put("default", task1);
         ScanTask task2 = new ScanTask(region2, 0L);
-        RTP.getInstance().scanTasks.put("region2", task2);
+        ScanTasks.current().put("region2", task2);
 
         scanCancelCmd.onCommand(senderId, paramsWithRegion("default"), null);
 
         assertTrue(task1.isCancelled(), "specified region task should be cancelled");
         assertFalse(task2.isCancelled(), "unspecified region task should not be cancelled");
-        assertNotNull(RTP.getInstance().scanTasks.get("region2"), "unspecified region task should remain");
+        assertNotNull(ScanTasks.current().get("region2"), "unspecified region task should remain");
     }
 
     // -------------------------------------------------------------------------
@@ -511,7 +514,7 @@ public class ScanCmdTest {
     void scanResumeCmd_onCommand_whenTaskExists_unpausesAndSchedules() {
         ScanTask task = makeFakeTask();
         task.pause.set(true);
-        RTP.getInstance().scanTasks.put("default", task);
+        ScanTasks.current().put("default", task);
 
         boolean result = scanResumeCmd.onCommand(senderId, params(), null);
 
@@ -521,7 +524,7 @@ public class ScanCmdTest {
 
     @Test
     void scanResumeCmd_onCommand_whenNoTask_startsNewScan() {
-        assertNull(RTP.getInstance().scanTasks.get("default"));
+        assertNull(ScanTasks.current().get("default"));
 
         boolean result = scanResumeCmd.onCommand(senderId, params(), null);
 
@@ -550,14 +553,14 @@ public class ScanCmdTest {
         RegionSettings settings2 = new RegionSettings(
                 "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
         Region region2 = new Region("region2", settings2);
-        RTP.selectionAPI.permRegionLookup.put("region2", region2);
+        ActiveSelection.get().permRegionLookup.put("region2", region2);
 
         ScanTask task1 = makeFakeTask();
         task1.pause.set(true);
-        RTP.getInstance().scanTasks.put("default", task1);
+        ScanTasks.current().put("default", task1);
         ScanTask task2 = new ScanTask(region2, 0L);
         task2.pause.set(true);
-        RTP.getInstance().scanTasks.put("region2", task2);
+        ScanTasks.current().put("region2", task2);
 
         scanResumeCmd.onCommand(senderId, paramsWithRegion("default"), null);
 
@@ -587,24 +590,24 @@ public class ScanCmdTest {
     void scanResetCmd_onCommand_clearsShapeAndRemovesTask() {
         ScanTask task = makeFakeTask();
         task.pause.set(true); // pause so scheduler doesn't run it
-        RTP.getInstance().scanTasks.put("default", task);
+        ScanTasks.current().put("default", task);
 
         boolean result = scanResetCmd.onCommand(senderId, params(), null);
 
         assertTrue(result);
-        assertNull(RTP.getInstance().scanTasks.get("default"),
+        assertNull(ScanTasks.current().get("default"),
                 "ScanResetCmd should remove any running scan task");
         assertTrue(task.isCancelled(), "ScanResetCmd should cancel the running task");
     }
 
     @Test
     void scanResetCmd_onCommand_withNoRunningTask_stillClearsShape() {
-        assertNull(RTP.getInstance().scanTasks.get("default"));
+        assertNull(ScanTasks.current().get("default"));
 
         boolean result = scanResetCmd.onCommand(senderId, params(), null);
 
         assertTrue(result);
-        assertNull(RTP.getInstance().scanTasks.get("default"));
+        assertNull(ScanTasks.current().get("default"));
     }
 
     @Test
@@ -650,14 +653,14 @@ public class ScanCmdTest {
 
     @Test
     void scanResetCmd_withRunningTaskAndAsyncTeardown_resetsAfterTeardownCompletes() throws Exception {
-        MockRTPScheduler scheduler = ((MockRTPScheduler) RTP.scheduler).enableServerThreads();
+        MockRTPScheduler scheduler = ((MockRTPScheduler) RTPRuntime.scheduler()).enableServerThreads();
         try {
             ScanTask task = makeFakeTask();
-            RTP.getInstance().scanTasks.put("default", task);
+            ScanTasks.current().put("default", task);
 
             boolean result = scanResetCmd.onCommand(senderId, params(), null);
             assertTrue(result);
-            assertNull(RTP.getInstance().scanTasks.get("default"), "task removed from map immediately");
+            assertNull(ScanTasks.current().get("default"), "task removed from map immediately");
             assertTrue(task.isCancelled(), "task should be cancelled");
 
             task.teardownFuture().get(5, TimeUnit.SECONDS);
@@ -676,7 +679,7 @@ public class ScanCmdTest {
         // Pre-populate a paused task to simulate a running scan
         ScanTask task = makeFakeTask();
         task.pause.set(true);
-        RTP.getInstance().scanTasks.put("default", task);
+        ScanTasks.current().put("default", task);
 
         // Pause (already paused, but verifies no error)
         scanPauseCmd.onCommand(senderId, params(), null);
@@ -688,12 +691,12 @@ public class ScanCmdTest {
 
         // Pause again before cancel
         task.pause.set(true);
-        RTP.getInstance().scanTasks.put("default", task);
+        ScanTasks.current().put("default", task);
 
         // Cancel
         scanCancelCmd.onCommand(senderId, params(), null);
         assertTrue(task.isCancelled(), "task should be cancelled after cancel");
-        assertNull(RTP.getInstance().scanTasks.get("default"), "task should be removed after cancel");
+        assertNull(ScanTasks.current().get("default"), "task should be removed after cancel");
     }
 
     @Test
@@ -701,33 +704,33 @@ public class ScanCmdTest {
         // Pre-populate a paused task to simulate a running scan
         ScanTask task = makeFakeTask();
         task.pause.set(true);
-        RTP.getInstance().scanTasks.put("default", task);
+        ScanTasks.current().put("default", task);
 
         // Reset cancels running task and clears shape
         scanResetCmd.onCommand(senderId, params(), null);
-        assertNull(RTP.getInstance().scanTasks.get("default"), "task should be removed after reset");
+        assertNull(ScanTasks.current().get("default"), "task should be removed after reset");
         assertTrue(task.isCancelled(), "task should be cancelled after reset");
     }
 
     @Test
     void stateTransition_pause_whenNotRunning_doesNotCreateTask() {
-        assertNull(RTP.getInstance().scanTasks.get("default"));
+        assertNull(ScanTasks.current().get("default"));
         scanPauseCmd.onCommand(senderId, params(), null);
-        assertNull(RTP.getInstance().scanTasks.get("default"),
+        assertNull(ScanTasks.current().get("default"),
                 "pause on non-running scan should not create a task");
     }
 
     @Test
     void stateTransition_cancel_whenNotRunning_doesNotCreateTask() {
-        assertNull(RTP.getInstance().scanTasks.get("default"));
+        assertNull(ScanTasks.current().get("default"));
         scanCancelCmd.onCommand(senderId, params(), null);
-        assertNull(RTP.getInstance().scanTasks.get("default"),
+        assertNull(ScanTasks.current().get("default"),
                 "cancel on non-running scan should not create a task");
     }
 
     @Test
     void stateTransition_resume_whenNotRunning_returnsTrue() {
-        assertNull(RTP.getInstance().scanTasks.get("default"));
+        assertNull(ScanTasks.current().get("default"));
         boolean result = scanResumeCmd.onCommand(senderId, params(), null);
         // ScanResumeCmd delegates to ScanStartCmd when no task exists
         assertTrue(result, "resume when not running should return true");
@@ -758,7 +761,7 @@ public class ScanCmdTest {
         RegionSettings settings2 = new RegionSettings(
                 "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
         Region region2 = new Region("region2", settings2);
-        RTP.selectionAPI.permRegionLookup.put("region2", region2);
+        ActiveSelection.get().permRegionLookup.put("region2", region2);
 
         Map<String, List<String>> p = new HashMap<>();
         p.put("region", Arrays.asList("default", "region2"));
@@ -775,20 +778,20 @@ public class ScanCmdTest {
         RegionSettings settings2 = new RegionSettings(
                 "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
         Region region2 = new Region("region2", settings2);
-        RTP.selectionAPI.permRegionLookup.put("region2", region2);
+        ActiveSelection.get().permRegionLookup.put("region2", region2);
 
         ScanTask task1 = new ScanTask(region, 0L);
         ScanTask task2 = new ScanTask(region2, 0L);
-        RTP.getInstance().scanTasks.put("default", task1);
-        RTP.getInstance().scanTasks.put("region2", task2);
+        ScanTasks.current().put("default", task1);
+        ScanTasks.current().put("region2", task2);
 
         Map<String, List<String>> p = new HashMap<>();
         p.put("region", Arrays.asList("default", "region2"));
 
         scanCancelCmd.onCommand(senderId, p, null);
 
-        assertNull(RTP.getInstance().scanTasks.get("default"));
-        assertNull(RTP.getInstance().scanTasks.get("region2"));
+        assertNull(ScanTasks.current().get("default"));
+        assertNull(ScanTasks.current().get("region2"));
         assertTrue(task1.isCancelled());
         assertTrue(task2.isCancelled());
     }
@@ -800,7 +803,7 @@ public class ScanCmdTest {
     @Test
     void scanStartCmd_whenTaskAlreadyRunning_announcesToOperators() {
         ScanTask task = makeFakeTask();
-        RTP.getInstance().scanTasks.put("default", task);
+        ScanTasks.current().put("default", task);
 
         scanStartCmd.onCommand(senderId, params(), null);
 
@@ -810,7 +813,7 @@ public class ScanCmdTest {
 
     @Test
     void scanPauseCmd_whenNoTask_announcesToOperators() {
-        assertNull(RTP.getInstance().scanTasks.get("default"));
+        assertNull(ScanTasks.current().get("default"));
 
         scanPauseCmd.onCommand(senderId, params(), null);
 
@@ -820,7 +823,7 @@ public class ScanCmdTest {
 
     @Test
     void scanCancelCmd_whenNoTask_announcesToOperators() {
-        assertNull(RTP.getInstance().scanTasks.get("default"));
+        assertNull(ScanTasks.current().get("default"));
 
         scanCancelCmd.onCommand(senderId, params(), null);
 
@@ -835,12 +838,12 @@ public class ScanCmdTest {
         RegionSettings settings2 = new RegionSettings(
                 "region2", world, square2, vert2, false, false, 10L, 1000L,  0L, 5, 0.0, 1L, "", false);
         Region region2 = new Region("region2", settings2);
-        RTP.selectionAPI.permRegionLookup.put("region2", region2);
+        ActiveSelection.get().permRegionLookup.put("region2", region2);
 
         // "default" has a paused task; "region2" has no task
         ScanTask task1 = makeFakeTask();
         task1.pause.set(true);
-        RTP.getInstance().scanTasks.put("default", task1);
+        ScanTasks.current().put("default", task1);
 
         // Explicit multi-region param to cover both regions
         Map<String, List<String>> p = new HashMap<>();
@@ -859,7 +862,7 @@ public class ScanCmdTest {
         // "default" has a paused task; no region param → should resume "default"
         ScanTask task1 = makeFakeTask();
         task1.pause.set(true);
-        RTP.getInstance().scanTasks.put("default", task1);
+        ScanTasks.current().put("default", task1);
 
         scanResumeCmd.onCommand(senderId, params(), null);
 
@@ -870,7 +873,7 @@ public class ScanCmdTest {
     @Test
     void scanCancelCmd_substitutesCancelledRegionName() {
         ScanTask task = makeFakeTask();
-        RTP.getInstance().scanTasks.put("default", task);
+        ScanTasks.current().put("default", task);
 
         scanCancelCmd.onCommand(senderId, paramsWithRegion("default"), null);
 
@@ -881,7 +884,7 @@ public class ScanCmdTest {
     @Test
     void scanPauseCmd_substitutesPausedRegionName() {
         ScanTask task = makeFakeTask();
-        RTP.getInstance().scanTasks.put("default", task);
+        ScanTasks.current().put("default", task);
 
         scanPauseCmd.onCommand(senderId, paramsWithRegion("default"), null);
 
@@ -904,7 +907,7 @@ public class ScanCmdTest {
         RegionSettings settings2 = new RegionSettings(
                 "region2", world, square2, vert2, false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
         Region region2 = new Region("region2", settings2);
-        RTP.selectionAPI.permRegionLookup.put("region2", region2);
+        ActiveSelection.get().permRegionLookup.put("region2", region2);
 
         Map<String, List<String>> p = new HashMap<>();
         p.put("region", Arrays.asList("default", "region2"));
@@ -1003,7 +1006,7 @@ public class ScanCmdTest {
     @Test
     void scanStartCmd_and_scanResetCmd_withAutoSpatialResolution_resolvesCorrectly() {
         MultiConfigParser<RegionKeys> multiConfigParser =
-                (MultiConfigParser<RegionKeys>) RTP.configs.getParser(RegionKeys.class);
+                (MultiConfigParser<RegionKeys>) ActiveConfigs.get().getParser(RegionKeys.class);
         ConfigParser<RegionKeys> regionConfig = multiConfigParser.getParser("default");
         when(regionConfig.getData(eq(RegionKeys.spatialResolution))).thenReturn("auto");
         when(regionConfig.getConfigValue(eq(RegionKeys.spatialResolution), any())).thenReturn("auto");

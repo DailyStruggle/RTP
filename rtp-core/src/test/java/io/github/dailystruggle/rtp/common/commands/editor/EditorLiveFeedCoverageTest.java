@@ -7,6 +7,7 @@ import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorKeys;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.InMemoryTransport;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.TrustedEditors;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.MemoryShape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
@@ -193,8 +194,8 @@ class EditorLiveFeedCoverageTest {
     @Test
     @DisplayName("Without a selection API there are no configured regions, shapes, worlds or surveys")
     void noSelectionApi() {
-        assertTrue(EditorLiveFeed.configuredRegions().isEmpty() || io.github.dailystruggle.rtp.common.RTP.selectionAPI != null);
-        if (io.github.dailystruggle.rtp.common.RTP.selectionAPI == null) {
+        assertTrue(EditorLiveFeed.configuredRegions().isEmpty() || ActiveSelection.get() != null);
+        if (ActiveSelection.get() == null) {
             assertTrue(EditorLiveFeed.configuredShapes().isEmpty());
             assertTrue(EditorLiveFeed.regionWorlds().isEmpty());
             assertTrue(EditorLiveFeed.planSurveys().isEmpty());
@@ -482,14 +483,14 @@ class EditorLiveFeedCoverageTest {
     @Test
     @DisplayName("start and startHosted fail closed without a scheduler (S-006); stopActive is a no-op without a feed")
     void staticEntryPointsFailClosed() throws IOException {
-        var saved = io.github.dailystruggle.rtp.common.RTP.scheduler;
+        var saved = io.github.dailystruggle.rtp.common.runtime.RTPRuntime.scheduler();
         try {
-            io.github.dailystruggle.rtp.common.RTP.scheduler = null;
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setScheduler(null);
             assertThrows(IllegalStateException.class, () -> EditorLiveFeed.start(tempDir.resolve("x")));
             openChannel();
             assertThrows(IllegalStateException.class, () -> EditorLiveFeed.startHosted(channel, null));
         } finally {
-            io.github.dailystruggle.rtp.common.RTP.scheduler = saved;
+            io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setScheduler(saved);
         }
         assertThrows(NullPointerException.class, () -> EditorLiveFeed.start(null));
         assertThrows(NullPointerException.class, () -> EditorLiveFeed.startHosted(null, null));

@@ -3,7 +3,7 @@ package io.github.dailystruggle.rtp.bukkitplatform.scheduling;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -99,7 +99,7 @@ public class BukkitSchedulerImpl implements RTPScheduler {
       RTPAPI.serverAccessor.registerAction(trackedTask);
     }
 
-    if (delayTicks < 1 && RTP.serverAccessor.isPrimaryThread()) {
+    if (delayTicks < 1 && RTPRuntime.serverAccessor().isPrimaryThread()) {
       trackedTask.run();
     } else if (delayTicks > 0) {
       Bukkit.getScheduler().runTaskLater(plugin, trackedTask, delayTicks);

@@ -7,7 +7,7 @@ import io.github.dailystruggle.rtp.api.world.ChunkColumnProbe;
 import io.github.dailystruggle.rtp.api.world.MutableRTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
@@ -43,7 +43,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
   private record SafetySnapshot(Set<String> unsafeBlocks, int platformDepth) {}
 
   /**
-   * Read the current safety configuration directly from {@link RTP#configs}
+   * Read the current safety configuration directly from {@link ActiveConfigs#get()}
    * and canonicalise the unsafe-block tokens for fast set-membership lookup
    * on the probe path. Tag expansion is already performed upstream by
    * {@code SafetyTokenExpander} at config load and on {@code /rtp reload},
@@ -52,10 +52,10 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
   @SuppressWarnings("unchecked")
   private static SafetySnapshot readSafetySnapshot() {
     ConfigParser<SafetyKeys> safety =
-        (ConfigParser<SafetyKeys>) RTP.configs.getParser(SafetyKeys.class);
+        (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
     Set<String> unsafe = new HashSet<>();
     if (safety != null) {
-      Object value = RTP.configs.getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>());
+      Object value = ActiveConfigs.get().getConfigValue(BlocksKeys.unsafeBlocks, new ArrayList<>());
       if (value instanceof Collection) {
         for (Object item : (Collection<?>) value) {
           if (item == null) continue;
@@ -99,6 +99,12 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
         "rtp.params", "which way to search for a valid location", (sender, s) -> true, 0, 1, 2, 3));
     subParameters.put("requireskylight", new BooleanParameter(
         "rtp.params", "require sky light for placement", (sender, s) -> true));
+    // ADR-119 slope keys: tab completion only, no defaults entry (cache key unchanged when unset).
+    subParameters.put("maxslope", new IntegerParameter(
+        "rtp.params", "largest floor-height step allowed around the landing spot, -1 off",
+        (sender, s) -> true, -1, 0, 1, 2, 3));
+    subParameters.put("sloperadius", new IntegerParameter(
+        "rtp.params", "horizontal distance of the slope samples", (sender, s) -> true, 1, 2, 3, 4, 8));
   }
 
   public LinearAdjustor(List<Predicate<RTPCoords>> verifiers) {
@@ -145,6 +151,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
     SafetySnapshot snap = readSafetySnapshot();
     Set<String> unsafeBlocks = snap.unsafeBlocks();
     int platformDepth = snap.platformDepth();
+    SlopeCheck slope = slopeCheck(chunk);
 
     for (int j = 0; j < testCoords.size(); j++) {
       List<Integer> xz = testCoords.get(j);
@@ -157,7 +164,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
         case 0:
           { // bottom up
             for (int i = minY; i < maxY; i++) {
-              if (acceptColumnY(chunk, x, i, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
+              if (acceptSloped(slope, chunk, x, i, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(i);
@@ -169,7 +176,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
         case 1:
           { // top down
             for (int i = maxY; i > minY; i--) {
-              if (acceptColumnY(chunk, x, i, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
+              if (acceptSloped(slope, chunk, x, i, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(i);
@@ -186,7 +193,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
             for (int i = 0; i <= maxDistance; i++) {
               // try top
               int y = middle + i;
-              if (acceptColumnY(chunk, x, y, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
+              if (acceptSloped(slope, chunk, x, y, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(y);
@@ -195,7 +202,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
 
               // try bottom
               y = middle - i;
-              if (acceptColumnY(chunk, x, y, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
+              if (acceptSloped(slope, chunk, x, y, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(y);
@@ -212,7 +219,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
             for (int i = maxDistance; i >= 0; i--) {
               // try top
               int y = middle + i;
-              if (acceptColumnY(chunk, x, y, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
+              if (acceptSloped(slope, chunk, x, y, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(y);
@@ -221,7 +228,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
 
               // try bottom
               y = middle - i;
-              if (acceptColumnY(chunk, x, y, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
+              if (acceptSloped(slope, chunk, x, y, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(y);
@@ -244,7 +251,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
             // try each
             for (int k = 0; k < trials.size(); k++) {
               int i = trials.get(k);
-              if (acceptColumnY(chunk, x, i, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
+              if (acceptSloped(slope, chunk, x, i, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) {
                 output.setWorldName(chunk.getWorld().name());
                 output.setXZ(globalX, globalZ);
                 output.setY(i);
@@ -255,6 +262,29 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
       }
     }
     return false;
+  }
+
+  /** {@link #acceptColumnY} followed by the optional ADR-119 slope check; slope null = off. */
+  private static boolean acceptSloped(
+      @Nullable SlopeCheck slope,
+      RTPChunk chunk,
+      int x,
+      int y,
+      int z,
+      boolean requireSkyLight,
+      int columnSkyFloor,
+      Set<String> unsafeBlocks,
+      int platformDepth) {
+    return acceptColumnY(chunk, x, y, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)
+        && (slope == null || slope.test(x, y, z));
+  }
+
+  /** Probe twin of {@link #acceptSloped}; same slope reads via {@code isAirAt} (ADR-016 parity). */
+  private boolean acceptProbeSloped(@Nullable SlopeCheck slope, ChunkColumnProbe probe, int lx, int lz,
+                                    int y, boolean requireSkyLight, int columnSkyFloor,
+                                    Set<String> unsafeBlocks, int platformDepth) {
+    return acceptY(probe, lx, lz, y, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)
+        && (slope == null || slope.test(lx, y, lz));
   }
 
   /**
@@ -329,7 +359,8 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
     int columnSkyFloor = requireSkyLight ? computeColumnSkyFloor(chunk, x, z) : Integer.MIN_VALUE;
 
     Integer y = scanColumnForY(
-        chunk, x, z, minY, maxY, dir, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth);
+        chunk, x, z, minY, maxY, dir, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth,
+        slopeCheck(chunk));
     if (y == null) return null;
     return new MutableRTPCoords(chunk.getWorld().name(), globalX, y, globalZ).toImmutable();
   }
@@ -349,17 +380,18 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
       boolean requireSkyLight,
       int columnSkyFloor,
       Set<String> unsafeBlocks,
-      int platformDepth) {
+      int platformDepth,
+      @Nullable SlopeCheck slope) {
     switch (dir) {
       case 0: { // bottom up
         for (int i = minY; i < maxY; i++) {
-          if (acceptColumnY(chunk, x, i, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return i;
+          if (acceptSloped(slope, chunk, x, i, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return i;
         }
         break;
       }
       case 1: { // top down
         for (int i = maxY; i > minY; i--) {
-          if (acceptColumnY(chunk, x, i, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return i;
+          if (acceptSloped(slope, chunk, x, i, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return i;
         }
         break;
       }
@@ -368,9 +400,9 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
         int middle = minY + maxDistance;
         for (int i = 0; i <= maxDistance; i++) {
           int yTop = middle + i;
-          if (acceptColumnY(chunk, x, yTop, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return yTop;
+          if (acceptSloped(slope, chunk, x, yTop, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return yTop;
           int yBot = middle - i;
-          if (acceptColumnY(chunk, x, yBot, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return yBot;
+          if (acceptSloped(slope, chunk, x, yBot, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return yBot;
         }
         break;
       }
@@ -379,9 +411,9 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
         int middle = minY + maxDistance;
         for (int i = maxDistance; i >= 0; i--) {
           int yTop = middle + i;
-          if (acceptColumnY(chunk, x, yTop, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return yTop;
+          if (acceptSloped(slope, chunk, x, yTop, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return yTop;
           int yBot = middle - i;
-          if (acceptColumnY(chunk, x, yBot, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return yBot;
+          if (acceptSloped(slope, chunk, x, yBot, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return yBot;
         }
         break;
       }
@@ -390,7 +422,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
         for (int i = minY; i <= maxY; i++) trials.add(i);
         Collections.shuffle(trials, rng);
         for (int i : trials) {
-          if (acceptColumnY(chunk, x, i, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return i;
+          if (acceptSloped(slope, chunk, x, i, z, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return i;
         }
       }
     }
@@ -432,6 +464,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
     if (probe.minY() > minY - 1 || probe.maxY() < maxY) return AdjustResult.WINDOW_REJECT;
 
     SafetySnapshot snap = readSafetySnapshot();
+    SlopeCheck slope = slopeCheck(probe);
 
     // Multi-column sweep over testCoords aligning with live adjust() columns.
     // Sky-light gating checks per-column block-data floor (computeColumnSkyFloor).
@@ -443,7 +476,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
           ? computeColumnSkyFloor(probe, lx, lz)
           : Integer.MIN_VALUE;
       int y = scanProbe(probe, lx, lz, minY, maxY, dir, requireSkyLight, columnSkyFloor,
-          snap.unsafeBlocks(), snap.platformDepth());
+          snap.unsafeBlocks(), snap.platformDepth(), slope);
       if (y == Integer.MIN_VALUE) continue;
       int globalX = (probe.chunkX() << 4) + lx;
       int globalZ = (probe.chunkZ() << 4) + lz;
@@ -461,22 +494,22 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
    */
   private int scanProbe(ChunkColumnProbe probe, int lx, int lz, int minY, int maxY, int dir,
                         boolean requireSkyLight, int columnSkyFloor,
-                        Set<String> unsafeBlocks, int platformDepth) {
+                        Set<String> unsafeBlocks, int platformDepth, @Nullable SlopeCheck slope) {
     switch (dir) {
       case 0: // bottom up
         for (int i = minY; i < maxY; i++)
-          if (acceptY(probe, lx, lz, i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return i;
+          if (acceptProbeSloped(slope, probe, lx, lz, i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return i;
         return Integer.MIN_VALUE;
       case 1: // top down
         for (int i = maxY; i > minY; i--)
-          if (acceptY(probe, lx, lz, i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return i;
+          if (acceptProbeSloped(slope, probe, lx, lz, i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return i;
         return Integer.MIN_VALUE;
       case 2: { // middle out
         int maxDistance = (maxY - minY) / 2;
         int middle = minY + maxDistance;
         for (int i = 0; i <= maxDistance; i++) {
-          if (acceptY(probe, lx, lz, middle + i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return middle + i;
-          if (acceptY(probe, lx, lz, middle - i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return middle - i;
+          if (acceptProbeSloped(slope, probe, lx, lz, middle + i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return middle + i;
+          if (acceptProbeSloped(slope, probe, lx, lz, middle - i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return middle - i;
         }
         return Integer.MIN_VALUE;
       }
@@ -484,8 +517,8 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
         int maxDistance = (maxY - minY) / 2;
         int middle = minY + maxDistance;
         for (int i = maxDistance; i >= 0; i--) {
-          if (acceptY(probe, lx, lz, middle + i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return middle + i;
-          if (acceptY(probe, lx, lz, middle - i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return middle - i;
+          if (acceptProbeSloped(slope, probe, lx, lz, middle + i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return middle + i;
+          if (acceptProbeSloped(slope, probe, lx, lz, middle - i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return middle - i;
         }
         return Integer.MIN_VALUE;
       }
@@ -495,7 +528,7 @@ public class LinearAdjustor extends AbstractVerticalAdjustor<GenericVerticalAdju
         Collections.shuffle(trials, rng);
         for (int k = 0; k < trials.size(); k++) {
           int i = trials.get(k);
-          if (acceptY(probe, lx, lz, i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return i;
+          if (acceptProbeSloped(slope, probe, lx, lz, i, requireSkyLight, columnSkyFloor, unsafeBlocks, platformDepth)) return i;
         }
         return Integer.MIN_VALUE;
       }

@@ -2,9 +2,9 @@ package io.github.dailystruggle.rtp.common.benchmark;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.benchmark.SimulationReport.Provenance;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.lang.management.GarbageCollectorMXBean;
 import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
@@ -95,7 +95,7 @@ class MemoryModelAllocationBenchmarkTest {
   @BeforeAll
   static void setup() {
     MockRTPServerAccessor accessor = new MockRTPServerAccessor(new java.io.File("target/test-data"));
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
 
     java.lang.management.ThreadMXBean bean = ManagementFactory.getThreadMXBean();

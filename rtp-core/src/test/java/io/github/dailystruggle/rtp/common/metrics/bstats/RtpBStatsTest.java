@@ -9,7 +9,7 @@ import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.scheduling.TrackedRTPTask;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,7 +67,7 @@ class RtpBStatsTest {
 
     @BeforeEach
     void setUp() {
-        savedScheduler = RTP.scheduler;
+        savedScheduler = RTPRuntime.scheduler();
         RtpBStats.shutdown();
         pluginDir = tmp.resolve("config").resolve("RTP").toFile();
     }
@@ -75,7 +75,7 @@ class RtpBStatsTest {
     @AfterEach
     void tearDown() {
         RtpBStats.shutdown();
-        RTP.scheduler = savedScheduler;
+        RTPRuntime.setScheduler(savedScheduler);
     }
 
     @Test
@@ -118,12 +118,12 @@ class RtpBStatsTest {
     @Test
     @DisplayName("start needs a scheduler, is idempotent, and shutdown cancels and allows restart")
     void lifecycle() {
-        RTP.scheduler = null;
+        RTPRuntime.setScheduler(null);
         assertNull(RtpBStats.start(RtpBStatsCatalogue.Host.of("fabric"), RtpBStats.SERVICE_ID, "full", pluginDir));
         assertNull(RtpBStats.service());
 
         RecordingScheduler sched = new RecordingScheduler();
-        RTP.scheduler = sched;
+        RTPRuntime.setScheduler(sched);
         BStatsService first = RtpBStats.start(RtpBStatsCatalogue.Host.of("fabric"), RtpBStats.SERVICE_ID, "full", pluginDir);
         assertTrue(first.isRunning());
         assertSame(first, RtpBStats.service());

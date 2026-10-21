@@ -1,187 +1,241 @@
-# RTP — Random Teleport
+# LeafRTP - Random Teleport
 
-The Folia-native, region-aware random teleport plugin for production Minecraft servers. Pre-generated, pre-validated locations resolve in 0-2 ticks with no main-thread chunk I/O and no region thrashing under load.
+Random teleport (`/rtp`) for Minecraft servers. Players type `/rtp` and land somewhere safe, far from spawn, right away. No "Finding a safe location..." wait and no lag spike for everyone else.
 
-**Supported:** Spigot and Paper 1.18+, Folia 1.21.11+, Fabric 1.20.1 and 1.21+, NeoForge 1.21.1+, up to 26.3. Bug reports are accepted for 1.21.11 through the latest release ([support matrix](docs/dev/SUPPORT_MATRIX.md)).
-
-🔗 **[Get RTP Pro on BuiltByBit](https://builtbybit.com/resources/leafrtp-pro.105418/)** — supports continued development and buys priority support, including fixes for the problems you report. The code is the same MIT-licensed engine as the free build.
+One jar runs on Paper, Spigot, Folia, Fabric and NeoForge. It's free and MIT-licensed.
 
 [![Build](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml/badge.svg)](https://github.com/DailyStruggle/RTP/actions/workflows/gradle.yml)
 [![Release](https://img.shields.io/github/v/release/DailyStruggle/RTP)](https://github.com/DailyStruggle/RTP/releases)
 [![Java](https://img.shields.io/badge/Java-17%2B-blue)](https://adoptium.net/)
+[![Modrinth](https://img.shields.io/badge/Modrinth-LeafRTP-green)](https://modrinth.com/plugin/leafrtp)
 [![SpigotMC](https://img.shields.io/badge/SpigotMC-RTP-orange)](https://www.spigotmc.org/resources/leafrtp.94812/)
 [![BuiltByBit](https://img.shields.io/badge/BuiltByBit-RTP%20Pro-blue)](https://builtbybit.com/resources/leafrtp-pro.105418/)
-[![Modrinth](https://img.shields.io/badge/Modrinth-LeafRTP-green)](https://modrinth.com/plugin/leafrtp)
 
-🔗 [Documentation site](https://dailystruggle.github.io/RTP/)
-🔗 [SpigotMC Resource Page](https://www.spigotmc.org/resources/leafrtp.94812/)
-🔗 [BuiltByBit Resource Page](https://builtbybit.com/resources/leafrtp-pro.105418/)
-🔗 [Modrinth Resource Page](https://modrinth.com/plugin/leafrtp)
+**[Download](https://modrinth.com/plugin/leafrtp)** · **[Documentation](https://dailystruggle.github.io/RTP/)** · **[Quick start](docs/admin/QUICK_START.md)** · **[Commands](docs/admin/COMMANDS.md)** · **[FAQ](docs/admin/FAQ.md)** · **[Get help](SUPPORT.md)**
 
 <div align="center">
 
 <img src="https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/teleport_title.webp" alt="An RTP teleport completing in 0 attempts, 49 ms" width="560" />
 
-<sub>A real `/rtp` landing: a pre-verified destination served in <b>0 attempts, 49 ms</b> - no "Finding a safe location..." wait.</sub>
+<sub>A real <code>/rtp</code>: the spot was checked ahead of time, so the player landed after <b>0 attempts, in 49 ms</b>.</sub>
 
 </div>
 
 ---
 
-## Why RTP?
+## Contents
 
-Legacy random-teleport plugins reroll random coordinates until one lands somewhere safe. Under load on Folia, each candidate triggers cross-region API calls (chunk lookups, block checks, biome queries), thrashing region threads and stretching teleports to seconds. RTP is designed the opposite way: every served location is pre-computed, pre-validated, and ready to hand out in 0-2 ticks.
-
-- **Built for Folia, not retrofitted.** Region-aware scheduling end-to-end. No synchronous chunk I/O on the main thread, no foreign-region API calls in the hot path, no `ThreadAccessException` fallbacks dragging down teleport latency. Spigot and Paper adapters share the same bounded pipeline with platform-correct concurrency.
-- **Pre-generation queue.** Safe locations are validated asynchronously *before* a player asks for one. Teleports resolve in 0-2 game ticks (≤ 100 ms) on average regardless of region size, biome complexity, or player count.
-- **Bounded algorithms, not rerolling.** Location selection runs in deterministic time via a 2D-to-1D Archimedean-spiral mapping that preemptively subtracts known-invalid sectors from the candidate space. See the [mathematical writeup](https://www.reddit.com/r/admincraft/comments/owgvzz/too_much_math/) and [ADR-001](docs/adr/ADR-001-archimedean-spiral-1d-mapping.md).
-- **Spatial memory.** The plugin maps every region it serves and remembers what's invalid (oceans, solid blocks, claims, biome exclusions). `/rtp scan` proactively maps a region for deterministic performance and instant skips of unsafe territory. Memory survives server restarts.
-- **Custom polygons.** Define teleport regions with any closed concave or convex polygon, not just circles and squares. Polygon shapes use the same spatial-memory and pre-validation pipeline as the built-in shapes.
-- **Void-world and SkyBlock support.** The `vert:fixed` adjustor places players at a configured Y for void worlds, SkyBlock servers, and any region where the platform creates the foothold rather than the terrain.
-- **Multi-region per world.** A single world can host any number of independent teleport regions, each with its own shape, distribution, permissions, queue, and economy cost.
-- **Production diagnostics.** `MemoryTracker` accounts for chunk tickets and pipeline allocations on every exit path; spark-compatible profiling surface; per-region MSPT and queue telemetry for tuning under live load.
-- **Extensible API.** Addon developers register custom shapes, vertical adjustors, and claim-check hooks without modifying the plugin.
-
----
-
-## Supported Platforms
-
-| Platform | Min Version | Notes |
-|---|---|---|
-| Spigot | 1.18 | Baseline adapter. No Spigot server runs in CI. |
-| Paper | 1.18 | Uses async chunk loading APIs. Nightly CI on 1.21.11 and 26.3. |
-| Folia | 1.21.11 | Full regional-thread scheduling support. Nightly CI on 1.21.11. Folia is experimental and only its current builds are maintained; older Folia is not supported. |
-| Fabric | 1.20.1 | Native mod support at feature parity with the Bukkit family. Runs on 1.20.1 and 1.21 - 26.3 (not 1.20.2 - 1.20.6); nightly CI on 1.21.11 and 26.3 ([details](platforms/rtp-fabric/README.md)) |
-| NeoForge | 1.21.1 | Native mod adapter, in-scope. Carriers for 1.21.1 and MC 26.x; nightly CI on 1.21.1 only, the 26.x carrier has broader runtime testing ongoing ([details](docs/dev/NEOFORGE_NOTES.md)). |
-| Forge (legacy) | — | No native adapter. Use a Bukkit-compatibility launcher (e.g. **Arclight** or **Mohist**) and run the Spigot/Paper build. |
-
-**Runtime:** Java 17+, or newer where Minecraft needs it (Java 21 from 1.20.5, Java 25 on 26.x). Versions below 1.21.11 are best effort; per-version status is in the [support matrix](docs/dev/SUPPORT_MATRIX.md).
+- [What servers use it for](#what-servers-use-it-for)
+- [Quick start](#quick-start)
+- [Features](#features)
+- [Supported platforms](#supported-platforms)
+- [Build from source](#build-from-source)
+- [How it works](#how-it-works)
+- [Documentation](#documentation)
+- [Contributing](#contributing)
+- [Support](#support)
+- [License](#license)
 
 ---
 
-## Minimum Operational Requirements
+## What servers use it for
 
-RTP trades memory for tick time: the pre-warmed location queue, per-region spatial memory, and the Anvil pre-filter caches all cost heap in exchange for teleports that resolve without on-demand chunk loading. On a heap-starved host the JVM will spend its time in garbage collection and the server will appear to hang; that is a deployment-environment limit, not a plugin fault.
-
-- **Java 17+** (hard requirement), or newer where Minecraft needs it.
-- **Headroom for the caches.** The queue is bounded by `cacheCap` (per region) and the ticket pool by `activeChunkCap`. Both are *absolute* per-region caps: their heap cost is fixed per region (roughly `cacheCap + activeChunkCap` entries) and scales with your region count, not with radius. Radius affects only the size of the per-region spatial memory (the `MemoryShape` land/bad-sector map), not the queue or ticket pool. RTP includes a built-in heap-pressure gate (`performance.yml` -> `maxHeapPercent`, default 85%) that pauses *background cache generation* while the heap is under pressure and logs a warning, so serving already-cached locations keeps working; a persistently-tripped gate means the host is under-provisioned for the configured `cacheCap`.
-
-**Reference environment (measured, not a certified minimum).** The in-repo devstack and stress harness run on a **Ryzen 9 3900X with 16 GiB allocated to the server**. Treat this as a known-good baseline, not a floor - a single small region needs far less. A properly-sourced minimum (heap per region at a given `cacheCap`) is planned once opt-in telemetry lands to measure real deployments; until then, provision generously and watch for `maxHeapPercent` warnings.
+- **Spreading players out on survival servers**, so new players don't all build next to spawn.
+- **Resource and mining worlds** that get reset regularly. `/rtp` can be set to send players to fresh land instead of spots that were already used.
+- **Random spawn on first join, death or world change** ([recipes](docs/admin/RECIPES.md#rtp-on-first-join-random-spawn-for-new-players)).
+- **Hardcore, deathban and UHC-style scatter**, including teleporting a whole group at once.
+- **SkyBlock, OneBlock and void worlds**, where RTP places players at a fixed height and the island plugin builds the ground.
+- **Arenas and 1v1 duels**, with matched spawn points for each side ([recipe](docs/admin/RECIPES.md#symmetrical-1v1-duels--arena-battles-subspace-placement)).
+- **Networks behind Velocity**: `/rtp` on one server sends the player to a region on another ([proxy mode](docs/admin/proxies/INDEX.md)).
+- **Paid teleports, NPCs, signs and menus**: charge through Vault, or start a teleport from any plugin that runs a command ([recipes](docs/admin/RECIPES.md)).
 
 ---
 
-## Pregenerate First
+## Quick start
 
-For best results, pregenerate each RTP world (Chunky / WorldBorder) sized to your region radius before going live. RTP's pipeline is bounded by your server's chunk-generation throughput on first touch; pregeneration removes that bottleneck. See [QUICK_START Step 0](docs/admin/QUICK_START.md#step-0--prerequisites--pregenerate-the-world).
+1. **Download** the jar from [Modrinth](https://modrinth.com/plugin/leafrtp). One jar covers every platform.
+2. **Install:** put it in `plugins/` (Paper, Spigot, Folia) or `mods/` (Fabric, NeoForge), then restart the server.
+3. **Teleport:** run `/rtp`. That's it.
+
+The defaults work as they are. Most servers only change how far players go:
+
+```yaml
+# plugins/RTP/definitions/regions/default.yml
+shape:
+  radius: 4096b        # farthest a player can land from the centre
+  centerRadius: 1024b  # closest a player can land (keeps people off spawn)
+```
+
+Or change it in game, without opening any files:
+
+```
+/rtp config regions default shape.radius=10km shape.centerRadius=1km
+```
+
+Optional extras:
+- `/rtp admin setup` is a guided wizard for single or multi-world servers, SkyBlock, arenas and economy. It shows a preview before it writes anything.
+- `/rtp editor` opens a web editor with a map you can drag the region border on.
+- `/rtp scan start` checks a region ahead of time, so even the first teleports are instant.
+
+Full walkthrough: **[Quick start guide](docs/admin/QUICK_START.md)**. Config folder is `plugins/RTP/` (Bukkit family) or `config/rtp/` (Fabric, NeoForge).
+
+### Everyday commands
+
+| Command | What it does |
+|---|---|
+| `/rtp` | Teleport yourself (permission `rtp.use`) |
+| `/rtp player=Steve` | Teleport another player |
+| `/rtp world=world_nether` / `/rtp region=mining` | Teleport into a specific world or region |
+| `/rtp menu` | In-game menu for picking regions and editing settings |
+| `/rtp reload` | Apply config changes without a restart |
+| `/rtp info` | Region status, queue size and diagnostics |
+
+All commands and permissions: [COMMANDS.md](docs/admin/COMMANDS.md).
 
 ---
 
 ## Features
 
-- **Shapes:** Circle, square, rectangle, and admin-authored **custom polygons** (convex or concave), each supporting flat, normal, and exponential distributions.
-- **Distributions:** Tune where players land, such as uniform spread, center-weighted, or ring-shaped.
-- **Biome filters:** Exclude specific biomes (e.g., ocean, nether_wastes) per region.
-- **Void-world / SkyBlock support:** `vert:fixed` adjustor places players at a configured Y for void worlds, SkyBlock servers, and any region where the platform creates the foothold instead of the terrain.
-- **Claim integration:** Works with GriefPrevention, WorldGuard, Towny, and any addon implementing the validation hook.
-- **Economy support:** Optional Vault integration to charge players per teleport.
-- **Per-region permissions:** Fine-grained permission nodes per region and per world.
-- **Runtime config reload:** Adjust region settings by command without restarting the server.
-- **Persistent state:** Spatial memory and region shape data survive server restarts, avoiding cold-start rebuild penalties.
-- **Built-in diagnostics:** `MemoryTracker` accounts for chunk tickets and pipeline allocations on every exit path; spark-compatible profiling surface for production tuning.
-- **Interactive `/rtp menu`:** A clickable in-game book UI for world/region selection and live config editing (Paper / Folia; chat-paginated fallback elsewhere).
+- **Instant teleports.** RTP finds and checks safe spots before anyone asks, so a teleport is usually served in 0-2 ticks.
+- **Doesn't lag the server.** No chunk loading on the main thread, and it's built for Folia's regional threads, not patched to work on them.
+- **Safe landings.** No lava, water, mid-air drops or suffocation. You choose which blocks and biomes count as unsafe.
+- **Respects claims.** Skips land protected by GriefPrevention, GriefDefender, WorldGuard, Towny, Lands and others, detected automatically.
+- **Learns your map.** Remembers oceans, claims and other bad areas so it stops retrying them, and keeps that across restarts.
+- **Fresh spots.** Optionally never reuses a landing area, so players keep finding new land.
+- **Any shape.** Circles, squares, rectangles or custom polygons, with uniform, centre-weighted or ring-shaped spread. Any number of regions per world.
+- **Biome filters.** Leave out oceans, or send players only to the biomes you list.
+- **Economy and cooldowns.** Optional Vault cost per teleport, plus cooldowns, use limits and per-region permissions.
+- **Configurable everything.** Every message is editable, and ships in 11 languages besides English. Teleport effects, sounds and countdowns are optional.
+- **Web editor and in-game menu.** Edit config from a browser or a clickable book menu instead of by hand.
+- **PlaceholderAPI** support for cooldowns, queues and region info on scoreboards, tab lists and holograms.
 
 <div align="center">
 
 <img src="https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/menu_1.png" alt="The /rtp menu admin panel book UI" width="280" /> <img src="https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/menu_2.png" alt="The /rtp menu config-files browser" width="280" />
 
-<sub>The clickable <code>/rtp menu</code> book UI: admin panel (left) and the in-game config-file browser (right).</sub>
+<sub>The clickable <code>/rtp menu</code>: admin panel (left) and config-file browser (right).</sub>
 
-<img src="https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/mspt_map.webp" alt="In-game MSPT and heap visualization during a region scan" width="340" /> <img src="https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/bad_locations_map.webp" alt="In-game land-vs-water map built from a region scan" width="340" />
+<img src="https://raw.githubusercontent.com/dailystruggle/RTP/V3/docs/assets/img/bad_locations_map.webp" alt="In-game land-vs-water map built from a region scan" width="340" />
 
-<sub>Built-in scan visualizations: live MSPT / heap graphs (left) and a land-vs-water heatmap of the region (right).</sub>
+<sub>A region scan's map of where players can and can't land.</sub>
 
 </div>
 
----
-
-## Shapes
-
-Circle with exponential distribution (σ = 0.1, 1.0, 10.0):
-![circle-exponential](https://user-images.githubusercontent.com/28832622/210043913-fd624a9f-8bdd-45de-b877-6a5f5e3bf40a.png)
-
-Square with exponential distribution (σ = 0.1, 1.0, 10.0):
-![square-exponential](https://user-images.githubusercontent.com/28832622/210043922-4d94e3d6-e829-4adc-a21a-74cce484f8e6.png)
-
-Circle with normal distribution:
-![circle-normal](https://user-images.githubusercontent.com/28832622/210043926-5c5013cf-032e-444c-9397-e381c17a4752.png)
-
-Square with normal distribution:
-![square-normal](https://user-images.githubusercontent.com/28832622/210043956-df964dde-4c70-460b-a377-ffd49a365e69.png)
-
-Rectangle with flat distribution and rotation:
-![rectangle-flat](https://user-images.githubusercontent.com/28832622/210043964-ca9725b8-be25-4e3c-a460-90f8b81326cb.png)
-
-Custom shapes can be registered at runtime via the `rtp-api`. See the `addons/` directory for examples.
+More detail: [feature overview](docs/site/features.md).
 
 ---
 
-## Repository Structure
+## Supported platforms
+
+| Platform | Versions | Notes |
+|---|---|---|
+| Paper / Spigot | 1.18+ | Paper is recommended. |
+| Folia | 1.21.11+ | Current Folia builds only. |
+| Fabric | 1.20.1, 1.21 - 26.3 | Not 1.20.2 - 1.20.6. |
+| NeoForge | 1.21.1+ | [Details](platforms/rtp-neoforge/README.md) |
+| Velocity (proxy) | - | Optional, for cross-server `/rtp`. [Proxy mode](docs/admin/proxies/INDEX.md) |
+| Forge (legacy) | - | Run the Paper/Spigot jar under Arclight or Mohist. |
+
+**Java 17+**, or newer if your Minecraft version needs it (Java 21 from 1.20.5, Java 25 on 26.x). Bug reports are accepted for 1.21.11 through the latest release; older versions are best effort. Per-version status: [support matrix](docs/dev/SUPPORT_MATRIX.md).
+
+**Tips:** pregenerating the world (for example with Chunky) makes the first teleports faster. RTP holds its prepared spots in memory, so give the server some heap headroom ([performance settings](docs/admin/configuration/PERFORMANCE.md)).
+
+---
+
+## Build from source
+
+Most people should [download a release](https://modrinth.com/plugin/leafrtp). To build it yourself:
+
+**You need:** Git and a JDK 21. Gradle and the Java 25 toolchain for the 26.x modules are downloaded automatically by the wrapper.
+
+```sh
+git clone https://github.com/DailyStruggle/RTP.git
+cd RTP
+./gradlew assemble        # Windows: .\gradlew.bat assemble
+```
+
+The jars land in `build/libs/`:
+
+| Jar | What it is |
+|---|---|
+| `LeafRTP-<version>.jar` | The plugin/mod. Install this one. |
+| `LeafRTP-Pro-<version>.jar` | The same engine plus the bundled SQL/Redis drivers for proxy mode and a Folia-tuned scheduler. |
+| `LeafRTPGuiAddon-*.jar`, `LeafRTPCountdownAddon-*.jar` | Optional addons. |
+
+Other useful commands:
+
+```sh
+./gradlew build                  # compile and run every test
+./gradlew :rtp-core:test         # test one module
+./gradlew -PexcludeJdk25 build   # skip the 26.x modules on a JDK-21-only machine
+./gradlew spotlessApply          # format before opening a PR
+```
+
+The first build downloads the Minecraft and loader dependencies and takes a while; later builds are cached. IntelliJ IDEA opens the folder as a Gradle project directly. More detail: [FOR_CONTRIBUTORS.md](docs/FOR_CONTRIBUTORS.md).
+
+### Building an addon
+
+Compile against `rtp-api` only. It lets you register custom shapes, landing rules and claim checks without touching the plugin. Start with the [addon quickstart](docs/ADDON_QUICKSTART.md) and [FOR_ADDON_DEVELOPERS.md](docs/FOR_ADDON_DEVELOPERS.md).
+
+---
+
+## How it works
+
+Most RTP plugins pick random coordinates and check them while the player waits, then pick again whenever a spot is unsafe. RTP does that work ahead of time. It keeps a queue of checked, safe spots for each region, refills it in the background, and remembers areas that failed so it doesn't test them again. When a player runs `/rtp`, the next spot in the queue is handed out.
+
+For the details (selection algorithm, threading model, design decisions), see [How it works](docs/site/how-it-works.md), [Why LeafRTP exists](docs/site/why.md) and the [shape algorithm charts](docs/site/shape-algorithms.md).
+
+<details>
+<summary>Repository layout</summary>
 
 | Directory | Purpose |
 |---|---|
-| `rtp-api/` | Public API and shared models. Compile addons against this module only. |
-| `commands-api/` | Unified multi-platform command framework. |
-| `effects-api/` | Unified multi-platform visual/particle effects framework. |
-| `rtp-core/` | Platform-agnostic core logic: regions, shapes, queues, database, memory tracking. |
-| `rtp-plugin/` | Plugin entry point for Bukkit platforms. Bridges core with Spigot/Paper/Folia adapters. |
-| `platforms/rtp-bukkit/` | Spigot platform adapter. |
-| `platforms/rtp-paper/` | Paper platform adapter (async chunk loading). |
-| `platforms/rtp-folia/` | Folia platform adapter (regional thread scheduling). |
-| `platforms/rtp-fabric/` | Fabric platform adapter and mod entry point. |
-| `platforms/rtp-neoforge/` | NeoForge platform adapter and mod entry point. |
-| `addons/` | Example addons: Iris integration, Glide. (Claim plugin integrations are folded into the core). |
-| `python_test_scripts/` | Visualisation scripts for distribution math and geometry validation. |
+| `rtp-api/` | Public API for addon developers. |
+| `rtp-core/` | Platform-independent engine: regions, shapes, queues, database. |
+| `commands-api/`, `effects-api/` | Shared command and effects frameworks. |
+| `rtp-plugin/` | Bukkit-family entry point and the shipped jar. |
+| `platforms/` | Spigot, Paper, Folia, Fabric, NeoForge and proxy adapters. |
+| `addons/` | Optional addons (GUI menu, countdown, integrations). |
+| `docs/` | Everything published on the documentation site. |
+| `devstack/` | Docker-based multi-server test environment. |
+
+</details>
 
 ---
 
 ## Documentation
 
-The operator and developer docs under `docs/` are published as a browsable, searchable
-website: **<https://dailystruggle.github.io/RTP/>** (rebuilt on every merge to `V3`). The
-same pages ship inside the jar under `plugins/RTP/docs/`, so they are readable offline and
-always match the installed version.
+**<https://dailystruggle.github.io/RTP/>** - searchable, and rebuilt on every merge. The same pages also ship inside the jar under `plugins/RTP/docs/`, so they work offline and always match your installed version.
 
-**Choose your path:**
-
-| I am a… | Start here |
+| I want to... | Start here |
 |---|---|
-| Server administrator installing or operating RTP | [docs/FOR_SERVER_ADMINS.md](docs/FOR_SERVER_ADMINS.md) |
-| Addon developer extending RTP via `rtp-api` | [docs/FOR_ADDON_DEVELOPERS.md](docs/FOR_ADDON_DEVELOPERS.md) |
-| Core contributor to `rtp-core`, `rtp-api`, or a platform adapter | [docs/FOR_CONTRIBUTORS.md](docs/FOR_CONTRIBUTORS.md) |
-
-### Full Reference Index
-
-See [docs/MAP.md](docs/MAP.md) for a one-line catalog of every document, or [docs/dev/INDEX.md](docs/dev/INDEX.md) for a task-to-file router. Root-level: [CONTRIBUTING.md](CONTRIBUTING.md), [CHANGELOG.md](CHANGELOG.md), [SECURITY.md](SECURITY.md).
+| Install and run RTP on my server | [FOR_SERVER_ADMINS.md](docs/FOR_SERVER_ADMINS.md) |
+| Copy a setup for a common task | [Recipes](docs/admin/RECIPES.md) |
+| Write an addon | [FOR_ADDON_DEVELOPERS.md](docs/FOR_ADDON_DEVELOPERS.md) |
+| Work on RTP itself | [FOR_CONTRIBUTORS.md](docs/FOR_CONTRIBUTORS.md) |
 
 ---
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for build instructions, code style rules, and the workflow for adding requirements.
+Bug fixes, translations, docs and addons are all welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow and code style, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md). In short: run `./gradlew build` and `./gradlew spotlessApply` before you open a pull request, and add a line to [CHANGELOG.md](CHANGELOG.md).
 
-New to the plugin? Start with [docs/FOR_SERVER_ADMINS.md](docs/FOR_SERVER_ADMINS.md). Want to extend it? See [docs/FOR_ADDON_DEVELOPERS.md](docs/FOR_ADDON_DEVELOPERS.md).
+---
 
-The short version:
-1. `./gradlew build` (compile and run all tests)
-2. `./gradlew spotlessApply` (format code before pushing)
-3. If you add a requirement, add a row to `docs/dev/TRACEABILITY.md` in the same commit, as CI will fail otherwise.
+## Support
+
+- Questions: [GitHub Discussions](https://github.com/DailyStruggle/RTP/discussions)
+- Bugs: [open an issue](https://github.com/DailyStruggle/RTP/issues/new?template=bug_report.md), after checking the [FAQ](docs/admin/FAQ.md) and confirming it still happens on the latest release (`/rtp version`)
+- Security problems: see [SECURITY.md](SECURITY.md); please don't open a public issue
+
+The full guide is in [SUPPORT.md](SUPPORT.md).
+
+**[RTP Pro on BuiltByBit](https://builtbybit.com/resources/leafrtp-pro.105418/)** buys priority support, including fixes for the problems you report, and funds development. It's the same MIT-licensed code as the free build.
 
 ---
 
 ## License
 
-RTP is **MIT-licensed** ([`LICENSE`](LICENSE); see [ADR-108](docs/adr/ADR-108-all-mit-licensing-pro-as-support.md)): all source in this repository and both the free and Pro binaries may be used, modified, and redistributed, including commercially.
+**MIT** ([`LICENSE`](LICENSE)). You may use, modify and redistribute all source in this repository and both the free and Pro jars, including commercially. Pro is a support tier, not a different licence ([ADR-108](docs/adr/ADR-108-all-mit-licensing-pro-as-support.md)).
 
-Pro is a support tier, not a code licence: buying it gets priority support, including patch releases for the problems you report, and funds development ([ADR-100](docs/adr/ADR-100-superseding-adr-024-sla-and-support-tier.md), [ADR-117](docs/adr/ADR-117-release-cadence-contractual-pro-discretionary-lite.md)).
-
-Where a module or file ships its own `LICENSE` or SPDX header (e.g. the GPL-3.0-or-later NeoForge carriers), that grant governs the file. Releases published before 2026-10-05 keep the licence they shipped with.
+Where a module or file ships its own `LICENSE` or SPDX header (for example the GPL-3.0-or-later NeoForge carriers), that grant governs the file. Releases published before 2026-10-05 keep the licence they shipped with.

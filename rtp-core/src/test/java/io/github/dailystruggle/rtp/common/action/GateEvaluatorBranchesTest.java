@@ -9,7 +9,8 @@ import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import org.junit.jupiter.api.AfterEach;
@@ -52,18 +53,18 @@ class GateEvaluatorBranchesTest {
 
   @BeforeEach
   void setUp() {
-    savedAccessor = RTP.serverAccessor;
+    savedAccessor = RTPRuntime.serverAccessor();
     savedActionService = RTPAPI.actionService;
-    RTP.serverAccessor = null;
+    RTPRuntime.setServerAccessor(null);
     RTPAPI.actionService = null;
     accessor = mock(RTPServerAccessor.class);
   }
 
   @AfterEach
   void tearDown() {
-    RTP.serverAccessor = savedAccessor;
+    RTPRuntime.setServerAccessor(savedAccessor);
     RTPAPI.actionService = savedActionService;
-    RTP.selectionAPI.permRegionLookup.remove(REGION_KEY);
+    ActiveSelection.get().permRegionLookup.remove(REGION_KEY);
   }
 
   private static ActionGateContext ctx() {
@@ -229,7 +230,7 @@ class GateEvaluatorBranchesTest {
     when(service.getSession(offlineCtx.sessionId())).thenReturn(Optional.of(allOffline));
     when(service.getSession(unknownCtx.sessionId())).thenReturn(Optional.empty());
 
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     RTPAPI.actionService = service;
     Map<String, Object> eq1 = Map.of("scoreboard", Map.of("objective", "rtp_alive", "matches", "== 1"));
     Map<String, Object> eq2 = Map.of("scoreboard", Map.of("objective", "rtp_alive", "matches", "== 2"));
@@ -237,10 +238,10 @@ class GateEvaluatorBranchesTest {
     assertTrue(GateEvaluator.evaluate(eq2, offlineCtx, null));
     assertTrue(GateEvaluator.evaluate(eq1, unknownCtx, null));
 
-    RTP.serverAccessor = null;
+    RTPRuntime.setServerAccessor(null);
     assertTrue(GateEvaluator.evaluate(eq1, mixedCtx, null));
 
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     RTPAPI.actionService = null;
     assertTrue(GateEvaluator.evaluate(eq1, mixedCtx, null));
   }
@@ -251,7 +252,7 @@ class GateEvaluatorBranchesTest {
     UUID pid = UUID.randomUUID();
     when(accessor.getScoreboardScore(pid, "kills")).thenReturn(7);
     when(accessor.getScoreboardScore(any(UUID.class), eq("deaths"))).thenReturn(null);
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
 
     ActionGateContext c = new ActionGateContext(UUID.randomUUID(), "test", pid, 1L, 1L, 0, true, 0.0);
     assertTrue(GateEvaluator.evaluate(Map.of("scoreboard", Map.of("objective", "kills", "matches", "== 7")), c, null));
@@ -308,7 +309,7 @@ class GateEvaluatorBranchesTest {
     when(shape.contains(anyInt(), anyInt())).thenReturn(false);
     when(shape.contains(0, 0)).thenReturn(true);
     doReturn(shape).when(region).getShape();
-    RTP.selectionAPI.permRegionLookup.put(REGION_KEY, region);
+    ActiveSelection.get().permRegionLookup.put(REGION_KEY, region);
 
     // Partial coordinates skip the containment check; no accessor means zero players.
     ActionGateContext partial = ctxAt(5.0, 64.0, null, 64.0, UUID.randomUUID());
@@ -327,7 +328,7 @@ class GateEvaluatorBranchesTest {
         player(UUID.randomUUID(), new RTPLocation(overworld, 3, 64, 3), true),
         player(UUID.randomUUID(), new RTPLocation(overworld, 1600, 64, 1600), true));
     doReturn(online).when(accessor).getOnlinePlayers();
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
 
     assertTrue(GateEvaluator.evaluate(
         Map.of("spatial", Map.of("region", REGION_KEY, "world", "WORLD", "playerCount", "== 1")), partial, null));
@@ -366,7 +367,7 @@ class GateEvaluatorBranchesTest {
   @DisplayName("Command gate dispatches list entries, skipping null and blank commands")
   void commandGateListsSkipNullAndBlank() {
     when(accessor.executeCommand(any(UUID.class), anyString())).thenReturn(true);
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
 
     Map<String, Object> execMap = new HashMap<>();
     execMap.put("execute", Arrays.asList("cmd_a", null));
@@ -382,7 +383,7 @@ class GateEvaluatorBranchesTest {
   @DisplayName("Command gate substitutes tokens, skips wildcard targets and fails on dispatch failure")
   void commandGateSubstitutionAndFailure() {
     when(accessor.executeCommand(any(UUID.class), anyString())).thenReturn(false);
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
 
     ActionGateContext noParticipant = new ActionGateContext(UUID.randomUUID(), "test", null, 1L, 1L, 0, true, 0.0);
     assertTrue(GateEvaluator.evaluate(Map.of("command", "msg [target_name] hi"), noParticipant, null));
@@ -396,7 +397,7 @@ class GateEvaluatorBranchesTest {
   @DisplayName("Command gate skips a target placeholder composed by substitution instead of dispatching it")
   void commandGateSkipsComposedTargetPlaceholder() {
     when(accessor.executeCommand(any(UUID.class), anyString())).thenReturn(false);
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
 
     ActionGateContext noParticipant = new ActionGateContext(UUID.randomUUID(), "test", null, 1L, 1L, 0, true, 0.0);
     assertTrue(GateEvaluator.evaluate(Map.of("command", "msg [target_[n]] hi"), noParticipant, null, Map.of("n", "1")));
@@ -407,7 +408,7 @@ class GateEvaluatorBranchesTest {
   @DisplayName("Entity predicates without a usable tag fall back to command dispatch")
   void entityPredicateFallsBackWithoutTag() {
     when(accessor.executeCommand(any(UUID.class), anyString())).thenReturn(true);
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
 
     assertTrue(GateEvaluator.evaluate(Map.of("command", "execute if entity @a"), ctx(), null));
     assertTrue(GateEvaluator.evaluate(Map.of("command", "execute if entity @a[]"), ctx(), null));
@@ -425,7 +426,7 @@ class GateEvaluatorBranchesTest {
     RTPPlayer bob = player(bobId, null, true);
     when(accessor.getPlayer("Bob")).thenReturn(bob);
     when(accessor.getPlayer("Ghost")).thenReturn(null);
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
 
     assertFalse(GateEvaluator.evaluate(Map.of("command", "execute if entity @a[name=Ghost,tag=t]"), ctx(), null));
 
@@ -453,7 +454,7 @@ class GateEvaluatorBranchesTest {
     when(accessor.getScoreboardTags(untaggedId)).thenReturn(Collections.emptySet());
     when(accessor.getScoreboardTags(nullTagsId)).thenReturn(null);
     when(accessor.getScoreboardTags(taggedId)).thenReturn(Set.of("t"));
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
 
     doReturn(Arrays.asList(null, untagged, nullTags)).when(accessor).getOnlinePlayers();
     assertFalse(GateEvaluator.evaluate(Map.of("command", "execute if entity @a[name=,tag=t]"), ctx(), null));

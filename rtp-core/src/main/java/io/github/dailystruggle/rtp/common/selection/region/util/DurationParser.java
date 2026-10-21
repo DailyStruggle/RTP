@@ -1,6 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region.util;
 
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Locale;
 import java.util.logging.Level;
 
@@ -231,6 +231,6 @@ public final class DurationParser {
         secEquiv,
         TemporalUnit.fromString(newUnit) != null ? TemporalUnit.fromString(newUnit).getPrimarySuffix() : newUnit
     );
-    RTP.log(Level.INFO, msg);
+    RTPRuntime.log(Level.INFO, msg);
   }
 }

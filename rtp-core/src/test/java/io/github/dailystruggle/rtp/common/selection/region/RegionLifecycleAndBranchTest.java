@@ -5,20 +5,27 @@ import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPChunk;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.mock.MockRTPChunk;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.mock.TrackedMockWorld;
+import io.github.dailystruggle.rtp.common.network.NetworkHooks;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Circle;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
+import io.github.dailystruggle.rtp.common.tasks.tick.MiscTasks;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -73,23 +80,23 @@ public class RegionLifecycleAndBranchTest {
     @Test
     void constructor_selfHealsNullShapeAndVert() {
         // Ensure factories exist in selectionAPI
-        if (RTP.selectionAPI == null) {
-            RTP.selectionAPI = new io.github.dailystruggle.rtp.common.selection.SelectionAPI();
+        if (ActiveSelection.get() == null) {
+            ActiveSelection.set(new io.github.dailystruggle.rtp.common.selection.SelectionAPI());
         }
-        if (RTP.selectionAPI.shapeFactory == null) {
+        if (ActiveSelection.get().shapeFactory == null) {
             io.github.dailystruggle.rtp.common.factory.Factory<Shape<?>> shapeFactory = new io.github.dailystruggle.rtp.common.factory.Factory<>();
             shapeFactory.add("SQUARE", new Square());
-            RTP.selectionAPI.shapeFactory = shapeFactory;
-            RTP.factoryMap.put(RTP.factoryNames.shape, shapeFactory);
-        } else if (!RTP.selectionAPI.shapeFactory.contains("SQUARE")) {
-            RTP.selectionAPI.shapeFactory.add("SQUARE", new Square());
+            ActiveSelection.get().shapeFactory = shapeFactory;
+            FactoryRegistry.map().put(FactoryNames.shape, shapeFactory);
+        } else if (!ActiveSelection.get().shapeFactory.contains("SQUARE")) {
+            ActiveSelection.get().shapeFactory.add("SQUARE", new Square());
         }
 
         io.github.dailystruggle.rtp.common.factory.Factory<VerticalAdjustor<?>> vertFactory =
-                (io.github.dailystruggle.rtp.common.factory.Factory<VerticalAdjustor<?>>) RTP.factoryMap.get(RTP.factoryNames.vert);
+                (io.github.dailystruggle.rtp.common.factory.Factory<VerticalAdjustor<?>>) FactoryRegistry.get(FactoryNames.vert);
         if (vertFactory == null) {
             vertFactory = new io.github.dailystruggle.rtp.common.factory.Factory<>();
-            RTP.factoryMap.put(RTP.factoryNames.vert, vertFactory);
+            FactoryRegistry.map().put(FactoryNames.vert, vertFactory);
         }
         if (!vertFactory.contains("LINEAR")) {
             vertFactory.add("LINEAR", new LinearAdjustor(new ArrayList<>()));
@@ -651,7 +658,7 @@ public class RegionLifecycleAndBranchTest {
         try {
             region.execute(0L);
             // Tick-thread chunk callbacks queue verify on the budgeted sync pipe; drain it.
-            RTP.getInstance().miscSyncTasks.execute(Long.MAX_VALUE);
+            MiscTasks.sync().execute(Long.MAX_VALUE);
             // getCachedChunk returned null -> logPromotionDropDiag(coldLoc, null, cx, cz) was invoked
             // and coldLoc2 was returned to unkept
             assertEquals(1, region.queueManager.unkeptLocations.size(),
@@ -802,7 +809,7 @@ public class RegionLifecycleAndBranchTest {
         assertFalse(region.queueManager.playerQueue.contains(player));
         region.requestTeleport(player);
         assertTrue(region.queueManager.playerQueue.contains(player));
-        assertTrue(RTP.getInstance().queuedPlayers.contains(player));
+        assertTrue(TeleportSessions.current().queuedPlayers.contains(player));
     }
 
     @Test
@@ -894,12 +901,12 @@ public class RegionLifecycleAndBranchTest {
         UUID pId = UUID.randomUUID();
         io.github.dailystruggle.rtp.common.mock.MockRTPPlayer mockPlayer =
                 new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(pId, "WakeP", new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 0, 64, 0));
-        ((MockRTPServerAccessor) RTP.serverAccessor).addPlayer(mockPlayer);
+        ((MockRTPServerAccessor) RTPRuntime.serverAccessor()).addPlayer(mockPlayer);
 
         TeleportData initialData = new TeleportData();
         initialData.sender = mockPlayer;
         initialData.targetRegion = region;
-        RTP.getInstance().latestTeleportData.put(pId, initialData);
+        TeleportSessions.current().latestTeleportData.put(pId, initialData);
 
         // Offer a kept location
         region.queueManager.keptLocations.offer(new RTPLocation(new RTPCoords(world.name(), 16, 64, 16), 1, null));
@@ -912,7 +919,7 @@ public class RegionLifecycleAndBranchTest {
         region.execute(10_000_000L);
 
         // TeleportData should have been updated
-        TeleportData data = RTP.getInstance().latestTeleportData.get(pId);
+        TeleportData data = TeleportSessions.current().latestTeleportData.get(pId);
         assertNotNull(data);
     }
 
@@ -922,7 +929,7 @@ public class RegionLifecycleAndBranchTest {
         UUID pId = UUID.randomUUID();
         io.github.dailystruggle.rtp.common.mock.MockRTPPlayer mockPlayer =
                 new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(pId, "RoutingP", new io.github.dailystruggle.rtp.api.world.RTPLocation(world, 0, 64, 0));
-        ((MockRTPServerAccessor) RTP.serverAccessor).addPlayer(mockPlayer);
+        ((MockRTPServerAccessor) RTPRuntime.serverAccessor()).addPlayer(mockPlayer);
 
         // Put location in personal queue
         region.openPersonalQueue(pId);
@@ -961,7 +968,7 @@ public class RegionLifecycleAndBranchTest {
         borderSquare.set(io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams.radius, 200L);
         io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder border =
                 new io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder(() -> borderSquare, loc -> true);
-        ((MockRTPServerAccessor) RTP.serverAccessor).setWorldBorderFunction(s -> border);
+        ((MockRTPServerAccessor) RTPRuntime.serverAccessor()).setWorldBorderFunction(s -> border);
 
         RegionSettings s = createValidSettings("wbo_reg", new Circle());
         RegionSettings wboSettings = new RegionSettings(
@@ -1031,7 +1038,7 @@ public class RegionLifecycleAndBranchTest {
         @SuppressWarnings("unchecked")
         io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys> perf =
                 (io.github.dailystruggle.rtp.common.configuration.ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys>)
-                        RTP.configs.getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
+                        ActiveConfigs.get().getParser(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.class);
         if (perf != null) {
             perf.set(io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys.maxHeapPercent, 0.0001);
         }
@@ -1057,26 +1064,26 @@ public class RegionLifecycleAndBranchTest {
         UUID offlineId = UUID.randomUUID(); // not added to MockRTPServerAccessor
 
         region.queueManager.playerQueue.offer(offlineId);
-        RTP.getInstance().processingPlayers.add(offlineId);
-        RTP.getInstance().queuedPlayers.add(offlineId);
+        TeleportSessions.current().processingPlayers.add(offlineId);
+        TeleportSessions.current().queuedPlayers.add(offlineId);
 
         region.execute(10_000_000L);
 
         assertFalse(region.queueManager.playerQueue.contains(offlineId));
-        assertFalse(RTP.getInstance().processingPlayers.contains(offlineId));
-        assertFalse(RTP.getInstance().queuedPlayers.contains(offlineId));
+        assertFalse(TeleportSessions.current().processingPlayers.contains(offlineId));
+        assertFalse(TeleportSessions.current().queuedPlayers.contains(offlineId));
     }
 
     @Test
     @DisplayName("Region execute with lobbyMode does not execute pulses")
     void testExecuteLobbyModeShortCircuits() {
-        RTP.lobbyMode = true;
+        NetworkHooks.setLobbyMode(true);
         try {
             Region region = new Region("lobby_reg", createValidSettings("lobby_reg", new Circle()));
             region.execute(10_000_000L);
             assertEquals(0, region.queueManager.keptLocations.size());
         } finally {
-            RTP.lobbyMode = false;
+            NetworkHooks.setLobbyMode(false);
         }
     }
 

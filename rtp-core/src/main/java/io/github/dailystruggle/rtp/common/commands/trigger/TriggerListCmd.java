@@ -2,7 +2,8 @@ package io.github.dailystruggle.rtp.common.commands.trigger;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.trigger.PhysicalTriggerManager;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
@@ -28,15 +29,15 @@ public class TriggerListCmd extends BaseTriggerCmd {
 
   @Override
   protected boolean execute(UUID senderId, Map<String, List<String>> parameterValues) {
-    Collection<PhysicalTriggerSpec> triggers = RTP.triggerManager.getTriggers();
+    Collection<PhysicalTriggerSpec> triggers = PhysicalTriggerManager.instance().getTriggers();
     if (triggers.isEmpty()) {
-      RTP.serverAccessor.sendMessage(senderId, senderId, "[RTP] No physical triggers registered.");
+      RTPRuntime.serverAccessor().sendMessage(senderId, senderId, "[RTP] No physical triggers registered.");
       return true;
     }
 
-    RTP.serverAccessor.sendMessage(senderId, senderId, "[RTP] Registered physical triggers (" + triggers.size() + "):");
+    RTPRuntime.serverAccessor().sendMessage(senderId, senderId, "[RTP] Registered physical triggers (" + triggers.size() + "):");
     for (PhysicalTriggerSpec t : triggers) {
-      RTP.serverAccessor.sendMessage(
+      RTPRuntime.serverAccessor().sendMessage(
           senderId, senderId,
           " - " + t.id() + " [" + t.type() + "] -> " + t.actionId() + " (" + t.worldName() + ":" + t.minX() + "," + t.minY() + "," + t.minZ() + ")");
     }

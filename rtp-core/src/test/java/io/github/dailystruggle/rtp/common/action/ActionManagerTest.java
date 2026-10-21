@@ -8,6 +8,8 @@ import io.github.dailystruggle.rtp.api.group.GroupPlacementResult;
 import io.github.dailystruggle.rtp.api.world.RTPLocation;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,7 +34,7 @@ class ActionManagerTest {
   @BeforeEach
   void setUp() {
     serverAccessor = new MockRTPServerAccessor(new File("."));
-    RTP.serverAccessor = serverAccessor;
+    RTPRuntime.setServerAccessor(serverAccessor);
     originalGroupService = RTP.groupPlacementService;
     actionManager = new ActionManager();
   }
@@ -477,7 +479,7 @@ class ActionManagerTest {
       return new io.github.dailystruggle.rtp.common.selection.region.RTPLocation(
           new io.github.dailystruggle.rtp.api.world.RTPCoords("world", x, 64, z), 1);
     });
-    RTP.selectionAPI.permRegionLookup.put("default", mockRegion);
+    ActiveSelection.get().permRegionLookup.put("default", mockRegion);
 
     java.util.concurrent.atomic.AtomicInteger liveCalls = new java.util.concurrent.atomic.AtomicInteger(0);
     RTP.groupPlacementService = req -> {
@@ -498,7 +500,7 @@ class ActionManagerTest {
     assertEquals(1, liveCalls.get(), "Must fallback to live placement when cached item is invalidated");
 
     actionManager.disarm(res.sessionId());
-    RTP.selectionAPI.permRegionLookup.remove("default");
+    ActiveSelection.get().permRegionLookup.remove("default");
   }
 
   @Test
@@ -654,7 +656,7 @@ class ActionManagerTest {
     org.mockito.Mockito.when(mockRegion.candidateValidator()).thenReturn((x, z) -> null); // Rejects everything!
     org.mockito.Mockito.when(mockShape.xzToLocation(org.mockito.ArgumentMatchers.any(long.class), org.mockito.ArgumentMatchers.any(long.class)))
         .thenReturn(9999L);
-    RTP.selectionAPI.permRegionLookup.put("hazard_region", mockRegion);
+    ActiveSelection.get().permRegionLookup.put("hazard_region", mockRegion);
 
     // Mock live group service fallback
     RTP.groupPlacementService = req -> CompletableFuture.completedFuture(
@@ -678,7 +680,7 @@ class ActionManagerTest {
     org.mockito.Mockito.verify(mockShape).addBadChunk(org.mockito.ArgumentMatchers.eq(9999L), org.mockito.ArgumentMatchers.any());
 
     actionManager.disarm(result.sessionId());
-    RTP.selectionAPI.permRegionLookup.remove("hazard_region");
+    ActiveSelection.get().permRegionLookup.remove("hazard_region");
   }
 
   @Test

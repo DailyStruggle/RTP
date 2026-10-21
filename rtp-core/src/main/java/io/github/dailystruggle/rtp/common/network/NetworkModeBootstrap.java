@@ -2,10 +2,13 @@ package io.github.dailystruggle.rtp.common.network;
 
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.server.PlayerLifecycleHook;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.database.options.AbstractSQLDatabaseAccessor;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.proxy.common.selector.LoadBalancerConfig;
 import io.github.dailystruggle.rtp.proxy.common.selector.LoadBalancerConfigYaml;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue;
@@ -52,7 +55,7 @@ public final class NetworkModeBootstrap {
     private NetworkRequestQueue requestQueue;
     // Peer-region registry view over the
     // cached snapshot + Bukkit-platform NetworkCommandHook installed into
-    // RTP.networkCommandHook. Null when network mode is disabled or
+    // NetworkHooks.commandHook(). Null when network mode is disabled or
     // boot() did not complete past router wiring.
     private PeerRegionRegistry peerRegionRegistry;
     private BukkitNetworkCommandHook commandHook;
@@ -104,7 +107,7 @@ public final class NetworkModeBootstrap {
         try {
             cfg = RtpYamlConfig.load(networkYml);
         } catch (IOException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[RTP] network.yml present but failed to parse: " + e.getMessage()
                             + " - network mode stays disabled.", e);
             return;
@@ -118,7 +121,7 @@ public final class NetworkModeBootstrap {
 
         String localServerId = network.getString("serverId", "");
         if (localServerId == null || localServerId.isEmpty()) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[RTP] network.enabled=true but network.serverId is empty; "
                             + "refusing to enable network mode (REQ-RTP-NET-002).");
             return;
@@ -165,7 +168,7 @@ public final class NetworkModeBootstrap {
             String tt = transportType == null ? "" : transportType.toLowerCase(java.util.Locale.ROOT);
             if (tt.equals("redis") || tt.equals("sql")
                     || tt.equals("proxy-direct") || tt.equals("proxydirect")) {
-                RTP.log(Level.SEVERE,
+                RTPRuntime.log(Level.SEVERE,
                         "[RTP] HMAC verifier load failed (secretEnv='" + secretEnv
                                 + "'): " + t.getMessage()
                                 + " - transport.type=" + transportType + " requires it; network mode stays "
@@ -173,7 +176,7 @@ public final class NetworkModeBootstrap {
                                 + "backend and proxy (REQ-RTP-PROXY-007).");
                 return;
             }
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[RTP] HMAC verifier load failed (secretEnv='" + secretEnv
                             + "'): " + t.getMessage()
                             + " - transport.type=" + transportType + " does not sign payloads; continuing.");
@@ -183,7 +186,7 @@ public final class NetworkModeBootstrap {
                 && !network.getBoolean("allowUnsigned", false)) {
             // Unsigned plugin-message rows can be injected by a modded client; running
             // without the secret is an explicit operator opt-in (REQ-RTP-PROXY-007).
-            RTP.log(Level.SEVERE,
+            RTPRuntime.log(Level.SEVERE,
                     "[RTP] transport.type=" + transportType + " has no HMAC secret (secretEnv='"
                             + secretEnv + "'); network mode stays DISABLED. Set the env var to a Base64"
                             + " secret of >= 32 bytes on every backend and the proxy, or set"
@@ -196,7 +199,7 @@ public final class NetworkModeBootstrap {
         try {
             selected = openTransport(transportType, intervalMs, staleAfterMs, transportSec, verifier, schemaVersion);
         } catch (Throwable t) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[RTP] Failed to open transport.type=" + transportType
                             + ": " + t.getMessage()
                             + " - network mode stays disabled.", t);
@@ -205,11 +208,11 @@ public final class NetworkModeBootstrap {
         if (selected == null) return;
 
         // Install on the SQL accessor so any future consumer of
-        // RTP.serverAccessor.getDatabaseAccessor()...getNetworkStateBinding()
+        // RTPRuntime.serverAccessor().getDatabaseAccessor()...getNetworkStateBinding()
         // sees the active binding without needing to hop through this helper.
         try {
-            if (RTP.getInstance() != null
-                    && RTP.getInstance().databaseAccessor instanceof AbstractSQLDatabaseAccessor sql) {
+            if (TeleportSessions.current() != null
+                    && ActiveDatabase.accessor() instanceof AbstractSQLDatabaseAccessor sql) {
                 sql.setNetworkStateBinding(new BindingAdapter(selected));
             }
         } catch (Throwable ignored) {
@@ -233,7 +236,7 @@ public final class NetworkModeBootstrap {
         }
 
         java.util.function.Function<Boolean, BackendStateSampler> samplerFactory =
-                RTP.backendStateSamplerFactory;
+                NetworkHooks.backendStateSamplerFactory();
         if (samplerFactory == null) {
             // ADR-049: each backend platform adapter installs a sampler
             // factory during startup. Without one we cannot publish
@@ -241,7 +244,7 @@ public final class NetworkModeBootstrap {
             // (S-004: log, never silently no-op). Real Bukkit / Paper /
             // Folia / Fabric adapters always install the factory; this
             // branch only fires on a misconfigured embedding.
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[RTP] no BackendStateSampler factory installed by the platform"
                             + " adapter; network mode requires one - aborting network boot"
                             + " for this lifecycle (serverId='" + localServerId + "').");
@@ -266,9 +269,9 @@ public final class NetworkModeBootstrap {
         };
         long refreshTicks = Math.max(1L, intervalMs / 50L);
         // Initial fill so we are not waiting a full intervalMs for the first cache value.
-        RTP.scheduler.runTaskAsynchronously(refresh);
+        RTPRuntime.scheduler().runTaskAsynchronously(refresh);
         this.snapshotRefreshTask =
-                RTP.scheduler.runTaskTimerAsynchronously(refresh, refreshTicks, refreshTicks);
+                RTPRuntime.scheduler().runTaskTimerAsynchronously(refresh, refreshTicks, refreshTicks);
 
         // Periodically pump auto-detect state machine for transport.type=auto.
         final io.github.dailystruggle.rtp.common.network.pluginmessage.ProxyAutoDetector detector =
@@ -293,7 +296,7 @@ public final class NetworkModeBootstrap {
                 }
             };
             this.autoDetectorTask =
-                    RTP.scheduler.runTaskTimerAsynchronously(pump, refreshTicks, refreshTicks);
+                    RTPRuntime.scheduler().runTaskTimerAsynchronously(pump, refreshTicks, refreshTicks);
         }
 
         // Reservation-token TTL reaper (REQ-RTP-NET-011). On backends in proxy-
@@ -341,13 +344,13 @@ public final class NetworkModeBootstrap {
             try {
                 rq = openRequestQueue(transportType, transportSec, verifier, schemaVersion);
             } catch (UnsupportedOperationException notReady) {
-                RTP.log(Level.INFO,
+                RTPRuntime.log(Level.INFO,
                         "[RTP] NetworkRequestQueue for transport=" + transportType
                                 + " is not yet wired; cross-server enrolment stays disabled "
                                 + "(router will short-circuit fallback): " + notReady.getMessage());
                 rq = null;
             } catch (Throwable t) {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "[RTP] NetworkRequestQueue open failed for transport=" + transportType
                                 + ": " + t.getMessage() + " - cross-server enrolment stays disabled.", t);
                 rq = null;
@@ -361,7 +364,7 @@ public final class NetworkModeBootstrap {
             if (rq == null
                     && this.transport instanceof io.github.dailystruggle.rtp.common.network.direct.ProxyDirectNetworkBinding pdb) {
                 rq = new io.github.dailystruggle.rtp.common.network.direct.ProxyDirectNetworkRequestQueue(pdb);
-                RTP.log(Level.FINE,
+                RTPRuntime.log(Level.FINE,
                         "[RTP] proxy-direct: request queue is a remote view of the proxy store "
                                 + "(enrolment + status ride the proxy-direct socket).");
             }
@@ -491,7 +494,7 @@ public final class NetworkModeBootstrap {
                     return;
                 }
                 try {
-                    RTP.getInstance().processingPlayers.remove(uuid);
+                    TeleportSessions.current().processingPlayers.remove(uuid);
                 } catch (Throwable ignored) {
                 }
                 if (this.lobbyRetryQueue != null) {
@@ -529,7 +532,7 @@ public final class NetworkModeBootstrap {
                     loadBalancerConfig = LoadBalancerConfigYaml.fromMap(lbSec.getValues(true));
                 }
             } catch (Throwable lbFail) {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "[RTP] failed to parse network.yml::loadBalancer: "
                                 + lbFail.getMessage()
                                 + " - falling back to bundled defaults (legacy most-kept behaviour).",
@@ -570,16 +573,16 @@ public final class NetworkModeBootstrap {
                         localServerId,
                         Duration.ofMillis(reservationTtlMs),
                         uuid -> {
-                            try { RTP.getInstance().processingPlayers.remove(uuid); } catch (Throwable ignored) {}
+                            try { TeleportSessions.current().processingPlayers.remove(uuid); } catch (Throwable ignored) {}
                         }
                 );
                 this.commandHook.setDirectDatabaseDispatcher(directDispatcher);
-                RTP.log(Level.INFO,
+                RTPRuntime.log(Level.INFO,
                         "[RTP] Direct DB Mode enabled (rtp-proxy-ADR-020): direct backend cross-server dispatch over "
                                 + transportType + " with native proxy Connect.");
             }
 
-            RTP.networkCommandHook = this.commandHook;
+            NetworkHooks.setCommandHook(this.commandHook);
             LIVE = this;
 
             // One-shot region collision audit on boot.
@@ -590,15 +593,15 @@ public final class NetworkModeBootstrap {
                         bootSnap, localServerId, NetworkRegionCollisionWarner.Policy.WARN);
             } catch (InterruptedException ie) {
                 Thread.currentThread().interrupt();
-                RTP.log(Level.FINE,
+                RTPRuntime.log(Level.FINE,
                         "[RTP] region-collision boot audit interrupted: " + ie.getMessage());
             } catch (Throwable warnFail) {
-                RTP.log(Level.FINE,
+                RTPRuntime.log(Level.FINE,
                         "[RTP] region-collision boot audit skipped: " + warnFail.getMessage());
             }
         } catch (Throwable t) {
             // Degrade gracefully on wiring failure: keep local pipeline active.
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[RTP] router / enrolment buffer / status cache wiring failed: "
                             + t.getMessage() + " - /rtp stays local for this lifecycle.", t);
             this.router = null;
@@ -608,8 +611,8 @@ public final class NetworkModeBootstrap {
             this.waitlistGuard = null;
             this.waitlistQuitListener = null;
             if (this.statusCache != null) { try { this.statusCache.shutdown(); } catch (Throwable ignored) {} this.statusCache = null; }
-            if (RTP.networkCommandHook == this.commandHook) {
-                RTP.networkCommandHook = io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY;
+            if (NetworkHooks.commandHook() == this.commandHook) {
+                NetworkHooks.setCommandHook(io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY);
             }
             this.commandHook = null;
             this.peerRegionRegistry = null;
@@ -620,14 +623,14 @@ public final class NetworkModeBootstrap {
         try {
             reconcileNetworkReservations(selected, localServerId);
         } catch (Throwable reconcileFail) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[RTP] boot-time reservation reconcile failed: "
                             + reconcileFail.getMessage()
                             + " - cross-server arrivals during this lifecycle "
                             + "will fall through to local /rtp.", reconcileFail);
         }
 
-        RTP.log(Level.INFO,
+        RTPRuntime.log(Level.INFO,
                 "[RTP] Backend network mode enabled: serverId='" + localServerId
                         + "' transport=" + transportType + " intervalMs=" + intervalMs
                         + " reapIntervalMs=" + reapMs
@@ -645,16 +648,16 @@ public final class NetworkModeBootstrap {
         if (joinTriggerSource == null) return;
         if (joinTriggerSourceRegistered) return;
         try {
-            PlayerLifecycleHook hook = (RTP.serverAccessor != null)
-                    ? RTP.serverAccessor.getPlayerLifecycleHook() : null;
+            PlayerLifecycleHook hook = (RTPRuntime.serverAccessor() != null)
+                    ? RTPRuntime.serverAccessor().getPlayerLifecycleHook() : null;
             if (hook == null) return;
             joinTriggerSource.register(hook);
             joinTriggerSourceRegistered = true;
-            RTP.log(Level.FINE,
+            RTPRuntime.log(Level.FINE,
                     "[RTP] JoinTriggerSource registered for serverId='"
                             + joinTriggerSource.serverId() + "'");
         } catch (Throwable t) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[RTP] failed to register JoinTriggerSource: " + t.getMessage(), t);
         }
     }
@@ -669,15 +672,15 @@ public final class NetworkModeBootstrap {
         if (waitlistQuitListener == null) return;
         if (waitlistQuitListenerRegistered) return;
         try {
-            PlayerLifecycleHook hook = (RTP.serverAccessor != null)
-                    ? RTP.serverAccessor.getPlayerLifecycleHook() : null;
+            PlayerLifecycleHook hook = (RTPRuntime.serverAccessor() != null)
+                    ? RTPRuntime.serverAccessor().getPlayerLifecycleHook() : null;
             if (hook == null) return;
             waitlistQuitListener.register(hook);
             waitlistQuitListenerRegistered = true;
-            RTP.log(Level.FINE,
+            RTPRuntime.log(Level.FINE,
                     "[RTP] NetworkWaitlistQuitListener registered.");
         } catch (Throwable t) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[RTP] failed to register NetworkWaitlistQuitListener: "
                             + t.getMessage(), t);
         }
@@ -702,8 +705,8 @@ public final class NetworkModeBootstrap {
         // /rtp call from this point on takes the local-only pipeline. This
         // must come before the enrolment buffer / router teardown so a
         // late command thread doesn't NPE on a half-shut router.
-        if (RTP.networkCommandHook == this.commandHook) {
-            RTP.networkCommandHook = io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY;
+        if (NetworkHooks.commandHook() == this.commandHook) {
+            NetworkHooks.setCommandHook(io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY);
         }
         this.commandHook = null;
         this.peerRegionRegistry = null;
@@ -760,13 +763,13 @@ public final class NetworkModeBootstrap {
             reservationReaper = null;
         }
         if (snapshotRefreshTask != null) {
-            try { RTP.scheduler.cancelTask(snapshotRefreshTask); }
+            try { RTPRuntime.scheduler().cancelTask(snapshotRefreshTask); }
             catch (Throwable ignored) { /* best-effort */ }
             snapshotRefreshTask = null;
         }
         // Stop pumping the auto-detect state machine.
         if (autoDetectorTask != null) {
-            try { RTP.scheduler.cancelTask(autoDetectorTask); }
+            try { RTPRuntime.scheduler().cancelTask(autoDetectorTask); }
             catch (Throwable ignored) { /* best-effort */ }
             autoDetectorTask = null;
         }
@@ -813,7 +816,7 @@ public final class NetworkModeBootstrap {
     public PeerRegionRegistry peerRegionRegistry() { return peerRegionRegistry; }
 
     /** Visible for tests. Null when network mode is disabled or
-     *  wiring failed; otherwise also installed at {@code RTP.networkCommandHook}. */
+     *  wiring failed; otherwise also installed at {@code NetworkHooks.commandHook()}. */
     public BukkitNetworkCommandHook commandHook() { return commandHook; }
 
     /**
@@ -897,14 +900,14 @@ public final class NetworkModeBootstrap {
         if (transport == null || serverId == null || serverId.isEmpty()) return;
         transport.listActiveForServer(serverId).whenComplete((tokens, err) -> {
             if (err != null) {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "[RTP] listActiveForServer('" + serverId + "') failed during "
                                 + "boot reconcile: " + err.getMessage()
                                 + " - skipping (REQ-RTP-S-004).", err);
                 return;
             }
             if (tokens == null || tokens.isEmpty()) {
-                RTP.log(Level.FINE,
+                RTPRuntime.log(Level.FINE,
                         "[RTP] boot reconcile: 0 active reservations for serverId='"
                                 + serverId + "'.");
                 return;
@@ -921,16 +924,16 @@ public final class NetworkModeBootstrap {
                     continue;
                 }
                 io.github.dailystruggle.rtp.common.selection.region.RTPLocation coord = null;
-                if (RTP.getInstance() != null && RTP.selectionAPI != null) {
+                if (TeleportSessions.current() != null && ActiveSelection.get() != null) {
                     for (io.github.dailystruggle.rtp.common.selection.region.Region r
-                            : RTP.selectionAPI.permRegionLookup.values()) {
+                            : ActiveSelection.get().permRegionLookup.values()) {
                         if (r == null || r.queueManager == null) continue;
                         coord = r.queueManager.reserveFromNetworkKept(networkTokenId, r.name);
                         if (coord != null) break;
                     }
                     if (coord == null) {
                         for (io.github.dailystruggle.rtp.common.selection.region.Region r
-                                : RTP.selectionAPI.tempRegions.values()) {
+                                : ActiveSelection.get().tempRegions.values()) {
                             if (r == null || r.queueManager == null) continue;
                             coord = r.queueManager.reserveFromNetworkKept(networkTokenId, r.name);
                             if (coord != null) break;
@@ -947,14 +950,14 @@ public final class NetworkModeBootstrap {
                     } catch (Throwable releaseErr) {
                         // S-004: a release failure must not abort the rest of
                         // the reconcile pass; subsequent tokens still process.
-                        RTP.log(Level.WARNING,
+                        RTPRuntime.log(Level.WARNING,
                                 "[RTP] boot reconcile: release(BACKEND_REJECTED) "
                                         + "failed for token=" + token.tokenId() + ": "
                                         + releaseErr.getMessage());
                     }
                 }
             }
-            RTP.log(Level.FINE,
+            RTPRuntime.log(Level.FINE,
                     "[RTP] boot reconcile complete: serverId='" + serverId
                             + "' totalActive=" + tokens.size()
                             + " reserved=" + reserved
@@ -965,22 +968,22 @@ public final class NetworkModeBootstrap {
     /**
      * Sum {@link io.github.dailystruggle.rtp.common.selection.region.RegionQueueManager#keptCount()}
      * across every permanent and temporary region known to
-     * {@link RTP#selectionAPI}. Gives the router a real
+     * {@link ActiveSelection#get()}. Gives the router a real
      * local-hot-queue depth instead of the placeholder
      * {@code () -> 0} so the {@code routing.mode = auto} 7-gate matrix
      * can correctly prefer local-serve when there are warm coordinates.
      */
     static int sumLocalKeptCount() {
         try {
-            if (RTP.getInstance() == null || RTP.selectionAPI == null) return 0;
+            if (TeleportSessions.current() == null || ActiveSelection.get() == null) return 0;
             long total = 0L;
             for (io.github.dailystruggle.rtp.common.selection.region.Region r
-                    : RTP.selectionAPI.permRegionLookup.values()) {
+                    : ActiveSelection.get().permRegionLookup.values()) {
                 if (r == null || r.queueManager == null) continue;
                 total += r.queueManager.keptCount();
             }
             for (io.github.dailystruggle.rtp.common.selection.region.Region r
-                    : RTP.selectionAPI.tempRegions.values()) {
+                    : ActiveSelection.get().tempRegions.values()) {
                 if (r == null || r.queueManager == null) continue;
                 total += r.queueManager.keptCount();
             }
@@ -1056,7 +1059,7 @@ public final class NetworkModeBootstrap {
                 io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge bridge =
                         openNetworkBridgeOrNull();
                 if (bridge == null || !bridge.isAvailable()) {
-                    RTP.log(Level.FINE,
+                    RTPRuntime.log(Level.FINE,
                             "[RTP] transport.type=auto resolved to disabled "
                                     + "(no proxy bridge installed) - staying standalone.");
                     return null;
@@ -1068,7 +1071,7 @@ public final class NetworkModeBootstrap {
                 if (detector.state()
                         == io.github.dailystruggle.rtp.common.network.pluginmessage
                                 .ProxyAutoDetector.State.DISABLED) {
-                    RTP.log(Level.FINE,
+                    RTPRuntime.log(Level.FINE,
                             "[RTP] transport.type=auto resolved to disabled "
                                     + "(passive proxy probe disarmed) - staying standalone.");
                     return null;
@@ -1112,7 +1115,7 @@ public final class NetworkModeBootstrap {
                         transportSec == null
                                 ? io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectTlsConfig.unset()
                                 : io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectTlsConfig
-                                        .fromMap(transportSec.getValues(false), msg -> RTP.log(Level.WARNING, "[RTP] " + msg));
+                                        .fromMap(transportSec.getValues(false), msg -> RTPRuntime.log(Level.WARNING, "[RTP] " + msg));
                 return new io.github.dailystruggle.rtp.common.network.direct
                         .ProxyDirectNetworkBinding(parsed, verifier, schemaVersion,
                         staleAfterMs, connectTimeoutMs, readTimeoutMs, System::currentTimeMillis, tls);
@@ -1155,16 +1158,16 @@ public final class NetworkModeBootstrap {
 
     /**
      * Resolve the platform-installed {@link io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge}
-     * via {@link RTP#networkBridgeFactory}, or {@code null} if unsupported.
+     * via {@link NetworkHooks#bridgeFactory()}, or {@code null} if unsupported.
      */
     private static io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge openNetworkBridgeOrNull() {
         try {
             java.util.function.Supplier<
                     io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge> factory =
-                    RTP.networkBridgeFactory;
+                    NetworkHooks.bridgeFactory();
             return factory == null ? null : factory.get();
         } catch (Throwable t) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[RTP] networkBridgeFactory threw while building a NetworkBridge: "
                             + t.getMessage() + " - plugin-message tier unavailable.", t);
             return null;
@@ -1200,7 +1203,7 @@ public final class NetworkModeBootstrap {
             String user = ep.username() != null ? ep.username() : username;
             return new RespEndpoint(ep.host(), ep.port(), tls, user);
         } catch (IllegalArgumentException e) {
-            RTP.log(Level.WARNING, "[RTP] transport.redis.host: " + e.getMessage() + "; falling back to defaults.");
+            RTPRuntime.log(Level.WARNING, "[RTP] transport.redis.host: " + e.getMessage() + "; falling back to defaults.");
             return new RespEndpoint("localhost", defaultPort, tlsFlag, username);
         }
     }
@@ -1219,7 +1222,7 @@ public final class NetworkModeBootstrap {
         }
         String yaml = redis == null ? null : redis.getString("password", null);
         if (yaml != null && !yaml.isEmpty() && YAML_REDIS_PASSWORD_WARNED.compareAndSet(false, true)) {
-            RTP.log(Level.WARNING, "[RTP] transport.redis.password is set in network.yml; prefer the env var '"
+            RTPRuntime.log(Level.WARNING, "[RTP] transport.redis.password is set in network.yml; prefer the env var '"
                     + envName + "' so the secret stays out of config files.");
         }
         return yaml;
@@ -1227,8 +1230,8 @@ public final class NetworkModeBootstrap {
 
     private static AbstractSQLDatabaseAccessor sqlAccessorOrNull() {
         try {
-            RTP r = RTP.getInstance();
-            if (r != null && r.databaseAccessor instanceof AbstractSQLDatabaseAccessor sql) {
+            TeleportSessions sessions = TeleportSessions.current();
+            if (sessions != null && ActiveDatabase.accessor() instanceof AbstractSQLDatabaseAccessor sql) {
                 return sql;
             }
         } catch (Throwable ignored) {
@@ -1256,7 +1259,7 @@ public final class NetworkModeBootstrap {
         } catch (Throwable t) {
             // Defensive: any failure means "not a lobby" so the backend keeps
             // its existing non-lobby behaviour.
-            RTP.log(Level.FINE,
+            RTPRuntime.log(Level.FINE,
                     "[RTP] readLobbyModeEarly degraded to non-lobby: " + t.getMessage());
             return false;
         }
@@ -1282,12 +1285,12 @@ public final class NetworkModeBootstrap {
                 Files.move(legacy.toPath(), target.toPath());
                 if (!warnedLegacyNetworkYml) {
                     warnedLegacyNetworkYml = true;
-                    RTP.log(Level.WARNING, "[RTP] 'network.yml' has moved to 'advanced/network.yml' "
+                    RTPRuntime.log(Level.WARNING, "[RTP] 'network.yml' has moved to 'advanced/network.yml' "
                             + "(ADR-071). Your existing transport settings were migrated automatically.");
                 }
                 return target;
             } catch (IOException e) {
-                RTP.log(Level.WARNING,
+                RTPRuntime.log(Level.WARNING,
                         "[RTP] failed to migrate legacy network.yml into advanced/: " + e.getMessage(), e);
                 // Fall through to extraction so the backend still has a usable file.
             }
@@ -1297,7 +1300,7 @@ public final class NetworkModeBootstrap {
             if (in == null) return target;
             Files.copy(in, target.toPath());
         } catch (IOException e) {
-            RTP.log(Level.WARNING,
+            RTPRuntime.log(Level.WARNING,
                     "[RTP] failed to write default advanced/network.yml: " + e.getMessage(), e);
         }
         return target;

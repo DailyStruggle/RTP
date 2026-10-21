@@ -1,9 +1,10 @@
 package io.github.dailystruggle.rtp.common.tasks.scan;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPScheduler;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionSettings;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
@@ -48,13 +49,13 @@ class ScanTaskTest {
                 "scan_region", world, square, vert,
                 false, false, 10L, 1000L, 0L, 5, 0.0, 1L, "", false);
         region = new Region("scan_region", settings);
-        RTP.selectionAPI.permRegionLookup.put("scan_region", region);
-        RTP.getInstance().scanTasks.clear();
+        ActiveSelection.get().permRegionLookup.put("scan_region", region);
+        ScanTasks.current().clear();
     }
 
     @AfterEach
     void tearDown() {
-        RTP.getInstance().scanTasks.clear();
+        ScanTasks.current().clear();
     }
 
     @Test
@@ -145,16 +146,16 @@ class ScanTaskTest {
     @Test
     void setCancelled_cancelsAndRemovesFromScanTasks() {
         ScanTask task = new ScanTask(region, 10L);
-        RTP.getInstance().scanTasks.put(region.name, task);
+        ScanTasks.current().put(region.name, task);
 
         task.setCancelled(true);
         assertTrue(task.isCancelled());
-        assertNull(RTP.getInstance().scanTasks.get(region.name));
+        assertNull(ScanTasks.current().get(region.name));
     }
 
     @Test
     void setCancelled_runsTeardownOffCallingThread() throws Exception {
-        MockRTPScheduler scheduler = ((MockRTPScheduler) RTP.scheduler).enableServerThreads();
+        MockRTPScheduler scheduler = ((MockRTPScheduler) RTPRuntime.scheduler()).enableServerThreads();
         try {
             RecordingSquare recorder = new RecordingSquare();
             Region threadedRegion = new Region("scan_region_async", new RegionSettings(
@@ -180,7 +181,7 @@ class ScanTaskTest {
 
     @Test
     void pause_runsTeardownOffCallingThread() throws Exception {
-        MockRTPScheduler scheduler = ((MockRTPScheduler) RTP.scheduler).enableServerThreads();
+        MockRTPScheduler scheduler = ((MockRTPScheduler) RTPRuntime.scheduler()).enableServerThreads();
         try {
             RecordingSquare recorder = new RecordingSquare();
             Region threadedRegion = new Region("scan_region_async", new RegionSettings(
@@ -255,7 +256,7 @@ class ScanTaskTest {
         @Override
         public void flushAndRebuild(long spatialResolution) {
             rebuildThreads.add(Thread.currentThread());
-            rebuildLanes.add(((MockRTPScheduler) RTP.scheduler).currentLane());
+            rebuildLanes.add(((MockRTPScheduler) RTPRuntime.scheduler()).currentLane());
             super.flushAndRebuild(spatialResolution);
         }
 
@@ -274,13 +275,13 @@ class ScanTaskTest {
         Region region2 = new Region("scan_region2", settings2);
         ScanTask task2 = new ScanTask(region2, 20L);
 
-        RTP.getInstance().scanTasks.put("scan_region", task1);
-        RTP.getInstance().scanTasks.put("scan_region2", task2);
+        ScanTasks.current().put("scan_region", task1);
+        ScanTasks.current().put("scan_region2", task2);
 
         ScanTask.kill();
         assertTrue(task1.isCancelled());
         assertTrue(task2.isCancelled());
-        assertTrue(RTP.getInstance().scanTasks.isEmpty());
+        assertTrue(ScanTasks.current().isEmpty());
     }
 
     @Test

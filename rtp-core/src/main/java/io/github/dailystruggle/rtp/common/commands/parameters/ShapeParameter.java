@@ -1,8 +1,9 @@
 package io.github.dailystruggle.rtp.common.commands.parameters;
 
 import io.github.dailystruggle.commandsapi.common.CommandParameter;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.factory.Factory;
+import io.github.dailystruggle.rtp.common.factory.FactoryNames;
+import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import java.util.Map;
 import java.util.Set;
@@ -18,29 +19,29 @@ public class ShapeParameter extends CommandParameter {
         permission,
         description,
         (uuid, s) -> {
-          Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+          Factory<Shape<?>> factory = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
           if (!factory.map.containsKey(s.toUpperCase())) return false;
           return isRelevant.apply(uuid, s);
         });
-    Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+    Factory<Shape<?>> factory = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
     factory.map.forEach((s, shape1) -> put(shape1.name, shape1.getParameters()));
   }
 
   @Override
   @SuppressWarnings("unchecked") // heterogeneous factoryMap holds the shape Factory under a raw value type
   public Set<String> values() {
-    Factory<Shape<?>> factory = (Factory<Shape<?>>) RTP.factoryMap.get(RTP.factoryNames.shape);
+    Factory<Shape<?>> factory = (Factory<Shape<?>>) FactoryRegistry.get(FactoryNames.shape);
     factory.map.forEach(
         (s, shape1) -> {
           if (!subParamMap.containsKey(s.toUpperCase())) put(shape1.name, shape1.getParameters());
         });
-    return RTP.factoryMap.get(RTP.factoryNames.shape).map.keySet();
+    return FactoryRegistry.get(FactoryNames.shape).map.keySet();
   }
 
   @Override
   public Map<String, CommandParameter> subParams(String parameter) {
     parameter = parameter.toUpperCase();
-    Factory<?> shapeFactory = RTP.factoryMap.get(RTP.factoryNames.shape);
+    Factory<?> shapeFactory = FactoryRegistry.get(FactoryNames.shape);
     Map<String, CommandParameter> map = subParamMap.get(parameter);
     if (map != null) {
       return map;

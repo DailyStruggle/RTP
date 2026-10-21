@@ -54,8 +54,8 @@ class RealMySQLDatabaseAccessorTest {
     void tearDown() {
         if (db != null) db.close();
         io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = null;
-        io.github.dailystruggle.rtp.common.RTP.serverAccessor = null;
-        io.github.dailystruggle.rtp.common.RTP.scheduler = null;
+        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(null);
+        io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setScheduler(null);
     }
 
     private static Map<DatabaseAccessor.TableObj, DatabaseAccessor.TableObj> cachedLocationRow(String uuid,

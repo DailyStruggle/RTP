@@ -7,16 +7,20 @@ import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.enums.BiomesKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.database.DatabaseAccessor;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.metrics.ChunkLoadProfile;
 import io.github.dailystruggle.rtp.common.metrics.RTPMetricsExtension;
 import io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
 import io.github.dailystruggle.rtp.common.selection.region.LockFreeLocationBuffer;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
@@ -84,12 +88,12 @@ class RtpBStatsCatalogueDetectorsTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        savedAccessor = RTP.serverAccessor;
-        savedScheduler = RTP.scheduler;
-        savedConfigs = RTP.configs;
-        savedSelection = RTP.selectionAPI;
+        savedAccessor = RTPRuntime.serverAccessor();
+        savedScheduler = RTPRuntime.scheduler();
+        savedConfigs = ActiveConfigs.get();
+        savedSelection = ActiveSelection.get();
         savedInstance = RTP.getInstance();
-        RTP.scheduler = null;
+        RTPRuntime.setScheduler(null);
         RtpBStatsCatalogue.stopRtpCostSampler();
         RtpOutcomeStats.GLOBAL.reset();
         ChunkLoadProfile.GLOBAL.reset();
@@ -97,12 +101,12 @@ class RtpBStatsCatalogueDetectorsTest {
 
     @AfterEach
     void tearDown() throws Exception {
-        RTP.scheduler = null;
+        RTPRuntime.setScheduler(null);
         RtpBStatsCatalogue.stopRtpCostSampler();
-        RTP.serverAccessor = savedAccessor;
-        RTP.scheduler = savedScheduler;
-        RTP.configs = savedConfigs;
-        RTP.selectionAPI = savedSelection;
+        RTPRuntime.setServerAccessor(savedAccessor);
+        RTPRuntime.setScheduler(savedScheduler);
+        ActiveConfigs.set(savedConfigs);
+        ActiveSelection.set(savedSelection);
         setInstance(savedInstance);
         RtpOutcomeStats.GLOBAL.reset();
         ChunkLoadProfile.GLOBAL.reset();
@@ -137,7 +141,7 @@ class RtpBStatsCatalogueDetectorsTest {
     void hostVersionDefaults() {
         RtpBStatsCatalogue.Host host = () -> "paper";
 
-        RTP.serverAccessor = null;
+        RTPRuntime.setServerAccessor(null);
         assertEquals("unknown", host.gameVersion());
         assertEquals("unknown", host.pluginVersion());
         assertEquals("Paper", host.serverInfo().version());
@@ -145,7 +149,7 @@ class RtpBStatsCatalogueDetectorsTest {
         assertTrue(host.onlinePlayerCount() >= -1);
 
         RTPServerAccessor accessor = mock(RTPServerAccessor.class);
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
         when(accessor.getServerVersion()).thenReturn("1.21.4-R0.1-SNAPSHOT");
         when(accessor.getPluginVersion()).thenReturn("3.3.0");
         assertEquals("1.21", host.gameVersion());
@@ -237,22 +241,22 @@ class RtpBStatsCatalogueDetectorsTest {
         assertEquals("none", RtpBStatsCatalogue.detectDatabaseBackend());
 
         RTP rtp = installMockInstance();
-        rtp.databaseAccessor = null;
+        ActiveDatabase.setAccessor(null);
         assertEquals("none", RtpBStatsCatalogue.detectDatabaseBackend());
 
-        rtp.databaseAccessor = new YamlFileDatabase(tmp.toFile());
+        ActiveDatabase.setAccessor(new YamlFileDatabase(tmp.toFile()));
         assertEquals("yaml", RtpBStatsCatalogue.detectDatabaseBackend());
-        rtp.databaseAccessor = mock(H2Accessor.class);
+        ActiveDatabase.setAccessor(mock(H2Accessor.class));
         assertEquals("h2", RtpBStatsCatalogue.detectDatabaseBackend());
-        rtp.databaseAccessor = mock(SqliteAccessor.class);
+        ActiveDatabase.setAccessor(mock(SqliteAccessor.class));
         assertEquals("sqlite", RtpBStatsCatalogue.detectDatabaseBackend());
-        rtp.databaseAccessor = mock(PostgresAccessor.class);
+        ActiveDatabase.setAccessor(mock(PostgresAccessor.class));
         assertEquals("postgresql", RtpBStatsCatalogue.detectDatabaseBackend());
-        rtp.databaseAccessor = mock(MysqlAccessor.class);
+        ActiveDatabase.setAccessor(mock(MysqlAccessor.class));
         assertEquals("mysql", RtpBStatsCatalogue.detectDatabaseBackend());
-        rtp.databaseAccessor = mock(MariadbAccessor.class);
+        ActiveDatabase.setAccessor(mock(MariadbAccessor.class));
         assertEquals("mysql", RtpBStatsCatalogue.detectDatabaseBackend());
-        rtp.databaseAccessor = mock(PlainAccessor.class);
+        ActiveDatabase.setAccessor(mock(PlainAccessor.class));
         assertEquals("other", RtpBStatsCatalogue.detectDatabaseBackend());
     }
 
@@ -260,7 +264,7 @@ class RtpBStatsCatalogueDetectorsTest {
     @DisplayName("language_selection: shipped locale, custom locale collapses to other, accessor failure to unknown")
     void languageLabels() throws Exception {
         RTPServerAccessor accessor = mock(RTPServerAccessor.class);
-        RTP.serverAccessor = accessor;
+        RTPRuntime.setServerAccessor(accessor);
         File dir = tmp.resolve("lang").toFile();
         assertTrue(dir.mkdirs());
         when(accessor.getPluginDirectory()).thenReturn(dir);
@@ -274,22 +278,22 @@ class RtpBStatsCatalogueDetectorsTest {
         when(accessor.getPluginDirectory()).thenThrow(new IllegalStateException("boom"));
         assertEquals("unknown", RtpBStatsCatalogue.detectLanguage());
 
-        RTP.serverAccessor = null;
+        RTPRuntime.setServerAccessor(null);
         assertEquals("unknown", RtpBStatsCatalogue.detectLanguage());
     }
 
     @Test
     @DisplayName("region_shapes_in_use tallies shape class names; anonymous or failing shapes count as unknown")
     void regionShapesTally() throws Exception {
-        RTP.selectionAPI = null;
+        ActiveSelection.set(null);
         assertTrue(RtpBStatsCatalogue.detectRegionShapesInUse().isEmpty());
-        RTP.selectionAPI = mock(SelectionAPI.class);
+        ActiveSelection.set(mock(SelectionAPI.class));
         assertTrue(RtpBStatsCatalogue.detectRegionShapesInUse().isEmpty(), "null lookup map yields empty tally");
 
         SelectionAPI api = mock(SelectionAPI.class);
         ConcurrentHashMap<String, Region> lookup = new ConcurrentHashMap<>();
         setField(api, "permRegionLookup", lookup);
-        RTP.selectionAPI = api;
+        ActiveSelection.set(api);
 
         Region named = mock(Region.class);
         when(named.getData(RegionKeys.shape)).thenReturn(new ArrayList<String>());
@@ -320,7 +324,7 @@ class RtpBStatsCatalogueDetectorsTest {
             @Override public Collection<Region> values() { throw new IllegalStateException("boom"); }
         };
         setField(api, "permRegionLookup", boom);
-        RTP.selectionAPI = api;
+        ActiveSelection.set(api);
 
         assertEquals(0, RtpBStatsCatalogue.safeRegionCount());
         assertTrue(RtpBStatsCatalogue.detectRegionShapesInUse().isEmpty());
@@ -330,9 +334,9 @@ class RtpBStatsCatalogueDetectorsTest {
     @Test
     @DisplayName("region_count reports the lookup size and zero without a selection API")
     void regionCount() throws Exception {
-        RTP.selectionAPI = null;
+        ActiveSelection.set(null);
         assertEquals(0, RtpBStatsCatalogue.safeRegionCount());
-        RTP.selectionAPI = mock(SelectionAPI.class);
+        ActiveSelection.set(mock(SelectionAPI.class));
         assertEquals(0, RtpBStatsCatalogue.safeRegionCount());
 
         SelectionAPI api = mock(SelectionAPI.class);
@@ -340,22 +344,22 @@ class RtpBStatsCatalogueDetectorsTest {
         lookup.put("a", mock(Region.class));
         lookup.put("b", mock(Region.class));
         setField(api, "permRegionLookup", lookup);
-        RTP.selectionAPI = api;
+        ActiveSelection.set(api);
         assertEquals(2, RtpBStatsCatalogue.safeRegionCount());
     }
 
     @Test
     @DisplayName("cache_pool_health sums kept/unkept fill across regions and skips missing queues")
     void cacheFillPercentages() throws Exception {
-        RTP.selectionAPI = null;
+        ActiveSelection.set(null);
         assertArrayEquals(new double[] {0.0, 0.0}, RtpBStatsCatalogue.computeCacheFillPercentages());
-        RTP.selectionAPI = mock(SelectionAPI.class);
+        ActiveSelection.set(mock(SelectionAPI.class));
         assertArrayEquals(new double[] {0.0, 0.0}, RtpBStatsCatalogue.computeCacheFillPercentages());
 
         SelectionAPI api = mock(SelectionAPI.class);
         ConcurrentHashMap<String, Region> lookup = new ConcurrentHashMap<>();
         setField(api, "permRegionLookup", lookup);
-        RTP.selectionAPI = api;
+        ActiveSelection.set(api);
 
         Region noQueue = mock(Region.class);
         noQueue.queueManager = null;
@@ -393,11 +397,11 @@ class RtpBStatsCatalogueDetectorsTest {
         assertEquals("unknown", RtpBStatsCatalogue.detectSafetyFeaturesEnabled());
 
         installMockInstance();
-        RTP.configs = null;
+        ActiveConfigs.set(null);
         assertEquals("unknown", RtpBStatsCatalogue.detectSafetyFeaturesEnabled());
 
         Configs configs = mock(Configs.class);
-        RTP.configs = configs;
+        ActiveConfigs.set(configs);
         assertEquals("unknown", RtpBStatsCatalogue.detectSafetyFeaturesEnabled(), "missing safety parser");
 
         ConfigParser<SafetyKeys> safety = mock(ConfigParser.class);
@@ -485,7 +489,7 @@ class RtpBStatsCatalogueDetectorsTest {
         RTPScheduler scheduler = mock(RTPScheduler.class);
         Object handle = new Object();
         when(scheduler.runTaskTimerAsynchronously(any(Runnable.class), anyLong(), anyLong())).thenReturn(handle);
-        RTP.scheduler = scheduler;
+        RTPRuntime.setScheduler(scheduler);
 
         RtpBStatsCatalogue.startRtpCostSampler();
         RtpBStatsCatalogue.startRtpCostSampler();
@@ -509,7 +513,7 @@ class RtpBStatsCatalogueDetectorsTest {
         RTPScheduler failing = mock(RTPScheduler.class);
         when(failing.runTaskTimerAsynchronously(any(Runnable.class), anyLong(), anyLong()))
                 .thenThrow(new IllegalStateException("boom"));
-        RTP.scheduler = failing;
+        RTPRuntime.setScheduler(failing);
         assertDoesNotThrow(RtpBStatsCatalogue::startRtpCostSampler);
         RtpBStatsCatalogue.stopRtpCostSampler();
         verify(failing, never()).cancelTask(any());
@@ -518,19 +522,19 @@ class RtpBStatsCatalogueDetectorsTest {
         Object handle = new Object();
         when(cancelFails.runTaskTimerAsynchronously(any(Runnable.class), anyLong(), anyLong())).thenReturn(handle);
         doThrow(new IllegalStateException("boom")).when(cancelFails).cancelTask(handle);
-        RTP.scheduler = cancelFails;
+        RTPRuntime.setScheduler(cancelFails);
         RtpBStatsCatalogue.startRtpCostSampler();
         assertDoesNotThrow(RtpBStatsCatalogue::stopRtpCostSampler);
 
         // Stop without a scheduler still clears the task so a later start re-schedules.
         RTPScheduler later = mock(RTPScheduler.class);
         when(later.runTaskTimerAsynchronously(any(Runnable.class), anyLong(), anyLong())).thenReturn(handle);
-        RTP.scheduler = later;
+        RTPRuntime.setScheduler(later);
         RtpBStatsCatalogue.startRtpCostSampler();
-        RTP.scheduler = null;
+        RTPRuntime.setScheduler(null);
         RtpBStatsCatalogue.stopRtpCostSampler();
         verify(later, never()).cancelTask(any());
-        RTP.scheduler = later;
+        RTPRuntime.setScheduler(later);
         RtpBStatsCatalogue.startRtpCostSampler();
         verify(later, times(2)).runTaskTimerAsynchronously(any(Runnable.class), anyLong(), anyLong());
     }

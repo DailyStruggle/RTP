@@ -8,7 +8,9 @@ import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.action.ActionManager;
+import io.github.dailystruggle.rtp.common.action.ActionServices;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Locale;
@@ -26,15 +28,15 @@ public class ActionSubCmd extends BaseRTPCmdImpl {
     ActionManager.setCommandRegistrar(new ActionManager.ActionCommandRegistrar() {
       @Override
       public void onActionRegistered(ActionDefinition definition) {
-        if (definition.command().isConfigured() && RTP.serverAccessor != null) {
+        if (definition.command().isConfigured() && RTPRuntime.serverAccessor() != null) {
           try {
             ActionCommand actionCmd = new ActionCommand(definition);
             java.util.List<String> names = new java.util.ArrayList<>();
             names.add(definition.command().name());
             names.addAll(definition.command().aliases());
-            RTP.serverAccessor.registerCommands(actionCmd, names.toArray(new String[0]));
+            RTPRuntime.serverAccessor().registerCommands(actionCmd, names.toArray(new String[0]));
           } catch (Exception e) {
-            RTP.log(java.util.logging.Level.WARNING, "[RTP Action] Failed registering command for action " + definition.id() + ": " + e.getMessage());
+            RTPRuntime.log(java.util.logging.Level.WARNING, "[RTP Action] Failed registering command for action " + definition.id() + ": " + e.getMessage());
           }
         }
         syncActionSubCmd();
@@ -91,9 +93,9 @@ public class ActionSubCmd extends BaseRTPCmdImpl {
       UUID senderId, Map<String, List<String>> parameterValues, CommandsAPICommand nextCommand) {
     if (nextCommand != null) return true;
 
-    RTPCommandSender sender = RTP.serverAccessor.getSender(senderId);
+    RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(senderId);
     if (sender == null || (!sender.hasPermission("rtp.action") && !sender.hasPermission("rtp.*"))) {
-      RTP.serverAccessor.sendMessage(senderId, senderId, PlayerMessages.noPerms);
+      RTPRuntime.serverAccessor().sendMessage(senderId, senderId, PlayerMessages.noPerms);
       return true;
     }
 
@@ -104,8 +106,8 @@ public class ActionSubCmd extends BaseRTPCmdImpl {
   public void syncActions() {
     synchronized (this) {
       ActionService effectiveService = RTPAPI.actions();
-      if (effectiveService == null && RTP.actionManager != null) {
-        effectiveService = RTP.actionManager;
+      if (effectiveService == null && ActionServices.actionManager() != null) {
+        effectiveService = ActionServices.actionManager();
       }
       if (effectiveService instanceof ActionManager manager) {
         final ActionService finalService = effectiveService;

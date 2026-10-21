@@ -100,7 +100,7 @@ class ReqRtpNeoforgeS005ChunkLoadingTest {
     @DisplayName("keep / unload are no-ops on anvil-backed instances (no S-002 ticket churn)")
     void keepAndUnloadAreNoOps() {
         NeoForgeRTPChunk c = new NeoForgeRTPChunk(emptyView(), 0, 0, WORLD_ID, null);
-        // No NeoForgeRTPWorld registered against WORLD_ID and RTP.serverAccessor
+        // No NeoForgeRTPWorld registered against WORLD_ID and RTPRuntime.serverAccessor()
         // is unset - if dispatch leaked into the live branch, the world lookup
         // would proceed (or NPE). The anvil branch returns immediately.
         assertDoesNotThrow(() -> c.keep(true));

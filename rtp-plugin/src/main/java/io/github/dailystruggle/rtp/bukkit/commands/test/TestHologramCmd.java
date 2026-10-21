@@ -12,6 +12,7 @@ import io.github.dailystruggle.rtp.bukkitplatform.commands.parameters.OnlinePlay
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.parameters.IntegerParameter;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -75,15 +76,15 @@ public class TestHologramCmd extends BaseRTPCmdImpl {
     RTPPlayer target = null;
     List<String> playerNames = parameterValues.get("player");
     if (playerNames != null && !playerNames.isEmpty()) {
-      target = RTP.serverAccessor.getPlayer(playerNames.get(0));
+      target = RTPRuntime.serverAccessor().getPlayer(playerNames.get(0));
       if (target == null) {
         String msg = "&c[RTP test/hologram] unknown player: " + playerNames.get(0);
-        RTP.serverAccessor.sendMessage(callerId, msg);
+        RTPRuntime.serverAccessor().sendMessage(callerId, msg);
         RTP.log(Level.WARNING, msg);
         return true;
       }
     } else if (!callerId.equals(RTPAPI.serverId)) {
-      target = RTP.serverAccessor.getPlayer(callerId);
+      target = RTPRuntime.serverAccessor().getPlayer(callerId);
     }
 
     int seconds = DEFAULT_SECONDS;
@@ -101,7 +102,7 @@ public class TestHologramCmd extends BaseRTPCmdImpl {
     if (target == null) {
       String msg = "&a[RTP test/hologram] Active HologramProvider: &b" + providerName
           + " &7(Specify player:<name> to spawn in-world)";
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      RTPRuntime.serverAccessor().sendMessage(callerId, msg);
       RTP.log(Level.INFO, "[RTP test/hologram] Active HologramProvider: " + providerName);
       return true;
     }
@@ -109,7 +110,7 @@ public class TestHologramCmd extends BaseRTPCmdImpl {
     RTPLocation loc = target.getLocation();
     if (loc == null || loc.world() == null) {
       String msg = "&c[RTP test/hologram] Unable to resolve player location.";
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      RTPRuntime.serverAccessor().sendMessage(callerId, msg);
       return true;
     }
 
@@ -132,20 +133,20 @@ public class TestHologramCmd extends BaseRTPCmdImpl {
           : null;
     } catch (Throwable t) {
       String err = "&c[RTP test/hologram] Failed to spawn hologram: " + t.getMessage();
-      RTP.serverAccessor.sendMessage(callerId, err);
+      RTPRuntime.serverAccessor().sendMessage(callerId, err);
       RTP.log(Level.WARNING, "[RTP test/hologram] Spawn failed: " + t.getMessage(), t);
       return true;
     }
 
     if (handle == null) {
       String msg = "&c[RTP test/hologram] No hologram spawned (provider returned null handle).";
-      RTP.serverAccessor.sendMessage(callerId, msg);
+      RTPRuntime.serverAccessor().sendMessage(callerId, msg);
       return true;
     }
 
     String startMsg = "&a[RTP test/hologram] Spawned test hologram (&b" + providerName
         + "&a) for &e" + totalSec + "s&a at &7" + worldName + " " + spawnPos.x() + ", " + spawnPos.y() + ", " + spawnPos.z();
-    RTP.serverAccessor.sendMessage(callerId, startMsg);
+    RTPRuntime.serverAccessor().sendMessage(callerId, startMsg);
 
     AtomicInteger remaining = new AtomicInteger(totalSec);
     AtomicBoolean closed = new AtomicBoolean(false);
@@ -165,9 +166,9 @@ public class TestHologramCmd extends BaseRTPCmdImpl {
         }
       } else {
         if (closed.compareAndSet(false, true)) {
-          if (taskHolder[0] != null && RTP.scheduler != null) {
+          if (taskHolder[0] != null && RTPRuntime.scheduler() != null) {
             try {
-              RTP.scheduler.cancelTask(taskHolder[0]);
+              RTPRuntime.scheduler().cancelTask(taskHolder[0]);
             } catch (Throwable ignored) {}
           }
           try {
@@ -180,9 +181,9 @@ public class TestHologramCmd extends BaseRTPCmdImpl {
       }
     };
 
-    if (RTP.scheduler != null) {
+    if (RTPRuntime.scheduler() != null) {
       // 20 ticks = 1 second
-      taskHolder[0] = RTP.scheduler.runTaskTimerAsynchronously(ticker, 20L, 20L);
+      taskHolder[0] = RTPRuntime.scheduler().runTaskTimerAsynchronously(ticker, 20L, 20L);
     }
 
     return true;

@@ -101,7 +101,7 @@ class ActionPlaceholderSanitizerTest {
   void testPlayerEntityPlaceholdersPreferName() {
     io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
         new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(new java.io.File("."));
-    io.github.dailystruggle.rtp.common.RTP.serverAccessor = accessor;
+    io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(accessor);
 
     UUID pId = UUID.randomUUID();
     accessor.addPlayer(new io.github.dailystruggle.rtp.common.mock.MockRTPPlayer(
@@ -120,7 +120,7 @@ class ActionPlaceholderSanitizerTest {
   void testNumberedPlaceholdersAndSenderResolution() {
     io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor accessor =
         new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(new java.io.File("."));
-    io.github.dailystruggle.rtp.common.RTP.serverAccessor = accessor;
+    io.github.dailystruggle.rtp.common.runtime.RTPRuntime.setServerAccessor(accessor);
 
     UUID p1 = UUID.randomUUID();
     UUID p2 = UUID.randomUUID();

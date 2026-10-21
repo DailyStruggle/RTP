@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.addon;
 
 import io.github.dailystruggle.rtp.api.addon.RTPAddon;
-import io.github.dailystruggle.rtp.common.RTP;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -78,7 +78,7 @@ public final class AddonRegistry {
         // An addon whose implementation (or a type it references, e.g. an
         // effects-api class absent from the rtp-lite assembly) cannot be linked
         // must not abort discovery of the remaining addons or plugin startup.
-        RTP.log(Level.WARNING,
+        RTPRuntime.log(Level.WARNING,
             "[RTP] skipping an addon that could not be loaded (missing dependency?)", e);
         break;
       }
@@ -105,7 +105,7 @@ public final class AddonRegistry {
       try {
         urls.add(jar.toURI().toURL());
       } catch (MalformedURLException e) {
-        RTP.log(Level.WARNING, "[RTP] skipping unreadable addon jar: " + jar.getName(), e);
+        RTPRuntime.log(Level.WARNING, "[RTP] skipping unreadable addon jar: " + jar.getName(), e);
       }
     }
     if (urls.isEmpty()) return;
@@ -113,7 +113,7 @@ public final class AddonRegistry {
     ClassLoader parent = AddonRegistry.class.getClassLoader();
     URLClassLoader addonClassLoader =
         new URLClassLoader(urls.toArray(new URL[0]), parent);
-    RTP.log(Level.INFO,
+    RTPRuntime.log(Level.INFO,
         "[RTP] scanning " + jars.length + " jar(s) in " + directory.getAbsolutePath());
     discover(addonClassLoader);
   }
@@ -152,11 +152,11 @@ public final class AddonRegistry {
         if (!name.isEmpty() && !name.startsWith("#")) names.add(name);
       }
     } catch (java.io.IOException e) {
-      RTP.log(Level.WARNING, "[RTP] failed to read bundled-addons index", e);
+      RTPRuntime.log(Level.WARNING, "[RTP] failed to read bundled-addons index", e);
       return;
     }
     if (!directory.isDirectory() && !directory.mkdirs()) {
-      RTP.log(Level.WARNING,
+      RTPRuntime.log(Level.WARNING,
           "[RTP] could not create addons folder for bundled addons: " + directory.getAbsolutePath());
       return;
     }
@@ -177,7 +177,7 @@ public final class AddonRegistry {
           if (tab > 0) recorded.put(t.substring(0, tab), t.substring(tab + 1));
         }
       } catch (java.io.IOException e) {
-        RTP.log(Level.FINE, "[RTP] could not read bundled-addons manifest; treating as empty", e);
+        RTPRuntime.log(Level.FINE, "[RTP] could not read bundled-addons manifest; treating as empty", e);
       }
     }
 
@@ -186,12 +186,12 @@ public final class AddonRegistry {
       byte[] bundled;
       try (java.io.InputStream in = loader.getResourceAsStream("bundled-addons/" + name)) {
         if (in == null) {
-          RTP.log(Level.WARNING, "[RTP] bundled addon resource missing: " + name);
+          RTPRuntime.log(Level.WARNING, "[RTP] bundled addon resource missing: " + name);
           continue;
         }
         bundled = in.readAllBytes();
       } catch (java.io.IOException e) {
-        RTP.log(Level.WARNING, "[RTP] failed to read bundled resource: " + name, e);
+        RTPRuntime.log(Level.WARNING, "[RTP] failed to read bundled resource: " + name, e);
         continue;
       }
       String bundledHash = sha256(bundled);
@@ -206,9 +206,9 @@ public final class AddonRegistry {
         try {
           java.nio.file.Files.write(target.toPath(), bundled);
           updated.put(name, bundledHash);
-          RTP.log(Level.INFO, "[RTP] extracted bundled resource: " + name);
+          RTPRuntime.log(Level.INFO, "[RTP] extracted bundled resource: " + name);
         } catch (java.io.IOException e) {
-          RTP.log(Level.WARNING, "[RTP] failed to extract bundled resource: " + name, e);
+          RTPRuntime.log(Level.WARNING, "[RTP] failed to extract bundled resource: " + name, e);
         }
         continue;
       }
@@ -217,7 +217,7 @@ public final class AddonRegistry {
       try {
         currentHash = sha256(java.nio.file.Files.readAllBytes(target.toPath()));
       } catch (java.io.IOException e) {
-        RTP.log(Level.FINE, "[RTP] could not read extracted addon for refresh check: " + name, e);
+        RTPRuntime.log(Level.FINE, "[RTP] could not read extracted addon for refresh check: " + name, e);
         continue;
       }
       String priorHash = recorded.get(name);
@@ -234,9 +234,9 @@ public final class AddonRegistry {
         try {
           java.nio.file.Files.write(target.toPath(), bundled);
           updated.put(name, bundledHash);
-          RTP.log(Level.INFO, "[RTP] refreshed bundled addon to this RTP version: " + name);
+          RTPRuntime.log(Level.INFO, "[RTP] refreshed bundled addon to this RTP version: " + name);
         } catch (java.io.IOException e) {
-          RTP.log(Level.WARNING, "[RTP] failed to refresh bundled addon: " + name, e);
+          RTPRuntime.log(Level.WARNING, "[RTP] failed to refresh bundled addon: " + name, e);
         }
       } else {
         updated.put(name, bundledHash);
@@ -251,7 +251,7 @@ public final class AddonRegistry {
       java.nio.file.Files.write(
           manifest.toPath(), out, java.nio.charset.StandardCharsets.UTF_8);
     } catch (java.io.IOException e) {
-      RTP.log(Level.FINE, "[RTP] could not write bundled-addons manifest", e);
+      RTPRuntime.log(Level.FINE, "[RTP] could not write bundled-addons manifest", e);
     }
   }
 
@@ -283,9 +283,9 @@ public final class AddonRegistry {
   private void load(RTPAddon addon) {
     try {
       addon.onLoad();
-      RTP.log(Level.INFO, "[RTP] loaded addon: " + addon.name());
+      RTPRuntime.log(Level.INFO, "[RTP] loaded addon: " + addon.name());
     } catch (Throwable t) {
-      RTP.log(Level.WARNING, "[RTP] addon failed to load: " + addon.name(), t);
+      RTPRuntime.log(Level.WARNING, "[RTP] addon failed to load: " + addon.name(), t);
     }
   }
 
@@ -298,7 +298,7 @@ public final class AddonRegistry {
       try {
         addon.onUnload();
       } catch (Throwable t) {
-        RTP.log(Level.WARNING, "[RTP] addon failed to unload: " + addon.name(), t);
+        RTPRuntime.log(Level.WARNING, "[RTP] addon failed to unload: " + addon.name(), t);
       }
     }
     addons.clear();

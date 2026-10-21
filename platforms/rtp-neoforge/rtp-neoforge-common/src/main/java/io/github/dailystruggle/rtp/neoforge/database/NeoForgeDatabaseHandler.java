@@ -1,10 +1,13 @@
 package io.github.dailystruggle.rtp.neoforge.database;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.DatabaseKeys;
+import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.database.options.DatabaseAccessorFactory;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.nio.file.FileSystemException;
 import java.nio.file.Files;
@@ -16,7 +19,7 @@ import java.util.logging.Level;
  * and {@code FabricDatabaseHandler#setupDatabase}.
  *
  * <p>The per-mod config dir is resolved through
- * {@code RTP.serverAccessor.getPluginDirectory()} (which on NeoForge resolves
+ * {@code RTPRuntime.serverAccessor().getPluginDirectory()} (which on NeoForge resolves
  * {@code FMLPaths.CONFIGDIR/rtp}); accessor selection is delegated to
  * {@code rtp-core}'s platform-agnostic {@code DatabaseAccessorFactory}. No
  * {@code org.bukkit.*} imports.</p>
@@ -29,7 +32,7 @@ public final class NeoForgeDatabaseHandler {
     }
 
     /**
-     * Initialise {@code rtp.databaseAccessor} from the configured database type.
+     * Initialise {@code ActiveDatabase.accessor()} from the configured database type.
      * Mirrors {@code FabricDatabaseHandler#setupDatabase(RTP)} for NeoForge.
      *
      * @param rtp the loaded RTP core instance
@@ -43,19 +46,19 @@ public final class NeoForgeDatabaseHandler {
                     "NeoForgeDatabaseHandler.setupDatabase invoked before rtp-core is loaded (REQ-RTP-S-006)");
         }
 
-        File pluginDir = RTP.serverAccessor.getPluginDirectory();
+        File pluginDir = RTPRuntime.serverAccessor().getPluginDirectory();
         File databaseDirectory = new File(pluginDir, "database");
         boolean mkdirs = databaseDirectory.mkdirs();
         if (!mkdirs && !databaseDirectory.exists()) {
             throw new FileSystemException("unable to make directories: " + databaseDirectory.getAbsolutePath());
         }
 
-        RTP.configs.reloadConfigs();
+        ActiveConfigs.get().reloadConfigs();
 
         // ADR-071: database settings now live in database.yml (split out of config.yml).
         ConfigParser<DatabaseKeys> databaseParser =
-                (ConfigParser<DatabaseKeys>) RTP.configs.getParser(DatabaseKeys.class);
-        Map<String, Object> databaseMap = RTP.configs.getDatabaseConfig();
+                (ConfigParser<DatabaseKeys>) ActiveConfigs.get().getParser(DatabaseKeys.class);
+        Map<String, Object> databaseMap = ActiveConfigs.get().getDatabaseConfig();
 
         // Mirror BukkitDatabaseHandler defaults so the requested -> H2 -> flat-file
         // fallback chain in DatabaseAccessorFactory is preserved verbatim across platforms.
@@ -113,7 +116,7 @@ public final class NeoForgeDatabaseHandler {
         // missing JDBC driver (we cannot shade every backend) does not crash startup.
         DatabaseAccessorFactory.Result dbResult = DatabaseAccessorFactory.create(
                 type, databaseDirectory, host, port, name, username, password);
-        rtp.databaseAccessor = dbResult.accessor;
+        ActiveDatabase.setAccessor(dbResult.accessor);
         String effectiveType = dbResult.effectiveType;
 
         RTP.handleMigration(previousType, effectiveType);
@@ -123,11 +126,11 @@ public final class NeoForgeDatabaseHandler {
             RTP.log(Level.WARNING, "NeoForgeDatabaseHandler: failed to write .db_state", e);
         }
 
-        RTP.configs.reloadRegions();
-        RTP.scheduler.runTaskLater(() -> RTP.getInstance().databaseAccessor.startup(), 1);
+        ActiveConfigs.get().reloadRegions();
+        RTPRuntime.scheduler().runTaskLater(() -> ActiveDatabase.accessor().startup(), 1);
         // ADR-060: start the emergency-platform restore reaper once the DB is up so any
         // persisted restore jobs resume across the restart.
-        RTP.scheduler.runTaskLater(
+        RTPRuntime.scheduler().runTaskLater(
                 io.github.dailystruggle.rtp.common.platform.PlatformRestoreManager::startGlobal, 2);
     }
 }

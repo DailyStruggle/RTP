@@ -1,7 +1,8 @@
 package io.github.dailystruggle.rtp.common.permission;
 
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
-import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -28,10 +29,10 @@ class ReqRtpF014PermissionSourceResolverTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        savedConfigs = RTP.configs;
-        savedAccessor = RTP.serverAccessor;
-        RTP.configs = null;
-        RTP.serverAccessor = null;
+        savedConfigs = ActiveConfigs.get();
+        savedAccessor = RTPRuntime.serverAccessor();
+        ActiveConfigs.set(null);
+        RTPRuntime.setServerAccessor(null);
         service = new PermissionMigrationService();
 
         write("BetterRTP/config.yml", """
@@ -102,8 +103,8 @@ class ReqRtpF014PermissionSourceResolverTest {
 
     @AfterEach
     void tearDown() {
-        RTP.configs = savedConfigs;
-        RTP.serverAccessor = savedAccessor;
+        ActiveConfigs.set(savedConfigs);
+        RTPRuntime.setServerAccessor(savedAccessor);
     }
 
     @Test
@@ -204,7 +205,7 @@ class ReqRtpF014PermissionSourceResolverTest {
     @DisplayName("The five-argument overload derives sources from the server plugin folder")
     void fiveArgOverloadDerivesFromPluginsDir() throws IOException {
         Path rtpData = Files.createDirectories(plugins.resolve("RTP"));
-        RTP.serverAccessor = new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(rtpData.toFile());
+        RTPRuntime.setServerAccessor(new io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor(rtpData.toFile()));
         assertEquals(plugins.toAbsolutePath(), PermissionSourceResolver.resolvePluginsDir().toAbsolutePath());
 
         PermissionMigrationService.MigrationPlan plan = service.planMigration("group", "g",

@@ -76,8 +76,10 @@ plugins:
 hooks:
   - mkdocs_hooks.py
 
-# Only narrative + operator-facing pages are published. Internal engineering
-# trees (dev/, adr/, architecture/) are intentionally left out of nav.
+# Narrative + operator-facing pages are the hand-authored nav. The internal
+# engineering trees (dev/, adr/, architecture/) are still built so deep links
+# resolve, but mkdocs_hooks.py marks them noindex and drops them from the
+# sitemap, so search engines index the operator docs only.
 nav:
   - Home: index.md
   - Getting started:
@@ -136,15 +138,14 @@ nav:
 exclude_docs: |
   /site/README.md
   # MAP.md is an internal, agent-oriented catalog of the dev/adr/architecture
-  # trees (which are not published); it is meaningless to operators and its
-  # links resolve into unpublished pages, so it is kept out of the site.
+  # trees; it is meaningless to operators, so it is kept out of the site.
   /MAP.md
   # publishing/FRONT_PAGE.md is the tagged storefront source; its edition and
   # audience blocks are only resolved by scripts/release/build_front_pages.py.
   /publishing/
 
-# Keep the build honest: internal-only trees are not part of the site, so do
-# not warn about them being absent from nav.
+# Internal-only trees are built (noindex) but deliberately absent from the
+# hand-authored nav, so do not warn about them.
 not_in_nav: |
   /dev/
   /adr/

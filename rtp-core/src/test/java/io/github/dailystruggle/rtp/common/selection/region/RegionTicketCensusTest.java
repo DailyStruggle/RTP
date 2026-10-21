@@ -3,10 +3,11 @@ package io.github.dailystruggle.rtp.common.selection.region;
 import io.github.dailystruggle.rtp.api.world.ChunkReservation;
 import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPWorld;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.playerData.TeleportData;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.linear.LinearAdjustor;
@@ -51,7 +52,7 @@ class RegionTicketCensusTest {
   @AfterEach
   void tearDown() {
     for (UUID id : teleportIds) {
-      RTP.getInstance().latestTeleportData.remove(id);
+      TeleportSessions.current().latestTeleportData.remove(id);
     }
     RTPTestSetup.cleanUp();
   }
@@ -82,7 +83,7 @@ class RegionTicketCensusTest {
     data.completed = completed;
     UUID id = UUID.randomUUID();
     teleportIds.add(id);
-    RTP.getInstance().latestTeleportData.put(id, data);
+    TeleportSessions.current().latestTeleportData.put(id, data);
   }
 
   @Test
@@ -143,9 +144,9 @@ class RegionTicketCensusTest {
   @DisplayName("allRegions lists permanent and temporary regions")
   void allRegionsListsPermanentAndTemporary() {
     Region temp = newRegion("census_temp");
-    RTP.selectionAPI.permRegionLookup.put("census_a", region);
+    ActiveSelection.get().permRegionLookup.put("census_a", region);
     UUID tempOwner = UUID.randomUUID();
-    RTP.selectionAPI.tempRegions.put(tempOwner, temp);
+    ActiveSelection.get().tempRegions.put(tempOwner, temp);
     try {
       Set<Object> worlds = new HashSet<>();
       int matches = 0;
@@ -156,8 +157,8 @@ class RegionTicketCensusTest {
       assertEquals(2, matches, "both regions in the census world");
       assertTrue(worlds.contains(world));
     } finally {
-      RTP.selectionAPI.permRegionLookup.remove("census_a");
-      RTP.selectionAPI.tempRegions.remove(tempOwner);
+      ActiveSelection.get().permRegionLookup.remove("census_a");
+      ActiveSelection.get().tempRegions.remove(tempOwner);
     }
   }
 }

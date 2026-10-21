@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.selection.region.util;
 
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.Square;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.memory.shapes.enums.GenericMemoryShapeParams;
 import io.github.dailystruggle.rtp.common.selection.worldborder.WorldBorder;
@@ -21,7 +21,7 @@ class WorldBorderAuditorTest {
   static void setupServer() {
     MockRTPServerAccessor accessor =
         new MockRTPServerAccessor(new java.io.File("target/test-data"));
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
   }
 
@@ -44,7 +44,7 @@ class WorldBorderAuditorTest {
   void testWorldBorderCheckPassesWhenInside() {
     MockRTPServerAccessor accessor =
         new MockRTPServerAccessor(new java.io.File("target/test-data"));
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
 
     Square regionSquare = new Square();
@@ -71,7 +71,7 @@ class WorldBorderAuditorTest {
   void testWorldBorderCheckFailsWhenExceedingBorder() {
     MockRTPServerAccessor accessor =
         new MockRTPServerAccessor(new java.io.File("target/test-data"));
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
 
     Square regionSquare = new Square();
@@ -98,7 +98,7 @@ class WorldBorderAuditorTest {
   void testAutoInterpretShapeReinterpretsBlockInputPastBorder() {
     MockRTPServerAccessor accessor =
         new MockRTPServerAccessor(new java.io.File("target/test-data"));
-    RTP.serverAccessor = accessor;
+    RTPRuntime.setServerAccessor(accessor);
     io.github.dailystruggle.rtp.api.RTPAPI.serverAccessor = accessor;
 
     // Suppose world border is 10,000 blocks radius (625 chunks)

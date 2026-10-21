@@ -1,6 +1,7 @@
 package io.github.dailystruggle.rtp.neoforge.v26_1_R1;
 
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.neoforge.version.NeoForgeVersionAdapter;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.core.Holder;
@@ -252,7 +253,7 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         final boolean ticketAdded = tryAddTempLoadTicket(level, ticketPos);
         if (server != null && server.isSameThread()) {
             CompletableFuture<ChunkAccess> out = new CompletableFuture<>();
-            RTP.scheduler.runTaskAsynchronously(() ->
+            RTPRuntime.scheduler().runTaskAsynchronously(() ->
                     invokeGetChunkFuture(level, cx, cz).whenComplete((ca, ex) -> {
                         if (ticketAdded) scheduleTempLoadTicketRemoval(level, ticketPos);
                         if (ex != null) out.completeExceptionally(ex);
@@ -618,7 +619,7 @@ public final class V26_1_R1NeoForgeVersionAdapter implements NeoForgeVersionAdap
         // NeoForgeRTPPlayer resolved and owns, so all server/level state is
         // reached through the player handle (sp.level()) rather than a standalone
         // MinecraftServer. The caller (NeoForgeRTPPlayer#renderMapChart) has
-        // already hopped to the server tick thread via RTP.scheduler, so map
+        // already hopped to the server tick thread via RTPRuntime.scheduler(), so map
         // allocation, colour writes, packet dispatch, and inventory mutation are
         // all server-thread-safe here.
         if (!(serverPlayer instanceof ServerPlayer sp)

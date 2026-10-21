@@ -1,8 +1,8 @@
 package io.github.dailystruggle.rtp.common.configuration;
 
-import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -45,23 +45,23 @@ public final class LanguageBootstrap {
 
     File file = new File(pluginDirectory, FILE_NAME);
     if (!file.exists()) {
-      RTP.log(Level.FINE, "[RTP] LanguageBootstrap: " + FILE_NAME
+      RTPRuntime.log(Level.FINE, "[RTP] LanguageBootstrap: " + FILE_NAME
           + " missing; writing default and using '" + DEFAULT_LOCALE + "'");
       writeDefault(file);
       return DEFAULT_LOCALE;
     }
 
     try {
-      RTP.log(Level.FINER, "[RTP] LanguageBootstrap: reading " + file.getPath());
+      RTPRuntime.log(Level.FINER, "[RTP] LanguageBootstrap: reading " + file.getPath());
       RtpYamlConfig yaml = new RtpYamlConfig(file.getPath());
       yaml.loadWithComments();
       Object raw = yaml.get(KEY);
       String locale = (raw == null) ? DEFAULT_LOCALE : raw.toString().trim();
       String sanitized = sanitize(locale);
-      RTP.log(Level.FINE, "[RTP] LanguageBootstrap: resolved locale '" + sanitized + "'");
+      RTPRuntime.log(Level.FINE, "[RTP] LanguageBootstrap: resolved locale '" + sanitized + "'");
       return sanitized;
     } catch (IOException e) {
-      RTP.log(Level.WARNING,
+      RTPRuntime.log(Level.WARNING,
           "[RTP] Failed to read " + FILE_NAME + "; falling back to '" + DEFAULT_LOCALE + "'.", e);
       return DEFAULT_LOCALE;
     }
@@ -78,7 +78,7 @@ public final class LanguageBootstrap {
     String normalized = locale.trim();
     if (normalized.isEmpty()) return DEFAULT_LOCALE;
     if (!SAFE_LOCALE.matcher(normalized).matches()) {
-      RTP.log(Level.WARNING,
+      RTPRuntime.log(Level.WARNING,
           "[RTP] Invalid language '" + locale + "' in " + FILE_NAME
               + "; falling back to '" + DEFAULT_LOCALE + "'.");
       return DEFAULT_LOCALE;
@@ -94,7 +94,7 @@ public final class LanguageBootstrap {
         return;
       }
     } catch (IOException e) {
-      RTP.log(Level.WARNING, "[RTP] Failed to extract bundled " + FILE_NAME + "; writing minimal default.", e);
+      RTPRuntime.log(Level.WARNING, "[RTP] Failed to extract bundled " + FILE_NAME + "; writing minimal default.", e);
     }
     try {
       RtpYamlConfig yaml = new RtpYamlConfig(file.getPath());
@@ -104,7 +104,7 @@ public final class LanguageBootstrap {
               + "On change, run /rtp reload (or restart). Locale-specific files live in lang/<locale>/.");
       yaml.save();
     } catch (IOException e) {
-      RTP.log(Level.WARNING, "[RTP] Failed to create " + FILE_NAME, e);
+      RTPRuntime.log(Level.WARNING, "[RTP] Failed to create " + FILE_NAME, e);
     }
   }
 }
