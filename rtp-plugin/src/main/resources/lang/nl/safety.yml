@@ -15,6 +15,7 @@
 # Onkwetsbaarheid (seconden)
 # Duur van de onkwetsbaarheid die aan de speler wordt verleend na teletransport.
 # Voorkomt schade door vuur, verdrinking of vallen bij aankomst.
+# Ondersteunt tijdseenheden (bijv. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -62,6 +63,7 @@ platformMateriaal: "GLASS"
 # Seconden waarna de voetafdruk van het platform wordt hersteld naar de originele
 # blokken. -1 = nooit (permanent), 0 = zodra de chunk herlaadt. De aftelling loopt
 # alleen terwijl de chunk geladen is; overleeft herstarts.
+# Ondersteunt tijdseenheden (bijv. 24h, 1d).
 # @type: integer
 # @range: [-1, null]
 # @unit: seconds
@@ -77,6 +79,7 @@ pvpCheckEnabled: false
 
 # Seconden dat een speler "in gevecht" blijft na PvP-schade (alleen de native
 # tracker; genegeerd wanneer een externe combat-tag-plugin is gekoppeld).
+# Ondersteunt tijdseenheden (bijv. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds

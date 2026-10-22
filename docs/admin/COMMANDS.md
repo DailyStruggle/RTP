@@ -308,11 +308,13 @@ Operator-facing self-test commands that exercise the teleport pipeline, queue, s
 | `/rtp test stress [count=1-16] [iterations=N] [intervalTicks=T] [region=<name>]` | Available | Without `player=`, exercises the pipeline with registered mock players in the default region or the selected region. `count` defaults to `4`; `iterations` is clamped to `[1, 1000]` (default `10`). |
 | `/rtp test stress player=<name> [iterations=N] [intervalTicks=T] [region=<name>]` | Available | Retains real-player platform teleport checks; `intervalTicks` is clamped to `[10, 6000]` (default `40`). Its BIT component is `stress-player`. |
 | `/rtp test queue-starvation [region=<name>] [samples=N]` | Available | Bounded queue sampling; console uses the default region when `region=` is omitted. Requires `rtp.test.mutating`. |
+| `/rtp test teleport-heatmap [region=<name>] [samples=N]` | Available | Runs sequential mock teleports through the real pipeline and writes timestamped landing CSV/PNG files under the plugin data folder at `reports/adr-121/teleport-heatmap`; artifacts are not automatically pruned. `region` defaults to `default`; `samples` defaults to `64` and is clamped to `[1, 256]`. Requires `rtp.test.mutating`. |
 | `/rtp test disconnect-midflight` | Available | Verifies disconnect cleanup using a registered mock player when the default region world is loaded. |
 | `/rtp test folia-ownership` | Available | Checks the Folia region handoff using a mock player and the default region world. |
 | `/rtp test async-reply [region=<name>]` | Available | Exercises the pipeline reply with a mock player. |
 | `/rtp test async-reply player=<name>` | Available | Retains real-player reply-thread classification; its BIT component is `async-reply-player`. |
 | `/rtp test hologram player=<name> [seconds=N]` | Available | Spawns and closes a temporary player-visible hologram; console invocation reports provider status only. |
+| `/rtp test action <id> [players=<n>] [script=<violate,die,expire>]` | Available | Runs a simulation asynchronously with 1-16 synthetic players (default `2`); prints gate results/reasons and fully substituted commands with an explicit simulation notice, and dispatches nothing. Options use `=`; a bare first token is accepted as the action id. |
 | `/rtp test queue`, `safety`, `verifiers`, `memory`, `platform` | Planned | Not yet available. |
 
 **Examples**
@@ -321,11 +323,14 @@ Operator-facing self-test commands that exercise the teleport pipeline, queue, s
 /rtp test stress player=leaf26
 /rtp test stress player=leaf26 iterations=50 intervalTicks=60
 /rtp test stress player=Alice player=Bob region=mining
+/rtp test teleport-heatmap
+/rtp test teleport-heatmap region=mining samples=128
 /rtp test async-reply player=Alice
 /rtp test hologram player=Alice seconds=10
+/rtp test action koth players=2 script=violate,expire
 ```
 
-> **Threading note:** Mock stress and queue sampling run asynchronously; mock teleports still use the standard `/rtp` pipeline. Real-player stress delegates each iteration to the standard pipeline, so normal safety guards remain active. Probe timeouts appear as `BIT_COMPONENT_TIMEOUT` in the BIT report.
+> **Threading note:** Mock stress, queue sampling, teleport heatmap sampling and action simulation run asynchronously; mock teleports still use the standard `/rtp` pipeline. Action simulation touches no live world or chunk and dispatches no command. Heatmap selection performs real asynchronous chunk I/O and records only the synthetic landings in `BitTeleportLog`; it does not alter ADR-104 `LandingHeatmap`. Real-player stress delegates each iteration to the standard pipeline, so normal safety guards remain active. Probe timeouts appear as `BIT_COMPONENT_TIMEOUT` in the BIT report.
 
 ---
 

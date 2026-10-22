@@ -1,7 +1,8 @@
 # --- RTP Safety Configuration ---
-# Documentation: plugins/RTP/docs/admin/configuration/SAFETY.md
+# Documentation: docs/admin/configuration/SAFETY.md
 
 # Seconds you can't be hurt after teleporting. 0 = off.
+# Supports duration units (e.g. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -43,6 +44,7 @@ platformAirHeight: 2
 platformMaterial: "GLASS"
 
 # Seconds until the platform turns back into the old blocks. -1 = never, 0 = on reload.
+# Supports duration units (e.g. 24h, 1d).
 # @type: integer
 # @range: [-1, null]
 # @unit: seconds
@@ -56,6 +58,7 @@ platformRestoreSeconds: -1
 pvpCheckEnabled: false
 
 # Seconds you stay "in combat" after a PvP hit (built-in tracker only).
+# Supports duration units (e.g. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds

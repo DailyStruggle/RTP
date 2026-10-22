@@ -327,6 +327,26 @@ class RTPCmdBranchTest {
     }
 
     @Test
+    @DisplayName("REQ-RTP-NET-001: cooldown guard uses the newer shared timestamp over an older local prior")
+    void cooldownGuardUsesNewerSharedTimestampThanLocalPrior() {
+        MockRTPPlayer sender = cooldownSubject("sharedNewerCooldownUser", 60_000L);
+        long now = System.currentTimeMillis();
+        RTP rtp = RTP.getInstance();
+        io.github.dailystruggle.rtp.common.network.RTPNetworkManager previous = rtp.networkManager;
+        io.github.dailystruggle.rtp.common.network.RTPNetworkManager networkManager =
+                org.mockito.Mockito.mock(io.github.dailystruggle.rtp.common.network.RTPNetworkManager.class);
+        org.mockito.Mockito.when(networkManager.getLastTeleportTime(sender.uuid())).thenReturn(now - 1_000L);
+        rtp.networkManager = networkManager;
+        try {
+            assertEquals(59_000L,
+                    RTPCmd.cooldownRemaining(sender, sender.uuid(), null, false,
+                            completedTeleport(null, now - 10_000L), now));
+        } finally {
+            rtp.networkManager = previous;
+        }
+    }
+
+    @Test
     void testOnCommandAlreadyTeleporting() {
         MockRTPPlayer sender = new MockRTPPlayer(UUID.randomUUID(), "busyUser", null);
         accessor.addPlayer(sender);

@@ -512,6 +512,7 @@ editorApplyFetching: "&7[P0] Konfigurations-Nutzlast wird abgerufen..."
 editorApplyValidating: "&7[P0] Integrität und Syntax der Nutzlast werden geprüft..."
 editorApplySuccess: "&a[P0] Konfiguration angewendet und im laufenden Betrieb neu geladen! (.bak-Kopien für geänderte Dateien erstellt)"
 editorApplyFailed: "&c[P0] Die Nutzlast konnte nicht angewendet werden: [reason]"
+editorApplyRejected: "&c[P0] Anwenden abgelehnt: [count] Konfigurationsfehler; es wurde nichts geschrieben. Erster: [code] in [source] bei [path]."
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

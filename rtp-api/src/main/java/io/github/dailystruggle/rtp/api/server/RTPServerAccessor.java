@@ -280,6 +280,11 @@ public interface RTPServerAccessor extends ServerAccessor {
     return null;
   }
 
+  /** Returns whether the host exposes a scoreboard objective, or {@code null} when unknown. */
+  default Boolean hasScoreboardObjective(String objective) {
+    return null;
+  }
+
   /**
    * Applies colour codes and placeholders in player context.
    *

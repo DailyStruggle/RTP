@@ -9,6 +9,8 @@ import io.github.dailystruggle.rtp.common.database.options.AbstractSQLDatabaseAc
 import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
+import io.github.dailystruggle.rtp.common.selection.region.util.DurationParser;
+import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
 import io.github.dailystruggle.rtp.proxy.common.selector.LoadBalancerConfig;
 import io.github.dailystruggle.rtp.proxy.common.selector.LoadBalancerConfigYaml;
 import io.github.dailystruggle.rtp.proxy.common.spi.NetworkRequestQueue;
@@ -26,6 +28,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.time.Duration;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
 /**
@@ -33,6 +37,7 @@ import java.util.logging.Level;
  * backend state publisher, and router hooks across plugin enable/disable.
  */
 public final class NetworkModeBootstrap {
+    private static final Set<String> LOGGED_INVALID_DURATIONS = ConcurrentHashMap.newKeySet();
 
     /**
      * Most-recently-booted instance, or {@code null} when network mode is
@@ -53,6 +58,7 @@ public final class NetworkModeBootstrap {
     // in-memory binding is wired (D4/D5 still pending); for any other
     // transport kind this stays null and the no-op sinks remain.
     private NetworkRequestQueue requestQueue;
+    private NetworkQueueEntryReaper entryTtlReaper;
     // Peer-region registry view over the
     // cached snapshot + Bukkit-platform NetworkCommandHook installed into
     // NetworkHooks.commandHook(). Null when network mode is disabled or
@@ -132,20 +138,20 @@ public final class NetworkModeBootstrap {
         String transportType = transportSec == null ? "in-memory"
                 : transportSec.getString("type", "in-memory");
         RtpYamlSection heartbeat = cfg.getConfigurationSection("heartbeat");
-        long intervalMs = heartbeat == null ? 1000L : heartbeat.getLong("intervalMs", 1000L);
+        long intervalMs = durationMs(heartbeat, "intervalMs", TemporalUnit.MILLISECOND, 1000L);
         if (intervalMs <= 0) intervalMs = 1000L;
         // The plugin-message tier ages a cached peer heartbeat out of its
         // snapshot after this window (its "stale" timeout). This reuses the
         // pre-existing heartbeat.staleAfterMs knob that the SQL poll loop
         // already honours - there is no separate transport.pluginMessage
         // staleness key - so one value drives staleness across all tiers.
-        long staleAfterMs = heartbeat == null ? 5000L : heartbeat.getLong("staleAfterMs", 5000L);
+        long staleAfterMs = durationMs(heartbeat, "staleAfterMs", TemporalUnit.MILLISECOND, 5000L);
         if (staleAfterMs <= 0) staleAfterMs = 5000L;
 
         // Reservation-token TTL reaper cadence (REQ-RTP-NET-011). Mirrors
         // NetworkConfig.reservationReapIntervalMs() default + clamping.
         RtpYamlSection reservation = cfg.getConfigurationSection("reservation");
-        long reapMs = reservation == null ? 30_000L : reservation.getLong("reapIntervalMs", 30_000L);
+        long reapMs = durationMs(reservation, "reapIntervalMs", TemporalUnit.MILLISECOND, 30_000L);
         if (reapMs <= 0) reapMs = 30_000L;
 
         // HMAC envelope wiring (REQ-RTP-PROXY-007 / ADR-010): load the shared
@@ -328,8 +334,9 @@ public final class NetworkModeBootstrap {
 
             RtpYamlSection queue = cfg.getConfigurationSection("queue");
             int queueMaxDepth = queue == null ? 50 : (int) queue.getLong("maxDepth", 50L);
-            long flushIntervalMs = queue == null ? 250L : queue.getLong("flushIntervalMs", 250L);
-            long pollIntervalMs = queue == null ? 1000L : queue.getLong("pollIntervalMs", 1000L);
+            long flushIntervalMs = durationMs(queue, "flushIntervalMs", TemporalUnit.MILLISECOND, 250L);
+            long pollIntervalMs = durationMs(queue, "pollIntervalMs", TemporalUnit.MILLISECOND, 1000L);
+            long entryTtlMs = durationMs(queue, "entryTtlMs", TemporalUnit.MILLISECOND, 0L);
             int rps = queue == null ? 5 : (int) queue.getLong("crossServerRequestsPerSecond", 5L);
             int burst = queue == null ? 10 : (int) queue.getLong("crossServerRequestsBurst", 10L);
 
@@ -476,6 +483,15 @@ public final class NetworkModeBootstrap {
             long pollTicks  = Math.max(1L, pollIntervalMs  / 50L);
             this.enrolmentBuffer.start(flushTicks);
             this.statusCache.start(pollTicks);
+            if (rq != null && entryTtlMs > 0L) {
+                long entryTtlTicks = Math.max(1L, Math.min(entryTtlMs, pollIntervalMs) / 50L);
+                this.entryTtlReaper = new NetworkQueueEntryReaper(
+                        rq, this.statusCache, entryTtlMs, System::currentTimeMillis);
+                this.entryTtlReaper.start(entryTtlTicks);
+                RTPRuntime.log(Level.INFO,
+                        "[RTP] Network queue entry TTL enabled: ttlMs=" + entryTtlMs
+                                + " sweepPeriodTicks=" + entryTtlTicks + ".");
+            }
 
             // Release local processing lock on terminal queue state transitions.
             this.statusCache.setTerminalListener((uuid, terminalState) -> {
@@ -504,9 +520,9 @@ public final class NetworkModeBootstrap {
 
             // Waitlist notifier and guard UX setup.
             RtpYamlSection waitlistSec = cfg.getConfigurationSection("network.waitlist");
-            long notifyIntervalMs = waitlistSec == null
-                    ? 5_000L
-                    : Math.max(0L, waitlistSec.getLong("notifyIntervalSeconds", 5L) * 1000L);
+            long notifyIntervalMs = waitlistSec == null ? 5_000L
+                    : Math.max(0L, durationMs(
+                        waitlistSec, "notifyIntervalSeconds", TemporalUnit.SECOND, 5_000L));
             this.waitlistNotifier = new NetworkWaitlistNotifier(this.statusCache, notifyIntervalMs);
             this.waitlistNotifier.start(pollTicks);
             this.waitlistGuard = new NetworkWaitlistGuard(this.statusCache);
@@ -563,7 +579,8 @@ public final class NetworkModeBootstrap {
             this.dispatchMode = DispatchMode.resolve(configuredDispatchMode, transportType, this.requestQueue != null);
 
             if (this.dispatchMode == DispatchMode.DIRECT_DB) {
-                long reservationTtlMs = reservation == null ? 60_000L : reservation.getLong("ttlMs", 60_000L);
+                long reservationTtlMs = durationMs(
+                        reservation, "ttlMs", TemporalUnit.MILLISECOND, 60_000L);
                 io.github.dailystruggle.rtp.common.network.pluginmessage.NetworkBridge bridge = openNetworkBridgeOrNull();
                 DirectDatabaseDispatcher directDispatcher = new DirectDatabaseDispatcher(
                         selected,
@@ -610,6 +627,10 @@ public final class NetworkModeBootstrap {
             if (this.lobbyRetryQueue != null) { try { this.lobbyRetryQueue.shutdown(); } catch (Throwable ignored) {} this.lobbyRetryQueue = null; }
             this.waitlistGuard = null;
             this.waitlistQuitListener = null;
+            if (this.entryTtlReaper != null) {
+                try { this.entryTtlReaper.shutdown(); } catch (Throwable ignored) {}
+                this.entryTtlReaper = null;
+            }
             if (this.statusCache != null) { try { this.statusCache.shutdown(); } catch (Throwable ignored) {} this.statusCache = null; }
             if (NetworkHooks.commandHook() == this.commandHook) {
                 NetworkHooks.setCommandHook(io.github.dailystruggle.rtp.api.network.NetworkCommandHook.LOCAL_ONLY);
@@ -733,6 +754,10 @@ public final class NetworkModeBootstrap {
         }
         waitlistQuitListener = null;
         waitlistQuitListenerRegistered = false;
+        if (entryTtlReaper != null) {
+            try { entryTtlReaper.shutdown(); } catch (Throwable ignored) { /* best-effort */ }
+            entryTtlReaper = null;
+        }
         if (statusCache != null) {
             try { statusCache.shutdown(); } catch (Throwable ignored) { /* best-effort */ }
             statusCache = null;
@@ -803,6 +828,9 @@ public final class NetworkModeBootstrap {
 
     /** Visible for tests. */
     public NetworkStatusCache statusCache() { return statusCache; }
+
+    /** Visible for tests. */
+    NetworkQueueEntryReaper entryTtlReaper() { return entryTtlReaper; }
 
     /** Lobby auto-retry queue; null off-lobby or when wiring failed. */
     public LobbyDispatchRetryQueue lobbyRetryQueue() { return lobbyRetryQueue; }
@@ -1105,10 +1133,12 @@ public final class NetworkModeBootstrap {
                             "transport.type=proxy-direct requires a non-empty transport.proxies "
                                     + "list (host:port of each proxy companion).");
                 }
-                int connectTimeoutMs = transportSec == null ? 1000
-                        : transportSec.getInt("connectTimeoutMs", 1000);
-                int readTimeoutMs = transportSec == null ? 2000
-                        : transportSec.getInt("readTimeoutMs", 2000);
+                int connectTimeoutMs = (int) Math.max(Integer.MIN_VALUE,
+                        Math.min(Integer.MAX_VALUE,
+                                durationMs(transportSec, "connectTimeoutMs", TemporalUnit.MILLISECOND, 1000L)));
+                int readTimeoutMs = (int) Math.max(Integer.MIN_VALUE,
+                        Math.min(Integer.MAX_VALUE,
+                                durationMs(transportSec, "readTimeoutMs", TemporalUnit.MILLISECOND, 2000L)));
                 // TLS keys (tls, keystore, truststore, *PasswordEnv, verifyHostname)
                 // sit beside transport.proxies, mirroring the proxy's transport.direct block.
                 io.github.dailystruggle.rtp.proxy.common.transport.direct.ProxyDirectTlsConfig tls =
@@ -1304,6 +1334,25 @@ public final class NetworkModeBootstrap {
                     "[RTP] failed to write default advanced/network.yml: " + e.getMessage(), e);
         }
         return target;
+    }
+
+    private static long durationMs(
+            RtpYamlSection section, String key, TemporalUnit bareUnit, long defaultMillis) {
+        if (section == null) return defaultMillis;
+        Object raw = section.get(key);
+        if (raw == null) return defaultMillis;
+        DurationParser.ParsedDuration parsed = DurationParser.parse(raw.toString(), bareUnit);
+        double millis = parsed == null ? Double.NaN : parsed.toMillis();
+        if (!Double.isFinite(millis) || millis < -0x1.0p63 || millis >= 0x1.0p63) {
+            String path = section.getCurrentPath().isEmpty()
+                    ? key : section.getCurrentPath() + "." + key;
+            if (LOGGED_INVALID_DURATIONS.add(path + "=" + raw)) {
+                RTPRuntime.log(Level.WARNING, "[RTP] invalid duration config value for " + path
+                        + ": " + raw + "; using " + defaultMillis + " ms");
+            }
+            return defaultMillis;
+        }
+        return Math.round(millis);
     }
 
     /**

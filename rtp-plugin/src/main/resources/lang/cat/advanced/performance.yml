@@ -29,6 +29,7 @@ maxHeapPurrcent: 85.0
 max_pounces: 32
 
 # Ticks between refills of the same region. Regions take turns.
+# Supports duration units (e.g. 24h, 1d).
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
@@ -36,6 +37,7 @@ max_pounces: 32
 tail_swish_period: 20
 
 # Max ms per tick for main-thread errands. Capped at 25.
+# Supports duration units (e.g. 24h, 1d).
 # @type: integer
 # @range: [1, 25]
 # @unit: ms
@@ -43,6 +45,7 @@ tail_swish_period: 20
 sync_nap_time: 5
 
 # Max ms per pulse for background errands. Capped at 25.
+# Supports duration units (e.g. 24h, 1d).
 # @type: integer
 # @range: [1, 25]
 # @unit: ms
@@ -67,6 +70,7 @@ pounce_distance: 0
 # landing, smoothing the chunk-load pounce. 0 turns the clamp off.
 # MEOW: Pawsed at 0 for now. The slow creep-back makes the kitty's screen flicker /
 # re-paint on landing. Leave it at 0 until the hooman says otherwise.
+# Supports duration units (e.g. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: ticks
@@ -131,6 +135,7 @@ forced_smell_memory: false
 
 # Lag threshold (ms) above which an instantly-served zoomie gets audited
 # (WARN logged, slowPipelineCount bumped). 0 or below turns it off.
+# Supports duration units (e.g. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: ms

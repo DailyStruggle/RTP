@@ -1,5 +1,8 @@
 package io.github.dailystruggle.rtp.bukkit.configuration;
 
+import io.github.dailystruggle.bit.BitFinding;
+import io.github.dailystruggle.rtp.common.bit.config.MessageKeyParity;
+import io.github.dailystruggle.rtp.common.bit.config.MessagesConfigCheck;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Nested;
@@ -23,6 +26,7 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -50,9 +54,13 @@ import static org.junit.jupiter.api.Assertions.fail;
  * </ul>
  *
  * <p>Locale discovery is dynamic: every directory under {@code lang/} not in
- * {@link #NON_LOCALE_DIRS} is a locale. Adding a new locale extends coverage
+ * {@link MessageKeyParity#NON_LOCALE_DIRS} is a locale. Adding a new locale extends coverage
  * with no test edit. Same for categories: every baseline {@code <file>.yml}
  * with a sibling {@code lang/<file>.lang.yml} is scanned.
+ *
+ * <p>Key-set computation (discovery, translated names, missing / stale / unresolved rows) is
+ * delegated to {@link MessageKeyParity}, the same code the {@code messages} config PBIT runs over
+ * the runtime classpath (ADR-121 section 6).
  */
 @DisplayName("REQ-RTP-F-013 / ADR-020 - locale parity (resource hygiene + cross-locale coverage)")
 public class LocaleParityTest {
@@ -60,6 +68,8 @@ public class LocaleParityTest {
     private static final Path RESOURCES =
             Paths.get("src", "main", "resources");
     private static final Path LANG_ROOT = RESOURCES.resolve("lang");
+    private static final MessageKeyParity.ResourceReader READER =
+            MessageKeyParity.ResourceReader.directory(RESOURCES);
     /**
      * The English baseline messages are split, per concern, across this
      * directory (placeholders / player / network / commands / system). Each
@@ -74,7 +84,7 @@ public class LocaleParityTest {
     private static final Pattern PLACEHOLDER = Pattern.compile("\\[[A-Za-z0-9_]+]");
 
     /** Subdirectories under {@code lang/} that are NOT locale folders. */
-    private static final Set<String> NON_LOCALE_DIRS = Set.of("shape", "vert", "advanced");
+    private static final Set<String> NON_LOCALE_DIRS = MessageKeyParity.NON_LOCALE_DIRS;
 
     // =========================================================================
     // Group 1: resource hygiene + per-locale lang-map / value-file integrity
@@ -133,20 +143,14 @@ public class LocaleParityTest {
                                 continue;
                             }
 
-                            Map<String, String> map = loadLangMap(langMap);
-                            Map<String, Object> values = loadYaml(valueFile);
-                            Set<String> valueKeys = values.keySet();
+                            Map<String, String> map = MessageKeyParity.langMap(READER, rel(langMap));
+                            Set<String> valueKeys = MessageKeyParity.keys(READER, rel(valueFile));
 
-                            for (Map.Entry<String, String> e : map.entrySet()) {
-                                String mappedName = e.getValue();
-                                if (mappedName.equals(e.getKey())) continue;
-                                if (!valueKeys.contains(mappedName)) {
+                            MessageKeyParity.unresolvedLangRows(map, valueKeys).forEach((key, mappedName) ->
                                     failures.add(String.format(
                                             "%s/%s maps %s -> %s but %s has no top-level key %s",
-                                            localeName, mapName, e.getKey(), mappedName,
-                                            valueName, mappedName));
-                                }
-                            }
+                                            localeName, mapName, key, mappedName,
+                                            valueName, mappedName)));
                         }
                     }
                 }
@@ -399,14 +403,10 @@ public class LocaleParityTest {
             List<DynamicTest> tests = new ArrayList<>();
             for (String category : discoverBaselineCategories()) {
                 tests.add(DynamicTest.dynamicTest(category, () -> {
-                    Path langPath = baselineLangPath(category);
-                    Map<String, Object> values = loadBaselineValues(category);
-                    Map<String, String> langMap = loadLangMap(langPath);
+                    Set<String> values = loadBaselineKeys(category);
+                    Map<String, String> langMap = loadLangMap(MessageKeyParity.baselineLangPath(category));
 
-                    List<String> missing = new ArrayList<>();
-                    for (String key : values.keySet()) {
-                        if (!langMap.containsKey(key)) missing.add(key);
-                    }
+                    List<String> missing = MessageKeyParity.unmappedBaselineKeys(values, langMap);
                     assertTrue(missing.isEmpty(),
                             "Baseline " + category + ".yml ships keys with no row in "
                                     + "lang/" + category + ".lang.yml (locales cannot "
@@ -427,15 +427,15 @@ public class LocaleParityTest {
                 String localeName = localeDir.getFileName().toString();
                 for (String category : categories) {
                     tests.add(DynamicTest.dynamicTest(localeName + " / " + category, () -> {
-                        Path baselineLang = baselineLangPath(category);
-                        Path localeValue = localeDir.resolve(category + ".yml");
-                        Path localeLang = localeLangPath(localeDir, category);
+                        String localeValue = MessageKeyParity.localeValuePath(localeName, category);
+                        String localeLang = MessageKeyParity.localeLangPath(localeName, category);
 
-                        Map<String, Object> baselineValues = loadBaselineValues(category);
-                        Map<String, String> baselineLangMap = loadLangMap(baselineLang);
+                        Set<String> baselineValues = loadBaselineKeys(category);
+                        Map<String, String> baselineLangMap =
+                                loadLangMap(MessageKeyParity.baselineLangPath(category));
 
-                        if (!Files.exists(localeValue)) {
-                            if (Files.exists(localeLang)) {
+                        if (!READER.exists(localeValue)) {
+                            if (READER.exists(localeLang)) {
                                 fail("Locale '" + localeName + "' ships "
                                         + category + ".lang.yml but no "
                                         + category + ".yml to back its "
@@ -445,20 +445,15 @@ public class LocaleParityTest {
                             return;
                         }
 
-                        Map<String, Object> localeValues = loadYaml(localeValue);
-                        Map<String, String> localeLangMap = Files.exists(localeLang)
+                        Set<String> localeValues = MessageKeyParity.keys(READER, localeValue);
+                        Map<String, String> localeLangMap = READER.exists(localeLang)
                                 ? loadLangMap(localeLang)
                                 : Collections.emptyMap();
 
                         List<String> missing = new ArrayList<>();
-                        for (String baselineKey : baselineValues.keySet()) {
-                            String translated = localeLangMap.get(baselineKey);
-                            if (translated == null) translated = baselineLangMap.get(baselineKey);
-                            if (translated == null) translated = baselineKey;
-                            if (!localeValues.containsKey(translated)) {
-                                missing.add(baselineKey + " (expected as '" + translated + "')");
-                            }
-                        }
+                        MessageKeyParity.missingLocaleKeys(baselineValues, baselineLangMap, localeLangMap, localeValues)
+                                .forEach((baselineKey, translated) ->
+                                        missing.add(baselineKey + " (expected as '" + translated + "')"));
                         assertTrue(missing.isEmpty(),
                                 "Locale '" + localeName + "/" + category + ".yml' is "
                                         + "missing " + missing.size() + " baseline "
@@ -480,15 +475,12 @@ public class LocaleParityTest {
             for (Path localeDir : locales) {
                 String localeName = localeDir.getFileName().toString();
                 for (String category : categories) {
-                    Path localeLang = localeLangPath(localeDir, category);
-                    if (!Files.exists(localeLang)) continue;
+                    String localeLang = MessageKeyParity.localeLangPath(localeName, category);
+                    if (!READER.exists(localeLang)) continue;
                     tests.add(DynamicTest.dynamicTest(localeName + " / " + category + ".lang.yml", () -> {
-                        Set<String> baselineKeys = loadBaselineValues(category).keySet();
+                        Set<String> baselineKeys = loadBaselineKeys(category);
                         Map<String, String> map = loadLangMap(localeLang);
-                        List<String> stale = new ArrayList<>();
-                        for (String key : map.keySet()) {
-                            if (!baselineKeys.contains(key)) stale.add(key);
-                        }
+                        List<String> stale = MessageKeyParity.staleLangRows(baselineKeys, map);
                         assertTrue(stale.isEmpty(),
                                 "Locale '" + localeName + "/" + category + ".lang.yml' "
                                         + "declares rows for keys the baseline "
@@ -499,6 +491,23 @@ public class LocaleParityTest {
                 }
             }
             return tests;
+        }
+
+        @Test
+        @DisplayName("ADR-121 messages PBIT over src/main/resources reports no RTP_MESSAGES_LOCALE_KEY_MISSING or other gap")
+        void messagesPbitAgreesWithParitySuite() {
+            if (!Files.isDirectory(LANG_ROOT)) return;
+            List<BitFinding> findings = MessagesConfigCheck.bundledFindings(READER);
+            assertTrue(findings.isEmpty(), "messages config PBIT findings: " + findings);
+        }
+
+        @Test
+        @DisplayName("ADR-121 classpath reader discovers the same locales as src/main/resources")
+        void classpathReaderDiscoversShippedLocales() {
+            if (!Files.isDirectory(LANG_ROOT)) return;
+            MessageKeyParity.ResourceReader classpath =
+                    MessageKeyParity.ResourceReader.classpath(LocaleParityTest.class.getClassLoader());
+            assertEquals(MessageKeyParity.locales(READER), MessageKeyParity.locales(classpath));
         }
 
         @Test
@@ -515,86 +524,20 @@ public class LocaleParityTest {
     // Shared discovery + YAML helpers
     // =========================================================================
 
-    /**
-     * ADR-076: the baseline rename map for a category is a co-located dotfile
-     * sibling of its value file - {@code .<stem>.lang.yml} beside {@code <stem>.yml}
-     * (root, {@code advanced/}, or {@code advanced/messages/}).
-     */
-    private static Path baselineLangPath(String category) {
-        int slash = category.lastIndexOf('/');
-        if (slash >= 0) {
-            return RESOURCES.resolve(category.substring(0, slash))
-                    .resolve("." + category.substring(slash + 1) + ".lang.yml");
-        }
-        return RESOURCES.resolve("." + category + ".lang.yml");
-    }
-
-    /**
-     * ADR-076: the per-locale rename map for a category, a co-located dotfile sibling
-     * of the per-locale value file under {@code lang/<locale>/}.
-     */
-    private static Path localeLangPath(Path localeDir, String category) {
-        int slash = category.lastIndexOf('/');
-        if (slash >= 0) {
-            return localeDir.resolve(category.substring(0, slash))
-                    .resolve("." + category.substring(slash + 1) + ".lang.yml");
-        }
-        return localeDir.resolve("." + category + ".lang.yml");
+    private static String rel(Path path) {
+        return RESOURCES.relativize(path).toString().replace('\\', '/');
     }
 
     /** Baseline categories: every {@code <file>.yml} with a co-located {@code .<file>.lang.yml}. */
-    private static List<String> discoverBaselineCategories() throws IOException {
-        List<String> categories = new ArrayList<>();
-        if (!Files.isDirectory(RESOURCES) || !Files.isDirectory(LANG_ROOT)) {
-            return categories;
-        }
-        try (DirectoryStream<Path> ymls = Files.newDirectoryStream(RESOURCES, "*.yml")) {
-            for (Path yml : ymls) {
-                String name = yml.getFileName().toString();
-                String stem = name.substring(0, name.length() - ".yml".length());
-                // ADR-076: co-located dotfile map beside the baseline value file.
-                Path langSibling = RESOURCES.resolve("." + stem + ".lang.yml");
-                if (Files.exists(langSibling)) categories.add(stem);
-            }
-        }
-        // ADR-071: the advanced/ tier holds ordinary single-file parsers under a
-        // subdirectory. Each advanced/<file>.yml whose sibling lang map lives at
-        // lang/advanced/<file>.lang.yml is a category named "advanced/<file>".
-        Path advancedDir = RESOURCES.resolve("advanced");
-        if (Files.isDirectory(advancedDir)) {
-            try (DirectoryStream<Path> ymls = Files.newDirectoryStream(advancedDir, "*.yml")) {
-                for (Path yml : ymls) {
-                    String name = yml.getFileName().toString();
-                    if (name.endsWith(".lang.yml")) continue;
-                    String stem = name.substring(0, name.length() - ".yml".length());
-                    // ADR-076: co-located dotfile map beside the advanced value file.
-                    Path langSibling = advancedDir.resolve("." + stem + ".lang.yml");
-                    if (Files.exists(langSibling)) categories.add("advanced/" + stem);
-                }
-            }
-        }
-        // ADR-076: the split messages tree lives under advanced/messages/ with
-        // per-file co-located dotfile maps (.<file>.lang.yml). Each member file
-        // is its own category "advanced/messages/<file>".
-        if (Files.isDirectory(MESSAGES_DIR)) {
-            try (DirectoryStream<Path> ymls = Files.newDirectoryStream(MESSAGES_DIR, "*.yml")) {
-                for (Path yml : ymls) {
-                    String name = yml.getFileName().toString();
-                    if (name.endsWith(".lang.yml")) continue;
-                    String stem = name.substring(0, name.length() - ".yml".length());
-                    Path langSibling = MESSAGES_DIR.resolve("." + stem + ".lang.yml");
-                    String cat = "advanced/messages/" + stem;
-                    if (Files.exists(langSibling) && !categories.contains(cat)) categories.add(cat);
-                }
-            }
-        }
-        Collections.sort(categories);
-        return categories;
+    private static List<String> discoverBaselineCategories() {
+        return MessageKeyParity.categories(READER);
     }
 
-    /** Baseline value map for a category: the single {@code <category>.yml}. */
-    private static Map<String, Object> loadBaselineValues(String category) throws IOException {
-        return loadYaml(RESOURCES.resolve(category + ".yml"));
+    /** Baseline top-level keys for a category: the single {@code <category>.yml}. */
+    private static Set<String> loadBaselineKeys(String category) {
+        String path = category + ".yml";
+        assertTrue(READER.exists(path), "Expected file: " + RESOURCES.resolve(path).toAbsolutePath());
+        return MessageKeyParity.keys(READER, path);
     }
 
     /**
@@ -639,16 +582,9 @@ public class LocaleParityTest {
     }
 
     /** Locale dirs: every directory under {@code lang/} not in {@link #NON_LOCALE_DIRS}. */
-    private static List<Path> discoverLocaleDirs() throws IOException {
+    private static List<Path> discoverLocaleDirs() {
         List<Path> dirs = new ArrayList<>();
-        if (!Files.isDirectory(LANG_ROOT)) return dirs;
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(LANG_ROOT, Files::isDirectory)) {
-            for (Path p : stream) {
-                if (NON_LOCALE_DIRS.contains(p.getFileName().toString())) continue;
-                dirs.add(p);
-            }
-        }
-        dirs.sort((a, b) -> a.getFileName().toString().compareTo(b.getFileName().toString()));
+        for (String locale : MessageKeyParity.locales(READER)) dirs.add(LANG_ROOT.resolve(locale));
         return dirs;
     }
 
@@ -662,6 +598,12 @@ public class LocaleParityTest {
                             + (loaded == null ? "null" : loaded.getClass()));
             return (Map<String, Object>) loaded;
         }
+    }
+
+    /** Rename map at a resource-relative path, read by {@link MessageKeyParity}. */
+    private static Map<String, String> loadLangMap(String path) {
+        assertTrue(READER.exists(path), "Expected file: " + RESOURCES.resolve(path).toAbsolutePath());
+        return MessageKeyParity.langMap(READER, path);
     }
 
     private static Map<String, String> loadLangMap(Path path) throws IOException {

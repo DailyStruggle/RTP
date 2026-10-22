@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.metrics;
 
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
 import io.github.dailystruggle.metrics.api.MetricsExtension;
+import io.github.dailystruggle.rtp.common.action.ActionCbitCounters;
 import io.github.dailystruggle.rtp.common.tools.MemoryTracker;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -81,10 +82,27 @@ class MetricsExtensionParityTest {
         assertEquals("RTPMetricsExtension{queueDepth=1, pendingTeleports=2, memoryTrackerEntries=3,"
                 + " chunkLoadBacklog=4, avgPipelineMs=5.5, databaseLatencyMs=6, slowPipelineCount=7,"
                 + " slowPipelineThresholdMs=8, queueGrowthWarnCount=9, queueGrowthWarnThreshold=10,"
-                + " regionQueueStatus={r=null}, probeGovernors={}, liveLoadGates={}, immediateGovernors={}}",
+                + " regionQueueStatus={r=null}, probeGovernors={}, liveLoadGates={}, immediateGovernors={},"
+                + " actionCbit=Snapshot[missingObjectiveReads={}, gateOutcomes=[], unresolvedPlaceholders=0,"
+                + " unknownActions=0, orphanedSessions=0, gateOutcomeSamples=200, lastUnresolvedToken=,"
+                + " lastUnknownAction=, lastOrphanedAction=]}",
                 ext.toString());
         assertThrows(UnsupportedOperationException.class, () -> ext.regionQueueStatus.put("x", null));
         assertTrue(ext.probeGovernors.isEmpty());
+    }
+
+    @Test
+    void coreSnapshotIncludesActionCbitCounters() {
+        ActionCbitCounters.reset();
+        try {
+            ActionCbitCounters.recordMissingObjective("metrics_objective");
+
+            RTPMetricsExtension extension = new CoreMetrics().snapshot().extension(RTPMetricsExtension.class);
+
+            assertEquals(1L, extension.actionCbit.missingObjectiveReads().get("metrics_objective"));
+        } finally {
+            ActionCbitCounters.reset();
+        }
     }
 
     @Test

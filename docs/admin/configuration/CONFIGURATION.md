@@ -38,6 +38,7 @@ RTP provides multiple ways to view and update settings:
 | `advanced/logging.yml` | Console logging verbosity | [LOGGING.md](LOGGING.md) |
 | `advanced/metrics.yml` | Runtime-health metrics SPI reporting knobs | [METRICS.md](METRICS.md) |
 | `advanced/ttl.yml` | Spatial memory expiration and cause-based TTL tiers | [TTL.md](TTL.md) |
+| `advanced/bit.yml` | BIT finding severity and strict action registration | [BIT.md](BIT.md) |
 | `advanced/network.yml` | Multi-server / multi-proxy network mode | [proxies/CONFIGURATION.md](../proxies/CONFIGURATION.md) |
 | `advanced/database.yml` | Database backend and connection settings | [CORE_CONFIG.md](CORE_CONFIG.md) |
 | `advanced/biomes.yml`, `advanced/blocks.yml` | Biome / block tag catalogs used by safety filters | [SAFETY.md](SAFETY.md) |

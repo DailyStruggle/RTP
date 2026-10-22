@@ -1,0 +1,21 @@
+# --- 내장 테스트(BIT) 설정 ---
+# 문서: docs/admin/configuration/BIT.md
+
+# 구조적 액션 진단을 경고로 기록하며 액션 등록을 막지 않습니다.
+# true로 설정하면 유효한 ERROR가 있는 액션은 등록되지 않습니다.
+strictActions: false
+
+# 이전 버전에서 허용되던 설정 문제를 경고로 기록하며 /rtp reload를 거부하지 않습니다.
+# true로 설정하면 오류로 취급하며, 오류가 있는 다시 불러오기나 Hot-Apply는 현재 설정을 유지합니다.
+strictConfig: false
+
+# 게이트의 항상 통과 또는 항상 실패를 판정하기 위한 최소 평가 횟수입니다.
+gateOutcomeSamples: 200
+
+# 등록된 BIT 코드의 심각도이며 strictActions 프리셋보다 우선합니다.
+# 허용 값: ERROR, WARNING, INFO, DEBUG, TRACE, OFF. OFF는 진단을 억제합니다.
+# 알 수 없는 코드와 레벨은 무시되고 로그에 기록됩니다.
+overrides:
+
+# 버전 번호를 변경하지 마세요
+version: 1.0

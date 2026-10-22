@@ -72,6 +72,13 @@ class MockProbeSyntaxTest {
   }
 
   @Test
+  void teleportHeatmapRegionAndSampleTokensAreParsed() {
+    assertTrue(dispatch("teleport-heatmap", "region=default", "samples=32"));
+    assertEquals(List.of("default"), command.teleportHeatmap.arguments.get("region"));
+    assertEquals(List.of("32"), command.teleportHeatmap.arguments.get("samples"));
+  }
+
+  @Test
   void colonPlayerSyntaxIsRejectedBeforeTheProbeRuns() {
     assertFalse(dispatch("stress", "player:Steve"));
     assertTrue(command.stress.arguments.isEmpty());
@@ -90,6 +97,7 @@ class MockProbeSyntaxTest {
     private final CapturingLeaf asyncReply = new CapturingLeaf(this, "async-reply", "player", "region", "json");
     private final CapturingLeaf hologram = new CapturingLeaf(this, "hologram", "player", "seconds", "json");
     private final CapturingLeaf queueStarvation = new CapturingLeaf(this, "queue-starvation", "region", "samples", "json");
+    private final CapturingLeaf teleportHeatmap = new CapturingLeaf(this, "teleport-heatmap", "region", "samples", "json");
 
     private CapturingBukkitTestCmd() {
       super(null);
@@ -97,6 +105,7 @@ class MockProbeSyntaxTest {
       getCommandLookup().put("ASYNC-REPLY", asyncReply);
       getCommandLookup().put("HOLOGRAM", hologram);
       getCommandLookup().put("QUEUE-STARVATION", queueStarvation);
+      getCommandLookup().put("TELEPORT-HEATMAP", teleportHeatmap);
     }
   }
 

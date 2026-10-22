@@ -6,6 +6,8 @@ import io.github.dailystruggle.rtp.api.claim.ClaimBoundaryProvider;
 import io.github.dailystruggle.rtp.api.hooks.ClaimBoundaryRegistry;
 import io.github.dailystruggle.rtp.api.hooks.RegionVerifierRegistry;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigPbit;
+import io.github.dailystruggle.rtp.common.bit.config.DirectiveConfigCheck;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
@@ -39,6 +41,9 @@ public final class ClaimIntegrations {
    */
   public static void setup(ClassLoader resourceLoader) {
     ActiveConfigs.get().putParser(buildParser(resourceLoader));
+    // Directives live in this jar, not on RTP's loader (ADR-121); false on re-enable is fine.
+    ConfigPbit.register(
+        DirectiveConfigCheck.bound("integrations", "addons/integrations.yml", resourceLoader));
 
     // Lands needs a Bukkit plugin instance to register its API; reuse the RTP plugin.
     Plugin host = Bukkit.getPluginManager().getPlugin("RTP");

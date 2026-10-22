@@ -1,8 +1,11 @@
 package io.github.dailystruggle.rtp.common.commands.editor;
 
+import io.github.dailystruggle.rtp.api.configuration.enums.CommandMessages;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigCandidateGate;
 import io.github.dailystruggle.rtp.common.commands.docs.DocsRegistry;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorKeys;
 import io.github.dailystruggle.rtp.common.commands.editor.channel.EditorLoopbackJson;
+import io.github.dailystruggle.rtp.common.commands.reload.ReloadSupport;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 
@@ -1448,6 +1451,15 @@ public final class EditorSessionManager {
             // Owning addons validate their declared files; any error fails the whole apply (ADR-107 §7, S-004)
             Map<String, String> addonFiles = EditorExtensions.validateFiles(pluginPath, parsed.files());
 
+            // ADR-121 section 7: PBIT the candidate (disk + payload) before any .bak, write or reload
+            ConfigCandidateGate.Result gate = ConfigCandidateGate.evaluate(pluginPath, parsed.files());
+            if (gate.rejected()) {
+                throw new ConfigCandidateGate.RejectedException(gate, ConfigCandidateGate.format(
+                        EditorChannelWiring.message(CommandMessages.editorApplyRejected,
+                                "[P0] Apply rejected: [count] config error(s); nothing was written."
+                                        + " First: [code] in [source] at [path]."), gate));
+            }
+
             // Backup all dirty files
             for (Map.Entry<String, String> entry : parsed.files().entrySet()) {
                 String relPath = entry.getKey();
@@ -1523,7 +1535,16 @@ public final class EditorSessionManager {
 
             // Trigger hot-reload on configs
             try {
-                if (!ActiveConfigs.get().reload()) {
+                if (!ReloadSupport.reloadAndRefresh(ActiveConfigs.get())) {
+                    var rejection = ActiveConfigs.get().lastReloadRejection();
+                    if (rejection.isPresent()) {
+                        String template = EditorChannelWiring.message(
+                                CommandMessages.editorApplyRejected,
+                                "[P0] Apply rejected: [count] config error(s); nothing was written."
+                                        + " First: [code] in [source] at [path].");
+                        throw new ConfigCandidateGate.RejectedException(
+                                rejection.get(), ConfigCandidateGate.format(template, rejection.get()));
+                    }
                     throw new IllegalStateException("configuration reload returned false");
                 }
             } catch (Exception e) {

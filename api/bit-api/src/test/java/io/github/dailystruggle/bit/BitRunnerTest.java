@@ -142,6 +142,21 @@ class BitRunnerTest {
         assertNotNull(result.toJson());
     }
 
+    @Test
+    void cliRunsSelectedComponentsAndFailsOnErrorsInJsonReport() {
+        BitRunner runner = new BitRunner();
+        runner.register(new BitComponent("failed", "test", BitTier.PBIT, BitSideEffect.SAFE, 1_000,
+                () -> new BitReport(BitReport.CURRENT_SCHEMA, BitHealth.HEALTHY,
+                        List.of(new BitFinding(Level.ERROR, "FAIL", "test.yml", "key", "invalid", "valid", "")))));
+        List<String> json = new ArrayList<>();
+
+        int exitCode = BitCli.run(runner, BitSelector.parse("tier:pbit"), DIRECT, true, json::add);
+
+        assertEquals(1, exitCode);
+        assertTrue(json.get(0).contains("\"schema\":" + BitReport.CURRENT_SCHEMA));
+        assertTrue(json.get(0).contains("\"code\":\"FAIL\""));
+    }
+
     private static BitComponent component(String id, String subsystem, BitSideEffect sideEffect,
                                           java.util.concurrent.Callable<BitReport> check) {
         return new BitComponent(id, subsystem, BitTier.IBIT, sideEffect, 1_000, check);

@@ -1,9 +1,13 @@
 package io.github.dailystruggle.rtp.common.placeholders;
 
+import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
+import io.github.dailystruggle.rtp.common.mock.MockRTPPlayer;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
+import io.github.dailystruggle.rtp.common.network.RTPNetworkManager;
 import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
@@ -11,6 +15,7 @@ import io.github.dailystruggle.rtp.common.selection.region.RegionContext;
 import io.github.dailystruggle.rtp.common.tasks.scan.ScanTasks;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -344,6 +349,49 @@ class PlaceholderProviderTest {
     void builtInPlaceholderIsRegistered(String key) {
         assertTrue(PlaceholderProvider.placeholders.containsKey(key),
                 "Expected built-in placeholder to be registered: " + key);
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-NET-001: cooldown placeholders honor shared time when local teleport data is absent")
+    void cooldownPlaceholdersUseSharedTimestampWithoutLocalData() {
+        UUID playerId = UUID.randomUUID();
+        MockRTPServerAccessor accessor = (MockRTPServerAccessor) RTPRuntime.serverAccessor();
+        MockRTPPlayer player = new MockRTPPlayer(playerId, "sharedCooldownUser", null) {
+            @Override
+            public long cooldown() {
+                return 300_000L;
+            }
+        };
+        accessor.addPlayer(player);
+
+        RTP rtp = RTP.getInstance();
+        RTPNetworkManager previous = rtp.networkManager;
+        RTPNetworkManager networkManager = org.mockito.Mockito.mock(RTPNetworkManager.class);
+        long now = System.currentTimeMillis();
+        org.mockito.Mockito.when(networkManager.getLastTeleportTime(playerId)).thenReturn(now - 90_000L);
+        rtp.networkManager = networkManager;
+        TeleportSessions.current().latestTeleportData.remove(playerId);
+        try {
+            String remaining = PlaceholderProvider.placeholders.get("remainingCooldown").apply(playerId);
+            assertTrue(remaining.startsWith("3"),
+                    "expected the remaining time to reflect the shared teleport, got: " + remaining);
+
+            String expectedStatus = ActiveConfigs.get()
+                    .getConfigValue(PlayerMessages.PLAYER_COOLDOWN, "").toString();
+            assertEquals(expectedStatus, PlaceholderProvider.placeholders.get("player_status").apply(playerId));
+
+            org.mockito.Mockito.when(networkManager.getLastTeleportTime(playerId))
+                    .thenReturn(System.currentTimeMillis() + 60_000L);
+            String expectedZero = "0" + ActiveConfigs.get()
+                    .getConfigValue(PlayerMessages.millis, "").toString();
+            assertEquals(expectedZero, PlaceholderProvider.placeholders.get("remainingCooldown").apply(playerId));
+            String expectedAvailable = ActiveConfigs.get()
+                    .getConfigValue(PlayerMessages.PLAYER_AVAILABLE, "").toString();
+            assertEquals(expectedAvailable, PlaceholderProvider.placeholders.get("player_status").apply(playerId));
+        } finally {
+            rtp.networkManager = previous;
+            TeleportSessions.current().latestTeleportData.remove(playerId);
+        }
     }
 
     @Test

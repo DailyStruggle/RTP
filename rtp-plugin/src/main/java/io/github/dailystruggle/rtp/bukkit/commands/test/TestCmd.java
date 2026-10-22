@@ -21,6 +21,7 @@ import io.github.dailystruggle.rtp.common.commands.test.TestConfigSetCmd;
 import io.github.dailystruggle.rtp.common.commands.test.TestSchedulerCmd;
 import io.github.dailystruggle.rtp.common.commands.test.TestSemaphore;
 import io.github.dailystruggle.rtp.common.commands.test.TestStatusCmd;
+import io.github.dailystruggle.rtp.common.commands.test.TestActionCmd;
 import io.github.dailystruggle.rtp.common.commands.test.TestTeleportCmd;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.List;
@@ -117,7 +118,9 @@ public class TestCmd extends BaseRTPCmdImpl {
     addSubCommand(new TestAsyncChunkLoadCmd(this));
     addSubCommand(new TestAccessorCmd(this));
     addSubCommand(new TestStatusCmd(this));
+    addSubCommand(new TestActionCmd(this));
     addSubCommand(new TestTeleportCmd(this));
+    addSubCommand(new TestTeleportHeatmapCmd(this));
     addSubCommand(new QueueStarvationTestJob(this));
     addSubCommand(new EconomyIsolationTestJob(this));
     addSubCommand(new FoliaOwnershipTestJob(this));

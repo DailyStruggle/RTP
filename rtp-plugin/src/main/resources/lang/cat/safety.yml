@@ -2,6 +2,7 @@
 
 # Where it is safe to land on four paws after a pounce.
 # Tail flicks (seconds) of invulnerability after pouncing
+# Supports duration units (e.g. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -45,6 +46,7 @@ paw_platform_material: "GLASS"
 # Seconds until the platform's paw-print gets put back to its original blocks.
 # -1 = never (forever), 0 = soon as the chunk wakes up again. The countdown only
 # ticks while the chunk is loaded; survives a nap-restart.
+# Supports duration units (e.g. 24h, 1d).
 # @type: integer
 # @range: [-1, null]
 # @unit: seconds
@@ -60,6 +62,7 @@ pvpCheckEnabled: false
 
 # Seconds a kitty stays "in a scuffle" after PvP boops (native tracker only;
 # ignored when an outside combat-tag plugin is hooked up).
+# Supports duration units (e.g. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds

@@ -59,9 +59,9 @@ class RtpYamlUnsupportedFeatureTest {
         assertEquals("rtpYaml.unsupported.docSep", e.messageKey());
     }
 
-    @Test @DisplayName("rejects block scalars with rtpYaml.unsupported.blockScalar")
+    @Test @DisplayName("rejects block scalar indicators inside flow sequences")
     void rejectsBlockScalar() {
-        RtpYamlParseException e = assertRejected("a: |\n  hello\n");
+        RtpYamlParseException e = assertRejected("a: [|x]\n");
         assertEquals("rtpYaml.unsupported.blockScalar", e.messageKey());
     }
 

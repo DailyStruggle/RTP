@@ -110,4 +110,12 @@ class PvPGateTest {
     assertFalse(PvPGate.isInCombat(null));
     assertEquals(PvPCombatAction.ALLOW, PvPGate.evaluate(null));
   }
+
+  @Test
+  @DisplayName("REQ-RTP-F-016: pvpCombatTagSeconds accepts explicit duration units")
+  void combatTagDurationAcceptsUnits() {
+    setSafety(SafetyKeys.pvpCombatTagSeconds.name(), "3h");
+
+    assertEquals(10_800_000L, PvPGate.combatTagMillis());
+  }
 }

@@ -3,6 +3,9 @@ package io.github.dailystruggle.rtp.common.commands.config;
 import static org.junit.jupiter.api.Assertions.*;
 
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
+import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporter;
+import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporterRegistry;
+import io.github.dailystruggle.rtp.common.importer.ImportResult;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.io.IOException;
@@ -80,6 +83,56 @@ class ConfigImportCmdExtendedTest {
         ConfigImportCmd.PARAM_PATH, List.of(tempDir.resolve("not_a_dir.txt").toString())
     );
     assertFalse(cmd.onCommand(UUID.randomUUID(), params, null));
+  }
+
+  @Test
+  void testImportRejectsBrokenConfigBeforeWritingDestination(@TempDir Path tempDir) throws IOException {
+    Path rtpDir = setupPluginDir(tempDir);
+    Path sourceDir = rtpDir.getParent().resolve("PbitRejectSource");
+    Files.createDirectories(sourceDir);
+    Files.writeString(sourceDir.resolve("config.yml"), "source: test\n");
+    Path destinationConfig = rtpDir.resolve("config.yml");
+    String originalConfig = Files.exists(destinationConfig) ? Files.readString(destinationConfig) : null;
+
+    ForeignConfigImporterRegistry.register(new ForeignConfigImporter() {
+      @Override
+      public String sourceName() {
+        return "pbit-rejection-test";
+      }
+
+      @Override
+      public boolean canImport(Path sourcePluginDir) {
+        return Files.isRegularFile(sourcePluginDir.resolve("config.yml"));
+      }
+
+      @Override
+      public ImportResult importConfiguration(Path sourcePluginDir, Path destinationDir, boolean overwrite) {
+        Path target = destinationDir.resolve("config.yml");
+        try {
+          Files.createDirectories(target.getParent());
+          Files.writeString(target, "broken: [yaml\n");
+          return ImportResult.success(sourceName(), List.of(target), List.of(), List.of("config.yml"));
+        } catch (IOException e) {
+          return ImportResult.failure(sourceName(), List.of(e.getMessage()), List.of());
+        }
+      }
+    });
+
+    ConfigImportCmd cmd = new ConfigImportCmd(null);
+    Map<String, List<String>> params = Map.of(
+        ConfigImportCmd.PARAM_SOURCE, List.of("pbit-rejection-test"),
+        ConfigImportCmd.PARAM_PATH, List.of(sourceDir.toString()),
+        ConfigImportCmd.PARAM_OVERWRITE, List.of("true"),
+        ConfigImportCmd.PARAM_PERMISSIONS, List.of("false")
+    );
+
+    assertTrue(cmd.onCommand(UUID.randomUUID(), params, null));
+
+    if (originalConfig == null) {
+      assertFalse(Files.exists(destinationConfig), "Rejected importer output must not create config.yml");
+    } else {
+      assertEquals(originalConfig, Files.readString(destinationConfig), "Rejected importer output must not replace config.yml");
+    }
   }
 
   @Test

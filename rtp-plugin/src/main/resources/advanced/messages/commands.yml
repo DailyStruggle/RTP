@@ -568,5 +568,9 @@ editorApplySuccess: "&a[P0] Successfully applied configurations and hot-reloaded
 # Sent when /rtp editor apply failed. Placeholder: [reason].
 editorApplyFailed: "&c[P0] Failed to apply payload: [reason]"
 
+# Sent when /rtp editor apply is rejected by config PBIT before any file is written.
+# Placeholders: [count] error count, [code] [source] [path] of the first error.
+editorApplyRejected: "&c[P0] Apply rejected: [count] config error(s); nothing was written. First: [code] in [source] at [path]."
+
 # DO NOT TOUCH VERSION NUMBER
-version: 1.0
+version: 1.1

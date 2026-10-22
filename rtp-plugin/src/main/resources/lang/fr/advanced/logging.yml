@@ -46,7 +46,7 @@ evenementMouvement: true
 evenementTeleport: true
 
 # --- Paramètres de journalisation du plugin ---
-# Documentation : plugins/RTP/docs/admin/configuration/CONFIGURATION.md#loggingyml--console-logging-verbosity
+# Documentation : docs/admin/configuration/CONFIGURATION.md#loggingyml--console-logging-verbosity
 # Journaliser tous les fichiers rechargés lors de /rtp reload
 # @type: boolean
 # @default: false

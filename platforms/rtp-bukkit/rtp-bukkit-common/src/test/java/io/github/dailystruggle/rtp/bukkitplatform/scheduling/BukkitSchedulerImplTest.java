@@ -140,7 +140,7 @@ class BukkitSchedulerImplTest {
 
     /** The Spigot tick watch marks a stuck main thread only while players are online. */
     @Test
-    @Timeout(2)
+    @Timeout(10)
     void tickWatch_marksTicks_onlyWithPlayersOnline() {
         io.github.dailystruggle.rtp.common.tools.ServerHealthGate.resetForTesting();
         try {

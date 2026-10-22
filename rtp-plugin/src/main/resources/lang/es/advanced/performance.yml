@@ -31,6 +31,7 @@ maxHeapPorcentaje: 85.0
 intentosMaximos: 10
 
 # Ticks entre recargas de la misma región. Las regiones se turnan.
+# Admite unidades de duración (p. ej. 24h, 1d).
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
@@ -38,6 +39,7 @@ intentosMaximos: 10
 periodo: 20
 
 # Máximo de ms por tick para el trabajo en el hilo principal. Limitado a 25.
+# Admite unidades de duración (p. ej. 24h, 1d).
 # @type: integer
 # @range: [1, 25]
 # @unit: ms
@@ -45,6 +47,7 @@ periodo: 20
 tiempoAsignadoSincrono: 5
 
 # Máximo de ms por pulso para el trabajo en segundo plano. Limitado a 25.
+# Admite unidades de duración (p. ej. 24h, 1d).
 # @type: integer
 # @range: [1, 25]
 # @unit: ms
@@ -73,6 +76,7 @@ distanciaVistaTeletransporte: 0
 # vuelve a la normalidad tras llegar, suavizando el pico de carga de chunks. 0 desactiva el ajuste.
 # NOTA: Forzado temporalmente a 0. La restauración gradual provoca parpadeo /
 # re-renderizado del lado del cliente al llegar. Déjalo en 0 hasta nuevo aviso.
+# Admite unidades de duración (p. ej. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: ticks
@@ -142,6 +146,7 @@ recuerdoBiomaForzado: false
 
 # Umbral de latencia (ms) por encima del cual un teletransporte servido al instante se
 # audita (se registra un WARN, se incrementa slowPipelineCount). 0 o menos lo desactiva.
+# Admite unidades de duración (p. ej. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: ms

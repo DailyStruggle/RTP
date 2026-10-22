@@ -518,5 +518,6 @@ editorApplyFetching: "&7[P0] Recupero del payload di configurazione..."
 editorApplyValidating: "&7[P0] Verifica dell'integrità e della sintassi del payload..."
 editorApplySuccess: "&a[P0] Configurazione applicata e ricaricata a caldo! (copie .bak create per i file modificati)"
 editorApplyFailed: "&c[P0] Impossibile applicare il payload: [reason]"
+editorApplyRejected: "&c[P0] Applicazione rifiutata: [count] errore/i di configurazione; non è stato scritto nulla. Primo: [code] in [source] a [path]."
 
 version: 1.0

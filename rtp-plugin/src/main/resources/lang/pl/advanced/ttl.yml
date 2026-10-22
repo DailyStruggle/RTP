@@ -1,5 +1,5 @@
 # --- Ustawienia TTL Pamięci Przestrzennej RTP ---
-# Dokumentacja: plugins/RTP/docs/admin/configuration/TTL.md
+# Dokumentacja: docs/admin/configuration/TTL.md
 
 # Podstawowy czas przechowywania dla odrzuconych współrzędnych w pamięci przestrzennej.
 # Obsługiwane formaty czasu: np. 14d, 12h, 30m, 3600s, 40t, 2500ms lub złożony 1d12h.

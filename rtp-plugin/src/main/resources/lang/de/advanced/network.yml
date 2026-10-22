@@ -52,11 +52,13 @@ transport:
 # Backend heartbeat / peer-staleness cadence (shared by every transport tier).
 heartbeat:
   # Wie oft dieses Backend seine Zustandszeile veröffentlicht.
+  # Unterstützt Zeiteinheiten (z. B. 24h, 1d).
   # @type: integer
   # @default: 1000
   intervalMs: 1000
 
   # How long a peer's last-seen state stays trusted before it is treated as unknown.
+  # Unterstützt Zeiteinheiten (z. B. 24h, 1d).
   # @type: integer
   # @default: 5000
   staleAfterMs: 5000
@@ -82,11 +84,13 @@ queue:
   maxDepth: 50
 
   # Flush-Takt für Dirty-Writes des Backends (ms). Niedriger = geringere Ende-zu-Ende- Latenz, höher = weniger Roundtrips zum Transport.
+  # Unterstützt Zeiteinheiten (z. B. 24h, 1d).
   # @type: integer
   # @default: 250
   flushIntervalMs: 250
 
   # Poll-Takt des Backend-Status-Caches (ms). Bestimmt, wie oft das Backend `rtp:net:wq:status:<pid>` liest, um den Fortschritt je Spieler zu aktualisieren.
+  # Unterstützt Zeiteinheiten (z. B. 24h, 1d).
   # @type: integer
   # @default: 1000
   pollIntervalMs: 1000
@@ -114,11 +118,13 @@ queue:
 # Lebenszyklus der Reservierungs-Tokens.
 reservation:
  # Takt des TTL-Reapers auf Proxy-Seite (ms). Der Reaper räumt abgelaufene Tokens auf, damit am selben Ort liegende Backends die Koordinate an `networkKeptLocations` zurückgeben können.
+  # Unterstützt Zeiteinheiten (z. B. 24h, 1d).
   # @type: integer
   # @default: 30000
   reapIntervalMs: 30000
 
   # TTL je Token (ms). Eine beanspruchte, aber nicht verbrauchte Reservierung, die älter als dieser Wert ist, gilt als verwaist und wird freigegeben.
+  # Unterstützt Zeiteinheiten (z. B. 24h, 1d).
   # @type: integer
   # @default: 60000
   ttlMs: 60000
@@ -304,6 +310,7 @@ editor:
   # Trusted web editor browsers (/rtp editor trust, /rtp editor untrust).
   trust:
     # Days a browser stays trusted after /rtp editor trust. 0 = never expires.
+    # Unterstützt Zeiteinheiten (z. B. 24h, 1d).
     # @type: integer
     # @default: 0
     maxAgeDays: 0

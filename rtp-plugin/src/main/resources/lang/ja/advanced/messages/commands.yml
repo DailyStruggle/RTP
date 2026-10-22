@@ -497,6 +497,7 @@ editorApplyFetching: "&7[P0] 設定ペイロードを取得しています..."
 editorApplyValidating: "&7[P0] ペイロードの整合性と構文を検証しています..."
 editorApplySuccess: "&a[P0] 設定を適用し、ホットリロードしました! (変更されたファイルの .bak コピーを作成しました)"
 editorApplyFailed: "&c[P0] ペイロードを適用できませんでした: [reason]"
+editorApplyRejected: "&c[P0] 適用を拒否しました: 設定エラー [count] 件のため、何も書き込まれていません。最初のエラー: [source] の [path] で [code]。"
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

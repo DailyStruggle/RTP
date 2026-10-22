@@ -510,5 +510,6 @@ editorApplyFetching: "&7[P0] Configuratiepayload wordt opgehaald..."
 editorApplyValidating: "&7[P0] Integriteit en syntaxis van de payload worden gecontroleerd..."
 editorApplySuccess: "&a[P0] Configuratie toegepast en live herladen! (.bak-kopieën gemaakt van gewijzigde bestanden)"
 editorApplyFailed: "&c[P0] De payload kon niet worden toegepast: [reason]"
+editorApplyRejected: "&c[P0] Toepassen geweigerd: [count] configuratiefout(en); er is niets geschreven. Eerste: [code] in [source] bij [path]."
 
 version: 1.0

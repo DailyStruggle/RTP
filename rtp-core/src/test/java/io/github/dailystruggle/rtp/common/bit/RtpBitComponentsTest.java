@@ -13,6 +13,7 @@ import io.github.dailystruggle.bit.BuiltInTestable;
 import io.github.dailystruggle.bit.PbitResult;
 import io.github.dailystruggle.rtp.api.scheduling.RTPScheduler;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
+import io.github.dailystruggle.rtp.common.action.ActionCbitCounters;
 import io.github.dailystruggle.rtp.common.action.ActionConfigLoader;
 import io.github.dailystruggle.rtp.common.action.ActionManager;
 import io.github.dailystruggle.rtp.common.mock.MockRTPScheduler;
@@ -40,7 +41,7 @@ class RtpBitComponentsTest {
     }
 
     @Test
-    void defaultsAreSafePbitComponentsAndRegistrationIsIdempotent() {
+    void defaultsAreSafePbitComponentsAndRegistrationIsIdempotent() throws Exception {
         RtpBitComponents.registerDefaults();
         List<BitComponent> registered = RtpBit.RUNNER.components();
 
@@ -53,6 +54,17 @@ class RtpBitComponentsTest {
             assertEquals(BitTier.PBIT, actual.tier());
             assertEquals(BitSideEffect.SAFE, actual.sideEffect());
         }
+        BitComponent actionCbit = registered.stream()
+                .filter(component -> component.id().equals("action-cbit"))
+                .findFirst().orElse(null);
+        assertNotNull(actionCbit, "action runtime counters must be registered");
+        assertEquals(BitTier.CBIT, actionCbit.tier());
+        assertEquals(BitSideEffect.SAFE, actionCbit.sideEffect());
+        ActionCbitCounters.reset();
+        assertEquals(BitHealth.HEALTHY, actionCbit.check().call().health());
+        ActionCbitCounters.recordUnknownAction("components_test_unknown");
+        assertEquals(BitHealth.DEGRADED, actionCbit.check().call().health());
+        ActionCbitCounters.reset();
 
         RtpBitComponents.registerDefaults();
         assertEquals(registered, RtpBit.RUNNER.components());
@@ -69,7 +81,8 @@ class RtpBitComponentsTest {
 
         assertTrue(report.findings().stream().anyMatch(finding ->
                 finding.code().equals("ACTION_UNKNOWN_STEP_KEY")));
-        assertEquals(BitHealth.FAILED, report.health());
+        assertEquals(BitHealth.DEGRADED, report.health());
+        assertTrue(report.findings().stream().allMatch(finding -> finding.severity() == Level.WARNING));
     }
 
     @Test

@@ -94,16 +94,16 @@ public class ReloadCmd extends BaseRTPCmdImpl {
     try {
       RTPRuntime.scheduler().runTaskAsynchronously(() -> {
         try {
-          boolean b = ActiveConfigs.get().reload();
-          if (!b) throw new IllegalStateException("reload failed");
-
-          // Drop the decoded-schematic cache so a swapped/edited <region>.schem file on disk is
-          // re-read on the next teleport instead of serving the stale in-memory copy (ADR-058).
-          io.github.dailystruggle.rtp.api.schematic.AbstractFileSchematicPaster.clearCache();
-
-          // Re-index <dataFolder>/docs so edited shipped docs reach /rtp docs and the editor.
-          io.github.dailystruggle.rtp.common.commands.docs.DocsRegistry.rebuildFromDataFolder(
-              RTPRuntime.serverAccessor().getPluginDirectory());
+          Configs active = ActiveConfigs.get();
+          boolean b = ReloadSupport.reloadAndRefresh(active);
+          if (!b) {
+            var rejection = active.lastReloadRejection();
+            if (rejection.isPresent()) {
+              ReloadSupport.sendReloadRejected(senderId, rejection.get());
+              return;
+            }
+            throw new IllegalStateException("reload failed");
+          }
 
           String msgReloaded = msg(SystemMessages.reloaded, "");
           if (!msgReloaded.isEmpty()) {

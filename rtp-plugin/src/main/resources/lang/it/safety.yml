@@ -1,8 +1,9 @@
 # --- Configurazione di sicurezza di RTP ---
-# Documentazione: plugins/RTP/docs/admin/configuration/SAFETY.md
+# Documentazione: docs/admin/configuration/SAFETY.md
 
 # Secondi di invulnerabilità concessi dopo il completamento di un teletrasporto.
 # 0 disattiva la finestra di invulnerabilità post-teletrasporto.
+# Supporta unità di durata (es. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -48,6 +49,7 @@ materialePiattaforma: "GLASS"
 # Secondi dopo i quali l'impronta della piattaforma viene ripristinata ai blocchi
 # originali. -1 = mai (permanente), 0 = appena il chunk si ricarica. Il conto alla
 # rovescia avanza solo mentre il chunk è caricato; sopravvive ai riavvii.
+# Supporta unità di durata (es. 24h, 1d).
 # @type: integer
 # @range: [-1, null]
 # @unit: seconds
@@ -63,6 +65,7 @@ pvpCheckEnabled: false
 
 # Secondi in cui un giocatore resta "in combattimento" dopo danni PvP (solo il
 # tracker nativo; ignorato se è collegato un plugin di combat-tag esterno).
+# Supporta unità di durata (es. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds

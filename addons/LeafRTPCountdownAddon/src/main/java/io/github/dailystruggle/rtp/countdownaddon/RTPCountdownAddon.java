@@ -3,6 +3,8 @@ package io.github.dailystruggle.rtp.countdownaddon;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.addon.RTPAddon;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigPbit;
+import io.github.dailystruggle.rtp.common.bit.config.DirectiveConfigCheck;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
@@ -42,6 +44,10 @@ public final class RTPCountdownAddon implements RTPAddon {
 
     // 4. Re-register on /rtp reload so operators see config changes without a restart.
     Configs.onReload(() -> ActiveConfigs.get().putParser(registerParser()));
+
+    // /rtp test config-countdown: directives come from this jar, not RTP's (ADR-121).
+    ConfigPbit.register(DirectiveConfigCheck.bound(
+        "countdown", "addons/countdown.yml", getClass().getClassLoader()));
 
     // 2. Contribute a safety predicate via the public RTPHooks facade (ADR-026).
     //    The lambda is invoked asynchronously by the pipeline; it must NOT block, perform

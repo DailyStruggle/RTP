@@ -21,7 +21,7 @@ maxMSPT: 45.0
 maxHeapProzent: 85.0
 
 # --- RTP Leistungseinstellungen ---
-# Dokumentation: plugins/RTP/docs/admin/configuration/PERFORMANCE.md
+# Dokumentation: docs/admin/configuration/PERFORMANCE.md
 # Maximale Suchversuche pro /rtp-Aufruf, bevor aufgegeben wird.
 # @type: integer
 # @range: [1, null]
@@ -29,6 +29,7 @@ maxHeapProzent: 85.0
 maxVersuche: 32
 
 # Ticks zwischen dem Auffüllen derselben Region. Die Regionen wechseln sich ab.
+# Unterstützt Zeiteinheiten (z. B. 24h, 1d).
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
@@ -36,6 +37,7 @@ maxVersuche: 32
 intervall: 20
 
 # Max. ms pro Tick für Arbeit im Hauptthread. Begrenzt auf 25.
+# Unterstützt Zeiteinheiten (z. B. 24h, 1d).
 # @type: integer
 # @range: [1, 25]
 # @unit: ms
@@ -43,6 +45,7 @@ intervall: 20
 syncZugeteilteZeit: 5
 
 # Max. ms pro Puls für Hintergrundarbeit. Begrenzt auf 25.
+# Unterstützt Zeiteinheiten (z. B. 24h, 1d).
 # @type: integer
 # @range: [1, 25]
 # @unit: ms
@@ -69,6 +72,7 @@ sichtweiteTeleport: 0
 # wieder normal wird und so die Chunk-Lade-Spitze glättet. 0 deaktiviert die Begrenzung.
 # HINWEIS: Vorübergehend auf 0 gesetzt. Die schrittweise Wiederherstellung verursacht
 # clientseitiges Flackern / Neu-Rendern bei der Ankunft. Bis auf Weiteres auf 0 lassen.
+# Unterstützt Zeiteinheiten (z. B. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: ticks
@@ -133,6 +137,7 @@ biomWiederverwendungErzwungen: false
 
 # Latenzschwelle (ms), oberhalb der ein sofort bedienter Teleport auditiert wird
 # (WARN protokolliert, slowPipelineCount erhöht). 0 oder weniger deaktiviert.
+# Unterstützt Zeiteinheiten (z. B. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: ms

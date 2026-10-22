@@ -93,7 +93,7 @@ Ignored when `network.enabled: false` or `routing.mode: local`.
 | `maxDepth` | Integer | `50` | Max locally-buffered enrolments before backpressure rejects new `/rtp` calls (`QUEUE_FULL`). |
 | `flushIntervalMs` | Integer | `250` | Backend dirty-write flush cadence (ms). Lower = lower latency, higher = fewer round trips. |
 | `pollIntervalMs` | Integer | `1000` | Backend status-cache poll cadence (ms); drives per-player progress refresh. |
-| `entryTtlMs` | Integer | `0` | Optional passive aging of envelope hashes. `0` disables (terminal transitions still delete explicitly). |
+| `entryTtlMs` | Integer | `0` | Cancels non-terminal queue entries whose last status update is at least this old; supports duration units and `0` disables it. |
 | `crossServerRequestsPerSecond` | Integer | `5` | Cross-server `/rtp` enrolment rate limit (token bucket refill). |
 | `crossServerRequestsBurst` | Integer | `10` | Token-bucket burst capacity. |
 | `workerThreads` | Integer | `1` | Proxy-side BLPOP worker count. Increase only when a single worker is observed to saturate. |

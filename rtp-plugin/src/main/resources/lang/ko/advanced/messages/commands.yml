@@ -497,5 +497,6 @@ editorApplyFetching: "&7[P0] 설정 페이로드를 가져오는 중..."
 editorApplyValidating: "&7[P0] 페이로드 무결성과 구문을 검증하는 중..."
 editorApplySuccess: "&a[P0] 설정을 적용하고 핫 리로드했습니다! (변경된 파일의 .bak 사본을 만들었습니다)"
 editorApplyFailed: "&c[P0] 페이로드를 적용하지 못했습니다: [reason]"
+editorApplyRejected: "&c[P0] 적용이 거부되었습니다: 설정 오류 [count]개로 아무것도 기록하지 않았습니다. 첫 오류: [source]의 [path]에서 [code]."
 
 version: 1.0

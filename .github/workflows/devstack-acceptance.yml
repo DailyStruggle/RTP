@@ -148,8 +148,10 @@ jobs:
         run: chmod +x devstack/*.sh
 
       - name: Boot and check ${{ matrix.service }}
+        env:
+          SMOKE_SERVICE: ${{ matrix.service }}
         run: |
-          ./devstack/run-versions-smoke.sh --service "${{ matrix.service }}" --fresh
+          ./devstack/run-versions-smoke.sh --service "$SMOKE_SERVICE" --fresh
 
       - name: Archive server log
         if: always()

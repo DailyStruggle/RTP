@@ -253,6 +253,13 @@ class TestFullCmdTest {
   }
 
   @Test
+  @DisplayName("action simulation is excluded because it requires an explicit action id")
+  void actionSimulationIsDeliberatelyExcluded() {
+    assertTrue(TestFullCmd.DELIBERATELY_EXCLUDED_SUBCOMMANDS.contains("action"));
+    assertFalse(TestFullCmd.SHIPPED_SUBCOMMAND_NAMES.contains("action"));
+  }
+
+  @Test
   @DisplayName("TestFullCmd.findRoot-like: constructor does not throw even with a null parent")
   void constructsWithNullParent() {
     TestFullCmd cmd = new TestFullCmd(null);

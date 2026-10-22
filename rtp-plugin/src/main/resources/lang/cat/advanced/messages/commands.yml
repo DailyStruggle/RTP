@@ -513,5 +513,6 @@ editorApplyFetching: "&7[P0] S'està obtenint la càrrega de configuració..."
 editorApplyValidating: "&7[P0] S'està validant la integritat i la sintaxi de la càrrega..."
 editorApplySuccess: "&a[P0] Configuració aplicada i recarregada en calent! (s'han creat còpies .bak dels fitxers modificats)"
 editorApplyFailed: "&c[P0] No s'ha pogut aplicar la càrrega: [reason]"
+editorApplyRejected: "&c[P0] Aplicació rebutjada: [count] error(s) de configuració; no s'ha escrit res. Primer: [code] a [source] a [path]."
 
 version: 1.0

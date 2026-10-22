@@ -2,8 +2,8 @@ package io.github.dailystruggle.rtp.common.configuration.yaml;
 
 /**
  * Thrown when {@link RtpYamlReader} encounters a YAML construct outside
- * the RTP-supported subset (anchors, aliases, merge keys, flow style,
- * tags, document separators, block scalars) or a syntactic error.
+ * the RTP-supported subset (anchors, aliases, merge keys, flow mappings,
+ * tags, document separators) or a syntactic error.
  *
  * <p>Carries 1-based line/column information so callers can surface
  * actionable diagnostics. The {@link #messageKey()} accessor returns

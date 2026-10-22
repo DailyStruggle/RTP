@@ -130,17 +130,15 @@ class ActionConfigLoaderCoverageTest {
             interval: 5
         """);
     List<PhysicalTriggerSpec> triggers = def.triggers();
-    assertEquals(3, triggers.size());
+    assertEquals(2, triggers.size());
     PhysicalTriggerSpec alpha = triggers.get(0);
     assertEquals("alpha", alpha.id());
     assertEquals("arena", alpha.worldName());
     assertEquals(PhysicalTriggerSpec.TriggerType.STEP_IN, alpha.type());
-    PhysicalTriggerSpec beta = triggers.get(1);
-    assertEquals("custom", beta.id());
-    assertEquals("nether", beta.worldName());
-    assertEquals(PhysicalTriggerSpec.TriggerType.STEP_IN, beta.type());
-    assertEquals("gamma", triggers.get(2).id());
-    assertEquals("world", triggers.get(2).worldName());
+    PhysicalTriggerSpec gamma = triggers.get(1);
+    assertEquals("gamma", gamma.id());
+    assertEquals("world", gamma.worldName());
+    assertEquals(PhysicalTriggerSpec.TriggerType.STEP_IN, gamma.type());
   }
 
   @Test
@@ -358,8 +356,8 @@ class ActionConfigLoaderCoverageTest {
     assertEquals(4L, life.onStart().get(3).delaySeconds());
     assertEquals(1, life.onEnqueue().size());
     assertEquals(ActionDefinition.ActionType.MESSAGE_TARGET, life.onEnqueue().get(0).actions().get(0).type());
-    assertEquals(2, life.onCancel().get(0).actions().size());
-    assertEquals(1, life.onCancel().get(0).actions().get(1).subActions().size());
+    assertEquals(1, life.onCancel().get(0).actions().size());
+    assertEquals(1, life.onCancel().get(0).actions().get(0).subActions().size());
   }
 
   @Test

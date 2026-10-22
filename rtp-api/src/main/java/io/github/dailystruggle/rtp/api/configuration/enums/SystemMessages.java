@@ -20,6 +20,11 @@ public enum SystemMessages {
   reloaded,
   /** Sent to the command sender when a configuration reload fails. */
   reloadFailed,
+  /**
+   * Sent when config PBIT rejects a reload candidate and the running config is kept (ADR-121).
+   * {@code [count]}, {@code [code]}, {@code [source]}, {@code [path]}.
+   */
+  reloadRejected,
   /** Sent when the plugin begins applying a configuration or data update. */
   updating,
   /** Sent when the configuration or data update completes successfully. */

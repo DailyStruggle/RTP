@@ -344,6 +344,15 @@ public abstract class AbstractServerAccessor implements RTPServerAccessor {
   }
 
   @Override
+  public Boolean hasScoreboardObjective(String objective) {
+    if (objective == null || objective.isBlank()) return null;
+    org.bukkit.scoreboard.ScoreboardManager manager = Bukkit.getScoreboardManager();
+    if (manager == null) return null;
+    org.bukkit.scoreboard.Scoreboard scoreboard = manager.getMainScoreboard();
+    return scoreboard == null ? null : scoreboard.getObjective(objective) != null;
+  }
+
+  @Override
   public void sendMessage(UUID target, Enum<?> msgType, String tag) {
     Object cv = ActiveConfigs.get().getConfigValue(msgType, "");
     String message = cv == null ? "" : cv.toString();

@@ -1,5 +1,5 @@
 # --- RTP Landing Block Lists (advanced) ---
-# Documentation: plugins/RTP/docs/admin/configuration/SAFETY.md
+# Documentation: docs/admin/configuration/SAFETY.md
 
 # Blocks you can stand in (counted as air). Use names or #minecraft:<tag>.
 # @type: list<material>

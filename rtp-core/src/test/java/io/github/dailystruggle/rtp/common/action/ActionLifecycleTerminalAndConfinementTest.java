@@ -289,6 +289,121 @@ class ActionLifecycleTerminalAndConfinementTest {
   }
 
   @Test
+  @DisplayName("Expire gates are evaluated once per participant")
+  void testExpireGatesAreEvaluatedPerParticipant() {
+    UUID nearId = UUID.randomUUID();
+    UUID farId = UUID.randomUUID();
+    RTPWorld<?> world = serverAccessor.getRTPWorld("world");
+    MockRTPPlayer nearPlayer = new MockRTPPlayer(nearId, "Near", new RTPLocation(world, 1, 64, 0));
+    MockRTPPlayer farPlayer = new MockRTPPlayer(farId, "Far", new RTPLocation(world, 20, 64, 0));
+    List<String> commands = new ArrayList<>();
+    MockRTPServerAccessor customAccessor = new MockRTPServerAccessor(tempDir) {
+      @Override
+      public boolean executeCommand(UUID senderId, String commandLine) {
+        commands.add(commandLine);
+        return true;
+      }
+    };
+    RTPRuntime.setServerAccessor(customAccessor);
+    customAccessor.addPlayer(nearPlayer);
+    customAccessor.addPlayer(farPlayer);
+
+    ActionDefinition.LifecycleStep nearStep = new ActionDefinition.LifecycleStep(
+        Map.of("spatial", Map.of("distance", "< 5")),
+        List.of(ActionDefinition.CommandAction.forEach(List.of(
+            ActionDefinition.CommandAction.console("say near [player]")))));
+    ActionDefinition.LifecycleStep farStep = new ActionDefinition.LifecycleStep(
+        Map.of("spatial", Map.of("distance", ">= 5")),
+        List.of(ActionDefinition.CommandAction.forEach(List.of(
+            ActionDefinition.CommandAction.console("say far [player]")))));
+    ActionDefinition.LifecycleSpec lifecycle = new ActionDefinition.LifecycleSpec(
+        Collections.emptyList(), Collections.emptyList(), List.of(nearStep, farStep), Collections.emptyList());
+    ActionDefinition definition = new ActionDefinition(
+        "test_expire_gates", "test_expire_gates", "", "",
+        ActionDefinition.PlacementSpec.DEFAULT, ActionDefinition.ConfinementSpec.DEFAULT, lifecycle);
+    ActionSessionImpl session = new ActionSessionImpl(
+        UUID.randomUUID(), definition, List.of(nearId, farId), ActionContext.EMPTY,
+        Map.of(nearId, new int[] {1, 64, 0}, farId, new int[] {20, 64, 0}),
+        "world", 0, 0, null, null, Collections.emptyMap());
+
+    session.arm();
+    session.triggerExpire();
+
+    assertEquals(List.of("say near Near", "say far Far"), commands);
+  }
+
+  @Test
+  @DisplayName("Death gate rejects a terminal step when its condition fails")
+  void testDeathGateRejectsFailedCondition() {
+    UUID victimId = UUID.randomUUID();
+    RTPWorld<?> world = serverAccessor.getRTPWorld("world");
+    MockRTPPlayer victim = new MockRTPPlayer(victimId, "Victim", new RTPLocation(world, 20, 64, 0));
+    List<String> commands = new ArrayList<>();
+    MockRTPServerAccessor customAccessor = new MockRTPServerAccessor(tempDir) {
+      @Override
+      public boolean executeCommand(UUID senderId, String commandLine) {
+        commands.add(commandLine);
+        return true;
+      }
+    };
+    RTPRuntime.setServerAccessor(customAccessor);
+    customAccessor.addPlayer(victim);
+
+    ActionDefinition.LifecycleStep deathStep = new ActionDefinition.LifecycleStep(
+        Map.of("spatial", Map.of("distance", "< 5")),
+        List.of(ActionDefinition.CommandAction.console("say death [victim]")));
+    ActionDefinition.LifecycleSpec lifecycle = new ActionDefinition.LifecycleSpec(
+        Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), List.of(deathStep));
+    ActionDefinition definition = new ActionDefinition(
+        "test_death_gate", "test_death_gate", "", "",
+        ActionDefinition.PlacementSpec.DEFAULT, ActionDefinition.ConfinementSpec.DEFAULT, lifecycle);
+    ActionSessionImpl session = new ActionSessionImpl(
+        UUID.randomUUID(), definition, List.of(victimId), ActionContext.EMPTY,
+        Map.of(victimId, new int[] {20, 64, 0}), "world", 0, 0, null, null, Collections.emptyMap());
+
+    session.arm();
+    session.triggerDeath(victimId, null);
+
+    assertTrue(commands.isEmpty(), "A failed death gate must suppress its command");
+  }
+
+  @Test
+  @DisplayName("Cancel gate is evaluated against the canceller")
+  void testCancelGateUsesCancellerContext() {
+    UUID cancellerId = UUID.randomUUID();
+    RTPWorld<?> world = serverAccessor.getRTPWorld("world");
+    MockRTPPlayer canceller = new MockRTPPlayer(cancellerId, "Canceller", new RTPLocation(world, 20, 64, 0));
+    List<String> commands = new ArrayList<>();
+    MockRTPServerAccessor customAccessor = new MockRTPServerAccessor(tempDir) {
+      @Override
+      public boolean executeCommand(UUID senderId, String commandLine) {
+        commands.add(commandLine);
+        return true;
+      }
+    };
+    RTPRuntime.setServerAccessor(customAccessor);
+    customAccessor.addPlayer(canceller);
+
+    ActionDefinition.LifecycleStep cancelStep = new ActionDefinition.LifecycleStep(
+        Map.of("spatial", Map.of("distance", "< 5")),
+        List.of(ActionDefinition.CommandAction.console("say cancel [player]")));
+    ActionDefinition.LifecycleSpec lifecycle = new ActionDefinition.LifecycleSpec(
+        Collections.emptyList(), Collections.emptyList(), Collections.emptyList(), Collections.emptyList(),
+        Collections.emptyList(), List.of(cancelStep));
+    ActionDefinition definition = new ActionDefinition(
+        "test_cancel_gate", "test_cancel_gate", "", "",
+        ActionDefinition.PlacementSpec.DEFAULT, ActionDefinition.ConfinementSpec.DEFAULT, lifecycle);
+    ActionSessionImpl session = new ActionSessionImpl(
+        UUID.randomUUID(), definition, List.of(cancellerId), ActionContext.EMPTY,
+        Map.of(cancellerId, new int[] {20, 64, 0}), "world", 0, 0, null, null, Collections.emptyMap());
+
+    session.arm();
+    session.triggerCancel(cancellerId);
+
+    assertTrue(commands.isEmpty(), "A cancel gate must use the canceller's context");
+  }
+
+  @Test
   @DisplayName("In-to-out violation transitions do not multi-count while outside")
   void testInToOutViolationTransitions() {
     UUID p1 = UUID.randomUUID();

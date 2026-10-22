@@ -1,22 +1,42 @@
 package io.github.dailystruggle.rtp.common.action;
 
+import com.google.gson.JsonParser;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
 import io.github.dailystruggle.bit.BitCode;
 import io.github.dailystruggle.bit.BitFinding;
 import io.github.dailystruggle.bit.BitReport;
 import io.github.dailystruggle.bit.BitTier;
 import io.github.dailystruggle.bit.KeyPath;
 import io.github.dailystruggle.bit.Vocabulary;
+import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec;
 import io.github.dailystruggle.rtp.common.bit.RtpBitCodes;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
+import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
+import java.io.File;
+import java.io.IOException;
+import java.io.StringReader;
 import java.lang.System.Logger.Level;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /** Structural checks for action definitions, sharing allowed values with their runtime consumers. */
 public final class ActionDefinitionValidator {
-    private static final Vocabulary TRIGGER_TYPES = new Vocabulary("trigger type",
+    static final Vocabulary TRIGGER_TYPES = new Vocabulary("trigger type",
             java.util.Arrays.stream(PhysicalTriggerSpec.TriggerType.values()).map(Enum::name).toList());
 
     public static final BitCode UNKNOWN_LIFECYCLE_STAGE = RtpBitCodes.ACTION.register(2001,
@@ -27,25 +47,96 @@ public final class ActionDefinitionValidator {
             "Rename the step key to one listed in expected; unknown keys are dropped at load.");
     public static final BitCode UNKNOWN_ACTION_NAME = RtpBitCodes.ACTION.register(2003,
             "ACTION_UNKNOWN_ACTION_NAME", Level.ERROR, BitTier.PBIT, "action", "",
-            "Use an ACTION: name listed in expected; unknown names fail when the step fires.");
+            "Use an ACTION: name listed in expected; unknown names are ignored during loading.");
     public static final BitCode UNKNOWN_GATE_TYPE = RtpBitCodes.ACTION.register(2004,
             "ACTION_UNKNOWN_GATE_TYPE", Level.ERROR, BitTier.PBIT, "action", "",
             "Use a gate type listed in expected; unknown gates always evaluate false.");
     public static final BitCode UNKNOWN_TRIGGER_TYPE = RtpBitCodes.ACTION.register(2005,
             "ACTION_UNKNOWN_TRIGGER_TYPE", Level.ERROR, BitTier.PBIT, "action", "",
-            "Use a trigger type listed in expected; unknown types fall back to STEP_IN.");
+            "Use a trigger type listed in expected; triggers with unknown types are skipped.");
+    public static final BitCode PLACEHOLDER_OUT_OF_SCOPE = RtpBitCodes.ACTION.register(2006,
+            "ACTION_PLACEHOLDER_OUT_OF_SCOPE", Level.ERROR, BitTier.PBIT, "action", "",
+            "Use this placeholder only in the lifecycle stage or action scope that provides it.");
+    public static final BitCode PLACEHOLDER_UNKNOWN = RtpBitCodes.ACTION.register(2007,
+            "ACTION_PLACEHOLDER_UNKNOWN", Level.WARNING, BitTier.PBIT, "action", "",
+            "Check the placeholder spelling; metadata-defined tokens are not validated as known tokens.");
+    public static final BitCode SCOREBOARD_MANAGED_TYPO = RtpBitCodes.ACTION.register(2008,
+            "ACTION_SCOREBOARD_MANAGED_TYPO", Level.ERROR, BitTier.PBIT, "action", "",
+            "Use the suggested RTP-managed scoreboard objective or choose an external objective.");
+    public static final BitCode SCOREBOARD_OBJECTIVE_MISSING = RtpBitCodes.ACTION.register(2009,
+            "ACTION_SCOREBOARD_OBJECTIVE_MISSING", Level.WARNING, BitTier.PBIT, "action", "",
+            "Create the scoreboard objective on the server or correct its name.");
+    public static final BitCode GATE_EXPRESSION_INVALID = RtpBitCodes.ACTION.register(2010,
+            "ACTION_GATE_EXPRESSION_INVALID", Level.ERROR, BitTier.PBIT, "action", "",
+            "Use a numeric comparison, exact number, or inclusive min..max range accepted by GateExpressionParser.");
+    public static final BitCode UNKNOWN_GATE_SUBKEY = RtpBitCodes.ACTION.register(2011,
+            "ACTION_UNKNOWN_GATE_SUBKEY", Level.ERROR, BitTier.PBIT, "action", "",
+            "Use a gate field listed in expected; gate field names are case-sensitive.");
+    public static final BitCode MISSING_GATE_SUBKEY = RtpBitCodes.ACTION.register(2012,
+            "ACTION_MISSING_GATE_SUBKEY", Level.ERROR, BitTier.PBIT, "action", "",
+            "Add the required gate field or one of the listed alternatives.");
+    public static final BitCode UNKNOWN_REGION = RtpBitCodes.ACTION.register(2013,
+            "ACTION_UNKNOWN_REGION", Level.ERROR, BitTier.PBIT, "action", "",
+            "Choose a region present in the loaded region configuration.");
+    public static final BitCode SCHEMATIC_UNRESOLVED = RtpBitCodes.ACTION.register(2014,
+            "ACTION_SCHEMATIC_UNRESOLVED", Level.ERROR, BitTier.PBIT, "action", "",
+            "Place the schematic under advanced/schematics and reference an existing file.");
+    public static final BitCode PAYLOAD_UNBALANCED = RtpBitCodes.ACTION.register(2015,
+            "ACTION_PAYLOAD_UNBALANCED", Level.ERROR, BitTier.PBIT, "action", "",
+            "Balance quotes, brackets and braces in the vanilla command payload.");
+    public static final BitCode PAYLOAD_JSON_INVALID = RtpBitCodes.ACTION.register(2016,
+            "ACTION_PAYLOAD_JSON_INVALID", Level.ERROR, BitTier.PBIT, "action", "",
+            "Provide a valid JSON text component where tellraw or title expects one.");
+
+    private static final Pattern TELLRAW_COMPONENT = Pattern.compile(
+            "(?i)^\\s*/?(?:minecraft:)?tellraw\\s+\\S+\\s+(.+)$");
+    private static final Pattern TITLE_COMPONENT = Pattern.compile(
+            "(?i)^\\s*/?(?:minecraft:)?title\\s+\\S+\\s+(?:title|subtitle|actionbar)\\s+(.+)$");
+    private static final Set<String> EXPRESSION_SUB_KEYS = Set.of(
+            "matches", "range", "distance", "elevationDelta", "elapsed", "remaining", "playerCount", "count");
+    private static final Set<String> SCALAR_EXPRESSION_GATES = Set.of("players", "participants", "queue", "participantcount");
+
+    /** Live inputs are optional: an unavailable host/region snapshot is deliberately not treated as missing. */
+    public record Environment(Function<String, Boolean> objectiveLookup, Set<String> regionNames, Path pluginDirectory) {
+        public static final Environment NONE = new Environment(null, Set.of(), null);
+
+        public Environment {
+            regionNames = regionNames == null ? Set.of() : Set.copyOf(regionNames);
+            pluginDirectory = pluginDirectory == null ? null : pluginDirectory.toAbsolutePath().normalize();
+        }
+
+        public static Environment live() {
+            RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+            var selection = ActiveSelection.get();
+            Set<String> regions = selection == null
+                    ? Set.of()
+                    : new HashSet<>(selection.permRegionLookup.keySet());
+            File directory = accessor == null ? null : accessor.getPluginDirectory();
+            return new Environment(accessor == null ? null : accessor::hasScoreboardObjective,
+                    regions, directory == null ? null : directory.toPath());
+        }
+    }
 
     private ActionDefinitionValidator() {}
 
     public static BitReport validate(String id, Map<?, ?> definition, String source) {
+        return validate(id, definition, source, Environment.live());
+    }
+
+    public static BitReport validate(String id, Map<?, ?> definition, String source, Environment environment) {
         List<BitFinding> findings = new ArrayList<>();
         if (definition == null) return BitReport.of(findings);
+        Environment inputs = environment == null ? Environment.NONE : environment;
         String actionId = id == null || id.isBlank() ? "<unknown>" : id;
         KeyPath root = KeyPath.root("actions").key(actionId);
-        inspectLifecycle(value(definition, "lifecycle"), source, root.key("lifecycle"), findings);
+        inspectLifecycle(value(definition, "lifecycle"), source, root.key("lifecycle"), inputs, findings);
+        inspectCommand(value(definition, "command"), source, root.key("command"), inputs, findings);
+        inspectConfinement(value(definition, "confinement"), source, root.key("confinement"), inputs, findings);
         Object gate = value(definition, "gate");
         String gateKey = gate == null ? "gates" : "gate";
-        inspectGateValue(gate == null ? value(definition, "gates") : gate, source, root.key(gateKey), findings);
+        inspectGateValue(gate == null ? value(definition, "gates") : gate, source, root.key(gateKey),
+                scope(ActionPlaceholderSanitizer.PRE_GATE), inputs, findings);
+        inspectPlacement(value(definition, "placement"), source, root.key("placement"), inputs, findings);
         Object triggers = value(definition, "trigger");
         String triggerKey = triggers == null ? "triggers" : "trigger";
         inspectTriggers(triggers == null ? value(definition, "triggers") : triggers,
@@ -53,7 +144,8 @@ public final class ActionDefinitionValidator {
         return BitReport.of(findings);
     }
 
-    private static void inspectLifecycle(Object raw, String source, KeyPath path, List<BitFinding> findings) {
+    private static void inspectLifecycle(
+            Object raw, String source, KeyPath path, Environment environment, List<BitFinding> findings) {
         Map<?, ?> lifecycle = asMap(raw);
         if (lifecycle == null) return;
         for (Map.Entry<?, ?> entry : lifecycle.entrySet()) {
@@ -64,32 +156,82 @@ public final class ActionDefinitionValidator {
                         ActionConfigLoader.LIFECYCLE_STAGES));
                 continue;
             }
-            inspectSteps(entry.getValue(), source, stagePath, findings);
+            inspectSteps(entry.getValue(), source, stagePath,
+                    scope(ActionPlaceholderSanitizer.STAGE_TOKENS.getOrDefault(canonicalStage(stage), Set.of())),
+                    environment, findings);
         }
     }
 
-    private static void inspectSteps(Object raw, String source, KeyPath path, List<BitFinding> findings) {
+    private static void inspectCommand(
+            Object raw, String source, KeyPath path, Environment environment, List<BitFinding> findings) {
+        Map<?, ?> command = asMap(raw);
+        if (command == null) return;
+        Map<?, ?> subcommands = asMap(value(command, "subcommands"));
+        if (subcommands == null) return;
+        for (Map.Entry<?, ?> entry : subcommands.entrySet()) {
+            String subcommandName = String.valueOf(entry.getKey());
+            Map<?, ?> subcommand = asMap(entry.getValue());
+            if (subcommand == null) continue;
+            Object actions = value(subcommand, "run");
+            String actionKey = "run";
+            if (actions == null) {
+                actions = value(subcommand, "actions");
+                actionKey = "actions";
+            }
+            if (actions != null) {
+                inspectActions(actions, source,
+                        path.key("subcommands").key(subcommandName).key(actionKey),
+                        scope(ActionPlaceholderSanitizer.SUBCOMMAND), environment, findings);
+            }
+        }
+    }
+
+    private static void inspectConfinement(
+            Object raw, String source, KeyPath path, Environment environment, List<BitFinding> findings) {
+        Map<?, ?> confinement = asMap(raw);
+        if (confinement == null) return;
+        Object actions = value(confinement, "outsideActions");
+        String actionKey = "outsideActions";
+        if (actions == null) {
+            actions = value(confinement, "outsideAction");
+            actionKey = "outsideAction";
+        }
+        if (actions == null) {
+            actions = value(confinement, "onOutsideLimit");
+            actionKey = "onOutsideLimit";
+        }
+        if (actions != null) {
+            inspectActions(actions, source, path.key(actionKey), scope(ActionPlaceholderSanitizer.OUTSIDE_ACTION),
+                    environment, findings);
+        }
+    }
+
+    private static void inspectSteps(
+            Object raw, String source, KeyPath path, Set<String> scope, Environment environment,
+            List<BitFinding> findings) {
         if (!(raw instanceof List<?> steps)) return;
         for (int i = 0; i < steps.size(); i++) {
             Map<?, ?> step = asMap(steps.get(i));
             if (step == null) continue;
             KeyPath stepPath = path.index(i);
             if (hasKey(step, "gate")) {
-                inspectGateValue(value(step, "gate"), source, stepPath.key("gate"), findings);
+                inspectGateValue(value(step, "gate"), source, stepPath.key("gate"),
+                        scope(scope, ActionPlaceholderSanitizer.PRE_GATE), environment, findings);
                 if (hasKey(step, "run")) {
-                    inspectUnknownStepEntries(step, source, stepPath, findings, true);
-                    inspectActions(value(step, "run"), source, stepPath.key("run"), findings);
+                    inspectUnknownStepEntries(step, source, stepPath, findings, true, scope, environment);
+                    inspectActions(value(step, "run"), source, stepPath.key("run"), scope, environment, findings);
                 } else {
-                    inspectUnknownStepEntries(step, source, stepPath, findings, false);
+                    inspectUnknownStepEntries(step, source, stepPath, findings, false, scope, environment);
                 }
             } else {
-                inspectActions(step, source, stepPath, findings);
+                inspectActions(step, source, stepPath, scope, environment, findings);
             }
         }
     }
 
     private static void inspectUnknownStepEntries(
-            Map<?, ?> step, String source, KeyPath path, List<BitFinding> findings, boolean hasRun) {
+            Map<?, ?> step, String source, KeyPath path, List<BitFinding> findings, boolean hasRun,
+            Set<String> scope, Environment environment) {
         for (Object rawKey : step.keySet()) {
             String key = String.valueOf(rawKey);
             if (ActionConfigLoader.STEP_STRUCTURAL_KEYS.contains(key)) continue;
@@ -97,35 +239,43 @@ public final class ActionDefinitionValidator {
                 findings.add(unknown(UNKNOWN_STEP_KEY, source, path.key(key), key,
                         ActionConfigLoader.STEP_ACTION_KEYS));
             } else if (!hasRun) {
-                inspectActionValue(key, value(step, key), source, path.key(key), findings);
+                inspectActionValue(key, value(step, key), source, path.key(key), scope, environment, findings);
             }
         }
     }
 
-    private static void inspectActions(Object raw, String source, KeyPath path, List<BitFinding> findings) {
+    private static void inspectActions(
+            Object raw, String source, KeyPath path, Set<String> scope, Environment environment,
+            List<BitFinding> findings) {
         if (raw instanceof List<?> actions) {
             for (int i = 0; i < actions.size(); i++) {
                 Object action = actions.get(i);
                 Map<?, ?> actionMap = asMap(action);
                 if (actionMap == null) continue;
-                inspectActionMap(actionMap, source, path.index(i), findings);
+                inspectActionMap(actionMap, source, path.index(i), scope, environment, findings);
             }
             return;
         }
         Map<?, ?> actionMap = asMap(raw);
-        if (actionMap != null) inspectActionMap(actionMap, source, path, findings);
+        if (actionMap != null) inspectActionMap(actionMap, source, path, scope, environment, findings);
     }
 
-    private static void inspectActionMap(Map<?, ?> actions, String source, KeyPath path, List<BitFinding> findings) {
+    private static void inspectActionMap(
+            Map<?, ?> actions, String source, KeyPath path, Set<String> scope, Environment environment,
+            List<BitFinding> findings) {
         for (Object rawKey : actions.keySet()) {
             String key = String.valueOf(rawKey);
             Object value = value(actions, key);
             KeyPath keyPath = path.key(key);
             if (ActionConfigLoader.STEP_ACTION_KEYS.contains(key)) {
-                inspectActionValue(key, value, source, keyPath, findings);
+                inspectActionValue(key, value, source, keyPath, scope, environment, findings);
             } else if (ActionConfigLoader.STEP_STRUCTURAL_KEYS.contains(key)) {
-                if (key.equalsIgnoreCase("gate")) inspectGateValue(value, source, keyPath, findings);
-                else if (key.equalsIgnoreCase("run")) inspectActions(value, source, keyPath, findings);
+                if (key.equalsIgnoreCase("gate")) {
+                    inspectGateValue(value, source, keyPath, scope(scope, ActionPlaceholderSanitizer.PRE_GATE),
+                            environment, findings);
+                } else if (key.equalsIgnoreCase("run")) {
+                    inspectActions(value, source, keyPath, scope, environment, findings);
+                }
             } else {
                 findings.add(unknown(UNKNOWN_STEP_KEY, source, keyPath, key,
                         ActionConfigLoader.STEP_ACTION_KEYS));
@@ -134,34 +284,315 @@ public final class ActionDefinitionValidator {
     }
 
     private static void inspectActionValue(
-            String key, Object value, String source, KeyPath path, List<BitFinding> findings) {
+            String key, Object value, String source, KeyPath path, Set<String> scope,
+            Environment environment, List<BitFinding> findings) {
         if (key.equalsIgnoreCase("ACTION")) {
             String name = value == null ? "" : value.toString().trim();
             if (!ActionSessionImpl.ACTION_NAMES.contains(name)) {
                 findings.add(unknown(UNKNOWN_ACTION_NAME, source, path, name, ActionSessionImpl.ACTION_NAMES));
             }
         } else if (key.equalsIgnoreCase("FOR_EACH")) {
-            inspectActions(value, source, path, findings);
-        }
-    }
-
-    private static void inspectGateValue(Object raw, String source, KeyPath path, List<BitFinding> findings) {
-        if (raw instanceof List<?> gates) {
-            for (int i = 0; i < gates.size(); i++) inspectGateMap(gates.get(i), source, path.index(i), findings);
+            inspectActions(value, source, path, scope(scope, ActionPlaceholderSanitizer.FOR_EACH), environment, findings);
+        } else if (key.equalsIgnoreCase("CONSOLE") || key.equalsIgnoreCase("PLAYER")) {
+            inspectPayloadValue(value, source, path, scope(scope, ActionPlaceholderSanitizer.FAN_OUT), findings);
         } else {
-            inspectGateMap(raw, source, path, findings);
+            inspectPlaceholderValue(value, source, path, scope, findings);
         }
     }
 
-    private static void inspectGateMap(Object raw, String source, KeyPath path, List<BitFinding> findings) {
+    private static void inspectGateValue(
+            Object raw, String source, KeyPath path, Set<String> scope, Environment environment,
+            List<BitFinding> findings) {
+        if (raw instanceof List<?> gates) {
+            for (int i = 0; i < gates.size(); i++) {
+                inspectGateMap(gates.get(i), source, path.index(i), scope, environment, findings);
+            }
+        } else {
+            inspectGateMap(raw, source, path, scope, environment, findings);
+        }
+    }
+
+    private static void inspectGateMap(
+            Object raw, String source, KeyPath path, Set<String> scope, Environment environment,
+            List<BitFinding> findings) {
         Map<?, ?> gates = asMap(raw);
         if (gates == null) return;
-        for (Object rawKey : gates.keySet()) {
-            String type = String.valueOf(rawKey);
+        for (Map.Entry<?, ?> entry : gates.entrySet()) {
+            String type = String.valueOf(entry.getKey());
             if (!GateEvaluator.GATE_TYPES.contains(type)) {
                 findings.add(unknown(UNKNOWN_GATE_TYPE, source, path.key(type), type, GateEvaluator.GATE_TYPES));
+                continue;
+            }
+
+            String canonicalType = type.toLowerCase(Locale.ROOT);
+            KeyPath gatePath = path.key(type);
+            Map<?, ?> gateValue = asMap(entry.getValue());
+            if (gateValue != null) {
+                inspectGateSubKeys(canonicalType, gateValue, source, gatePath, findings);
+                inspectGateExpressions(canonicalType, gateValue, source, gatePath, findings);
+                if (canonicalType.equals("scoreboard")) {
+                    inspectScoreboardObjective(value(gateValue, "objective"), source,
+                            gatePath.key("objective"), environment, findings);
+                } else if (canonicalType.equals("command")) {
+                    Object commands = value(gateValue, "execute");
+                    String commandKey = "execute";
+                    if (commands == null) {
+                        commands = value(gateValue, "run");
+                        commandKey = "run";
+                    }
+                    inspectPayloadValue(commands, source, gatePath.key(commandKey),
+                            scope(scope, ActionPlaceholderSanitizer.GATE_COMMAND), findings);
+                }
+            } else if (canonicalType.equals("command")) {
+                inspectPayloadValue(entry.getValue(), source, gatePath,
+                        scope(scope, ActionPlaceholderSanitizer.GATE_COMMAND), findings);
+            } else if (SCALAR_EXPRESSION_GATES.contains(canonicalType) && entry.getValue() != null
+                    && !GateExpressionParser.isValid(entry.getValue().toString())) {
+                findings.add(BitFinding.of(GATE_EXPRESSION_INVALID, source, gatePath.toString(),
+                        "Invalid gate expression: " + entry.getValue(),
+                        "comparison, exact number, or min..max range", ""));
             }
         }
+    }
+
+    private static void inspectGateSubKeys(
+            String gateType, Map<?, ?> values, String source, KeyPath path, List<BitFinding> findings) {
+        Set<String> allowed = GateEvaluator.GATE_SUB_KEYS.getOrDefault(gateType, Set.of());
+        Vocabulary vocabulary = new Vocabulary("gate sub-key", allowed.stream().sorted().toList());
+        for (Object rawKey : values.keySet()) {
+            String key = String.valueOf(rawKey);
+            if (!allowed.contains(key)) {
+                findings.add(BitFinding.of(UNKNOWN_GATE_SUBKEY, source, path.key(key).toString(),
+                        "Unknown " + gateType + " gate sub-key: " + key,
+                        String.join(", ", allowed.stream().sorted().toList()),
+                        vocabulary.suggest(key).orElse("")));
+            }
+        }
+
+        for (Set<String> requiredGroup : GateEvaluator.GATE_REQUIRED_SUB_KEYS.getOrDefault(gateType, List.of())) {
+            boolean present = requiredGroup.stream().anyMatch(key -> hasRequiredValue(values.get(key), values.containsKey(key)));
+            if (!present) {
+                String expected = String.join(" or ", requiredGroup.stream().sorted().toList());
+                String suggestion = requiredGroup.stream().sorted().findFirst().orElse("");
+                findings.add(BitFinding.of(MISSING_GATE_SUBKEY, source, path.toString(),
+                        "Missing required " + gateType + " gate sub-key",
+                        expected, suggestion));
+            }
+        }
+    }
+
+    private static boolean hasRequiredValue(Object value, boolean keyPresent) {
+        if (!keyPresent || value == null) return false;
+        if (value instanceof String text) return !text.isBlank();
+        if (value instanceof List<?> list) return !list.isEmpty();
+        if (value instanceof Map<?, ?> map) return !map.isEmpty();
+        return true;
+    }
+
+    private static void inspectGateExpressions(
+            String gateType, Map<?, ?> values, String source, KeyPath path, List<BitFinding> findings) {
+        Set<String> allowed = GateEvaluator.GATE_SUB_KEYS.getOrDefault(gateType, Set.of());
+        for (String key : EXPRESSION_SUB_KEYS) {
+            if (!allowed.contains(key) || !values.containsKey(key) || values.get(key) == null) continue;
+            String expression = String.valueOf(values.get(key));
+            if (!GateExpressionParser.isValid(expression)) {
+                findings.add(BitFinding.of(GATE_EXPRESSION_INVALID, source, path.key(key).toString(),
+                        "Invalid gate expression: " + expression,
+                        "comparison, exact number, or min..max range", ""));
+            }
+        }
+    }
+
+    private static void inspectScoreboardObjective(
+            Object raw, String source, KeyPath path, Environment environment, List<BitFinding> findings) {
+        if (raw == null || raw.toString().isBlank()) return;
+        String objective = raw.toString().trim();
+        if (ActionSessionImpl.MANAGED_OBJECTIVES.contains(objective)) return;
+        String suggestion = ActionSessionImpl.MANAGED_OBJECTIVES.suggest(objective, 2).orElse("");
+        if (!suggestion.isEmpty()) {
+            findings.add(BitFinding.of(SCOREBOARD_MANAGED_TYPO, source, path.toString(),
+                    "Objective is within edit distance 2 of a managed RTP objective: " + objective,
+                    String.join(", ", ActionSessionImpl.MANAGED_OBJECTIVES.values()), suggestion));
+            return;
+        }
+        if (environment.objectiveLookup() != null && Boolean.FALSE.equals(environment.objectiveLookup().apply(objective))) {
+            findings.add(BitFinding.of(SCOREBOARD_OBJECTIVE_MISSING, source, path.toString(),
+                    "Scoreboard objective is absent: " + objective, "an existing scoreboard objective", ""));
+        }
+    }
+
+    private static void inspectPlacement(
+            Object raw, String source, KeyPath path, Environment environment, List<BitFinding> findings) {
+        Map<?, ?> placement = asMap(raw);
+        if (placement == null) return;
+        Object regionValue = value(placement, "region");
+        if (regionValue != null && !environment.regionNames().isEmpty()) {
+            String region = regionValue.toString().trim();
+            if (environment.regionNames().stream().noneMatch(name -> name.equalsIgnoreCase(region))) {
+                Vocabulary regions = new Vocabulary("region", environment.regionNames().stream().sorted().toList());
+                findings.add(BitFinding.of(UNKNOWN_REGION, source, path.key("region").toString(),
+                        "Placement region is not loaded: " + region,
+                        String.join(", ", environment.regionNames().stream().sorted().toList()),
+                        regions.suggest(region).orElse("")));
+            }
+        }
+
+        Object schematicValue = value(placement, "schematic");
+        if (schematicValue != null && environment.pluginDirectory() != null
+                && !schematicResolves(environment.pluginDirectory(), schematicValue.toString())) {
+            findings.add(BitFinding.of(SCHEMATIC_UNRESOLVED, source, path.key("schematic").toString(),
+                    "Placement schematic cannot be resolved: " + schematicValue,
+                    "an existing file under advanced/schematics", ""));
+        }
+    }
+
+    private static boolean schematicResolves(Path pluginDirectory, String rawName) {
+        Path root = pluginDirectory.resolve("advanced").resolve("schematics").toAbsolutePath().normalize();
+        try {
+            Path relative = Path.of(rawName.trim());
+            Path requested = root.resolve(relative).normalize();
+            if (!requested.startsWith(root)) return false;
+            List<Path> candidates = new ArrayList<>();
+            if (hasExtension(relative.getFileName().toString())) {
+                candidates.add(requested);
+            } else {
+                candidates.add(Path.of(requested + ".schem"));
+                candidates.add(Path.of(requested + ".schematic"));
+            }
+            for (Path candidate : candidates) {
+                if (!Files.isRegularFile(candidate)) continue;
+                if (candidate.toRealPath().startsWith(root.toRealPath())) return true;
+            }
+        } catch (IOException | java.nio.file.InvalidPathException ignored) {
+            return false;
+        }
+        return false;
+    }
+
+    private static boolean hasExtension(String filename) {
+        int dot = filename.lastIndexOf('.');
+        return dot > 0 && dot < filename.length() - 1;
+    }
+
+    private static void inspectPayloadValue(
+            Object raw, String source, KeyPath path, Set<String> scope, List<BitFinding> findings) {
+        if (raw instanceof List<?> values) {
+            for (int i = 0; i < values.size(); i++) {
+                inspectPayloadValue(values.get(i), source, path.index(i), scope, findings);
+            }
+        } else if (raw != null) {
+            inspectPayload(raw.toString(), source, path, scope, findings);
+        }
+    }
+
+    private static void inspectPlaceholderValue(
+            Object raw, String source, KeyPath path, Set<String> scope, List<BitFinding> findings) {
+        if (raw instanceof List<?> values) {
+            for (int i = 0; i < values.size(); i++) {
+                inspectPlaceholderValue(values.get(i), source, path.index(i), scope, findings);
+            }
+        } else if (raw != null) {
+            inspectPlaceholders(raw.toString(), source, path, scope, findings);
+        }
+    }
+
+    private static void inspectPayload(String payload, String source, KeyPath path, Set<String> scope,
+            List<BitFinding> findings) {
+        inspectPlaceholders(payload, source, path, scope, findings);
+
+        if (!isBalancedPayload(payload)) {
+            findings.add(BitFinding.of(PAYLOAD_UNBALANCED, source, path.toString(),
+                    "Vanilla command payload contains unbalanced quotes, brackets, or braces",
+                    "balanced quotes, [], and {}", ""));
+            return;
+        }
+        String component = jsonComponent(payload);
+        if (component != null && !isValidJsonComponent(component)) {
+            findings.add(BitFinding.of(PAYLOAD_JSON_INVALID, source, path.toString(),
+                    "Vanilla command text component is not valid JSON", "a parseable JSON component", ""));
+        }
+    }
+
+    private static void inspectPlaceholders(String payload, String source, KeyPath path, Set<String> scope,
+            List<BitFinding> findings) {
+        for (String token : ActionPlaceholderSanitizer.placeholders(payload)) {
+            if (token.matches("\\d+")) continue;
+            if (!ActionPlaceholderSanitizer.inScope(token, ActionPlaceholderSanitizer.knownTokens())) {
+                Vocabulary knownTokens = new Vocabulary("placeholder",
+                        ActionPlaceholderSanitizer.knownTokens().stream().sorted().toList());
+                findings.add(BitFinding.of(PLACEHOLDER_UNKNOWN, source, path.toString(),
+                        "Unknown action placeholder: [" + token + "]",
+                        String.join(", ", ActionPlaceholderSanitizer.knownTokens().stream().sorted().toList()),
+                        knownTokens.suggest(token).orElse("")));
+            } else if (!ActionPlaceholderSanitizer.inScope(token, scope)) {
+                findings.add(BitFinding.of(PLACEHOLDER_OUT_OF_SCOPE, source, path.toString(),
+                        "Action placeholder is not available in this scope: [" + token + "]",
+                        String.join(", ", scope.stream().sorted().toList()), ""));
+            }
+        }
+    }
+
+    private static boolean isBalancedPayload(String payload) {
+        Deque<Character> brackets = new ArrayDeque<>();
+        boolean quoted = false;
+        boolean escaped = false;
+        for (int i = 0; i < payload.length(); i++) {
+            char character = payload.charAt(i);
+            if (quoted) {
+                if (escaped) escaped = false;
+                else if (character == '\\') escaped = true;
+                else if (character == '"') quoted = false;
+                continue;
+            }
+            if (character == '"') {
+                quoted = true;
+            } else if (character == '[' || character == '{') {
+                brackets.push(character);
+            } else if (character == ']' || character == '}') {
+                if (brackets.isEmpty()) return false;
+                char opening = brackets.pop();
+                if ((character == ']' && opening != '[') || (character == '}' && opening != '{')) return false;
+            }
+        }
+        return !quoted && brackets.isEmpty();
+    }
+
+    private static String jsonComponent(String payload) {
+        Matcher tellraw = TELLRAW_COMPONENT.matcher(payload);
+        if (tellraw.matches()) return tellraw.group(1).trim();
+        Matcher title = TITLE_COMPONENT.matcher(payload);
+        return title.matches() ? title.group(1).trim() : null;
+    }
+
+    private static boolean isValidJsonComponent(String component) {
+        try (JsonReader reader = new JsonReader(new StringReader(component))) {
+            reader.setLenient(true);
+            JsonParser.parseReader(reader);
+            return reader.peek() == JsonToken.END_DOCUMENT;
+        } catch (LinkageError unavailable) {
+            return true;
+        } catch (IOException | RuntimeException invalid) {
+            return false;
+        }
+    }
+
+    private static Set<String> scope(Set<String> addition) {
+        Set<String> result = new HashSet<>(ActionPlaceholderSanitizer.COMMON_TOKENS);
+        for (String token : addition) result.add(token.toLowerCase(Locale.ROOT));
+        return Collections.unmodifiableSet(result);
+    }
+
+    private static Set<String> scope(Set<String> current, Set<String> addition) {
+        Set<String> result = new HashSet<>(current);
+        for (String token : addition) result.add(token.toLowerCase(Locale.ROOT));
+        return Collections.unmodifiableSet(result);
+    }
+
+    private static String canonicalStage(String stage) {
+        return ActionPlaceholderSanitizer.STAGE_TOKENS.keySet().stream()
+                .filter(candidate -> candidate.equalsIgnoreCase(stage))
+                .findFirst()
+                .orElse(stage);
     }
 
     private static void inspectTriggers(Object raw, String source, KeyPath path, List<BitFinding> findings) {

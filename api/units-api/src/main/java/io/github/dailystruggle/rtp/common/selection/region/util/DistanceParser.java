@@ -1,8 +1,9 @@
 package io.github.dailystruggle.rtp.common.selection.region.util;
 
-import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Locale;
-import java.util.logging.Level;
+import java.util.Objects;
+import java.util.function.Consumer;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -92,6 +93,22 @@ public final class DistanceParser {
    */
   public static ParsedDistance autoInterpret(
       ParsedDistance parsed, double worldBorderRadius, String contextName) {
+    return autoInterpret(parsed, worldBorderRadius, contextName,
+        message -> Logger.getLogger(DistanceParser.class.getName()).info(message));
+  }
+
+  /**
+   * Auto-interprets a dimensionless distance and reports any reinterpretation to {@code logInfo}.
+   *
+   * @param parsed the parsed distance
+   * @param worldBorderRadius radius of the world border in blocks (or {@code <= 0} if unknown/infinite)
+   * @param contextName context identifier for logging
+   * @param logInfo receives an informational message when a value is reinterpreted
+   * @return auto-interpreted distance (or the original if no re-interpretation occurred)
+   */
+  public static ParsedDistance autoInterpret(
+      ParsedDistance parsed, double worldBorderRadius, String contextName, Consumer<String> logInfo) {
+    Objects.requireNonNull(logInfo, "logInfo");
     if (parsed == null || parsed.explicitUnit()) {
       return parsed;
     }
@@ -105,17 +122,17 @@ public final class DistanceParser {
       if (val <= 32.0 && worldBorderRadius >= 256.0) {
         // Check if regions or chunks fits nicely inside the world border
         if (val <= 8.0 && val * 512.0 <= worldBorderRadius) {
-          logAutoInterpret(contextName, val, "blocks", val * 32.0, "regions", val * 512.0);
+          logAutoInterpret(contextName, val, "blocks", val * 32.0, "regions", val * 512.0, logInfo);
           return new ParsedDistance(val, SpatialUnit.REGION, false);
         } else if (val * 16.0 <= worldBorderRadius) {
-          logAutoInterpret(contextName, val, "blocks", val, "chunks", val * 16.0);
+          logAutoInterpret(contextName, val, "blocks", val, "chunks", val * 16.0, logInfo);
           return new ParsedDistance(val, SpatialUnit.CHUNK, false);
         }
       }
     } else if (parsed.unit() == SpatialUnit.CHUNK
         && worldBorderRadius > 0 && val > 512.0 && val * 16.0 > worldBorderRadius && val <= worldBorderRadius) {
       // If default was CHUNK, but value is e.g. 5000 (which would be 80,000 blocks) and exceeds world border
-      logAutoInterpret(contextName, val, "chunks", val / 16.0, "blocks", val);
+      logAutoInterpret(contextName, val, "chunks", val / 16.0, "blocks", val, logInfo);
       return new ParsedDistance(val, SpatialUnit.BLOCK, false);
     }
 
@@ -123,7 +140,8 @@ public final class DistanceParser {
   }
 
   private static void logAutoInterpret(
-      String context, double origVal, String origUnit, double newVal, String newUnit, double blockEquiv) {
+      String context, double origVal, String origUnit, double newVal, String newUnit, double blockEquiv,
+      Consumer<String> logInfo) {
     String msg = String.format(
         Locale.ROOT,
         "[RTP] Auto-interpreted dimensionless %s '%s' from %s to %s %s (%.0f blocks). To specify explicitly, use suffix '%s'.",
@@ -135,6 +153,6 @@ public final class DistanceParser {
         blockEquiv,
         SpatialUnit.fromString(newUnit) != null ? SpatialUnit.fromString(newUnit).getPrimarySuffix() : newUnit
     );
-    RTPRuntime.log(Level.INFO, msg);
+    logInfo.accept(msg);
   }
 }

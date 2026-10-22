@@ -76,4 +76,24 @@ class TickBudgetTest {
         assertEquals(TimeUnit.MILLISECONDS.toNanos(25), TickBudget.asyncNanos(), "async clamped to ceiling");
         assertEquals(40L, TickBudget.periodTicks());
     }
+
+    @Test
+    @DisplayName("REQ-RTP-F-016: allotted time settings accept explicit duration units")
+    void refreshReadsDurationUnits() {
+        ConfigParser<PerformanceKeys> perf = perf();
+        if (perf == null) return;
+        perf.set(PerformanceKeys.syncAllottedTime, "10ms");
+        perf.set(PerformanceKeys.asyncAllottedTime, "10s");
+        perf.set(PerformanceKeys.period, "2s");
+
+        TickBudget.refresh();
+
+        assertEquals(TimeUnit.MILLISECONDS.toNanos(10), TickBudget.syncNanos());
+        assertEquals(TimeUnit.MILLISECONDS.toNanos(25), TickBudget.asyncNanos(), "async budget remains capped");
+        assertEquals(40L, TickBudget.periodTicks());
+
+        perf.set(PerformanceKeys.period, "invalid");
+        TickBudget.refresh();
+        assertEquals(TickBudget.DEFAULT_PERIOD_TICKS, TickBudget.periodTicks());
+    }
 }

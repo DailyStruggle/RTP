@@ -31,6 +31,7 @@ maxHeapPercentage: 85.0
 maximaalPogingen: 10
 
 # Ticks tussen het opnieuw vullen van dezelfde regio. Regio's komen om de beurt aan.
+# Ondersteunt tijdseenheden (bijv. 24h, 1d).
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
@@ -38,6 +39,7 @@ maximaalPogingen: 10
 periode: 20
 
 # Max. ms per tick voor werk op de hoofdthread. Begrensd op 25.
+# Ondersteunt tijdseenheden (bijv. 24h, 1d).
 # @type: integer
 # @range: [1, 25]
 # @unit: ms
@@ -45,6 +47,7 @@ periode: 20
 synchroonToegewezenTijd: 5
 
 # Max. ms per puls voor achtergrondwerk. Begrensd op 25.
+# Ondersteunt tijdseenheden (bijv. 24h, 1d).
 # @type: integer
 # @range: [1, 25]
 # @unit: ms
@@ -73,6 +76,7 @@ zichtafstandTeletransport: 0
 # naar normaal loopt, wat de chunk-laadpiek afvlakt. 0 schakelt de begrenzing uit.
 # LET OP: Tijdelijk op 0 gezet. Het geleidelijke herstel veroorzaakt flikkering /
 # opnieuw renderen aan de clientzijde bij aankomst. Laat op 0 tot nader bericht.
+# Ondersteunt tijdseenheden (bijv. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: ticks
@@ -142,6 +146,7 @@ bioomHerinnering_geforceerd: false
 
 # Latentiedrempel (ms) waarboven een direct bediende teleportatie wordt geaudit
 # (WARN gelogd, slowPipelineCount opgehoogd). 0 of minder schakelt uit.
+# Ondersteunt tijdseenheden (bijv. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: ms

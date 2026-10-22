@@ -196,6 +196,7 @@ class NetworkRouterTest {
         assertSame(NetworkRouter.Mode.LOCAL, NetworkRouter.Mode.parse("local"));
         assertSame(NetworkRouter.Mode.CROSS_SERVER, NetworkRouter.Mode.parse("cross-server"));
         assertSame(NetworkRouter.Mode.CROSS_SERVER, NetworkRouter.Mode.parse("cross_server"));
+        assertSame(NetworkRouter.Mode.CROSS_SERVER, NetworkRouter.Mode.parse("always"));
         assertSame(NetworkRouter.Mode.AUTO, NetworkRouter.Mode.parse("auto"));
         assertSame(NetworkRouter.Mode.LOCAL, NetworkRouter.Mode.parse("nonsense"));
     }

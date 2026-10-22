@@ -3,6 +3,8 @@ package io.github.dailystruggle.rtp.guiaddon.common;
 import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.addon.RTPAddon;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigPbit;
+import io.github.dailystruggle.rtp.common.bit.config.DirectiveConfigCheck;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.Configs;
@@ -50,6 +52,9 @@ public final class RTPGuiCommonAddon implements RTPAddon {
     // Register addons/guimenu.yml with RTP's config system (first-boot create + /rtp reload).
     ActiveConfigs.get().putParser(registerParser());
     Configs.onReload(() -> ActiveConfigs.get().putParser(registerParser()));
+    // /rtp test config-guimenu: directives come from this jar, not RTP's (ADR-121).
+    ConfigPbit.register(DirectiveConfigCheck.bound(
+        "guimenu", "addons/guimenu.yml", getClass().getClassLoader()));
 
     // Discover platform renderers via META-INF/services. This is the load path that
     // matters when the addon is dropped into plugins/RTP/addons/ or extracted from the

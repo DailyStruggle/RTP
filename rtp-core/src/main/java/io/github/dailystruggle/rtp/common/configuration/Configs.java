@@ -8,6 +8,12 @@ import io.github.dailystruggle.rtp.api.configuration.enums.PlayerMessages;
 import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.bit.BitFinding;
+import io.github.dailystruggle.rtp.common.bit.BitSeverityPolicy;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigCandidateGate;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigEnvironment;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigPbit;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigSnapshot;
 import io.github.dailystruggle.rtp.common.configuration.enums.*;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
@@ -37,6 +43,8 @@ public class Configs {
 
   /** Map of multi-configuration parsers */
   public Map<Class<?>, MultiConfigParser<?>> multiConfigParserMap = new ConcurrentHashMap<>();
+
+  private volatile List<BitFinding> startupYamlFindings = List.of();
 
 
   /**
@@ -597,8 +605,25 @@ public class Configs {
     return parser;
   }
 
+  private volatile ConfigCandidateGate.Result lastReloadRejection;
+
   /**
-   * Reload all configurations
+   * Rejection of the most recent {@link #reload()} by the config PBIT gate, or empty when it was
+   * accepted (or failed for another reason).
+   */
+  public java.util.Optional<ConfigCandidateGate.Result> lastReloadRejection() {
+    return java.util.Optional.ofNullable(lastReloadRejection);
+  }
+
+  /** YAML findings captured from disk before the first parser load can quarantine bad files. */
+  public List<BitFinding> startupYamlFindings() {
+    return startupYamlFindings;
+  }
+
+  /**
+   * Reload all configurations. The candidate on disk is first checked by
+   * {@link ConfigCandidateGate}; a rejected candidate leaves every parser, region and in-flight
+   * teleport untouched and returns false with {@link #lastReloadRejection()} set.
    *
    * @return true if successful
    */
@@ -606,6 +631,15 @@ public class Configs {
     try {
       RTPRuntime.log(Level.FINE, "[RTP] reload(): flushing fileDatabase queries before parser swap");
       this.fileDatabase.processQueries(Long.MAX_VALUE);
+      // ADR-121 section 7: PBIT the on-disk candidate before reconnect, teleport cancellation,
+      // migrations or the parser swap; any effective ERROR keeps the running config.
+      ConfigCandidateGate.Result gate =
+          ConfigCandidateGate.evaluate(pluginDirectory.toPath(), java.util.Map.of());
+      if (gate.rejected()) {
+        lastReloadRejection = gate;
+        return false;
+      }
+      lastReloadRejection = null;
       RTPRuntime.log(Level.FINER, "[RTP] reload(): fileDatabase.processQueries complete; reconnecting");
       this.fileDatabase.connect();
       RTPRuntime.log(Level.FINER, "[RTP] reload(): fileDatabase reconnected; entering reloadAction");
@@ -623,6 +657,9 @@ public class Configs {
    * Cancels any in-flight teleports and kills the scan task before reloading.
    */
   public void reloadConfigs() {
+    if (configParserMap.isEmpty() && multiConfigParserMap.isEmpty()) {
+      recordStartupYamlFindings();
+    }
     reloadLifecycle.beforeReload();
 
     Map<Class<?>, ConfigParser<?>> newConfigParserMap = new ConcurrentHashMap<>();
@@ -686,10 +723,10 @@ public class Configs {
             new ConfigParser<>(NetworkMessages.class, "advanced/messages/network.yml", "1.0", pluginDirectory, fileDatabase, locale));
     RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/messages/commands.yml");
     newConfigParserMap.put(CommandMessages.class,
-            new ConfigParser<>(CommandMessages.class, "advanced/messages/commands.yml", "1.0", pluginDirectory, fileDatabase, locale));
+            new ConfigParser<>(CommandMessages.class, "advanced/messages/commands.yml", "1.1", pluginDirectory, fileDatabase, locale));
     RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/messages/system.yml");
     newConfigParserMap.put(SystemMessages.class,
-            new ConfigParser<>(SystemMessages.class, "advanced/messages/system.yml", "1.1", pluginDirectory, fileDatabase, locale));
+            new ConfigParser<>(SystemMessages.class, "advanced/messages/system.yml", "1.2", pluginDirectory, fileDatabase, locale));
     // ADR-071 rule 4: a legacy flat messages.yml left by an older install is read
     // once, its operator customizations folded into the matching per-concern
     // files, archived (renamed, not deleted), and logged.
@@ -722,6 +759,12 @@ public class Configs {
             new ConfigParser<>(TtlKeys.class, "advanced/ttl.yml", "1.0", pluginDirectory, fileDatabase, locale);
     newConfigParserMap.put(TtlKeys.class, ttl);
     io.github.dailystruggle.rtp.common.selection.region.selectors.memory.TtlConfig.loadFromConfig(ttl);
+
+    RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building parser advanced/bit.yml");
+    ConfigParser<BitKeys> bit =
+            new ConfigParser<>(BitKeys.class, "advanced/bit.yml", "1.1", pluginDirectory, fileDatabase, locale);
+    newConfigParserMap.put(BitKeys.class, bit);
+    io.github.dailystruggle.rtp.common.bit.BitSeverityPolicy.loadFromConfig(bit);
 
     RTPRuntime.log(Level.FINER, "[RTP] reloadConfigs(): building parser safety.yml");
     ConfigParser<SafetyKeys> safety =
@@ -823,6 +866,19 @@ public class Configs {
     // from the factories, so it cannot drift from what the server actually accepts.
     SelectorCatalogWriter.write(pluginDirectory);
     RTPRuntime.log(Level.FINE, "[RTP] reloadConfigs(): complete (in-flight tasks retain old snapshots)");
+  }
+
+  private void recordStartupYamlFindings() {
+    ConfigSnapshot snapshot = ConfigSnapshot.read(pluginDirectory.toPath());
+    List<BitFinding> findings = ConfigPbit.run(
+            ConfigPbit.YAML_SYNTAX, snapshot, ConfigEnvironment.HEADLESS).findings();
+    startupYamlFindings = List.copyOf(findings);
+    for (BitFinding finding : findings) {
+      String path = finding.path().isEmpty() ? "" : " at " + finding.path();
+      RTPRuntime.log(BitSeverityPolicy.toJul(finding.severity()),
+              "[RTP bit] startup config " + finding.code() + " " + finding.source() + path
+                      + ": " + finding.message());
+    }
   }
 
   /**

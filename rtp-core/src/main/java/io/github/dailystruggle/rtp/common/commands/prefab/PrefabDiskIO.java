@@ -210,30 +210,47 @@ public final class PrefabDiskIO {
             }
         }
 
-        RtpYamlConfig cfg = null;
-        if (target.exists() && target.isFile()) {
-            cfg = new RtpYamlConfig(target);
-            cfg.loadWithComments();
-        } else if (templateFileId != null) {
-            // New file with a comment template: seed structure and comments
-            // from the template (e.g. regions/default.yml), then re-bind the
-            // config to the target path so the save lands on the new file.
-            File template = resolveFile(pluginDirectory, templateFileId);
-            if (template.exists() && template.isFile()) {
-                cfg = new RtpYamlConfig(template);
-                cfg.loadWithComments();
-                cfg.setConfigurationFile(target);
-            }
-        }
-        if (cfg == null) {
-            // New file: write a fresh empty config bound to the target path.
-            cfg = new RtpYamlConfig(target);
-        }
+        RtpYamlConfig cfg = configForWrite(pluginDirectory, fileId, templateFileId);
         for (PrefabApplier.Change c : changes) {
             cfg.set(c.keyPath(), c.newValue());
         }
         cfg.saveWithComments();
         return bakPath;
+    }
+
+    /** Render a pending file overlay as YAML without creating backups or writing to disk. */
+    public static String render(File pluginDirectory,
+                                String fileId,
+                                List<PrefabApplier.Change> changes,
+                                String templateFileId) throws IOException {
+        Objects.requireNonNull(changes, "changes");
+        RtpYamlConfig cfg = configForWrite(pluginDirectory, fileId, templateFileId);
+        for (PrefabApplier.Change change : changes) {
+            cfg.set(change.keyPath(), change.newValue());
+        }
+        return cfg.saveToString();
+    }
+
+    private static RtpYamlConfig configForWrite(File pluginDirectory, String fileId, String templateFileId)
+            throws IOException {
+        Objects.requireNonNull(pluginDirectory, "pluginDirectory");
+        Objects.requireNonNull(fileId, "fileId");
+        File target = resolveFile(pluginDirectory, fileId);
+        if (target.exists() && target.isFile()) {
+            RtpYamlConfig cfg = new RtpYamlConfig(target);
+            cfg.loadWithComments();
+            return cfg;
+        }
+        if (templateFileId != null) {
+            File template = resolveFile(pluginDirectory, templateFileId);
+            if (template.exists() && template.isFile()) {
+                RtpYamlConfig cfg = new RtpYamlConfig(template);
+                cfg.loadWithComments();
+                cfg.setConfigurationFile(target);
+                return cfg;
+            }
+        }
+        return new RtpYamlConfig(target);
     }
 
     /**

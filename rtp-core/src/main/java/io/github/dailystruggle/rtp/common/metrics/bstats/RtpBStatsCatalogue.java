@@ -21,7 +21,6 @@ import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
 import io.github.dailystruggle.rtp.common.metrics.RTPMetricsExtension;
 import io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats;
 import io.github.dailystruggle.rtp.common.metrics.RtpSchedulerProfile;
-import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.model.FailTypes;
@@ -304,7 +303,7 @@ public final class RtpBStatsCatalogue {
 
     public static String detectDatabaseBackend() {
         try {
-            Object accessor = (TeleportSessions.current() == null) ? null : ActiveDatabase.accessor();
+            Object accessor = ActiveDatabase.accessor();
             if (accessor == null) return "none";
             String lc = accessor.getClass().getSimpleName().toLowerCase(Locale.ROOT);
             if (lc.contains("yaml")) return "yaml";
@@ -363,7 +362,7 @@ public final class RtpBStatsCatalogue {
     @SuppressWarnings("unchecked")
     public static String detectSafetyFeaturesEnabled() {
         try {
-            if (TeleportSessions.current() == null || ActiveConfigs.get() == null) return "unknown";
+            if (ActiveConfigs.get() == null) return "unknown";
             ConfigParser<SafetyKeys> safety = (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
             if (safety == null) return "unknown";
             TreeSet<String> on = new TreeSet<>();

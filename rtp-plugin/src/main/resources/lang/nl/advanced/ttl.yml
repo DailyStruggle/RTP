@@ -1,5 +1,5 @@
 # --- RTP Ruimtelijk Geheugen TTL-instellingen ---
-# Documentatie: plugins/RTP/docs/admin/configuration/TTL.md
+# Documentatie: docs/admin/configuration/TTL.md
 
 # Basis bewaartermijn voor afgewezen coördinaatpogingen in het ruimtelijk geheugen.
 # Ondersteunde tijdsindelingen: bijv. 14d, 12h, 30m, 3600s, 40t, 2500ms of samengesteld 1d12h.

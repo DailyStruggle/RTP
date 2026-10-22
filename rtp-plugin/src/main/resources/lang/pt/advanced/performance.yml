@@ -31,6 +31,7 @@ maxHeapPorcentagem: 85.0
 tentativasMaximas: 10
 
 # Ticks entre recargas da mesma região. As regiões se alternam.
+# Suporta unidades de duracao (ex.: 24h, 1d).
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
@@ -38,6 +39,7 @@ tentativasMaximas: 10
 periodo: 20
 
 # Máximo de ms por tick para o trabalho na thread principal. Limitado a 25.
+# Suporta unidades de duracao (ex.: 24h, 1d).
 # @type: integer
 # @range: [1, 25]
 # @unit: ms
@@ -45,6 +47,7 @@ periodo: 20
 tempoAlocadoSincrono: 5
 
 # Máximo de ms por pulso para o trabalho em segundo plano. Limitado a 25.
+# Suporta unidades de duracao (ex.: 24h, 1d).
 # @type: integer
 # @range: [1, 25]
 # @unit: ms
@@ -73,6 +76,7 @@ distanciaVisaoTeletransporte: 0
 # normal após chegar, suavizando o pico de carga de chunks. 0 desativa o limite.
 # NOTA: Forçado temporariamente para 0. A restauração gradual causa cintilação /
 # re-renderização no lado do cliente ao chegar. Deixe em 0 até novo aviso.
+# Suporta unidades de duracao (ex.: 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: ticks
@@ -142,6 +146,7 @@ lembrancaBiomaForcada: false
 
 # Limite de latência (ms) acima do qual um teleporte servido imediatamente é
 # auditado (WARN registrado, slowPipelineCount incrementado). 0 ou menos desativa.
+# Suporta unidades de duracao (ex.: 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: ms

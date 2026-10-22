@@ -512,6 +512,7 @@ editorApplyFetching: "&7[P0] Récupération de la charge de configuration..."
 editorApplyValidating: "&7[P0] Vérification de l'intégrité et de la syntaxe de la charge..."
 editorApplySuccess: "&a[P0] Configuration appliquée et rechargée à chaud ! (copies .bak créées pour les fichiers modifiés)"
 editorApplyFailed: "&c[P0] Impossible d'appliquer la charge : [reason]"
+editorApplyRejected: "&c[P0] Application refusée : [count] erreur(s) de configuration ; rien n'a été écrit. Première : [code] dans [source] à [path]."
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

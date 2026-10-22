@@ -4,6 +4,8 @@ import io.github.dailystruggle.rtp.api.action.ActionDefinition;
 import io.github.dailystruggle.rtp.api.action.ConfinementBoundary;
 import io.github.dailystruggle.bit.BitFinding;
 import io.github.dailystruggle.bit.Vocabulary;
+import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.BitSeverityPolicy;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.ActionKeys;
@@ -40,6 +42,7 @@ public final class ActionConfigLoader {
       List.of("onStart", "onBoundaryViolation", "onExpire", "onDeath", "onEnqueue", "onCancel", "onWait"));
 
   private static volatile List<LoadedDefinition> loadedDefinitions = List.of();
+  private static volatile List<LoadFailure> loadFailures = List.of();
 
   /** Immutable raw definition captured when its file is validated during loading. */
   public record LoadedDefinition(String id, String source, Map<?, ?> values) {
@@ -50,11 +53,24 @@ public final class ActionConfigLoader {
     }
   }
 
+  /** File that could not be parsed during the last action-definition load pass. */
+  public record LoadFailure(String source, String message) {
+    public LoadFailure {
+      source = source == null ? "" : source;
+      message = message == null ? "" : message;
+    }
+  }
+
   private ActionConfigLoader() {}
 
   /** Returns the immutable snapshot of definitions validated by the last successful load pass. */
   public static List<LoadedDefinition> loadedDefinitions() {
     return loadedDefinitions;
+  }
+
+  /** Returns the immutable snapshot of files that failed during the last load pass. */
+  public static List<LoadFailure> loadFailures() {
+    return loadFailures;
   }
 
   private static Map<?, ?> immutableDefinition(Map<?, ?> values) {
@@ -79,15 +95,27 @@ public final class ActionConfigLoader {
     return value;
   }
 
-  private static void logValidationFindings(String id, Map<?, ?> definition, String source) {
-    for (BitFinding finding : ActionDefinitionValidator.validate(id, definition, source).findings()) {
+  private static boolean logValidationFindings(String id, Map<?, ?> definition, String source) {
+    boolean hasErrors = false;
+    boolean hasStructuralFindings = false;
+    for (BitFinding rawFinding : ActionDefinitionValidator.validate(id, definition, source).findings()) {
+      java.util.Optional<BitFinding> effectiveFinding = BitSeverityPolicy.effectiveFinding(rawFinding);
+      if (effectiveFinding.isEmpty()) continue;
+      BitFinding finding = effectiveFinding.get();
       String message = "[RTP Action] " + finding.code() + " (" + finding.codeId() + ") at "
           + finding.source() + ":" + finding.path()
           + " - " + finding.message();
       if (!finding.expected().isBlank()) message += " (expected: " + finding.expected() + ")";
       if (!finding.suggestion().isBlank()) message += " (did you mean: " + finding.suggestion() + "?)";
-      RTPRuntime.log(Level.WARNING, message);
+      RTP.log(BitSeverityPolicy.toJul(finding.severity()), message);
+      hasErrors |= finding.severity() == java.lang.System.Logger.Level.ERROR;
+      hasStructuralFindings |= BitSeverityPolicy.isStructuralActionCode(finding.code());
     }
+    if (!BitSeverityPolicy.strictActions() && hasStructuralFindings && !hasErrors) {
+      RTP.log(Level.INFO, "[RTP Action] Action '" + id
+          + "' remains registered with structural findings; strictActions=true rejects it unless a code override lowers severity.");
+    }
+    return hasErrors;
   }
 
   /**
@@ -99,6 +127,7 @@ public final class ActionConfigLoader {
   public static void loadActions(MultiConfigParser<ActionKeys> actionsParser, ActionManager manager) {
     if (actionsParser == null || manager == null) return;
     List<LoadedDefinition> definitions = new ArrayList<>();
+    List<LoadFailure> failures = new ArrayList<>();
     for (ConfigParser<ActionKeys> parser : actionsParser.configParserFactory.map.values()) {
       String id = parser.name.replace(".yml", "");
       try {
@@ -111,8 +140,9 @@ public final class ActionConfigLoader {
           if (f.exists()) {
             try (Reader reader = new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8)) {
               root = RtpYamlConfig.parse(reader);
-            } catch (Exception ignored) {
-              // Ignored: fallback to ConfigParser getYamlRoot() below
+            } catch (Exception failure) {
+              failures.add(new LoadFailure(f.toString(), failureMessage(failure)));
+              // Keep the config-parser fallback, but surface the failed file read through PBIT.
             }
           }
         }
@@ -121,17 +151,24 @@ public final class ActionConfigLoader {
         }
         if (root != null) {
           Map<?, ?> values = root.getValues(false);
-          logValidationFindings(id, values, parser.name);
+          boolean hasErrors = logValidationFindings(id, values, parser.name);
           definitions.add(new LoadedDefinition(id, parser.name, values));
+          if (hasErrors) {
+            RTP.log(Level.WARNING, "[RTP Action] Not registering action '" + id
+                + "' because its definition has ERROR findings.");
+            continue;
+          }
         }
         ActionDefinition def = (root != null) ? parseDefinition(id, root) : parseDefinition(id, parser);
         manager.registerAction(def);
         RTPRuntime.log(Level.FINE, "[RTP Action] Loaded scripted action: " + id);
       } catch (Exception e) {
+        failures.add(new LoadFailure(parser.name, failureMessage(e)));
         RTPRuntime.log(Level.WARNING, "[RTP Action] Failed parsing action config: " + parser.name, e);
       }
     }
     loadedDefinitions = List.copyOf(definitions);
+    loadFailures = List.copyOf(failures);
   }
 
   /**
@@ -142,33 +179,54 @@ public final class ActionConfigLoader {
    */
   public static void loadActions(File pluginDirectory, ActionManager manager) {
     if (pluginDirectory == null || manager == null) return;
-    File actionsDir = new File(pluginDirectory, "definitions/actions");
+    loadActionsDirectory(new File(pluginDirectory, "definitions/actions"), manager);
+  }
+
+  /** Loads action definitions directly from their directory without requiring a plugin data root. */
+  public static void loadActionsDirectory(File actionsDir, ActionManager manager) {
+    if (actionsDir == null || manager == null) return;
     if (!actionsDir.exists() || !actionsDir.isDirectory()) {
       loadedDefinitions = List.of();
+      loadFailures = List.of();
       return;
     }
     File[] files = actionsDir.listFiles((dir, name) -> name.endsWith(".yml") && !name.startsWith("."));
     if (files == null) {
       loadedDefinitions = List.of();
+      loadFailures = List.of(new LoadFailure(actionsDir.toString(), "Unable to read action definitions directory."));
       return;
     }
 
+    java.util.Arrays.sort(files, java.util.Comparator.comparing(File::getName));
     List<LoadedDefinition> definitions = new ArrayList<>();
+    List<LoadFailure> failures = new ArrayList<>();
     for (File file : files) {
       String id = file.getName().substring(0, file.getName().length() - 4);
       try (Reader reader = new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8)) {
         RtpYamlConfig yaml = RtpYamlConfig.parse(reader);
         Map<?, ?> values = yaml.getValues(false);
-        logValidationFindings(id, values, file.toString());
+        boolean hasErrors = logValidationFindings(id, values, file.toString());
         definitions.add(new LoadedDefinition(id, file.toString(), values));
+        if (hasErrors) {
+          RTP.log(Level.WARNING, "[RTP Action] Not registering action '" + id
+              + "' because its definition has ERROR findings.");
+          continue;
+        }
         ActionDefinition def = parseDefinition(id, yaml);
         manager.registerAction(def);
         RTPRuntime.log(Level.FINE, "[RTP Action] Loaded scripted action: " + id);
       } catch (Exception e) {
+        failures.add(new LoadFailure(file.toString(), failureMessage(e)));
         RTPRuntime.log(Level.WARNING, "[RTP Action] Failed parsing action config: " + file.getName(), e);
       }
     }
     loadedDefinitions = List.copyOf(definitions);
+    loadFailures = List.copyOf(failures);
+  }
+
+  private static String failureMessage(Throwable failure) {
+    String message = failure.getMessage();
+    return message == null || message.isBlank() ? failure.getClass().getName() : message;
   }
 
   /**
@@ -782,9 +840,9 @@ public final class ActionConfigLoader {
       oaObj = map.get("onOutsideLimit");
     }
     if (oaObj instanceof List<?> list) {
-      outsideActions = parseActions(list);
+      outsideActions = parseActions(list, true);
     } else if (oaObj instanceof Map<?, ?> m) {
-      outsideActions = parseActionFromMap((Map<String, Object>) m);
+      outsideActions = parseActionFromMap((Map<String, Object>) m, true);
     } else if (oaObj instanceof String s) {
       outsideActions = List.of(ActionDefinition.CommandAction.action(s));
     }
@@ -848,11 +906,11 @@ public final class ActionConfigLoader {
         if (typedMap.containsKey("run")) {
           Object runObj = typedMap.get("run");
           if (runObj instanceof List<?> runList) {
-            actions = parseActions(runList);
+            actions = parseActions(runList, true);
           } else if (runObj instanceof Map<?, ?> runMap) {
-            actions = parseActionFromMap((Map<String, Object>) runMap);
+            actions = parseActionFromMap((Map<String, Object>) runMap, true);
           } else if (runObj instanceof RtpYamlSection runSec) {
-            actions = parseActionFromMap(runSec.getValues(false));
+            actions = parseActionFromMap(runSec.getValues(false), true);
           } else {
             actions = Collections.emptyList();
           }
@@ -862,12 +920,12 @@ public final class ActionConfigLoader {
           actionMap.remove("gate");
           actionMap.remove("delay");
           actionMap.remove("delaySeconds");
-          actions = parseActionFromMap(actionMap);
+          actions = parseActionFromMap(actionMap, true);
         }
         steps.add(new ActionDefinition.LifecycleStep(gateConfig, actions, delaySeconds));
       } else {
         // Ungated step: single action map, e.g. { CONSOLE: "..." } or { FOR_EACH: { ... } }
-        List<ActionDefinition.CommandAction> actions = parseActionFromMap(typedMap);
+        List<ActionDefinition.CommandAction> actions = parseActionFromMap(typedMap, true);
         steps.add(new ActionDefinition.LifecycleStep(Collections.emptyMap(), actions, delaySeconds));
       }
     }
@@ -876,13 +934,18 @@ public final class ActionConfigLoader {
 
   @SuppressWarnings("unchecked")
   private static List<ActionDefinition.CommandAction> parseActions(List<?> rawList) {
+    return parseActions(rawList, true);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<ActionDefinition.CommandAction> parseActions(List<?> rawList, boolean validateActionNames) {
     if (rawList == null || rawList.isEmpty()) return Collections.emptyList();
     List<ActionDefinition.CommandAction> actions = new ArrayList<>();
     for (Object item : rawList) {
       if (item instanceof Map<?, ?> map) {
-        actions.addAll(parseActionFromMap((Map<String, Object>) map));
+        actions.addAll(parseActionFromMap((Map<String, Object>) map, validateActionNames));
       } else if (item instanceof RtpYamlSection sec) {
-        actions.addAll(parseActionFromMap(sec.getValues(false)));
+        actions.addAll(parseActionFromMap(sec.getValues(false), validateActionNames));
       }
     }
     return actions;
@@ -890,6 +953,12 @@ public final class ActionConfigLoader {
 
   @SuppressWarnings("unchecked")
   private static List<ActionDefinition.CommandAction> parseActionFromMap(Map<String, Object> map) {
+    return parseActionFromMap(map, true);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<ActionDefinition.CommandAction> parseActionFromMap(
+      Map<String, Object> map, boolean validateActionNames) {
     List<ActionDefinition.CommandAction> res = new ArrayList<>();
     for (Map.Entry<String, Object> entry : map.entrySet()) {
       String key = entry.getKey().toUpperCase();
@@ -898,18 +967,24 @@ public final class ActionConfigLoader {
       switch (key) {
         case "CONSOLE" -> res.add(ActionDefinition.CommandAction.console(val != null ? val.toString() : ""));
         case "PLAYER" -> res.add(ActionDefinition.CommandAction.player(val != null ? val.toString() : ""));
-        case "ACTION" -> res.add(ActionDefinition.CommandAction.action(val != null ? val.toString() : ""));
+        case "ACTION" -> {
+          String actionName = val != null ? val.toString() : "";
+          if (!validateActionNames || ActionSessionImpl.ACTION_NAMES.contains(actionName)) {
+            res.add(ActionDefinition.CommandAction.action(actionName));
+          }
+        }
         case "MESSAGE", "TELL", "MSG" -> res.add(ActionDefinition.CommandAction.message(val != null ? val.toString() : ""));
         case "MESSAGE_TARGET", "TELL_TARGET", "MSG_TARGET" -> res.add(ActionDefinition.CommandAction.messageTarget(val != null ? val.toString() : ""));
         case "FOR_EACH" -> {
           if (val instanceof RtpYamlSection sec) {
-            List<ActionDefinition.CommandAction> subActions = parseActionFromMap(sec.getValues(false));
+            List<ActionDefinition.CommandAction> subActions = parseActionFromMap(sec.getValues(false), validateActionNames);
             res.add(ActionDefinition.CommandAction.forEach(subActions));
           } else if (val instanceof Map<?, ?> subMap) {
-            List<ActionDefinition.CommandAction> subActions = parseActionFromMap((Map<String, Object>) subMap);
+            List<ActionDefinition.CommandAction> subActions = parseActionFromMap(
+                (Map<String, Object>) subMap, validateActionNames);
             res.add(ActionDefinition.CommandAction.forEach(subActions));
           } else if (val instanceof List<?> subList) {
-            List<ActionDefinition.CommandAction> subActions = parseActions(subList);
+            List<ActionDefinition.CommandAction> subActions = parseActions(subList, validateActionNames);
             res.add(ActionDefinition.CommandAction.forEach(subActions));
           }
         }
@@ -992,11 +1067,13 @@ public final class ActionConfigLoader {
       io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec.TriggerType type =
           io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec.TriggerType.STEP_IN;
       if (map.containsKey("type")) {
-        String tStr = String.valueOf(map.get("type")).trim().toUpperCase();
+        String tStr = String.valueOf(map.get("type")).trim().toUpperCase(java.util.Locale.ROOT);
         try {
           type = io.github.dailystruggle.rtp.api.trigger.PhysicalTriggerSpec.TriggerType.valueOf(tStr);
         } catch (IllegalArgumentException ignored) {
-          // Ignored: fallback to STEP_IN default
+          RTP.log(Level.WARNING, "[RTP Action] Unknown trigger type '" + tStr
+              + "' at actions." + actionId + ".triggers." + triggerId + ".type; skipping trigger.");
+          continue;
         }
       }
 

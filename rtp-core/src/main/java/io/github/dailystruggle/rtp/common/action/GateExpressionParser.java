@@ -63,6 +63,27 @@ public final class GateExpressionParser {
     return val != null && Math.abs(actualValue - val) < 1e-6;
   }
 
+  /** Returns whether {@code expr} has a complete expression accepted by the gate parser. */
+  public static boolean isValid(String expr) {
+    if (expr == null || expr.isBlank()) return false;
+    String trimmed = expr.trim();
+
+    int sep = trimmed.indexOf(RANGE_SEPARATOR, 1);
+    if (sep > 0 && sep + RANGE_SEPARATOR.length() < trimmed.length()) {
+      return isNumber(trimmed.substring(0, sep))
+          && isNumber(trimmed.substring(sep + RANGE_SEPARATOR.length()));
+    }
+
+    Matcher opMatcher = OP_PATTERN.matcher(trimmed);
+    if (opMatcher.matches()) return isNumber(opMatcher.group(2));
+    return isNumber(trimmed);
+  }
+
+  private static boolean isNumber(String text) {
+    Double value = parseNumber(text.trim());
+    return value != null && Double.isFinite(value);
+  }
+
   /** {@code text} is a slice of the trimmed expression ending or starting at its non-blank edge, so never blank. */
   private static double parseValue(String text) {
     Double val = parseNumber(text.trim());

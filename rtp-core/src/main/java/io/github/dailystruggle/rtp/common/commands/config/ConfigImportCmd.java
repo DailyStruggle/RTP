@@ -5,6 +5,9 @@ import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.reload.ReloadSupport;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigCandidateGate;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigSnapshot;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporter;
 import io.github.dailystruggle.rtp.common.importer.ForeignConfigImporterRegistry;
@@ -14,6 +17,7 @@ import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.logging.Level;
@@ -271,6 +275,38 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
 
         Runnable importTask = () -> {
             sendMessage(callerId, "&7[RTP] Importing from &f" + finalSourceDir.getFileName() + "&7 (overwrite=" + finalOverwrite + ")...");
+            Path stagingDir = null;
+            try {
+                stagingDir = java.nio.file.Files.createTempDirectory("rtp-config-import-");
+                copyYamlSnapshot(ConfigSnapshot.read(destinationDir), stagingDir);
+                ImportResult stagedResult = finalImporter.importConfiguration(finalSourceDir, stagingDir, finalOverwrite);
+
+                if (!stagedResult.isSuccess()) {
+                    for (String warn : stagedResult.getWarnings()) {
+                        sendMessage(callerId, "&e[WARN] " + warn);
+                    }
+                    reportImportFailure(callerId, stagedResult, finalOverwrite);
+                    return;
+                }
+
+                Map<String, String> overlay = readStagedYaml(stagingDir, stagedResult);
+                ConfigCandidateGate.Result candidate = ConfigCandidateGate.evaluate(destinationDir, overlay);
+                if (candidate.rejected()) {
+                    for (String warn : stagedResult.getWarnings()) {
+                        sendMessage(callerId, "&e[WARN] " + warn);
+                    }
+                    ReloadSupport.sendReloadRejected(callerId, candidate);
+                    return;
+                }
+            } catch (IOException | RuntimeException e) {
+                RTPRuntime.log(Level.WARNING, "[RTP] Could not stage or validate foreign configuration import", e);
+                sendMessage(callerId, "&c[RTP] Import failed!");
+                sendMessage(callerId, "&c[ERROR] Could not stage or validate imported configuration: " + e.getMessage());
+                return;
+            } finally {
+                deleteStagingDirectory(stagingDir);
+            }
+
             ImportResult result = finalImporter.importConfiguration(finalSourceDir, destinationDir, finalOverwrite);
 
             for (String warn : result.getWarnings()) {
@@ -278,13 +314,7 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
             }
 
             if (!result.isSuccess()) {
-                sendMessage(callerId, "&c[RTP] Import failed!");
-                for (String err : result.getErrors()) {
-                    sendMessage(callerId, "&c[ERROR] " + err);
-                }
-                if (!finalOverwrite) {
-                    sendMessage(callerId, "&7Tip: pass &foverwrite=true&7 to replace existing files.");
-                }
+                reportImportFailure(callerId, result, finalOverwrite);
                 return;
             }
 
@@ -295,6 +325,7 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
 
             boolean reloaded = false;
             Throwable reloadFailure = null;
+            boolean fallbackReload = false;
             try {
                 CommandsAPICommand reload = (RTP.baseCommand != null)
                         ? RTP.baseCommand.getCommandLookup().get("reload")
@@ -302,6 +333,7 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
                 if (reload != null) {
                     reloaded = reload.onCommand(callerId, Collections.emptyMap(), null);
                 } else if (ActiveConfigs.get() != null) {
+                    fallbackReload = true;
                     RTP.reloading.set(true);
                     try {
                         reloaded = ActiveConfigs.get().reload();
@@ -314,7 +346,18 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
                 RTP.reloading.set(false);
             }
 
-            if (reloaded) {
+            boolean reloadRejected = false;
+            if (!reloaded && fallbackReload && ActiveConfigs.get() != null) {
+                var rejection = ActiveConfigs.get().lastReloadRejection();
+                if (rejection.isPresent()) {
+                    ReloadSupport.sendReloadRejected(callerId, rejection.get());
+                    reloadRejected = true;
+                }
+            }
+
+            if (reloadRejected) {
+                // The shared helper delivered the path-aware reloadRejected message.
+            } else if (reloaded) {
                 sendMessage(callerId, "&aGenerated &f" + result.getWrittenFiles().size()
                         + "&a file(s). Configuration reload completed!");
             } else if (reloadFailure != null) {
@@ -339,6 +382,64 @@ public class ConfigImportCmd extends BaseRTPCmdImpl {
         }
 
         return true;
+    }
+
+    private void copyYamlSnapshot(ConfigSnapshot snapshot, Path stagingDir) throws IOException {
+        Path stagingRoot = stagingDir.toAbsolutePath().normalize();
+        for (String file : snapshot.files()) {
+            var text = snapshot.text(file);
+            if (text.isEmpty()) continue;
+            Path stagedFile = stagingRoot.resolve(file).normalize();
+            if (!stagedFile.startsWith(stagingRoot)) {
+                throw new IOException("Configuration snapshot path escaped its root: " + file);
+            }
+            if (stagedFile.getParent() != null) java.nio.file.Files.createDirectories(stagedFile.getParent());
+            java.nio.file.Files.writeString(stagedFile, text.get(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+    }
+
+    private Map<String, String> readStagedYaml(Path stagingDir, ImportResult result) throws IOException {
+        Path stagingRoot = stagingDir.toAbsolutePath().normalize();
+        Map<String, String> overlay = new TreeMap<>();
+        for (Path writtenFile : result.getWrittenFiles()) {
+            if (writtenFile == null) continue;
+            Path stagedFile = (writtenFile.isAbsolute() ? writtenFile : stagingRoot.resolve(writtenFile))
+                    .toAbsolutePath().normalize();
+            if (!stagedFile.startsWith(stagingRoot)) {
+                throw new IOException("Importer reported a file outside its staging directory: " + writtenFile);
+            }
+            if (!stagedFile.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".yml")) continue;
+            if (!java.nio.file.Files.isRegularFile(stagedFile)) {
+                throw new IOException("Importer-reported YAML file is missing from staging: " + writtenFile);
+            }
+            String relative = stagingRoot.relativize(stagedFile).toString().replace(File.separatorChar, '/');
+            overlay.put(relative, java.nio.file.Files.readString(stagedFile, java.nio.charset.StandardCharsets.UTF_8));
+        }
+        return overlay;
+    }
+
+    private void deleteStagingDirectory(Path stagingDir) {
+        if (stagingDir == null) return;
+        try (var paths = java.nio.file.Files.walk(stagingDir)) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+                java.nio.file.Files.deleteIfExists(path);
+            }
+        } catch (IOException e) {
+            RTPRuntime.log(Level.WARNING, "[RTP] Could not remove configuration import staging directory " + stagingDir, e);
+        }
+    }
+
+    private void reportImportFailure(@Nullable UUID callerId, ImportResult result, boolean overwrite) {
+        sendMessage(callerId, "&c[RTP] Import failed!");
+        for (String err : result.getErrors()) {
+            sendMessage(callerId, "&c[ERROR] " + err);
+        }
+        if (result.getErrors().isEmpty()) {
+            sendMessage(callerId, "&c[ERROR] Importer did not produce a valid candidate.");
+        }
+        if (!overwrite) {
+            sendMessage(callerId, "&7Tip: pass &foverwrite=true&7 to replace existing files.");
+        }
     }
 
     private void executePermissionMigration(@Nullable UUID callerId, @Nullable String sourceFilter, boolean apply) {

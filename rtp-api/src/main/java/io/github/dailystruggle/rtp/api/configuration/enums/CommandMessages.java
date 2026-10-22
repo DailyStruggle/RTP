@@ -434,5 +434,10 @@ public enum CommandMessages {
   /** {@code /rtp editor apply}: the payload was applied and the configs reloaded. No placeholders. */
   editorApplySuccess,
   /** {@code /rtp editor apply}: fetching, validating or applying the payload failed. {@code [reason]}. */
-  editorApplyFailed
+  editorApplyFailed,
+  /**
+   * {@code /rtp editor apply}: config PBIT rejected the payload before any write (ADR-121).
+   * {@code [count]}, {@code [code]}, {@code [source]}, {@code [path]}.
+   */
+  editorApplyRejected
 }

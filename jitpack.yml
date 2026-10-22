@@ -27,6 +27,7 @@ install:
       :commands-api:publishToMavenLocal
       :effects-api:publishToMavenLocal
       :yaml-api:publishToMavenLocal
+      :units-api:publishToMavenLocal
       :metrics-api:publishToMavenLocal
       :bstats-api:publishToMavenLocal
       :maps-api:publishToMavenLocal

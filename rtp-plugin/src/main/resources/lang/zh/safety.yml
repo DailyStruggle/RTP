@@ -12,6 +12,7 @@
 # 记录一次（）。列表内的顺序无关紧要。
 # 无敌时间（秒）
 # 玩家传送后获得的无敌时长。可避免到达后被火焰、窒息或坠落造成伤害。
+# 支持持续时间单位（例如 24h, 1d）。
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -61,6 +62,7 @@
 
 # 平台占地恢复为原始方块的秒数。-1 = 永不（永久），0 = 区块重新加载后立即恢复。
 # 倒计时仅在区块加载时推进；重启后仍保留。
+# 支持持续时间单位（例如 24h, 1d）。
 # @type: integer
 # @range: [-1, null]
 # @unit: seconds
@@ -75,6 +77,7 @@ pvpCheckEnabled: false
 
 # 玩家受到 PvP 伤害后保持"战斗中"的秒数（仅原生跟踪器；若绑定了外部 combat-tag
 # 插件则忽略）。
+# 支持持续时间单位（例如 24h, 1d）。
 # @type: integer
 # @range: [0, null]
 # @unit: seconds

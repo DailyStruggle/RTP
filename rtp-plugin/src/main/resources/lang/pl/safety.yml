@@ -1,8 +1,9 @@
 # --- RTP Safety Configuration ---
-# Documentation: plugins/RTP/docs/admin/configuration/SAFETY.md
+# Documentation: docs/admin/configuration/SAFETY.md
 
 # Seconds of invulnerability granted after a teleport completes.
 # 0 disables the post-teleport invulnerability window.
+# Obsługuje jednostki czasu (np. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -48,6 +49,7 @@ platformMaterial: "GLASS"
 # Sekundy, po których ślad platformy zostaje przywrócony do pierwotnych bloków.
 # -1 = nigdy (na stałe), 0 = gdy chunk się przeładuje. Odliczanie biegnie tylko
 # przy załadowanym chunku; przetrwa restarty.
+# Obsługuje jednostki czasu (np. 24h, 1d).
 # @type: integer
 # @range: [-1, null]
 # @unit: seconds
@@ -63,6 +65,7 @@ pvpCheckEnabled: false
 
 # Sekundy, przez które gracz pozostaje "w walce" po obrażeniach PvP (tylko natywny
 # tracker; ignorowane, gdy podłączony jest zewnętrzny plugin combat-tag).
+# Obsługuje jednostki czasu (np. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds

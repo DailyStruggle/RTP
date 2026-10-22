@@ -53,6 +53,7 @@ on:
       - 'api/commands-api/**'
       - 'api/effects-api/**'
       - 'api/yaml-api/**'
+      - 'api/units-api/**'
       - 'api/metrics-api/**'
       - 'api/bstats-api/**'
       - 'api/maps-api/**'
@@ -134,6 +135,7 @@ jobs:
           :anvil-api:publishMavenJavaPublicationToCentralStagingRepository
           :commands-api:publishMavenJavaPublicationToCentralStagingRepository
           :yaml-api:publishMavenJavaPublicationToCentralStagingRepository
+          :units-api:publishMavenJavaPublicationToCentralStagingRepository
           :metrics-api:publishMavenJavaPublicationToCentralStagingRepository
           :bstats-api:publishMavenJavaPublicationToCentralStagingRepository
           :maps-api:publishMavenJavaPublicationToCentralStagingRepository

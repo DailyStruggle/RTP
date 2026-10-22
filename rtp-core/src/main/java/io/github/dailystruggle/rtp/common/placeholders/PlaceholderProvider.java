@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.entity.RTPPlayer;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.metrics.api.MetricsSnapshot;
+import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.database.ActiveDatabase;
 import io.github.dailystruggle.rtp.common.metrics.CoreMetrics;
@@ -223,14 +224,13 @@ public class PlaceholderProvider {
 
                     RTPCommandSender sender = RTPRuntime.serverAccessor().getSender(uuid);
                     if (sender != null) {
-                        TeleportData teleportData = TeleportSessions.current().latestTeleportData.get(uuid);
-                        long lastTime = start;
-                        if (teleportData != null) lastTime = teleportData.time;
+                        long lastTime = RTP.getEffectiveLastTeleportTime(uuid);
+                        if (lastTime <= 0L) lastTime = start;
 
                         long n = sender.cooldown();
 
                         long currTime = (start - lastTime);
-                        long remainingTime = n - currTime;
+                        long remainingTime = currTime < 0L ? 0L : n - currTime;
                         if (remainingTime < 0) remainingTime = 0;
 
                         long days = TimeUnit.MILLISECONDS.toDays(remainingTime);
@@ -274,7 +274,8 @@ public class PlaceholderProvider {
                     if (cfg == null) return "";
                     long cap = cfg.getNumber(ConfigKeys.lockAfterUses, 0L).longValue();
                     long resetMillis =
-                            cfg.getNumber(ConfigKeys.lockAfterResetSeconds, 0L).longValue() * 1000L;
+                            ConfigParser.parseSecondsDurationMillis(
+                                    cfg.getConfigValue(ConfigKeys.lockAfterResetSeconds, 0L), 0L);
                     long remainingTime = ActiveDatabase.teleportLimitStore().millisUntilReset(
                             uuid, cap, resetMillis, System.currentTimeMillis());
                     if (remainingTime <= 0) return "";
@@ -314,7 +315,8 @@ public class PlaceholderProvider {
                             (ConfigParser<ConfigKeys>) ActiveConfigs.get().getParser(ConfigKeys.class);
                     if (cfg == null) return "0";
                     long resetMillis =
-                            cfg.getNumber(ConfigKeys.lockAfterResetSeconds, 0L).longValue() * 1000L;
+                            ConfigParser.parseSecondsDurationMillis(
+                                    cfg.getConfigValue(ConfigKeys.lockAfterResetSeconds, 0L), 0L);
                     long uses = ActiveDatabase.teleportLimitStore().uses(
                             uuid, resetMillis, System.currentTimeMillis());
                     return String.valueOf(uses);
@@ -332,7 +334,8 @@ public class PlaceholderProvider {
                     long cap = cfg.getNumber(ConfigKeys.lockAfterUses, 0L).longValue();
                     if (cap <= 0) return "0";
                     long resetMillis =
-                            cfg.getNumber(ConfigKeys.lockAfterResetSeconds, 0L).longValue() * 1000L;
+                            ConfigParser.parseSecondsDurationMillis(
+                                    cfg.getConfigValue(ConfigKeys.lockAfterResetSeconds, 0L), 0L);
                     long uses = ActiveDatabase.teleportLimitStore().uses(
                             uuid, resetMillis, System.currentTimeMillis());
                     long remaining = cap - uses;
@@ -789,12 +792,18 @@ public class PlaceholderProvider {
 
                     TeleportData data = TeleportSessions.current().latestTeleportData.get(uuid);
 
-                    if (data == null)
+                    if (data == null) {
+                        long lastTime = RTP.getEffectiveLastTeleportTime(uuid);
+                        long elapsed = System.currentTimeMillis() - lastTime;
+                        if (lastTime > 0L && elapsed >= 0L && elapsed < sender.cooldown()) {
+                            return ActiveConfigs.get().getConfigValue(PlayerMessages.PLAYER_COOLDOWN, "").toString();
+                        }
                         return ActiveConfigs.get().getConfigValue(PlayerMessages.PLAYER_AVAILABLE, "").toString();
+                    }
                     if (data.completed) {
-                        long dt = System.currentTimeMillis() - data.time;
-                        if (dt < 0) dt = Long.MAX_VALUE + dt;
-                        if (dt < sender.cooldown()) {
+                        long lastTime = RTP.getEffectiveLastTeleportTime(uuid);
+                        long dt = System.currentTimeMillis() - lastTime;
+                        if (lastTime > 0L && dt >= 0L && dt < sender.cooldown()) {
                             return ActiveConfigs.get().getConfigValue(PlayerMessages.PLAYER_COOLDOWN, "").toString();
                         }
 

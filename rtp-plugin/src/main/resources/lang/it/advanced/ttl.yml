@@ -1,5 +1,5 @@
 # --- Impostazioni TTL Memoria Spaziale RTP ---
-# Documentazione: plugins/RTP/docs/admin/configuration/TTL.md
+# Documentazione: docs/admin/configuration/TTL.md
 
 # Durate base di conservazione per le sequenze di coordinate rifiutate nella memoria spaziale.
 # Formati di durata supportati: es. 14d, 12h, 30m, 3600s, 40t, 2500ms o composito 1d12h.

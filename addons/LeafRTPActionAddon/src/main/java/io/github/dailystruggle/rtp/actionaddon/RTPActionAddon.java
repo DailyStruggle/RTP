@@ -5,6 +5,7 @@ import io.github.dailystruggle.rtp.api.addon.RTPAddon;
 import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.action.ActionCacheWarmTask;
 import io.github.dailystruggle.rtp.common.action.ActionConfigLoader;
+import io.github.dailystruggle.rtp.common.action.ActionEngineSelfTest;
 import io.github.dailystruggle.rtp.common.action.ActionManager;
 import io.github.dailystruggle.rtp.common.action.ActionServices;
 import io.github.dailystruggle.rtp.common.commands.action.ActionSubCmd;
@@ -37,6 +38,7 @@ public final class RTPActionAddon implements RTPAddon {
   @Override
   public void onLoad() {
     RTP.log(Level.INFO, "[LeafRTPActionAddon] Initializing declarative action subsystem (ADR-093)...");
+    ActionEngineSelfTest.register(RTPActionAddon.class.getClassLoader());
 
     actionManager = new ActionManager();
     ActionServices.setActionManager(actionManager);
@@ -100,6 +102,7 @@ public final class RTPActionAddon implements RTPAddon {
   @Override
   public void onUnload() {
     RTP.log(Level.INFO, "[LeafRTPActionAddon] Unloading action subsystem...");
+    ActionEngineSelfTest.unregister();
 
     if (actionManager != null) {
       actionManager.clearCaches();

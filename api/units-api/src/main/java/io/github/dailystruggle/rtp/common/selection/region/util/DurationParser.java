@@ -1,8 +1,9 @@
 package io.github.dailystruggle.rtp.common.selection.region.util;
 
-import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import java.util.Locale;
-import java.util.logging.Level;
+import java.util.Objects;
+import java.util.function.Consumer;
+import java.util.logging.Logger;
 
 /**
  * Robust parser for temporal duration values with optional unit suffixes and auto-interpretation.
@@ -194,6 +195,22 @@ public final class DurationParser {
    */
   public static ParsedDuration autoInterpret(
       ParsedDuration parsed, TemporalUnit expectedUnit, String contextName) {
+    return autoInterpret(parsed, expectedUnit, contextName,
+        message -> Logger.getLogger(DurationParser.class.getName()).info(message));
+  }
+
+  /**
+   * Auto-interprets a dimensionless duration and reports any reinterpretation to {@code logInfo}.
+   *
+   * @param parsed the parsed duration
+   * @param expectedUnit expected/conventional unit in this context
+   * @param contextName context identifier for logging
+   * @param logInfo receives an informational message when a value is reinterpreted
+   * @return auto-interpreted duration (or the original if no re-interpretation occurred)
+   */
+  public static ParsedDuration autoInterpret(
+      ParsedDuration parsed, TemporalUnit expectedUnit, String contextName, Consumer<String> logInfo) {
+    Objects.requireNonNull(logInfo, "logInfo");
     if (parsed == null || parsed.explicitUnit()) {
       return parsed;
     }
@@ -205,13 +222,13 @@ public final class DurationParser {
     if (expectedUnit == TemporalUnit.TICK && parsed.unit() == TemporalUnit.TICK) {
       if (val >= 1000.0 && val % 50 == 0) {
         // High likelihood of millisecond value mistakenly entered without unit
-        logAutoInterpret(contextName, val, "ticks", val / 50.0, "ticks (from millis)", val / 50.0 * 0.05);
+        logAutoInterpret(contextName, val, "ticks", val / 50.0, "ticks (from millis)", val / 50.0 * 0.05, logInfo);
         return new ParsedDuration(val, TemporalUnit.MILLISECOND, false);
       }
     } else if (expectedUnit == TemporalUnit.SECOND && parsed.unit() == TemporalUnit.SECOND
         && val >= 1000.0 && val % 500 == 0) {
       // If expected is SECOND, but user configured e.g. 1000 or 5000 (likely milliseconds)
-      logAutoInterpret(contextName, val, "seconds", val / 1000.0, "seconds (from millis)", val / 1000.0);
+      logAutoInterpret(contextName, val, "seconds", val / 1000.0, "seconds (from millis)", val / 1000.0, logInfo);
       return new ParsedDuration(val, TemporalUnit.MILLISECOND, false);
     }
 
@@ -219,7 +236,8 @@ public final class DurationParser {
   }
 
   private static void logAutoInterpret(
-      String context, double origVal, String origUnit, double newVal, String newUnit, double secEquiv) {
+      String context, double origVal, String origUnit, double newVal, String newUnit, double secEquiv,
+      Consumer<String> logInfo) {
     String msg = String.format(
         Locale.ROOT,
         "[RTP] Auto-interpreted dimensionless %s '%s' from %s to %s %s (%.2f seconds). To specify explicitly, use suffix '%s'.",
@@ -231,6 +249,6 @@ public final class DurationParser {
         secEquiv,
         TemporalUnit.fromString(newUnit) != null ? TemporalUnit.fromString(newUnit).getPrimarySuffix() : newUnit
     );
-    RTPRuntime.log(Level.INFO, msg);
+    logInfo.accept(msg);
   }
 }
