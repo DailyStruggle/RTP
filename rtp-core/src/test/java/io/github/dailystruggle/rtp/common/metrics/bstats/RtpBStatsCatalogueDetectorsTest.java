@@ -136,13 +136,6 @@ class RtpBStatsCatalogueDetectorsTest {
         f.set(target, value);
     }
 
-    private static RTP installMockInstance() throws Exception {
-        RTP rtp = mock(RTP.class);
-        setInstance(rtp);
-        TeleportSessions.install(new TeleportSessions());
-    }
-
-        return rtp;
     // --- Host defaults ---
 
     @Test
