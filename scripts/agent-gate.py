@@ -140,6 +140,14 @@ def main(argv: list[str]) -> int:
     tasks = gradle_tasks(scope)
     if tasks:
         steps.append(("set builds", [gradlew, *tasks, *GATE_FLAGS, *extra]))
+    if kind == "full" or any(scope.get(name) == "true" for name in ("core", "plugin", "addons")):
+        steps.append(("BIT action examples",
+                      [gradlew, ":rtp-core:bit",
+                       "-Pconfig=addons/LeafRTPActionAddon/src/main/resources/definitions/actions",
+                       "-Pstrict", *extra]))
+        steps.append(("BIT shipped default config",
+                      [gradlew, ":rtp-core:bit", "-Pconfig=rtp-plugin/src/main/resources",
+                       "-Pstrict", *extra]))
     if kind == "full":
         steps.append(("reduced JDK 21 graph",
                       [gradlew, "assemble", "verifyJava17Bytecode", *REDUCED_FLAGS, *extra]))

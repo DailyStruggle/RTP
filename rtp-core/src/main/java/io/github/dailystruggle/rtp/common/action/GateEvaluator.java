@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.api.action.ActionGateContext;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
+import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -36,6 +37,23 @@ public final class GateEvaluator {
 
   public static final Vocabulary GATE_TYPES = new Vocabulary("gate type", List.of(
       "scoreboard", "spatial", "time", "predicate", "players", "participants", "queue", "participantcount", "command"));
+  public static final Map<String, Set<String>> GATE_SUB_KEYS = Map.of(
+      "scoreboard", Set.of("objective", "matches", "range"),
+      "spatial", Set.of("withinBoundary", "distance", "target", "elevationDelta", "shape", "region", "playerCount", "world"),
+      "time", Set.of("elapsed", "remaining"),
+      "predicate", Set.of(),
+      "players", Set.of("matches", "range", "count"),
+      "participants", Set.of("matches", "range", "count"),
+      "queue", Set.of("matches", "range", "count"),
+      "participantcount", Set.of("matches", "range", "count"),
+      "command", Set.of("execute", "run"));
+  public static final Map<String, List<Set<String>>> GATE_REQUIRED_SUB_KEYS = Map.of(
+      "scoreboard", List.of(Set.of("objective"), Set.of("matches", "range")),
+      "players", List.of(Set.of("matches", "range", "count")),
+      "participants", List.of(Set.of("matches", "range", "count")),
+      "queue", List.of(Set.of("matches", "range", "count")),
+      "participantcount", List.of(Set.of("matches", "range", "count")),
+      "command", List.of(Set.of("execute", "run")));
 
   private static final Pattern COORD_SEPARATORS = Pattern.compile("[,\\s]+");
 
@@ -79,9 +97,22 @@ public final class GateEvaluator {
       ActionGateContext context,
       Map<String, Predicate<ActionGateContext>> externalPredicates,
       Map<String, Object> additionalTokens) {
+    return evaluateAll(gates, context, externalPredicates, additionalTokens, null);
+  }
+
+  static boolean evaluateAll(
+      List<Map<String, Object>> gates,
+      ActionGateContext context,
+      Map<String, Predicate<ActionGateContext>> externalPredicates,
+      Map<String, Object> additionalTokens,
+      GateTrace trace) {
     if (context != null && context.context() != null) {
       for (Predicate<ActionGateContext> validator : context.context().gateValidators()) {
         if (validator != null && !validator.test(context)) {
+          if (trace != null) {
+            trace.onOutcome(Map.of("context", "validator"), false,
+                "A caller-supplied context validator rejected the action.");
+          }
           return false;
         }
       }
@@ -90,7 +121,7 @@ public final class GateEvaluator {
       return true;
     }
     for (Map<String, Object> gateConfig : gates) {
-      if (!evaluate(gateConfig, context, externalPredicates, additionalTokens)) {
+      if (!evaluate(gateConfig, context, externalPredicates, additionalTokens, trace)) {
         return false;
       }
     }
@@ -121,35 +152,44 @@ public final class GateEvaluator {
    * @param additionalTokens   context tokens for placeholder substitution
    * @return true if all defined conditions pass, false if any fails or an unknown gate is encountered
    */
+  static boolean evaluate(
+      Map<String, Object> gateConfig,
+      ActionGateContext context,
+      Map<String, Predicate<ActionGateContext>> externalPredicates,
+      Map<String, Object> additionalTokens) {
+    return evaluate(gateConfig, context, externalPredicates, additionalTokens, null);
+  }
+
   @SuppressWarnings("unchecked")
   public static boolean evaluate(
       Map<String, Object> gateConfig,
       ActionGateContext context,
       Map<String, Predicate<ActionGateContext>> externalPredicates,
-      Map<String, Object> additionalTokens) {
+      Map<String, Object> additionalTokens,
+      GateTrace trace) {
     if (context != null && context.context() != null) {
       for (Predicate<ActionGateContext> validator : context.context().gateValidators()) {
         if (validator != null && !validator.test(context)) {
-          return false;
+          return completeGateEvaluation(gateConfig, context, false, trace);
         }
       }
     }
 
     if (gateConfig == null || gateConfig.isEmpty()) {
-      return true;
+      return completeGateEvaluation(gateConfig, context, true, trace);
     }
 
     for (Map.Entry<String, Object> entry : gateConfig.entrySet()) {
       String gateType = entry.getKey().toLowerCase();
-      Object val = entry.getValue();
+      Object val = unwrapYamlValue(entry.getValue());
 
       switch (gateType) {
         case "scoreboard" -> {
-          if (!(val instanceof Map<?, ?> map)) return false;
+          if (!(val instanceof Map<?, ?> map)) return completeGateEvaluation(gateConfig, context, false, trace);
           Object objName = map.get("objective");
           Object matches = map.get("matches");
           if (matches == null) matches = map.get("range");
-          if (objName == null || matches == null) return false;
+          if (objName == null || matches == null) return completeGateEvaluation(gateConfig, context, false, trace);
 
           // ADR-093 §4: Managed action scoreboard objectives
           String objStr = objName.toString().trim();
@@ -171,8 +211,10 @@ public final class GateEvaluator {
             }
           } else if ("rtp_alive".equalsIgnoreCase(objStr)) {
             // Count alive session participants via server accessor if available
-            RTPServerAccessor accessor = RTPRuntime.serverAccessor();
-            if (accessor != null && io.github.dailystruggle.rtp.api.RTPAPI.actionService != null) {
+            RTPServerAccessor accessor = trace == null ? RTPRuntime.serverAccessor() : null;
+            if (trace != null) {
+              scoreValue = context.participantCount();
+            } else if (accessor != null && io.github.dailystruggle.rtp.api.RTPAPI.actionService != null) {
               scoreValue = io.github.dailystruggle.rtp.api.RTPAPI.actionService.getSession(context.sessionId())
                   .map(s -> {
                     int c = 0;
@@ -186,24 +228,26 @@ public final class GateEvaluator {
               scoreValue = 1.0;
             }
           } else {
-            RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+            RTPServerAccessor accessor = trace == null ? RTPRuntime.serverAccessor() : null;
             UUID pid = context.participantId();
             Integer realScore = (accessor != null && pid != null)
                 ? accessor.getScoreboardScore(pid, objStr)
                 : null;
             if (realScore != null) {
               scoreValue = realScore.doubleValue();
+            } else if (trace == null) {
+              ActionCbitCounters.recordMissingObjective(objStr);
             }
           }
           if (!GateExpressionParser.matches(matches.toString(), scoreValue)) {
-            return false;
+            return completeGateEvaluation(gateConfig, context, false, trace);
           }
         }
         case "spatial" -> {
-          if (!(val instanceof Map<?, ?> map)) return false;
+          if (!(val instanceof Map<?, ?> map)) return completeGateEvaluation(gateConfig, context, false, trace);
           if (map.containsKey("withinBoundary")) {
             boolean req = Boolean.parseBoolean(map.get("withinBoundary").toString());
-            if (context.inBounds() != req) return false;
+            if (context.inBounds() != req) return completeGateEvaluation(gateConfig, context, false, trace);
           }
           if (map.containsKey("distance")) {
             double actualDist;
@@ -219,16 +263,16 @@ public final class GateEvaluator {
                   double dz = context.currentZ() - tz;
                   actualDist = Math.hypot(dx, dz);
                 } catch (NumberFormatException e) {
-                  return false;
+                  return completeGateEvaluation(gateConfig, context, false, trace);
                 }
               } else {
-                return false;
+                return completeGateEvaluation(gateConfig, context, false, trace);
               }
             } else {
               actualDist = Math.sqrt(Math.max(0.0, context.distanceSqFromAnchor()));
             }
             if (!GateExpressionParser.matches(map.get("distance").toString(), actualDist)) {
-              return false;
+              return completeGateEvaluation(gateConfig, context, false, trace);
             }
           }
           if (map.containsKey("elevationDelta")) {
@@ -237,7 +281,7 @@ public final class GateEvaluator {
               delta = 0.0; // current or anchor Y unknown
             }
             if (!GateExpressionParser.matches(map.get("elevationDelta").toString(), delta)) {
-              return false;
+              return completeGateEvaluation(gateConfig, context, false, trace);
             }
           }
           if (map.containsKey("shape") || map.containsKey("region") || map.containsKey("playerCount")) {
@@ -257,7 +301,7 @@ public final class GateEvaluator {
               }
             }
             if (map.containsKey("shape") && shape == null) {
-              return false;
+              return completeGateEvaluation(gateConfig, context, false, trace);
             }
             if (shape != null) {
               // If context has current coords, check contains
@@ -265,7 +309,7 @@ public final class GateEvaluator {
                 int chunkX = (int) Math.floor(context.currentX() / 16.0);
                 int chunkZ = (int) Math.floor(context.currentZ() / 16.0);
                 if (!shape.contains(chunkX, chunkZ)) {
-                  return false;
+                  return completeGateEvaluation(gateConfig, context, false, trace);
                 }
               }
               // If playerCount condition is present, count online players inside shape
@@ -273,8 +317,11 @@ public final class GateEvaluator {
                 String reqCount = String.valueOf(map.get("playerCount"));
                 int matchingPlayers = 0;
                 String targetWorld = map.containsKey("world") ? String.valueOf(map.get("world")) : null;
-                RTPServerAccessor accessor = RTPRuntime.serverAccessor();
-                if (accessor != null) {
+                RTPServerAccessor accessor = trace == null ? RTPRuntime.serverAccessor() : null;
+                if (trace != null) {
+                  matchingPlayers = context.participantCount();
+                  if (targetWorld != null && !targetWorld.equalsIgnoreCase("simulation")) matchingPlayers = 0;
+                } else if (accessor != null) {
                   for (io.github.dailystruggle.rtp.api.entity.RTPPlayer p : accessor.getOnlinePlayers()) {
                     if (p != null) {
                       io.github.dailystruggle.rtp.api.world.RTPLocation loc = p.getLocation();
@@ -290,24 +337,24 @@ public final class GateEvaluator {
                   }
                 }
                 if (!GateExpressionParser.matches(reqCount, matchingPlayers)) {
-                  return false;
+                  return completeGateEvaluation(gateConfig, context, false, trace);
                 }
               }
             } else if (map.containsKey("playerCount")) {
               // No shape configured but playerCount specified
-              return false;
+              return completeGateEvaluation(gateConfig, context, false, trace);
             }
           }
         }
         case "time" -> {
-          if (!(val instanceof Map<?, ?> map)) return false;
+          if (!(val instanceof Map<?, ?> map)) return completeGateEvaluation(gateConfig, context, false, trace);
           if (map.containsKey("elapsed")
               && !GateExpressionParser.matches(map.get("elapsed").toString(), context.elapsedSeconds())) {
-            return false;
+            return completeGateEvaluation(gateConfig, context, false, trace);
           }
           if (map.containsKey("remaining")
               && !GateExpressionParser.matches(map.get("remaining").toString(), context.remainingSeconds())) {
-            return false;
+            return completeGateEvaluation(gateConfig, context, false, trace);
           }
         }
         case "predicate" -> {
@@ -315,7 +362,7 @@ public final class GateEvaluator {
           Predicate<ActionGateContext> predicate =
               (externalPredicates == null) ? null : externalPredicates.get(predName);
           if (predicate == null || !predicate.test(context)) {
-            return false;
+            return completeGateEvaluation(gateConfig, context, false, trace);
           }
         }
         case "players", "participants", "queue", "participantcount" -> {
@@ -328,10 +375,10 @@ public final class GateEvaluator {
           } else if (val != null) {
             matchExpr = val.toString();
           }
-          if (matchExpr == null || matchExpr.isBlank()) return false;
+          if (matchExpr == null || matchExpr.isBlank()) return completeGateEvaluation(gateConfig, context, false, trace);
           int count = (context != null) ? context.participantCount() : 0;
           if (!GateExpressionParser.matches(matchExpr, count)) {
-            return false;
+            return completeGateEvaluation(gateConfig, context, false, trace);
           }
         }
         case "command" -> {
@@ -349,10 +396,10 @@ public final class GateEvaluator {
           } else if (val instanceof String s) {
             rawCommands.add(s);
           }
-          if (rawCommands.isEmpty()) return false;
+          if (rawCommands.isEmpty()) return completeGateEvaluation(gateConfig, context, false, trace);
 
-          RTPServerAccessor accessor = RTPRuntime.serverAccessor();
-          if (accessor == null) return false;
+          RTPServerAccessor accessor = trace == null ? RTPRuntime.serverAccessor() : null;
+          if (trace == null && accessor == null) return completeGateEvaluation(gateConfig, context, false, trace);
 
           Map<String, Object> tokens = new HashMap<>();
           if (additionalTokens != null && !additionalTokens.isEmpty()) {
@@ -374,6 +421,7 @@ public final class GateEvaluator {
             }
 
             String substituted = ActionPlaceholderSanitizer.substitute(cmdTemplate, tokens);
+            if (trace == null) ActionCbitCounters.recordUnresolvedPlaceholders(substituted);
             // Substitution can compose a target placeholder the pre-check could not see,
             // e.g. "[target_[n]]" -> "[target_1]"; never dispatch it unresolved.
             if (ActionPlaceholderSanitizer.containsUnresolvedPrefix(substituted, "target")) {
@@ -384,23 +432,64 @@ public final class GateEvaluator {
             // checks natively via scoreboard tags. Bukkit's dispatchCommand return value
             // does not reflect the predicate result for vanilla 'execute if', so trusting
             // it silently passes/fails gates (and leaks "Test failed" chat feedback).
+            if (trace != null) {
+              if (!trace.simulateCommand(substituted)) {
+                return completeGateEvaluation(gateConfig, context, false, trace);
+              }
+              continue;
+            }
+
             Optional<Boolean> nativeResult = evaluateEntityPredicate(substituted, accessor);
             if (nativeResult.isPresent()) {
-              if (!nativeResult.get()) return false;
+              if (!nativeResult.get()) return completeGateEvaluation(gateConfig, context, false, trace);
               continue; // predicate satisfied; do not dispatch the vanilla command
             }
 
             boolean success = accessor.executeCommand(new UUID(0, 0), substituted);
-            if (!success) return false;
+            if (!success) return completeGateEvaluation(gateConfig, context, false, trace);
           }
         }
         default -> {
           // ADR-093: Unrecognized gate key fails closed (block skipped)
-          return false;
+          return completeGateEvaluation(gateConfig, context, false, trace);
         }
       }
     }
-    return true;
+    return completeGateEvaluation(gateConfig, context, true, trace);
+  }
+
+  private static boolean completeGateEvaluation(
+      Map<String, Object> gateConfig, ActionGateContext context, boolean passed, GateTrace trace) {
+    if (trace == null) {
+      ActionCbitCounters.recordGateOutcome(gateConfig, context == null ? null : context.actionId(), passed);
+    }
+    if (trace != null && gateConfig != null && !gateConfig.isEmpty()) {
+      Object normalized = unwrapYamlValue(gateConfig);
+      Map<String, Object> tracedConfig = new HashMap<>();
+      if (normalized instanceof Map<?, ?> map) {
+        map.forEach((key, value) -> tracedConfig.put(String.valueOf(key), value));
+      }
+      String reason = passed
+          ? "All configured gate conditions matched."
+          : "Gate rejected the context for condition(s): " + tracedConfig;
+      trace.onOutcome(tracedConfig, passed, reason);
+    }
+    return passed;
+  }
+
+  private static Object unwrapYamlValue(Object value) {
+    if (value instanceof RtpYamlSection section) return unwrapYamlValue(section.getValues(false));
+    if (value instanceof Map<?, ?> map) {
+      Map<String, Object> normalized = new HashMap<>();
+      map.forEach((key, child) -> normalized.put(String.valueOf(key), unwrapYamlValue(child)));
+      return normalized;
+    }
+    if (value instanceof List<?> values) {
+      List<Object> normalized = new ArrayList<>(values.size());
+      for (Object child : values) normalized.add(unwrapYamlValue(child));
+      return normalized;
+    }
+    return value;
   }
 
   private static final Pattern ENTITY_PREDICATE_PATTERN = Pattern.compile(

@@ -101,7 +101,8 @@ public final class WorldBorderAuditor {
     }
 
     DistanceParser.ParsedDistance interpreted =
-        DistanceParser.autoInterpret(parsed, borderRadBlocks, "region '" + regionName + "' " + paramName);
+        DistanceParser.autoInterpret(parsed, borderRadBlocks, "region '" + regionName + "' " + paramName,
+            message -> RTPRuntime.log(Level.INFO, message));
 
     if (interpreted != null && interpreted.unit() != SpatialUnit.CHUNK) {
       double chunks = interpreted.toChunks();

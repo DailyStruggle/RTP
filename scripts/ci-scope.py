@@ -70,7 +70,7 @@ ZERO_SHA = "0" * 40
 
 # Project set -> top-level Gradle path segments it owns. Order is output order.
 SETS: dict[str, tuple[str, ...]] = {
-    "core": ("rtp-api", "rtp-core", "commands-api", "yaml-api", "effects-api",
+    "core": ("rtp-api", "rtp-core", "commands-api", "yaml-api", "units-api", "effects-api",
              "maps-api", "metrics-api", "bstats-api", "anvil-api", "bit-api", "tags-api"),
     "bukkit": ("rtp-bukkit", "rtp-paper", "rtp-folia"),
     "fabric": ("rtp-fabric",),

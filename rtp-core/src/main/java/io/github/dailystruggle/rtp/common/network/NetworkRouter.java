@@ -28,7 +28,7 @@ public final class NetworkRouter {
             if (raw == null) return LOCAL;
             String trimmed = raw.trim().toLowerCase(Locale.ROOT).replace('-', '_');
             return switch (trimmed) {
-                case "cross_server", "crossserver", "cross", "remote" -> CROSS_SERVER;
+                case "always", "cross_server", "crossserver", "cross", "remote" -> CROSS_SERVER;
                 case "auto", "smart" -> AUTO;
                 default -> LOCAL;
             };

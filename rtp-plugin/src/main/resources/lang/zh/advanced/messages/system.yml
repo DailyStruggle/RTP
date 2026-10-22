@@ -16,6 +16,7 @@
 重载中: "&b[P0] 正在加载 [filename]……"
 已重载: "&b[P0] [filename] 已成功加载。"
 reloadFailed: "&c[P0] 配置重新加载失败。请检查服务器日志。"
+reloadRejected: "&c[P0] 已拒绝重载：存在 [count] 个配置错误，保留当前配置。第一个：[source] 中 [path] 处的 [code]。详情：/rtp test subsystem=config"
 更新中: "&a[P0] 正在更新 [filename]……"
 已更新: "&a[P0] [filename] 已成功更新。"
 

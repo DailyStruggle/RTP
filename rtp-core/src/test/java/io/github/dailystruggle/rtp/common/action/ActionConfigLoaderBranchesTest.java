@@ -107,10 +107,10 @@ class ActionConfigLoaderBranchesTest {
                 - "j"
                 - "enter"
               run:
-                - ACTION: "START"
+                - ACTION: "PULL_BACK"
             quit:
               actions:
-                - ACTION: "CANCEL"
+                - ACTION: "DISARM"
         """;
     ActionDefinition def = ActionConfigLoader.parseDefinition("test", RtpYamlConfig.parse(yaml));
     assertTrue(def.command().isConfigured());
@@ -125,6 +125,7 @@ class ActionConfigLoaderBranchesTest {
     assertEquals("perm.join", joinSub.permission());
     assertEquals(List.of("j", "enter"), joinSub.aliases());
     assertEquals(1, joinSub.actions().size());
+    assertEquals(1, def.command().subcommands().get("quit").actions().size());
   }
 
   @Test
@@ -317,7 +318,7 @@ class ActionConfigLoaderBranchesTest {
         """;
     ActionDefinition def = ActionConfigLoader.parseDefinition("coords_test", RtpYamlConfig.parse(yaml));
     assertNotNull(def);
-    assertEquals(2, def.triggers().size());
+    assertEquals(1, def.triggers().size());
   }
 
   @Test

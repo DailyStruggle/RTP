@@ -10,6 +10,7 @@ import io.github.dailystruggle.bit.BitTier;
 import io.github.dailystruggle.bit.BuiltInTestable;
 import io.github.dailystruggle.bit.PbitResult;
 import io.github.dailystruggle.rtp.common.action.ActionConfigLoader;
+import io.github.dailystruggle.rtp.common.action.ActionCbitCounters;
 import io.github.dailystruggle.rtp.common.action.ActionDefinitionValidator;
 import java.lang.System.Logger.Level;
 import java.util.ArrayList;
@@ -22,6 +23,9 @@ public final class RtpBitComponents {
     private static final BitComponent ACTION_DEFINITIONS = new BitComponent(
             "action-definitions", "action", BitTier.PBIT, BitSideEffect.SAFE,
             COMPONENT_TIMEOUT_MILLIS, RtpBitComponents::checkActionDefinitions);
+    private static final BitComponent ACTION_CBIT = new BitComponent(
+            "action-cbit", "action", BitTier.CBIT, BitSideEffect.SAFE,
+            COMPONENT_TIMEOUT_MILLIS, ActionCbitCounters::report);
     private static final BitComponent ANVIL_ZSTD = anvilComponent("anvil-zstd",
             () -> bitReport("anvil-zstd",
                     io.github.dailystruggle.rtp.anvil.DynamicZstdBinding.INSTANCE.asBit()));
@@ -40,6 +44,8 @@ public final class RtpBitComponents {
     /** Registers RTP-owned PBIT components once; repeated calls preserve existing registrations. */
     public static void registerDefaults() {
         for (BitComponent component : DEFAULTS) RtpBit.RUNNER.register(component);
+        RtpBit.RUNNER.register(ACTION_CBIT);
+        io.github.dailystruggle.rtp.common.bit.config.ConfigPbit.registerComponents();
     }
 
     static List<BitComponent> defaults() {
@@ -58,8 +64,14 @@ public final class RtpBitComponents {
     private static BitReport checkActionDefinitions() {
         List<BitFinding> findings = new ArrayList<>();
         for (ActionConfigLoader.LoadedDefinition definition : ActionConfigLoader.loadedDefinitions()) {
-            findings.addAll(ActionDefinitionValidator.validate(
-                    definition.id(), definition.values(), definition.source()).findings());
+            for (BitFinding finding : ActionDefinitionValidator.validate(
+                    definition.id(), definition.values(), definition.source()).findings()) {
+                BitSeverityPolicy.effectiveFinding(finding).ifPresent(findings::add);
+            }
+        }
+        for (ActionConfigLoader.LoadFailure failure : ActionConfigLoader.loadFailures()) {
+            findings.add(BitFinding.of(BitCodes.PBIT_FAILED, Level.ERROR, failure.source(), "",
+                    failure.message(), "valid action definition YAML", BitCodes.PBIT_FAILED.remediation()));
         }
         return BitReport.of(findings);
     }

@@ -46,6 +46,15 @@ class LoadBalancerConfigYamlTest {
     }
 
     @Test
+    @DisplayName("REQ-RTP-F-016: staleAfterMs accepts duration units and falls back on invalid values")
+    void staleAfterDurationUnits() {
+        assertEquals(30_000L,
+                LoadBalancerConfigYaml.fromMap(Map.of("staleAfterMs", "30s")).staleAfterMs());
+        assertEquals(LoadBalancerConfig.defaults().staleAfterMs(),
+                LoadBalancerConfigYaml.fromMap(Map.of("staleAfterMs", "invalid")).staleAfterMs());
+    }
+
+    @Test
     @DisplayName("New sub-config terms block: nested curve sub-map (no inline braces)")
     void termsSubConfigBlock() {
         Map<String, Object> sigmoidCurve = new LinkedHashMap<>();

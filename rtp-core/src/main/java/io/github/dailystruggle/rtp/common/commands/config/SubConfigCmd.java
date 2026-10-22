@@ -6,14 +6,17 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.configuration.enums.SystemMessages;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigCandidateGate;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmd;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.base.ConfigSubtreeRegistrar;
 import io.github.dailystruggle.rtp.common.commands.base.NetherEndConfigAmender;
 import io.github.dailystruggle.rtp.common.commands.parameters.*;
 import io.github.dailystruggle.rtp.common.commands.config.list.ListCmd;
+import io.github.dailystruggle.rtp.common.commands.reload.ReloadSupport;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
+import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.RegionKeys;
 import io.github.dailystruggle.rtp.common.factory.Factory;
@@ -25,6 +28,7 @@ import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.shapes.Shape;
 import io.github.dailystruggle.rtp.common.selection.region.selectors.verticalAdjustors.VerticalAdjustor;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -134,6 +138,8 @@ public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistr
         }
       }
 
+      String migrationFrom = null;
+      String migrationTo = null;
       for (Map.Entry<String, List<String>> e : parameterValues.entrySet()) {
         String key = e.getKey();
         Object value = e.getValue().get(0);
@@ -143,9 +149,8 @@ public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistr
 
         if (configParser.myClass.equals(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.class) && key.equalsIgnoreCase("database.type")) {
           Object oldValue = ((ConfigParser<io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys>)configParser).getConfigValue(io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys.database, "yaml");
-          String oldStr = String.valueOf(oldValue);
-          String newStr = value.toString();
-          RTP.handleMigration(oldStr, newStr);
+          migrationFrom = String.valueOf(oldValue);
+          migrationTo = value.toString();
         }
 
         // A key that names one of the type-bearing factories we own
@@ -226,6 +231,17 @@ public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistr
         }
       }
 
+      ConfigCandidateGate.Result gate = evaluateCandidate(configParser);
+      if (gate.rejected()) {
+        restoreParserFromDisk(configParser);
+        ReloadSupport.sendReloadRejected(callerId, gate);
+        return;
+      }
+
+      if (migrationFrom != null && migrationTo != null) {
+        RTP.handleMigration(migrationFrom, migrationTo);
+      }
+
       try {
         configParser.save();
       } catch (IOException ex) {
@@ -274,6 +290,51 @@ public class SubConfigCmd extends BaseRTPCmdImpl implements ConfigSubtreeRegistr
     }
     });
     return true;
+  }
+
+  private static ConfigCandidateGate.Result evaluateCandidate(ConfigParser<?> parser) {
+    Configs configs = ActiveConfigs.get();
+    if (configs == null || configs.pluginDirectory == null) {
+      throw new IllegalStateException("Active config directory is unavailable");
+    }
+
+    Map<String, String> overlays = new HashMap<>();
+    if (parser.fileDatabase != null && parser.fileDatabase.cachedLookup.get() != null) {
+      RtpYamlConfig yaml = parser.fileDatabase.cachedLookup.get().get(parser.name);
+      if (yaml != null && yaml.getConfigurationFile() != null) {
+        Path root = configs.pluginDirectory.toPath().toAbsolutePath().normalize();
+        Path target = yaml.getConfigurationFile().toPath().toAbsolutePath().normalize();
+        if (!target.startsWith(root)) {
+          throw new IllegalArgumentException("Configuration file is outside plugin directory: " + target);
+        }
+        overlays.put(root.relativize(target).toString().replace('\\', '/'), yaml.saveToString());
+      }
+    }
+    return ConfigCandidateGate.evaluate(configs.pluginDirectory.toPath(), overlays);
+  }
+
+  private static void restoreParserFromDisk(ConfigParser<?> parser) {
+    if (parser.fileDatabase == null) return;
+    RtpYamlConfig yaml = parser.fileDatabase.cachedLookup.get() == null
+            ? null : parser.fileDatabase.cachedLookup.get().get(parser.name);
+    java.io.File target = yaml == null
+            ? new java.io.File(parser.pluginDirectory, parser.subDir.isEmpty()
+                    ? parser.name : parser.subDir + java.io.File.separator + parser.name)
+            : yaml.getConfigurationFile();
+    if (target != null) {
+      String cacheKey = target.getName();
+      Map<String, RtpYamlConfig> cache = parser.fileDatabase.cachedLookup.get();
+      if (cache != null) cache.remove(cacheKey);
+      Map<String, Long> modified = parser.fileDatabase.cachedLookupLastModified.get();
+      if (modified != null) modified.remove(cacheKey);
+    }
+    try {
+      parser.check(parser.version, parser.pluginDirectory, parser.langFile);
+    } catch (RuntimeException restoreFailure) {
+      RTPRuntime.log(java.util.logging.Level.SEVERE,
+              "Failed to restore configuration parser " + parser.name + " after PBIT rejection",
+              restoreFailure);
+    }
   }
 
   @Override

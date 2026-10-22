@@ -19,8 +19,9 @@ services:
       MEMORY: 3G
       ONLINE_MODE: "FALSE"
       SKIP_CHOWN: "TRUE"
-      RUN_AS_UID: "0"
-      RUN_AS_GID: "0"
+      UID: "0"
+      GID: "0"
+      SKIP_CHOWN_DATA: "TRUE"
     ports:
       - "127.0.0.1:25591:25565"
     volumes:
@@ -40,8 +41,9 @@ services:
       MEMORY: 6G
       ONLINE_MODE: "FALSE"
       SKIP_CHOWN: "TRUE"
-      RUN_AS_UID: "0"
-      RUN_AS_GID: "0"
+      UID: "0"
+      GID: "0"
+      SKIP_CHOWN_DATA: "TRUE"
       # Resolves the Fabric API build matching VERSION + loader.
       MODRINTH_PROJECTS: fabric-api
     ports:
@@ -64,8 +66,9 @@ services:
       MEMORY: 6G
       ONLINE_MODE: "FALSE"
       SKIP_CHOWN: "TRUE"
-      RUN_AS_UID: "0"
-      RUN_AS_GID: "0"
+      UID: "0"
+      GID: "0"
+      SKIP_CHOWN_DATA: "TRUE"
       MODRINTH_PROJECTS: fabric-api
     ports:
       - "127.0.0.1:25593:25565"

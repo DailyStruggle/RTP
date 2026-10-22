@@ -47,4 +47,4 @@ not describe a specific config knob or command. Keeping them here means:
 - Absolute site URLs (`https://dailystruggle.github.io/RTP/<path>/`) are for copy that is
   read *outside* the repo: `README.md`, `SUPPORT.md`, `FRONT_PAGE*`, issue templates,
   listing bodies. Inside `docs/`, keep links relative so they also resolve on GitHub and
-  in the jar-bundled copy under `plugins/RTP/docs/`.
+  in the jar-bundled copy under `plugins/RTP/docs/` or `config/rtp/docs/`.

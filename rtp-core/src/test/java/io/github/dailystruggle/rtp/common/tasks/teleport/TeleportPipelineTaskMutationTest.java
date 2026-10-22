@@ -1715,7 +1715,7 @@ public class TeleportPipelineTaskMutationTest {
         assertEquals(TeleportPipelineTask.Phase.CLEANUP, task.getPhase());
     }
     @Test
-    @DisplayName("ConfigCache reload accurately applies delay ticks and viewDistance restore intervals")
+    @DisplayName("REQ-RTP-F-016: ConfigCache reload applies duration and tick intervals")
     void configCache_reload_detailed_values() {
         ActiveConfigs.get().getParser(PerformanceKeys.class).set(PerformanceKeys.viewDistanceRestoreInterval, 42L);
         ActiveConfigs.get().getParser(PerformanceKeys.class).set(PerformanceKeys.viewDistanceTeleport, 3);
@@ -1728,6 +1728,19 @@ public class TeleportPipelineTaskMutationTest {
         assertEquals(3, TeleportPipelineTask.ConfigCache.viewDistanceTeleport);
         assertEquals(7, TeleportPipelineTask.ConfigCache.lockAfterUses);
         assertEquals(15000L, TeleportPipelineTask.ConfigCache.lockAfterResetMillis);
+
+        ActiveConfigs.get().getParser(PerformanceKeys.class).set(
+                PerformanceKeys.viewDistanceRestoreInterval, "5s");
+        TeleportPipelineTask.ConfigCache.reload();
+        assertEquals(100L, TeleportPipelineTask.ConfigCache.viewDistanceRestoreInterval);
+
+        ActiveConfigs.get().getParser(ConfigKeys.class).set(ConfigKeys.lockAfterResetSeconds, "3h");
+        TeleportPipelineTask.ConfigCache.reload();
+        assertEquals(10_800_000L, TeleportPipelineTask.ConfigCache.lockAfterResetMillis);
+
+        ActiveConfigs.get().getParser(ConfigKeys.class).set(ConfigKeys.lockAfterResetSeconds, 60);
+        TeleportPipelineTask.ConfigCache.reload();
+        assertEquals(60_000L, TeleportPipelineTask.ConfigCache.lockAfterResetMillis);
     }
 
     // -------------------------------------------------------------------------

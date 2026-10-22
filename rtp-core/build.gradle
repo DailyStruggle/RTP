@@ -154,6 +154,30 @@ test {
     // consulted by the ping). See that file and testcontainers/testcontainers-java#11212.
 }
 
+tasks.register('bit', JavaExec) {
+    group = 'verification'
+    description = 'Runs RTP PBIT checks against a configuration or action-definition directory (ADR-121).'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'io.github.dailystruggle.rtp.common.bit.RtpBitCli'
+    workingDir = rootProject.projectDir
+
+    doFirst {
+        if (!project.hasProperty('config') || project.property('config').toString().isBlank()) {
+            throw new GradleException('The bit task requires -Pconfig=<directory>.')
+        }
+        List<String> cliArgs = ['--config', project.property('config').toString()]
+        String actionId = project.providers.gradleProperty('action').getOrNull()
+        String players = project.providers.gradleProperty('players').getOrNull()
+        String script = project.providers.gradleProperty('script').getOrNull()
+        if (actionId != null) cliArgs.addAll(['--action', actionId])
+        if (players != null) cliArgs.addAll(['--players', players])
+        if (script != null) cliArgs.addAll(['--script', script])
+        if (project.hasProperty('json')) cliArgs.add('--json')
+        if (project.hasProperty('strict')) cliArgs.add('--strict')
+        setArgs(cliArgs)
+    }
+}
+
 // Opt-in benchmark tier (ADR-080).
 //
 // Heap and collector are deliberately NOT overridden here.  The root build already pins

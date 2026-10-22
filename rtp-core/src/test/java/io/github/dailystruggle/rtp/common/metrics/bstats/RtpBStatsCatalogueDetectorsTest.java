@@ -19,6 +19,7 @@ import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.metrics.ChunkLoadProfile;
 import io.github.dailystruggle.rtp.common.metrics.RTPMetricsExtension;
 import io.github.dailystruggle.rtp.common.metrics.RtpOutcomeStats;
+import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.SelectionAPI;
@@ -83,16 +84,21 @@ class RtpBStatsCatalogueDetectorsTest {
     private RTPServerAccessor savedAccessor;
     private RTPScheduler savedScheduler;
     private Configs savedConfigs;
+    private DatabaseAccessor<?> savedDatabaseAccessor;
     private SelectionAPI savedSelection;
     private RTP savedInstance;
+    private TeleportSessions savedSessions;
 
     @BeforeEach
     void setUp() throws Exception {
         savedAccessor = RTPRuntime.serverAccessor();
         savedScheduler = RTPRuntime.scheduler();
         savedConfigs = ActiveConfigs.get();
+        savedDatabaseAccessor = ActiveDatabase.accessor();
         savedSelection = ActiveSelection.get();
         savedInstance = RTP.getInstance();
+        savedSessions = TeleportSessions.current();
+        TeleportSessions.install(null);
         RTPRuntime.setScheduler(null);
         RtpBStatsCatalogue.stopRtpCostSampler();
         RtpOutcomeStats.GLOBAL.reset();
@@ -106,8 +112,10 @@ class RtpBStatsCatalogueDetectorsTest {
         RTPRuntime.setServerAccessor(savedAccessor);
         RTPRuntime.setScheduler(savedScheduler);
         ActiveConfigs.set(savedConfigs);
+        ActiveDatabase.setAccessor(savedDatabaseAccessor);
         ActiveSelection.set(savedSelection);
         setInstance(savedInstance);
+        TeleportSessions.install(savedSessions);
         RtpOutcomeStats.GLOBAL.reset();
         ChunkLoadProfile.GLOBAL.reset();
         RtpBStatsCatalogue.RTP_SYNC_COST_WINDOW.reset();
@@ -131,9 +139,10 @@ class RtpBStatsCatalogueDetectorsTest {
     private static RTP installMockInstance() throws Exception {
         RTP rtp = mock(RTP.class);
         setInstance(rtp);
-        return rtp;
+        TeleportSessions.install(new TeleportSessions());
     }
 
+        return rtp;
     // --- Host defaults ---
 
     @Test
@@ -236,11 +245,7 @@ class RtpBStatsCatalogueDetectorsTest {
 
     @Test
     @DisplayName("database_backend maps the accessor class name onto the documented labels")
-    void databaseBackendLabels() throws Exception {
-        setInstance(null);
-        assertEquals("none", RtpBStatsCatalogue.detectDatabaseBackend());
-
-        RTP rtp = installMockInstance();
+    void databaseBackendLabels() {
         ActiveDatabase.setAccessor(null);
         assertEquals("none", RtpBStatsCatalogue.detectDatabaseBackend());
 
@@ -392,11 +397,7 @@ class RtpBStatsCatalogueDetectorsTest {
     @Test
     @DisplayName("safety_features_enabled reports non-default toggles, default, or unknown on missing/failing config")
     @SuppressWarnings("unchecked")
-    void safetyFeatures() throws Exception {
-        setInstance(null);
-        assertEquals("unknown", RtpBStatsCatalogue.detectSafetyFeaturesEnabled());
-
-        installMockInstance();
+    void safetyFeatures() {
         ActiveConfigs.set(null);
         assertEquals("unknown", RtpBStatsCatalogue.detectSafetyFeaturesEnabled());
 

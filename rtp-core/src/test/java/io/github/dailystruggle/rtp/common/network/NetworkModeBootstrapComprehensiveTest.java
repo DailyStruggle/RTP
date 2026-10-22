@@ -180,6 +180,7 @@ class NetworkModeBootstrapComprehensiveTest {
         assertNotNull(bootstrap.router());
         assertNotNull(bootstrap.enrolmentBuffer());
         assertNotNull(bootstrap.statusCache());
+        assertNull(bootstrap.entryTtlReaper(), "zero/default entryTtlMs must leave the reaper disabled");
         assertNotNull(bootstrap.requestQueue());
         assertNotNull(bootstrap.peerRegionRegistry());
         assertNotNull(bootstrap.commandHook());
@@ -204,6 +205,32 @@ class NetworkModeBootstrapComprehensiveTest {
 
         // Idempotent shutdown
         bootstrap.shutdown();
+    }
+
+    @Test
+    @DisplayName("configured queue entry TTL starts a backend reaper")
+    void configuredQueueEntryTtlStartsReaper() throws IOException {
+        File file = new File(tempDir, "queue-ttl.yml");
+        Files.writeString(file.toPath(), "network:\n"
+                + "  enabled: true\n"
+                + "  serverId: backend-main\n"
+                + "transport:\n"
+                + "  type: in-memory\n"
+                + "queue:\n"
+                + "  entryTtlMs: 2s\n"
+                + "  pollIntervalMs: 1s\n");
+        NetworkHooks.setBackendStateSamplerFactory(lobby -> sid -> new BackendHeartbeat(
+                sid, 1, BackendHeartbeat.PluginState.READY, true, System.currentTimeMillis(),
+                20.0, 0, 100, 0L, 1L, 0, List.of(), List.of(), false
+        ));
+
+        NetworkModeBootstrap bootstrap = new NetworkModeBootstrap();
+        bootstrap.boot(file);
+
+        assertNotNull(bootstrap.requestQueue());
+        assertNotNull(bootstrap.entryTtlReaper(), "entryTtlMs must start a reaper when a queue is available");
+        bootstrap.shutdown();
+        assertNull(bootstrap.entryTtlReaper(), "shutdown must stop and clear the reaper");
     }
 
     @Test

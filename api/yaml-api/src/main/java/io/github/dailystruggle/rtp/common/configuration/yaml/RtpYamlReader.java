@@ -17,6 +17,9 @@ import java.util.regex.Pattern;
  *       indented child).</li>
  *   <li>Block-style sequences ({@code - item} at consistent indent).</li>
  *   <li>Plain, single-quoted, and double-quoted scalars.</li>
+ *   <li>Literal ({@code |}) and folded ({@code >}) block scalars with optional
+ *       chomping and indentation indicators. The writer emits their equivalent
+ *       double-quoted scalar.</li>
  *   <li>Single-line flow sequences ({@code key: [a, b]}, {@code - [a, b]},
  *       nestable as {@code [[1, 2], [3, 4]]}, empty {@code []}) holding
  *       plain/quoted scalars - Chunky parity for polygon {@code vertices}
@@ -43,7 +46,6 @@ import java.util.regex.Pattern;
  *       the closing bracket ({@code rtpYaml.syntax.flowTrailing})</li>
  *   <li>Tags ({@code !!str}) - {@code rtpYaml.unsupported.tag}</li>
  *   <li>Document separators ({@code ---}, {@code ...}) - {@code rtpYaml.unsupported.docSep}</li>
- *   <li>Block scalars ({@code |}, {@code >}) - {@code rtpYaml.unsupported.blockScalar}</li>
  * </ul>
  */
 public final class RtpYamlReader {
@@ -55,16 +57,29 @@ public final class RtpYamlReader {
     private static final class RawLine {
         final int lineNo;       // 1-based
         final int indent;       // number of leading spaces (tabs rejected)
+        final String raw;       // complete physical line, retained for block scalar content
         final String content;   // line text after leading spaces; "" if blank
         final boolean blank;    // whitespace-only
         final boolean comment;  // first non-space char is '#'
+        final RtpYamlParseException deferredError;
 
         RawLine(int lineNo, int indent, String content, boolean blank, boolean comment) {
+            this(lineNo, indent, content, content, blank, comment, null);
+        }
+
+        RawLine(int lineNo, int indent, String raw, String content, boolean blank, boolean comment,
+                RtpYamlParseException deferredError) {
             this.lineNo = lineNo;
             this.indent = indent;
+            this.raw = raw;
             this.content = content;
             this.blank = blank;
             this.comment = comment;
+            this.deferredError = deferredError;
+        }
+
+        void throwIfDeferredError() {
+            if (deferredError != null) throw deferredError;
         }
     }
 
@@ -195,27 +210,29 @@ public final class RtpYamlReader {
         for (int i = 0; i < count; i++) {
             String raw = split[i];
             int lineNo = i + 1;
-            // Reject tabs in indentation explicitly - YAML disallows them and our
-            // emitter only produces spaces, so this guard prevents silent corruption.
             int indent = 0;
             while (indent < raw.length() && raw.charAt(indent) == ' ') indent++;
+            RtpYamlParseException deferredError = null;
             if (indent < raw.length() && raw.charAt(indent) == '\t') {
-                throw new RtpYamlParseException("rtpYaml.syntax.tabIndent",
+                deferredError = new RtpYamlParseException("rtpYaml.syntax.tabIndent",
                         "tabs in indentation are not allowed", lineNo, indent);
             }
             String content = raw.substring(indent);
             boolean blank = content.isEmpty();
             boolean comment = !blank && content.charAt(0) == '#';
-            // Reject document separators eagerly.
             if (!blank && (content.equals("---") || content.startsWith("--- "))) {
-                throw new RtpYamlParseException("rtpYaml.unsupported.docSep",
-                        "document separators are not supported", lineNo, indent);
+                if (deferredError == null) {
+                    deferredError = new RtpYamlParseException("rtpYaml.unsupported.docSep",
+                            "document separators are not supported", lineNo, indent);
+                }
             }
             if (!blank && (content.equals("...") || content.startsWith("... "))) {
-                throw new RtpYamlParseException("rtpYaml.unsupported.docSep",
-                        "document separators are not supported", lineNo, indent);
+                if (deferredError == null) {
+                    deferredError = new RtpYamlParseException("rtpYaml.unsupported.docSep",
+                            "document separators are not supported", lineNo, indent);
+                }
             }
-            out.add(new RawLine(lineNo, indent, content, blank, comment));
+            out.add(new RawLine(lineNo, indent, raw, content, blank, comment, deferredError));
         }
         return out;
     }
@@ -245,6 +262,7 @@ public final class RtpYamlReader {
         }
         while (pos < lines.size()) {
             RawLine ln = lines.get(pos);
+            ln.throwIfDeferredError();
             if (ln.blank) {
                 // Preserve the blank as a sentinel inside the pending
                 // comment block so writers can re-emit the separator
@@ -298,7 +316,7 @@ public final class RtpYamlReader {
                 // empty-scalar value (null).
                 child = parseChildBlock(ln.indent, depth + 1);
             } else {
-                child = parseInlineValue(afterColon, ln.lineNo, ln.indent + pk.keyLength + 2);
+                child = parseValue(afterColon, ln.lineNo, ln.indent + pk.keyLength + 2, ln.indent);
             }
             child.setSourcePosition(ln.lineNo, ln.indent);
             child.setBlockComments(attached);
@@ -324,6 +342,7 @@ public final class RtpYamlReader {
         List<String> bufferedComments = new ArrayList<>();
         while (peek < lines.size()) {
             RawLine ln = lines.get(peek);
+            ln.throwIfDeferredError();
             if (ln.blank) { peek++; bufferedComments.clear(); continue; }
             if (ln.comment) { peek++; bufferedComments.add(stripCommentMarker(ln.content)); continue; }
             break;
@@ -356,6 +375,7 @@ public final class RtpYamlReader {
         }
         while (pos < lines.size()) {
             RawLine ln = lines.get(pos);
+            ln.throwIfDeferredError();
             if (ln.blank) {
                 if (!pendingComments.isEmpty()
                         && !BLANK_LINE_SENTINEL.equals(pendingComments.get(pendingComments.size() - 1))) {
@@ -398,7 +418,8 @@ public final class RtpYamlReader {
                 if (pk.afterColon.isEmpty()) {
                     child = parseChildBlock(ln.indent + 2, depth + 1);
                 } else {
-                    child = parseInlineValue(pk.afterColon, ln.lineNo, ln.indent + 2 + pk.keyLength + 2);
+                    child = parseValue(pk.afterColon, ln.lineNo,
+                            ln.indent + 2 + pk.keyLength + 2, ln.indent + 2);
                 }
                 child.setSourcePosition(ln.lineNo, ln.indent + 2);
                 itemMap.put(pk.key, child);
@@ -406,7 +427,7 @@ public final class RtpYamlReader {
                 parseMappingBody(itemMap, ln.indent + 2, depth + 1);
                 item = itemMap;
             } else {
-                item = parseInlineValue(after, ln.lineNo, ln.indent + 2);
+                item = parseValue(after, ln.lineNo, ln.indent + 2, ln.indent);
             }
             item.setBlockComments(attachedItem);
             seq.add(item);
@@ -529,6 +550,115 @@ public final class RtpYamlReader {
             return new FlowParser(body, line, column).parseTop();
         }
         return parseInlineScalar(text, line, column);
+    }
+
+    private RtpYamlNode parseValue(String text, int line, int column, int parentIndent) {
+        int leadingSpaces = 0;
+        while (leadingSpaces < text.length() && text.charAt(leadingSpaces) == ' ') leadingSpaces++;
+        String candidate = stripInlineComment(text.substring(leadingSpaces)).stripTrailing();
+        if (!candidate.isEmpty() && (candidate.charAt(0) == '|' || candidate.charAt(0) == '>')) {
+            return parseBlockScalar(candidate, line, column + leadingSpaces, parentIndent);
+        }
+        return parseInlineValue(text, line, column);
+    }
+
+    private RtpYamlScalar parseBlockScalar(String header, int line, int column, int parentIndent) {
+        char indicator = header.charAt(0);
+        char chomping = 0;
+        int indentation = 0;
+        boolean hasIndentation = false;
+        for (int i = 1; i < header.length(); i++) {
+            char c = header.charAt(i);
+            if (c == '+' || c == '-') {
+                if (chomping != 0) throw invalidBlockScalarHeader(line, column);
+                chomping = c;
+            } else if (c >= '1' && c <= '9') {
+                if (hasIndentation) throw invalidBlockScalarHeader(line, column);
+                indentation = c - '0';
+                hasIndentation = true;
+            } else {
+                throw invalidBlockScalarHeader(line, column);
+            }
+        }
+
+        int contentIndent = hasIndentation ? parentIndent + indentation : -1;
+        List<String> contentLines = new ArrayList<>();
+        List<RawLine> pendingBlankLines = new ArrayList<>();
+        int pendingBlankStart = -1;
+
+        while (pos < lines.size()) {
+            RawLine ln = lines.get(pos);
+            if (ln.blank) {
+                if (pendingBlankStart < 0) pendingBlankStart = pos;
+                pendingBlankLines.add(ln);
+                pos++;
+                continue;
+            }
+            if (ln.indent <= parentIndent) break;
+            if (contentIndent < 0) contentIndent = ln.indent;
+            if (ln.indent < contentIndent) break;
+
+            for (int i = 0; i < pendingBlankLines.size(); i++) contentLines.add("");
+            pendingBlankLines.clear();
+            pendingBlankStart = -1;
+            contentLines.add(ln.raw.substring(contentIndent));
+            pos++;
+        }
+
+        if (!pendingBlankLines.isEmpty()) {
+            if (chomping == '+') {
+                for (int i = 0; i < pendingBlankLines.size(); i++) contentLines.add("");
+            } else {
+                pos = pendingBlankStart;
+            }
+        }
+
+        String value = indicator == '>'
+                ? foldBlockScalarLines(contentLines)
+                : String.join("\n", contentLines);
+        if (!contentLines.isEmpty() && chomping != '-') value += "\n";
+        return new RtpYamlScalar(value, RtpYamlScalar.Style.DOUBLE);
+    }
+
+    private static String foldBlockScalarLines(List<String> lines) {
+        StringBuilder value = new StringBuilder();
+        int i = 0;
+        while (i < lines.size()) {
+            String line = lines.get(i);
+            if (line.isEmpty()) {
+                int blankLines = 0;
+                while (i < lines.size() && lines.get(i).isEmpty()) {
+                    blankLines++;
+                    i++;
+                }
+                value.append("\n".repeat(blankLines));
+                continue;
+            }
+            value.append(line);
+            i++;
+            if (i < lines.size()) {
+                String next = lines.get(i);
+                if (!next.isEmpty() && !isMoreIndented(line) && !isMoreIndented(next)) {
+                    value.append(' ');
+                } else {
+                    value.append('\n');
+                    while (i < lines.size() && lines.get(i).isEmpty()) {
+                        i++;
+                        if (i < lines.size() && lines.get(i).isEmpty()) value.append('\n');
+                    }
+                }
+            }
+        }
+        return value.toString();
+    }
+
+    private static boolean isMoreIndented(String line) {
+        return !line.isEmpty() && (line.charAt(0) == ' ' || line.charAt(0) == '\t');
+    }
+
+    private static RtpYamlParseException invalidBlockScalarHeader(int line, int column) {
+        return new RtpYamlParseException("rtpYaml.syntax.blockScalarHeader",
+                "invalid block scalar header", line, column);
     }
 
     /**

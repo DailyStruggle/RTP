@@ -3,7 +3,11 @@ package io.github.dailystruggle.rtp.common.action;
 import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -19,7 +23,66 @@ public final class ActionPlaceholderSanitizer {
   private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\[([a-zA-Z0-9_]+)\\]");
   private static final Pattern SAFE_TOKEN_PATTERN = Pattern.compile("^[a-zA-Z0-9_-]+(?: [a-zA-Z0-9_-]+)*+$");
 
+  public static final Set<String> COMMON_TOKENS = Set.of(
+      "session_id", "players", "participants", "all", "sender", "challenger", "target", "opponent",
+      "sender_name", "sender_uuid", "player_name", "player_uuid", "target_name", "target_uuid", "clusters");
+  public static final Map<String, Set<String>> STAGE_TOKENS = Map.of(
+      "onStart", Set.of(),
+      "onBoundaryViolation", Set.of("violator"),
+      "onExpire", Set.of(),
+      "onDeath", Set.of("victim", "winner"),
+      "onEnqueue", Set.of("player"),
+      "onCancel", Set.of("player", "canceller"),
+      "onWait", Set.of("player"));
+  public static final Set<String> OUTSIDE_ACTION = Set.of("player", "violator", "world");
+  public static final Set<String> SUBCOMMAND = Set.of("player", "action_id");
+  public static final Set<String> PRE_GATE = Set.of("player");
+  public static final Set<String> FOR_EACH = Set.of("player");
+  public static final Set<String> GATE_COMMAND = Set.of("player", "violator");
+  public static final Set<String> FAN_OUT = Set.of("player", "player_name", "player_uuid");
+
+  private static final Set<String> KNOWN_TOKENS = knownTokenSet();
+
   private ActionPlaceholderSanitizer() {}
+
+  /** Extracts distinct placeholder names in normalized form, ignoring non-token bracket text. */
+  public static Set<String> placeholders(String text) {
+    if (text == null || text.isBlank()) return Set.of();
+    Set<String> result = new LinkedHashSet<>();
+    Matcher matcher = PLACEHOLDER_PATTERN.matcher(text);
+    while (matcher.find()) result.add(matcher.group(1).toLowerCase(java.util.Locale.ROOT));
+    return Collections.unmodifiableSet(result);
+  }
+
+  /** Checks direct, suffix-derived, numbered, and named-cluster tokens against one declared scope. */
+  public static boolean inScope(String token, Set<String> scope) {
+    if (token == null || token.isBlank() || scope == null || scope.isEmpty()) return false;
+    String normalized = token.toLowerCase(java.util.Locale.ROOT);
+    if (scope.contains(normalized)) return true;
+
+    String withoutNumber = normalized.replaceFirst("_\\d+$", "");
+    if (!withoutNumber.equals(normalized) && inScope(withoutNumber, scope)) return true;
+
+    for (String suffix : Set.of("_name", "_uuid")) {
+      if (normalized.endsWith(suffix)
+          && inScope(normalized.substring(0, normalized.length() - suffix.length()), scope)) return true;
+    }
+
+    return (normalized.matches("player_\\d+") && scope.contains("players"))
+        || ((normalized.startsWith("cluster_") || normalized.startsWith("group_"))
+        && (scope.contains("clusters") || scope.contains("cluster") || scope.contains("group")));
+  }
+
+  /** Canonical tokens recognized by the action engine, excluding arbitrary metadata keys. */
+  public static Set<String> knownTokens() {
+    return KNOWN_TOKENS;
+  }
+
+  private static Set<String> knownTokenSet() {
+    Set<String> tokens = new HashSet<>(COMMON_TOKENS);
+    tokens.addAll(Set.of("player", "victim", "winner", "violator", "canceller", "world", "action_id"));
+    return Collections.unmodifiableSet(tokens);
+  }
 
   /**
    * Replaces placeholders in {@code command} with sanitized values from {@code contextTokens}.

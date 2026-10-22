@@ -6,6 +6,7 @@ import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.common.configuration.enums.ConfigKeys;
 import io.github.dailystruggle.rtp.common.database.options.YamlFileDatabase;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
 import java.io.File;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -82,6 +83,19 @@ class ConfigParserTimeTest {
     assertEquals(7L, ConfigParser.parseSecondsDurationMillis(null, 7L));
     assertEquals(7L, ConfigParser.parseSecondsDurationMillis("", 7L));
     assertEquals(7L, ConfigParser.parseSecondsDurationMillis("garbage", 7L));
+  }
+
+  @Test
+  @DisplayName("REQ-RTP-F-016: duration parsing honors bare units and preserves signed values")
+  void testParseDurationWithBareAndTargetUnits() {
+    assertEquals(5_000L, ConfigParser.parseDuration(5, TemporalUnit.SECOND, TemporalUnit.MILLISECOND, -7L));
+    assertEquals(2500L, ConfigParser.parseDuration(2500, TemporalUnit.MILLISECOND, TemporalUnit.MILLISECOND, -7L));
+    assertEquals(2000L, ConfigParser.parseDuration(40, TemporalUnit.TICK, TemporalUnit.MILLISECOND, -7L));
+    assertEquals(86_400_000L, ConfigParser.parseDuration(1, TemporalUnit.DAY, TemporalUnit.MILLISECOND, -7L));
+    assertEquals(10_800_000L, ConfigParser.parseDuration("3h", TemporalUnit.SECOND, TemporalUnit.MILLISECOND, -7L));
+    assertEquals(129_600_000L, ConfigParser.parseDuration("1d12h", TemporalUnit.SECOND, TemporalUnit.MILLISECOND, -7L));
+    assertEquals(-1L, ConfigParser.parseDuration(-1, TemporalUnit.SECOND, TemporalUnit.SECOND, 0L));
+    assertEquals(777L, ConfigParser.parseDuration("garbage", TemporalUnit.SECOND, TemporalUnit.MILLISECOND, 777L));
   }
 
   @Test

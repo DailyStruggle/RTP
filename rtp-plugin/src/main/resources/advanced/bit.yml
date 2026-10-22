@@ -1,0 +1,26 @@
+# --- Built-In Test (BIT) Configuration ---
+# Documentation: docs/admin/configuration/BIT.md
+
+# Log structural action findings as warnings instead of blocking action registration.
+# Set true to prevent an action with an effective ERROR finding from registering.
+# @type: boolean
+strictActions: false
+
+# Log configuration findings that older releases accepted as warnings, so /rtp reload is not rejected.
+# Set true to treat them as errors; a reload or Hot-Apply with any error keeps the running config.
+# @type: boolean
+strictConfig: false
+
+# Minimum sample size before a gate is classified as never or always passing.
+# @type: integer
+# @range: [1, 100000]
+# @default: 200
+gateOutcomeSamples: 200
+
+# Severity overrides for registered BIT code keys; these take precedence over strictActions.
+# Allowed levels: ERROR, WARNING, INFO, DEBUG, TRACE and OFF. OFF suppresses the finding.
+# Unknown codes and levels are ignored and logged.
+overrides:
+
+# DO NOT TOUCH VERSION NUMBER
+version: 1.1

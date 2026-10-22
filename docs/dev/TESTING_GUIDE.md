@@ -57,6 +57,16 @@ python3 scripts/agent-gate.py --base origin/V2
 
 It runs `scripts/ci-scope.py --working-tree`, then the `checks` job (traceability, mojibake, front pages, `spotlessCheck`) and every affected set's tasks with `-Pcoverage -PstaticAnalysis` (tests, PMD, JaCoCo floors, SpotBugs). In `full` scope it adds `checkBinaryCompatibility`, the plugin set, the reduced JDK 21 graph and the 80% changed-line coverage gate. Any change under `scripts/`, `gradle/`, `.github/` or root Gradle files is `full`, as in CI. Not covered: SonarCloud and devstack acceptance.
 
+#### Headless Built-In Test (ADR-121)
+Run RTP's shared PBIT checks against a plugin configuration directory or an action-definition directory without starting a server. The task uses the `tier:pbit` selector; `-Pstrict` makes structural action findings errors, `-Pjson` emits the versioned `BitReport` JSON as a single RTP log message, and any `ERROR` finding makes the task fail.
+
+```bash
+./gradlew :rtp-core:bit -Pconfig=rtp-plugin/src/main/resources
+./gradlew :rtp-core:bit -Pconfig=addons/LeafRTPActionAddon/src/main/resources/definitions/actions -Pstrict -Pjson
+```
+
+Pass `-Pconfig=<directory>` for every invocation. The task can also be run through `python3 scripts/agent-gate.py`; the CI-parity gate includes both shipped inputs when core, plugin, addons, or the full project scope is affected.
+
 ### Tier 2: Coverage & Mutation Verification
 When modifying core safety or high-assurance logic:
 * **Coverage Verification:** Enforces module and package JaCoCo minimums.

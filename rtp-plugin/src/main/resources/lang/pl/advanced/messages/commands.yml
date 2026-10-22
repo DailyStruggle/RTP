@@ -516,6 +516,7 @@ editorApplyFetching: "&7[P0] Pobieranie ładunku konfiguracji..."
 editorApplyValidating: "&7[P0] Sprawdzanie integralności i składni ładunku..."
 editorApplySuccess: "&a[P0] Konfiguracja zastosowana i przeładowana na gorąco! (utworzono kopie .bak zmienionych plików)"
 editorApplyFailed: "&c[P0] Nie udało się zastosować ładunku: [reason]"
+editorApplyRejected: "&c[P0] Odrzucono zastosowanie: błędy konfiguracji: [count]; nic nie zostało zapisane. Pierwszy: [code] w [source] w [path]."
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

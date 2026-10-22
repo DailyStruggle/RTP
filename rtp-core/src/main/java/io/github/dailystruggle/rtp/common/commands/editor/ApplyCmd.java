@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.common.commands.editor;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigCandidateGate;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
@@ -152,6 +153,12 @@ public class ApplyCmd extends BaseRTPCmdImpl {
                 RTPRuntime.log(Level.WARNING, "[editor] apply of session " + shown + " refused: " + cause.getMessage());
                 sendMessage(callerId, EditorChannelWiring.message("editorApplyDigestMissing",
                         "[P0] The editor payload has no sha256 checksum, so it was not applied. Commit again from an up-to-date editor page."));
+                return null;
+            }
+            if (cause instanceof ConfigCandidateGate.RejectedException) {
+                // ADR-121 section 7: findings were logged by the gate; nothing was written
+                RTPRuntime.log(Level.WARNING, "[editor] apply of session " + shown + " rejected by config PBIT");
+                sendMessage(callerId, cause.getMessage());
                 return null;
             }
             RTPRuntime.log(Level.WARNING, "[editor] apply of session " + shown + " failed: " + cause.getMessage(), cause);

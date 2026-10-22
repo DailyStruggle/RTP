@@ -15,6 +15,8 @@ import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlConfig;
 import io.github.dailystruggle.rtp.common.configuration.yaml.RtpYamlSection;
 
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.region.util.DurationParser;
+import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -154,12 +156,17 @@ final class EditorChannelWiring {
         try {
             RtpYamlSection editor = RtpYamlConfig.load(file).getConfigurationSection("editor");
             RtpYamlSection trust = editor == null ? null : editor.getConfigurationSection("trust");
-            long days = trust == null ? 0L : trust.getLong("maxAgeDays", 0L);
-            if (days < 0L) {
-                RTPRuntime.log(Level.WARNING, "[editor] " + file + " editor.trust.maxAgeDays " + days + " is negative; trust never expires");
+            Object rawAge = trust == null ? null : trust.get("maxAgeDays");
+            if (rawAge == null) return 0L;
+            DurationParser.ParsedDuration parsed =
+                    DurationParser.parse(rawAge.toString(), TemporalUnit.DAY);
+            double ageMillis = parsed == null ? Double.NaN : parsed.toMillis();
+            if (!Double.isFinite(ageMillis) || ageMillis < 0.0 || ageMillis >= 0x1.0p63) {
+                RTPRuntime.log(Level.WARNING, "[editor] " + file + " editor.trust.maxAgeDays "
+                        + rawAge + " is invalid or negative; trust never expires");
                 return 0L;
             }
-            return days > Long.MAX_VALUE / 86_400_000L ? 0L : days * 86_400_000L;
+            return Math.round(ageMillis);
         } catch (IOException | RuntimeException e) {
             RTPRuntime.log(Level.WARNING, "[editor] could not read " + file + " editor.trust; trust never expires: " + e.getMessage(), e);
             return 0L;

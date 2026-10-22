@@ -2,6 +2,7 @@ package io.github.dailystruggle.rtp.proxy.common.config;
 
 import io.github.dailystruggle.rtp.proxy.common.RTPProxyAccessor;
 import io.github.dailystruggle.rtp.proxy.common.Role;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
@@ -222,6 +223,20 @@ class NetworkConfigTest {
         NetworkConfig cfg = NetworkConfig.fromMap(root, velocityAccessor("p1"));
         assertEquals(250L, cfg.heartbeatIntervalMs());
         assertEquals(2000L, cfg.heartbeatStaleAfterMs());
+    }
+
+    @Test
+    @DisplayName("REQ-RTP-F-016: proxy heartbeat accepts duration units and rejects invalid values")
+    void heartbeatDurationUnitsAcceptedAndInvalidValuesRejected() {
+        Map<String, Object> root = minimalDisabled();
+        Map<String, Object> heartbeat = new LinkedHashMap<>();
+        heartbeat.put("intervalMs", "2s");
+        root.put("heartbeat", heartbeat);
+        assertEquals(2000L, NetworkConfig.fromMap(root, velocityAccessor("p1")).heartbeatIntervalMs());
+
+        heartbeat.put("intervalMs", "not-a-duration");
+        assertThrows(NetworkConfigException.class,
+                () -> NetworkConfig.fromMap(root, velocityAccessor("p1")));
     }
 
     @Test

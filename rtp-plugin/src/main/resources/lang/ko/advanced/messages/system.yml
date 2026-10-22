@@ -16,6 +16,7 @@
 리로드중: "&b[P0] [filename] 을(를) 로딩 중……"
 리로드완료: "&b[P0] [filename] 로딩이 완료되었습니다."
 reloadFailed: "&c[P0] 설정을 다시 불러오지 못했습니다. 서버 로그를 확인하세요."
+reloadRejected: "&c[P0] 다시 불러오기가 거부되었습니다: 설정 오류 [count]개로 현재 설정을 유지합니다. 첫 오류: [source]의 [path]에서 [code]. 자세히: /rtp test subsystem=config"
 업데이트중: "&a[P0] [filename] 업데이트 중……"
 업데이트완료: "&a[P0] [filename] 업데이트가 정상적으로 완료되었습니다."
 

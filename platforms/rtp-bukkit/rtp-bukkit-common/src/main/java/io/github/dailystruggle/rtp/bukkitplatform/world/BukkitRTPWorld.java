@@ -18,6 +18,7 @@ import io.github.dailystruggle.rtp.common.RTP;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.BlocksKeys;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
+import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -1155,7 +1156,10 @@ public class BukkitRTPWorld extends RTPWorld<World> {
       int depth = safety.getNumber(SafetyKeys.platformDepth, 0).intValue();
       // ADR-060: optional block-restoration timeout. -1 (default) keeps the platform permanent
       // and skips diff capture entirely (zero added cost).
-      int restoreSeconds = safety.getNumber(SafetyKeys.platformRestoreSeconds, -1).intValue();
+      long restoreDurationSeconds = safety.getDuration(SafetyKeys.platformRestoreSeconds,
+          TemporalUnit.SECOND, TemporalUnit.SECOND, -1L);
+      int restoreSeconds = (int) Math.max(Integer.MIN_VALUE,
+          Math.min(Integer.MAX_VALUE, restoreDurationSeconds));
       Object rawMat = safety.getConfigValue(SafetyKeys.platformMaterial, "GLASS");
       Material material = BukkitMaterialResolver.resolve(
           rawMat != null ? rawMat.toString() : "GLASS",

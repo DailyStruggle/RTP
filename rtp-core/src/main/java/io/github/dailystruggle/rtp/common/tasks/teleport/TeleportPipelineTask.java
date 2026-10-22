@@ -24,6 +24,7 @@ import io.github.dailystruggle.rtp.common.playerData.TeleportData;
 import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
+import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
 import io.github.dailystruggle.rtp.common.tasks.ChunkTicketHolder;
 import io.github.dailystruggle.rtp.common.tasks.RTPRunnable;
 import io.github.dailystruggle.rtp.common.tasks.TrackableTask;
@@ -184,8 +185,8 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
       ConfigParser<PerformanceKeys> perf =
           (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
       viewDistanceTeleport = perf.getNumber(PerformanceKeys.viewDistanceTeleport, 0L).longValue();
-      viewDistanceRestoreInterval =
-          perf.getNumber(PerformanceKeys.viewDistanceRestoreInterval, 200L).longValue();
+      viewDistanceRestoreInterval = perf.getDuration(PerformanceKeys.viewDistanceRestoreInterval,
+          TemporalUnit.TICK, TemporalUnit.TICK, 200L);
       postTeleportQueueing = Boolean.parseBoolean(
           perf.getConfigValue(PerformanceKeys.postTeleportQueueing, false).toString());
 
@@ -195,8 +196,15 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
         setRespawnOnTeleport = Boolean.parseBoolean(
             cfg.getConfigValue(ConfigKeys.setRespawnOnTeleport, false).toString());
         lockAfterUses = cfg.getNumber(ConfigKeys.lockAfterUses, 0L).longValue();
-        lockAfterResetMillis =
-            cfg.getNumber(ConfigKeys.lockAfterResetSeconds, 0L).longValue() * 1000L;
+        Object lockAfterResetSeconds = cfg.getConfigValue(ConfigKeys.lockAfterResetSeconds, 0L);
+        lockAfterResetMillis = ConfigParser.parseSecondsDurationMillis(
+            lockAfterResetSeconds, Long.MIN_VALUE);
+        if (lockAfterResetMillis == Long.MIN_VALUE) {
+          RTPRuntime.log(Level.WARNING,
+              "[RTP] invalid config value for lockAfterResetSeconds: " + lockAfterResetSeconds
+                  + "; using 0 (never resets)");
+          lockAfterResetMillis = 0L;
+        }
       }
     }
   }
@@ -1205,12 +1213,11 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
                 SupportLogger.logException(Level.SEVERE, "Error in setLocation callback", throwable);
               }
               if (aBoolean != null && aBoolean) {
+                teleportData.processingTime = System.currentTimeMillis() - teleportData.time;
                 computeDistance();
                 // ADR-104 heatmap layer; ADR-121 s11: mock landings go to BitTeleportLog instead
                 SyntheticSideEffects.recordLanding(
                     playerId, region != null ? region.name : null, location, teleportData);
-                String message = formatWithPlaceholders(ConfigCache.teleportMessage, playerId);
-                RTPRuntime.serverAccessor().sendMessage(playerId, message);
 
                 // BetterRTP SetAsRespawn parity: anchor the player's respawn to the
                 // landed location. Runs on the teleport completion thread (the owning
@@ -1232,6 +1239,9 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
                       ConfigCache.lockAfterUses, ConfigCache.lockAfterResetMillis,
                       System.currentTimeMillis());
                 }
+
+                String message = formatWithPlaceholders(ConfigCache.teleportMessage, playerId);
+                RTPRuntime.serverAccessor().sendMessage(playerId, message);
               } else if (DeathTeleports.effectInFlight().contains(playerId)) {
                 // Player died deliberately via DEATH effect in pipeline; respawn location was
                 // anchored to target and this teleport is completed rather than failed.
@@ -1243,20 +1253,18 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
               }
 
               // Null-safe fetch to prevent silent CompletableFuture crashes in test environments
-              long duration = 0L;
+              long durationTicks = 0L;
               ConfigParser<SafetyKeys> safetyParser = (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
               if (safetyParser != null) {
-                Number num = safetyParser.getNumber(SafetyKeys.invulnerabilityTime, 0L);
-                if (num != null) {
-                  duration = num.longValue();
-                }
+                durationTicks = safetyParser.getDuration(SafetyKeys.invulnerabilityTime,
+                    TemporalUnit.SECOND, TemporalUnit.TICK, 0L);
               }
 
-              if (duration > 0) {
+              if (durationTicks > 0) {
                 TeleportSessions.current().invulnerablePlayers.put(playerId, System.currentTimeMillis());
                 RTPRuntime.scheduler().runTaskLater(() -> {
                   TeleportSessions.current().invulnerablePlayers.remove(playerId);
-                }, duration * 20L);
+                }, durationTicks);
               } else {
                 TeleportSessions.current().invulnerablePlayers.remove(playerId);
               }
@@ -1325,29 +1333,27 @@ public final class TeleportPipelineTask extends RTPRunnable implements Trackable
             SyntheticSideEffects.recordLanding(
                 playerId, region != null ? region.name : null, destination, teleportData);
           }
-          String message = formatWithPlaceholders(ConfigCache.teleportMessage, playerId);
-          RTPRuntime.serverAccessor().sendMessage(playerId, message);
-
           if (ConfigCache.lockAfterUses > 0) {
             SyntheticSideEffects.recordLimitUse(playerId,
                 ConfigCache.lockAfterUses, ConfigCache.lockAfterResetMillis,
                 System.currentTimeMillis());
           }
 
+          String message = formatWithPlaceholders(ConfigCache.teleportMessage, playerId);
+          RTPRuntime.serverAccessor().sendMessage(playerId, message);
+
           // Invulnerability duration on respawn
-          long duration = 0L;
+          long durationTicks = 0L;
           ConfigParser<SafetyKeys> safetyParser = (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
           if (safetyParser != null) {
-            Number num = safetyParser.getNumber(SafetyKeys.invulnerabilityTime, 0L);
-            if (num != null) {
-              duration = num.longValue();
-            }
+            durationTicks = safetyParser.getDuration(SafetyKeys.invulnerabilityTime,
+                TemporalUnit.SECOND, TemporalUnit.TICK, 0L);
           }
-          if (duration > 0) {
+          if (durationTicks > 0) {
             TeleportSessions.current().invulnerablePlayers.put(playerId, System.currentTimeMillis());
             RTPRuntime.scheduler().runTaskLater(() -> {
               TeleportSessions.current().invulnerablePlayers.remove(playerId);
-            }, duration * 20L);
+            }, durationTicks);
           } else {
             TeleportSessions.current().invulnerablePlayers.remove(playerId);
           }

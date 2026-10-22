@@ -40,6 +40,14 @@ public final class Vocabulary {
     public Optional<String> suggest(String value) {
         if (value == null || value.isBlank() || values.isEmpty()) return Optional.empty();
         String candidate = normalize(value);
+        int limit = Math.max(1, Math.min(3, candidate.length() / 3 + 1));
+        return suggest(value, limit);
+    }
+
+    /** Returns the nearest allowed value only when its edit distance is at most {@code maxDistance}. */
+    public Optional<String> suggest(String value, int maxDistance) {
+        if (value == null || value.isBlank() || values.isEmpty() || maxDistance < 0) return Optional.empty();
+        String candidate = normalize(value);
         String best = null;
         int bestDistance = Integer.MAX_VALUE;
         for (Map.Entry<String, String> entry : values.entrySet()) {
@@ -49,8 +57,7 @@ public final class Vocabulary {
                 best = entry.getValue();
             }
         }
-        int limit = Math.max(1, Math.min(3, candidate.length() / 3 + 1));
-        return bestDistance <= limit ? Optional.of(best) : Optional.empty();
+        return bestDistance <= maxDistance ? Optional.of(best) : Optional.empty();
     }
 
     private static String normalize(String value) {

@@ -83,4 +83,19 @@ class GateExpressionParserTest {
     assertFalse(GateExpressionParser.matches("", 5));
     assertFalse(GateExpressionParser.matches("abc", 5));
   }
+
+  @Test
+  @DisplayName("REQ-API-F-009: expression validation accepts complete parser syntax only")
+  void testExpressionValidation() {
+    assertTrue(GateExpressionParser.isValid("< 2"));
+    assertTrue(GateExpressionParser.isValid("1..5"));
+    assertTrue(GateExpressionParser.isValid(">= 1m30s"));
+    assertTrue(GateExpressionParser.isValid("1e3"));
+    assertFalse(GateExpressionParser.isValid(null));
+    assertFalse(GateExpressionParser.isValid(" "));
+    assertFalse(GateExpressionParser.isValid(">= invalid"));
+    assertFalse(GateExpressionParser.isValid("1.."));
+    assertFalse(GateExpressionParser.isValid("1..2..3"));
+    assertFalse(GateExpressionParser.isValid("NaN"));
+  }
 }

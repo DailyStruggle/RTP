@@ -1,0 +1,21 @@
+# --- 内置测试（BIT）配置 ---
+# 文档：docs/admin/configuration/BIT.md
+
+# 将动作结构问题记录为警告，不会阻止动作注册。
+# 设为 true 后，存在有效 ERROR 的动作将不会注册。
+strictActions: false
+
+# 将旧版本接受的配置问题记录为警告，不会拒绝 /rtp reload。
+# 设为 true 则视为错误；存在错误的重载或 Hot-Apply 会保留当前配置。
+strictConfig: false
+
+# 将门判定为始终通过或始终不通过前所需的最少评估次数。
+gateOutcomeSamples: 200
+
+# 已注册 BIT 代码的严重级别；优先于 strictActions 预设。
+# 可用值：ERROR、WARNING、INFO、DEBUG、TRACE、OFF。OFF 会抑制该问题。
+# 未知代码和级别将被忽略并写入日志。
+overrides:
+
+# 请勿更改版本号
+version: 1.0

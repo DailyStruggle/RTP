@@ -21,7 +21,7 @@ maxMSPT: 45.0
 maxHeapPourcentage: 85.0
 
 # --- RTP Performance Settings ---
-# Documentation: plugins/RTP/docs/admin/configuration/PERFORMANCE.md
+# Documentation: docs/admin/configuration/PERFORMANCE.md
 # Max search attempts before giving up
 # @type: integer
 # @range: [1, null]
@@ -29,6 +29,7 @@ maxHeapPourcentage: 85.0
 tentativesMax: 32
 
 # Ticks entre deux remplissages de la même région. Les régions alternent.
+# Prend en charge les unités de durée (ex. 24h, 1d).
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
@@ -36,6 +37,7 @@ tentativesMax: 32
 periode: 20
 
 # Maximum de ms par tick pour le travail du thread principal. Limité à 25.
+# Prend en charge les unités de durée (ex. 24h, 1d).
 # @type: integer
 # @range: [1, 25]
 # @unit: ms
@@ -43,6 +45,7 @@ periode: 20
 tempsAlloueSync: 5
 
 # Maximum de ms par impulsion pour le travail en arrière-plan. Limité à 25.
+# Prend en charge les unités de durée (ex. 24h, 1d).
 # @type: integer
 # @range: [1, 25]
 # @unit: ms
@@ -67,6 +70,7 @@ distanceVueTeleport: 0
 # normale après l'arrivée, lissant le pic de chargement de chunks. 0 désactive le bridage.
 # REMARQUE : Forcé temporairement à 0. La restauration progressive provoque un
 # scintillement / un re-rendu côté client à l'arrivée. Laissez à 0 jusqu'à nouvel ordre.
+# Prend en charge les unités de durée (ex. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: ticks
@@ -131,6 +135,7 @@ rappelBiomeForce: false
 
 # Seuil de latence (ms) au-delà duquel une téléportation servie immédiatement est
 # auditée (WARN journalisé, slowPipelineCount incrémenté). 0 ou moins désactive.
+# Prend en charge les unités de durée (ex. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: ms

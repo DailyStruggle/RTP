@@ -1,5 +1,5 @@
 # --- RTP Core Configuration ---
-# Documentation: plugins/RTP/docs/admin/configuration/CORE_CONFIG.md
+# Documentation: docs/admin/configuration/CORE_CONFIG.md
 # Pick your language in language.yml.
 #
 # Where to find things (files/folders in this RTP folder):

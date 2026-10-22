@@ -153,8 +153,8 @@ public interface RTPCmd extends BaseRTPCmd {
   static long cooldownRemaining(RTPCommandSender subject, UUID playerId, Region region,
       boolean requested, TeleportData prior, long now) {
     if (subject == null) return 0L;
-    long globalLast = (prior != null && prior.time > 0L)
-        ? prior.time : RTP.getSharedLastTeleportTime(playerId);
+    long localLast = (prior != null && prior.time > 0L) ? prior.time : 0L;
+    long globalLast = Math.max(localLast, RTP.getSharedLastTeleportTime(playerId));
     long globalRemaining = remainingAfter(RTP.getCooldown(subject, null), globalLast, now);
     RegionSettings settings = (region == null) ? null : region.getSettings();
     if (settings == null || settings.cooldownMillis() == null || settings.cooldownMillis() < 0) {
@@ -372,7 +372,8 @@ public interface RTPCmd extends BaseRTPCmd {
         long cap = cfg.getNumber(ConfigKeys.lockAfterUses, 0L).longValue();
         if (cap > 0) {
           long resetMillis =
-                  cfg.getNumber(ConfigKeys.lockAfterResetSeconds, 0L).longValue() * 1000L;
+                  ConfigParser.parseSecondsDurationMillis(
+                          cfg.getConfigValue(ConfigKeys.lockAfterResetSeconds, 0L), 0L);
           if (ActiveDatabase.teleportLimitStore().isLocked(
                   senderId, cap, resetMillis, System.currentTimeMillis())) {
             String msg = (String) ActiveConfigs.get().getConfigValue(PlayerMessages.lockedAfterUses, "");
@@ -982,7 +983,7 @@ public interface RTPCmd extends BaseRTPCmd {
                   }
                   io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.ParsedDistance interpreted =
                       io.github.dailystruggle.rtp.common.selection.region.util.DistanceParser.autoInterpret(
-                          parsedDist, worldBorderRad, name);
+                          parsedDist, worldBorderRad, name, msg -> RTPRuntime.log(Level.INFO, msg));
                   if (interpreted != null && interpreted.unit() != io.github.dailystruggle.rtp.common.selection.region.util.SpatialUnit.CHUNK) {
                     double chunks = interpreted.toChunks();
                     value = (chunks == Math.floor(chunks)) ? (Object) Long.valueOf((long) chunks) : (Object) Double.valueOf(chunks);

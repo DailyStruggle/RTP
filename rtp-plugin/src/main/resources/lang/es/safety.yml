@@ -16,6 +16,7 @@
 # Invulnerabilidad (segundos)
 # Duración de la invulnerabilidad concedida al jugador tras teletransportarse.
 # Evita daño por fuego, ahogamiento o caídas al llegar.
+# Admite unidades de duración (p. ej. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds
@@ -71,6 +72,7 @@ materialPlataforma: "GLASS"
 # Segundos tras los cuales la huella de la plataforma se restaura a sus bloques
 # originales. -1 = nunca (permanente), 0 = en cuanto el chunk se recargue. La
 # cuenta atrás solo avanza mientras el chunk está cargado; sobrevive a reinicios.
+# Admite unidades de duración (p. ej. 24h, 1d).
 # @type: integer
 # @range: [-1, null]
 # @unit: seconds
@@ -86,6 +88,7 @@ pvpCheckEnabled: false
 
 # Segundos que un jugador permanece "en combate" tras recibir daño PvP (solo el
 # rastreador nativo; se ignora si hay un plugin de combat-tag externo).
+# Admite unidades de duración (p. ej. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: seconds

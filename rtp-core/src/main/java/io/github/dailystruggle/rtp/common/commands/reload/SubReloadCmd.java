@@ -7,7 +7,9 @@ import io.github.dailystruggle.rtp.api.entity.RTPCommandSender;
 import io.github.dailystruggle.rtp.api.server.RTPServerAccessor;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigCandidateGate;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.configuration.Configs;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.MultiConfigParser;
@@ -89,6 +91,7 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
     RTPServerAccessor serverAccessor = RTPRuntime.serverAccessor();
 
     if (ActiveConfigs.get() == null) return false;
+    if (!candidateAccepted(senderId)) return false;
 
     String msg = String.valueOf(ActiveConfigs.get().getConfigValue(SystemMessages.reloading, ""));
     if (msg != null) msg = filenamePattern.matcher(msg).replaceAll(parser.name);
@@ -106,6 +109,7 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
   @SuppressWarnings("java:S3516") // Method returns true on reload completion
   public boolean subReloadMulti(UUID senderId, MultiConfigParser<?> parser) {
     if (ActiveConfigs.get() == null) return false;
+    if (!candidateAccepted(senderId)) return false;
 
     RTPServerAccessor serverAccessor = RTPRuntime.serverAccessor();
     RTPCommandSender commandSender = serverAccessor.getSender(senderId);
@@ -116,7 +120,8 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
 
     MultiConfigParser<?> newParser =
         new MultiConfigParser<>(
-            parser.myClass, parser.name, "1.0", parser.pluginDirectory, parser.directory);
+            parser.myClass, parser.name, parser.version, parser.pluginDirectory,
+            parser.directory, parser.locale);
     if (parser.myClass.equals(RegionKeys.class)) {
       @SuppressWarnings("unchecked")
       MultiConfigParser<RegionKeys> regions = (MultiConfigParser<RegionKeys>) newParser;
@@ -161,6 +166,18 @@ public class SubReloadCmd<T extends Enum<T>> extends BaseRTPCmdImpl {
     if (msg != null) msg = filenamePattern.matcher(msg).replaceAll(parser.name);
     serverAccessor.sendMessage(RTPAPI.serverId, commandSender.uuid(), msg);
 
+    return true;
+  }
+
+  private boolean candidateAccepted(UUID senderId) {
+    Configs configs = ActiveConfigs.get();
+    if (configs == null) return false;
+    ConfigCandidateGate.Result gate =
+        ConfigCandidateGate.evaluate(configs.pluginDirectory.toPath(), Map.of());
+    if (gate.rejected()) {
+      ReloadSupport.sendReloadRejected(senderId, gate);
+      return false;
+    }
     return true;
   }
 }

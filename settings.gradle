@@ -121,7 +121,7 @@ include 'server-api'
 // Non-rtp-exclusive, platform-neutral API modules are grouped under the
 // api/ folder to declutter the repo root. The Gradle project paths and
 // Maven coordinates are intentionally KEPT FLAT (':server-api', ':yaml-api',
-// ':effects-api', ':maps-api', ':metrics-api', and the nested
+// ':effects-api', ':maps-api', ':metrics-api', ':units-api', and the nested
 // ':effects-api:effects-api-fabric-unobf'); only the on-disk location moves,
 // applied via projectDir overrides at the bottom of this section. This keeps
 // every existing project(':...') dependency, Maven coordinate, and ADR/doc
@@ -136,6 +136,9 @@ include 'bit-api'
 // rtp-core so rtp-api can host the configurable selection model without a core
 // dependency. Pure Java, no platform/Loom dependency.
 include 'yaml-api'
+// units-api -- dependency-free general-purpose temporal, spatial, and data-size
+// parsers, extracted from rtp-core and re-exported by rtp-api.
+include 'units-api'
 // effects-api -- platform-neutral effects SPI + Bukkit runtime
 // (effects-api-ADR-003). Pure Java, no Loom: Minecraft-typed effect code lives
 // in the Fabric / NeoForge platform carriers. Consumed via project(':effects-api').
@@ -186,6 +189,7 @@ if (!excludeJdk25) {
     project(':effects-api:effects-api-fabric-unobf').projectDir = file('api/effects-api/effects-api-fabric-unobf')
 }
 project(':yaml-api').projectDir     = file('api/yaml-api')
+project(':units-api').projectDir    = file('api/units-api')
 project(':maps-api').projectDir     = file('api/maps-api')
 project(':metrics-api').projectDir  = file('api/metrics-api')
 project(':bstats-api').projectDir   = file('api/bstats-api')

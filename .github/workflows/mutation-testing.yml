@@ -44,10 +44,13 @@ jobs:
         uses: gradle/actions/setup-gradle@d9c87d481d55275bb5441eef3fe0e46805f9ef70 # v3.5.0
 
       - name: Run PIT Mutation Testing
+        env:
+          MUTATION_PACKAGES: ${{ matrix.package.target }}
+          MUTATION_THRESHOLD: ${{ matrix.package.threshold }}
         run: |
           ./gradlew :rtp-core:pitest -Pmutation \
-            -PmutationPackages="${{ matrix.package.target }}" \
-            -PmutationThreshold=${{ matrix.package.threshold }} \
+            -PmutationPackages="$MUTATION_PACKAGES" \
+            -PmutationThreshold="$MUTATION_THRESHOLD" \
             --no-daemon
 
       - name: Archive PIT Report

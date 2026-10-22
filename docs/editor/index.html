@@ -1740,7 +1740,7 @@ function isConfigGuarded(fileName) {
 function createConfigTemplate(kind, cleanName) {
   if (kind === 'regions') {
     return `# --- RTP Region Configuration ---
-# Documentation: plugins/RTP/docs/admin/configuration/REGIONS.md
+# Documentation: docs/admin/configuration/REGIONS.md
 
 # Target world name (e.g. "[0]" or "world")
 world: "[0]"
@@ -7860,7 +7860,7 @@ function computeCurrentRegionYaml(region) {
   const worldName = region.world || '[0]';
   const { shape, set } = regionGeometryValues(region);
   let yml = `# --- RTP Region Configuration ---\n`;
-  yml += `# Documentation: plugins/RTP/docs/admin/configuration/REGIONS.md\n\n`;
+  yml += `# Documentation: docs/admin/configuration/REGIONS.md\n\n`;
   yml += `world: "${worldName}"\n`;
   yml += `worldBorderOverride: false\n\n`;
   yml += `shape:\n`;

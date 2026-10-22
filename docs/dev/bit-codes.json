@@ -1,0 +1,1693 @@
+{
+  "schema": 1,
+  "namespaces": [
+    {
+      "prefix": "BIT",
+      "firstId": 1,
+      "lastId": 999
+    },
+    {
+      "prefix": "RTP",
+      "firstId": 1000,
+      "lastId": 1999
+    },
+    {
+      "prefix": "ACTION",
+      "firstId": 2000,
+      "lastId": 2999
+    },
+    {
+      "prefix": "TEST",
+      "firstId": 3000,
+      "lastId": 4099
+    },
+    {
+      "prefix": "PROBE",
+      "firstId": 4100,
+      "lastId": 4699
+    },
+    {
+      "prefix": "HEATMAP",
+      "firstId": 4700,
+      "lastId": 4799
+    }
+  ],
+  "codes": [
+    {
+      "id": 1,
+      "key": "BIT_PBIT_FAILED",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "bit",
+      "messageKey": "",
+      "remediation": "Inspect the component diagnostic message and fix the failing check."
+    },
+    {
+      "id": 2,
+      "key": "BIT_PBIT_THROWN",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "bit",
+      "messageKey": "",
+      "remediation": "The component threw instead of reporting; capture failures in its PbitResult."
+    },
+    {
+      "id": 3,
+      "key": "BIT_HEALTH_FAILED",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "bit",
+      "messageKey": "",
+      "remediation": "The component passed PBIT but reports FAILED health; check its runtime state."
+    },
+    {
+      "id": 4,
+      "key": "BIT_HEALTH_DEGRADED",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "bit",
+      "messageKey": "",
+      "remediation": "The component reports DEGRADED health; check its warnings."
+    },
+    {
+      "id": 5,
+      "key": "BIT_COMPONENT_TIMEOUT",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "bit",
+      "messageKey": "",
+      "remediation": "Increase the component timeout or make the check bounded."
+    },
+    {
+      "id": 6,
+      "key": "BIT_COMPONENT_THROWN",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "bit",
+      "messageKey": "",
+      "remediation": "Fix the component failure and return a BitReport instead of throwing."
+    },
+    {
+      "id": 7,
+      "key": "BIT_COMPONENT_UNKNOWN",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "bit",
+      "messageKey": "",
+      "remediation": "Select a registered component or a matching tier/subsystem."
+    },
+    {
+      "id": 1001,
+      "key": "RTP_YAML_UNPARSABLE",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Fix the YAML syntax in source; a reload keeps the running config until the file parses."
+    },
+    {
+      "id": 1002,
+      "key": "RTP_YAML_UNSUPPORTED_UNOWNED",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "RTP does not load this file, so it cannot break a reload; fix or remove it if it should be read."
+    },
+    {
+      "id": 1100,
+      "key": "RTP_DIRECTIVE_TYPE_MISMATCH",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Write a value of the type named by the key's @type directive in the bundled default file."
+    },
+    {
+      "id": 1101,
+      "key": "RTP_DIRECTIVE_OPTION_UNKNOWN",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Use one of the values listed by the key's @options directive (case does not matter)."
+    },
+    {
+      "id": 1102,
+      "key": "RTP_DIRECTIVE_OUT_OF_RANGE",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Keep the value inside the key's @range [min, max] (inclusive; null is open-ended)."
+    },
+    {
+      "id": 1103,
+      "key": "RTP_DIRECTIVE_UNKNOWN_KEY",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Remove or rename the key; it is not read. Compare with the bundled default file."
+    },
+    {
+      "id": 1104,
+      "key": "RTP_DIRECTIVE_DEFAULT_INVALID",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Shipping bug: the bundled default value or @default violates its own directives; fix the resource."
+    },
+    {
+      "id": 1105,
+      "key": "RTP_DIRECTIVE_MALFORMED",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Shipping bug: the bundled default does not parse or has an unreadable directive; fix the resource."
+    },
+    {
+      "id": 1201,
+      "key": "RTP_REFERENCE_UNKNOWN_FILE",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Use @config, @economy or @safety, or replace the token with a literal value."
+    },
+    {
+      "id": 1202,
+      "key": "RTP_REFERENCE_SETTING_MISSING",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Add the setting to the referenced file (config.yml: under defaults) or use a literal value."
+    },
+    {
+      "id": 1301,
+      "key": "RTP_REGION_UNKNOWN_WORLD",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Name a loaded world (or [index]); a region on an unloaded world stays dormant until it loads."
+    },
+    {
+      "id": 1302,
+      "key": "RTP_WORLD_UNKNOWN_REGION",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Name a region file in definitions/regions; an unknown region falls back to default."
+    },
+    {
+      "id": 1303,
+      "key": "RTP_REGION_UNKNOWN_OVERRIDE",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Name a region file in definitions/regions as the no-permission override."
+    },
+    {
+      "id": 1304,
+      "key": "RTP_WORLD_UNKNOWN_OVERRIDE",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Name a loaded world, a definitions/worlds file or [index] as the no-permission override."
+    },
+    {
+      "id": 1305,
+      "key": "RTP_SCHEMATIC_ORPHAN",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Rename the schematic to <region>.schem, reference it from an action placement.schematic, or remove it."
+    },
+    {
+      "id": 1306,
+      "key": "RTP_WORLD_REFERENCES_UNVERIFIED",
+      "severity": "INFO",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Run the check on a server (or pass loaded world names) to verify world references."
+    },
+    {
+      "id": 1401,
+      "key": "RTP_SHAPE_RADIUS_NOT_ABOVE_CENTER",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Set shape.radius greater than shape.centerRadius; an equal or larger inner hole leaves no landing area."
+    },
+    {
+      "id": 1402,
+      "key": "RTP_ACTION_RADIUS_NOT_ABOVE_CENTER",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Set radius greater than centerRadius in the action's placement or confinement block."
+    },
+    {
+      "id": 1403,
+      "key": "RTP_ACTION_SHRINK_ABOVE_INITIAL",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Set confinement.shrinkTo at most confinement.initialSize; the border only shrinks."
+    },
+    {
+      "id": 1501,
+      "key": "RTP_MESSAGES_BASELINE_UNMAPPED",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Add a row for the key to the baseline .<file>.lang.yml so locales can rename it."
+    },
+    {
+      "id": 1502,
+      "key": "RTP_MESSAGES_LOCALE_VALUES_MISSING",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Ship the locale's <file>.yml beside its .<file>.lang.yml, or remove the rename map."
+    },
+    {
+      "id": 1503,
+      "key": "RTP_MESSAGES_LOCALE_KEY_MISSING",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Mirror the baseline key into the locale value file under its translated name."
+    },
+    {
+      "id": 1504,
+      "key": "RTP_MESSAGES_LOCALE_STALE_ROW",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Remove the rename-map row; the baseline no longer ships that key."
+    },
+    {
+      "id": 1505,
+      "key": "RTP_MESSAGES_LOCALE_UNRESOLVED_ROW",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Make the rename-map target a top-level key of the sibling value file."
+    },
+    {
+      "id": 1510,
+      "key": "RTP_MESSAGES_KEY_MISSING",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Add the key back (or delete the file to regenerate it); until then the English default is used."
+    },
+    {
+      "id": 1511,
+      "key": "RTP_MESSAGES_KEY_UNKNOWN",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Rename the key to a known message key or remove it; unknown keys are never read."
+    },
+    {
+      "id": 1600,
+      "key": "RTP_EFFECTS_UNKNOWN_KEY",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Remove or rename the key; an effect group accepts only version, when, permission, players, inherit and effects."
+    },
+    {
+      "id": 1601,
+      "key": "RTP_EFFECTS_MISSING_STAGE",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Add when: <stage>; a group without a stage never fires."
+    },
+    {
+      "id": 1602,
+      "key": "RTP_EFFECTS_UNKNOWN_STAGE",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Set when: to one stage token, e.g. preteleport or postteleport."
+    },
+    {
+      "id": 1603,
+      "key": "RTP_EFFECTS_STAGE_NOT_DISPATCHED",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "No platform fires this stage; bind the group to a dispatched stage or use an action instead."
+    },
+    {
+      "id": 1604,
+      "key": "RTP_EFFECTS_INHERIT_UNRESOLVED",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Name an existing group file in definitions/effects (without .yml) or remove the entry."
+    },
+    {
+      "id": 1605,
+      "key": "RTP_EFFECTS_INHERIT_CYCLE",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Break the inherit: loop; at runtime the walk is truncated and effects are lost."
+    },
+    {
+      "id": 1606,
+      "key": "RTP_EFFECTS_UNKNOWN_EFFECT",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Use a registered effect name (first token before '.') or install the addon that provides it."
+    },
+    {
+      "id": 1607,
+      "key": "RTP_EFFECTS_BAD_TYPE",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "when and permission take one string; players, inherit and effects take a list of strings."
+    },
+    {
+      "id": 1701,
+      "key": "RTP_NETWORK_KEY_UNKNOWN",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Rename or remove the top-level key; network.yml readers ignore it."
+    },
+    {
+      "id": 1702,
+      "key": "RTP_NETWORK_SECTION_NOT_MAP",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Make the section a YAML mapping; a scalar is read as an absent section (all defaults)."
+    },
+    {
+      "id": 1703,
+      "key": "RTP_NETWORK_SERVER_ID_MISSING",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Set network.serverId to this server's unique name; network mode is refused without it."
+    },
+    {
+      "id": 1704,
+      "key": "RTP_NETWORK_TRANSPORT_UNKNOWN",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Set transport.type to auto, plugin-message, proxy-cache, proxy-direct, in-memory, sql or redis."
+    },
+    {
+      "id": 1705,
+      "key": "RTP_NETWORK_REDIS_HOST_MISSING",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Set transport.redis.host (host or redis[s]:// URL) shared by every server."
+    },
+    {
+      "id": 1706,
+      "key": "RTP_NETWORK_PROXIES_MISSING",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "List each proxy companion as host:port under transport.proxies."
+    },
+    {
+      "id": 1707,
+      "key": "RTP_NETWORK_PORT_RANGE",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Use a TCP port between 1 and 65535."
+    },
+    {
+      "id": 1708,
+      "key": "RTP_NETWORK_DURATION_INVALID",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Use a number of milliseconds or a duration with a unit (e.g. 500, 5s, 1m); invalid values fall back to the default."
+    },
+    {
+      "id": 1709,
+      "key": "RTP_NETWORK_STALE_BEFORE_INTERVAL",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Keep heartbeat.staleAfterMs above heartbeat.intervalMs, or live peers flap to stale between beats."
+    },
+    {
+      "id": 1710,
+      "key": "RTP_NETWORK_VALUE_UNKNOWN",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "config",
+      "messageKey": "",
+      "remediation": "Use one of the listed values; unrecognised values silently fall back to the default."
+    },
+    {
+      "id": 2001,
+      "key": "ACTION_UNKNOWN_LIFECYCLE_STAGE",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Rename the stage to one listed in expected; unknown stages never run."
+    },
+    {
+      "id": 2002,
+      "key": "ACTION_UNKNOWN_STEP_KEY",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Rename the step key to one listed in expected; unknown keys are dropped at load."
+    },
+    {
+      "id": 2003,
+      "key": "ACTION_UNKNOWN_ACTION_NAME",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Use an ACTION: name listed in expected; unknown names are ignored during loading."
+    },
+    {
+      "id": 2004,
+      "key": "ACTION_UNKNOWN_GATE_TYPE",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Use a gate type listed in expected; unknown gates always evaluate false."
+    },
+    {
+      "id": 2005,
+      "key": "ACTION_UNKNOWN_TRIGGER_TYPE",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Use a trigger type listed in expected; triggers with unknown types are skipped."
+    },
+    {
+      "id": 2006,
+      "key": "ACTION_PLACEHOLDER_OUT_OF_SCOPE",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Use this placeholder only in the lifecycle stage or action scope that provides it."
+    },
+    {
+      "id": 2007,
+      "key": "ACTION_PLACEHOLDER_UNKNOWN",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Check the placeholder spelling; metadata-defined tokens are not validated as known tokens."
+    },
+    {
+      "id": 2008,
+      "key": "ACTION_SCOREBOARD_MANAGED_TYPO",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Use the suggested RTP-managed scoreboard objective or choose an external objective."
+    },
+    {
+      "id": 2009,
+      "key": "ACTION_SCOREBOARD_OBJECTIVE_MISSING",
+      "severity": "WARNING",
+      "tier": "PBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Create the scoreboard objective on the server or correct its name."
+    },
+    {
+      "id": 2010,
+      "key": "ACTION_GATE_EXPRESSION_INVALID",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Use a numeric comparison, exact number, or inclusive min..max range accepted by GateExpressionParser."
+    },
+    {
+      "id": 2011,
+      "key": "ACTION_UNKNOWN_GATE_SUBKEY",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Use a gate field listed in expected; gate field names are case-sensitive."
+    },
+    {
+      "id": 2012,
+      "key": "ACTION_MISSING_GATE_SUBKEY",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Add the required gate field or one of the listed alternatives."
+    },
+    {
+      "id": 2013,
+      "key": "ACTION_UNKNOWN_REGION",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Choose a region present in the loaded region configuration."
+    },
+    {
+      "id": 2014,
+      "key": "ACTION_SCHEMATIC_UNRESOLVED",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Place the schematic under advanced/schematics and reference an existing file."
+    },
+    {
+      "id": 2015,
+      "key": "ACTION_PAYLOAD_UNBALANCED",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Balance quotes, brackets and braces in the vanilla command payload."
+    },
+    {
+      "id": 2016,
+      "key": "ACTION_PAYLOAD_JSON_INVALID",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Provide a valid JSON text component where tellraw or title expects one."
+    },
+    {
+      "id": 2101,
+      "key": "ACTION_CBIT_OBJECTIVE_MISSING",
+      "severity": "WARNING",
+      "tier": "CBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Create the external scoreboard objective or correct its name."
+    },
+    {
+      "id": 2102,
+      "key": "ACTION_CBIT_GATE_NEVER_PASSED",
+      "severity": "WARNING",
+      "tier": "CBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Check the gate expression and the runtime values it reads."
+    },
+    {
+      "id": 2103,
+      "key": "ACTION_CBIT_GATE_ALWAYS_PASSED",
+      "severity": "INFO",
+      "tier": "CBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Confirm that the gate is intended to pass for every observed evaluation."
+    },
+    {
+      "id": 2104,
+      "key": "ACTION_CBIT_PLACEHOLDER_UNRESOLVED",
+      "severity": "WARNING",
+      "tier": "CBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Use a placeholder available at this dispatch stage or correct its spelling."
+    },
+    {
+      "id": 2105,
+      "key": "ACTION_CBIT_UNKNOWN_ACTION",
+      "severity": "WARNING",
+      "tier": "CBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Use one of the registered ACTION names."
+    },
+    {
+      "id": 2106,
+      "key": "ACTION_CBIT_SESSION_ORPHANED",
+      "severity": "WARNING",
+      "tier": "CBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Check action lifecycle and teardown behavior before the session reaper window expires."
+    },
+    {
+      "id": 2107,
+      "key": "ACTION_SELFTEST_MISMATCH",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Make the bundled expected commands match the real action parser, gates, and session output."
+    },
+    {
+      "id": 2108,
+      "key": "ACTION_SELFTEST_CASE_INVALID",
+      "severity": "ERROR",
+      "tier": "PBIT",
+      "subsystem": "action",
+      "messageKey": "",
+      "remediation": "Repair the self-test case structure and use a supported deterministic simulation script."
+    },
+    {
+      "id": 3001,
+      "key": "TEST_ACCESSOR_UNAVAILABLE",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.accessor",
+      "messageKey": "",
+      "remediation": "Initialize the server accessor before running the test."
+    },
+    {
+      "id": 3002,
+      "key": "TEST_ACCESSOR_MATERIALS",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.accessor",
+      "messageKey": "",
+      "remediation": "Provide a non-empty material set containing common materials."
+    },
+    {
+      "id": 3003,
+      "key": "TEST_ACCESSOR_TAGS",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.accessor",
+      "messageKey": "",
+      "remediation": "Return a non-null block tag snapshot."
+    },
+    {
+      "id": 3004,
+      "key": "TEST_ACCESSOR_SENDER",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.accessor",
+      "messageKey": "",
+      "remediation": "Provide a valid console sender and return null for unknown players."
+    },
+    {
+      "id": 3005,
+      "key": "TEST_ACCESSOR_FORMAT",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.accessor",
+      "messageKey": "",
+      "remediation": "Return non-null formatted and color-stripped messages."
+    },
+    {
+      "id": 3006,
+      "key": "TEST_ACCESSOR_THREAD",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.accessor",
+      "messageKey": "",
+      "remediation": "Return a non-negative scheduler overtime measurement."
+    },
+    {
+      "id": 3007,
+      "key": "TEST_ACCESSOR_BIOME",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.accessor",
+      "messageKey": "",
+      "remediation": "Return a biome sample for an available world."
+    },
+    {
+      "id": 3008,
+      "key": "TEST_ACCESSOR_MENU",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.accessor",
+      "messageKey": "",
+      "remediation": "Provide the expected menu permission and locale queries."
+    },
+    {
+      "id": 3009,
+      "key": "TEST_ACCESSOR_VERSION",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.accessor",
+      "messageKey": "",
+      "remediation": "Return complete platform and server version metadata."
+    },
+    {
+      "id": 3010,
+      "key": "TEST_ACCESSOR_WORLD",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.accessor",
+      "messageKey": "",
+      "remediation": "Return consistent world lookups and world metadata."
+    },
+    {
+      "id": 3011,
+      "key": "TEST_ACCESSOR_MESSAGING",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.accessor",
+      "messageKey": "",
+      "remediation": "Support the server accessor message and announcement overloads."
+    },
+    {
+      "id": 3012,
+      "key": "TEST_ACCESSOR_SUBSYSTEM",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.accessor",
+      "messageKey": "",
+      "remediation": "Provide TPS, plugin directory, scheduler and location generator access."
+    },
+    {
+      "id": 3013,
+      "key": "TEST_ACCESSOR_WORLD_BORDER",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.accessor",
+      "messageKey": "",
+      "remediation": "Support world-border updates and resets for online players."
+    },
+    {
+      "id": 3101,
+      "key": "TEST_CHUNK_TICKET_OPEN",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.chunk-ticket",
+      "messageKey": "",
+      "remediation": "Ensure opening a chunk ticket increments the live count."
+    },
+    {
+      "id": 3102,
+      "key": "TEST_CHUNK_TICKET_RELEASE",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.chunk-ticket",
+      "messageKey": "",
+      "remediation": "Release the chunk ticket and restore the baseline count."
+    },
+    {
+      "id": 3103,
+      "key": "TEST_CHUNK_TICKET_TRACKER_LEAK",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.chunk-ticket",
+      "messageKey": "",
+      "remediation": "Untrack every ticket created by the probe."
+    },
+    {
+      "id": 3104,
+      "key": "TEST_CHUNK_TICKET_SENTINEL_UNTRACK",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.chunk-ticket",
+      "messageKey": "",
+      "remediation": "Make both sentinel untrack operations return to the baseline."
+    },
+    {
+      "id": 3105,
+      "key": "TEST_CHUNK_TICKET_SENTINEL_DIAGNOSTICS",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.chunk-ticket",
+      "messageKey": "",
+      "remediation": "Keep a live sentinel during diagnostics and release it afterward."
+    },
+    {
+      "id": 3106,
+      "key": "TEST_CHUNK_TICKET_STALE_SENTINEL",
+      "severity": "WARNING",
+      "tier": "IBIT",
+      "subsystem": "test.chunk-ticket",
+      "messageKey": "",
+      "remediation": "Investigate the previous interrupted probe and clear its stale sentinels."
+    },
+    {
+      "id": 3201,
+      "key": "TEST_TELEPORT_MOCKED",
+      "severity": "INFO",
+      "tier": "IBIT",
+      "subsystem": "test.teleport",
+      "messageKey": "",
+      "remediation": "Results come from synthetic rtp-bit-* players, not real accounts."
+    },
+    {
+      "id": 3202,
+      "key": "TEST_TELEPORT_UNAVAILABLE",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.teleport",
+      "messageKey": "",
+      "remediation": "Load the core and name a region whose world is loaded."
+    },
+    {
+      "id": 3203,
+      "key": "TEST_TELEPORT_REJECTED",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.teleport",
+      "messageKey": "",
+      "remediation": "Resolve the rejection reason (reload, cooldown, economy, permission) and rerun."
+    },
+    {
+      "id": 3204,
+      "key": "TEST_TELEPORT_SET_LOCATION_NOT_REACHED",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.teleport",
+      "messageKey": "",
+      "remediation": "Check that the pipeline's teleport stage reaches the player."
+    },
+    {
+      "id": 3205,
+      "key": "TEST_TELEPORT_PROCESSING_LEAK",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.teleport",
+      "messageKey": "",
+      "remediation": "Clear processingPlayers on every pipeline exit path."
+    },
+    {
+      "id": 3206,
+      "key": "TEST_TELEPORT_TRACKER_LEAK",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.teleport",
+      "messageKey": "",
+      "remediation": "Untrack TeleportData on every pipeline exit path (REQ-RTP-S-002)."
+    },
+    {
+      "id": 3207,
+      "key": "TEST_TELEPORT_TIMEOUT",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.teleport",
+      "messageKey": "",
+      "remediation": "Investigate the stalled pipeline stage; the API future did not complete."
+    },
+    {
+      "id": 3301,
+      "key": "TEST_COMMANDS_MISSING_NAME",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.commands",
+      "messageKey": "",
+      "remediation": "Repair the reported command-tree node or registration key."
+    },
+    {
+      "id": 3302,
+      "key": "TEST_COMMANDS_MISSING_PERMISSION",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.commands",
+      "messageKey": "",
+      "remediation": "Repair the reported command-tree node or registration key."
+    },
+    {
+      "id": 3303,
+      "key": "TEST_COMMANDS_KEY_NAME_MISMATCH",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.commands",
+      "messageKey": "",
+      "remediation": "Repair the reported command-tree node or registration key."
+    },
+    {
+      "id": 3304,
+      "key": "TEST_COMMANDS_NULL_CHILD",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.commands",
+      "messageKey": "",
+      "remediation": "Repair the reported command-tree node or registration key."
+    },
+    {
+      "id": 3305,
+      "key": "TEST_COMMANDS_TRAVERSAL_ERROR",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.commands",
+      "messageKey": "",
+      "remediation": "Repair the reported command-tree node or registration key."
+    },
+    {
+      "id": 3306,
+      "key": "TEST_COMMANDS_NO_TREE",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.commands",
+      "messageKey": "",
+      "remediation": "Repair the reported command-tree node or registration key."
+    },
+    {
+      "id": 3401,
+      "key": "TEST_SCHEDULER_UNAVAILABLE",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.scheduler",
+      "messageKey": "",
+      "remediation": "Verify the platform scheduler can dispatch this execution tier."
+    },
+    {
+      "id": 3402,
+      "key": "TEST_SCHEDULER_ASYNC",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.scheduler",
+      "messageKey": "",
+      "remediation": "Verify the platform scheduler can dispatch this execution tier."
+    },
+    {
+      "id": 3403,
+      "key": "TEST_SCHEDULER_PRIMARY",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.scheduler",
+      "messageKey": "",
+      "remediation": "Verify the platform scheduler can dispatch this execution tier."
+    },
+    {
+      "id": 3404,
+      "key": "TEST_SCHEDULER_REGION",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.scheduler",
+      "messageKey": "",
+      "remediation": "Verify the platform scheduler can dispatch this execution tier."
+    },
+    {
+      "id": 3501,
+      "key": "TEST_EVENTS_COMMAND_SUCCESS",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.events",
+      "messageKey": "",
+      "remediation": "Verify the corresponding RTP event listener is registered and dispatched."
+    },
+    {
+      "id": 3502,
+      "key": "TEST_EVENTS_COMMAND_FAIL",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.events",
+      "messageKey": "",
+      "remediation": "Verify the corresponding RTP event listener is registered and dispatched."
+    },
+    {
+      "id": 3503,
+      "key": "TEST_EVENTS_PREFAB",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.events",
+      "messageKey": "",
+      "remediation": "Verify the corresponding RTP event listener is registered and dispatched."
+    },
+    {
+      "id": 3504,
+      "key": "TEST_EVENTS_PLAYER_MOVE",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.events",
+      "messageKey": "",
+      "remediation": "Verify the corresponding RTP event listener is registered and dispatched."
+    },
+    {
+      "id": 3505,
+      "key": "TEST_EVENTS_THREW",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.events",
+      "messageKey": "",
+      "remediation": "Verify the corresponding RTP event listener is registered and dispatched."
+    },
+    {
+      "id": 3601,
+      "key": "TEST_ECONOMY_ISOLATION_UNAVAILABLE",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.economy-isolation",
+      "messageKey": "",
+      "remediation": "Check the economy probe's platform scheduler availability and execution context."
+    },
+    {
+      "id": 3602,
+      "key": "TEST_ECONOMY_ISOLATION_TIMEOUT",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.economy-isolation",
+      "messageKey": "",
+      "remediation": "Check the economy probe's platform scheduler availability and execution context."
+    },
+    {
+      "id": 3603,
+      "key": "TEST_ECONOMY_ISOLATION_CALLER_THREAD",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.economy-isolation",
+      "messageKey": "",
+      "remediation": "Check the economy probe's platform scheduler availability and execution context."
+    },
+    {
+      "id": 3604,
+      "key": "TEST_ECONOMY_ISOLATION_REGION_THREAD",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.economy-isolation",
+      "messageKey": "",
+      "remediation": "Check the economy probe's platform scheduler availability and execution context."
+    },
+    {
+      "id": 3605,
+      "key": "TEST_ECONOMY_ISOLATION_FAILED",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.economy-isolation",
+      "messageKey": "",
+      "remediation": "Check the economy probe's platform scheduler availability and execution context."
+    },
+    {
+      "id": 3606,
+      "key": "TEST_ECONOMY_ISOLATION_NOT_APPLICABLE",
+      "severity": "INFO",
+      "tier": "IBIT",
+      "subsystem": "test.economy-isolation",
+      "messageKey": "",
+      "remediation": "Check the economy probe's platform scheduler availability and execution context."
+    },
+    {
+      "id": 3701,
+      "key": "TEST_DISCONNECT_JOB_TRY_FINALLY",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.disconnect-job",
+      "messageKey": "",
+      "remediation": "Verify the disconnect cleanup releases this state exactly once."
+    },
+    {
+      "id": 3702,
+      "key": "TEST_DISCONNECT_JOB_RESERVATION",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.disconnect-job",
+      "messageKey": "",
+      "remediation": "Verify the disconnect cleanup releases this state exactly once."
+    },
+    {
+      "id": 3703,
+      "key": "TEST_DISCONNECT_JOB_RESIDUAL_TICKETS",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.disconnect-job",
+      "messageKey": "",
+      "remediation": "Verify the disconnect cleanup releases this state exactly once."
+    },
+    {
+      "id": 3704,
+      "key": "TEST_DISCONNECT_JOB_PROCESSING",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.disconnect-job",
+      "messageKey": "",
+      "remediation": "Verify the disconnect cleanup releases this state exactly once."
+    },
+    {
+      "id": 3705,
+      "key": "TEST_DISCONNECT_JOB_TELEPORT_DATA",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.disconnect-job",
+      "messageKey": "",
+      "remediation": "Verify the disconnect cleanup releases this state exactly once."
+    },
+    {
+      "id": 3706,
+      "key": "TEST_DISCONNECT_JOB_NEXT_TASK",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.disconnect-job",
+      "messageKey": "",
+      "remediation": "Verify the disconnect cleanup releases this state exactly once."
+    },
+    {
+      "id": 3707,
+      "key": "TEST_DISCONNECT_JOB_THREW",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.disconnect-job",
+      "messageKey": "",
+      "remediation": "Verify the disconnect cleanup releases this state exactly once."
+    },
+    {
+      "id": 3801,
+      "key": "TEST_NETWORK_NOT_CONFIGURED",
+      "severity": "INFO",
+      "tier": "IBIT",
+      "subsystem": "test.network",
+      "messageKey": "",
+      "remediation": "Check network transport availability and the selected synthetic probe."
+    },
+    {
+      "id": 3802,
+      "key": "TEST_NETWORK_HEARTBEAT",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.network",
+      "messageKey": "",
+      "remediation": "Check network transport availability and the selected synthetic probe."
+    },
+    {
+      "id": 3803,
+      "key": "TEST_NETWORK_TOKENS",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.network",
+      "messageKey": "",
+      "remediation": "Check network transport availability and the selected synthetic probe."
+    },
+    {
+      "id": 3804,
+      "key": "TEST_NETWORK_UNAVAILABLE",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.network",
+      "messageKey": "",
+      "remediation": "Check network transport availability and the selected synthetic probe."
+    },
+    {
+      "id": 3901,
+      "key": "TEST_SAFETY_VERIFIER_PRECONDITION",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.safety-verifier",
+      "messageKey": "",
+      "remediation": "Verify the teleport safety probe's preconditions, async verifier and strict timeout."
+    },
+    {
+      "id": 3902,
+      "key": "TEST_SAFETY_VERIFIER_UNSAFE_CACHE",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.safety-verifier",
+      "messageKey": "",
+      "remediation": "Verify the teleport safety probe's preconditions, async verifier and strict timeout."
+    },
+    {
+      "id": 3903,
+      "key": "TEST_SAFETY_VERIFIER_FUTURE_RETURNED",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.safety-verifier",
+      "messageKey": "",
+      "remediation": "Verify the teleport safety probe's preconditions, async verifier and strict timeout."
+    },
+    {
+      "id": 3904,
+      "key": "TEST_SAFETY_VERIFIER_FUTURE_ASYNC",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.safety-verifier",
+      "messageKey": "",
+      "remediation": "Verify the teleport safety probe's preconditions, async verifier and strict timeout."
+    },
+    {
+      "id": 3905,
+      "key": "TEST_SAFETY_VERIFIER_DISPATCH",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.safety-verifier",
+      "messageKey": "",
+      "remediation": "Verify the teleport safety probe's preconditions, async verifier and strict timeout."
+    },
+    {
+      "id": 3906,
+      "key": "TEST_SAFETY_VERIFIER_TIMEOUT",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.safety-verifier",
+      "messageKey": "",
+      "remediation": "Verify the teleport safety probe's preconditions, async verifier and strict timeout."
+    },
+    {
+      "id": 4001,
+      "key": "TEST_API_COMPAT_MISSING_METHOD",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.api-compat",
+      "messageKey": "",
+      "remediation": "Check the platform method signature required by the runtime adapter."
+    },
+    {
+      "id": 4002,
+      "key": "TEST_API_COMPAT_RESOLUTION_ERROR",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.api-compat",
+      "messageKey": "",
+      "remediation": "Resolve the reported class-loading or reflection error for this platform."
+    },
+    {
+      "id": 4101,
+      "key": "PROBE_STRESS_MOCKED",
+      "severity": "INFO",
+      "tier": "IBIT",
+      "subsystem": "test.stress",
+      "messageKey": "",
+      "remediation": "Inspect the RTP stress pipeline result and rerun with bounded parameters."
+    },
+    {
+      "id": 4102,
+      "key": "PROBE_STRESS_UNAVAILABLE",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.stress",
+      "messageKey": "",
+      "remediation": "Inspect the RTP stress pipeline result and rerun with bounded parameters."
+    },
+    {
+      "id": 4103,
+      "key": "PROBE_STRESS_REJECTED",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.stress",
+      "messageKey": "",
+      "remediation": "Inspect the RTP stress pipeline result and rerun with bounded parameters."
+    },
+    {
+      "id": 4104,
+      "key": "PROBE_STRESS_SET_LOCATION",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.stress",
+      "messageKey": "",
+      "remediation": "Inspect the RTP stress pipeline result and rerun with bounded parameters."
+    },
+    {
+      "id": 4105,
+      "key": "PROBE_STRESS_PROCESSING_LEAK",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.stress",
+      "messageKey": "",
+      "remediation": "Inspect the RTP stress pipeline result and rerun with bounded parameters."
+    },
+    {
+      "id": 4106,
+      "key": "PROBE_STRESS_PLAYER_FAILURES",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.stress",
+      "messageKey": "",
+      "remediation": "Inspect the RTP stress pipeline result and rerun with bounded parameters."
+    },
+    {
+      "id": 4107,
+      "key": "PROBE_STRESS_PLAYER_CANCELLED",
+      "severity": "WARNING",
+      "tier": "IBIT",
+      "subsystem": "test.stress-player",
+      "messageKey": "",
+      "remediation": "Allow the bounded player stress run to complete."
+    },
+    {
+      "id": 4201,
+      "key": "PROBE_QUEUE_STARVATION_FAILURES",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.queue-starvation",
+      "messageKey": "",
+      "remediation": "Resolve the queue sampling failure and rerun the bounded probe."
+    },
+    {
+      "id": 4202,
+      "key": "PROBE_QUEUE_STARVATION_STALLS",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.queue-starvation",
+      "messageKey": "",
+      "remediation": "Resolve the queue sampling failure and rerun the bounded probe."
+    },
+    {
+      "id": 4203,
+      "key": "PROBE_QUEUE_STARVATION_COMPUTE_THROWN",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.queue-starvation",
+      "messageKey": "",
+      "remediation": "Resolve the queue sampling failure and rerun the bounded probe."
+    },
+    {
+      "id": 4204,
+      "key": "PROBE_QUEUE_STARVATION_REGION_UNAVAILABLE",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.queue-starvation",
+      "messageKey": "",
+      "remediation": "Resolve the queue sampling failure and rerun the bounded probe."
+    },
+    {
+      "id": 4205,
+      "key": "PROBE_QUEUE_STARVATION_CANCELLED",
+      "severity": "WARNING",
+      "tier": "IBIT",
+      "subsystem": "test.queue-starvation",
+      "messageKey": "",
+      "remediation": "Allow the bounded sampling run to complete."
+    },
+    {
+      "id": 4301,
+      "key": "PROBE_DISCONNECT_MIDFLIGHT_PROCESSING",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.disconnect-midflight",
+      "messageKey": "",
+      "remediation": "Verify the disconnect cleanup releases this player state."
+    },
+    {
+      "id": 4302,
+      "key": "PROBE_DISCONNECT_MIDFLIGHT_INVULNERABLE",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.disconnect-midflight",
+      "messageKey": "",
+      "remediation": "Verify the disconnect cleanup releases this player state."
+    },
+    {
+      "id": 4303,
+      "key": "PROBE_DISCONNECT_MIDFLIGHT_NEXT_TASK",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.disconnect-midflight",
+      "messageKey": "",
+      "remediation": "Verify the disconnect cleanup releases this player state."
+    },
+    {
+      "id": 4304,
+      "key": "PROBE_DISCONNECT_MIDFLIGHT_TELEPORT_DATA",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.disconnect-midflight",
+      "messageKey": "",
+      "remediation": "Verify the disconnect cleanup releases this player state."
+    },
+    {
+      "id": 4305,
+      "key": "PROBE_DISCONNECT_MIDFLIGHT_THREW",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.disconnect-midflight",
+      "messageKey": "",
+      "remediation": "Verify the disconnect cleanup releases this player state."
+    },
+    {
+      "id": 4306,
+      "key": "PROBE_DISCONNECT_MIDFLIGHT_NO_WORLD",
+      "severity": "INFO",
+      "tier": "IBIT",
+      "subsystem": "test.disconnect-midflight",
+      "messageKey": "",
+      "remediation": "Load the default region world to use a registered BIT mock player."
+    },
+    {
+      "id": 4401,
+      "key": "PROBE_FOLIA_OWNERSHIP",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.folia-ownership",
+      "messageKey": "",
+      "remediation": "Verify the region scheduler owns the location before changing the mock location."
+    },
+    {
+      "id": 4402,
+      "key": "PROBE_FOLIA_OWNERSHIP_WORLD_UNAVAILABLE",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.folia-ownership",
+      "messageKey": "",
+      "remediation": "Verify the region scheduler owns the location before changing the mock location."
+    },
+    {
+      "id": 4403,
+      "key": "PROBE_FOLIA_OWNERSHIP_UNSUPPORTED",
+      "severity": "INFO",
+      "tier": "IBIT",
+      "subsystem": "test.folia-ownership",
+      "messageKey": "",
+      "remediation": "Run this probe on a Folia server to verify region ownership."
+    },
+    {
+      "id": 4501,
+      "key": "PROBE_ASYNC_REPLY_PIPELINE_THROWN",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.async-reply",
+      "messageKey": "",
+      "remediation": "Verify the asynchronous reply pipeline and mock teleport cleanup."
+    },
+    {
+      "id": 4502,
+      "key": "PROBE_ASYNC_REPLY_PIPELINE_NOT_REACHED",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.async-reply",
+      "messageKey": "",
+      "remediation": "Verify the asynchronous reply pipeline and mock teleport cleanup."
+    },
+    {
+      "id": 4503,
+      "key": "PROBE_ASYNC_REPLY_PROCESSING_LEAK",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.async-reply",
+      "messageKey": "",
+      "remediation": "Verify the asynchronous reply pipeline and mock teleport cleanup."
+    },
+    {
+      "id": 4504,
+      "key": "PROBE_ASYNC_REPLY_WORLD_UNAVAILABLE",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.async-reply",
+      "messageKey": "",
+      "remediation": "Verify the asynchronous reply pipeline and mock teleport cleanup."
+    },
+    {
+      "id": 4505,
+      "key": "PROBE_ASYNC_REPLY_PLAYER_UNKNOWN",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.async-reply",
+      "messageKey": "",
+      "remediation": "Verify the asynchronous reply pipeline and mock teleport cleanup."
+    },
+    {
+      "id": 4506,
+      "key": "PROBE_ASYNC_REPLY_THREAD_UNSAFE",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.async-reply",
+      "messageKey": "",
+      "remediation": "Verify the asynchronous reply pipeline and mock teleport cleanup."
+    },
+    {
+      "id": 4507,
+      "key": "PROBE_ASYNC_REPLY_MOCKED_PIPELINE",
+      "severity": "INFO",
+      "tier": "IBIT",
+      "subsystem": "test.async-reply",
+      "messageKey": "",
+      "remediation": "This result exercises the pipeline with a registered mock, not a real player."
+    },
+    {
+      "id": 4601,
+      "key": "PROBE_HOLOGRAM_PLAYER_UNKNOWN",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.hologram",
+      "messageKey": "",
+      "remediation": "Inspect the hologram provider and ensure its handle closes successfully."
+    },
+    {
+      "id": 4602,
+      "key": "PROBE_HOLOGRAM_LOCATION_UNAVAILABLE",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.hologram",
+      "messageKey": "",
+      "remediation": "Inspect the hologram provider and ensure its handle closes successfully."
+    },
+    {
+      "id": 4603,
+      "key": "PROBE_HOLOGRAM_SPAWN_FAILED",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.hologram",
+      "messageKey": "",
+      "remediation": "Inspect the hologram provider and ensure its handle closes successfully."
+    },
+    {
+      "id": 4604,
+      "key": "PROBE_HOLOGRAM_NULL_HANDLE",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.hologram",
+      "messageKey": "",
+      "remediation": "Inspect the hologram provider and ensure its handle closes successfully."
+    },
+    {
+      "id": 4605,
+      "key": "PROBE_HOLOGRAM_CLOSE_FAILED",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.hologram",
+      "messageKey": "",
+      "remediation": "Inspect the hologram provider and ensure its handle closes successfully."
+    },
+    {
+      "id": 4606,
+      "key": "PROBE_HOLOGRAM_SCHEDULER_UNAVAILABLE",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.hologram",
+      "messageKey": "",
+      "remediation": "Inspect the hologram provider and ensure its handle closes successfully."
+    },
+    {
+      "id": 4607,
+      "key": "PROBE_HOLOGRAM_UPDATE_FAILED",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.hologram",
+      "messageKey": "",
+      "remediation": "Inspect the hologram provider and ensure its handle closes successfully."
+    },
+    {
+      "id": 4608,
+      "key": "PROBE_HOLOGRAM_CONSOLE_STATUS",
+      "severity": "INFO",
+      "tier": "IBIT",
+      "subsystem": "test.hologram",
+      "messageKey": "",
+      "remediation": "Provide player=<name> to spawn the hologram in-world."
+    },
+    {
+      "id": 4609,
+      "key": "PROBE_HOLOGRAM_CANCELLED",
+      "severity": "WARNING",
+      "tier": "IBIT",
+      "subsystem": "test.hologram",
+      "messageKey": "",
+      "remediation": "Allow the hologram countdown to complete or rerun it."
+    },
+    {
+      "id": 4700,
+      "key": "HEATMAP_MOCKED",
+      "severity": "INFO",
+      "tier": "IBIT",
+      "subsystem": "test.heatmap",
+      "messageKey": "",
+      "remediation": "Heatmap results are generated by synthetic BIT players, not real accounts."
+    },
+    {
+      "id": 4701,
+      "key": "HEATMAP_UNAVAILABLE",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.heatmap",
+      "messageKey": "",
+      "remediation": "Load RTP and select a region whose world is available."
+    },
+    {
+      "id": 4702,
+      "key": "HEATMAP_TELEPORT_FAILED",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.heatmap",
+      "messageKey": "",
+      "remediation": "Inspect the RTP pipeline failure and retry the heatmap probe."
+    },
+    {
+      "id": 4703,
+      "key": "HEATMAP_LANDING_MISSING",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.heatmap",
+      "messageKey": "",
+      "remediation": "Verify that successful mock landings are appended to BitTeleportLog."
+    },
+    {
+      "id": 4704,
+      "key": "HEATMAP_EXPORT_FAILED",
+      "severity": "ERROR",
+      "tier": "IBIT",
+      "subsystem": "test.heatmap",
+      "messageKey": "",
+      "remediation": "Check the plugin data folder is writable and rerun the probe."
+    },
+    {
+      "id": 4705,
+      "key": "HEATMAP_CANCELLED",
+      "severity": "WARNING",
+      "tier": "IBIT",
+      "subsystem": "test.heatmap",
+      "messageKey": "",
+      "remediation": "Rerun the named probe after the current test is no longer cancelled."
+    }
+  ]
+}

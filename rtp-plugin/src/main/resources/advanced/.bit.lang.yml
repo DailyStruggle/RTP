@@ -1,0 +1,7 @@
+# --- Language Mapping: advanced/bit.yml ---
+# BIT keys are stable technical names, so their localized spelling remains identical.
+strictActions: strictActions
+strictConfig: strictConfig
+gateOutcomeSamples: gateOutcomeSamples
+overrides: overrides
+version: version

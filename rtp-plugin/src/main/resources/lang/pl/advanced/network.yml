@@ -52,11 +52,13 @@ transport:
 # Backend heartbeat / peer-staleness cadence (shared by every transport tier).
 heartbeat:
   # Jak czesto ten backend publikuje swoj wiersz stanu (ms).
+  # Obsługuje jednostki czasu (np. 24h, 1d).
   # @type: integer
   # @default: 1000
   intervalMs: 1000
 
   # Jak dlugo ostatnio widziany stan rownorzednego wezla pozostaje zaufany, zanim zostanie uznany za nieznany (ms); utrzymuj powyzej intervalMs.
+  # Obsługuje jednostki czasu (np. 24h, 1d).
   # @type: integer
   # @default: 5000
   staleAfterMs: 5000
@@ -82,11 +84,13 @@ queue:
   maxDepth: 50
 
   # Czestotliwosc oprozniania oczekujacych zapisow backendu (ms); nizej = mniejsze opoznienie, wyzej = mniej podrozy do transportu.
+  # Obsługuje jednostki czasu (np. 24h, 1d).
   # @type: integer
   # @default: 250
   flushIntervalMs: 250
 
   # Czestotliwosc odpytywania pamieci podrecznej stanu backendu (ms); jak czesto odswiezany jest postep na gracza.
+  # Obsługuje jednostki czasu (np. 24h, 1d).
   # @type: integer
   # @default: 1000
   pollIntervalMs: 1000
@@ -114,11 +118,13 @@ queue:
 # Reservation-token lifecycle.
 reservation:
   # Czestotliwosc czyszczenia TTL po stronie proxy (ms); usuwa wygasle tokeny i zwalnia ich wspolrzedne.
+  # Obsługuje jednostki czasu (np. 24h, 1d).
   # @type: integer
   # @default: 30000
   reapIntervalMs: 30000
 
   # TTL na token (ms); zarezerwowana, ale niewykorzystana rezerwacja starsza niz to jest zwalniana jako porzucona.
+  # Obsługuje jednostki czasu (np. 24h, 1d).
   # @type: integer
   # @default: 60000
   ttlMs: 60000
@@ -304,6 +310,7 @@ editor:
   # Trusted web editor browsers (/rtp editor trust, /rtp editor untrust).
   trust:
     # Days a browser stays trusted after /rtp editor trust. 0 = never expires.
+    # Obsługuje jednostki czasu (np. 24h, 1d).
     # @type: integer
     # @default: 0
     maxAgeDays: 0

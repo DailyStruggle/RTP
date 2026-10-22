@@ -511,6 +511,7 @@ editorApplyFetching: "&7[P0] Obtendo o payload de configuração..."
 editorApplyValidating: "&7[P0] Validando a integridade e a sintaxe do payload..."
 editorApplySuccess: "&a[P0] Configuração aplicada e recarregada a quente! (cópias .bak criadas para os arquivos modificados)"
 editorApplyFailed: "&c[P0] Não foi possível aplicar o payload: [reason]"
+editorApplyRejected: "&c[P0] Aplicação rejeitada: [count] erro(s) de configuração; nada foi gravado. Primeiro: [code] em [source] em [path]."
 
 # DO NOT TOUCH VERSION NUMBER
 version: 1.0

@@ -1,0 +1,21 @@
+# --- Configurazione dei test integrati (BIT) ---
+# Documentazione: docs/admin/configuration/BIT.md
+
+# Registra i rilievi strutturali delle azioni come avvisi senza bloccarne la registrazione.
+# Imposta true per impedire la registrazione delle azioni con errori effettivi.
+strictActions: false
+
+# Registra come avvisi i rilievi di configurazione accettati dalle versioni precedenti, senza rifiutare /rtp reload.
+# Imposta true per trattarli come errori; un ricaricamento o Hot-Apply con errori mantiene la configurazione attiva.
+strictConfig: false
+
+# Numero minimo di campioni prima di classificare una condizione come sempre o mai superata.
+gateOutcomeSamples: 200
+
+# Livelli per i codici BIT registrati; prevalgono su strictActions.
+# Valori consentiti: ERROR, WARNING, INFO, DEBUG, TRACE e OFF. OFF nasconde il rilievo.
+# Codici e livelli sconosciuti vengono ignorati e registrati nel log.
+overrides:
+
+# NON MODIFICARE IL NUMERO DI VERSIONE
+version: 1.0

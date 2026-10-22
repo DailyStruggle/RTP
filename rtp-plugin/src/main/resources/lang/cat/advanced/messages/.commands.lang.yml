@@ -204,4 +204,5 @@ editorApplyFetching: "editorApplyFetching"
 editorApplyValidating: "editorApplyValidating"
 editorApplySuccess: "editorApplySuccess"
 editorApplyFailed: "editorApplyFailed"
+editorApplyRejected: "editorApplyRejected"
 version: version

@@ -38,6 +38,13 @@ pipeline {
       }
     }
 
+    stage('BIT (shipped config)') {
+      steps {
+        sh './gradlew :rtp-core:bit -Pconfig=addons/LeafRTPActionAddon/src/main/resources/definitions/actions -Pstrict'
+        sh './gradlew :rtp-core:bit -Pconfig=rtp-plugin/src/main/resources -Pstrict'
+      }
+    }
+
     // PMD gate (config/pmd/ruleset.xml), same rules GitHub Actions enforces in
     // gradle-set.yml. Fails on any violation; pmdRegexMain stays advisory.
     stage('Static Analysis') {

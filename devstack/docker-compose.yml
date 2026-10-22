@@ -119,8 +119,9 @@ services:
       # bind from the named volume). Running as root means session.lock,
       # region files, and all world I/O succeed regardless of volume ownership.
       # Safe for a local devstack; do NOT replicate in production.
-      RUN_AS_UID: "0"
-      RUN_AS_GID: "0"
+      UID: "0"
+      GID: "0"
+      SKIP_CHOWN_DATA: "TRUE"
       # Vanilla 1.21.2+ stops ticking after 60 s with no players, which parks
       # RTP's tick-thread probes (`rtp test ...`) and the background cache fill.
       PAUSE_WHEN_EMPTY_SECONDS: "-1"
@@ -233,8 +234,9 @@ services:
       DIFFICULTY: peaceful
       OPS: ${OPS:-}
       OVERRIDE_OPS: "TRUE"
-      RUN_AS_UID: "0"
-      RUN_AS_GID: "0"
+      UID: "0"
+      GID: "0"
+      SKIP_CHOWN_DATA: "TRUE"
       # Vanilla 1.21.2+ stops ticking after 60 s with no players, which parks
       # RTP's tick-thread probes (`rtp test ...`) and the background cache fill.
       PAUSE_WHEN_EMPTY_SECONDS: "-1"
@@ -294,8 +296,9 @@ services:
       DIFFICULTY: peaceful
       OPS: ${OPS:-}
       OVERRIDE_OPS: "TRUE"
-      RUN_AS_UID: "0"
-      RUN_AS_GID: "0"
+      UID: "0"
+      GID: "0"
+      SKIP_CHOWN_DATA: "TRUE"
       # Vanilla 1.21.2+ stops ticking after 60 s with no players, which parks
       # RTP's tick-thread probes (`rtp test ...`) and the background cache fill.
       PAUSE_WHEN_EMPTY_SECONDS: "-1"
@@ -355,8 +358,9 @@ services:
       # every boot, otherwise itzg only writes ops.json once per world.
       OVERRIDE_OPS: "TRUE"
       # See backend-a: run as root to sidestep named-volume ownership.
-      RUN_AS_UID: "0"
-      RUN_AS_GID: "0"
+      UID: "0"
+      GID: "0"
+      SKIP_CHOWN_DATA: "TRUE"
       # Vanilla 1.21.2+ stops ticking after 60 s with no players, which parks
       # RTP's tick-thread probes (`rtp test ...`) and the background cache fill.
       PAUSE_WHEN_EMPTY_SECONDS: "-1"
@@ -411,8 +415,9 @@ services:
       ONLINE_MODE: "FALSE"
       OPS: ${OPS:-}
       OVERRIDE_OPS: "TRUE"
-      RUN_AS_UID: "0"
-      RUN_AS_GID: "0"
+      UID: "0"
+      GID: "0"
+      SKIP_CHOWN_DATA: "TRUE"
       # Vanilla 1.21.2+ stops ticking after 60 s with no players, which parks
       # RTP's tick-thread probes (`rtp test ...`) and the background cache fill.
       PAUSE_WHEN_EMPTY_SECONDS: "-1"
@@ -448,8 +453,9 @@ services:
       ONLINE_MODE: "FALSE"
       OPS: ${OPS:-}
       OVERRIDE_OPS: "TRUE"
-      RUN_AS_UID: "0"
-      RUN_AS_GID: "0"
+      UID: "0"
+      GID: "0"
+      SKIP_CHOWN_DATA: "TRUE"
       # Vanilla 1.21.2+ stops ticking after 60 s with no players, which parks
       # RTP's tick-thread probes (`rtp test ...`) and the background cache fill.
       PAUSE_WHEN_EMPTY_SECONDS: "-1"

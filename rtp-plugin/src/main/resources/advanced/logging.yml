@@ -1,5 +1,5 @@
 # --- Plugin Logging Toggles ---
-# Documentation: plugins/RTP/docs/admin/configuration/LOGGING.md
+# Documentation: docs/admin/configuration/LOGGING.md
 
 # Minimum log level (finer of this and the server logger's own level).
 # ALL keeps behavior identical to the server logger.

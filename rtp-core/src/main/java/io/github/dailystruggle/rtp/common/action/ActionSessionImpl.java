@@ -32,8 +32,11 @@ import java.util.regex.Pattern;
 public final class ActionSessionImpl implements ActionSession {
 
   public static final Vocabulary ACTION_NAMES = new Vocabulary("action name", List.of("PULL_BACK", "DISARM", "ELIMINATE"));
+  public static final Vocabulary MANAGED_OBJECTIVES = new Vocabulary("managed scoreboard objective", List.of(
+      "rtp_session_id", "rtp_time_left", "rtp_violations", "rtp_in_bounds", "rtp_dist_sq", "rtp_alive"));
 
   private static final Pattern WHITESPACE = Pattern.compile("\\s+");
+  private static final String FOR_EACH_PLAYER_SCOPE = "_for_each_player_scope";
 
   private final UUID sessionId;
   private final ActionDefinition definition;
@@ -54,9 +57,21 @@ public final class ActionSessionImpl implements ActionSession {
   private final Map<UUID, Long> lastDamageSeconds = new ConcurrentHashMap<>();
   private final AtomicBoolean active = new AtomicBoolean(true);
   private final AtomicBoolean ending = new AtomicBoolean(false);
+  private final AtomicBoolean started = new AtomicBoolean(false);
+  private final AtomicBoolean orphanReported = new AtomicBoolean(false);
   private final java.util.Set<UUID> pullBackInFlight = ConcurrentHashMap.newKeySet();
   private final Consumer<UUID> onDisarmCallback;
   private final Map<String, Predicate<ActionGateContext>> externalPredicates;
+  private final Simulation simulation;
+
+  interface Simulation {
+    long currentTimeMillis();
+    void schedule(long delayTicks, Runnable task);
+    void dispatch(String command);
+    void note(String message);
+    String playerName(UUID participantId);
+    GateTrace gateTrace();
+  }
 
   public ActionSessionImpl(
       UUID sessionId,
@@ -70,6 +85,23 @@ public final class ActionSessionImpl implements ActionSession {
       Region parentRegion,
       Consumer<UUID> onDisarmCallback,
       Map<String, Predicate<ActionGateContext>> externalPredicates) {
+    this(sessionId, definition, participants, context, assignedSlots, worldName, anchorX, anchorZ,
+        parentRegion, onDisarmCallback, externalPredicates, null);
+  }
+
+  ActionSessionImpl(
+      UUID sessionId,
+      ActionDefinition definition,
+      List<UUID> participants,
+      ActionContext context,
+      Map<UUID, int[]> assignedSlots,
+      String worldName,
+      int anchorX,
+      int anchorZ,
+      Region parentRegion,
+      Consumer<UUID> onDisarmCallback,
+      Map<String, Predicate<ActionGateContext>> externalPredicates,
+      Simulation simulation) {
 
     this.sessionId = Objects.requireNonNull(sessionId, "sessionId must not be null");
     this.definition = Objects.requireNonNull(definition, "definition must not be null");
@@ -82,13 +114,33 @@ public final class ActionSessionImpl implements ActionSession {
     this.parentRegion = parentRegion;
     this.onDisarmCallback = onDisarmCallback;
     this.externalPredicates = externalPredicates;
+    this.simulation = simulation;
 
-    this.startTimeMillis = System.currentTimeMillis();
+    this.startTimeMillis = currentTimeMillis();
     this.durationSeconds = definition.confinement().durationSeconds();
 
     for (UUID p : participants) {
       violations.put(p, new AtomicInteger(0));
     }
+  }
+
+  private long currentTimeMillis() {
+    return simulation == null ? System.currentTimeMillis() : simulation.currentTimeMillis();
+  }
+
+  private RTPServerAccessor accessor() {
+    return simulation == null ? RTPRuntime.serverAccessor() : null;
+  }
+
+  private GateTrace gateTrace() {
+    return simulation == null ? null : simulation.gateTrace();
+  }
+
+  private String playerName(UUID participantId) {
+    if (simulation != null) return simulation.playerName(participantId);
+    RTPServerAccessor accessor = accessor();
+    io.github.dailystruggle.rtp.api.entity.RTPPlayer player = accessor == null ? null : accessor.getPlayer(participantId);
+    return player == null ? null : player.name();
   }
 
   public ActionContext context() {
@@ -111,7 +163,7 @@ public final class ActionSessionImpl implements ActionSession {
 
   @Override
   public long elapsedSeconds() {
-    return Math.max(0L, (System.currentTimeMillis() - startTimeMillis) / 1000L);
+    return Math.max(0L, (currentTimeMillis() - startTimeMillis) / 1000L);
   }
 
   @Override
@@ -135,10 +187,12 @@ public final class ActionSessionImpl implements ActionSession {
    * Arms movement confinement watchers for all participants (ADR-075) and tracks session in MemoryTracker.
    */
   public void arm() {
-    long maxLifespanMs = (durationSeconds > 0L)
-        ? (durationSeconds + 30L) * 1000L
-        : 30_000L;
-    MemoryTracker.track(this, "ActionSession-" + sessionId, maxLifespanMs);
+    arm(memoryTrackerLifespanMillis());
+  }
+
+  void arm(long reaperWindowMillis) {
+    if (simulation != null) return;
+    MemoryTracker.track(this, "ActionSession-" + sessionId, reaperWindowMillis, orphanReaperCallback());
 
     // If placement is disabled or worldName is null, movement confinement is not monitored
     if (!definition.placement().enabled() || worldName == null) {
@@ -146,7 +200,7 @@ public final class ActionSessionImpl implements ActionSession {
     }
 
     for (UUID participant : participants) {
-      AutoCloseable reg = RTPRuntime.serverAccessor() != null
+      AutoCloseable reg = accessor() != null
           ? io.github.dailystruggle.rtp.api.RTPAPI.playerMoveEvents.watch(participant, this::onPlayerMove)
           : null;
       if (reg != null) {
@@ -159,6 +213,10 @@ public final class ActionSessionImpl implements ActionSession {
    * Tick update for session expiration, continuous boundary confinement, and timeout checks.
    */
   public void tick() {
+    tick(currentTimeMillis());
+  }
+
+  void tick(long nowMillis) {
     if (!active.get()) return;
     checkContinuousConfinement();
     updateDynamicScoreboards();
@@ -167,16 +225,32 @@ public final class ActionSessionImpl implements ActionSession {
     }
   }
 
+  private long memoryTrackerLifespanMillis() {
+    return durationSeconds > 0L ? (durationSeconds + 30L) * 1000L : 30_000L;
+  }
+
+  private Runnable orphanReaperCallback() {
+    AtomicBoolean sessionActive = active;
+    AtomicBoolean sessionStarted = started;
+    AtomicBoolean reported = orphanReported;
+    String actionId = definition.id();
+    return () -> {
+      if (sessionActive.get() && sessionStarted.get() && reported.compareAndSet(false, true)) {
+        ActionCbitCounters.recordOrphanedSession(actionId);
+      }
+    };
+  }
+
   private void checkContinuousConfinement() {
     if (!definition.placement().enabled() || worldName == null) return;
-    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+    RTPServerAccessor accessor = accessor();
     if (accessor == null) return;
 
     double damageAmount = definition.confinement().damageAmount();
     double damageBuffer = definition.confinement().damageBuffer();
     long damageIntervalSec = definition.confinement().damageIntervalSeconds();
     double maxDistanceOutside = definition.confinement().maxDistanceOutside();
-    long nowSec = System.currentTimeMillis() / 1000L;
+    long nowSec = currentTimeMillis() / 1000L;
 
     for (UUID pid : participants) {
       io.github.dailystruggle.rtp.api.entity.RTPPlayer p = accessor.getPlayer(pid);
@@ -263,12 +337,13 @@ public final class ActionSessionImpl implements ActionSession {
       // Declarative damage check on move
       double damageAmount = definition.confinement().damageAmount();
       if (damageAmount > 0.0 && distOutside > definition.confinement().damageBuffer()) {
-        long nowSec = System.currentTimeMillis() / 1000L;
+        long nowSec = currentTimeMillis() / 1000L;
         long lastDmg = lastDamageSeconds.getOrDefault(pid, 0L);
         if (nowSec - lastDmg >= definition.confinement().damageIntervalSeconds()) {
           lastDamageSeconds.put(pid, nowSec);
-          if (RTPRuntime.serverAccessor() != null) {
-            RTPRuntime.serverAccessor().damagePlayer(pid, damageAmount);
+          RTPServerAccessor accessor = accessor();
+          if (accessor != null) {
+            accessor.damagePlayer(pid, damageAmount);
           }
         }
       }
@@ -311,12 +386,10 @@ public final class ActionSessionImpl implements ActionSession {
     if (worldName != null) {
       tokens.put("world", worldName);
     }
-    if (RTPRuntime.serverAccessor() != null) {
-      io.github.dailystruggle.rtp.api.entity.RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(pid);
-      if (player != null && player.name() != null) {
-        tokens.put("player_name", player.name());
-        tokens.put("violator_name", player.name());
-      }
+    String name = playerName(pid);
+    if (name != null) {
+      tokens.put("player_name", name);
+      tokens.put("violator_name", name);
     }
 
     for (ActionDefinition.CommandAction cmd : actions) {
@@ -429,6 +502,7 @@ public final class ActionSessionImpl implements ActionSession {
   }
 
   public void triggerStart() {
+    started.set(true);
     sendConfinementWorldBorder();
     initializeScoreboards();
     UUID firstParticipant = participants.isEmpty() ? new UUID(0, 0) : participants.get(0);
@@ -471,17 +545,14 @@ public final class ActionSessionImpl implements ActionSession {
   }
 
   private void initializeScoreboards() {
-    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+    RTPServerAccessor accessor = accessor();
     if (accessor == null) return;
 
     // ADR-093 §4: Ensure dummy objectives exist once per plugin lifecycle
     if (SCOREBOARD_OBJECTIVES_INITIALIZED.compareAndSet(false, true)) {
-      accessor.ensureScoreboardObjective("rtp_session_id", "dummy");
-      accessor.ensureScoreboardObjective("rtp_time_left", "dummy");
-      accessor.ensureScoreboardObjective("rtp_violations", "dummy");
-      accessor.ensureScoreboardObjective("rtp_in_bounds", "dummy");
-      accessor.ensureScoreboardObjective("rtp_dist_sq", "dummy");
-      accessor.ensureScoreboardObjective("rtp_alive", "dummy");
+      for (String objective : MANAGED_OBJECTIVES.values()) {
+        accessor.ensureScoreboardObjective(objective, "dummy");
+      }
     }
 
     String sessionTag = "rtp_session_" + sessionId.toString().substring(0, 8);
@@ -502,7 +573,7 @@ public final class ActionSessionImpl implements ActionSession {
   }
 
   private int countAliveParticipants() {
-    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+    RTPServerAccessor accessor = accessor();
     if (accessor == null) return participants.size();
     int count = 0;
     for (UUID pid : participants) {
@@ -515,7 +586,7 @@ public final class ActionSessionImpl implements ActionSession {
   }
 
   private void updateDynamicScoreboards() {
-    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+    RTPServerAccessor accessor = accessor();
     if (accessor == null) return;
 
     long timeLeft = durationSeconds >= 0L ? Math.max(0L, remainingSeconds()) : 999999L;
@@ -539,7 +610,7 @@ public final class ActionSessionImpl implements ActionSession {
   }
 
   private void updateParticipantBreachScoreboard(UUID violatorId, int breachCount, double distSq) {
-    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+    RTPServerAccessor accessor = accessor();
     if (accessor == null || violatorId == null) return;
     accessor.setScoreboardScore(violatorId, "rtp_violations", breachCount);
     accessor.setScoreboardScore(violatorId, "rtp_in_bounds", 0);
@@ -547,7 +618,7 @@ public final class ActionSessionImpl implements ActionSession {
   }
 
   private void cleanupScoreboards() {
-    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+    RTPServerAccessor accessor = accessor();
     if (accessor == null) return;
     String sessionTag = "rtp_session_" + sessionId.toString().substring(0, 8);
 
@@ -606,7 +677,7 @@ public final class ActionSessionImpl implements ActionSession {
     double damageAmount = definition.confinement().damageAmount();
     double damageBuffer = definition.confinement().damageBuffer();
 
-    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+    RTPServerAccessor accessor = accessor();
     if (accessor != null) {
       for (UUID participant : participants) {
         accessor.sendWorldBorder(
@@ -616,7 +687,7 @@ public final class ActionSessionImpl implements ActionSession {
   }
 
   private void resetConfinementWorldBorder() {
-    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+    RTPServerAccessor accessor = accessor();
     if (accessor != null) {
       for (UUID participant : participants) {
         accessor.resetWorldBorder(participant);
@@ -658,7 +729,7 @@ public final class ActionSessionImpl implements ActionSession {
   public void triggerExpire() {
     if (!ending.compareAndSet(false, true)) return;
     try {
-      executeLifecycleSteps(definition.lifecycle().onExpire(), null, true);
+      executeTerminalSteps(definition.lifecycle().onExpire(), null, Collections.emptyMap());
     } catch (Exception e) {
       RTPRuntime.log(Level.WARNING, "[RTP Action] Error executing onExpire lifecycle steps", e);
     } finally {
@@ -679,7 +750,7 @@ public final class ActionSessionImpl implements ActionSession {
       if (steps.isEmpty()) {
         steps = definition.lifecycle().onExpire();
       }
-      executeLifecycleStepsWithTokens(steps, null, extra, true);
+      executeTerminalSteps(steps, participantId, extra);
     } catch (Exception e) {
       RTPRuntime.log(Level.WARNING, "[RTP Action] Error executing onCancel lifecycle steps", e);
     } finally {
@@ -694,7 +765,7 @@ public final class ActionSessionImpl implements ActionSession {
       if (victimId != null) extra.put("victim", victimId);
       if (winnerId != null) extra.put("winner", winnerId);
 
-      executeLifecycleStepsWithTokens(definition.lifecycle().onDeath(), null, extra, true);
+      executeTerminalSteps(definition.lifecycle().onDeath(), victimId, extra);
     } catch (Exception e) {
       RTPRuntime.log(Level.WARNING, "[RTP Action] Error executing onDeath lifecycle steps", e);
     } finally {
@@ -712,7 +783,7 @@ public final class ActionSessionImpl implements ActionSession {
       return;
     }
 
-    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+    RTPServerAccessor accessor = accessor();
     if (accessor != null) {
       // Dispatch safe teleport back to slot without rubberbanding (ADR-093 §8, S-001, S-004, S-005)
       io.github.dailystruggle.rtp.api.world.RTPWorld<?> world = accessor.getRTPWorld(worldName);
@@ -744,7 +815,7 @@ public final class ActionSessionImpl implements ActionSession {
 
   public void eliminate(UUID participantId) {
     if (participantId == null) return;
-    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+    RTPServerAccessor accessor = accessor();
     if (accessor != null) {
       accessor.executeCommand(new UUID(0, 0), "gamemode survival " + participantId);
     }
@@ -777,7 +848,7 @@ public final class ActionSessionImpl implements ActionSession {
 
     pullBackInFlight.clear();
     participantBreachType.clear();
-    MemoryTracker.untrack(this);
+    if (simulation == null) MemoryTracker.untrack(this);
     resetConfinementWorldBorder();
     cleanupScoreboards();
 
@@ -812,8 +883,97 @@ public final class ActionSessionImpl implements ActionSession {
 
     if (steps == null || steps.isEmpty()) return;
 
+    Map<String, Object> baseTokens = buildBaseTokens(additionalTokens, gateCtx);
+    for (ActionDefinition.LifecycleStep step : steps) {
+      executeStep(step, gateCtx, baseTokens, terminal);
+    }
+  }
+
+  private void executeTerminalSteps(
+      List<ActionDefinition.LifecycleStep> steps,
+      UUID subject,
+      Map<String, Object> additionalTokens) {
+    if (steps == null || steps.isEmpty()) return;
+
+    Map<String, Object> baseTokens = buildBaseTokens(additionalTokens, null);
+    for (ActionDefinition.LifecycleStep step : steps) {
+      if (step == null) continue;
+      if (step.gateConfig().isEmpty()) {
+        executeStep(step, null, baseTokens, true);
+      } else if (subject != null) {
+        executeStep(step, terminalGateContext(subject), baseTokens, true);
+      } else {
+        for (UUID participantId : participants) {
+          if (!isOnlineParticipant(participantId)) continue;
+          Map<String, Object> scopedTokens = new HashMap<>(baseTokens);
+          scopedTokens.put("player", participantId);
+          scopedTokens.put("player_uuid", participantId);
+          scopedTokens.put(FOR_EACH_PLAYER_SCOPE, participantId);
+          executeStep(step, terminalGateContext(participantId), scopedTokens, true);
+        }
+      }
+    }
+  }
+
+  private boolean isOnlineParticipant(UUID participantId) {
+    RTPServerAccessor accessor = accessor();
+    if (accessor == null) return true;
+    io.github.dailystruggle.rtp.api.entity.RTPPlayer player = accessor.getPlayer(participantId);
+    return player != null && player.isOnline();
+  }
+
+  private ActionGateContext terminalGateContext(UUID participantId) {
+    Double currentX = null;
+    Double currentY = null;
+    Double currentZ = null;
+    Double anchorY = null;
+    double distanceSq = Double.POSITIVE_INFINITY;
+    int[] slot = assignedSlots.get(participantId);
+    if (slot != null && slot.length >= 3) anchorY = (double) slot[1];
+
+    RTPServerAccessor accessor = accessor();
+    io.github.dailystruggle.rtp.api.entity.RTPPlayer player = accessor == null ? null : accessor.getPlayer(participantId);
+    io.github.dailystruggle.rtp.api.world.RTPLocation location =
+        player != null && player.isOnline() ? player.getLocation() : null;
+    if (location != null) {
+      currentX = (double) location.x();
+      currentY = (double) location.y();
+      currentZ = (double) location.z();
+    } else if (slot != null && slot.length >= 3) {
+      currentX = (double) slot[0];
+      currentY = (double) slot[1];
+      currentZ = (double) slot[2];
+    }
+
+    if (currentX != null && currentZ != null) {
+      double dx = currentX - anchorX;
+      double dz = currentZ - anchorZ;
+      distanceSq = dx * dx + dz * dz;
+    }
+    return new ActionGateContext(
+        sessionId,
+        definition.id(),
+        participantId,
+        elapsedSeconds(),
+        remainingSeconds(),
+        getViolations(participantId),
+        participantInBoundsState.getOrDefault(participantId, true),
+        distanceSq,
+        currentX,
+        currentY,
+        currentZ,
+        (double) anchorX,
+        anchorY,
+        (double) anchorZ,
+        participants.size(),
+        context);
+  }
+
+  private Map<String, Object> buildBaseTokens(
+      Map<String, Object> additionalTokens,
+      ActionGateContext gateCtx) {
     Map<String, Object> baseTokens = new HashMap<>(context.metadata());
-    baseTokens.putAll(additionalTokens);
+    if (additionalTokens != null) baseTokens.putAll(additionalTokens);
     baseTokens.put("session_id", sessionId.toString().substring(0, 8));
     if (gateCtx != null && gateCtx.participantId() != null) {
       baseTokens.put("violator", gateCtx.participantId());
@@ -841,12 +1001,10 @@ public final class ActionSessionImpl implements ActionSession {
       baseTokens.put("player_uuid_" + num, pid);
       baseTokens.put("sender_" + num, pid);
       baseTokens.put("sender_uuid_" + num, pid);
-      if (RTPRuntime.serverAccessor() != null) {
-        io.github.dailystruggle.rtp.api.entity.RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(pid);
-        if (player != null && player.name() != null) {
-          baseTokens.put("player_name_" + num, player.name());
-          baseTokens.put("sender_name_" + num, player.name());
-        }
+      String name = playerName(pid);
+      if (name != null) {
+        baseTokens.put("player_name_" + num, name);
+        baseTokens.put("sender_name_" + num, name);
       }
     }
 
@@ -862,90 +1020,110 @@ public final class ActionSessionImpl implements ActionSession {
       baseTokens.put("group_" + entry.getKey().toLowerCase(), entry.getValue());
     }
 
-    for (ActionDefinition.LifecycleStep step : steps) {
-      if (step == null) continue;
-      try {
-        if (gateCtx != null && !GateEvaluator.evaluate(step.gateConfig(), gateCtx, externalPredicates, baseTokens)) {
-          continue; // Gate failed; skip step
-        }
+    return baseTokens;
+  }
 
-        if (step.delaySeconds() > 0L) {
-          // Schedule delayed execution
-          long delayTicks = Math.max(1L, step.delaySeconds() * 20L);
-          RTPRuntime.scheduler().runTaskLater(() -> {
-            if (!terminal && !active.get()) return;
-            if (terminal) {
-              Object pObj = baseTokens.get("player");
-              if (pObj == null) pObj = baseTokens.get("violator");
-              if (pObj instanceof UUID pid && RTPRuntime.serverAccessor() != null) {
-                io.github.dailystruggle.rtp.api.entity.RTPPlayer p = RTPRuntime.serverAccessor().getPlayer(pid);
-                if (p == null || !p.isOnline()) return;
-              } else if (!participants.isEmpty() && RTPRuntime.serverAccessor() != null) {
-                boolean anyOnline = false;
-                for (UUID pid : participants) {
-                  io.github.dailystruggle.rtp.api.entity.RTPPlayer p = RTPRuntime.serverAccessor().getPlayer(pid);
-                  if (p != null && p.isOnline()) {
-                    anyOnline = true;
-                    break;
-                  }
-                }
-                if (!anyOnline) return;
-              }
-            }
-            try {
-              // Re-evaluate gate if context present (e.g. opt-out check)
-              ActionGateContext currentGateCtx = gateCtx;
-              if (currentGateCtx != null && currentGateCtx.participantId() != null) {
-                int currentViolations = getViolations(currentGateCtx.participantId());
-                currentGateCtx = new ActionGateContext(
-                    currentGateCtx.sessionId(),
-                    currentGateCtx.actionId(),
-                    currentGateCtx.participantId(),
-                    elapsedSeconds(),
-                    remainingSeconds(),
-                    currentViolations,
-                    currentGateCtx.inBounds(),
-                    currentGateCtx.distanceSqFromAnchor(),
-                    currentGateCtx.currentX(),
-                    currentGateCtx.currentY(),
-                    currentGateCtx.currentZ(),
-                    currentGateCtx.anchorX(),
-                    currentGateCtx.anchorY(),
-                    currentGateCtx.anchorZ());
-              }
-              if (currentGateCtx != null && !GateEvaluator.evaluate(step.gateConfig(), currentGateCtx, externalPredicates, baseTokens)) {
-                return;
-              }
-              if (step.actions() != null) {
-                for (ActionDefinition.CommandAction cmd : step.actions()) {
-                  if (cmd != null) {
-                    executeGuardedAction(cmd, baseTokens);
-                  }
+  private void executeStep(
+      ActionDefinition.LifecycleStep step,
+      ActionGateContext gateCtx,
+      Map<String, Object> baseTokens,
+      boolean terminal) {
+    if (step == null) return;
+    try {
+      if (gateCtx != null
+          && !GateEvaluator.evaluate(step.gateConfig(), gateCtx, externalPredicates, baseTokens, gateTrace())) {
+        return;
+      }
+
+      if (step.delaySeconds() > 0L) {
+        // Schedule delayed execution
+        long delayTicks = Math.max(1L, step.delaySeconds() * 20L);
+        Runnable delayedTask = () -> {
+          if (!terminal && !active.get()) return;
+          if (terminal) {
+            RTPServerAccessor accessor = accessor();
+            Object pObj = baseTokens.get("player");
+            if (pObj == null) pObj = baseTokens.get("violator");
+            if (pObj instanceof UUID pid && accessor != null) {
+              io.github.dailystruggle.rtp.api.entity.RTPPlayer p = accessor.getPlayer(pid);
+              if (p == null || !p.isOnline()) return;
+            } else if (!participants.isEmpty() && accessor != null) {
+              boolean anyOnline = false;
+              for (UUID pid : participants) {
+                io.github.dailystruggle.rtp.api.entity.RTPPlayer p = accessor.getPlayer(pid);
+                if (p != null && p.isOnline()) {
+                  anyOnline = true;
+                  break;
                 }
               }
-            } catch (Exception ex) {
-              RTPRuntime.log(Level.WARNING, "[RTP Action] Error executing delayed lifecycle step", ex);
+              if (!anyOnline) return;
             }
-          }, delayTicks);
+          }
+          try {
+            // Re-evaluate the gate with current time and violation data, retaining the terminal snapshot.
+            ActionGateContext currentGateCtx = gateCtx;
+            if (currentGateCtx != null && currentGateCtx.participantId() != null) {
+              int currentViolations = getViolations(currentGateCtx.participantId());
+              currentGateCtx = new ActionGateContext(
+                  currentGateCtx.sessionId(),
+                  currentGateCtx.actionId(),
+                  currentGateCtx.participantId(),
+                  elapsedSeconds(),
+                  remainingSeconds(),
+                  currentViolations,
+                  currentGateCtx.inBounds(),
+                  currentGateCtx.distanceSqFromAnchor(),
+                  currentGateCtx.currentX(),
+                  currentGateCtx.currentY(),
+                  currentGateCtx.currentZ(),
+                  currentGateCtx.anchorX(),
+                  currentGateCtx.anchorY(),
+                  currentGateCtx.anchorZ(),
+                  currentGateCtx.participantCount(),
+                  currentGateCtx.context());
+            }
+            if (currentGateCtx != null
+                && !GateEvaluator.evaluate(step.gateConfig(), currentGateCtx, externalPredicates, baseTokens, gateTrace())) {
+              return;
+            }
+            if (step.actions() != null) {
+              for (ActionDefinition.CommandAction cmd : step.actions()) {
+                if (cmd != null) {
+                  executeGuardedAction(cmd, baseTokens);
+                }
+              }
+            }
+          } catch (Exception ex) {
+            RTPRuntime.log(Level.WARNING, "[RTP Action] Error executing delayed lifecycle step", ex);
+          }
+        };
+        if (simulation == null) {
+          RTPRuntime.scheduler().runTaskLater(delayedTask, delayTicks);
         } else {
-          if (step.actions() != null) {
-            for (ActionDefinition.CommandAction cmd : step.actions()) {
-              if (cmd != null) {
-                executeGuardedAction(cmd, baseTokens);
-              }
+          simulation.schedule(delayTicks, delayedTask);
+        }
+      } else {
+        if (step.actions() != null) {
+          for (ActionDefinition.CommandAction cmd : step.actions()) {
+            if (cmd != null) {
+              executeGuardedAction(cmd, baseTokens);
             }
           }
         }
-      } catch (Exception ex) {
-        RTPRuntime.log(Level.WARNING, "[RTP Action] Error evaluating lifecycle step", ex);
       }
+    } catch (Exception ex) {
+      RTPRuntime.log(Level.WARNING, "[RTP Action] Error evaluating lifecycle step", ex);
     }
   }
 
   private void executeGuardedAction(ActionDefinition.CommandAction cmd, Map<String, Object> tokens) {
     try {
       if (ActionPlaceholderSanitizer.hasMissingTarget(cmd.payload(), tokens)) {
-        RTPRuntime.log(Level.FINE, "[RTP Action] Dropping lifecycle command due to missing target: " + cmd.payload());
+        if (simulation != null) {
+          simulation.note("Lifecycle command was omitted because its target was not specified: " + cmd.payload());
+        } else {
+          RTPRuntime.log(Level.FINE, "[RTP Action] Dropping lifecycle command due to missing target: " + cmd.payload());
+        }
         return;
       }
       switch (cmd.type()) {
@@ -956,8 +1134,9 @@ public final class ActionSessionImpl implements ActionSession {
               || cmd.payload().contains("[player_uuid]");
           if (hasPlayerToken && !tokens.containsKey("player") && !participants.isEmpty()) {
             for (UUID pid : participants) {
-              if (RTPRuntime.serverAccessor() != null) {
-                io.github.dailystruggle.rtp.api.entity.RTPPlayer player = RTPRuntime.serverAccessor().getPlayer(pid);
+              RTPServerAccessor accessor = accessor();
+              if (accessor != null) {
+                io.github.dailystruggle.rtp.api.entity.RTPPlayer player = accessor.getPlayer(pid);
                 if (player != null && !player.isOnline()) {
                   continue;
                 }
@@ -976,10 +1155,16 @@ public final class ActionSessionImpl implements ActionSession {
           } else {
             String raw = ActionPlaceholderSanitizer.substitute(cmd.payload(), tokens);
             if (ActionPlaceholderSanitizer.containsUnresolvedPrefix(raw, "target")) {
+              if (simulation != null) simulation.note("Lifecycle command was omitted because a target placeholder was unresolved.");
               return;
             }
             if (ActionPlaceholderSanitizer.containsAnyUnresolvedPlaceholder(raw)) {
-              RTPRuntime.log(Level.WARNING, "[action] dropping console command with unresolved placeholder: " + raw);
+              if (simulation != null) {
+                simulation.note("Lifecycle command was omitted because a placeholder was unresolved: " + raw);
+              } else {
+                ActionCbitCounters.recordUnresolvedPlaceholders(raw);
+                RTPRuntime.log(Level.WARNING, "[action] dropping console command with unresolved placeholder: " + raw);
+              }
               return;
             }
             dispatchConsoleCommand(raw);
@@ -1027,7 +1212,14 @@ public final class ActionSessionImpl implements ActionSession {
                 eliminate(pid);
               }
             }
-            default -> RTPRuntime.log(Level.WARNING, "[RTP Action] Unknown action command: " + actionName);
+            default -> {
+              if (simulation != null) {
+                simulation.note("Unknown action was omitted: " + actionName);
+              } else {
+                ActionCbitCounters.recordUnknownAction(actionName);
+                RTPRuntime.log(Level.WARNING, "[RTP Action] Unknown action command: " + actionName);
+              }
+            }
           }
         }
         case MESSAGE -> {
@@ -1058,18 +1250,22 @@ public final class ActionSessionImpl implements ActionSession {
             if (targetObj instanceof UUID tId) {
               dispatchPlayerMessage(tId, raw);
             } else if (targetObj instanceof String tName) {
-              RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+              RTPServerAccessor accessor = accessor();
               if (accessor != null) {
                 io.github.dailystruggle.rtp.api.entity.RTPPlayer tp = accessor.getPlayer(tName);
                 if (tp != null) {
                   dispatchPlayerMessage(tp.uuid(), raw);
                 }
+              } else if (simulation != null) {
+                simulation.note("Message (not sent to " + tName + "): " + raw);
               }
             }
           }
         }
         case FOR_EACH -> {
-          for (UUID participant : participants) {
+          Object scopedParticipant = tokens.get(FOR_EACH_PLAYER_SCOPE);
+          List<UUID> scopedParticipants = scopedParticipant instanceof UUID pid ? List.of(pid) : participants;
+          for (UUID participant : scopedParticipants) {
             Map<String, Object> perPlayerTokens = new HashMap<>(tokens);
             perPlayerTokens.put("player", participant);
             for (ActionDefinition.CommandAction sub : cmd.subActions()) {
@@ -1080,21 +1276,35 @@ public final class ActionSessionImpl implements ActionSession {
       }
     } catch (Exception e) {
       // Guarded execution: ADR-093 Section 2. Failures log WARNING and never crash script
-      RTPRuntime.log(Level.WARNING, "[RTP Action] Command execution failed for step: " + cmd.payload(), e);
+      if (simulation != null) {
+        simulation.note("Command execution failed for step " + cmd.payload() + ": " + e.getMessage());
+      } else {
+        RTPRuntime.log(Level.WARNING, "[RTP Action] Command execution failed for step: " + cmd.payload(), e);
+      }
     }
   }
 
   private void dispatchConsoleCommand(String commandLine) {
-    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+    if (simulation != null) {
+      if (commandLine != null && !commandLine.isBlank()) simulation.dispatch(commandLine);
+      return;
+    }
+    RTPServerAccessor accessor = accessor();
     if (accessor != null && commandLine != null && !commandLine.isBlank()) {
+      ActionCbitCounters.recordUnresolvedPlaceholders(commandLine);
       RTPRuntime.log(Level.FINE, "[action] dispatching console command: " + commandLine);
       accessor.executeCommand(new UUID(0, 0), commandLine);
     }
   }
 
   private void dispatchPlayerCommand(UUID playerId, String commandLine) {
-    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+    if (simulation != null) {
+      if (commandLine != null && !commandLine.isBlank()) simulation.dispatch(commandLine);
+      return;
+    }
+    RTPServerAccessor accessor = accessor();
     if (accessor != null && commandLine != null && !commandLine.isBlank()) {
+      ActionCbitCounters.recordUnresolvedPlaceholders(commandLine);
       RTPRuntime.log(Level.FINE, "[action] dispatching player command for " + playerId + ": " + commandLine);
       // If a command begins with 'msg ' or 'tell ' without a target player, fallback to sending message directly
       String trimmed = commandLine.trim();
@@ -1114,8 +1324,13 @@ public final class ActionSessionImpl implements ActionSession {
   }
 
   private void dispatchPlayerMessage(UUID playerId, String message) {
-    RTPServerAccessor accessor = RTPRuntime.serverAccessor();
+    if (simulation != null) {
+      if (message != null && !message.isBlank()) simulation.note("Message (not sent): " + message);
+      return;
+    }
+    RTPServerAccessor accessor = accessor();
     if (accessor != null && message != null && !message.isBlank()) {
+      ActionCbitCounters.recordUnresolvedPlaceholders(message);
       accessor.sendMessage(playerId, message);
     }
   }

@@ -21,7 +21,7 @@ maxMSPT: 45.0
 maxHeapPercentuale: 85.0
 
 # --- Impostazioni di prestazione di RTP ---
-# Documentazione: plugins/RTP/docs/admin/configuration/PERFORMANCE.md
+# Documentazione: docs/admin/configuration/PERFORMANCE.md
 # Numero massimo di tentativi di ricerca per invocazione di /rtp prima di rinunciare.
 # @type: integer
 # @range: [1, null]
@@ -29,6 +29,7 @@ maxHeapPercentuale: 85.0
 tentativiMassimi: 32
 
 # Tick tra i riempimenti della stessa regione. Le regioni si alternano.
+# Supporta unità di durata (es. 24h, 1d).
 # @type: integer
 # @range: [1, null]
 # @unit: ticks
@@ -36,6 +37,7 @@ tentativiMassimi: 32
 periodo: 20
 
 # Massimo di ms per tick per il lavoro sul thread principale. Limitato a 25.
+# Supporta unità di durata (es. 24h, 1d).
 # @type: integer
 # @range: [1, 25]
 # @unit: ms
@@ -43,6 +45,7 @@ periodo: 20
 tempoAssegnatoSinc: 5
 
 # Massimo di ms per impulso per il lavoro in background. Limitato a 25.
+# Supporta unità di durata (es. 24h, 1d).
 # @type: integer
 # @range: [1, 25]
 # @unit: ms
@@ -69,6 +72,7 @@ distanzaVisualeTeletrasporto: 0
 # normale dopo l'arrivo, smussando il picco di caricamento chunk. 0 disabilita il limite.
 # NOTA: Forzato temporaneamente a 0. Il ripristino graduale causa sfarfallio /
 # re-rendering lato client all'arrivo. Lascialo a 0 fino a nuovo avviso.
+# Supporta unità di durata (es. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: ticks
@@ -134,6 +138,7 @@ richiamoBiomaForzato: false
 
 # Soglia di latenza (ms) oltre la quale un teletrasporto servito subito viene
 # verificato (WARN registrato, slowPipelineCount incrementato). 0 o meno disabilita.
+# Supporta unità di durata (es. 24h, 1d).
 # @type: integer
 # @range: [0, null]
 # @unit: ms

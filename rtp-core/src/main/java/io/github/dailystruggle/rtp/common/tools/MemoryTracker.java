@@ -93,8 +93,13 @@ public class MemoryTracker {
    * @param maxLifespan the expected maximum lifespan in milliseconds
    */
   public static UUID track(Object target, String label, long maxLifespan) {
+    return track(target, label, maxLifespan, null);
+  }
+
+  /** Tracks an object and invokes {@code leakCallback} once if the active reaper declares it leaking. */
+  public static UUID track(Object target, String label, long maxLifespan, Runnable leakCallback) {
     UUID uuid = UUID.randomUUID();
-    TrackedObject trackedObject = new TrackedObject(target, label, maxLifespan);
+    TrackedObject trackedObject = new TrackedObject(target, label, maxLifespan, leakCallback);
     trackedObjects.put(uuid, trackedObject);
     // Diagram 03: TrackRes node - MemoryTracker.track() registers a freshly opened
     // ChunkReservation (or pipeline task) for the active GC safety net.
@@ -392,6 +397,12 @@ public class MemoryTracker {
                           log(Level.WARNING,
                               "[RTP][GC] Force-disarming stalled ActionSession label={0} ageOverBudgetMs={1}",
                               label, leakDuration);
+                          try {
+                            tracked.runLeakCallback();
+                          } catch (RuntimeException callbackFailure) {
+                            RTPRuntime.log(Level.WARNING,
+                                "[RTP][GC] ActionSession leak callback failed for " + label, callbackFailure);
+                          }
                           session.disarm();
                           return true;
                         }

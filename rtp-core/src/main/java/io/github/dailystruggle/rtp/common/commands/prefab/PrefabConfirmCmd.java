@@ -5,7 +5,9 @@ import io.github.dailystruggle.rtp.api.RTPAPI;
 import io.github.dailystruggle.rtp.api.event.PrefabAppliedEvent;
 import io.github.dailystruggle.rtp.api.event.PrefabChange;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigCandidateGate;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
+import io.github.dailystruggle.rtp.common.commands.reload.ReloadSupport;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigBackups;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
@@ -119,6 +121,32 @@ public class PrefabConfirmCmd extends BaseRTPCmdImpl {
         boolean expandPerWorld = PrefabRegistry.byId(entry.prefabId())
                 .map(Prefab::expandPerWorld).orElse(false);
         String defaultRegionFileId = "definitions/regions/" + MultiWorldExpander.DEFAULT_REGION_ID;
+        Map<String, String> candidateOverlays = new LinkedHashMap<>();
+        for (Map.Entry<String, List<PrefabApplier.Change>> fe : entry.perFileDiff().entrySet()) {
+            String fileId = fe.getKey();
+            List<PrefabApplier.Change> changes = fe.getValue();
+            if (changes.isEmpty()) continue;
+            String templateFileId = (expandPerWorld
+                    && (fileId.startsWith("definitions/regions/") || fileId.startsWith("regions/"))
+                    && !fileId.equals(defaultRegionFileId)) ? defaultRegionFileId : null;
+            String path = pluginDir.toPath().toAbsolutePath().normalize()
+                    .relativize(PrefabDiskIO.resolveFile(pluginDir, fileId).toPath().toAbsolutePath().normalize())
+                    .toString().replace(File.separatorChar, '/');
+            try {
+                candidateOverlays.put(path,
+                        PrefabDiskIO.render(pluginDir, fileId, changes, templateFileId));
+            } catch (IOException renderFailure) {
+                RTPRuntime.log(Level.WARNING, "[prefab] candidate render failed for " + fileId, renderFailure);
+                send(callerId, "&cPrefab apply rejected because " + fileId + " could not be validated.");
+                return false;
+            }
+        }
+        ConfigCandidateGate.Result gate = ConfigCandidateGate.evaluate(pluginDir.toPath(), candidateOverlays);
+        if (gate.rejected()) {
+            ReloadSupport.sendReloadRejected(callerId, gate);
+            return false;
+        }
+
         List<String> writtenFiles = new ArrayList<>();
         List<String> writtenBaks = new ArrayList<>();
         for (Map.Entry<String, List<PrefabApplier.Change>> fe : entry.perFileDiff().entrySet()) {

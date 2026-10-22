@@ -1,5 +1,7 @@
 package io.github.dailystruggle.rtp.proxy.common.selector;
 
+import io.github.dailystruggle.rtp.common.selection.region.util.DurationParser;
+import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
 import io.github.dailystruggle.rtp.proxy.common.selector.curve.Curve;
 import io.github.dailystruggle.rtp.proxy.common.selector.curve.Curves;
 
@@ -11,6 +13,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TreeMap;
+import java.util.logging.Logger;
 
 /**
  * Parses a {@link LoadBalancerConfig} from the {@code loadBalancer} subtree of
@@ -58,6 +61,7 @@ import java.util.TreeMap;
  * </ol>
  */
 public final class LoadBalancerConfigYaml {
+    private static final Logger LOG = Logger.getLogger(LoadBalancerConfigYaml.class.getName());
 
     private LoadBalancerConfigYaml() {}
 
@@ -70,7 +74,7 @@ public final class LoadBalancerConfigYaml {
         if (lb == null || lb.isEmpty()) return LoadBalancerConfig.defaults();
         LoadBalancerConfig d = LoadBalancerConfig.defaults();
 
-        long staleAfterMs    = asLong  (lb.get("staleAfterMs"),     d.staleAfterMs());
+        long staleAfterMs    = asDurationMs(lb.get("staleAfterMs"), d.staleAfterMs());
         double msptW         = asDouble(lb.get("msptWeight"),        d.msptWeight());
         double queueW        = asDouble(lb.get("queueDepthWeight"),  d.queueDepthWeight());
         double heapW         = asDouble(lb.get("heapWeight"),        d.heapWeight());
@@ -181,13 +185,16 @@ public final class LoadBalancerConfigYaml {
         return fallback;
     }
 
-    private static long asLong(Object o, long fallback) {
+    private static long asDurationMs(Object o, long fallback) {
         if (o == null) return fallback;
-        if (o instanceof Number n) return n.longValue();
-        if (o instanceof String s && !s.isBlank()) {
-            try { return Long.parseLong(s.trim()); } catch (NumberFormatException ignored) {}
+        DurationParser.ParsedDuration parsed =
+                DurationParser.parse(String.valueOf(o), TemporalUnit.MILLISECOND);
+        double millis = parsed == null ? Double.NaN : parsed.toMillis();
+        if (!Double.isFinite(millis) || millis < -0x1.0p63 || millis >= 0x1.0p63) {
+            LOG.warning("Invalid loadBalancer.staleAfterMs duration '" + o + "'; using " + fallback + " ms");
+            return fallback;
         }
-        return fallback;
+        return Math.round(millis);
     }
 
     // Suppress unused-import warning when not all helpers are wired.

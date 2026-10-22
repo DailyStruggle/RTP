@@ -1,5 +1,6 @@
 package io.github.dailystruggle.rtp.common.selection.region;
 
+import io.github.dailystruggle.rtp.api.world.ChunkSet;
 import io.github.dailystruggle.rtp.api.world.RTPCoords;
 import io.github.dailystruggle.rtp.api.world.RTPWorld;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
@@ -18,11 +19,13 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.concurrent.CompletableFuture;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
@@ -74,6 +77,83 @@ class LoginCacheTaskGenerationBudgetTest {
         new LoginCacheTask(spyRegion).promoteUpTo(1);
 
         verify(spyWorld).getChunkAtAsync(anyInt(), anyInt());
+        assertEquals(1, region.queueManager.unkeptLocations.size());
+        assertEquals(0, region.inFlightCalculations.get());
+        assertEquals(0, budget.inFlight());
+    }
+
+    @Test
+    @DisplayName("RTP-80: null login-load future releases the reservation and requeues the location")
+    void nullLoadFutureReleasesReservationAndRequeuesLocation() {
+        GenerationBudget budget = GenerationBudget.server();
+        Region region = createRegionWithColdLocation();
+        RTPWorld<?> spyWorld = spy(world);
+        Region spyRegion = spy(region);
+        doReturn(spyWorld).when(spyRegion).getWorld();
+        doReturn(null).when(spyWorld).getChunkAtAsync(anyInt(), anyInt());
+
+        new LoginCacheTask(spyRegion).promoteUpTo(1);
+
+        assertFailedPromotionReleased(region, budget);
+    }
+
+    @Test
+    @DisplayName("RTP-80: null login-load result releases the reservation and requeues the location")
+    void nullChunkSetReleasesReservationAndRequeuesLocation() {
+        GenerationBudget budget = GenerationBudget.server();
+        Region region = createRegionWithColdLocation();
+        RTPWorld<?> spyWorld = spy(world);
+        Region spyRegion = spy(region);
+        doReturn(spyWorld).when(spyRegion).getWorld();
+        CompletableFuture<ChunkSet> loadFuture = CompletableFuture.completedFuture(null);
+        doReturn(loadFuture).when(spyWorld).getChunkAtAsync(anyInt(), anyInt());
+
+        new LoginCacheTask(spyRegion).promoteUpTo(1);
+
+        assertFailedPromotionReleased(region, budget);
+    }
+
+    @Test
+    @DisplayName("RTP-80: null completion future releases the reservation and requeues the location")
+    void nullCompletionReleasesReservationAndRequeuesLocation() {
+        GenerationBudget budget = GenerationBudget.server();
+        Region region = createRegionWithColdLocation();
+        RTPWorld<?> spyWorld = spy(world);
+        Region spyRegion = spy(region);
+        ChunkSet chunkSet = mock(ChunkSet.class);
+        doReturn(null).when(chunkSet).complete();
+        doReturn(spyWorld).when(spyRegion).getWorld();
+        doReturn(CompletableFuture.completedFuture(chunkSet))
+                .when(spyWorld).getChunkAtAsync(anyInt(), anyInt());
+
+        new LoginCacheTask(spyRegion).promoteUpTo(1);
+
+        assertFailedPromotionReleased(region, budget);
+    }
+
+    @Test
+    @DisplayName("RTP-80: empty login promotion releases its reservation without entering flight")
+    void emptyUnkeptQueueReleasesReservation() {
+        GenerationBudget budget = GenerationBudget.server();
+        Region region = createRegion();
+        region.queueManager.loginLocations = new LockFreeLocationBuffer(10);
+
+        new LoginCacheTask(region).promoteUpTo(1);
+
+        assertEquals(0, region.inFlightCalculations.get());
+        assertEquals(0, budget.inFlight());
+        assertEquals(0, region.queueManager.unkeptLocations.size());
+    }
+
+    private Region createRegionWithColdLocation() {
+        Region region = createRegion();
+        region.queueManager.loginLocations = new LockFreeLocationBuffer(10);
+        region.queueManager.unkeptLocations.offer(new RTPLocation(
+                new RTPCoords(world.name(), 16, 0, 16), 1L, null));
+        return region;
+    }
+
+    private void assertFailedPromotionReleased(Region region, GenerationBudget budget) {
         assertEquals(1, region.queueManager.unkeptLocations.size());
         assertEquals(0, region.inFlightCalculations.get());
         assertEquals(0, budget.inFlight());

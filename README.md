@@ -72,7 +72,7 @@ Speed is the obvious part. These are the other things it's built to get right.
 - **Web editor.** `/rtp editor` opens your config in a browser. Drag the region border on a map of your world, review the exact YAML change before applying it, and get a backup of every file it touches. Like the LuckPerms and spark editors, it needs no open ports ([web editor](docs/admin/WEB_EDITOR_GUIDE.md)).
 - **Admin menu.** `/rtp admin` is one book menu for setup presets, a config browser, diagnostics, scans and reload. From the console, `/rtp config <section> key=value` does the same ([in-game config](docs/admin/configuration/IN_GAME_CONFIG.md)).
 - **Safeguards.** The setup wizard (`/rtp admin setup`) shows a preview and backs up your config before it writes. Presets can be rolled back, and the editor rejects shapes that cross themselves or leave the world border.
-- **In-game help.** `/rtp info` shows what each region is doing. The full admin guide is unpacked to `plugins/RTP/docs/` on first run and can be read inside the web editor.
+- **In-game help.** `/rtp info` shows what each region is doing. The full admin guide is unpacked to `docs/` in the config folder on first run and can be read inside the web editor.
 - **Migration.** `/rtp config import` reads a BetterRTP, JustRTP or EzRTP config folder, even with the old plugin removed, and moves worlds, radius, cooldowns, prices and effects across, backing up anything it replaces. `/rtp config import permissions` prints the LuckPerms commands for the old permission nodes.
 
 ---
@@ -228,7 +228,7 @@ For the details (selection algorithm, threading model, design decisions), see [H
 
 ## Documentation
 
-**<https://dailystruggle.github.io/RTP/>** - searchable, and rebuilt on every merge. The same pages also ship inside the jar under `plugins/RTP/docs/`, so they work offline and always match your installed version.
+**<https://dailystruggle.github.io/RTP/>** - searchable, and rebuilt on every merge. The same pages also ship inside the jar and unpack to `plugins/RTP/docs/` (`config/rtp/docs/` on Fabric / NeoForge), so they work offline and always match your installed version.
 
 | I want to... | Start here |
 |---|---|

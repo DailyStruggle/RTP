@@ -96,6 +96,21 @@ public class ConfigsTest {
     }
 
     @Test
+    void initialLoadRecordsYamlFindingBeforeParserRecovery() throws IOException {
+        Configs configs = ActiveConfigs.get();
+        configs.configParserMap.clear();
+        configs.multiConfigParserMap.clear();
+        configs.fileDatabase.cachedLookup.get().clear();
+        configs.fileDatabase.cachedLookupLastModified.get().clear();
+        Files.writeString(tempDir.resolve("config.yml"), "radius: [1, 2\n");
+
+        configs.reloadConfigs();
+
+        assertTrue(configs.startupYamlFindings().stream().anyMatch(finding ->
+                finding.source().equals("config.yml") && finding.code().equals("RTP_YAML_UNPARSABLE")));
+    }
+
+    @Test
     void testGetParserLoggingKeys() {
         FactoryValue<LoggingKeys> loggingParser = ActiveConfigs.get().getParser(LoggingKeys.class);
         assertNotNull(loggingParser, "LoggingKeys parser should be registered after reloadConfigs()");

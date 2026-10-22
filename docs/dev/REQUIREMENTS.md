@@ -63,6 +63,7 @@ For specific code-level and platform-specific requirements, please refer to the 
 ### 1.5 Configuration
 - **REQ-RTP-F-013 — Configurable User Messages:** The system shall allow all user-facing messages to be configurable via the `messages.yml` configuration file.
 - **REQ-RTP-F-014 — Foreign Configuration & Permission Import:** The system shall provide an explicit, non-destructive migration mechanism (`/rtp config import <plugin>`) capable of translating third-party random teleport configurations (BetterRTP, JustRTP, EzRTP, JakesRTP) and permissions into native RTP configuration trees and permissions without modifying or clobbering existing customized configs without confirmation (ADR-066).
+- **REQ-RTP-F-016 — Human-Readable Config Durations:** Runtime-read duration settings shall accept explicit duration units supported by the shared parser. Bare numbers shall retain each setting's documented unit, and invalid values shall be surfaced by the owning configuration reader and handled using its documented fallback or validation contract.
 
 ### 1.6 Network / Proxy Support
 
@@ -172,5 +173,5 @@ These requirements describe prohibited behaviours. Each maps to one or more haza
   instead.
 
 ## 4. System Requirements
-- **REQ-RTP-SYS-001 — Runtime Environment:** The system shall run on Java 17 or higher, together with the Java runtime that the host Minecraft version itself requires (Java 17 for 1.18-1.20.4, Java 21 for 1.20.5-1.21.x, Java 25 for 26.x). The shared platform-neutral modules (`rtp-api`, `rtp-core`, `anvil-api`, `yaml-api`, `commands-api`, `effects-api`, `metrics-api`, `bstats-api`, `maps-api`, `rtp-proxy-common`), the pre-1.20.5 platform carriers with their common modules, and the `rtp-plugin` entry points shall compile to Java 17 bytecode (classfile 61) per [ADR-113](../adr/ADR-113-java-17-baseline-and-26x-support-boundary.md).
+- **REQ-RTP-SYS-001 — Runtime Environment:** The system shall run on Java 17 or higher, together with the Java runtime that the host Minecraft version itself requires (Java 17 for 1.18-1.20.4, Java 21 for 1.20.5-1.21.x, Java 25 for 26.x). The shared platform-neutral modules (`rtp-api`, `rtp-core`, `anvil-api`, `yaml-api`, `units-api`, `commands-api`, `effects-api`, `metrics-api`, `bstats-api`, `maps-api`, `rtp-proxy-common`), the pre-1.20.5 platform carriers with their common modules, and the `rtp-plugin` entry points shall compile to Java 17 bytecode (classfile 61) per [ADR-113](../adr/ADR-113-java-17-baseline-and-26x-support-boundary.md).
 - **REQ-RTP-SYS-002 — Server Software:** The system shall be compatible with Bukkit-derived server software (Spigot, Paper, and Folia), with Fabric, and with NeoForge. All platforms are delivered through dedicated native platform adapters; rationale and decisions are recorded in [rtp-fabric-ADR-002](../../platforms/rtp-fabric/docs/adr/rtp-fabric-ADR-002-platform-in-scope.md) and [ADR-033](../adr/ADR-033-neoforge-platform-in-scope.md).

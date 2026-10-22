@@ -1,5 +1,5 @@
 # --- RTP Economy Settings ---
-# Documentation: plugins/RTP/docs/admin/configuration/ECONOMY.md
+# Documentation: docs/admin/configuration/ECONOMY.md
 
 # Cost for a /rtp.
 # @type: number

@@ -319,7 +319,8 @@ public class RTP {
             long cap = cfg.getNumber(ConfigKeys.lockAfterUses, 0L).longValue();
             if (cap > 0) {
               long resetMillis =
-                  cfg.getNumber(ConfigKeys.lockAfterResetSeconds, 0L).longValue() * 1000L;
+                  ConfigParser.parseSecondsDurationMillis(
+                      cfg.getConfigValue(ConfigKeys.lockAfterResetSeconds, 0L), 0L);
               if (ActiveDatabase.teleportLimitStore().isLocked(
                   uuid, cap, resetMillis, System.currentTimeMillis())) {
                 future.complete(io.github.dailystruggle.rtp.api.RTPResult.failure(

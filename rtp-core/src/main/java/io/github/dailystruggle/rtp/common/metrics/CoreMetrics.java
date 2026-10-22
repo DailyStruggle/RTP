@@ -8,6 +8,7 @@ import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import io.github.dailystruggle.rtp.common.selection.ActiveSelection;
 import io.github.dailystruggle.rtp.common.selection.region.Region;
 import io.github.dailystruggle.rtp.common.selection.region.RegionQueueManager;
+import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -93,7 +94,8 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
             ConfigParser<PerformanceKeys> perf =
                     (ConfigParser<PerformanceKeys>) ActiveConfigs.get().getParser(PerformanceKeys.class);
             if (perf == null) return 5000L;
-            return perf.getNumber(PerformanceKeys.slowPipelineThresholdMs, 5000L).longValue();
+            return perf.getDuration(PerformanceKeys.slowPipelineThresholdMs,
+                    TemporalUnit.MILLISECOND, TemporalUnit.MILLISECOND, 5000L);
         } catch (Throwable ignored) {
             return 5000L;
         }
@@ -262,6 +264,7 @@ public final class CoreMetrics implements io.github.dailystruggle.metrics.api.Me
                 .probeGovernors(io.github.dailystruggle.rtp.common.selection.region.ProbeFirstGovernor.snapshotAll())
                 .liveLoadGates(io.github.dailystruggle.rtp.common.selection.region.LiveLoadGate.snapshotAll())
                 .immediateGovernors(io.github.dailystruggle.rtp.common.selection.region.ImmediateLoadGovernor.snapshotAll())
+                .actionCbit(io.github.dailystruggle.rtp.common.action.ActionCbitCounters.snapshot())
                 .build());
         // Compose sibling-plugin extensions registered via Metrics.registerExtension(...).
         // Suppliers are evaluated in registration order; nulls are skipped; failures are swallowed.

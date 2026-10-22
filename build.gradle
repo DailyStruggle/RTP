@@ -110,7 +110,7 @@ subprojects {
     // providers, which every platform instantiates before the family filter.
     // Tests are not shipped and stay on the toolchain level.
     def java17Modules = [
-            ':rtp-api', ':server-api', ':rtp-core', ':anvil-api', ':bit-api', ':yaml-api', ':commands-api',
+            ':rtp-api', ':server-api', ':rtp-core', ':anvil-api', ':bit-api', ':yaml-api', ':units-api', ':commands-api',
             ':effects-api', ':metrics-api', ':bstats-api', ':maps-api',
             ':rtp-proxy:rtp-proxy-common',
             ':rtp-bukkit:rtp-bukkit-common', ':rtp-bukkit:rtp-bukkit-v1_20_R1',
@@ -350,6 +350,9 @@ subprojects {
             // yaml-api measured: 97.0% instruction / 88.1% branch.
             // Sits at 0.92/0.80. ENTERPRISE_READINESS.md 4.2 item 7.
             ':yaml-api': [instruction: 0.92, branch: 0.80],
+            // units-api measured via jacocoTestReport (2026-10-22): 86.3% instruction /
+            // 67.9% branch. CacheMemoryCost's RTP-dependent tests remain in rtp-core.
+            ':units-api': [instruction: 0.85, branch: 0.66],
             // tags-api measured: 98.2% instruction / 90.9% branch.
             // Sits at Stage A target (0.95/0.85). ENTERPRISE_READINESS.md 4.2 item 8.
             ':tags-api': [instruction: 0.95, branch: 0.85],
@@ -516,10 +519,10 @@ subprojects {
 // For a "real" registry (Maven Central) see docs/dev/PUBLISHING.md.
 //
 // Closure rationale (transitive `api`/`implementation` project edges):
-//   rtp-api  -> server-api, commands-api, yaml-api, metrics-api
+//   rtp-api  -> server-api, commands-api, yaml-api, units-api, metrics-api
 //   anvil-api -> bit-api
 //   rtp-core -> rtp-api, anvil-api, bit-api, commands-api, yaml-api, effects-api,
-//               metrics-api, bstats-api, maps-api, rtp-proxy:rtp-proxy-common
+//               metrics-api, bstats-api, maps-api, units-api, rtp-proxy:rtp-proxy-common
 //   rtp-proxy-common   -> rtp-api
 // Every coordinate that can appear in a generated POM must itself be published,
 // otherwise a consumer's transitive resolution fails. commands-api and
@@ -534,6 +537,7 @@ def publishedModulePaths = [
         ':commands-api',
         ':effects-api',
         ':yaml-api',
+        ':units-api',
         ':metrics-api',
         ':bstats-api',
         ':maps-api',

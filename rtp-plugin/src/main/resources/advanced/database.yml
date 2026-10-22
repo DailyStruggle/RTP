@@ -1,5 +1,5 @@
 # --- RTP Database / Persistence Configuration ---
-# Documentation: plugins/RTP/docs/admin/configuration/CORE_CONFIG.md
+# Documentation: docs/admin/configuration/CORE_CONFIG.md
 
 # Where RTP saves its data.
 database:

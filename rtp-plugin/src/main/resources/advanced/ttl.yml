@@ -1,5 +1,5 @@
 # --- RTP Spatial Memory TTL Settings ---
-# Documentation: plugins/RTP/docs/admin/configuration/TTL.md
+# Documentation: docs/admin/configuration/TTL.md
 
 # Base retention durations for rejected coordinate runs in spatial memory.
 # Supported duration formats: e.g. 14d, 12h, 30m, 3600s, 40t, 2500ms, or composite 1d12h.

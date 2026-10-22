@@ -62,7 +62,9 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** A NeoForge server can hang and crash with no player action beyond joining.
 - **Vanilla reproduction without RTP (2026-10-21, same world, all mods removed):** `forceload add` on random chunks within +-10,000 blocks, sent one at a time over RCON, does the same thing. 105 of 130 forceloads went in before one `forceload add` held the main thread in `ServerChunkCache.getChunk` -> `managedBlock` for 180 s, and the watchdog crashed the server (`crash-2026-10-21_20.54.42`, 22 of 23 `Worker-Main` threads parked, no mod frames). In a second copy, 40 forceloads then a bot join gave a 60.8 s ("1215 ticks behind") join tick; the bot stayed connected. So the hang is vanilla 1.21.1 behaviour once roughly 40-100 ticketed chunks in fresh terrain are queued; RTP's part is how many tickets its fill holds, which is the budget to fix.
 - **Attribution (2026-10-21, same world copied twice, bot joins 60 s after start):** with RTP removed the join costs one 2 s "Can't keep up" and the bot stays connected; with RTP (including the generation budget and stuck-tick pause added that day) the join tick runs 129 s and the bot times out. RTP-driven chunk writes in the first two minutes: about 14,000 with RTP, about 600 without. The budget counts only the centre chunk future of each RTP load, and the check lags the load (8 promotions pass one pulse's check before the async probe reaches the counter). Likely uncounted sources: the restart re-pin of saved kept locations and the generation cascade each RTP ticket causes around its chunk (`RTP_TICKET_DISTANCE` 1, so about radius 11 of partial generation per ticket).
-- **Suggested next step:** On hold-back hosts, take a budget slot when a promotion or re-pin is decided (not when the load reaches the adapter), count ticket applications, and pace the restart re-pin through the same budget. Re-run the A/B above to confirm.
+- **Partial fix (2026-10-22, in the working tree):** `LoginCacheTask` promotions and the `RegionQueueManager.validateTickets` re-pin now take a `GenerationBudget` slot before they dispatch a load. The re-pin runs as one sweep that resumes through `RTP.scheduler` when slots free up. On NeoForge, `TicketGenerationWatch` counts each ticket's non-resident footprint until it is resident, cancelled or past its TTL.
+- **A/B rerun (2026-10-22, `neoforge-ctrl` world copied per run, 6G, bot joins 60 s after boot and stays 150 s):** no RTP: bot spawns at 1.0 s, no stall. Jar from 2026-10-21 15:37: bot never spawns (socket closed at 31 s), 180 s tick, watchdog crash (`crash-2026-10-22_15.57.12`). Current build, two runs: bot spawns at 12.9 s and 13.5 s and stays connected, worst ticks 12.5 s and 13.0 s, no crash. RTP's tick-stuck / unhealthy pauses fired and generation resumed once the tick recovered. Chunk writes over about 3.5 minutes were 27,859 and 18,001 with the current build and 810 without RTP; the old jar's 1,945 is not comparable because it crashed before its final save. Harness: `scripts/tmp/livecheck/ab.sh` (gitignored).
+- **Suggested next step:** The crash is gone, but the join still stalls about 13 s where vanilla stalls 0 s. Find what fills the chunk workers in the first minute: count ticket applications and generation-cascade chunks against the budget during the A/B, and try a lower budget cap or a later fill start after boot on hold-back hosts. Clears when a rerun shows a join tick comparable to the no-RTP baseline.
 - **Linear:** RTP-80
 
 ### 2026-10-21 - ConfigParser recompiles a regex in a hot string operation
@@ -195,6 +197,7 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** When the centre chunk is an Anvil view (`reservation == null`), `evaluateSafety` runs on the async worker, but neighbour slots can hold live resident chunks whose `isSafe` reads touch live block state. Neighbours that belong to another Folia region than the centre were also read from the centre's thread before ADR-112.
 - **Impact:** Possible `ThreadAccessException` or racy reads at `safetyRadius > 0` near loaded areas; candidates are rejected rather than accepted, so S-001 holds.
 - **Suggested next step:** Read neighbours from Anvil views or snapshots only, or dispatch each live neighbour's column check to its own region and join the results off-thread.
+- **Linear:** RTP-92
 
 ### 2026-10-14 - Folia arrival platform writes blocks in one unbudgeted destination-region task
 
@@ -205,6 +208,7 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** After `teleportAsync` completes on the destination region, the emergency platform is built inline with nested `runTask` per chunk and `setType` loops sized by `platformRadius`. It is player-facing, so the new per-region budget only charges it.
 - **Impact:** Many simultaneous arrivals in one region with large platforms can still extend that region's tick.
 - **Suggested next step:** Measure with the stress harness; if it shows, split block writes across ticks per chunk or cap writes per tick.
+- **Linear:** RTP-93
 
 ### 2026-10-16 — Package tangles: selection.region is mutually coupled with cache, claim, database, tools and shapes
 
@@ -238,7 +242,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** Operators who copy the inline-map trigger example from older docs lose the action with no hint why.
 - **Suggested next step:** Carry the parse exception from the file database to this warning and log its message key and line.
 - **Linear:** RTP-73
-
 
 ### 2026-10-18 - `gif-preset.sh` exits silently when no LeafRTP-Pro jar is present
 
@@ -307,7 +310,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Suggested next step:** Let the fuzzer pick the chunk coordinates (`FuzzedDataProvider`); add a prefilter target asserting the verdict is never ACCEPT on malformed data; narrow the tolerated exceptions; add targets for YAML, editor JSON and the network envelope first.
 - **Linear:** RTP-28
 
-
 ### 2026-10-07 — Web editor reference materialize does not support native undo/redo
 
 - **Severity:** Low
@@ -319,7 +321,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Suggested next step:** Replace editor line text using `document.execCommand('insertText', false, replacement)` across the selected line range (with fallback to `setRangeText`), and dispatch an `input` event. This preserves the browser's native undo stack on the textarea while ensuring geometry synchronization (`applyYamlGeometry`), gutter diagnostics, and diff updates execute cleanly without requiring extra server-roundtrip data.
 - **Linear:** RTP-31
 
-
 ### 2026-10-07 — Bare /rtp early guard enforces global cooldown when destination region override is shorter
 
 - **Severity:** Low
@@ -330,7 +331,6 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Impact:** Players cannot take advantage of shorter region-specific cooldown overrides when executing bare `/rtp`; they are held to the longer global cooldown unless they invoke an explicit target override (e.g. `/rtp region:<name>`), which bypasses the early guard.
 - **Suggested next step:** Resolve the sender's current world default region in `RTPCmd.onCommand` when evaluating the early cooldown guard for bare `/rtp`, or delegate cooldown enforcement for bare `/rtp` entirely to the `compute()` pipeline phase.
 - **Linear:** RTP-32
-
 
 ### 2026-10-12 - FoliaSchedulerImpl.runTask regional cap is check-then-increment and re-queues at a fixed 50 ms
 
@@ -468,15 +468,5 @@ Entries in the *Open* section are ordered by **priority** (highest first): runti
 - **Symptom / hypothesis:** The row predates the Pro support tier (ADR-100, ADR-108), which sells priority support. README and the storefront pages say it is offered.
 - **Impact:** Buyers and readers get contradictory answers about paid support.
 - **Suggested next step:** Point the row at the BuiltByBit Pro listing and describe what it covers, matching the README wording.
-
-### 2026-10-21 - `TicketFootprint.ticketDistance` serializes cache refresh
-
-- **Severity:** Low
-- **Status:** Open
-- **Discovered during:** ADR-121 delivery step 8 CI-parity gate
-- **Location:** `rtp-core/src/main/java/io/github/dailystruggle/rtp/common/selection/region/TicketFootprint.java` line 30, `ticketDistance()`
-- **Symptom / hypothesis:** PMD `PreferNonLockingExecution` rejects the synchronized cache refresh. When the one-second snapshot expires, region maps are scanned while holding the class monitor, so concurrent callers wait for that traversal.
-- **Impact:** The full CI gate fails `:rtp-core:pmdMain`; concurrent ticket-distance checks may also experience a short delay during refresh.
-- **Suggested next step:** Replace the monitor-protected refresh with an atomic snapshot compare-and-set, preserving the cached radius while avoiding a lock around the region scan.
 
 <!-- Append new entries above this comment, ordered by priority (highest severity first). Resolved entries are deleted, not archived. -->

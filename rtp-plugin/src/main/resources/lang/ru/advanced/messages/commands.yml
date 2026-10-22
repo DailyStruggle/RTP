@@ -511,5 +511,6 @@ editorApplyFetching: "&7[P0] Получение данных конфигура�
 editorApplyValidating: "&7[P0] Проверка целостности и синтаксиса данных..."
 editorApplySuccess: "&a[P0] Конфигурация применена и перезагружена на лету! (созданы копии .bak изменённых файлов)"
 editorApplyFailed: "&c[P0] Не удалось применить данные: [reason]"
+editorApplyRejected: "&c[P0] Применение отклонено: ошибок конфигурации: [count]; ничего не записано. Первая: [code] в [source], путь [path]."
 
 version: 1.0

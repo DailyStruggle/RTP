@@ -4,7 +4,7 @@ import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.SafetyKeys;
 import io.github.dailystruggle.rtp.common.playerData.TeleportSessions;
-import java.util.concurrent.TimeUnit;
+import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -23,9 +23,10 @@ public class OnPlayerDamage implements Listener {
 
     ConfigParser<SafetyKeys> safety =
         (ConfigParser<SafetyKeys>) ActiveConfigs.get().getParser(SafetyKeys.class);
-    long max = safety.getNumber(SafetyKeys.invulnerabilityTime, 0).longValue();
+    long maxMillis = safety.getDuration(SafetyKeys.invulnerabilityTime,
+        TemporalUnit.SECOND, TemporalUnit.MILLISECOND, 0L);
 
-    if (max <= 0) {
+    if (maxMillis <= 0) {
       TeleportSessions.current().invulnerablePlayers.remove(entity.getUniqueId());
       return;
     }
@@ -33,7 +34,7 @@ public class OnPlayerDamage implements Listener {
     long dt = current - lastTeleport;
     if (dt < 0) dt = dt - Long.MIN_VALUE;
 
-    if (dt < TimeUnit.SECONDS.toMillis(max)) event.setCancelled(true);
+    if (dt < maxMillis) event.setCancelled(true);
     else TeleportSessions.current().invulnerablePlayers.remove(entity.getUniqueId());
   }
 }

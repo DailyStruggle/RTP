@@ -6,6 +6,8 @@ import io.github.dailystruggle.rtp.common.factory.FactoryNames;
 import io.github.dailystruggle.rtp.common.factory.FactoryRegistry;
 import io.github.dailystruggle.rtp.common.factory.FactoryValue;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
+import io.github.dailystruggle.rtp.common.selection.region.util.DurationParser;
+import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -32,6 +34,7 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
   private static final Pattern UNSAFE_NAME_CHARS = Pattern.compile("[:\\\\/*?\"<>|]");
   private static final Pattern VERSION_LINE_INDENTED = Pattern.compile("(?i)\\s*+version\\s*+:.*+");
   private static final Pattern VERSION_LINE = Pattern.compile("(?i)version\\s*:.*");
+  private static final Set<String> LOGGED_INVALID_DURATIONS = ConcurrentHashMap.newKeySet();
 
   /** The file database used by this parser */
   public final YamlFileDatabase fileDatabase;
@@ -1354,6 +1357,55 @@ public class ConfigParser<E extends Enum<E>> extends FactoryValue<E> implements 
     long ms = parseDurationMillis(s, Long.MIN_VALUE);
     if (ms == Long.MIN_VALUE) return defMillis;
     return Math.max(ms, 0L);
+  }
+
+  /**
+   * Parses a duration into {@code targetUnit}. Bare numbers use {@code bareUnit}; suffixed and
+   * composite values retain their expressed units. Negative values are preserved for sentinel
+   * settings such as platform restoration's {@code -1}.
+   *
+   * @param input configured number or duration string
+   * @param bareUnit unit assigned to values without suffixes
+   * @param targetUnit unit requested by the caller
+   * @param def fallback when the input is missing or invalid
+   * @return rounded duration in {@code targetUnit}, or {@code def}
+   */
+  public static long parseDuration(
+      Object input, TemporalUnit bareUnit, TemporalUnit targetUnit, long def) {
+    Long parsed = parseDurationValue(input, bareUnit, targetUnit);
+    return parsed == null ? def : parsed;
+  }
+
+  private static Long parseDurationValue(
+      Object input, TemporalUnit bareUnit, TemporalUnit targetUnit) {
+    if (input == null) return null;
+    Objects.requireNonNull(bareUnit, "bareUnit");
+    Objects.requireNonNull(targetUnit, "targetUnit");
+    String text = input.toString().trim();
+    if (text.isEmpty()) return null;
+    if (text.equalsIgnoreCase("infinite") || text.equalsIgnoreCase("permanent")) return -1L;
+    DurationParser.ParsedDuration parsed = DurationParser.parse(text, bareUnit);
+    if (parsed == null) return null;
+    double value = parsed.toSeconds() / targetUnit.getSecondsPerUnit();
+    return Double.isFinite(value) ? Math.round(value) : null;
+  }
+
+  /**
+   * Retrieves and converts a configured duration, warning once per key/value when it is invalid.
+   * The fallback is already in {@code targetUnit} and is returned unchanged when the key is absent.
+   */
+  public long getDuration(E key, TemporalUnit bareUnit, TemporalUnit targetUnit, long def) {
+    Object value = getConfigValue(key, null);
+    if (value == null) return def;
+    Long parsed = parseDurationValue(value, bareUnit, targetUnit);
+    if (parsed != null) return parsed;
+    String warningKey = key.getDeclaringClass().getName() + '.' + key.name() + '=' + value;
+    if (LOGGED_INVALID_DURATIONS.add(warningKey)) {
+      RTPRuntime.log(Level.WARNING,
+          "[RTP] invalid duration config value for " + key.name() + ": " + value
+              + "; using " + def);
+    }
+    return def;
   }
 
   /**

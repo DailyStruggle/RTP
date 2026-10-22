@@ -2,10 +2,12 @@ package io.github.dailystruggle.rtp.common.commands.setup;
 
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.rtp.common.RTP;
+import io.github.dailystruggle.rtp.common.bit.config.ConfigCandidateGate;
 import io.github.dailystruggle.rtp.common.commands.base.BaseRTPCmdImpl;
 import io.github.dailystruggle.rtp.common.commands.prefab.Prefab;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabApplier;
 import io.github.dailystruggle.rtp.common.commands.prefab.PrefabDiskIO;
+import io.github.dailystruggle.rtp.common.commands.reload.ReloadSupport;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.runtime.RTPRuntime;
 import org.jetbrains.annotations.Nullable;
@@ -14,6 +16,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -92,6 +95,26 @@ public class SetupConfirmCmd extends BaseRTPCmdImpl {
             String defaultRegionFileId = "definitions/regions/" + io.github.dailystruggle.rtp.common.commands.prefab.MultiWorldExpander.DEFAULT_REGION_ID;
 
             try {
+                Map<String, String> candidateOverlays = new LinkedHashMap<>();
+                for (Map.Entry<String, List<PrefabApplier.Change>> entry : diff.entrySet()) {
+                    String fileId = entry.getKey();
+                    if (result.newTrees().get(fileId) == null) continue;
+                    String templateFileId = (fileId.startsWith("definitions/regions/")
+                            && !fileId.equals(defaultRegionFileId)) ? defaultRegionFileId : null;
+                    String path = baseDir.toPath().toAbsolutePath().normalize()
+                            .relativize(PrefabDiskIO.resolveFile(baseDir, fileId).toPath().toAbsolutePath().normalize())
+                            .toString().replace(File.separatorChar, '/');
+                    candidateOverlays.put(path, PrefabDiskIO.render(
+                            baseDir, fileId, entry.getValue(), templateFileId));
+                }
+                ConfigCandidateGate.Result gate = ConfigCandidateGate.evaluate(baseDir.toPath(), candidateOverlays);
+                if (gate.rejected()) {
+                    ReloadSupport.sendReloadRejected(callerId, gate);
+                    SetupHandlerSupport.sendMessage(callerId,
+                            "&c[RTP Setup] No setup files were written because the candidate config was rejected.");
+                    return;
+                }
+
                 for (Map.Entry<String, List<PrefabApplier.Change>> entry : diff.entrySet()) {
                     String fileId = entry.getKey();
                     Map<String, Object> newTree = result.newTrees().get(fileId);

@@ -52,11 +52,13 @@ transport:
 # Backend heartbeat / peer-staleness cadence (shared by every transport tier).
 heartbeat:
   # Как часто этот бэкенд публикует свою строку состояния (мс).
+  # Поддерживает единицы времени (например, 24h, 1d).
   # @type: integer
   # @default: 1000
   intervalMs: 1000
 
   # Как долго последнее известное состояние узла остаётся доверенным, прежде чем считаться неизвестным (мс); держите выше intervalMs.
+  # Поддерживает единицы времени (например, 24h, 1d).
   # @type: integer
   # @default: 5000
   staleAfterMs: 5000
@@ -82,11 +84,13 @@ queue:
   maxDepth: 50
 
   # Частота сброса отложенных записей бэкенда (мс); ниже = меньше задержка, выше = меньше обращений к транспорту.
+  # Поддерживает единицы времени (например, 24h, 1d).
   # @type: integer
   # @default: 250
   flushIntervalMs: 250
 
   # Частота опроса кэша состояния бэкенда (мс); как часто обновляется прогресс по каждому игроку.
+  # Поддерживает единицы времени (например, 24h, 1d).
   # @type: integer
   # @default: 1000
   pollIntervalMs: 1000
@@ -114,11 +118,13 @@ queue:
 # Reservation-token lifecycle.
 reservation:
   # Частота очистки по TTL на стороне прокси (мс); удаляет истёкшие токены и освобождает их координаты.
+  # Поддерживает единицы времени (например, 24h, 1d).
   # @type: integer
   # @default: 30000
   reapIntervalMs: 30000
 
   # TTL на токен (мс); запрошенная, но не использованная бронь старше этого значения освобождается как брошенная.
+  # Поддерживает единицы времени (например, 24h, 1d).
   # @type: integer
   # @default: 60000
   ttlMs: 60000
@@ -304,6 +310,7 @@ editor:
   # Trusted web editor browsers (/rtp editor trust, /rtp editor untrust).
   trust:
     # Days a browser stays trusted after /rtp editor trust. 0 = never expires.
+    # Поддерживает единицы времени (например, 24h, 1d).
     # @type: integer
     # @default: 0
     maxAgeDays: 0

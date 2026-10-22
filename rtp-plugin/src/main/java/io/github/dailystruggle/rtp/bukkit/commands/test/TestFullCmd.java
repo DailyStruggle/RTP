@@ -48,10 +48,11 @@ import org.jetbrains.annotations.Nullable;
  * {@link #runStep(UUID, int, FullAudit)} in the same
  * change. Today the shipped set is {@link TestSchedulerCmd} and
  * {@link TestStressCmd}; {@link TestCancelCmd} is deliberately excluded
- * (invoking cancel inside the sweep would abort the sweep itself), and
+ * (invoking cancel inside the sweep would abort the sweep itself),
  * {@link TestReloadSafetyCmd} is excluded because it requires
  * {@code rtp.test.admin} and intentionally courts failures that would
- * swamp a default operator run.
+ * swamp a default operator run, and {@code action} is excluded because it
+ * requires an explicitly selected action definition.
  *
  * <p>Permission is {@code rtp.test.full} rather than {@code rtp.test} so
  * operators can grant per-subcommand access without granting the aggregate
@@ -74,8 +75,9 @@ public class TestFullCmd extends BaseRTPCmdImpl {
    * {@link TestCmd}'s registration set without having to initialise
    * {@link RTPRuntime#serverAccessor()}.
    *
-   * <p>Deliberately excluded: {@code cancel} (would abort the sweep itself)
-   * and {@code reload-safety} (admin-only, intentionally noisy).
+   * <p>Deliberately excluded: {@code cancel} (would abort the sweep itself),
+   * {@code reload-safety} (admin-only, intentionally noisy), and {@code action}
+   * (requires a selected action id and is exercised by its dedicated simulation tests).
    */
   static final List<String> SHIPPED_SUBCOMMAND_NAMES =
       Collections.unmodifiableList(
@@ -118,8 +120,12 @@ public class TestFullCmd extends BaseRTPCmdImpl {
               // subcommands that do not yet publish BIT components.
               "all",
               "status",
+              // Requires an explicitly selected action id; its isolated simulation has dedicated tests.
+              "action",
               // A player-targeted teleport changes the caller's location and is not a group check.
               "teleport",
+              // Heavy mock sampling performs real location selection and chunk I/O; run only when named.
+              "teleport-heatmap",
               // Visual diagnostic: spawns holograms in player world context.
               "hologram",
               // Player-context diagnostic: needs the caller's live world + origin

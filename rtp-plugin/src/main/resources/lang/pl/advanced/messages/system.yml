@@ -18,6 +18,7 @@ nowySwiat: "&b[P0] wykryto nowy świat '[world]'"
 przeladowywanie: "&b[P0] wczytywanie [filename]..."
 przeladowano: "&b[P0] pomyślnie wczytano [filename]."
 reloadFailed: "&c[P0] Nie udało się ponownie wczytać konfiguracji. Sprawdź dziennik serwera."
+reloadRejected: "&c[P0] Odrzucono przeładowanie: błędy konfiguracji: [count]; bieżąca konfiguracja pozostaje aktywna. Pierwszy: [code] w [source] w [path]. Szczegóły: /rtp test subsystem=config"
 aktualizowanie: "&a[P0] aktualizowanie [filename]..."
 zaktualizowano: "&a[P0] pomyślnie zaktualizowano [filename]."
 

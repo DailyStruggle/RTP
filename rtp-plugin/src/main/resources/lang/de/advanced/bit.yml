@@ -1,0 +1,21 @@
+# --- Konfiguration der integrierten Tests (BIT) ---
+# Dokumentation: docs/admin/configuration/BIT.md
+
+# Protokolliert strukturelle Aktionsbefunde als Warnungen, ohne die Registrierung zu blockieren.
+# Auf true setzen, damit Aktionen mit einem effektiven Fehler nicht registriert werden.
+strictActions: false
+
+# Protokolliert Konfigurationsbefunde, die ältere Versionen akzeptierten, als Warnungen, ohne /rtp reload abzulehnen.
+# Auf true setzen, um sie als Fehler zu behandeln; ein Neuladen oder Hot-Apply mit Fehlern behält die laufende Konfiguration.
+strictConfig: false
+
+# Mindestanzahl der Stichproben, bevor ein Gate als immer oder nie bestanden gilt.
+gateOutcomeSamples: 200
+
+# Schweregrade für registrierte BIT-Codes; diese Einstellung hat Vorrang vor strictActions.
+# Zulässig: ERROR, WARNING, INFO, DEBUG, TRACE und OFF. OFF unterdrückt den Befund.
+# Unbekannte Codes und Stufen werden ignoriert und protokolliert.
+overrides:
+
+# VERSIONSNUMMER NICHT ÄNDERN
+version: 1.0

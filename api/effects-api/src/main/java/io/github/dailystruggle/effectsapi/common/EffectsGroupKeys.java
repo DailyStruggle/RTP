@@ -12,7 +12,7 @@ package io.github.dailystruggle.effectsapi.common;
  *
  * <ul>
  *   <li>{@link #version}    schema version (must match the on-disk default).</li>
- *   <li>{@link #when}       pipeline stage token (one of:
+ *   <li>{@link #when}       pipeline stage token ({@link EffectStage}, one of:
  *       {@code firstjoin / join / presetup / postsetup / preload / postload /
  *        preteleport / postteleport / cancel / queuepush / queuepop / death}).</li>
  *   <li>{@link #permission} optional permission node gating membership.</li>

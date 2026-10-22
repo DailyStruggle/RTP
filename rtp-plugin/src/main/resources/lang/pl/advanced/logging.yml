@@ -46,7 +46,7 @@ zdarzenie_ruch: true
 zdarzenie_teleportacja: true
 
 # --- Przełączniki logowania pluginu ---
-# Documentation: plugins/RTP/docs/admin/configuration/CONFIGURATION.md#loggingyml--console-logging-verbosity
+# Documentation: docs/admin/configuration/CONFIGURATION.md#loggingyml--console-logging-verbosity
 # Loguj wszystkie pliki przeładowane podczas /rtp reload
 # @type: boolean
 # @default: false

@@ -3,6 +3,7 @@ package io.github.dailystruggle.rtp.common.tasks.tick;
 import io.github.dailystruggle.rtp.common.configuration.ActiveConfigs;
 import io.github.dailystruggle.rtp.common.configuration.ConfigParser;
 import io.github.dailystruggle.rtp.common.configuration.enums.PerformanceKeys;
+import io.github.dailystruggle.rtp.common.selection.region.util.TemporalUnit;
 
 import java.util.concurrent.TimeUnit;
 
@@ -37,10 +38,12 @@ public final class TickBudget {
       return;
     }
     try {
-      syncNanos = toNanos(perf.getNumber(PerformanceKeys.syncAllottedTime, DEFAULT_SYNC_MS).longValue());
-      asyncNanos = toNanos(perf.getNumber(PerformanceKeys.asyncAllottedTime, DEFAULT_ASYNC_MS).longValue());
-      long p = ConfigParser.parseDurationTicks(
-          perf.getConfigValue(PerformanceKeys.period, DEFAULT_PERIOD_TICKS), DEFAULT_PERIOD_TICKS);
+      syncNanos = toNanos(perf.getDuration(PerformanceKeys.syncAllottedTime,
+          TemporalUnit.MILLISECOND, TemporalUnit.MILLISECOND, DEFAULT_SYNC_MS));
+      asyncNanos = toNanos(perf.getDuration(PerformanceKeys.asyncAllottedTime,
+          TemporalUnit.MILLISECOND, TemporalUnit.MILLISECOND, DEFAULT_ASYNC_MS));
+      long p = perf.getDuration(PerformanceKeys.period,
+          TemporalUnit.TICK, TemporalUnit.TICK, DEFAULT_PERIOD_TICKS);
       periodTicks = Math.max(1L, p);
     } catch (Throwable t) {
       clear();

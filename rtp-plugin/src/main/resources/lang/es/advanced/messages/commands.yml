@@ -509,5 +509,6 @@ editorApplyFetching: "&7[P0] Obteniendo la carga de configuración..."
 editorApplyValidating: "&7[P0] Validando la integridad y la sintaxis de la carga..."
 editorApplySuccess: "&a[P0] ¡Configuración aplicada y recargada en caliente! (se crearon copias .bak de los archivos modificados)"
 editorApplyFailed: "&c[P0] No se pudo aplicar la carga: [reason]"
+editorApplyRejected: "&c[P0] Aplicación rechazada: [count] error(es) de configuración; no se escribió nada. Primero: [code] en [source] en [path]."
 
 version: 1.0

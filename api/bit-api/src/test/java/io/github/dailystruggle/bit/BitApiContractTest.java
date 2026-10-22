@@ -9,16 +9,22 @@ import java.lang.System.Logger.Level;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 class BitApiContractTest {
     @Test
+    @DisplayName("REQ-API-F-009: Vocabulary suggestions honor an explicit edit-distance limit")
     void vocabularyMatchesCaseInsensitivelyAndSuggestsNearestValue() {
         Vocabulary keys = new Vocabulary("step key", List.of("CONSOLE", "MESSAGE", "FOR_EACH"));
 
         assertTrue(keys.contains("console"));
         assertEquals("MESSAGE", keys.suggest("MESAGE").orElseThrow());
         assertTrue(keys.suggest("not-a-step-key").isEmpty());
+
+        Vocabulary objectives = new Vocabulary("objective", List.of("rtp_violations"));
+        assertEquals("rtp_violations", objectives.suggest("rtp_violatons", 1).orElseThrow());
+        assertTrue(objectives.suggest("rtp_violatons", 0).isEmpty());
     }
 
     @Test

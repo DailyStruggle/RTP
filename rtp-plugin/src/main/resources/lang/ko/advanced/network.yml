@@ -52,11 +52,13 @@ transport:
 # Backend heartbeat / peer-staleness cadence (shared by every transport tier).
 heartbeat:
   # 이 백엔드가 상태 행을 게시하는 빈도(ms).
+  # 기간 단위를 지원합니다 (예: 24h, 1d).
   # @type: integer
   # @default: 1000
   intervalMs: 1000
 
   # 피어의 마지막 확인 상태가 알 수 없음으로 처리되기 전까지 신뢰되는 시간(ms). intervalMs보다 크게 유지하세요.
+  # 기간 단위를 지원합니다 (예: 24h, 1d).
   # @type: integer
   # @default: 5000
   staleAfterMs: 5000
@@ -82,11 +84,13 @@ queue:
   maxDepth: 50
 
   # 백엔드 대기 쓰기 플러시 주기(ms). 낮을수록 지연이 줄고, 높을수록 전송 왕복이 줄어듭니다.
+  # 기간 단위를 지원합니다 (예: 24h, 1d).
   # @type: integer
   # @default: 250
   flushIntervalMs: 250
 
   # 백엔드 상태 캐시 폴링 주기(ms). 플레이어별 진행 상황을 새로 고치는 빈도.
+  # 기간 단위를 지원합니다 (예: 24h, 1d).
   # @type: integer
   # @default: 1000
   pollIntervalMs: 1000
@@ -114,11 +118,13 @@ queue:
 # Reservation-token lifecycle.
 reservation:
   # 프록시 측 TTL 수거기 주기(ms). 만료된 토큰을 정리하고 좌표를 해제합니다.
+  # 기간 단위를 지원합니다 (예: 24h, 1d).
   # @type: integer
   # @default: 30000
   reapIntervalMs: 30000
 
   # 토큰별 TTL(ms). 요청되었으나 사용되지 않은 예약이 이보다 오래되면 버려진 것으로 해제됩니다.
+  # 기간 단위를 지원합니다 (예: 24h, 1d).
   # @type: integer
   # @default: 60000
   ttlMs: 60000
@@ -304,6 +310,7 @@ editor:
   # Trusted web editor browsers (/rtp editor trust, /rtp editor untrust).
   trust:
     # Days a browser stays trusted after /rtp editor trust. 0 = never expires.
+    # 기간 단위를 지원합니다 (예: 24h, 1d).
     # @type: integer
     # @default: 0
     maxAgeDays: 0

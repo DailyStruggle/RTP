@@ -4,6 +4,7 @@ import io.github.dailystruggle.bit.BitComponent;
 import io.github.dailystruggle.bit.BitOutput;
 import io.github.dailystruggle.bit.BitOutputs;
 import io.github.dailystruggle.bit.BitResult;
+import io.github.dailystruggle.bit.BitTier;
 import io.github.dailystruggle.commandsapi.common.CommandsAPICommand;
 import io.github.dailystruggle.commandsapi.common.parameters.BooleanParameter;
 import io.github.dailystruggle.rtp.api.RTPAPI;
@@ -50,6 +51,9 @@ public class TestStatusCmd extends BaseRTPCmdImpl {
     if (components.isEmpty()) {
       output.writeEmpty("registered", line -> emit(callerId, line));
       return true;
+    }
+    for (BitComponent component : components) {
+      if (component.tier() == BitTier.CBIT) RtpBit.RUNNER.run(component, Runnable::run);
     }
     if (!json) {
       BitTableOutput.emit(callerId, BitTableOutput.rows(components, RtpBit.RUNNER::last));

@@ -1,0 +1,21 @@
+# --- Configuratie van ingebouwde tests (BIT) ---
+# Documentatie: docs/admin/configuration/BIT.md
+
+# Registreert structurele actievondsten als waarschuwingen zonder registratie te blokkeren.
+# Stel in op true om registratie van acties met een effectieve fout te voorkomen.
+strictActions: false
+
+# Logt configuratiebevindingen die oudere versies accepteerden als waarschuwingen, zonder /rtp reload te weigeren.
+# Zet op true om ze als fouten te behandelen; herladen of Hot-Apply met fouten behoudt de actieve configuratie.
+strictConfig: false
+
+# Minimaal aantal metingen voordat een poort als altijd of nooit geslaagd geldt.
+gateOutcomeSamples: 200
+
+# Ernstniveaus voor geregistreerde BIT-codes; deze hebben voorrang op strictActions.
+# Toegestaan: ERROR, WARNING, INFO, DEBUG, TRACE en OFF. OFF onderdrukt de vondst.
+# Onbekende codes en niveaus worden genegeerd en gelogd.
+overrides:
+
+# VERSIENUMMER NIET WIJZIGEN
+version: 1.0

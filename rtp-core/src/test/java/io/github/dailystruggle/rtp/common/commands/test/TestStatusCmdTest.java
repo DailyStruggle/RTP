@@ -7,7 +7,9 @@ import io.github.dailystruggle.bit.BitReport;
 import io.github.dailystruggle.bit.BitSideEffect;
 import io.github.dailystruggle.bit.BitTier;
 import io.github.dailystruggle.rtp.api.RTPAPI;
+import io.github.dailystruggle.rtp.common.action.ActionCbitCounters;
 import io.github.dailystruggle.rtp.common.bit.RtpBit;
+import io.github.dailystruggle.rtp.common.bit.RtpBitComponents;
 import io.github.dailystruggle.rtp.common.mock.MockRTPServerAccessor;
 import io.github.dailystruggle.rtp.common.mock.RTPTestSetup;
 import java.io.File;
@@ -63,5 +65,20 @@ class TestStatusCmdTest {
         message.contains("[RTP bit/test.") && message.contains("\"component\":\"accessor\"")));
     assertTrue(accessor.logMessages.stream().noneMatch(message ->
         message.contains("[RTP test/accessor]")));
+  }
+
+  @Test
+  void statusRefreshesActionCbitFromLiveCounters() {
+    RtpBitComponents.registerDefaults();
+    ActionCbitCounters.reset();
+    ActionCbitCounters.recordUnknownAction("status_test_unknown");
+    try {
+      new TestStatusCmd(null).onCommand(RTPAPI.serverId, Map.of(), null);
+
+      assertTrue(accessor.logMessages.stream().anyMatch(message ->
+          message.contains("action-cbit") && message.contains("DEGRADED")));
+    } finally {
+      ActionCbitCounters.reset();
+    }
   }
 }

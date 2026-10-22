@@ -11,7 +11,7 @@ question belongs and how to ask it so you actually get a useful answer.
 Check these first. Most questions are already answered:
 
 1. **Documentation site** (searchable) — <https://dailystruggle.github.io/RTP/>.
-   The same pages ship inside the jar under `plugins/RTP/docs/` and live in this
+   The same pages ship inside the jar (unpacked to `plugins/RTP/docs/`, or `config/rtp/docs/` on Fabric / NeoForge) and live in this
    repo under [`docs/`](docs/). They replace the old GitHub Wiki.
 2. **Server-admin docs** — <https://dailystruggle.github.io/RTP/FOR_SERVER_ADMINS/>
    ([`docs/FOR_SERVER_ADMINS.md`](docs/FOR_SERVER_ADMINS.md)) and the rest of
